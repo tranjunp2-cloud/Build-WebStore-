@@ -5,18 +5,16 @@ import {
     Bold, Italic, Underline,
     AlignLeft, AlignCenter, AlignRight, AlignJustify
 } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 interface RichTextToolbarProps {
     onCommand: (command: string, value?: string) => void
     activeState?: Record<string, unknown>
 }
 
-const TAG_LABELS: Record<string, string> = {
-    H1: 'Heading 1', H2: 'Heading 2', H3: 'Heading 3', H4: 'Heading 4',
-    P: 'Paragraph', SPAN: 'Paragraph', DIV: 'Paragraph',
-}
-
 export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbarProps) {
+    const { t } = useI18n()
+    const rt = t.editor.richText
     const isActive = (cmd: string) => Boolean(activeState[cmd])
     const currentTag = String(activeState.formatBlock || 'P').toUpperCase()
     const currentValue = ['H1', 'H2', 'H3', 'H4'].includes(currentTag) ? currentTag : 'P'
@@ -35,11 +33,11 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onCommand('formatBlock', e.target.value)}
                 className="w-[110px] h-8 text-xs border-0 bg-transparent hover:bg-gray-100 focus:ring-0 cursor-pointer outline-none"
             >
-                <option value="H1">Heading 1</option>
-                <option value="H2">Heading 2</option>
-                <option value="H3">Heading 3</option>
-                <option value="H4">Heading 4</option>
-                <option value="P">Paragraph</option>
+                <option value="H1">{rt.heading1}</option>
+                <option value="H2">{rt.heading2}</option>
+                <option value="H3">{rt.heading3}</option>
+                <option value="H4">{rt.heading4}</option>
+                <option value="P">{rt.paragraph}</option>
             </select>
 
             <div className="w-px h-6 bg-gray-200 mx-1" />
@@ -47,21 +45,21 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
             <button
                 className={`p-1.5 rounded transition-colors ${isActive('bold') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('bold') }}
-                title="Bold"
+                title={rt.bold}
             >
                 <Bold className="w-4 h-4" />
             </button>
             <button
                 className={`p-1.5 rounded transition-colors ${isActive('italic') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('italic') }}
-                title="Italic"
+                title={rt.italic}
             >
                 <Italic className="w-4 h-4" />
             </button>
             <button
                 className={`p-1.5 rounded transition-colors ${isActive('underline') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('underline') }}
-                title="Underline"
+                title={rt.underline}
             >
                 <Underline className="w-4 h-4" />
             </button>
@@ -71,28 +69,28 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
             <button
                 className={`p-1.5 rounded transition-colors ${isAlign('left') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('justifyLeft') }}
-                title="Align Left"
+                title={rt.alignLeft}
             >
                 <AlignLeft className="w-4 h-4" />
             </button>
             <button
                 className={`p-1.5 rounded transition-colors ${isAlign('center') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('justifyCenter') }}
-                title="Align Center"
+                title={rt.alignCenter}
             >
                 <AlignCenter className="w-4 h-4" />
             </button>
             <button
                 className={`p-1.5 rounded transition-colors ${isAlign('right') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('justifyRight') }}
-                title="Align Right"
+                title={rt.alignRight}
             >
                 <AlignRight className="w-4 h-4" />
             </button>
             <button 
                 className={`p-1.5 rounded transition-colors ${isAlign('justify') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('justifyFull') }}
-                title="Justify"
+                title={rt.justify}
             >
                 <AlignJustify className="w-4 h-4" />
             </button>

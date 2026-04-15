@@ -39,10 +39,7 @@ export const GET = withAuth(async (user) => {
             limit: 100,
         })
 
-        // Filter out soft-deleted categories
-        const activeCategories = result.docs.filter((doc: any) => doc.status !== 'deleted')
-
-        return NextResponse.json({ success: true, data: activeCategories })
+        return NextResponse.json({ success: true, data: result.docs })
     } catch (error) {
         console.error('GET /api/blog-categories error:', error)
         return NextResponse.json(
@@ -76,7 +73,10 @@ export const POST = withAuth(async (user, req) => {
         // Check for duplicate slug
         const existing = await payload.find({
             collection: 'blog_categories',
-            where: { slug: { equals: slug }, tenant: { equals: resolvedTenantId } },
+            where: {
+                slug: { equals: slug },
+                tenant: { equals: resolvedTenantId },
+            },
             limit: 1,
         })
         if (existing.docs.length > 0) {

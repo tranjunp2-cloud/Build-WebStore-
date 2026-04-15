@@ -7,6 +7,7 @@ const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:adminprimeweb@yopmail
 let vapidConfigured = false
 
 interface PushPayload {
+  id: string
   title: string
   body?: string
   tag: string
@@ -60,6 +61,7 @@ export async function sendPushToUser(
     })
 
     const pushData = JSON.stringify({
+      id: pushPayload.id,
       title: pushPayload.title,
       body: pushPayload.body || '',
       tag: pushPayload.tag,

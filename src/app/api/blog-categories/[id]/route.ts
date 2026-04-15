@@ -54,7 +54,7 @@ export const PATCH = withAuth<RouteContext>(async (user, req, ctx) => {
 })
 
 /**
- * DELETE /api/blog-categories/[id] — Delete a category (unsets from related blogs)
+ * DELETE /api/blog-categories/[id] — Delete a category, reassign posts to Uncategorized
  */
 export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
     try {
@@ -74,11 +74,11 @@ export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
             )
         }
 
-        // Cascade: unset category from all posts referencing this category (TC-F17-05-06)
+        // Unset category from all posts referencing this category
         const affected = await payload.find({
             collection: 'blogs',
             where: { category: { equals: id } },
-            limit: 0,
+            limit: 500,
             depth: 0,
         })
 
@@ -94,16 +94,13 @@ export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
             )
         }
 
-        // Soft delete category
-        await payload.update({
-            collection: 'blog_categories',
-            id,
-            data: { status: 'deleted' },
-        })
+        // Hard delete the category
+        await payload.delete({ collection: 'blog_categories', id })
 
         return NextResponse.json({ success: true, data: { deleted: id, affectedPosts: affected.docs.length } })
-    } catch (error: any) {
-        if (error?.message?.includes('not found') || error?.status === 404) {
+    } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error)
+        if (msg.includes('not found')) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', details: 'Category not found' } },
                 { status: 404 }

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import { deleteBlogCategoryAction, getCategoryPublishedPostCountAction } from '../actions'
 
 type Category = {
     id: string
@@ -34,13 +35,14 @@ export default function BlogCategoriesPage() {
     const [isUpdating, setIsUpdating] = useState(false)
 
     // Delete modal state
-    const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; publishedCount: number } | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [fetchingDeleteId, setFetchingDeleteId] = useState<string | null>(null)
 
     const fetchCategories = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('/api/blog-categories', { credentials: 'include' })
+            const res = await fetch('/api/blog-categories', { credentials: 'include', cache: 'no-store' })
             if (!res.ok) throw new Error('fetch failed')
             const json = await res.json()
             setCategories(json.data || [])
@@ -66,14 +68,16 @@ export default function BlogCategoriesPage() {
                 body: JSON.stringify({ name: newName.trim() }),
             })
             const json = await res.json()
-            if (!res.ok) throw new Error(json.error?.details || cp.toastCreateFail)
+            if (!res.ok) {
+                toast.error(cp.toastCreateFail)
+                return
+            }
             toast.success(cp.toastCreated.replace('{name}', newName.trim()))
             setNewName('')
             setShowCreateInput(false)
             fetchCategories()
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : cp.toastCreateFail
-            toast.error(msg)
+        } catch {
+            toast.error(cp.toastCreateFail)
         } finally {
             setIsCreating(false)
         }
@@ -95,15 +99,29 @@ export default function BlogCategoriesPage() {
                 body: JSON.stringify({ name: editName.trim() }),
             })
             const json = await res.json()
-            if (!res.ok) throw new Error(json.error?.details || cp.toastUpdateFail)
+            if (!res.ok) {
+                toast.error(cp.toastUpdateFail)
+                return
+            }
             toast.success(cp.toastUpdated)
             setEditingId(null)
             fetchCategories()
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : cp.toastUpdateFail
-            toast.error(msg)
+        } catch {
+            toast.error(cp.toastUpdateFail)
         } finally {
             setIsUpdating(false)
+        }
+    }
+
+    const openDeleteModal = async (cat: Category) => {
+        setFetchingDeleteId(cat.id)
+        try {
+            const publishedCount = await getCategoryPublishedPostCountAction(cat.id)
+            setDeleteTarget({ id: cat.id, name: cat.name, publishedCount })
+        } catch {
+            setDeleteTarget({ id: cat.id, name: cat.name, publishedCount: 0 })
+        } finally {
+            setFetchingDeleteId(null)
         }
     }
 
@@ -111,14 +129,14 @@ export default function BlogCategoriesPage() {
         if (!deleteTarget) return
         setIsDeleting(true)
         try {
-            const res = await fetch(`/api/blog-categories/${deleteTarget.id}`, {
-                method: 'DELETE',
-                credentials: 'include',
-            })
-            if (!res.ok) throw new Error(cp.toastDeleteFail)
+            const res = await deleteBlogCategoryAction(deleteTarget.id)
+            if (res.error) {
+                toast.error(cp.toastDeleteFail)
+                return
+            }
             toast.success(cp.toastDeleted.replace('{name}', deleteTarget.name))
+            setCategories(prev => prev.filter(c => c.id !== deleteTarget.id))
             setDeleteTarget(null)
-            fetchCategories()
         } catch {
             toast.error(cp.toastDeleteFail)
         } finally {
@@ -171,7 +189,7 @@ export default function BlogCategoriesPage() {
                                             className={`flex flex-col p-[12px] gap-[12px] border-[1px] border-[#374151] hover:bg-white/5 transition-colors group ${roundedClass}`}
                                         >
                                             {editingId === cat.id ? (
-                                                <div className="flex flex-row items-center gap-[12px]">
+                                                <div className="flex flex-row items-center gap-[12px] overflow-hidden">
                                                     <input
                                                         value={editName}
                                                         onChange={e => setEditName(e.target.value)}
@@ -180,12 +198,12 @@ export default function BlogCategoriesPage() {
                                                             if (e.key === 'Escape') setEditingId(null)
                                                         }}
                                                         autoFocus
-                                                        className="flex-1 px-[12px] py-[4px] h-[26px] bg-[rgba(255,255,255,0.1)] border-[1px] border-[rgba(255,255,255,0.3)] rounded-[12px] font-['Inter'] font-[500] text-[12px] text-[#FFFFFF] outline-none"
+                                                        className="flex-1 min-w-0 px-[12px] py-[4px] h-[26px] bg-[rgba(255,255,255,0.1)] border-[1px] border-[rgba(255,255,255,0.3)] rounded-[12px] font-['Inter'] font-[500] text-[12px] text-[#FFFFFF] outline-none"
                                                     />
-                                                    <button onClick={handleUpdate} disabled={!editName.trim() || isUpdating} className="text-cyan-400 p-[4px] hover:bg-white/10 rounded">
+                                                    <button onClick={handleUpdate} disabled={!editName.trim() || isUpdating} className="shrink-0 text-cyan-400 p-[4px] hover:bg-white/10 rounded">
                                                         {isUpdating ? <Loader2 className="w-[14px] h-[14px] animate-spin" /> : <Check className="w-[14px] h-[14px]" />}
                                                     </button>
-                                                    <button onClick={() => setEditingId(null)} className="text-[#9F9FA9] p-[4px] hover:bg-white/10 rounded">
+                                                    <button onClick={() => setEditingId(null)} className="shrink-0 text-[#9F9FA9] p-[4px] hover:bg-white/10 rounded">
                                                         <X className="w-[14px] h-[14px]" />
                                                     </button>
                                                 </div>
@@ -202,10 +220,14 @@ export default function BlogCategoriesPage() {
                                                             <Pencil className="w-[14px] h-[14px]" />
                                                         </button>
                                                         <button
-                                                            onClick={() => setDeleteTarget(cat)}
-                                                            className="text-[#9F9FA9] hover:text-red-400 p-[4px]"
+                                                            onClick={() => openDeleteModal(cat)}
+                                                            disabled={fetchingDeleteId === cat.id}
+                                                            className="text-[#9F9FA9] hover:text-red-400 p-[4px] disabled:opacity-50"
                                                         >
-                                                            <Trash2 className="w-[14px] h-[14px]" />
+                                                            {fetchingDeleteId === cat.id
+                                                                ? <Loader2 className="w-[14px] h-[14px] animate-spin" />
+                                                                : <Trash2 className="w-[14px] h-[14px]" />
+                                                            }
                                                         </button>
                                                     </div>
                                                 </div>
@@ -219,17 +241,17 @@ export default function BlogCategoriesPage() {
 
                     {/* Add new Category */}
                     {showCreateInput ? (
-                        <div className="flex flex-row items-center gap-[12px] w-full mt-[8px]">
-                            <Plus className="w-[24px] h-[24px] text-white opacity-50" strokeWidth={1.5} />
+                        <div className="flex flex-row items-center gap-[12px] w-full mt-[8px] overflow-hidden">
+                            <Plus className="w-[24px] h-[24px] shrink-0 text-white opacity-50" strokeWidth={1.5} />
                             <input
                                 value={newName}
                                 onChange={e => setNewName(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
                                 autoFocus
                                 placeholder={cp.namePlaceholder}
-                                className="flex-1 bg-transparent font-['Inter'] font-[600] text-[14px] text-[#FFFFFF] outline-none placeholder-[#9F9FA9] border-b-[1px] border-b-[rgba(255,255,255,0.2)] pb-[4px]"
+                                className="flex-1 min-w-0 bg-transparent font-['Inter'] font-[600] text-[14px] text-[#FFFFFF] outline-none placeholder-[#9F9FA9] border-b-[1px] border-b-[rgba(255,255,255,0.2)] pb-[4px]"
                             />
-                            <div className="flex gap-[4px]">
+                            <div className="flex shrink-0 gap-[4px]">
                                 <button onClick={handleCreate} disabled={!newName.trim() || isCreating} className="p-[4px] text-cyan-400 hover:bg-white/10 rounded">
                                     {isCreating ? <Loader2 className="w-[16px] h-[16px] animate-spin" /> : <Check className="w-[16px] h-[16px]" />}
                                 </button>
@@ -274,8 +296,16 @@ export default function BlogCategoriesPage() {
                             </button>
                         </div>
                         <p className="text-[14px] text-gray-400 mb-[8px]">
-                            {cp.deleteConfirm} <span className="text-white font-bold">&quot;{deleteTarget.name}&quot;</span>?
+                            {cp.deleteConfirm.replace('{name}', deleteTarget.name)}
                         </p>
+                        {deleteTarget.publishedCount > 0 && (
+                            <div className="mb-4 flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-4 py-3">
+                                <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-yellow-400">
+                                    {cp.deletePublishedWarning.replace('{count}', String(deleteTarget.publishedCount))}
+                                </p>
+                            </div>
+                        )}
                         <p className="text-[13px] text-gray-500 mb-[24px]">
                             {cp.deleteWarning}
                         </p>
@@ -301,6 +331,7 @@ export default function BlogCategoriesPage() {
                     </div>
                 </div>
             )}
+
         </div>
     )
 }

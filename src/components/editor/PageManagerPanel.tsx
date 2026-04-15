@@ -111,8 +111,11 @@ export function PageManagerPanel({
             })
 
             if (!res.ok) {
-                const errorText = await res.text()
-                throw new Error(errorText || 'Failed to create page')
+                if (res.status === 409) {
+                    toast.error(t.editor.pageManagerPanel.slugConflict)
+                    return
+                }
+                throw new Error(`HTTP ${res.status}`)
             }
 
             const data = await res.json()
@@ -130,7 +133,8 @@ export function PageManagerPanel({
 
             onPagesChanged?.()
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Error creating page')
+            console.error('[PageManagerPanel] Create page failed:', err)
+            toast.error(t.editor.pageManagerPanel.createError)
         } finally {
             setIsSubmitting(false)
         }
@@ -231,9 +235,9 @@ export function PageManagerPanel({
             <div className="border-b border-white/10 px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <p className="text-sm font-semibold text-white">Page Manager</p>
+                        <p className="text-sm font-semibold text-white">{t.editor.pageManagerPanel.title}</p>
                         <p className="mt-1 text-xs text-gray-500">
-                            Create, select, hide, and soft-delete pages for this site.
+                            {t.editor.pageManagerPanel.description}
                         </p>
                     </div>
                     <FileText className="h-4 w-4 text-blue-400" />
@@ -298,9 +302,9 @@ export function PageManagerPanel({
                 {isEmptyState ? (
                     <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/5 px-6 text-center">
                         <FileText className="h-8 w-8 text-gray-600" />
-                        <p className="mt-4 text-sm font-medium text-white">No pages found</p>
+                        <p className="mt-4 text-sm font-medium text-white">{t.editor.pageManagerPanel.noPagesFound}</p>
                         <p className="mt-2 max-w-xs text-xs text-gray-500">
-                            Create a new page or try a different search keyword.
+                            {t.editor.pageManagerPanel.noPagesSuggestion}
                         </p>
                     </div>
                 ) : (

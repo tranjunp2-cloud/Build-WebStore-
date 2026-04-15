@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
@@ -49,9 +50,9 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     <div className="p-8 bg-white rounded-lg shadow-xl max-w-md text-center">
                         <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
                         <p className="text-slate-600 mb-6">You do not have permission to preview this site.</p>
-                        <a href="/dashboard" className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+                        <Link href="/dashboard" className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
                             Back to Dashboard
-                        </a>
+                        </Link>
                     </div>
                 </div>
             )
