@@ -37,143 +37,27 @@ function moodHint(preset: ThemePreset, _category: string): string {
   return `${mood.label.toLowerCase()} — ${mood.description}`
 }
 
-// ── Style Personalities (DEPRECATED) ────────────────────────────────────────
-//
-// Plan 260414-2249 phase-02: replaced by `ThemeMood.voiceStyle` bullet rules
-// (see `./theme-moods.ts`). Consumers get richer, mood-specific voice rules
-// via `buildUserPrompt({ mood })` COPY VOICE block instead of a single line.
-//
-// Kept as a compatibility shim so any direct caller of `selectPersonality`
-// (none in current code) still returns a sensible string. The array is now
-// empty — previously it had 8 keyword-matched personalities, but those were
-// superseded by the 6 mood archetypes × 4-5 voice rules in THEME_MOODS.
-
-/** @deprecated Use `THEME_MOODS[moodId].voiceStyle` instead. */
-interface StylePersonality {
-  name: string
-  prompt: string
-  keywords: string[]
-}
-
-/** @deprecated Use `THEME_MOODS` from `./theme-moods.ts`. */
-const STYLE_PERSONALITIES: StylePersonality[] = []
-
-/**
- * @deprecated Use `THEME_MOODS[preset.moodId].voiceStyle` for mood-aware
- * voice rules. This shim returns a single safe default sentence so any
- * legacy caller that still expects a one-line personality gets a value.
- *
- * New code should pass `mood` into `buildUserPrompt` options — it will
- * inject the full 4-5 rule COPY VOICE block from the mood archetype.
- */
-function selectPersonality(_info: BusinessInfoInput): string {
-  // Default to elegant mood as the safest cross-category personality hint.
-  const mood = THEME_MOODS.elegant
-  return mood.voiceStyle[0] ?? 'Polished, professional, approachable — benefit-led, specific.'
-}
-
-// ── Dynamic Block Composition Generator ────────────────────────────────────
-// Generates unique block composition hints on-the-fly instead of hardcoded arrays.
-
-/** Category-specific signature blocks that make each industry unique */
-const CATEGORY_SIGNATURE_BLOCKS: Record<string, string[]> = {
-  restaurant: ['menu-display', 'booking-widget', 'gallery'],
-  ecommerce: ['products-grid', 'product-quick-view', 'social-proof'],
-  beauty: ['before-after', 'booking-widget', 'gallery'],
-  tech: ['feature-comparison', 'video-showcase', 'pricing'],
-  health: ['doctor-profile', 'booking-widget', 'review-cards'],
-  education: ['class-schedule', 'video-showcase', 'step-process'],
-  realestate: ['property-card', 'gallery', 'stats'],
-  fitness: ['class-schedule', 'booking-widget', 'gallery'],
-  creative: ['portfolio-grid', 'gallery', 'video-showcase'],
-  business: ['service-cards', 'client-logos', 'stats'],
-  fnb: ['menu-display', 'gallery', 'review-cards'],
-  events: ['countdown-timer', 'booking-widget', 'step-process'],
-  blog: ['blog-list', 'social-proof', 'newsletter'],
-  travel: ['booking-widget', 'gallery', 'video-showcase'],
-}
-
-/** Common blocks shared across all categories */
-const COMMON_BLOCKS = ['features', 'testimonials', 'about', 'stats', 'faq', 'cta', 'newsletter', 'team']
-
-/** Hero variants per category mood */
-const HERO_VARIANTS_BY_CATEGORY: Record<string, string[]> = {
-  restaurant: ['split-left', 'magazine', 'gradient', 'parallax', 'fullscreen'],
-  ecommerce: ['slideshow', 'cards-overlay', 'gradient', 'split-right', 'magazine'],
-  beauty: ['gradient', 'minimal', 'parallax', 'split-left', 'magazine'],
-  tech: ['gradient', 'split-video', 'minimal', 'parallax', 'cards-overlay'],
-  health: ['centered', 'split-left', 'minimal', 'gradient', 'parallax'],
-  education: ['centered', 'split-right', 'gradient', 'magazine', 'parallax'],
-  realestate: ['fullscreen', 'parallax', 'slideshow', 'split-left', 'magazine'],
-  fitness: ['fullscreen', 'parallax', 'split-video', 'gradient', 'cards-overlay'],
-  creative: ['magazine', 'parallax', 'cards-overlay', 'minimal', 'gradient'],
-  business: ['centered', 'split-left', 'gradient', 'minimal', 'parallax'],
-  fnb: ['split-left', 'gradient', 'magazine', 'parallax', 'fullscreen'],
-  events: ['fullscreen', 'gradient', 'split-left', 'centered', 'parallax'],
-  blog: ['minimal', 'split-left', 'fullscreen', 'centered', 'magazine'],
-  travel: ['fullscreen', 'parallax', 'split-left', 'gradient', 'slideshow'],
-}
-
-/** Footer variants pool */
-const FOOTER_VARIANTS = ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient']
-
-/** Random pick helper */
-function pickFrom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]!
-}
-
-/** Shuffle array (Fisher-Yates) */
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr]
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!]
-  }
-  return copy
-}
-
-/**
- * Generate a unique block composition hint dynamically.
- * Each call produces a different combination — never repeats.
- */
-function generateCompositionHint(category: string): string {
-  const heroVariants = HERO_VARIANTS_BY_CATEGORY[category] ?? ['centered', 'gradient', 'minimal']
-  const signatureBlocks = CATEGORY_SIGNATURE_BLOCKS[category] ?? []
-
-  // 1. Hero with random category-appropriate variant
-  const hero = `hero(${pickFrom(heroVariants)})`
-
-  // 2. Pick 1-2 signature blocks for this category
-  const sigCount = Math.min(signatureBlocks.length, 1 + Math.floor(Math.random() * 2))
-  const selectedSig = shuffle(signatureBlocks).slice(0, sigCount)
-
-  // 3. Pick 3-4 common blocks (excluding duplicates with signature)
-  const availableCommon = COMMON_BLOCKS.filter(b => !selectedSig.includes(b))
-  const commonCount = 3 + Math.floor(Math.random() * 2)
-  const selectedCommon = shuffle(availableCommon).slice(0, commonCount)
-
-  // 4. Combine and shuffle middle section
-  const middleBlocks = shuffle([...selectedSig, ...selectedCommon])
-
-  // 5. Footer with random variant
-  const footer = `footer(${pickFrom(FOOTER_VARIANTS)})`
-
-  return [hero, ...middleBlocks, footer].join(' → ')
-}
-
-const CATEGORY_HINTS: Record<string, string> = {
-  restaurant: 'F&B, eatery, cafe, restaurant',
-  ecommerce: 'shop, store, fashion, cosmetics',
-  portfolio: 'portfolio, freelancer, designer, photographer',
-  blog: 'blog, news, content',
-  business: 'services, company, agency, startup',
-}
+// Plan 2253 follow-up (audit-unused-code) — deleted ~130 lines of dead code:
+//   - STYLE_PERSONALITIES (empty array, deprecated by plan 2249 phase-02)
+//   - selectPersonality() (deprecated shim, no callers post-cleanup)
+//   - generateCompositionHint() + CATEGORY_SIGNATURE_BLOCKS + COMMON_BLOCKS
+//     + HERO_VARIANTS_BY_CATEGORY + FOOTER_VARIANTS (R12 soft hint ignored
+//     by GPT-4o; superseded by plan 2249 phase-04 `recipe` hard directive
+//     injection in buildUserPrompt)
+//   - CATEGORY_HINTS (only consumed by generateCompositionHint's legacy
+//     fallback branch, no longer needed)
+//   - pickFrom / shuffle (local helpers only used by generateCompositionHint)
+// See plans/260414-2253-ai-gen-variety-root-cause/reports/audit-unused-code.md
 
 export function buildSystemPrompt(
   language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
   themeContext?: ThemePromptContext,
 ): string {
-  const blockMetas = blockRegistry.getAllMeta()
+  // Plan 2253 audit-unused-code — filter out editor-only blocks (aiVisible=false)
+  // so GPT-4o prompt lists only blocks the AI should actually output. Blocks
+  // like divider/breadcrumb/whatsapp-button/cart-widget are still available in
+  // the editor library UI for manual user drag-drop, just hidden from AI.
+  const blockMetas = blockRegistry.getAllMeta().filter((m) => m.aiVisible !== false)
 
   const blockList = blockMetas.map(m =>
     `- **${m.type}** (${m.name}): ${m.description}. Variants: [${m.variants.join(', ')}]. Fields: ${m.editableFields.join(', ')}`
@@ -458,23 +342,13 @@ export function buildUserPrompt(
   // is provided. This is a HARD constraint (not "feel free to modify") —
   // GPT should produce blocks in this exact order. Replaces the legacy
   // generateCompositionHint which used a shuffled CATEGORY_SIGNATURE_BLOCKS
-  // lookup.
+  // lookup (deleted by Plan 2253 follow-up audit-unused-code cleanup).
   if (!referencePrompt && recipe) {
     const sequence = recipe.blocks.join(' → ')
     const required = recipe.required.join(', ')
     parts.push(
       `\nRHYTHM: ${recipe.label} (${recipe.rhythm})\nBlock sequence: ${sequence}\nRequired blocks (must be present): ${required}\nRationale: ${recipe.description}\nIMPORTANT: Emit blocks in this exact order. You may omit optional blocks but do not reorder them.`,
     )
-  } else if (!referencePrompt) {
-    // Legacy path: category signature hint when no recipe provided.
-    const categoryLower = info.industry.toLowerCase()
-    const matchedCategory = Object.keys(CATEGORY_SIGNATURE_BLOCKS).find(
-      cat => categoryLower.includes(cat) || (CATEGORY_HINTS[cat] && CATEGORY_HINTS[cat].split(', ').some(kw => categoryLower.includes(kw)))
-    )
-    if (matchedCategory) {
-      const hint = generateCompositionHint(matchedCategory)
-      parts.push(`\nSuggested block composition (feel free to modify): ${hint}`)
-    }
   }
 
   // Append reference content from ContentBrief (URL/Image extraction)
