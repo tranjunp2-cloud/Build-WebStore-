@@ -1,4 +1,7 @@
+'use client'
+
 import type { ReactNode } from 'react'
+import { useI18n } from '@/i18n'
 
 interface BuilderSubmitButtonProps {
     loading?: boolean
@@ -17,6 +20,7 @@ export function BuilderSubmitButton({
     type = 'submit',
     onClick,
 }: BuilderSubmitButtonProps) {
+    const { t } = useI18n()
     return (
         <button
             aria-disabled={disabled}
@@ -28,7 +32,7 @@ export function BuilderSubmitButton({
             {loading ? (
                 <>
                     <span className="size-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-                    <span className="text-white">Initializing...</span>
+                    <span className="text-white">{t.onboarding.form.initializing}</span>
                 </>
             ) : (
                 <>

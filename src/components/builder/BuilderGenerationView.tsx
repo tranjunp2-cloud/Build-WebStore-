@@ -65,7 +65,7 @@ function BuilderGenerationCard({
     onCancel?: () => void
     showTimeoutWarning?: boolean
 }) {
-    const { t } = useI18n()
+    const { t, ti } = useI18n()
     const activeStep = getActiveStep(progress)
     return (
         <div className="mx-auto flex w-full max-w-[864px] items-center justify-center px-12">
@@ -144,7 +144,7 @@ function BuilderGenerationCard({
                         </div>
                         {typeof elapsedSeconds === 'number' && elapsedSeconds > 0 && (
                             <div className="mt-1 text-center text-xs text-[#64748b]">
-                                Elapsed: {elapsedSeconds}s
+                                {ti(t.onboarding.generating.elapsed, { seconds: elapsedSeconds })}
                             </div>
                         )}
                     </div>
@@ -155,7 +155,7 @@ function BuilderGenerationCard({
                             role="alert"
                         >
                             <p className="text-center text-sm text-amber-300/90">
-                                Taking longer than expected...
+                                {t.onboarding.generating.timeoutWarning}
                             </p>
                             <button
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
@@ -163,7 +163,7 @@ function BuilderGenerationCard({
                                 type="button"
                             >
                                 <X className="size-3.5" />
-                                Cancel generation
+                                {t.onboarding.generating.cancelButton}
                             </button>
                         </div>
                     )}

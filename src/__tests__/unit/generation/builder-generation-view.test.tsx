@@ -1,30 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import en from '@/i18n/locales/en.json'
 
-// Mock i18n before imports
+// Mock i18n before imports. Plan 260415 — use the real en.json so any new
+// keys stay in sync automatically (previously a hand-maintained subset
+// went stale when the `elapsed` / `timeoutWarning` / `cancelButton` keys
+// were added).
 vi.mock('@/i18n', () => ({
     useI18n: vi.fn(() => ({
         locale: 'en',
-        t: {
-            onboarding: {
-                generating: {
-                    title: 'Create Website with AI',
-                    subtitle: 'Website Generation',
-                    startingMessage: 'Starting website creation...',
-                    creatingTitle: 'Creating Your Website...',
-                    creatingSubtitle: 'AI is analyzing your business and generating the perfect design.',
-                    stepAnalyzing: 'Analyzing business information',
-                    stepGenerating: 'Generating content & design',
-                    stepPreparing: 'Preparing preview',
-                    progressLabel: 'Building your website',
-                    processing: 'Processing...',
-                },
-            },
-        },
+        t: en,
         setLocale: vi.fn(),
         toggleLocale: vi.fn(),
         tp: vi.fn(),
-        ti: vi.fn(),
+        ti: (template: string, vars: Record<string, string | number>) =>
+            template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? '')),
     })),
 }))
 
