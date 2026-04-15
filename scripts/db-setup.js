@@ -1642,8 +1642,22 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
-      cta_label varchar, cta_url varchar, cta_style varchar
+      cta_label varchar, cta_url varchar, cta_style varchar,
+      secondary_cta_label varchar, secondary_cta_url varchar
     );`,
+  },
+  // Plan 260415 cta-bugfix — add secondary_cta fields + rename floating → card
+  {
+    name: 'pages_blocks_cta.secondary_cta_label',
+    sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_label varchar;`,
+  },
+  {
+    name: 'pages_blocks_cta.secondary_cta_url',
+    sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
+  },
+  {
+    name: 'pages_blocks_cta.rename_floating_to_card',
+    sql: `UPDATE pages_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
   },
   {
     name: 'pages_blocks_newsletter.create_table',
@@ -1967,8 +1981,22 @@ const MIGRATIONS = [
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
       _path text NOT NULL, _uuid varchar, block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
-      cta_label varchar, cta_url varchar, cta_style varchar
+      cta_label varchar, cta_url varchar, cta_style varchar,
+      secondary_cta_label varchar, secondary_cta_url varchar
     );`,
+  },
+  // Plan 260415 cta-bugfix — version table sync
+  {
+    name: '_pages_v_blocks_cta.secondary_cta_label',
+    sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_label varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_cta.secondary_cta_url',
+    sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_cta.rename_floating_to_card',
+    sql: `UPDATE _pages_v_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
   },
   {
     name: '_pages_v_blocks_newsletter.create_table',
@@ -2327,6 +2355,35 @@ const MIGRATIONS = [
     name: 'subscribers.email_site_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
   },
+  // ── Contact Submissions (Plan 260415 contact-bugfix) ──
+  {
+    name: 'contact_submissions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS contact_submissions (
+      id serial PRIMARY KEY,
+      name varchar NOT NULL,
+      email varchar NOT NULL,
+      phone varchar,
+      message text NOT NULL,
+      site_id integer NOT NULL,
+      status varchar DEFAULT 'new',
+      source varchar DEFAULT 'contact-block',
+      ip_address varchar,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'contact_submissions.site_created_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_site_created_idx ON contact_submissions (site_id, created_at DESC);`,
+  },
+  {
+    name: 'contact_submissions.status_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_status_idx ON contact_submissions (status);`,
+  },
+  {
+    name: 'contact_submissions.email_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_email_idx ON contact_submissions (email);`,
+  },
   // ── Sites: SEO auto meta toggle ──
   {
     name: 'sites.seo_auto_meta_enabled',
@@ -2459,6 +2516,7 @@ const COLLECTION_SLUGS = [
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
   'seo_meta_jobs', 'notifications', 'subscribers',
+  'contact_submissions',
   'ai_usage_logs',
 ];
 
