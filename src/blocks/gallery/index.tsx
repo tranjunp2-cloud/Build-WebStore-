@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import type { BlockProps } from '../types'
 import type { GalleryConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -277,6 +277,10 @@ function CarouselGallery({ headline, images, theme: _theme }: { headline?: strin
 function LightboxGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     void _theme
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+    /* Plan 260415 Lỗi A (P1 CRITICAL) — refs cho focus trap + restore */
+    const closeButtonRef = useRef<HTMLButtonElement>(null)
+    const prevFocusRef = useRef<HTMLElement | null>(null)
+    const lightboxRef = useRef<HTMLDivElement>(null)
 
     const handlePrev = useCallback(() => {
         setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : images.length - 1))
@@ -290,15 +294,64 @@ function LightboxGallery({ headline, images, theme: _theme }: { headline?: strin
         setSelectedIndex(null)
     }, [])
 
+    /* Plan 260415 Lỗi A — keyboard + scroll lock + focus management */
     useEffect(() => {
         if (selectedIndex === null) return
+
+        /* Save focus trước khi mở lightbox để restore khi close */
+        prevFocusRef.current = (document.activeElement as HTMLElement) || null
+
+        /* Scroll lock body khi lightbox open */
+        const prevOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+
+        /* Focus close button khi open (focus trap entry) */
+        const focusTimer = setTimeout(() => {
+            closeButtonRef.current?.focus()
+        }, 50)
+
         const handleKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') handleClose()
-            if (e.key === 'ArrowLeft') handlePrev()
-            if (e.key === 'ArrowRight') handleNext()
+            if (e.key === 'Escape') {
+                handleClose()
+                return
+            }
+            if (e.key === 'ArrowLeft') {
+                handlePrev()
+                return
+            }
+            if (e.key === 'ArrowRight') {
+                handleNext()
+                return
+            }
+            /* Plan 260415 — Focus trap: Tab/Shift+Tab wrap trong lightbox */
+            if (e.key === 'Tab') {
+                const container = lightboxRef.current
+                if (!container) return
+                const focusable = container.querySelectorAll<HTMLElement>(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+                )
+                if (focusable.length === 0) return
+                const first = focusable[0]!
+                const last = focusable[focusable.length - 1]!
+                const active = document.activeElement as HTMLElement
+                if (e.shiftKey && active === first) {
+                    e.preventDefault()
+                    last.focus()
+                } else if (!e.shiftKey && active === last) {
+                    e.preventDefault()
+                    first.focus()
+                }
+            }
         }
         document.addEventListener('keydown', handleKey)
-        return () => document.removeEventListener('keydown', handleKey)
+
+        return () => {
+            document.removeEventListener('keydown', handleKey)
+            document.body.style.overflow = prevOverflow
+            clearTimeout(focusTimer)
+            /* Restore focus khi lightbox close */
+            prevFocusRef.current?.focus()
+        }
     }, [selectedIndex, handleClose, handlePrev, handleNext])
 
     return (
@@ -314,21 +367,26 @@ function LightboxGallery({ headline, images, theme: _theme }: { headline?: strin
                 </StaggerGrid>
             </GallerySection>
 
-            {/* Lightbox Overlay */}
+            {/* Plan 260415 Lỗi A — Lightbox Overlay giờ có role=dialog + aria-modal + scroll lock + focus trap */}
             <AnimatePresence>
                 {selectedIndex !== null && (
                     <motion.div
+                        ref={lightboxRef}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
                         className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
                         onClick={handleClose}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Image viewer, image ${selectedIndex + 1} of ${images.length}`}
                     >
                         {/* Close button — 44px touch target */}
                         <button
+                            ref={closeButtonRef}
                             type="button"
-                            className={`absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
+                            className={`absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded`}
                             onClick={handleClose}
                             aria-label="Close lightbox"
                         >
