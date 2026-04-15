@@ -37,11 +37,13 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
         return new Response('Missing filename', { status: 400 })
     }
 
-    // 1. Try local disk first (dev + legacy files).
+    // 1. Try local disk first (dev + legacy files). Match the staticDir env
+    // logic above so we check the same path Payload's upload handler writes to.
+    const localDir = process.env.VERCEL === '1' ? '/tmp/media' : 'public/media'
     try {
         const fs = await import('fs/promises')
         const path = await import('path')
-        const localPath = path.resolve('public/media', filename)
+        const localPath = path.resolve(localDir, filename)
         const data = await fs.readFile(localPath)
         return new Response(data, {
             status: 200,
@@ -101,12 +103,20 @@ export const Media: CollectionConfig = {
         ],
     },
     upload: {
-        staticDir: 'public/media',
+        // Plan 260415 fix-500 — On Vercel, `/var/task` (cwd) is a readonly
+        // build artifact. Payload + Sharp try `fs.mkdir('public', { recursive:
+        // true })` to write image size thumbnails before the s3Storage plugin
+        // uploads them → ENOENT / EROFS → the entire request 500s. Seen on
+        // /products/new (20 hits/24h), /products/[id] (30), /blog/new (50).
+        // Switch the staticDir to /tmp/media in any Vercel environment — /tmp
+        // is writable + ephemeral which is exactly what we want for thumbnail
+        // staging before the S3 upload picks them up.
+        staticDir: process.env.VERCEL === '1' ? '/tmp/media' : 'public/media',
         // Plan 260415 fix-500 — Vercel ephemeral FS + S3 migration means old
         // media rows may reference files that don't exist on disk. Payload's
         // default getFileHandler returns 500 on ENOENT (see node_modules/
         // payload/dist/uploads/endpoints/getFile.js). Intercept requests here:
-        //   1. If local file exists → fall through to default (stream from disk)
+        //   1. If local file exists → stream it with correct Content-Type
         //   2. If missing but S3 configured → 302 redirect to public S3 URL
         //   3. If missing with no S3 → clean 404 (not 500)
         // Logs showed ~90 x 500/24h from this path alone.

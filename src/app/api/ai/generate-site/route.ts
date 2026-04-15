@@ -26,6 +26,7 @@ import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool } from '@/lib/ai/image-pool'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { resolveSiteType } from '@/lib/ai/site-type'
+import { withPayloadRetry } from '@/lib/payload-retry'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -585,18 +586,31 @@ export async function POST(req: NextRequest) {
             // logged and skipped; user gets a site with fewer pages instead
             // of a full 500 + "try again".
             try {
-                const createdPage = await payload.create({
-                    collection: 'pages',
-                    data: {
-                        title: pageDefinition.title,
-                        slug: pageDefinition.slug,
-                        site: site.id,
-                        isHomepage: pageDefinition.isHomepage,
-                        _status: 'published',
-                        layout: sanitizedLayout,
-                        seo: pageDefinition.seo,
+                // Plan 260415 fix-500 — wrap create in retry. Same transient
+                // deadlock / pages_blocks_*_parent_id_fk races observed on
+                // /api/sites/*/save also hit AI gen create (1 hit / 6h
+                // window). Reuses the save-route retry wrapper.
+                const createdPage = await withPayloadRetry(
+                    () => payload.create({
+                        collection: 'pages',
+                        data: {
+                            title: pageDefinition.title,
+                            slug: pageDefinition.slug,
+                            site: site.id,
+                            isHomepage: pageDefinition.isHomepage,
+                            _status: 'published',
+                            layout: sanitizedLayout,
+                            seo: pageDefinition.seo,
+                        },
+                    }),
+                    {
+                        onRetry: (attempt, kind) => {
+                            console.warn(
+                                `[generate-site] Retry page create attempt=${attempt} kind=${kind} slug=${pageDefinition.slug}`,
+                            )
+                        },
                     },
-                })
+                )
                 createdPages.push(createdPage)
                 _createdPagesCount++
             } catch (pageErr) {
