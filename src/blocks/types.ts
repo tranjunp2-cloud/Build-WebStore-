@@ -118,6 +118,14 @@ export type BlockMeta = {
     defaultVariant: string
     editableFields: string[]
     quickActions: string[]
+    /**
+     * Plan 2253 audit-unused-code — when false, this block is hidden from the
+     * AI prompt's block list (buildSystemPrompt's blockList). Users can still
+     * add these blocks manually via the editor library UI. Defaults to true.
+     * Use for editor-only utility blocks: divider, breadcrumb, announcement-bar,
+     * whatsapp-button, cart widgets, etc.
+     */
+    aiVisible?: boolean
 }
 
 // ── CTA Button (shared across blocks) ────────────────────────────────────────

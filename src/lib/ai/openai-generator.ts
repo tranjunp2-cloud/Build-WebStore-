@@ -1063,13 +1063,31 @@ export function sanitizeBlockData(
     // VARIANT VALIDATION: Fuzzy match → alias → weighted-by-category fallback
     // Uses blockRegistry as single source of truth (not a hardcoded list)
     // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Plan 2253 follow-up (audit-unused-code P1) — FORCE_REPICK_BLOCKS
+    // bypasses fuzzy match + accepts AI's valid variant, because GPT-4o
+    // always returns the enum default for these 4 block types. Without
+    // forcing, post-fix-v3 measurement showed 100% dominance on:
+    //   pricing  → 'cards'   (100% across 13 gens)
+    //   faq      → 'accordion' (100% across 49 gens)
+    //   contact  → 'form'    (100% across 20 gens)
+    //   service-cards → 'grid' (100% across 80 gens)
+    // All 4 blocks use a single Zod schema with variant as cosmetic enum —
+    // field structure is identical cross-variants, so re-picking is safe.
+    // Re-pick uses pickWeightedVariant with the themeSeed already flowing
+    // through sanitizeBlockData (Plan 2253 Phase 01 plumbing).
+    const FORCE_REPICK_BLOCKS = new Set(['pricing', 'faq', 'contact', 'service-cards'])
     if (typeof s.blockType === 'string' && blockRegistry.has(s.blockType)) {
         const meta = blockRegistry.getBlockMeta(s.blockType)
         if (meta && meta.variants.length > 0) {
             // Coerce variant to string (AI sometimes returns number/null)
             const rawVariant = s.variant != null ? String(s.variant) : ''
 
-            if (rawVariant.length > 0) {
+            if (FORCE_REPICK_BLOCKS.has(s.blockType)) {
+                // Bypass fuzzy match — always re-pick via seeded shuffle to
+                // break 100% dominance on default variants.
+                s.variant = pickWeightedVariant(s.blockType, meta.variants, siteCategory, seed)
+            } else if (rawVariant.length > 0) {
                 const matched = fuzzyMatchVariant(rawVariant, meta.variants)
                 if (matched) {
                     s.variant = matched
