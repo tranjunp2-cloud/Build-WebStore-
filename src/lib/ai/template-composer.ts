@@ -429,7 +429,7 @@ export function buildFeatures(biz: BusinessSample, category: string): Record<str
   }
 }
 
-function buildTestimonials(content: CategoryContent): Record<string, unknown> {
+export function buildTestimonials(content: CategoryContent): Record<string, unknown> {
   // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
   return {
     blockType: 'testimonials',
@@ -588,7 +588,7 @@ function buildGallery(biz: BusinessSample): Record<string, unknown> {
   }
 }
 
-function buildFAQ(content: CategoryContent): Record<string, unknown> {
+export function buildFAQ(content: CategoryContent): Record<string, unknown> {
   return {
     blockType: 'faq',
     variant: 'accordion',
@@ -597,7 +597,7 @@ function buildFAQ(content: CategoryContent): Record<string, unknown> {
   }
 }
 
-function buildCTA(
+export function buildCTA(
   biz: BusinessSample,
   category: string = 'business',
   mood?: ThemeMood,
@@ -618,7 +618,7 @@ function buildCTA(
   }
 }
 
-function buildAbout(biz: BusinessSample): Record<string, unknown> {
+export function buildAbout(biz: BusinessSample): Record<string, unknown> {
   return {
     blockType: 'about',
     variant: 'split',
