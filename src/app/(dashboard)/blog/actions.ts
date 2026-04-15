@@ -148,17 +148,16 @@ export async function getCategoryPublishedPostCountAction(categoryId: string): P
 
     const payload = await getPayload({ config: configPromise })
     const tenantId = getTenantId(user as UserWithTenants)
-    if (!tenantId) return 0
+
+    const conditions: Where[] = [
+        { category: { equals: categoryId } },
+        { status: { equals: 'published' } },
+    ]
+    if (tenantId) conditions.push({ tenant: { equals: tenantId } })
 
     const result = await payload.find({
         collection: 'blogs',
-        where: {
-            and: [
-                { category: { equals: categoryId } },
-                { status: { equals: 'published' } },
-                { tenant: { equals: tenantId } },
-            ],
-        },
+        where: { and: conditions },
         limit: 1,
         depth: 0,
     })
