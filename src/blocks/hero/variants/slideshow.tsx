@@ -35,7 +35,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
     }, [slides.length])
 
     return (
-        <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             {/* Image layers with crossfade */}
             {slides.map((slide, i) => (
                 <div

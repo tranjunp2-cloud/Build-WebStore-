@@ -17,7 +17,7 @@ export function CardsOverlayHero({ block, site }: BlockProps<HeroConfig>) {
     const fallbackHeroUrl = getHeroImage(category)
 
     return (
-        <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             {/* Full-width background image */}
             <div
                 className="absolute inset-0 bg-cover bg-center"
