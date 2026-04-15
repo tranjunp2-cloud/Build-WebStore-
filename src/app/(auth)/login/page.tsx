@@ -101,11 +101,11 @@ function LoginFormContent() {
         const authErrors = t.auth.errors as Record<string, string | undefined>
 
         if (errorMsg === 'serviceAccountUI') {
-            toast.error(authErrors.serviceAccountUI)
+            toast.error(authErrors.serviceAccountUI || 'Service accounts cannot access the web UI.')
         } else if (errorMsg === 'accountLocked') {
-            toast.error(authErrors.accountLocked)
+            toast.error(authErrors.accountLocked || 'Account is locked.')
         } else if (errorMsg === 'missingCredentials') {
-            toast.error(authErrors.missingCredentials)
+            toast.error(authErrors.missingCredentials || 'Missing credentials.')
         } else if (errorMsg === 'sessionExpired') {
             toast.error(t.auth.errors.sessionExpired)
         } else {
@@ -131,11 +131,11 @@ function LoginFormContent() {
         const authErrs = t.auth.errors as Record<string, string | undefined>
 
         switch (msg) {
-            case 'serviceAccountUI': return authErrs.serviceAccountUI
-            case 'timeout': return authErrs.timeout
+            case 'serviceAccountUI': return authErrs.serviceAccountUI || 'Service accounts cannot access the web UI.'
+            case 'timeout': return authErrs.timeout || 'Request timeout'
             case 'incorrect': return t.auth.errors.incorrect
-            case 'missingCredentials': return authErrs.missingCredentials
-            case 'accountLocked': return authErrs.accountLocked
+            case 'missingCredentials': return authErrs.missingCredentials || 'Missing credentials'
+            case 'accountLocked': return authErrs.accountLocked || 'Account locked'
             case 'connection': return t.auth.errors.connection
             default: return msg
         }
