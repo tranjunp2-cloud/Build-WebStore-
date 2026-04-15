@@ -15,7 +15,6 @@ const MarkReadSchema = z.object({
 })
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 /**
  * POST /api/notifications/mark-read

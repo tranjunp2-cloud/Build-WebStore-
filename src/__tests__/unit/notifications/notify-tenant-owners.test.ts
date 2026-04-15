@@ -43,7 +43,7 @@ describe('notifyTenantOwners [TC-F16.12]', () => {
                 'tenants.role': { in: ['owner', 'admin'] },
                 'tenants.status': { equals: 'active' },
             },
-            limit: 50,
+            limit: 200,
             depth: 0,
         })
         expect(mockCreate).toHaveBeenCalledTimes(2)

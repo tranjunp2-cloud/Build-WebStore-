@@ -1,7 +1,9 @@
 import type { Payload } from 'payload'
 
+type NotificationType = 'ORDER_NEW' | 'SYSTEM_ALERT' | 'PRODUCT_LOW_STOCK' | 'BLOG_PUBLISHED'
+
 /** Default roles per notification type */
-const ROLES_BY_TYPE: Record<string, string[]> = {
+const ROLES_BY_TYPE: Record<NotificationType, string[]> = {
     ORDER_NEW: ['owner', 'admin'],
     PRODUCT_LOW_STOCK: ['owner', 'admin', 'editor'],
     BLOG_PUBLISHED: ['owner', 'admin', 'editor'],
@@ -17,14 +19,14 @@ export async function notifyTenantOwners(
     payload: Payload,
     tenantId: number | string,
     data: {
-        type: 'ORDER_NEW' | 'SYSTEM_ALERT' | 'PRODUCT_LOW_STOCK' | 'BLOG_PUBLISHED'
+        type: NotificationType
         title: string
         message: string
         actionUrl: string
         roles?: string[]
     },
 ) {
-    const targetRoles = data.roles ?? ROLES_BY_TYPE[data.type] ?? ['owner']
+    const targetRoles = data.roles ?? ROLES_BY_TYPE[data.type]
 
     const roleFilter = targetRoles.length === 1
         ? { equals: targetRoles[0] }
@@ -37,9 +39,13 @@ export async function notifyTenantOwners(
             'tenants.role': roleFilter,
             'tenants.status': { equals: 'active' },
         },
-        limit: 50,
+        limit: 200,
         depth: 0,
     })
+
+    if (usersResult.totalDocs > usersResult.docs.length) {
+        console.warn(`[Notification] Tenant ${tenantId} has ${usersResult.totalDocs} matching users but only ${usersResult.docs.length} were notified (limit: 200)`)
+    }
 
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 

@@ -42,6 +42,7 @@ export function NotificationProvider() {
     const lastPollRef = useRef<string>(new Date().toISOString())
     const intervalRef = useRef(getBasePollInterval())
     const abortRef = useRef<AbortController | null>(null)
+    const pendingPollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     // Track seen notification IDs to detect genuinely new items
     const seenIdsRef = useRef<Set<string>>(new Set())
@@ -84,6 +85,8 @@ export function NotificationProvider() {
                 if (seenIdsRef.current.size > SEEN_IDS_MAX) {
                     const arr = [...seenIdsRef.current]
                     seenIdsRef.current = new Set(arr.slice(-SEEN_IDS_MAX / 2))
+                    // Advance watermark so evicted IDs are not re-fetched by next poll
+                    lastPollRef.current = new Date().toISOString()
                 }
 
                 if (newItems.length > 0) {
@@ -150,8 +153,12 @@ export function NotificationProvider() {
                 message: payload.message,
             })
 
-            // Sync badge count from server
-            poll()
+            // Sync badge count from server (debounced — batches burst pushes)
+            if (pendingPollRef.current) clearTimeout(pendingPollRef.current)
+            pendingPollRef.current = setTimeout(() => {
+                pendingPollRef.current = null
+                poll()
+            }, 2_000)
         }
         navigator.serviceWorker?.addEventListener('message', handlePushMessage)
 
@@ -177,6 +184,7 @@ export function NotificationProvider() {
         return () => {
             mounted = false
             clearTimer()
+            if (pendingPollRef.current) clearTimeout(pendingPollRef.current)
             if (abortRef.current) abortRef.current.abort()
             navigator.serviceWorker?.removeEventListener('message', handlePushMessage)
             document.removeEventListener('visibilitychange', handleVisibility)

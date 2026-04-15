@@ -5,6 +5,20 @@ import { Bell, X } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+const PUSH_SUBSCRIBE_KEY = 'push-last-subscribed'
+const PUSH_SUBSCRIBE_INTERVAL_MS = 24 * 60 * 60 * 1000 // 24h
+
+function shouldResubscribe(): boolean {
+  try {
+    const lastSubscribed = localStorage.getItem(PUSH_SUBSCRIBE_KEY)
+    if (!lastSubscribed) return true
+    const timestamp = parseInt(lastSubscribed, 10)
+    if (isNaN(timestamp)) return true
+    return Date.now() - timestamp > PUSH_SUBSCRIBE_INTERVAL_MS
+  } catch {
+    return true
+  }
+}
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -40,16 +54,18 @@ export function PushOptInPrompt() {
   const [show, setShow] = useState(false)
   const { t } = useI18n()
 
-  // Auto re-subscribe on every mount if permission already granted
-  // This ensures each user (even on shared browser) has their subscription saved
+  // Auto re-subscribe if permission granted AND >24h since last subscribe
   useEffect(() => {
     if (!VAPID_PUBLIC_KEY) return
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return
-    if (Notification.permission === 'granted') {
-      registerAndSubscribe().catch((err) =>
-        console.warn('[Push] Auto re-subscribe failed', err),
-      )
-    }
+    if (Notification.permission !== 'granted') return
+    if (!shouldResubscribe()) return
+
+    registerAndSubscribe()
+      .then(() => {
+        try { localStorage.setItem(PUSH_SUBSCRIBE_KEY, Date.now().toString()) } catch { /* ignore */ }
+      })
+      .catch((err) => console.warn('[Push] Auto re-subscribe failed', err))
   }, [])
 
   const shouldShowPrompt = useCallback(() => {
@@ -89,6 +105,7 @@ export function PushOptInPrompt() {
       if (permission === 'granted') {
         await registerAndSubscribe()
         localStorage.setItem('push-opt-in-completed', 'true')
+        try { localStorage.setItem(PUSH_SUBSCRIBE_KEY, Date.now().toString()) } catch { /* ignore */ }
       }
     } catch (err) {
       console.error('[Push] Opt-in failed', err)

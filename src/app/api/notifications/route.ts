@@ -6,7 +6,6 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import type { NotificationsResponse } from '@/types/notification'
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 /**
  * GET /api/notifications?limit=20&offset=0&since=ISO8601
@@ -17,8 +16,8 @@ export const revalidate = 0
  */
 export const GET = withAuth(async (user, request) => {
     try {
-        // Rate limit: 30 requests per minute per user
-        const rateCheck = await checkRateLimit(`notifications:get:${user.id}`, 30, 60_000)
+        // Rate limit: 60 requests per minute per user (supports multi-tab polling)
+        const rateCheck = await checkRateLimit(`notifications:get:${user.id}`, 60, 60_000)
         if (!rateCheck.allowed) {
             return NextResponse.json(
                 { success: false, error: 'Too many requests' },
