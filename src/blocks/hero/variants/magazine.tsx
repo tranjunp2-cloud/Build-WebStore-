@@ -5,7 +5,7 @@ import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
-import { CTAButtons, HERO_CONTAINER } from '../shared'
+import { CTAButtons, HERO_CONTAINER, safeAltText } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
@@ -16,7 +16,7 @@ export function MagazineHero({ block, site }: BlockProps<HeroConfig>) {
     const fallbackHeroUrl = getHeroImage(category)
 
     return (
-        <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             <GradientBlob color={CSS_VARS.primary} className="top-[-10%] left-[-5%]" size={500} opacity={0.08} />
             <DotGrid color={CSS_VARS.primary} />
 
@@ -32,7 +32,7 @@ export function MagazineHero({ block, site }: BlockProps<HeroConfig>) {
                     >
                         <img
                             src={image?.url || fallbackHeroUrl}
-                            alt={image?.alt || headline}
+                            alt={safeAltText(image?.alt, headline)}
                             className="w-full h-auto rounded-2xl object-cover aspect-[4/3] max-h-[600px]"
                             style={{
                                 border: `2px solid rgba(var(--brand-primary-rgb), 0.2)`,

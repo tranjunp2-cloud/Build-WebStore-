@@ -42,15 +42,19 @@ function CountUp({ value, duration = 1200 }: { value: string; duration?: number 
     const ref = useRef<HTMLSpanElement>(null)
     const isInView = useInView(ref, { once: true })
     const shouldReduce = useReducedMotion()
-    // Plan 260415 — treat a value as animatable ONLY when it has a single
-    // contiguous digit run (e.g. "500+", "98%", "10+"). Multi-run values
-    // like "24/7" or "4.9★" previously mis-animated because `replace(/\d+/,
-    // String(count))` only swaps the FIRST digit group, leaving the second
-    // group trailing behind ("24/7" → "247/7" mid-animation).
-    const digitMatches = value.match(/\d+/g) ?? []
-    const isSingleDigitRun = digitMatches.length === 1
-    const numericValue = isSingleDigitRun ? parseInt(digitMatches[0]!, 10) : NaN
-    const isNumeric = isSingleDigitRun && !isNaN(numericValue)
+    // Plan 260415 Lỗi E — treat value as animatable when it has a single
+    // numeric portion. Support:
+    //   "500+", "98%", "10+" (single int)
+    //   "4.5★", "4.9" (single decimal) — Lỗi F parseFloat
+    //   "$1,000,000", "1.000.000" (comma/dot thousand separator) — strip first
+    // Multi-distinct values like "24/7" still render static (2 digit runs).
+    const stripped = value.replace(/[,_]/g, '') // thousand separators
+    const numericMatch = stripped.match(/-?\d+\.?\d*/g) ?? []
+    const isSingleNumeric = numericMatch.length === 1
+    const numericValue = isSingleNumeric ? parseFloat(numericMatch[0]!) : NaN
+    const hasDecimal = isSingleNumeric && numericMatch[0]!.includes('.')
+    const decimals = hasDecimal ? numericMatch[0]!.split('.')[1]!.length : 0
+    const isNumeric = isSingleNumeric && !isNaN(numericValue)
     const [count, setCount] = useState(0)
 
     useEffect(() => {
@@ -66,7 +70,7 @@ function CountUp({ value, duration = 1200 }: { value: string; duration?: number 
                 setCount(numericValue)
                 clearInterval(timer)
             } else {
-                setCount(Math.floor(start))
+                setCount(start)
             }
         }, 16)
         return () => clearInterval(timer)
@@ -74,7 +78,13 @@ function CountUp({ value, duration = 1200 }: { value: string; duration?: number 
 
     if (!isNumeric) return <span ref={ref}>{value}</span>
 
-    const formatted = value.replace(/\d+/, String(count))
+    // Plan 260415 Lỗi E — format count với số thập phân + preserve thousand separators.
+    // Dùng `toLocaleString()` không tham số để browser tự detect locale — hỗ trợ
+    // tiếng Việt (1.234) và English (1,234) tự động theo user setting.
+    const formattedCount = hasDecimal
+        ? count.toFixed(decimals)
+        : Math.floor(count).toLocaleString()
+    const formatted = value.replace(/-?[\d.,]+/, formattedCount)
     return <span ref={ref} style={{ fontVariantNumeric: 'tabular-nums' }}>{formatted}</span>
 }
 
@@ -88,21 +98,28 @@ function StatValue({ stat }: { stat: StatItem }) {
     )
 }
 
+/* Plan 260415 Lỗi D — aria-label nên đi trên wrapper element, không phải <p>.
+   Dùng <div role="group" aria-label> để wrap cả number + label semantic group. */
 function RowVariant({ headline, stats }: { headline?: string; stats: StatItem[] }) {
     return (
         <StatsSection style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
             <StatsHeadline headline={headline} />
             <StaggerGrid className="flex flex-col sm:flex-row flex-wrap justify-center gap-8 md:gap-12">
                 {stats.map((stat, i) => (
-                    <StaggerItem key={i} className="flex-1 min-w-[140px] text-center">
-                        <p
-                            className="text-4xl md:text-5xl font-bold mb-2"
-                            style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary }}
-                            aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}
-                        >
-                            <StatValue stat={stat} />
-                        </p>
-                        <Body size="small" style={{ color: CSS_VARS.muted }}>{stat.label}</Body>
+                    <StaggerItem
+                        /* Plan 260415 Lỗi B — stable key */
+                        key={`${stat.label}-${i}`}
+                        className="flex-1 min-w-[140px] text-center"
+                    >
+                        <div role="group" aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}>
+                            <p
+                                className="text-4xl md:text-5xl font-bold mb-2"
+                                style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary, fontVariantNumeric: 'tabular-nums' }}
+                            >
+                                <StatValue stat={stat} />
+                            </p>
+                            <Body size="small" style={{ color: CSS_VARS.muted }}>{stat.label}</Body>
+                        </div>
                     </StaggerItem>
                 ))}
             </StaggerGrid>
@@ -117,7 +134,7 @@ function GridVariant({ headline, stats }: { headline?: string; stats: StatItem[]
             <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {stats.map((stat, i) => (
                     <StaggerItem
-                        key={i}
+                        key={`${stat.label}-${i}`}
                         className={`text-center ${CARD_PADDING.md} transition-shadow hover:shadow-md`}
                         style={{
                             background: CSS_VARS.surface,
@@ -125,14 +142,15 @@ function GridVariant({ headline, stats }: { headline?: string; stats: StatItem[]
                             boxShadow: 'var(--shadow-sm)',
                         }}
                     >
-                        <p
-                            className="text-4xl font-bold mb-2"
-                            style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary }}
-                            aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}
-                        >
-                            <StatValue stat={stat} />
-                        </p>
-                        <Body size="small" style={{ color: CSS_VARS.muted }}>{stat.label}</Body>
+                        <div role="group" aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}>
+                            <p
+                                className="text-4xl font-bold mb-2"
+                                style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary, fontVariantNumeric: 'tabular-nums' }}
+                            >
+                                <StatValue stat={stat} />
+                            </p>
+                            <Body size="small" style={{ color: CSS_VARS.muted }}>{stat.label}</Body>
+                        </div>
                     </StaggerItem>
                 ))}
             </StaggerGrid>
@@ -149,35 +167,54 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
             <StatsHeadline headline={headline} />
             <StaggerGrid className="flex flex-col gap-6">
                 {stats.map((stat, i) => {
-                    const numericValue = parseInt(stat.value.replace(/[^0-9]/g, ''), 10)
-                    const percentage = !isNaN(numericValue) && numericValue <= 100 ? numericValue : null
+                    /* Plan 260415 Lỗi F — parseFloat thay vì parseInt strip non-digit.
+                       "4.5" parse đúng decimal, "98" vẫn work. */
+                    const stripped = stat.value.replace(/[,_]/g, '').match(/-?\d+\.?\d*/)?.[0] || ''
+                    const numericValue = parseFloat(stripped)
+                    const percentage = !isNaN(numericValue) && numericValue >= 0 && numericValue <= 100 ? numericValue : null
 
                     return (
-                        <StaggerItem key={i} className="w-full">
-                            <div className="flex items-center justify-between mb-2">
-                                <Caption className="font-medium" style={{ color: CSS_VARS.text }}>
-                                    {stat.label}
-                                </Caption>
-                                <span
-                                    className="text-lg font-bold"
-                                    style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary, fontVariantNumeric: 'tabular-nums' }}
-                                    aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}
-                                >
-                                    <StatValue stat={stat} />
-                                </span>
-                            </div>
+                        <StaggerItem
+                            /* Plan 260415 Lỗi B — stable key */
+                            key={`${stat.label}-${i}`}
+                            className="w-full"
+                        >
                             <div
-                                className="w-full h-3 overflow-hidden"
-                                style={{ background: 'rgba(var(--brand-primary-rgb), 0.15)', borderRadius: 'var(--radius-full)' }}
+                                role="group"
+                                aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}
                             >
-                                <div
-                                    className="h-full transition-all duration-1000 ease-out"
-                                    style={{
-                                        width: percentage !== null ? `${percentage}%` : '75%',
-                                        background: CSS_VARS.primary,
-                                        borderRadius: 'var(--radius-full)',
-                                    }}
-                                />
+                                <div className="flex items-center justify-between mb-2">
+                                    <Caption className="font-medium" style={{ color: CSS_VARS.text }}>
+                                        {stat.label}
+                                    </Caption>
+                                    <span
+                                        className="text-lg font-bold"
+                                        style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary, fontVariantNumeric: 'tabular-nums' }}
+                                    >
+                                        <StatValue stat={stat} />
+                                    </span>
+                                </div>
+                                {/* Plan 260415 Lỗi G — chỉ render progress bar khi numeric percentage,
+                                    không hard-code 75% arbitrary cho non-percent values */}
+                                {percentage !== null && (
+                                    <div
+                                        className="w-full h-2 overflow-hidden"
+                                        style={{ background: 'rgba(var(--brand-primary-rgb), 0.15)', borderRadius: 'var(--radius-full)' }}
+                                        role="progressbar"
+                                        aria-valuenow={percentage}
+                                        aria-valuemin={0}
+                                        aria-valuemax={100}
+                                    >
+                                        <div
+                                            className="h-full transition-all duration-1000 ease-out"
+                                            style={{
+                                                width: `${percentage}%`,
+                                                background: CSS_VARS.primary,
+                                                borderRadius: 'var(--radius-full)',
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </StaggerItem>
                     )
@@ -190,7 +227,13 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
 export function StatsBlock({ block }: BlockProps<StatsConfig>) {
     const { headline, stats = [], variant = 'row' } = block
 
-    if (!stats.length) return null
+    /* Plan 260415 Lỗi C — empty state dev warn */
+    if (!stats.length) {
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+            console.warn('[stats] stats array empty — block rendered nothing')
+        }
+        return null
+    }
 
     switch (variant) {
         case 'grid':

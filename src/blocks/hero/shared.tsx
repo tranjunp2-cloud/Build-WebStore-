@@ -11,6 +11,25 @@ import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 // Token shortcut: hero containers consume CONTAINER.default + INNER_PADDING.
 export const HERO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
+/**
+ * Plan 260415 Lỗi E — hero min-h responsive: mobile 75vh (không tràn dưới
+ * dải gesture iOS), desktop 92vh giữ cinematic feel. Các variants dùng helper
+ * này thay vì hardcode `min-h-[92vh]`.
+ */
+export const HERO_MIN_HEIGHT = 'min-h-[75vh] md:min-h-[92vh]'
+
+/**
+ * Plan 260415 Lỗi D — alt text helper cho hero images. headline có thể là
+ * Lexical JSON object (từ RichText editor) → render trực tiếp cho alt sẽ
+ * thành "[object Object]". Check type trước khi dùng headline làm fallback.
+ * Ưu tiên image.alt, rồi plain string headline, cuối cùng generic "Hero image".
+ */
+export function safeAltText(imageAlt: string | undefined, headline: unknown): string {
+    if (imageAlt && typeof imageAlt === 'string') return imageAlt
+    if (typeof headline === 'string' && headline.trim()) return headline
+    return 'Hero image'
+}
+
 // ── Shared CTA renderer ──────────────────────────────────────────────────────
 // CTA button has px-8 py-4 = ~56px effective height (passes WCAG 2.5.5).
 // TOUCH_TARGET.min added explicitly as a guarantee in case future restyles

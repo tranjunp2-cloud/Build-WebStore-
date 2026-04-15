@@ -5,7 +5,7 @@ import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
-import { CTAButtons, HERO_CONTAINER } from '../shared'
+import { CTAButtons, HERO_CONTAINER, safeAltText } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 
@@ -14,7 +14,7 @@ export function CenteredHero({ block, site }: BlockProps<HeroConfig>) {
 
     return (
         <AnimatedSection
-            className="relative min-h-[92vh] flex items-center overflow-hidden"
+            className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden"
         >
             {/* Multi-layer background */}
             <div className="absolute inset-0" style={{
@@ -85,7 +85,7 @@ export function CenteredHero({ block, site }: BlockProps<HeroConfig>) {
                         >
                             <img
                                 src={image?.url}
-                                alt={image?.alt || headline}
+                                alt={safeAltText(image?.alt, headline)}
                                 className="w-full rounded-2xl object-cover"
                             />
                             {/* Gradient overlay for polish */}
