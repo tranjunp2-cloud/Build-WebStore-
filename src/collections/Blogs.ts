@@ -15,7 +15,7 @@ export const Blogs: CollectionConfig = {
                             type: 'BLOG_PUBLISHED',
                             title: 'Blog Published',
                             message: `${doc.title} has been published`,
-                            actionUrl: '/blogs',
+                            actionUrl: '/blog',
                         })
                     })
                     .catch((err) => console.error('[Notification] BLOG_PUBLISHED hook failed', err))
@@ -100,6 +100,7 @@ export const Blogs: CollectionConfig = {
             options: [
                 { label: 'Draft', value: 'draft' },
                 { label: 'Published', value: 'published' },
+                { label: 'Scheduled', value: 'scheduled' },
             ],
         },
         {
@@ -107,6 +108,14 @@ export const Blogs: CollectionConfig = {
             type: 'date',
             admin: {
                 description: 'When this post was or will be published.',
+            },
+        },
+        {
+            name: 'scheduledPublishDate',
+            type: 'date',
+            admin: {
+                description: 'Auto-set when saving a future-dated post as scheduled.',
+                readOnly: true,
             },
         },
         {

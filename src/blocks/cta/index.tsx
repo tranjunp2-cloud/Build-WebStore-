@@ -9,11 +9,13 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { trackEvent } from '@/lib/analytics/track-event'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
 const CTA_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
 function CTAButton({ label, url, style, variant, siteId }: { label: string; url: string; style: 'primary' | 'outline'; variant: string; siteId?: string }) {
     const shouldReduce = useReducedMotion()
+    const isOwner = useIsOwner()
     const isPrimary = style === 'primary'
 
     const buttonStyle = isPrimary
@@ -25,7 +27,7 @@ function CTAButton({ label, url, style, variant, siteId }: { label: string; url:
     const btnCls = `inline-flex items-center justify-center px-8 py-3.5 font-semibold text-sm transition-colors ${TOUCH_TARGET.min}`
 
     const handleClick = () => {
-        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label, url, variant } })
+        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label, url, variant }, isOwner })
     }
 
     if (shouldReduce) {

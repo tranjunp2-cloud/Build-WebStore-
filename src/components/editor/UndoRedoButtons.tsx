@@ -4,6 +4,7 @@ import React from 'react'
 import { Undo2, Redo2 } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 /**
  * UndoRedoButtons — Toolbar component for F11 Undo/Redo
@@ -14,6 +15,8 @@ import { cn } from '@/lib/utils'
  *   - Gap between buttons: 4px
  */
 export function UndoRedoButtons({ className }: { className?: string }) {
+    const { t } = useI18n()
+    const ur = t.editor.undoRedo
     const undo = useEditorStore((s) => s.undo)
     const redo = useEditorStore((s) => s.redo)
     const canUndo = useEditorStore((s) => s.canUndo)
@@ -47,13 +50,13 @@ export function UndoRedoButtons({ className }: { className?: string }) {
     const isRedoEnabled = canRedo()
 
     return (
-        <div className={cn("flex items-center gap-1", className)} role="group" aria-label="Undo and redo">
+        <div className={cn("flex items-center gap-1", className)} role="group" aria-label={ur.groupLabel}>
             {/* Undo */}
             <button
                 onClick={handleUndo}
                 disabled={!isUndoEnabled}
-                title={isUndoEnabled ? `Undo: ${undoLabel() ?? 'last change'} (Ctrl+Z)` : 'Nothing to undo'}
-                aria-label={`Undo${undoCount > 0 ? ` (${undoCount})` : ''}`}
+                title={isUndoEnabled ? ur.undoTooltip.replace('{label}', undoLabel() ?? ur.lastChange) : ur.nothingToUndo}
+                aria-label={`${ur.undo}${undoCount > 0 ? ` (${undoCount})` : ''}`}
                 className={cn(
                     'flex h-8 items-center gap-2 rounded-[10px] px-2.5 transition-all duration-150 touch-manipulation',
                     'bg-white/5 text-[#F8FAFC] font-medium text-[12px]',
@@ -63,7 +66,7 @@ export function UndoRedoButtons({ className }: { className?: string }) {
                 )}
             >
                 <Undo2 className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-                <span>Undo</span>
+                <span>{ur.undo}</span>
                 {undoCount > 0 && isUndoEnabled && (
                     <span className="rounded px-1 py-px text-[10px] leading-none font-semibold bg-white/10 text-[#F8FAFC]/70 tabular-nums">
                         {undoCount}
@@ -75,8 +78,8 @@ export function UndoRedoButtons({ className }: { className?: string }) {
             <button
                 onClick={handleRedo}
                 disabled={!isRedoEnabled}
-                title={isRedoEnabled ? `Redo: ${redoLabel() ?? 'last undone change'} (Ctrl+Y)` : 'Nothing to redo'}
-                aria-label={`Redo${redoCount > 0 ? ` (${redoCount})` : ''}`}
+                title={isRedoEnabled ? ur.redoTooltip.replace('{label}', redoLabel() ?? ur.lastUndoneChange) : ur.nothingToRedo}
+                aria-label={`${ur.redo}${redoCount > 0 ? ` (${redoCount})` : ''}`}
                 className={cn(
                     'flex h-8 items-center gap-2 rounded-[10px] px-2.5 transition-all duration-150 touch-manipulation',
                     'bg-white/5 text-[#F8FAFC] font-medium text-[12px]',
@@ -86,7 +89,7 @@ export function UndoRedoButtons({ className }: { className?: string }) {
                 )}
             >
                 <Redo2 className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-                <span>Redo</span>
+                <span>{ur.redo}</span>
                 {redoCount > 0 && isRedoEnabled && (
                     <span className="rounded px-1 py-px text-[10px] leading-none font-semibold bg-white/10 text-[#F8FAFC]/70 tabular-nums">
                         {redoCount}

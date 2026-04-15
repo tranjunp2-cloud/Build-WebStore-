@@ -4,8 +4,11 @@ import React from 'react'
 import { Undo2, Redo2 } from 'lucide-react'
 import { useEditorStore } from '@/store/editorStore'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 export function MobileUndoRedoButtons({ className }: { className?: string }) {
+    const { t } = useI18n()
+    const ur = t.editor.undoRedo
     const undo = useEditorStore((s) => s.undo)
     const redo = useEditorStore((s) => s.redo)
     const canUndo = useEditorStore((s) => s.canUndo)
@@ -37,19 +40,19 @@ export function MobileUndoRedoButtons({ className }: { className?: string }) {
     }
 
     return (
-        <div 
+        <div
             className={cn(
                 "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full p-1.5 shadow-2xl bg-slate-900 border border-white/10 backdrop-blur-md",
                 className
             )}
-            role="group" 
-            aria-label="Mobile Undo and redo"
+            role="group"
+            aria-label={ur.mobileGroupLabel}
         >
             {/* Touch-Accessible Undo (>44px) */}
             <button
                 onClick={handleUndo}
                 disabled={!isUndoEnabled}
-                aria-label={`Undo${undoCount > 0 ? ` (${undoCount})` : ''}`}
+                aria-label={`${ur.undo}${undoCount > 0 ? ` (${undoCount})` : ''}`}
                 className={cn(
                     'relative flex h-12 w-16 items-center justify-center rounded-full transition-all duration-150 touch-manipulation',
                     'bg-white/5 text-[#F8FAFC]',
@@ -72,7 +75,7 @@ export function MobileUndoRedoButtons({ className }: { className?: string }) {
             <button
                 onClick={handleRedo}
                 disabled={!isRedoEnabled}
-                aria-label={`Redo${redoCount > 0 ? ` (${redoCount})` : ''}`}
+                aria-label={`${ur.redo}${redoCount > 0 ? ` (${redoCount})` : ''}`}
                 className={cn(
                     'relative flex h-12 w-16 items-center justify-center rounded-full transition-all duration-150 touch-manipulation',
                     'bg-white/5 text-[#F8FAFC]',

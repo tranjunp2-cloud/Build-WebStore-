@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Inter } from 'next/font/google'
 import type { PageData } from '@/store/editorStore'
+import { useI18n } from '@/i18n'
 
 const inter = Inter({
     subsets: ['latin'],
@@ -28,6 +29,8 @@ export function PrePublishModal({
     hasUnsavedChanges,
     pages,
 }: PrePublishModalProps) {
+    const { t } = useI18n()
+    const pm = t.editor.publishModal
     const eligiblePages = pages.filter((page) => !page.deletedAt)
     const missingSeoPages = eligiblePages.filter((page) => !page.seoTitle?.trim() || !page.seoDescription?.trim())
     const hasSeoWarning = !hasUnsavedChanges && missingSeoPages.length > 0
@@ -40,8 +43,8 @@ export function PrePublishModal({
             iconClassName: 'text-[#F0B100]',
             titleClassName: 'text-[#FFF085]',
             descriptionClassName: 'text-[rgba(255,240,133,0.7)]',
-            title: 'Unsaved changes detected',
-            description: 'We will save your latest edits before publishing.',
+            title: pm.unsavedChanges,
+            description: pm.unsavedChangesDesc,
         }
         : hasSeoWarning
             ? {
@@ -51,8 +54,10 @@ export function PrePublishModal({
                 iconClassName: 'text-[#F0B100]',
                 titleClassName: 'text-[#FFF085]',
                 descriptionClassName: 'text-[rgba(255,240,133,0.7)]',
-                title: 'SEO optimization needed',
-                description: `${missingSeoPages.length} page${missingSeoPages.length > 1 ? 's are' : ' is'} missing meta title or description`,
+                title: pm.seoNeeded,
+                description: missingSeoPages.length > 1
+                    ? pm.seoMissingMany.replace('{count}', String(missingSeoPages.length))
+                    : pm.seoMissingOne.replace('{count}', String(missingSeoPages.length)),
             }
             : {
                 icon: CheckCircle2,
@@ -61,8 +66,8 @@ export function PrePublishModal({
                 iconClassName: 'text-[#00C950]',
                 titleClassName: 'text-[#B9F8CF]',
                 descriptionClassName: 'text-[rgba(185,248,207,0.7)]',
-                title: 'SEO metadata is set',
-                description: 'All pages have meta title and description.',
+                title: pm.seoSet,
+                description: pm.seoSetDesc,
             }
 
     return (
@@ -90,7 +95,7 @@ export function PrePublishModal({
                                 <div className={`${inter.className} w-[448px] max-w-[calc(100vw-2rem)] rounded-[16px] border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] p-6 shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] backdrop-blur-[25px]`}>
                                     <Dialog.Title className="text-[20px] font-semibold leading-7 tracking-normal text-[#F8FAFC]">
                                         <span className="mr-2">🚀</span>
-                                        Ready to Publish?
+                                        {pm.title}
                                     </Dialog.Title>
 
                                     <div className="mt-4 flex flex-col gap-3">
@@ -98,10 +103,10 @@ export function PrePublishModal({
                                             <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#00C950]" />
                                             <div className="min-w-0">
                                                 <p className="text-[14px] font-medium leading-5 text-[#B9F8CF]">
-                                                    Homepage is set
+                                                    {pm.homepageReady}
                                                 </p>
                                                 <p className="text-[12px] leading-4 text-[rgba(185,248,207,0.7)]">
-                                                    Your Home page is ready
+                                                    {pm.homepageReadyDesc}
                                                 </p>
                                             </div>
                                         </div>
@@ -125,7 +130,7 @@ export function PrePublishModal({
                                                 type="button"
                                                 className="h-[42px] flex-1 rounded-[12px] border border-[rgba(59,130,246,0.07)] text-[14px] font-medium text-[#F8FAFC] transition-colors hover:bg-white/[0.04]"
                                             >
-                                                Cancel
+                                                {pm.cancel}
                                             </button>
                                         </Dialog.Close>
 
@@ -138,10 +143,10 @@ export function PrePublishModal({
                                             {isPublishing ? (
                                                 <span className="inline-flex items-center gap-2">
                                                     <Loader2 className="h-4 w-4 animate-spin" />
-                                                    Publishing...
+                                                    {pm.publishingBtn}
                                                 </span>
                                             ) : (
-                                                'Publish Now'
+                                                pm.publishNow
                                             )}
                                         </button>
                                     </div>

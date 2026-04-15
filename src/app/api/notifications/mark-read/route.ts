@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 import type { MarkReadPayload } from '@/types/notification'
 
 import { z } from 'zod'
 
 const MarkReadSchema = z.object({
     mark_all: z.boolean().optional(),
-    notificationIds: z.array(z.string()).optional(),
+    notificationIds: z.array(z.string()).max(100).optional(),
 }).refine(data => data.mark_all || (data.notificationIds && data.notificationIds.length > 0), {
     message: "Must provide either mark_all=true or an array of notificationIds",
 })
@@ -24,6 +25,15 @@ export const dynamic = 'force-dynamic'
  */
 export const POST = withAuth(async (user, request) => {
     try {
+        // Rate limit: 10 requests per minute per user
+        const rateCheck = await checkRateLimit(`notifications:mark-read:${user.id}`, 10, 60_000)
+        if (!rateCheck.allowed) {
+            return NextResponse.json(
+                { success: false, error: 'Too many requests' },
+                { status: 429, headers: { 'Retry-After': String(Math.max(1, Math.ceil((rateCheck.resetAt - Date.now()) / 1000))) } },
+            )
+        }
+
         const payload = await getPayload({ config })
         const jsonBody = await request.json()
         const parsed = MarkReadSchema.safeParse(jsonBody)

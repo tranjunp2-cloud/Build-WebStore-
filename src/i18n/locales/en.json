@@ -203,7 +203,18 @@
             "copyLink": "Copy Link",
             "copied": "Copied",
             "linkCopied": "Link copied! 🎉",
-            "copyFailed": "Failed to copy link"
+            "copyFailed": "Failed to copy link",
+            "yourWebsite": "Your website",
+            "previewPreparing": "Preview is being prepared.",
+            "savingDraft": "Saving draft...",
+            "savedAt": "Saved {time}",
+            "saveFailed": "Save failed",
+            "unsavedChanges": "Unsaved changes",
+            "pagesGenerated": "{count} pages",
+            "generated": "generated",
+            "generationTime": "{seconds}s",
+            "createdSuccessfully": "Website \"{name}\" has been created successfully!",
+            "viewPreviewHint": "You can view the Preview on the right, open the Editor to make changes, or Publish now!"
         },
         "form": {
             "businessName": "Business Name",
@@ -1175,6 +1186,8 @@
                 "bulkDeleteConfirm": "Are you sure you want to delete {count} posts?",
                 "bulkDeleteWarning": "This action cannot be undone.",
                 "deletePublishedWarning": "Warning: This post is currently published and visible to your customers. Deleting it will immediately remove it from your storefront.",
+                "bulkDeleteTitle": "Delete {count} posts?",
+                "bulkDeletePublishedWarning": "Some selected posts are currently published. Deleting them will immediately remove them from your storefront.",
                 "cancel": "Cancel",
                 "deleting": "Deleting...",
                 "bulkPublish": "Publish",
@@ -1209,6 +1222,7 @@
                 "postTitle": "Post title",
                 "titlePlaceholder": "e.g., E-commerce Marketing Strategies",
                 "titleRequired": "Title is required",
+                "contentRequired": "Content is required",
                 "titleMaxLength": "Title must be less than 255 characters",
                 "slugInvalid": "Slug can only contain lowercase letters, numbers, and hyphens",
                 "urlSlugLabel": "URL Slug (auto-generated, editable)",
@@ -1286,7 +1300,7 @@
                 "saveBtn": "Save",
                 "closeBtn": "Close",
                 "removeTitle": "Remove category",
-                "removeConfirmMsg": "Are you sure you want to remove the \"{name}\" category?\nPosts using this category will be changed to \"Uncategorized\".",
+                "removeConfirmMsg": "Are you sure you want to remove the \"{name}\" category?\nThis category will be permanently deleted.",
                 "cancelBtn": "Cancel",
                 "deletingBtn": "Deleting...",
                 "deleteBtn": "Delete",
@@ -1296,7 +1310,8 @@
                 "toastUpdateSuccess": "Category updated",
                 "toastUpdateFail": "Failed to update category",
                 "toastDeleteSuccess": "Category \"{name}\" deleted",
-                "toastDeleteFail": "Failed to delete category"
+                "toastDeleteFail": "Failed to delete category",
+                "deletePublishedWarning": "This category is assigned to {count} published post(s). Deleting it will remove the category from those posts, but they will remain published."
             },
             "categoryPage": {
                 "title": "Manage Category",
@@ -1307,8 +1322,9 @@
                 "namePlaceholder": "Category name",
                 "close": "Close",
                 "deleteTitle": "Delete Category",
-                "deleteConfirm": "Are you sure you want to delete",
-                "deleteWarning": "Posts assigned to this category will become uncategorized. This cannot be undone.",
+                "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+                "deletePublishedWarning": "This category is assigned to {count} published post(s). Deleting it will remove the category from those posts, but they will remain published.",
+                "deleteWarning": "This category will be permanently removed. This cannot be undone.",
                 "cancel": "Cancel",
                 "delete": "Delete",
                 "deleting": "Deleting...",
@@ -1734,6 +1750,12 @@
             "newCount": "{count} new notifications",
             "justNow": "Just now",
             "dismiss": "Dismiss"
+        },
+        "push": {
+            "title": "Enable desktop notifications?",
+            "description": "Get notified about new orders and updates even when this tab is in the background.",
+            "enable": "Enable",
+            "later": "Later"
         }
     },
     "Staff": {
@@ -1908,7 +1930,22 @@
             "updating": "Updating...",
             "preview": "Preview",
             "live": "Live",
-            "draft": "Draft"
+            "draft": "Draft",
+            "saving": "Saving...",
+            "unsaved": "Unsaved",
+            "saved": "Saved",
+            "menu": "Menu",
+            "templates": "Templates",
+            "undo": "Undo",
+            "redo": "Redo",
+            "undoShortcut": "Undo (Cmd/Ctrl+Z)",
+            "redoShortcut": "Redo (Cmd/Ctrl+Shift+Z)",
+            "openMenu": "Open menu",
+            "desktop": "Desktop",
+            "mobile": "Mobile",
+            "changesPending": "Changes pending",
+            "sitePreview": "Site Preview",
+            "dragToReorder": "Drag to reorder section"
         },
         "publishModal": {
             "title": "Ready to Publish?",
@@ -1920,7 +1957,35 @@
             "seoSet": "SEO metadata is set",
             "seoSetDesc": "All pages have meta title and description.",
             "cancel": "Cancel",
-            "publishNow": "Publish Now"
+            "publishNow": "Publish Now",
+            "publishingBtn": "Publishing...",
+            "seoMissingOne": "{count} page is missing meta title or description",
+            "seoMissingMany": "{count} pages are missing meta title or description"
+        },
+        "imageToolbar": {
+            "changeImage": "Change Image",
+            "generateAI": "Generate AI Image"
+        },
+        "saveStatus": {
+            "saving": "Saving...",
+            "saved": "Saved",
+            "savedAgo": "Saved {timeAgo}",
+            "notSaved": "Not saved",
+            "draftSaving": "Draft saving in 3s..."
+        },
+        "richText": {
+            "heading1": "Heading 1",
+            "heading2": "Heading 2",
+            "heading3": "Heading 3",
+            "heading4": "Heading 4",
+            "paragraph": "Paragraph",
+            "bold": "Bold",
+            "italic": "Italic",
+            "underline": "Underline",
+            "alignLeft": "Align Left",
+            "alignCenter": "Align Center",
+            "alignRight": "Align Right",
+            "justify": "Justify"
         },
         "unpublishModal": {
             "title": "Unpublish Website",
@@ -2148,6 +2213,124 @@
             "labelVisible": "Label visible",
             "iconOnly": "Icon only",
             "badgeDesc": "Badge count always stays visible"
+        },
+        "statusBar": {
+            "connected": "Connected",
+            "pageLabel": "Page:",
+            "blocksCount": "{count} blocks"
+        },
+        "undoRedo": {
+            "undo": "Undo",
+            "redo": "Redo",
+            "undoTooltip": "Undo: {label} (Ctrl+Z)",
+            "redoTooltip": "Redo: {label} (Ctrl+Y)",
+            "lastChange": "last change",
+            "lastUndoneChange": "last undone change",
+            "nothingToUndo": "Nothing to undo",
+            "nothingToRedo": "Nothing to redo",
+            "groupLabel": "Undo and redo",
+            "mobileGroupLabel": "Mobile Undo and redo"
+        },
+        "template": {
+            "title": "Choose a Template",
+            "searchPlaceholder": "Search templates...",
+            "showingCount": "Showing {filtered} of {total} templates",
+            "loading": "Loading templates...",
+            "loadError": "Failed to load templates",
+            "noTemplates": "No templates available yet.",
+            "seedHint": "Run POST /api/templates/seed to create templates.",
+            "noMatch": "No templates match this filter",
+            "applyConfirmTitle": "Apply \"{name}\"?",
+            "applyConfirmDesc": "This will apply the new template layout and theme. Your existing content (text, images) will be preserved where possible.",
+            "cancel": "Cancel",
+            "applying": "Applying...",
+            "applyButton": "Apply Template",
+            "appliedSuccess": "Template \"{name}\" applied!",
+            "applyFailed": "Failed to apply template",
+            "previewTitle": "Preview: {name}",
+            "all": "All",
+            "restaurant": "Restaurant",
+            "ecommerce": "E-Commerce",
+            "beauty": "Beauty",
+            "tech": "Tech",
+            "health": "Health",
+            "education": "Education",
+            "realEstate": "Real Estate",
+            "fitness": "Fitness",
+            "creative": "Creative",
+            "business": "Business",
+            "cafeBakery": "Cafe & Bakery",
+            "events": "Events",
+            "blog": "Blog",
+            "travel": "Travel"
+        },
+        "addSection": {
+            "testimonials": "Add testimonials",
+            "testimonialsCompact": "💬 Add testimonials",
+            "testimonialsPrompt": "Add a testimonials section with 3 customer reviews",
+            "faq": "Add FAQ",
+            "faqCompact": "❓ Add FAQ",
+            "faqPrompt": "Add an FAQ section with 3 common customer questions",
+            "gallery": "Add gallery",
+            "galleryCompact": "🖼️ Add gallery",
+            "galleryPrompt": "Add a gallery section with 6 placeholder images",
+            "features": "Add features",
+            "featuresCompact": "✨ Add features",
+            "featuresPrompt": "Add a features section with 3 key service highlights",
+            "team": "Add team",
+            "teamCompact": "👥 Add team",
+            "teamPrompt": "Add a team section with 3 team members",
+            "newsletter": "Add newsletter",
+            "newsletterCompact": "✉️ Add newsletter",
+            "newsletterPrompt": "Add a newsletter signup section",
+            "banner": "Add banner",
+            "bannerCompact": "📣 Add banner",
+            "bannerPrompt": "Add a banner section for a promotion campaign",
+            "cta": "Add CTA",
+            "ctaCompact": "🚀 Add CTA",
+            "ctaPrompt": "Add a call to action section with a strong offer"
+        },
+        "inlineEditComponent": {
+            "clickToEdit": "Click to edit",
+            "defaultPlaceholder": "Click to edit...",
+            "save": "Save",
+            "cancel": "Cancel",
+            "aiRewrite": "AI Rewrite",
+            "aiPlaceholder": "e.g. Make it shorter, add emoji...",
+            "rewrite": "Rewrite"
+        },
+        "preview": {
+            "mapImageError": "Could not map image to block field",
+            "imageReplaceSuccess": "Image replaced successfully",
+            "imageReplaceFailed": "Failed to replace image",
+            "inlineEditFailed": "Inline edit failed",
+            "aiContextLocked": "AI Generation context locked to: {blockType}"
+        },
+        "pageManagerPanel": {
+            "title": "Page Manager",
+            "description": "Create, select, hide, and soft-delete pages for this site.",
+            "createError": "Error creating page",
+            "slugConflict": "Page slug already exists in this site",
+            "noPagesFound": "No pages found",
+            "noPagesSuggestion": "Create a new page or try a different search keyword."
+        },
+        "navigationValidation": {
+            "labelRequired": "Link label is required",
+            "selectPageError": "Please select a page",
+            "urlRequired": "Link URL is required",
+            "invalidUrl": "Please enter a valid URL starting with http:// or https://",
+            "noDestination": "No destination set",
+            "linkType": "Link type",
+            "pageDestination": "Page destination",
+            "urlPlaceholder": "https://..."
+        },
+        "settingsValidation": {
+            "invalidPhone": "Please enter a valid phone number (digits, +, -, spaces)",
+            "primaryColorLabel": "Primary color picker",
+            "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?"
+        },
+        "menuDrawer": {
+            "defaultUserName": "User"
         }
     }
 }

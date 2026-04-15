@@ -2,6 +2,7 @@
 
 import { useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
 type AddToCartButtonProps = {
     product: {
@@ -21,6 +22,7 @@ type AddToCartButtonProps = {
 
 export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: AddToCartButtonProps) {
     const { addItem, setSiteSlug } = useCartStore()
+    const isOwner = useIsOwner()
     const isOutOfStock = product.inventory <= 0
 
     const handleClick = () => {
@@ -40,6 +42,7 @@ export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: Add
                 siteId,
                 event: 'add_to_cart',
                 metadata: { productId: product.id, productSlug: product.slug, price: product.price },
+                isOwner,
             })
         }
     }

@@ -7,8 +7,10 @@ export function trackEvent(params: {
     event: 'click' | 'add_to_cart' | 'checkout' | 'purchase'
     pageUrl?: string
     metadata?: Record<string, unknown>
+    isOwner?: boolean
 }) {
-    // Skip tracking in editor/preview mode
+    // Skip tracking for owner visits and editor/preview mode
+    if (params.isOwner) return
     const path = window.location.pathname
     if (path.startsWith('/preview/') || path.startsWith('/builder/')) return
 

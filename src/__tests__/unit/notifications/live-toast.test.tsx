@@ -10,7 +10,6 @@ import { I18nProvider } from '@/i18n'
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
-let fetchCallCount = 0
 let fetchResponse: { unreadCount: number; items: Array<{ id: string; title: string; type?: string; message?: string }> } = {
     unreadCount: 0,
     items: [],
@@ -29,20 +28,29 @@ function renderLiveToastFeature() {
     )
 }
 
+/** Advance fake timers and flush React batched state updates */
+async function advanceAndFlush(ms: number) {
+    await act(async () => {
+        await vi.advanceTimersByTimeAsync(ms)
+    })
+    // Flush batched React state updates triggered by CustomEvent → setToasts
+    await act(async () => {
+        await vi.advanceTimersByTimeAsync(1)
+    })
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────
 
 describe('[TC-F16.06] Live Toast Polling Delivery', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.useFakeTimers({ shouldAdvanceTime: true })
-        fetchCallCount = 0
         useNotificationStore.setState({ unreadCount: 0 })
 
         // Default: no new notifications
         setupFetchMock({ unreadCount: 0, items: [] })
 
         global.fetch = vi.fn(async () => {
-            fetchCallCount++
             return {
                 ok: true,
                 json: async () => fetchResponse,
@@ -60,10 +68,8 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
     it('displays a single toast when polling detects new notification', async () => {
         renderLiveToastFeature()
 
-        // Initial poll — no notifications
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(100)
-        })
+        // Initial poll — seed seen IDs with empty set
+        await advanceAndFlush(100)
         expect(useNotificationStore.getState().unreadCount).toBe(0)
 
         // Simulate new notification appearing on next poll
@@ -77,10 +83,8 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
             }],
         })
 
-        // Advance to next poll (15s)
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(15500)
-        })
+        // Advance past poll interval (15s for non-push-granted in jsdom)
+        await advanceAndFlush(16_000)
 
         expect(useNotificationStore.getState().unreadCount).toBe(1)
         expect(screen.getByText('New Order #1024')).toBeInTheDocument()
@@ -90,9 +94,7 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
         renderLiveToastFeature()
 
         // Initial poll
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(100)
-        })
+        await advanceAndFlush(100)
 
         // Next poll returns 3 new notifications
         setupFetchMock({
@@ -104,9 +106,7 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
             ],
         })
 
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(15500)
-        })
+        await advanceAndFlush(16_000)
 
         expect(useNotificationStore.getState().unreadCount).toBe(3)
         expect(screen.getByText('3 new notifications')).toBeInTheDocument()
@@ -115,9 +115,7 @@ describe('[TC-F16.06] Live Toast Polling Delivery', () => {
     it('polls using fetch, not EventSource', async () => {
         renderLiveToastFeature()
 
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(100)
-        })
+        await advanceAndFlush(100)
 
         expect(global.fetch).toHaveBeenCalled()
         const fetchCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string
