@@ -139,6 +139,20 @@ function resolveCTA(
   return role === 'primary' ? 'Get Started' : 'Learn More'
 }
 
+/**
+ * Plan 260415 nav-bugfix A — resolve a safe CTA URL for the navigation block.
+ * Checks if the site actually has a contact page before emitting `/contact`
+ * (previous hardcoded value 404'd when the template had no contact page).
+ * Priority: /contact → /services → /about → anchor fallback `/#contact`.
+ */
+function resolveNavCtaUrl(pages: string[]): string {
+  const priorityOrder = ['contact', 'services', 'about', 'booking', 'pricing']
+  for (const slug of priorityOrder) {
+    if (pages.includes(slug)) return `/${slug}`
+  }
+  return '/#contact'
+}
+
 function buildNavigation(
   biz: BusinessSample,
   pages: string[],
@@ -151,10 +165,9 @@ function buildNavigation(
   }))
   return {
     blockType: 'navigation',
-    variant: 'simple',
     logoText: biz.name,
     links,
-    ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: '/contact' },
+    ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: resolveNavCtaUrl(pages) },
   }
 }
 

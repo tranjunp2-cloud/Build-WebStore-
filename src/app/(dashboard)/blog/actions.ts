@@ -138,6 +138,32 @@ export async function updateBlogCategoryAction(id: string, data: { name: string 
     }
 }
 
+/**
+ * Returns count of PUBLISHED posts assigned to a category.
+ * Used by delete-category UI to decide whether to show a warning.
+ */
+export async function getCategoryPublishedPostCountAction(categoryId: string): Promise<number> {
+    const user = await getCurrentUser()
+    if (!user) return 0
+
+    const payload = await getPayload({ config: configPromise })
+    const tenantId = getTenantId(user as UserWithTenants)
+
+    const conditions: Where[] = [
+        { category: { equals: categoryId } },
+        { status: { equals: 'published' } },
+    ]
+    if (tenantId) conditions.push({ tenant: { equals: tenantId } })
+
+    const result = await payload.find({
+        collection: 'blogs',
+        where: { and: conditions },
+        limit: 1,
+        depth: 0,
+    })
+    return result.totalDocs
+}
+
 export async function deleteBlogCategoryAction(id: string) {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
@@ -151,47 +177,14 @@ export async function deleteBlogCategoryAction(id: string) {
         const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
         if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
-            return { error: 'Unauthorized delete access' }
+            return { error: 'ERR_UNAUTHORIZED' }
         }
 
-        // Guard: cannot delete the "Uncategorized" fallback category
-        if (existing.slug === 'uncategorized') {
-            return { error: 'Cannot delete the Uncategorized category' }
-        }
-
-        // Find or create "Uncategorized" fallback for this tenant (TC-F17-05-06)
-        const uncatWhere: Where[] = [
-            { slug: { equals: 'uncategorized' } },
-            { status: { not_equals: 'deleted' } },
-        ]
-        if (tenantId) uncatWhere.push({ tenant: { equals: tenantId } })
-
-        const uncatResult = await payload.find({
-            collection: 'blog_categories',
-            where: { and: uncatWhere },
-            limit: 1,
-        })
-
-        let uncategorizedId: string | number
-        if (uncatResult.docs.length > 0) {
-            uncategorizedId = uncatResult.docs[0].id
-        } else {
-            const created = await payload.create({
-                collection: 'blog_categories',
-                data: {
-                    name: 'Uncategorized',
-                    slug: 'uncategorized',
-                    tenant: tenantId || undefined,
-                } as Record<string, unknown>,
-            })
-            uncategorizedId = created.id
-        }
-
-        // Cascade: reassign posts to "Uncategorized"
+        // Unset category from all posts referencing this category
         const affected = await payload.find({
             collection: 'blogs',
             where: { category: { equals: id } },
-            limit: 0,
+            limit: 500,
             depth: 0,
         })
 
@@ -201,22 +194,21 @@ export async function deleteBlogCategoryAction(id: string) {
                     payload.update({
                         collection: 'blogs',
                         id: blog.id,
-                        data: { category: uncategorizedId },
+                        data: { category: null },
                     })
                 )
             )
         }
 
-        await payload.update({
+        // Hard delete the category
+        await payload.delete({
             collection: 'blog_categories',
             id,
-            data: { status: 'deleted' as const },
-            user: user as PayloadUser,
         })
         return { success: true }
     } catch (e: unknown) {
         console.error('Failed to delete category:', e)
-        return { error: 'Failed to delete category. It might be in use.' }
+        return { error: 'ERR_DELETE_CATEGORY' }
     }
 }
 
@@ -237,6 +229,7 @@ export async function saveBlogAction(data: {
     category?: string | null
     thumbnail?: string | null
     publishedAt?: string | null
+    scheduledPublishDate?: string | null
     seo?: {
         metaTitle?: string
         metaDescription?: string
@@ -272,6 +265,7 @@ export async function saveBlogAction(data: {
         category: data.category ? (isNaN(Number(data.category)) ? data.category : Number(data.category)) : null,
         thumbnail: data.thumbnail ? (isNaN(Number(data.thumbnail)) ? data.thumbnail : Number(data.thumbnail)) : null,
         publishedAt: data.publishedAt || null,
+        scheduledPublishDate: data.scheduledPublishDate || null,
         seo: data.seo || {},
         author: (user as UserWithTenants).id,
     }

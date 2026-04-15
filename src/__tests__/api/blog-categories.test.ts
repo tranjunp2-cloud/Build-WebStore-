@@ -21,11 +21,11 @@ describe('GET /api/blog-categories [TC-F17]', () => {
         vi.clearAllMocks()
     })
 
-    it('returns active categories', async () => {
+    it('returns all categories (hard-delete means no soft-deleted in DB)', async () => {
         mockFind.mockResolvedValue({
             docs: [
                 { id: 1, name: 'Tech', status: 'active' },
-                { id: 2, name: 'Deleted', status: 'deleted' },
+                { id: 2, name: 'News', status: 'active' },
             ],
         })
 
@@ -34,7 +34,7 @@ describe('GET /api/blog-categories [TC-F17]', () => {
         const body = await res.json()
 
         expect(res.status).toBe(200)
-        expect(body.data).toHaveLength(1) // filtered out deleted
+        expect(body.data).toHaveLength(2)
         expect(body.data[0].name).toBe('Tech')
     })
 })

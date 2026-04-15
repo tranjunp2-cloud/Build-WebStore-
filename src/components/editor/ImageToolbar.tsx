@@ -3,6 +3,7 @@
 import React, { useRef } from 'react'
 import { ImagePlus, Sparkles } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
+import { useI18n } from '@/i18n'
 
 interface ImageToolbarProps {
     onImageSelect: (file: File, compressedUrl: string) => void
@@ -11,6 +12,8 @@ interface ImageToolbarProps {
 }
 
 export function ImageToolbar({ onImageSelect, onAiGenerate, isProcessing }: ImageToolbarProps) {
+    const { t } = useI18n()
+    const it = t.editor.imageToolbar
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,7 +50,7 @@ export function ImageToolbar({ onImageSelect, onAiGenerate, isProcessing }: Imag
                 disabled={isProcessing}
             >
                 <ImagePlus className="w-4 h-4" />
-                Thay ảnh
+                {it.changeImage}
             </button>
 
             <div className="w-px h-5 bg-white/10 mx-1" />
@@ -58,7 +61,7 @@ export function ImageToolbar({ onImageSelect, onAiGenerate, isProcessing }: Imag
                 disabled={isProcessing}
             >
                 <Sparkles className="w-4 h-4" />
-                Sinh ảnh AI
+                {it.generateAI}
             </button>
         </div>
     )

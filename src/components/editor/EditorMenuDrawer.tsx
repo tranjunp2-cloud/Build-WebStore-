@@ -215,7 +215,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0)] shadow-[0_0_0_2px_rgba(59,130,246,0.3)] text-[12px] font-bold text-white overflow-hidden">
                                 {userInitial || '?'}
                             </div>
-                            <span className="text-[14px] font-medium text-[#F8FAFC]">{userName || 'User'}</span>
+                            <span className="text-[14px] font-medium text-[#F8FAFC]">{userName || t.editor.menuDrawer.defaultUserName}</span>
                         </div>
                         <div className="notification-bell-sidebar">
                             <NotificationBell />

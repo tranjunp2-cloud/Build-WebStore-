@@ -12,7 +12,8 @@ import {
     getBlogCategoriesAction,
     createBlogCategoryAction,
     updateBlogCategoryAction,
-    deleteBlogCategoryAction
+    deleteBlogCategoryAction,
+    getCategoryPublishedPostCountAction,
 } from '../actions'
 import { useI18n } from '@/i18n'
 
@@ -45,7 +46,9 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
 
     // Delete state
     const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
+    const [deletePublishedCount, setDeletePublishedCount] = useState(0)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [fetchingDeleteId, setFetchingDeleteId] = useState<string | null>(null)
 
     const fetchCategories = useCallback(async () => {
         try {
@@ -71,7 +74,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
         try {
             const res = await createBlogCategoryAction({ name: newName.trim() })
             if (res?.error) {
-                toast.error(res.error)
+                toast.error(t.dashboard.blog.categoryModal.toastCreateFail)
                 return
             }
             toast.success(t.dashboard.blog.categoryModal.toastCreateSuccess)
@@ -97,7 +100,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
         try {
             const res = await updateBlogCategoryAction(editingId, { name: editName.trim() })
             if (res?.error) {
-                toast.error(res.error)
+                toast.error(t.dashboard.blog.categoryModal.toastUpdateFail)
                 return
             }
             toast.success(t.dashboard.blog.categoryModal.toastUpdateSuccess)
@@ -111,17 +114,32 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
         }
     }
 
+    const openDeleteModal = async (cat: Category) => {
+        setFetchingDeleteId(cat.id)
+        try {
+            const count = await getCategoryPublishedPostCountAction(cat.id)
+            setDeletePublishedCount(count)
+            setDeleteTarget(cat)
+        } catch {
+            setDeletePublishedCount(0)
+            setDeleteTarget(cat)
+        } finally {
+            setFetchingDeleteId(null)
+        }
+    }
+
     const handleDelete = async () => {
         if (!deleteTarget) return
         setIsDeleting(true)
         try {
             const res = await deleteBlogCategoryAction(deleteTarget.id)
             if (res?.error) {
-                toast.error(res.error)
+                toast.error(t.dashboard.blog.categoryModal.toastDeleteFail)
                 return
             }
             toast.success(t.dashboard.blog.categoryModal.toastDeleteSuccess.replace('{name}', deleteTarget.name))
             setDeleteTarget(null)
+            setDeletePublishedCount(0)
             fetchCategories()
             onCategoryUpdated?.()
         } catch {
@@ -226,10 +244,14 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                                     <Pencil className="w-[16px] h-[16px] text-[#3B82F6]" strokeWidth={1.333} />
                                                 </button>
                                                 <button
-                                                    onClick={(e) => { e.preventDefault(); setDeleteTarget(cat); }}
-                                                    className="flex flex-col items-center pt-[8px] px-[8px] pb-0 w-[32px] h-[32px] rounded-[12px] hover:bg-white/10 transition-colors"
+                                                    onClick={(e) => { e.preventDefault(); openDeleteModal(cat); }}
+                                                    disabled={fetchingDeleteId === cat.id}
+                                                    className="flex flex-col items-center pt-[8px] px-[8px] pb-0 w-[32px] h-[32px] rounded-[12px] hover:bg-white/10 transition-colors disabled:opacity-50"
                                                 >
-                                                    <Trash2 className="w-[16px] h-[16px] text-[#EF4444]" strokeWidth={1.333} />
+                                                    {fetchingDeleteId === cat.id
+                                                        ? <Loader2 className="w-[16px] h-[16px] text-[#EF4444] animate-spin" strokeWidth={1.333} />
+                                                        : <Trash2 className="w-[16px] h-[16px] text-[#EF4444]" strokeWidth={1.333} />
+                                                    }
                                                 </button>
                                             </div>
                                         </div>
@@ -256,14 +278,14 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                     {showCreateInput && (
                         <div className="flex flex-col w-full p-[16px] mt-[4px] gap-[8px] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px]">
                             <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[#FAFAFA]">{t.dashboard.blog.categoryModal.categoryNameLabel}</span>
-                            <div className="flex flex-row gap-[16px] w-full h-[48px]">
+                            <div className="flex flex-row gap-[16px] w-full">
                                 <input
                                     value={newName}
                                     onChange={e => setNewName(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleCreate()}
                                     autoFocus
                                     placeholder={t.dashboard.blog.categoryModal.categoryNamePlaceholder}
-                                    className="flex-1 h-full bg-[#0B1120] border-[1px] border-solid border-white/[0.08] rounded-[12px] px-[16px] font-['Inter'] font-[400] text-[14px] text-[#FFFFFF] outline-none placeholder-[#9F9FA9] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)]"
+                                    className="flex-1 min-w-0 h-[48px] bg-[#0B1120] border-[1px] border-solid border-white/[0.08] rounded-[12px] px-[16px] font-['Inter'] font-[400] text-[14px] text-[#FFFFFF] outline-none placeholder-[#9F9FA9] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)]"
                                 />
                                 <button
                                     onClick={handleCreate}
@@ -308,6 +330,15 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                 {t.dashboard.blog.categoryModal.removeConfirmMsg.replace('{name}', deleteTarget.name)}
                             </span>
                         </div>
+
+                        {deletePublishedCount > 0 && (
+                            <div className="flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-4 py-3 mx-[10px] w-full max-w-[398px]">
+                                <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-yellow-400">
+                                    {t.dashboard.blog.categoryModal.deletePublishedWarning.replace('{count}', String(deletePublishedCount))}
+                                </p>
+                            </div>
+                        )}
 
                         {/* Buttons */}
                         <div className="flex flex-row gap-[12px] w-full max-w-[398px] mt-[6px] px-[10px]">

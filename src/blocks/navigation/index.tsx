@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, type CSSProperties, type ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -8,24 +8,57 @@ import { Menu, X } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { useScrollShrink } from './use-scroll-shrink'
 
 // Token shortcut: nav containers consume CONTAINER.default + INNER_PADDING.
 // h-16 stays because nav row height is a layout invariant, not section padding.
 const NAV_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
-// ── Shared Logo Component ────────────────────────────────────────────────────
+// Theme-adaptive nav surface — uses color-mix so nav background reads the
+// site's resolved --background CSS var and adds 85% opacity instead of the
+// previous hardcoded `rgba(9,9,11,0.85)`. Falls back to near-black when
+// color-mix is unsupported so existing dark-first sites look identical.
+const NAV_SURFACE_BG = `color-mix(in srgb, var(--background, #09090b) 85%, transparent)`
+const NAV_SURFACE_BG_SOLID = `color-mix(in srgb, var(--background, #09090b) 97%, transparent)`
+const NAV_SURFACE_BORDER = `1px solid rgba(var(--brand-primary-rgb), 0.12)`
+const NAV_SURFACE_TEXT = `var(--text, #fafafa)`
 
-function NavLogo({ logo, logoText, className }: { logo?: { url: string; alt?: string }; logoText?: string; className?: string }) {
+// ── Shared Logo Component ────────────────────────────────────────────────────
+// Plan 260415 nav-bugfix C — nhận thêm gradientMode + scrolled để TransparentNav
+// dùng chung component này thay cho logic inline duplicate. Mặc định luôn
+// show gradient brand primary → 56% primary. Khi gradientMode='when-scrolled'
+// (dùng cho TransparentNav), chỉ show gradient khi đã scroll — lúc trên hero
+// giữ màu trắng trên overlay.
+
+const LOGO_GRADIENT_STYLE = {
+    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.565))`,
+    WebkitBackgroundClip: 'text' as const,
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text' as const,
+}
+
+type NavLogoProps = {
+    logo?: { url: string; alt?: string }
+    logoText?: string
+    className?: string
+    gradientMode?: 'always' | 'when-scrolled' | 'never'
+    scrolled?: boolean
+}
+
+function NavLogo({
+    logo,
+    logoText,
+    className,
+    gradientMode = 'always',
+    scrolled = false,
+}: NavLogoProps) {
     if (logo?.url) {
         return <img src={logo?.url} alt={logoText || 'Logo'} className={className || 'h-6 sm:h-8 w-auto'} />
     }
+    const shouldShowGradient =
+        gradientMode === 'always' || (gradientMode === 'when-scrolled' && scrolled)
     return (
-        <span style={{
-            background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.565))`,
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-        }}>
+        <span style={shouldShowGradient ? LOGO_GRADIENT_STYLE : { color: 'inherit' }}>
             {logoText}
         </span>
     )
@@ -72,7 +105,16 @@ function DropdownLink({ link, i }: { link: NavLink; i: number }) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 8 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-xl border border-white/10 bg-[#0F172A]/95 p-1.5 shadow-xl backdrop-blur-lg"
+                        className="absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-xl p-1.5 shadow-xl backdrop-blur-lg"
+                        style={{
+                            // Plan 260415 nav fix: theme-adaptive dropdown panel.
+                            // Reads --surface from resolved theme so light themes
+                            // get a light dropdown instead of the previous
+                            // hardcoded navy `#0F172A`.
+                            background: `color-mix(in srgb, var(--surface, #111111) 95%, transparent)`,
+                            border: `1px solid color-mix(in srgb, var(--text, #fafafa) 10%, transparent)`,
+                            color: NAV_SURFACE_TEXT,
+                        }}
                     >
                         {link.children!.map((child, ci) => (
                             <a
@@ -268,7 +310,7 @@ function NavMobileMenuDrawer({
     onClose,
     links,
     ctaButton,
-    background = 'rgba(9,9,11,0.95)',
+    background = NAV_SURFACE_BG_SOLID,
 }: NavMobileDrawerProps) {
     return (
         <AnimatePresence>
@@ -281,7 +323,8 @@ function NavMobileMenuDrawer({
                     className="md:hidden overflow-hidden"
                     style={{
                         background,
-                        borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
+                        color: NAV_SURFACE_TEXT,
+                        borderTop: NAV_SURFACE_BORDER,
                     }}
                 >
                     <div className={`${NAV_CONTAINER} py-4 flex flex-col gap-1`}>
@@ -304,6 +347,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
     const mergedBlock = mergeNavigationBrandingWithSite(block, site)
     const { logoText, links = [], ctaButton, variant = 'simple' } = mergedBlock
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const scrolled = useScrollShrink(50)
 
     // ── Transparent variant ───────────────────────────────────────────────
     if (variant === 'transparent') {
@@ -336,24 +380,25 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="sticky top-0 z-50"
+            className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
             style={{
-                borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                background: 'rgba(9,9,11,0.85)',
-                // Plan 260415 nav fix: set explicit white text so DropdownLink's
-                // `opacity-60` renders as 60% white on the dark bg instead of
-                // inheriting the document's default black (which collides with
-                // the near-black bg and drops contrast below WCAG AA).
-                color: '#fff',
+                borderBottom: NAV_SURFACE_BORDER,
+                background: NAV_SURFACE_BG,
+                // Plan 260415 nav fix: text color reads the site's resolved
+                // --text CSS var so the nav adapts to both light and dark
+                // themes. DropdownLink's `opacity-60` renders as 60% of that
+                // color (was locked to white on near-black before).
+                color: NAV_SURFACE_TEXT,
                 backdropFilter: 'blur(20px) saturate(1.8)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
+                boxShadow: scrolled ? '0 4px 20px rgba(0,0,0,0.08)' : 'none',
             }}
         >
-            <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
+            <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
                 <motion.div
                     whileHover={{ scale: 1.02 }}
-                    className="font-bold text-xl font-heading flex items-center gap-2"
+                    className={`font-bold ${scrolled ? 'text-lg' : 'text-xl'} font-heading flex items-center gap-2 transition-[font-size] duration-300`}
                 >
                     <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                 </motion.div>
@@ -399,14 +444,8 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
     links: NavLink[]
     ctaButton?: { show: boolean; label: string; url: string }
 }) {
-    const [scrolled, setScrolled] = useState(false)
+    const scrolled = useScrollShrink(100)
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-    useEffect(() => {
-        const handleScroll = () => setScrolled(window.scrollY > 100)
-        window.addEventListener('scroll', handleScroll, { passive: true })
-        return () => window.removeEventListener('scroll', handleScroll)
-    }, [])
 
     return (
         <motion.nav
@@ -415,28 +454,30 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
             style={{
-                background: scrolled ? 'rgba(255,255,255,0.95)' : 'transparent',
+                // Plan 260415 — when scrolled, the transparent nav snaps to
+                // the site's resolved surface + text color instead of the
+                // hardcoded white → near-black pair. Above the hero it stays
+                // transparent with white text (standard overlay pattern).
+                background: scrolled
+                    ? `color-mix(in srgb, var(--background, #ffffff) 95%, transparent)`
+                    : 'transparent',
                 backdropFilter: scrolled ? 'blur(20px)' : 'none',
                 WebkitBackdropFilter: scrolled ? 'blur(20px)' : 'none',
-                borderBottom: scrolled ? `1px solid rgba(var(--brand-primary-rgb), 0.071)` : '1px solid transparent',
-                color: scrolled ? '#18181b' : '#fff',
+                borderBottom: scrolled
+                    ? NAV_SURFACE_BORDER
+                    : '1px solid transparent',
+                color: scrolled ? NAV_SURFACE_TEXT : '#fff',
             }}
         >
             <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
                 <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
-                    {mergedBlock.logo?.url ? (
-                        <img src={mergedBlock.logo?.url} alt={logoText || 'Logo'} className="h-6 sm:h-8 w-auto" />
-                    ) : (
-                        <span style={scrolled ? {
-                            background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.565))`,
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                        } : { color: 'inherit' }}>
-                            {logoText}
-                        </span>
-                    )}
+                    <NavLogo
+                        logo={mergedBlock.logo}
+                        logoText={logoText}
+                        gradientMode="when-scrolled"
+                        scrolled={scrolled}
+                    />
                 </motion.div>
 
                 {/* Desktop Links */}
@@ -488,11 +529,11 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                 onClick={() => setIsOpen(true)}
                 aria-label="Open navigation"
                 style={{
-                    background: 'rgba(9,9,11,0.85)',
+                    background: NAV_SURFACE_BG,
                     backdropFilter: 'blur(12px)',
                     WebkitBackdropFilter: 'blur(12px)',
-                    border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                    color: '#fff',
+                    border: NAV_SURFACE_BORDER,
+                    color: NAV_SURFACE_TEXT,
                 }}
             >
                 <Menu size={20} />
@@ -520,9 +561,9 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                             className="fixed top-0 left-0 bottom-0 w-72 z-50 flex flex-col"
                             style={{
-                                background: 'rgba(9,9,11,0.97)',
-                                borderRight: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                                color: '#fff',
+                                background: NAV_SURFACE_BG_SOLID,
+                                borderRight: NAV_SURFACE_BORDER,
+                                color: NAV_SURFACE_TEXT,
                             }}
                         >
                             {/* Close + Logo */}
@@ -587,6 +628,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
     ctaButton?: { show: boolean; label: string; url: string }
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const scrolled = useScrollShrink(50)
     const midpoint = Math.ceil(links.length / 2)
     const leftLinks = links.slice(0, midpoint)
     const rightLinks = links.slice(midpoint)
@@ -596,17 +638,18 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="sticky top-0 z-50"
+            className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
             style={{
-                borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                background: 'rgba(9,9,11,0.85)',
-                // Plan 260415 nav fix: explicit white text for DropdownLink children.
-                color: '#fff',
+                borderBottom: NAV_SURFACE_BORDER,
+                background: NAV_SURFACE_BG,
+                // Plan 260415 nav fix: theme-adaptive text for DropdownLink children.
+                color: NAV_SURFACE_TEXT,
                 backdropFilter: 'blur(20px) saturate(1.8)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
+                boxShadow: scrolled ? '0 4px 20px rgba(0,0,0,0.08)' : 'none',
             }}
         >
-            <div className={`${NAV_CONTAINER} h-16`}>
+            <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} transition-[height] duration-300`}>
                 {/* Desktop: 3-column grid layout */}
                 <div className="hidden md:grid grid-cols-3 items-center h-full">
                     {/* Left links */}
@@ -673,6 +716,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+    const scrolled = useScrollShrink(50)
 
     const getSubLinks = (link?: NavLink) => {
         const children = link?.children ?? []
@@ -690,18 +734,19 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="sticky top-0 z-50"
+            className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
             style={{
-                borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                background: 'rgba(9,9,11,0.85)',
-                // Plan 260415 nav fix: explicit white text for DropdownLink children.
-                color: '#fff',
+                borderBottom: NAV_SURFACE_BORDER,
+                background: NAV_SURFACE_BG,
+                // Plan 260415 nav fix: theme-adaptive text for DropdownLink children.
+                color: NAV_SURFACE_TEXT,
                 backdropFilter: 'blur(20px) saturate(1.8)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
+                boxShadow: scrolled ? '0 4px 20px rgba(0,0,0,0.08)' : 'none',
             }}
             onMouseLeave={() => setHoveredIndex(null)}
         >
-            <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
+            <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} flex items-center justify-between transition-[height] duration-300`}>
                 {/* Logo */}
                 <motion.div
                     whileHover={{ scale: 1.02 }}
@@ -764,8 +809,9 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                         transition={{ duration: 0.2, ease: 'easeOut' }}
                         className="hidden md:block absolute left-0 right-0 z-40"
                         style={{
-                            background: 'rgba(9,9,11,0.97)',
-                            borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
+                            background: NAV_SURFACE_BG_SOLID,
+                            borderBottom: NAV_SURFACE_BORDER,
+                            color: NAV_SURFACE_TEXT,
                             backdropFilter: 'blur(20px)',
                             WebkitBackdropFilter: 'blur(20px)',
                         }}
@@ -829,27 +875,20 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
             <div
                 className="rounded-full px-6 py-3 flex items-center justify-between"
                 style={{
-                    background: 'rgba(255,255,255,0.90)',
+                    // Plan 260415 — pill variant was hardcoded white which
+                    // flipped against dark-theme sites. Read --background so
+                    // light sites get a white pill, dark sites get a dark pill.
+                    background: `color-mix(in srgb, var(--background, #ffffff) 90%, transparent)`,
+                    color: NAV_SURFACE_TEXT,
                     backdropFilter: 'blur(20px) saturate(1.8)',
                     WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                    border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
+                    border: NAV_SURFACE_BORDER,
                 }}
             >
                 {/* Logo */}
-                <div className="font-bold text-lg font-heading text-zinc-900">
-                    {mergedBlock.logo?.url ? (
-                        <img src={mergedBlock.logo?.url} alt={logoText || 'Logo'} className="h-6 w-auto" />
-                    ) : (
-                        <span style={{
-                            background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.565))`,
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                        }}>
-                            {logoText}
-                        </span>
-                    )}
+                <div className="font-bold text-lg font-heading">
+                    <NavLogo logo={mergedBlock.logo} logoText={logoText} className="h-6 w-auto" />
                 </div>
 
                 {/* Desktop Links */}
@@ -874,10 +913,11 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                     )}
                     <button
                         type="button"
-                        className={`md:hidden p-1.5 rounded-full text-zinc-600 hover:text-zinc-900 transition-colors ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
+                        className={`md:hidden p-1.5 rounded-full opacity-70 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                         aria-expanded={mobileMenuOpen}
+                        style={{ color: 'inherit' }}
                     >
                         {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
                     </button>
@@ -894,11 +934,12 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                         transition={{ duration: 0.2 }}
                         className="md:hidden mt-2 rounded-2xl overflow-hidden"
                         style={{
-                            background: 'rgba(255,255,255,0.95)',
+                            background: `color-mix(in srgb, var(--background, #ffffff) 95%, transparent)`,
+                            color: NAV_SURFACE_TEXT,
                             backdropFilter: 'blur(20px)',
                             WebkitBackdropFilter: 'blur(20px)',
                             boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                            border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
+                            border: NAV_SURFACE_BORDER,
                         }}
                     >
                         <div className="p-3 flex flex-col gap-0.5">
