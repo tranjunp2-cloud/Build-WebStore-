@@ -1957,15 +1957,21 @@ export function composeFromBlueprint(
   preset: TemplatePreset,
   compositionSeed?: number,
   bizOverride?: Partial<BusinessSample>,
-): TemplateSeed {
+): TemplateSeed | null {
+  // Plan 260415 fix-500 — return null instead of throw so caller (e.g.
+  // fallback-adapter.composeFallbackResult) can fall back to the legacy
+  // generateBlocks path cleanly rather than bubbling an uncaught error up
+  // through the AI gen outer catch.
   const content = getCategoryContent(preset.category)
   if (!content) {
-    throw new Error(`[composeFromBlueprint] Content not found for category: ${preset.category}`)
+    console.warn(`[composeFromBlueprint] Content not found for category: ${preset.category}`)
+    return null
   }
 
   const baseBiz = content.businesses[preset.businessIndex]
   if (!baseBiz) {
-    throw new Error(`[composeFromBlueprint] businessIndex ${preset.businessIndex} out of range for ${preset.category} (has ${content.businesses.length})`)
+    console.warn(`[composeFromBlueprint] businessIndex ${preset.businessIndex} out of range for ${preset.category} (has ${content.businesses.length})`)
+    return null
   }
 
   const biz: BusinessSample = bizOverride
@@ -2040,15 +2046,19 @@ export function composeFromBlueprint(
 // ── Legacy composer (deprecated — kept for backward compat) ────────────────
 
 /** @deprecated Use composeFromBlueprint() with TemplatePreset instead */
-export function composeTemplate(input: ComposerInput): TemplateSeed {
+export function composeTemplate(input: ComposerInput): TemplateSeed | null {
+  // Plan 260415 fix-500 — return null instead of throw (same reason as
+  // composeFromBlueprint above).
   const content = getCategoryContent(input.category)
   if (!content) {
-    throw new Error(`Unknown category: ${input.category}`)
+    console.warn(`[composeTemplate] Unknown category: ${input.category}`)
+    return null
   }
 
   const biz = content.businesses[input.businessIndex]
   if (!biz) {
-    throw new Error(`Business index ${input.businessIndex} out of range for category ${input.category} (has ${content.businesses.length})`)
+    console.warn(`[composeTemplate] Business index ${input.businessIndex} out of range for category ${input.category} (has ${content.businesses.length})`)
+    return null
   }
 
   const pages = getPageNames(input.variant)

@@ -179,7 +179,11 @@ export function composeFallbackResult(
     seed: number,
     language: Language = 'en',
     info?: BusinessInfoInput | string,
-): GenerationResult {
+): GenerationResult | null {
+    // Plan 260415 fix-500 — return null on any unrecoverable composer
+    // failure so the caller (openai-generator.generateWithFallback) can
+    // cleanly try the legacy generateBlocks safety net instead of throwing
+    // through the outer catch and surfacing as a 500 to the user.
     const category = resolveComposerCategory(prompt)
     const preset = pickPreset(category, seed)
 
@@ -193,6 +197,10 @@ export function composeFallbackResult(
     }
 
     const templateSeed = composeFromBlueprint(preset, seed, bizOverride)
+    if (!templateSeed) {
+        console.warn(`[fallback-adapter] composeFromBlueprint returned null for ${preset.category}`)
+        return null
+    }
 
     // Fetch canonical biz from content to populate top-level siteName/SEO.
     // Composer already injected extractedName into blocks via bizOverride; we
@@ -200,7 +208,8 @@ export function composeFallbackResult(
     const content = getCategoryContent(preset.category)
     const baseBiz = content?.businesses[preset.businessIndex]
     if (!baseBiz) {
-        throw new Error(`[fallback-adapter] Missing business content for ${preset.category}[${preset.businessIndex}]`)
+        console.warn(`[fallback-adapter] Missing business content for ${preset.category}[${preset.businessIndex}]`)
+        return null
     }
 
     const biz: BusinessSample = bizOverride
