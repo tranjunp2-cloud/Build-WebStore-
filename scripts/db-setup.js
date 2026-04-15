@@ -2350,6 +2350,10 @@ const MIGRATIONS = [
     name: 'blogs.published_at',
     sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS published_at timestamp(3) with time zone;`,
   },
+  {
+    name: 'blogs.scheduled_publish_date',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS scheduled_publish_date timestamp(3) with time zone;`,
+  },
   // ── AI Usage Logs (plan 260414-0914 phase-05) — per-call observability ──
   {
     name: 'ai_usage_logs.create_table',
