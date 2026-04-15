@@ -19,6 +19,8 @@ vi.mock('@/blocks/registry', () => ({
 }))
 
 import { buildSystemPrompt, buildUserPrompt } from '@/lib/ai/system-prompt'
+import { THEME_MOODS } from '@/lib/ai/theme-moods'
+import { CATEGORY_RECIPES } from '@/lib/ai/category-recipes'
 
 const businessInfo = {
   businessName: 'Nasi Kandar Pelita',
@@ -27,15 +29,32 @@ const businessInfo = {
   shortDescription: 'Traditional Malaysian restaurant in Kuala Lumpur',
 }
 
-// ── TC-F01-V.01: buildUserPrompt() injects "Design personality" ──────────
+// ── TC-F01-V.01: buildUserPrompt() injects mood COPY VOICE ──────────────
+// Plan 260414-2249 phase-02 (theme-moods) deprecated the legacy
+// "Design personality:" single-line personality injection in favour of a
+// mood-driven `COPY VOICE (...):` block that only fires when the caller
+// passes a mood option. Legacy no-mood calls now add no personality hint
+// at all — the previous STYLE_PERSONALITIES fallback was removed with
+// commit da3c2c74 ("close phase-02 gaps 3 + 4 — deprecate legacy mood
+// paths").
 
-describe('TC-F01-V.01: buildUserPrompt — inject Design personality', () => {
-  it('should contain "Design personality:" in output (auto-injected)', () => {
+describe('TC-F01-V.01: buildUserPrompt — inject mood COPY VOICE', () => {
+  it('should contain "COPY VOICE" block when mood is provided', () => {
+    // Arrange + Act
+    const prompt = buildUserPrompt(businessInfo, { mood: THEME_MOODS.elegant })
+
+    // Assert — mood-driven voice block injected with tone label
+    expect(prompt).toContain('COPY VOICE')
+    expect(prompt).toContain(THEME_MOODS.elegant.label)
+  })
+
+  it('should not add any personality block when mood is not provided (legacy callers)', () => {
     // Arrange + Act
     const prompt = buildUserPrompt(businessInfo)
 
-    // Assert — personality is injected automatically (random from matched keywords)
-    expect(prompt).toContain('Design personality:')
+    // Assert — no legacy "Design personality:" line and no COPY VOICE block
+    expect(prompt).not.toContain('Design personality:')
+    expect(prompt).not.toContain('COPY VOICE')
   })
 })
 
@@ -120,8 +139,16 @@ describe('buildSystemPrompt — design quality rules', () => {
     expect(prompt).toContain('Anti-Patterns')
   })
 
-  it('should contain composition hint in user prompt for known category', () => {
+  it('should not contain legacy composition hint without recipe', () => {
     const prompt = buildUserPrompt(businessInfo)
-    expect(prompt).toContain('Suggested block composition')
+    expect(prompt).not.toContain('Suggested block composition')
+  })
+
+  it('should contain RHYTHM section when recipe is provided', () => {
+    const recipe = CATEGORY_RECIPES.restaurant[0]!
+    const prompt = buildUserPrompt(businessInfo, { recipe })
+    expect(prompt).toContain('RHYTHM:')
+    expect(prompt).toContain(recipe.label)
+    expect(prompt).toContain(recipe.blocks.join(' → '))
   })
 })

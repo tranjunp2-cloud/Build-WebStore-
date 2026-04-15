@@ -18,6 +18,7 @@ import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
+import { useI18n } from '@/i18n'
 
 export interface AIBuilderPageClientProps {
     /** Server-resolved current user ID — used to detect cross-user localStorage contamination */
@@ -140,6 +141,7 @@ function LivePreview({
 }
 
 export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps) {
+    const { t } = useI18n()
     const router = useRouter()
     const [isFullPreviewOpen, setIsFullPreviewOpen] = useState(false)
     const [isMobileViewport, setIsMobileViewport] = useState(false)
@@ -218,7 +220,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             if (meta.lastTouchedAt && Date.now() - meta.lastTouchedAt > BUILDER_SESSION_TTL_MS) {
                 reset()
                 window.localStorage.removeItem(BUILDER_SESSION_META_KEY)
-                toast.message('Your previous AI builder draft expired after 24 hours.')
+                toast.message(t.onboarding.generating.draftExpired)
             }
         } catch {
             window.localStorage.removeItem(BUILDER_SESSION_META_KEY)
@@ -300,7 +302,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         } catch (error) {
             setDraftSaveState('error')
             console.error('[Save Draft] Failed to persist draft:', error)
-            toast.error('Failed to save the latest preview changes.')
+            toast.error(t.onboarding.generating.saveFailed)
             return false
         }
     }, [blocks, siteId, theme])
@@ -598,7 +600,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     url: payload?.data?.url,
                 })
             }
-            toast.success('Website published successfully!')
+            toast.success(t.onboarding.completion.publishSuccess)
         } catch (error: any) {
             toast.error(error?.message || 'Failed to publish website')
         } finally {

@@ -122,25 +122,76 @@ export function getCategoryRequirement(category: string | undefined): CategoryRe
 }
 
 /**
- * Recommended navigation variant per category. Overrides AI's default choice
- * (which often picks bland "simple" or "transparent"). Applied in sanitizer.
+ * Recommended navigation variants per category (2-3 per category). Overrides
+ * AI's default choice (which often picks bland "simple" or "transparent").
+ * Seed-picked in structure-enforcer so businesses within the same category
+ * rotate through the pool instead of locking to one variant.
  * All variants: simple | centered | mega-menu | transparent | sidebar | pill
+ *
+ * Plan 2253 Phase 01 — fixes R9 (single nav variant per category).
  */
-export const NAV_VARIANT_BY_CATEGORY: Readonly<Record<string, string>> = {
-    beauty: 'pill',
-    restaurant: 'centered',
-    fnb: 'pill',
-    tech: 'centered',
-    health: 'centered',
-    education: 'centered',
-    realestate: 'centered',
-    fitness: 'pill',
-    creative: 'pill',
-    business: 'centered',
-    ecommerce: 'mega-menu',
-    events: 'centered',
-    blog: 'centered',
-    travel: 'pill',
+export const NAV_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['pill', 'centered', 'transparent'],
+    restaurant: ['centered', 'pill', 'mega-menu'],
+    fnb: ['pill', 'centered', 'transparent'],
+    tech: ['centered', 'pill', 'mega-menu'],
+    health: ['centered', 'pill', 'transparent'],
+    education: ['centered', 'mega-menu', 'pill'],
+    realestate: ['centered', 'mega-menu', 'transparent'],
+    fitness: ['pill', 'centered', 'transparent'],
+    creative: ['pill', 'transparent', 'centered'],
+    business: ['centered', 'mega-menu', 'pill'],
+    ecommerce: ['mega-menu', 'pill', 'centered'],
+    events: ['centered', 'transparent', 'pill'],
+    blog: ['centered', 'pill', 'transparent'],
+    travel: ['pill', 'transparent', 'centered'],
+}
+
+/**
+ * Plan 260415 — contact variant rotation per category. Mirror of
+ * NAV_VARIANT_BY_CATEGORY so enforcer + composer can spread contact
+ * block styles across same-category businesses instead of every site
+ * landing on the default `form` layout.
+ *
+ * All listed variant ids must exist in `src/blocks/contact/config.ts`.
+ * Supported set: form / info-only / split / card-float / map-split / minimal-inline.
+ */
+export const CONTACT_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['card-float', 'form', 'map-split'],
+    restaurant: ['map-split', 'split', 'form'],
+    fnb: ['map-split', 'card-float', 'split'],
+    tech: ['form', 'split', 'card-float'],
+    health: ['map-split', 'form', 'split'],
+    education: ['split', 'form', 'card-float'],
+    realestate: ['map-split', 'form', 'split'],
+    fitness: ['split', 'card-float', 'form'],
+    creative: ['card-float', 'split', 'form'],
+    business: ['form', 'split', 'map-split'],
+    ecommerce: ['form', 'card-float', 'split'],
+    events: ['map-split', 'split', 'card-float'],
+    blog: ['form', 'info-only', 'split'],
+    travel: ['map-split', 'card-float', 'split'],
+}
+
+/**
+ * Plan 260415 — footer variant rotation per category. Supported set:
+ * simple / expanded / minimal / centered-stack / mega-footer / dark-gradient.
+ */
+export const FOOTER_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['centered-stack', 'expanded', 'minimal'],
+    restaurant: ['expanded', 'dark-gradient', 'mega-footer'],
+    fnb: ['expanded', 'centered-stack', 'minimal'],
+    tech: ['mega-footer', 'expanded', 'dark-gradient'],
+    health: ['expanded', 'minimal', 'centered-stack'],
+    education: ['expanded', 'mega-footer', 'centered-stack'],
+    realestate: ['expanded', 'dark-gradient', 'mega-footer'],
+    fitness: ['dark-gradient', 'expanded', 'centered-stack'],
+    creative: ['centered-stack', 'minimal', 'dark-gradient'],
+    business: ['expanded', 'mega-footer', 'minimal'],
+    ecommerce: ['mega-footer', 'expanded', 'centered-stack'],
+    events: ['dark-gradient', 'expanded', 'centered-stack'],
+    blog: ['minimal', 'centered-stack', 'expanded'],
+    travel: ['dark-gradient', 'expanded', 'mega-footer'],
 }
 
 /** Maps block type → the array field where items live (for padding). */

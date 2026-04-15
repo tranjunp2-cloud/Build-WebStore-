@@ -14,9 +14,15 @@ import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
-import { pickCategoryTheme, hashBusinessName } from './category-theme-picker'
+import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
+import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
+import { generateAllPageSeo, type PageForSeo } from './seo-generator'
+import { mapBusinessInfo } from './business-info-mapper'
+import type { BusinessSample } from './content/types'
+import { runConsistencyCheck, logConsistencyReport, emitConsistencyEvents } from './consistency-validator'
 import { resolveFontPairing } from './font-pairings'
+import { seededShufflePick, hashString } from './seeded-random'
 import {
     validateBlockContent,
     validateOrdering,
@@ -33,7 +39,15 @@ function getOpenAI(): OpenAI | null {
 }
 
 export type SSEEvent = {
-    event: 'step' | 'theme_set' | 'block_complete' | 'seo_generated' | 'error' | 'done'
+    event:
+        | 'step'
+        | 'theme_set'
+        | 'block_complete'
+        | 'seo_generated'
+        | 'error'
+        | 'done'
+        /** Phase 06 — post-gen consistency check findings (warn-only). */
+        | 'consistency_warning'
     data: Record<string, unknown>
 }
 
@@ -58,7 +72,7 @@ export async function generateSiteWithAI(
     const openai = getOpenAI()
     if (!openai) {
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
-        return generateWithFallback(promptText, events)
+        return generateWithFallback(promptText, events, 'en', businessInfo)
     }
 
     try {
@@ -67,13 +81,32 @@ export async function generateSiteWithAI(
         // Resolve category + pick deterministic theme preset BEFORE prompt build
         // so phase-03 can inject the exact hex/font hint into the system prompt.
         // Precedence downstream: URL extraction visualStyle (route.ts) > this preset > AI output.
+        //
+        // Plan 260414-2249 phase-02: resolve mood from preset.moodId so GPT
+        // prompt receives the COPY VOICE bulleted block (4-5 voice rules +
+        // imagery hint + mood label). Without this, the happy path generates
+        // generic copy even though the preset dictates elegant/bold/etc.
+        //
+        // Plan 260414-2249 phase-04: pick a layout recipe so GPT gets an
+        // explicit RHYTHM section — hard-constrained block sequence drawn
+        // from 3 curated recipes per category (story-first/menu-first/...).
+        // Without this, GPT reverts to its prior and every site rhymes.
         const presetCategory = resolveComposerCategory(promptText)
         const themeSeed = hashBusinessName(businessInfo.businessName)
-        const themePreset = pickCategoryTheme(presetCategory, themeSeed)
-        console.log(`[Theme] Using category preset "${themePreset.name}" for category=${presetCategory} (seed=${themeSeed})`)
+        const { preset: themePreset, mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
+        const layoutRecipe = pickRecipe(presetCategory, themeSeed)
+        console.log(
+            `[Theme] Using category preset "${themePreset.name}" (mood=${themeMood.id}, recipe=${layoutRecipe.id}) for category=${presetCategory} (seed=${themeSeed})`,
+        )
 
         const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
-        const userPromptText = buildUserPrompt(businessInfo, extraInstructions, language, referencePrompt)
+        const userPromptText = buildUserPrompt(businessInfo, {
+            extraInstructions,
+            language,
+            referencePrompt,
+            mood: themeMood,
+            recipe: layoutRecipe,
+        })
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 
@@ -169,7 +202,7 @@ export async function generateSiteWithAI(
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
             const valid: Record<string, unknown>[] = []
             for (const block of rawBlocks) {
-                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang)
+                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
                 const blockType = typeof sanitized.blockType === 'string' ? sanitized.blockType : ''
                 if (!blockType) continue
 
@@ -198,6 +231,11 @@ export async function generateSiteWithAI(
         let validBlocks: Record<string, unknown>[]
         let generatedPages: GeneratedPage[] | undefined
 
+        // Plan 07 — derive the user-facing BusinessSample override once so both
+        // the enforcer padding path and the SEO mining step thread identical
+        // user data into library-built blocks. Done before both branches.
+        const enforcerBizOverride = mapBusinessInfo(businessInfo)
+
         if (rawPages && rawPages.length > 0) {
             // Multi-page format
             generatedPages = []
@@ -206,6 +244,12 @@ export async function generateSiteWithAI(
             const enforcerCtx = {
                 businessName: businessInfo.businessName,
                 industry: businessInfo.industry,
+                seed: themeSeed,
+                // Plan 07 — thread user data + mood into the enforcer so
+                // buildBlockFromLibrary emits biz-aware hero/features/about
+                // when GPT output is thin and needs padding.
+                userBiz: enforcerBizOverride,
+                mood: themeMood,
             }
 
             for (let p = 0; p < rawPages.length; p++) {
@@ -221,6 +265,7 @@ export async function generateSiteWithAI(
                     pageBlocks = enforceMinItems(
                         pageBlocks as Record<string, unknown>[],
                         detectedCategory,
+                        enforcerCtx,
                     ) as typeof pageBlocks
                 }
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
@@ -243,6 +288,41 @@ export async function generateSiteWithAI(
             }
 
             validBlocks = allBlocks
+
+            // Phase 06 — override per-page SEO with deterministic unique values
+            // mined from page content, and attach ogImage + JSON-LD. AI-returned
+            // descriptions are frequently duplicated across pages; this step
+            // guarantees each page ships a distinct meta description plus a
+            // LocalBusiness schema (and FAQPage where an FAQ block exists).
+            const seoBiz: BusinessSample = {
+                name: enforcerBizOverride.name ?? businessInfo.businessName,
+                tagline: enforcerBizOverride.tagline ?? '',
+                description: enforcerBizOverride.description ?? '',
+                phone: enforcerBizOverride.phone ?? '',
+                email: enforcerBizOverride.email ?? '',
+                address: enforcerBizOverride.address ?? '',
+                heroHeadline: '',
+                heroSubheadline: '',
+                products: enforcerBizOverride.products,
+            }
+            const seoPages: PageForSeo[] = generatedPages.map((gp) => ({
+                title: gp.title,
+                slug: gp.slug,
+                isHomepage: gp.isHomepage,
+                blocks: gp.blocks as unknown as Array<Record<string, unknown>>,
+            }))
+            const seoList = generateAllPageSeo(seoPages, {
+                biz: seoBiz,
+                category: detectedCategory ?? businessInfo.industry ?? 'business',
+            })
+            for (let i = 0; i < generatedPages.length; i++) {
+                generatedPages[i]!.seo = {
+                    title: seoList[i]!.title,
+                    description: seoList[i]!.description,
+                    ogImage: seoList[i]!.ogImage,
+                    jsonLd: seoList[i]!.jsonLd as unknown as Array<Record<string, unknown>>,
+                }
+            }
 
             // Phase 04 — page-level guards: min block count + AIDA ordering.
             // Both log warnings only; they do not mutate pages or throw.
@@ -272,6 +352,10 @@ export async function generateSiteWithAI(
                 const enforcerCtx = {
                     businessName: businessInfo.businessName,
                     industry: businessInfo.industry,
+                    seed: themeSeed,
+                    // Plan 07 — same userBiz + mood threading as the multi-page branch.
+                    userBiz: enforcerBizOverride,
+                    mood: themeMood,
                 }
                 validBlocks = enforceMinimumStructure(
                     validBlocks as Record<string, unknown>[],
@@ -281,6 +365,7 @@ export async function generateSiteWithAI(
                 validBlocks = enforceMinItems(
                     validBlocks as Record<string, unknown>[],
                     detectedCategory,
+                    enforcerCtx,
                 ) as typeof validBlocks
             }
 
@@ -324,7 +409,22 @@ export async function generateSiteWithAI(
             theme,
         }
 
-        events.push({ event: 'done', data: { totalBlocks: validBlocks.length, timeMs: 0 } })
+        // Phase 06 — warn-only consistency check on the final AI happy-path
+        // result. Emits one `consistency_warning` SSE event per finding,
+        // logs to server console, and bundles `warnings[]` into the `done`
+        // event payload. Never blocks save; auto-retry is out of scope.
+        const report = runConsistencyCheck(result)
+        emitConsistencyEvents(report, 'ai', events)
+        logConsistencyReport(report, 'ai')
+
+        events.push({
+            event: 'done',
+            data: {
+                totalBlocks: validBlocks.length,
+                timeMs: 0,
+                warnings: report.warnings,
+            },
+        })
 
         return { result, events }
     } catch (error: unknown) {
@@ -332,7 +432,7 @@ export async function generateSiteWithAI(
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
         events.push({ event: 'error', data: { code: 'ai_fallback', message: 'Using smart templates', retryable: false } })
         const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
-        return generateWithFallback(promptText, events, fallbackLang, businessInfo.businessName)
+        return generateWithFallback(promptText, events, fallbackLang, businessInfo)
     }
 }
 
@@ -340,12 +440,15 @@ export async function generateSiteWithAI(
  * Fallback path — runs when OpenAI errors out or no API key.
  * Tier 1: call `composeFallbackResult` (rich composer path, 14 industries, Phase 04 validation).
  * Tier 2 (legacy safety net): fall through to `generateBlocks` skeleton if composer throws.
+ *
+ * Plan 260414-2249 phase-01: accept full BusinessInfoInput (not just name) so
+ * user-supplied phone/email/address/products flow into composer block builders.
  */
 function generateWithFallback(
     prompt: string,
     events: SSEEvent[],
     language: 'en' | 'ms' | 'vi' = 'en',
-    extractedName?: string,
+    businessInfo?: BusinessInfoInput,
 ): { result: GenerationResult; events: SSEEvent[] } {
     events.push({ event: 'step', data: { step: 'fallback_analyzing', label: 'Analysing template library...', progress: 50 } })
     events.push({ event: 'step', data: { step: 'fallback_composing', label: 'Composing from smart templates...', progress: 60 } })
@@ -353,7 +456,7 @@ function generateWithFallback(
     const seed = Date.now()
 
     try {
-        const result = composeFallbackResult(prompt, seed, language, extractedName)
+        const result = composeFallbackResult(prompt, seed, language, businessInfo)
 
         events.push({ event: 'step', data: { step: 'fallback_validating', label: 'Validating content...', progress: 75 } })
         events.push({ event: 'theme_set', data: { theme: result.theme } })
@@ -367,7 +470,17 @@ function generateWithFallback(
 
         events.push({ event: 'seo_generated', data: result.seo as Record<string, unknown> })
         events.push({ event: 'step', data: { step: 'saving', label: 'Saving...', progress: 95 } })
-        events.push({ event: 'done', data: { totalBlocks: total, timeMs: 0 } })
+
+        // Phase 06 — fallback-path consistency check + SSE event emission.
+        // Kept in sync with the AI happy path; never blocks save.
+        const report = runConsistencyCheck(result)
+        emitConsistencyEvents(report, 'fallback', events)
+        logConsistencyReport(report, 'fallback')
+
+        events.push({
+            event: 'done',
+            data: { totalBlocks: total, timeMs: 0, warnings: report.warnings },
+        })
 
         return { result, events }
     } catch (composerError: unknown) {
@@ -389,7 +502,21 @@ function generateWithFallback(
             events.push({ event: 'block_complete', data: { block: block as Record<string, unknown>, index: i } })
         })
         events.push({ event: 'seo_generated', data: result.seo as Record<string, unknown> })
-        events.push({ event: 'done', data: { totalBlocks: result.blocks.length, timeMs: 0 } })
+
+        // Phase 06 — legacy safety-net path also runs consistency check so
+        // the event stream shape stays consistent across all 3 gen paths.
+        const legacyReport = runConsistencyCheck(result)
+        emitConsistencyEvents(legacyReport, 'fallback', events)
+        logConsistencyReport(legacyReport, 'fallback')
+
+        events.push({
+            event: 'done',
+            data: {
+                totalBlocks: result.blocks.length,
+                timeMs: 0,
+                warnings: legacyReport.warnings,
+            },
+        })
 
         return { result, events }
     }
@@ -703,8 +830,19 @@ const BROKEN_VARIANTS: Record<string, string[]> = {
 /**
  * Pick a weighted-by-category variant when AI's choice is invalid.
  * Excludes broken variants. Uses category preferences if available, otherwise random.
+ *
+ * When `seed` provided, uses `seededShuffle` to distribute picks deterministically
+ * across the preferred pool — different seeds land on different variants, same seed
+ * always reproduces. Without a seed, falls back to `Math.random()` (legacy path).
+ *
+ * Plan 2253 Phase 01 — fixes R2 (pool collapse to 1-2 dominant variants).
  */
-function pickWeightedVariant(blockType: string, validVariants: string[], category?: string): string {
+function pickWeightedVariant(
+    blockType: string,
+    validVariants: string[],
+    category?: string,
+    seed?: number,
+): string {
     // Filter out broken variants
     const broken = BROKEN_VARIANTS[blockType] ?? []
     const safeVariants = validVariants.filter(v => !broken.includes(v))
@@ -715,9 +853,20 @@ function pickWeightedVariant(blockType: string, validVariants: string[], categor
         if (catWeights) {
             const preferred = catWeights.filter(v => pool.includes(v))
             if (preferred.length > 0) {
+                if (typeof seed === 'number') {
+                    // Compound seed with blockType + category so (seed, blockType) tuples
+                    // distribute evenly — otherwise same seed would pick same pool index
+                    // across every blockType for the same category.
+                    const compound = seed ^ hashString(blockType + category)
+                    return seededShufflePick(preferred, compound) ?? preferred[0]!
+                }
                 return preferred[Math.floor(Math.random() * preferred.length)]!
             }
         }
+    }
+    if (typeof seed === 'number') {
+        const compound = seed ^ hashString(blockType + (category ?? ''))
+        return seededShufflePick(pool, compound) ?? pool[0]!
     }
     return pool[Math.floor(Math.random() * pool.length)]!
 }
@@ -858,6 +1007,7 @@ export function sanitizeBlockData(
     block: Record<string, unknown>,
     siteCategory?: string,
     language: 'en' | 'vi' | 'ms' = 'en',
+    seed?: number,
 ): Record<string, unknown> {
     const s = { ...block }
 
@@ -913,19 +1063,37 @@ export function sanitizeBlockData(
     // VARIANT VALIDATION: Fuzzy match → alias → weighted-by-category fallback
     // Uses blockRegistry as single source of truth (not a hardcoded list)
     // ═══════════════════════════════════════════════════════════════════════
+    //
+    // Plan 2253 follow-up (audit-unused-code P1) — FORCE_REPICK_BLOCKS
+    // bypasses fuzzy match + accepts AI's valid variant, because GPT-4o
+    // always returns the enum default for these 4 block types. Without
+    // forcing, post-fix-v3 measurement showed 100% dominance on:
+    //   pricing  → 'cards'   (100% across 13 gens)
+    //   faq      → 'accordion' (100% across 49 gens)
+    //   contact  → 'form'    (100% across 20 gens)
+    //   service-cards → 'grid' (100% across 80 gens)
+    // All 4 blocks use a single Zod schema with variant as cosmetic enum —
+    // field structure is identical cross-variants, so re-picking is safe.
+    // Re-pick uses pickWeightedVariant with the themeSeed already flowing
+    // through sanitizeBlockData (Plan 2253 Phase 01 plumbing).
+    const FORCE_REPICK_BLOCKS = new Set(['pricing', 'faq', 'contact', 'service-cards'])
     if (typeof s.blockType === 'string' && blockRegistry.has(s.blockType)) {
         const meta = blockRegistry.getBlockMeta(s.blockType)
         if (meta && meta.variants.length > 0) {
             // Coerce variant to string (AI sometimes returns number/null)
             const rawVariant = s.variant != null ? String(s.variant) : ''
 
-            if (rawVariant.length > 0) {
+            if (FORCE_REPICK_BLOCKS.has(s.blockType)) {
+                // Bypass fuzzy match — always re-pick via seeded shuffle to
+                // break 100% dominance on default variants.
+                s.variant = pickWeightedVariant(s.blockType, meta.variants, siteCategory, seed)
+            } else if (rawVariant.length > 0) {
                 const matched = fuzzyMatchVariant(rawVariant, meta.variants)
                 if (matched) {
                     s.variant = matched
                 } else {
                     // No match — pick weighted-by-category variant instead of always-default
-                    const replacement = pickWeightedVariant(s.blockType, meta.variants, siteCategory)
+                    const replacement = pickWeightedVariant(s.blockType, meta.variants, siteCategory, seed)
                     console.warn(
                         `[AI Sanitizer] "${s.blockType}": variant "${rawVariant}" → "${replacement}" (not in [${meta.variants.join(', ')}])`
                     )
@@ -933,7 +1101,7 @@ export function sanitizeBlockData(
                 }
             } else {
                 // Empty/null variant — pick weighted variant
-                s.variant = pickWeightedVariant(s.blockType, meta.variants, siteCategory)
+                s.variant = pickWeightedVariant(s.blockType, meta.variants, siteCategory, seed)
             }
 
             // Content-count guard: ensure variant has enough items to render properly

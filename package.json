@@ -28,6 +28,7 @@
     "harness:render": "playwright test --config=scripts/test-harness/render/playwright.config.ts",
     "harness:merge": "tsx scripts/test-harness/render/visual-report.ts",
     "harness:report": "tsx scripts/test-harness/report/generate.ts",
+    "measure:variety": "tsx scripts/measure-variety.ts",
     "harness:all": "tsx scripts/test-harness/cli.ts --mode=full && tsx scripts/test-harness/check.ts && (playwright test --config=scripts/test-harness/render/playwright.config.ts || true) && tsx scripts/test-harness/render/visual-report.ts; tsx scripts/test-harness/report/generate.ts"
   },
   "dependencies": {
@@ -73,7 +74,9 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dompurify": "^3.4.0",
     "framer-motion": "^11.12.0",
+    "franc-min": "^6.2.0",
     "graphql": "^16.13.1",
     "isomorphic-dompurify": "~2.26.0",
     "lucide-react": "^0.454.0",

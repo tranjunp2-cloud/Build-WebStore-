@@ -16,9 +16,39 @@ import {
     getCategoryRequirement,
     ITEM_FIELD_BY_BLOCK,
     NAV_VARIANT_BY_CATEGORY,
+    CONTACT_VARIANT_BY_CATEGORY,
+    FOOTER_VARIANT_BY_CATEGORY,
     type CategoryRequirement,
 } from './category-requirements'
 import { buildBlockFromLibrary, padItems, type InjectionContext } from './content-injection'
+import { seededShufflePick, hashString } from './seeded-random'
+import { CATEGORY_RECIPES, type CategoryRecipe, type RecipeCategory } from './category-recipes'
+import { isUnsupportedBlock } from './unsupported-blocks'
+
+/**
+ * Plan 2253 follow-up (R1 fix) — pick 1 of 3 hand-curated category recipes
+ * using seeded Fisher-Yates shuffle so different businesses in the same
+ * category rotate through distinct block sequences. Returns null if the
+ * category has no recipes defined (falls back to legacy mandatoryBlocks).
+ */
+function pickSkeletonRecipe(category: string, seed: number): CategoryRecipe | null {
+    const recipes = CATEGORY_RECIPES[category as RecipeCategory]
+    if (!recipes || recipes.length === 0) return null
+    const compound = seed ^ hashString('skeleton:' + category)
+    return seededShufflePick(recipes, compound) ?? recipes[0]!
+}
+
+/**
+ * Filter a recipe's block sequence to drop types the Payload schema can't
+ * handle (unsupported-blocks list is the single source of truth) — matches
+ * the same drop list applied in openai-generator's validateBlocks and
+ * fallback-adapter's filterUnsupportedBlocks. Prevents the enforcer from
+ * injecting menu-display / booking-widget / before-after which the sanitizer
+ * would then immediately drop.
+ */
+function recipeBlocksUsable(recipe: CategoryRecipe): string[] {
+    return recipe.blocks.filter((b) => !isUnsupportedBlock(b))
+}
 
 type Block = Record<string, unknown>
 
@@ -82,9 +112,13 @@ export function enforceMinimumStructure(
     )
 
     // Upgrade navigation variant per category (before any other enforcement).
-    // AI often picks bland "simple" or "transparent" — override with category-appropriate.
-    const preferredNav = NAV_VARIANT_BY_CATEGORY[category]
-    if (preferredNav) {
+    // AI often picks bland "simple" or "transparent" — override with a seed-picked
+    // variant from the category pool so same-category businesses rotate through
+    // multiple nav styles instead of locking to one. (Plan 2253 Phase 01 — R9)
+    const navPool = NAV_VARIANT_BY_CATEGORY[category]
+    if (navPool && navPool.length > 0) {
+        const navSeed = (ctx.seed ?? 0) ^ hashString('navigation' + category)
+        const preferredNav = seededShufflePick(navPool, navSeed) ?? navPool[0]
         for (const block of out) {
             if (block.blockType === 'navigation') {
                 block.variant = preferredNav
@@ -93,7 +127,110 @@ export function enforceMinimumStructure(
         }
     }
 
-    // 1. Inject missing mandatory blocks
+    // Plan 2253 follow-up (R1 fix) — if category has recipes, use seed-picked
+    // recipe as the skeleton template. Same category + different business =
+    // different skeleton rotation. Recipes are defined in category-recipes.ts
+    // (shipped by plan 2249 phase 04 data layer).
+    const recipe = pickSkeletonRecipe(category, ctx.seed ?? 0)
+
+    if (recipe) {
+        const usableBlocks = recipeBlocksUsable(recipe)
+        console.info(
+            `[Structure Enforcer] using recipe "${recipe.id}" (${recipe.rhythm}) for ${category}`,
+        )
+
+        // 1a. Navigation + footer are always required regardless of recipe.
+        // Recipe.blocks starts at 'hero' per plan 2249 schema, so we prepend
+        // navigation and ensure footer is the last block.
+        const alwaysNeeded = ['navigation', 'footer']
+        for (const blockType of alwaysNeeded) {
+            if (presentTypes.has(blockType)) continue
+            const injected = buildBlockFromLibrary(blockType, category, ctx)
+            if (!injected) continue
+            out.push(injected)
+            presentTypes.add(blockType)
+        }
+
+        // 1b. Inject any recipe.required block that's missing
+        for (const blockType of recipe.required) {
+            if (presentTypes.has(blockType)) continue
+            if (isUnsupportedBlock(blockType)) continue
+            const injected = buildBlockFromLibrary(blockType, category, ctx)
+            if (!injected) {
+                console.warn(
+                    `[Structure Enforcer] no library content for required "${blockType}" (recipe=${recipe.id})`,
+                )
+                continue
+            }
+            out.push(injected)
+            presentTypes.add(blockType)
+            console.info(
+                `[Structure Enforcer] injected required "${blockType}" (recipe=${recipe.id})`,
+            )
+        }
+
+        // 1c. Backward compat — legacy mandatoryBlocks still get injected if
+        // they're not in the recipe. Keeps categories that historically
+        // required e.g. `team` from losing it when a recipe omits it.
+        for (const blockType of req.mandatoryBlocks) {
+            if (presentTypes.has(blockType)) continue
+            if (isUnsupportedBlock(blockType)) continue
+            const injected = buildBlockFromLibrary(blockType, category, ctx)
+            if (!injected) continue
+            out.push(injected)
+            presentTypes.add(blockType)
+            console.info(
+                `[Structure Enforcer] injected legacy mandatory "${blockType}" (not in recipe ${recipe.id})`,
+            )
+        }
+
+        // 1d. Pad to minBlocks — first try remaining recipe blocks, then
+        // fall through to req.recommendedBlocks if recipe exhausted.
+        const padCandidates = [
+            ...usableBlocks.filter((b) => !presentTypes.has(b)),
+            ...req.recommendedBlocks.filter((b) => !presentTypes.has(b) && !isUnsupportedBlock(b)),
+        ]
+        let guard = 0
+        while (out.length < req.minBlocks && guard < padCandidates.length + 5) {
+            guard++
+            const next = padCandidates.find((b) => !presentTypes.has(b))
+            if (!next) break
+            const injected = buildBlockFromLibrary(next, category, ctx)
+            if (!injected) {
+                presentTypes.add(next)
+                continue
+            }
+            out.push(injected)
+            presentTypes.add(next)
+            console.info(
+                `[Structure Enforcer] padded "${next}" to reach minBlocks=${req.minBlocks}`,
+            )
+        }
+
+        // 1e. Reorder output to match recipe.blocks sequence, with navigation
+        // always at index 0 and footer always at last. Blocks not in the
+        // recipe sort by their type's natural mid-section position.
+        const recipeOrder = new Map<string, number>()
+        usableBlocks.forEach((b, i) => recipeOrder.set(b, i + 1)) // +1 to leave 0 for nav
+        recipeOrder.set('navigation', 0)
+        recipeOrder.set('footer', Number.MAX_SAFE_INTEGER - 1)
+        out.sort((a, b) => {
+            const ai = recipeOrder.get(String(a.blockType)) ?? Number.MAX_SAFE_INTEGER / 2
+            const bi = recipeOrder.get(String(b.blockType)) ?? Number.MAX_SAFE_INTEGER / 2
+            return ai - bi
+        })
+
+        // Plan 260415 — rotate contact + footer variants AFTER recipe
+        // injection so freshly injected blocks also pick up the category-
+        // seeded variant instead of the library hardcoded default.
+        applyStructuralVariantRotation(out, category, ctx.seed ?? 0)
+
+        return out
+    }
+
+    // Legacy fallback: no recipe for this category — use old mandatoryBlocks
+    // path. Kept for backward compat so categories not in CATEGORY_RECIPES
+    // (none currently, but defensive) still get enforcement.
     for (const blockType of req.mandatoryBlocks) {
         if (presentTypes.has(blockType)) continue
         const injected = buildBlockFromLibrary(blockType, category, ctx)
@@ -107,7 +244,6 @@ export function enforceMinimumStructure(
         console.info(`[Structure Enforcer] injected mandatory "${blockType}" at index ${insertIdx} for ${category}`)
     }
 
-    // 2. Pad to minBlocks using recommended
     let guard = 0
     while (out.length < req.minBlocks && guard < req.recommendedBlocks.length + 5) {
         guard++
@@ -115,7 +251,7 @@ export function enforceMinimumStructure(
         if (!next) break
         const injected = buildBlockFromLibrary(next, category, ctx)
         if (!injected) {
-            presentTypes.add(next) // avoid infinite loop
+            presentTypes.add(next)
             continue
         }
         const insertIdx = findInsertionIndex(out, next)
@@ -124,14 +260,58 @@ export function enforceMinimumStructure(
         console.info(`[Structure Enforcer] padded recommended "${next}" to reach minBlocks=${req.minBlocks}`)
     }
 
+    // Plan 260415 — legacy path also rotates contact + footer variants
+    // against the category pool on the way out.
+    applyStructuralVariantRotation(out, category, ctx.seed ?? 0)
+
     return out
+}
+
+/**
+ * Plan 260415 — rotate contact + footer block variants against the curated
+ * per-category pool using the same seeded-shuffle approach as nav rotation.
+ * Mutates blocks in place. Shared helper so the recipe + legacy paths both
+ * apply the rotation on their final block list.
+ */
+function applyStructuralVariantRotation(out: Block[], category: string, seed: number): void {
+    const contactPool = CONTACT_VARIANT_BY_CATEGORY[category]
+    if (contactPool && contactPool.length > 0) {
+        const contactSeed = seed ^ hashString('contact' + category)
+        const preferredContact = seededShufflePick(contactPool, contactSeed) ?? contactPool[0]
+        for (const block of out) {
+            if (block.blockType === 'contact') {
+                block.variant = preferredContact
+                break
+            }
+        }
+    }
+
+    const footerPool = FOOTER_VARIANT_BY_CATEGORY[category]
+    if (footerPool && footerPool.length > 0) {
+        const footerSeed = seed ^ hashString('footer' + category)
+        const preferredFooter = seededShufflePick(footerPool, footerSeed) ?? footerPool[0]
+        for (const block of out) {
+            if (block.blockType === 'footer') {
+                block.variant = preferredFooter
+                break
+            }
+        }
+    }
 }
 
 /**
  * Pad per-block items to meet minItems requirements.
  * Mutates blocks in place + returns same array for chainability.
+ *
+ * Plan 2253 Phase 03 — accept InjectionContext so padItems can seed-rotate
+ * its library pool start index, avoiding testimonial/FAQ repetition across
+ * same-category businesses.
  */
-export function enforceMinItems(blocks: Block[], category: string): Block[] {
+export function enforceMinItems(
+    blocks: Block[],
+    category: string,
+    ctx: InjectionContext = {},
+): Block[] {
     const req = getCategoryRequirement(category)
     const mins = req.minItems
     if (!mins) return blocks
@@ -149,7 +329,7 @@ export function enforceMinItems(blocks: Block[], category: string): Block[] {
         if (!Array.isArray(current)) continue
         if (current.length >= minCount) continue
 
-        const padded = padItems(blockType, current, minCount, category)
+        const padded = padItems(blockType, current, minCount, category, ctx)
         block[itemField] = padded
         console.info(
             `[Structure Enforcer] padded ${blockType}.${itemField}: ${current.length} → ${padded.length}`,

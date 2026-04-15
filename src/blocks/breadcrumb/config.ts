@@ -7,4 +7,4 @@ export const BreadcrumbConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('breadcrumb'), variant: z.enum(['simple', 'with-icon']).default('simple'),
     items: z.array(z.object({ label: z.string(), url: z.string().optional() })).default([]),
 })
-export const breadcrumbMeta = { type: 'breadcrumb' as const, name: 'Breadcrumb', description: 'Navigation breadcrumb trail', icon: '🧭', variants: ['simple', 'with-icon'], defaultVariant: 'simple', editableFields: ['items'], quickActions: ['Add item', 'Reset path'] }
+export const breadcrumbMeta = { type: 'breadcrumb' as const, name: 'Breadcrumb', description: 'Navigation breadcrumb trail', icon: '🧭', variants: ['simple', 'with-icon'], defaultVariant: 'simple', editableFields: ['items'], quickActions: ['Add item', 'Reset path'], aiVisible: false }

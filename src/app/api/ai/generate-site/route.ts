@@ -1,4 +1,10 @@
 export const dynamic = 'force-dynamic'
+// Override vercel.json's 60s default — AI site generation runs:
+//   OpenAI GPT-4.1-mini → Unsplash pipeline (5-10 images) → Payload create
+// Real-world timing sits around 60-120s, previous 60s cap produced 504
+// Gateway Timeout (staging run 00:42:15 2026-04-14 `[Theme] Using category…`).
+// Vercel Pro / Fluid Compute allows up to 800s; 300s leaves comfortable headroom.
+export const maxDuration = 300
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -14,6 +20,10 @@ import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { blockRegistry } from '@/blocks/registry'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
+import { parseProductsString } from '@/lib/ai/business-info-mapper'
+import { pickCategoryThemeWithMood, hashBusinessName } from '@/lib/ai/category-theme-picker'
+import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
+import { buildImagePool } from '@/lib/ai/image-pool'
 import { resolveTheme } from '@/lib/theme/resolve'
 
 
@@ -294,12 +304,73 @@ export async function POST(req: NextRequest) {
         // Fetches 5-10 real stock images (hero, gallery, team, testimonials, about)
         // and injects Media IDs into block fields before sanitizer runs.
         // Partial failure tolerated: blocks without images degrade gracefully.
+        //
+        // IMPORTANT — collect ALL block arrays, not just `result.blocks`.
+        // When the generator returns multi-page format (`result.pages[]`),
+        // buildGeneratedPages reads `result.pages[].blocks` directly (see
+        // route.ts:755-766). Previously cleanup only ran on `result.blocks`,
+        // so a subpage hero/about with `image: { url: "..." }` object would
+        // survive into payload.create and crash with:
+        //   "The following field is invalid: Page Blocks > Block N (…) > Image"
+        // Staging log 2026-04-14 21:06:15 confirmed this path after the
+        // Unsplash fallback chain failed to upgrade the object to a numeric
+        // Media ID (UNSPLASH_ACCESS_KEY missing on staging env + mkdir
+        // 'public' ENOENT on Vercel read-only fs).
+        const collectAllBlockBuckets = (): Record<string, unknown>[][] => {
+            const buckets: Record<string, unknown>[][] = []
+            if (Array.isArray(result.blocks)) {
+                buckets.push(result.blocks as Record<string, unknown>[])
+            }
+            const pagesArr = (result as { pages?: Array<{ blocks?: unknown[] }> }).pages
+            if (Array.isArray(pagesArr)) {
+                for (const page of pagesArr) {
+                    if (Array.isArray(page?.blocks)) {
+                        buckets.push(page.blocks as Record<string, unknown>[])
+                    }
+                }
+            }
+            return buckets
+        }
+
         if (!ENABLE_DALLE_HERO) {
             try {
-                const mutableBlocks = result.blocks as Record<string, unknown>[]
-                const needs = planImageNeeds(mutableBlocks)
+                const allBuckets = collectAllBlockBuckets()
+                // Flatten image needs across homepage + every subpage so a
+                // single fulfillImageNeeds call covers the whole site.
+                const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
                 if (needs.length > 0) {
                     const resolvedLang = (result.language || language) as 'en' | 'ms' | 'vi' | 'auto'
+                    // Plan 260414-2249 phase-01: pass parsed user products into
+                    // media pipeline so deriveKeywords can drive Unsplash queries
+                    // from what the user actually sells (translated vi/ms → en).
+                    const parsedProducts = parseProductsString(businessInfo.products)
+                    // Plan 260414-2249 phase-02: resolve theme mood and pass it
+                    // so deriveKeywords appends mood imagery adjectives (e.g.
+                    // 'candlelit' for elegant, 'minimalist' for serene). Keeps
+                    // Unsplash queries per-mood coherent across all blocks on a site.
+                    const presetCategory = resolveComposerCategory(businessInfo.industry)
+                    const themeSeed = hashBusinessName(businessInfo.businessName)
+                    const { mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
+
+                    // Plan 260414-2249 phase-03: build ONE per-site image pool
+                    // before fulfillment so all blocks share the same photographer,
+                    // lighting, mood. 1-2 Unsplash calls total (landscape + square)
+                    // — replaces 6-8 per-block calls and delivers visual cohesion.
+                    //
+                    // Plan 07 — pass top-3 products so two restaurants whose
+                    // first product collides still produce different queries.
+                    const topProduct = parsedProducts[0]
+                    const imagePool = await buildImagePool({
+                        category: presetCategory,
+                        mood: themeMood,
+                        topProduct,
+                        products: parsedProducts.slice(0, 3),
+                        seed: themeSeed,
+                    })
+                    console.info(
+                        `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
+                    )
+
                     await fulfillImageNeeds(
                         needs,
                         {
@@ -307,18 +378,28 @@ export async function POST(req: NextRequest) {
                             tenantId: String(resolvedTenantId),
                             category: businessInfo.industry,
                             language: resolvedLang,
+                            products: parsedProducts.length > 0 ? parsedProducts : undefined,
+                            mood: themeMood,
+                            pool: imagePool,
                         },
                         payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                     )
                 }
                 // Strip any slot still holding a URL/object (Unsplash failed or missing) —
                 // Payload upload fields are optional; better empty than reject.
-                cleanupNonNumericImageFields(mutableBlocks)
+                // Run over every bucket so multi-page subpages get cleaned too.
+                for (const bucket of allBuckets) {
+                    cleanupNonNumericImageFields(bucket)
+                }
             } catch (unsplashErr) {
                 console.error('[AI Generate] Unsplash pipeline error (non-fatal):', unsplashErr)
-                // Best-effort cleanup on any unexpected throw
+                // Best-effort cleanup on any unexpected throw — still run
+                // cleanup on every bucket so a partial failure can't leak
+                // raw image objects into payload.create.
                 try {
-                    cleanupNonNumericImageFields(result.blocks as Record<string, unknown>[])
+                    for (const bucket of collectAllBlockBuckets()) {
+                        cleanupNonNumericImageFields(bucket)
+                    }
                 } catch { /* ignore */ }
             }
         }
@@ -453,7 +534,12 @@ export async function POST(req: NextRequest) {
 
         for (const pageDefinition of pageDefinitions) {
             // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
-            const sanitizedLayout = Array.isArray(pageDefinition.layout)
+            // Plan 260415 — also run sanitizeBlocksForPayload on EVERY page's
+            // layout (not just homepage), so sub-page team/testimonials/faq
+            // blocks get defensive name/role/question/etc fallback. Without
+            // this the AI happy path could ship a team block with an empty
+            // member name on /about and crash payload.create.
+            const variantFixed = Array.isArray(pageDefinition.layout)
                 ? pageDefinition.layout.map((block: AIBlock | null) => {
                     if (!block) return block
                     if (typeof block.blockType === 'string' && blockRegistry.has(block.blockType)) {
@@ -467,6 +553,9 @@ export async function POST(req: NextRequest) {
                     return block
                 })
                 : pageDefinition.layout
+            const sanitizedLayout = Array.isArray(variantFixed)
+                ? sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b)))
+                : variantFixed
 
             const createdPage = await payload.create({
                 collection: 'pages',
@@ -1012,25 +1101,39 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             delete sanitized.items
         }
 
-        // ── Team: members[].socials[] requires { platform, url } ──
+        // ── Team: members[] requires { name (required) } + socials[] ──
+        // Plan 260415 — defensive name + role fallback. Payload schema marks
+        // `members.name` as `required: true`, so any member with empty/missing
+        // name crashes the whole `payload.create` with a ValidationError.
+        // Historical gens have surfaced this when GPT returned 4+ members and
+        // left the last one with only `bio` + `image`. Run this as a final
+        // pre-save sanitize so neither the AI happy path nor the fallback
+        // composer can ship a nameless team member.
         if (sanitized.blockType === 'team' && Array.isArray(sanitized.members)) {
-            sanitized.members = sanitized.members.map((memberRaw: unknown) => {
-                const member = (typeof memberRaw === 'object' && memberRaw !== null) ? memberRaw as Record<string, unknown> : {};
-                const safeMember = { ...member }
-                if (Array.isArray(safeMember.socials)) {
-                    safeMember.socials = safeMember.socials.map((socialRaw: unknown) => {
-                        if (typeof socialRaw === 'string') {
-                            return { platform: socialRaw.toLowerCase(), url: '#' }
-                        }
-                        const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
-                        return {
-                            platform: String(social.platform || social.name || 'twitter').toLowerCase(),
-                            url: String(social.url || social.link || '#'),
-                        }
-                    })
-                }
-                return safeMember
-            })
+            sanitized.members = sanitized.members
+                .map((memberRaw: unknown, idx: number) => {
+                    const member = (typeof memberRaw === 'object' && memberRaw !== null) ? memberRaw as Record<string, unknown> : {};
+                    const safeMember = { ...member }
+                    const rawName = (member.name ?? member.fullName ?? member.displayName ?? '') as string
+                    const trimmedName = typeof rawName === 'string' ? rawName.trim() : ''
+                    safeMember.name = trimmedName || `Team Member ${idx + 1}`
+                    const rawRole = (member.role ?? member.position ?? member.title ?? '') as string
+                    const trimmedRole = typeof rawRole === 'string' ? rawRole.trim() : ''
+                    safeMember.role = trimmedRole || 'Team Member'
+                    if (Array.isArray(safeMember.socials)) {
+                        safeMember.socials = safeMember.socials.map((socialRaw: unknown) => {
+                            if (typeof socialRaw === 'string') {
+                                return { platform: socialRaw.toLowerCase(), url: '#' }
+                            }
+                            const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
+                            return {
+                                platform: String(social.platform || social.name || 'twitter').toLowerCase(),
+                                url: String(social.url || social.link || '#'),
+                            }
+                        })
+                    }
+                    return safeMember
+                })
         }
 
         // ── About: ensure headline ──

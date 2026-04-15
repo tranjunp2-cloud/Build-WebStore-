@@ -7,6 +7,7 @@
 import { blockRegistry } from '@/blocks/registry'
 import type { ThemePreset } from './theme-presets'
 import { resolveFontPairing } from './font-pairings'
+import { THEME_MOODS } from './theme-moods'
 
 // ── Theme context for soft guidance injection ─────────────────────────────
 
@@ -17,215 +18,46 @@ export type ThemePromptContext = {
 
 /**
  * Describe the mood a preset should set so AI copy (CTAs, taglines, headings)
- * matches the palette. Keeps the prompt readable without dumping every variant.
+ * matches the palette.
+ *
+ * Plan 260414-2249 phase-02: delegates to `THEME_MOODS[preset.moodId]` which
+ * is the single source of truth for mood metadata (voiceStyle rules, imagery,
+ * CTAs). The old category×colorMode classification is gone — mood is now a
+ * FIRST-CLASS property of each preset, not derived at call time.
+ *
+ * `category` kept in signature for backward compat (some call sites still
+ * pass it) but unused — mood encodes everything needed.
  */
-function moodHint(preset: ThemePreset, category: string): string {
-  const dark = preset.colorMode === 'dark'
-  const warmCategories = new Set(['restaurant', 'fnb', 'fitness', 'beauty', 'events', 'creative'])
-  const trustCategories = new Set(['health', 'realestate', 'business', 'education'])
-  const edgeCategories = new Set(['tech', 'ecommerce', 'blog', 'travel'])
-
-  if (warmCategories.has(category)) {
-    return dark
-      ? 'warm appetite / intimate nightlife — evocative copy, sensory language, urgency'
-      : 'warm, inviting, appetite-driving — sensory adjectives, human touch, scarcity CTAs'
+function moodHint(preset: ThemePreset, _category: string): string {
+  const mood = THEME_MOODS[preset.moodId]
+  if (!mood) {
+    // Defensive fallback — preset missing moodId (shouldn't happen post-phase-02)
+    return 'polished, professional, approachable — benefit-led, specific'
   }
-  if (trustCategories.has(category)) {
-    return dark
-      ? 'calm authority — understated confidence, credentials, proof points'
-      : 'calm, trustworthy, stable — reassurance, credentials, clinical clarity'
-  }
-  if (edgeCategories.has(category)) {
-    return dark
-      ? 'sharp, modern, confident — benefit-led, outcome-focused copy'
-      : 'clean, efficient, outcome-driven — benefit-led CTAs, specific metrics'
-  }
-  return dark
-    ? 'premium, confident, focused — concise copy, strong verbs'
-    : 'polished, professional, approachable — benefit-led, specific'
+  return `${mood.label.toLowerCase()} — ${mood.description}`
 }
 
-// ── Style Personalities ────────────────────────────────────────────────────
-// Each personality has keywords that match user input for context-aware selection.
-
-interface StylePersonality {
-  name: string
-  prompt: string
-  keywords: string[]
-}
-
-const STYLE_PERSONALITIES: StylePersonality[] = [
-  {
-    name: 'bold',
-    prompt: 'Bold and energetic — use vibrant colors, large typography, and dynamic layouts',
-    keywords: ['startup', 'gym', 'fitness', 'sports', 'energy', 'bold', 'vibrant', 'young', 'dynamic'],
-  },
-  {
-    name: 'minimal',
-    prompt: 'Minimal and sophisticated — clean whitespace, muted tones, simple elegance',
-    keywords: ['minimal', 'clean', 'simple', 'zen', 'modern', 'scandinavian', 'architect', 'gallery'],
-  },
-  {
-    name: 'warm',
-    prompt: 'Warm and inviting — soft gradients, rounded shapes, friendly tone',
-    keywords: ['family', 'home', 'bakery', 'cafe', 'cozy', 'friendly', 'community', 'traditional', 'handmade', 'organic'],
-  },
-  {
-    name: 'professional',
-    prompt: 'Professional and authoritative — structured grid, corporate feel, data-driven',
-    keywords: ['consulting', 'law', 'finance', 'corporate', 'enterprise', 'b2b', 'agency', 'professional'],
-  },
-  {
-    name: 'creative',
-    prompt: 'Creative and playful — asymmetric layouts, bright accents, unexpected block ordering',
-    keywords: ['creative', 'design', 'art', 'photographer', 'portfolio', 'studio', 'boutique', 'unique'],
-  },
-  {
-    name: 'luxurious',
-    prompt: 'Luxurious and premium — dark backgrounds, gold accents, serif headings',
-    keywords: ['luxury', 'premium', 'spa', 'jewelry', 'high-end', 'exclusive', 'vip', 'cao cấp', 'sang trọng'],
-  },
-  {
-    name: 'tech',
-    prompt: 'Modern tech — glassmorphism vibes, cool blues/purples, sharp geometry',
-    keywords: ['tech', 'saas', 'software', 'ai', 'digital', 'app', 'platform', 'cloud', 'api', 'startup'],
-  },
-  {
-    name: 'editorial',
-    prompt: 'Editorial and storytelling — magazine-style hero, rich typography, long-form sections',
-    keywords: ['blog', 'magazine', 'news', 'story', 'content', 'media', 'publishing', 'journalist'],
-  },
-]
-
-/**
- * Select a style personality based on user input context.
- * Scores each personality by keyword matches, then randomly picks from top candidates.
- * Falls back to pure random if no keywords match.
- */
-function selectPersonality(info: BusinessInfoInput): string {
-  const input = `${info.businessName} ${info.industry} ${info.products} ${info.shortDescription}`.toLowerCase()
-
-  // Score each personality by keyword matches
-  const scored = STYLE_PERSONALITIES.map(p => ({
-    ...p,
-    score: p.keywords.filter(kw => input.includes(kw)).length,
-  }))
-
-  // Find candidates: all with score > 0, sorted descending
-  const candidates = scored.filter(p => p.score > 0).sort((a, b) => b.score - a.score)
-
-  if (candidates.length > 0) {
-    // Pick randomly from top 3 candidates (or fewer if less matched)
-    const topN = candidates.slice(0, Math.min(3, candidates.length))
-    return topN[Math.floor(Math.random() * topN.length)]!.prompt
-  }
-
-  // No keyword match → pure random from all personalities
-  return STYLE_PERSONALITIES[Math.floor(Math.random() * STYLE_PERSONALITIES.length)]!.prompt
-}
-
-// ── Dynamic Block Composition Generator ────────────────────────────────────
-// Generates unique block composition hints on-the-fly instead of hardcoded arrays.
-
-/** Category-specific signature blocks that make each industry unique */
-const CATEGORY_SIGNATURE_BLOCKS: Record<string, string[]> = {
-  restaurant: ['menu-display', 'booking-widget', 'gallery'],
-  ecommerce: ['products-grid', 'product-quick-view', 'social-proof'],
-  beauty: ['before-after', 'booking-widget', 'gallery'],
-  tech: ['feature-comparison', 'video-showcase', 'pricing'],
-  health: ['doctor-profile', 'booking-widget', 'review-cards'],
-  education: ['class-schedule', 'video-showcase', 'step-process'],
-  realestate: ['property-card', 'gallery', 'stats'],
-  fitness: ['class-schedule', 'booking-widget', 'gallery'],
-  creative: ['portfolio-grid', 'gallery', 'video-showcase'],
-  business: ['service-cards', 'client-logos', 'stats'],
-  fnb: ['menu-display', 'gallery', 'review-cards'],
-  events: ['countdown-timer', 'booking-widget', 'step-process'],
-  blog: ['blog-list', 'social-proof', 'newsletter'],
-  travel: ['booking-widget', 'gallery', 'video-showcase'],
-}
-
-/** Common blocks shared across all categories */
-const COMMON_BLOCKS = ['features', 'testimonials', 'about', 'stats', 'faq', 'cta', 'newsletter', 'team']
-
-/** Hero variants per category mood */
-const HERO_VARIANTS_BY_CATEGORY: Record<string, string[]> = {
-  restaurant: ['split-left', 'magazine', 'gradient', 'parallax', 'fullscreen'],
-  ecommerce: ['slideshow', 'cards-overlay', 'gradient', 'split-right', 'magazine'],
-  beauty: ['gradient', 'minimal', 'parallax', 'split-left', 'magazine'],
-  tech: ['gradient', 'split-video', 'minimal', 'parallax', 'cards-overlay'],
-  health: ['centered', 'split-left', 'minimal', 'gradient', 'parallax'],
-  education: ['centered', 'split-right', 'gradient', 'magazine', 'parallax'],
-  realestate: ['fullscreen', 'parallax', 'slideshow', 'split-left', 'magazine'],
-  fitness: ['fullscreen', 'parallax', 'split-video', 'gradient', 'cards-overlay'],
-  creative: ['magazine', 'parallax', 'cards-overlay', 'minimal', 'gradient'],
-  business: ['centered', 'split-left', 'gradient', 'minimal', 'parallax'],
-  fnb: ['split-left', 'gradient', 'magazine', 'parallax', 'fullscreen'],
-  events: ['fullscreen', 'gradient', 'split-left', 'centered', 'parallax'],
-  blog: ['minimal', 'split-left', 'fullscreen', 'centered', 'magazine'],
-  travel: ['fullscreen', 'parallax', 'split-left', 'gradient', 'slideshow'],
-}
-
-/** Footer variants pool */
-const FOOTER_VARIANTS = ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient']
-
-/** Random pick helper */
-function pickFrom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]!
-}
-
-/** Shuffle array (Fisher-Yates) */
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr]
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!]
-  }
-  return copy
-}
-
-/**
- * Generate a unique block composition hint dynamically.
- * Each call produces a different combination — never repeats.
- */
-function generateCompositionHint(category: string): string {
-  const heroVariants = HERO_VARIANTS_BY_CATEGORY[category] ?? ['centered', 'gradient', 'minimal']
-  const signatureBlocks = CATEGORY_SIGNATURE_BLOCKS[category] ?? []
-
-  // 1. Hero with random category-appropriate variant
-  const hero = `hero(${pickFrom(heroVariants)})`
-
-  // 2. Pick 1-2 signature blocks for this category
-  const sigCount = Math.min(signatureBlocks.length, 1 + Math.floor(Math.random() * 2))
-  const selectedSig = shuffle(signatureBlocks).slice(0, sigCount)
-
-  // 3. Pick 3-4 common blocks (excluding duplicates with signature)
-  const availableCommon = COMMON_BLOCKS.filter(b => !selectedSig.includes(b))
-  const commonCount = 3 + Math.floor(Math.random() * 2)
-  const selectedCommon = shuffle(availableCommon).slice(0, commonCount)
-
-  // 4. Combine and shuffle middle section
-  const middleBlocks = shuffle([...selectedSig, ...selectedCommon])
-
-  // 5. Footer with random variant
-  const footer = `footer(${pickFrom(FOOTER_VARIANTS)})`
-
-  return [hero, ...middleBlocks, footer].join(' → ')
-}
-
-const CATEGORY_HINTS: Record<string, string> = {
-  restaurant: 'F&B, eatery, cafe, restaurant',
-  ecommerce: 'shop, store, fashion, cosmetics',
-  portfolio: 'portfolio, freelancer, designer, photographer',
-  blog: 'blog, news, content',
-  business: 'services, company, agency, startup',
-}
+// Plan 2253 follow-up (audit-unused-code) — deleted ~130 lines of dead code:
+//   - STYLE_PERSONALITIES (empty array, deprecated by plan 2249 phase-02)
+//   - selectPersonality() (deprecated shim, no callers post-cleanup)
+//   - generateCompositionHint() + CATEGORY_SIGNATURE_BLOCKS + COMMON_BLOCKS
+//     + HERO_VARIANTS_BY_CATEGORY + FOOTER_VARIANTS (R12 soft hint ignored
+//     by GPT-4o; superseded by plan 2249 phase-04 `recipe` hard directive
+//     injection in buildUserPrompt)
+//   - CATEGORY_HINTS (only consumed by generateCompositionHint's legacy
+//     fallback branch, no longer needed)
+//   - pickFrom / shuffle (local helpers only used by generateCompositionHint)
+// See plans/260414-2253-ai-gen-variety-root-cause/reports/audit-unused-code.md
 
 export function buildSystemPrompt(
   language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
   themeContext?: ThemePromptContext,
 ): string {
-  const blockMetas = blockRegistry.getAllMeta()
+  // Plan 2253 audit-unused-code — filter out editor-only blocks (aiVisible=false)
+  // so GPT-4o prompt lists only blocks the AI should actually output. Blocks
+  // like divider/breadcrumb/whatsapp-button/cart-widget are still available in
+  // the editor library UI for manual user drag-drop, just hidden from AI.
+  const blockMetas = blockRegistry.getAllMeta().filter((m) => m.aiVisible !== false)
 
   const blockList = blockMetas.map(m =>
     `- **${m.type}** (${m.name}): ${m.description}. Variants: [${m.variants.join(', ')}]. Fields: ${m.editableFields.join(', ')}`
@@ -318,12 +150,14 @@ NOTE: For backward compatibility, "blocks" at the root level is also accepted (t
 ${blockList}
 
 ## STRUCTURE RULES
-1. Generate 4 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-5 blocks)
-2. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
-3. Each block MUST have "blockType" and "variant" fields
-4. blockType MUST be one of the listed types — no custom types
-5. variant MUST be one of the listed variants for that block type
-6. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+1. Generate 5 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-6 blocks), Blog (4-6 blocks with 3-5 seeded posts)
+2. Every page MUST have at least 4 blocks with non-empty body copy — no stub pages
+3. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
+4. Each block MUST have "blockType" and "variant" fields
+5. blockType MUST be one of the listed types — no custom types
+6. variant MUST be one of the listed variants for that block type
+7. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+8. Blog page MUST include blog-list block with ≥3 posts (title + excerpt + slug + readTime)
 
 ## LANGUAGE DETECTION
 - Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
@@ -419,40 +253,102 @@ export type BusinessInfoInput = {
   industry: string
   products: string
   shortDescription: string
+  // User-supplied optional fields (plan 260414-2249 phase-01). Wire-level ephemeral
+  // — phone/email/address flow into composer via mapBusinessInfo() and override
+  // canned BusinessSample fields. tagline falls back to shortDescription slice.
+  tagline?: string
+  phone?: string
+  email?: string
+  address?: string
+}
+
+import type { ThemeMood } from './theme-moods'
+import type { CategoryRecipe } from './category-recipes'
+
+export type BuildUserPromptOptions = {
+  extraInstructions?: string
+  language?: 'en' | 'ms' | 'vi' | 'auto'
+  referencePrompt?: string
+  /** Plan 260414-2249 phase-02: bundled voice/imagery/CTA archetype. */
+  mood?: ThemeMood
+  /**
+   * Plan 260414-2249 phase-04: ordered block sequence hard constraint.
+   * When provided, replaces the legacy `generateCompositionHint`
+   * category signature with an explicit RHYTHM section in the user
+   * prompt — tells GPT the exact order of blocks to emit.
+   */
+  recipe?: CategoryRecipe
 }
 
 export function buildUserPrompt(
   info: BusinessInfoInput,
-  extraInstructions?: string,
+  extraInstructionsOrOptions?: string | BuildUserPromptOptions,
   language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
   referencePrompt?: string,
 ): string {
+  // Backward-compat: legacy positional args (string, lang, referencePrompt)
+  // OR new options object. Normalize.
+  let extraInstructions: string | undefined
+  let mood: ThemeMood | undefined
+  let recipe: CategoryRecipe | undefined
+  if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
+    extraInstructions = extraInstructionsOrOptions
+  } else {
+    extraInstructions = extraInstructionsOrOptions.extraInstructions
+    mood = extraInstructionsOrOptions.mood
+    recipe = extraInstructionsOrOptions.recipe
+    if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
+    if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
+  }
   const parts = [
     `Create a complete website for: "${info.businessName}"`,
     `Industry: ${info.industry}`,
     `Main products/services: ${info.products}`,
     `Business description: ${info.shortDescription}`,
   ]
+  // Plan 260414-2249 phase-01: forward user-supplied contact + tagline so
+  // GPT happy-path output mirrors what the composer fallback emits.
+  if (info.tagline && info.tagline.trim()) {
+    parts.push(`Tagline: ${info.tagline.trim()}`)
+  }
+  if (info.phone && info.phone.trim()) {
+    parts.push(`Contact phone: ${info.phone.trim()} (use this verbatim in any contact block)`)
+  }
+  if (info.email && info.email.trim()) {
+    parts.push(`Contact email: ${info.email.trim()} (use this verbatim)`)
+  }
+  if (info.address && info.address.trim()) {
+    parts.push(`Physical address: ${info.address.trim()} (use this verbatim)`)
+  }
   if (extraInstructions) {
     parts.push(`Additional instructions: ${extraInstructions}`)
   }
 
-  // Inject context-aware style personality for variety (skip for reference/recreation mode)
-  if (!referencePrompt && STYLE_PERSONALITIES.length > 0) {
-    const personality = selectPersonality(info)
-    parts.push(`\nDesign personality: ${personality}`)
+  // Plan 260414-2249 phase-02: inject mood-driven COPY VOICE block.
+  // When a mood is provided, it replaces the legacy one-sentence personality
+  // with 4-5 bulleted voice rules + imagery adjectives + copy tone label.
+  //
+  // When no mood is supplied (legacy callers), no personality block is added
+  // at all — the previous STYLE_PERSONALITIES fallback is deprecated. Current
+  // openai-generator.ts always passes mood after the GAP 1 fix.
+  if (!referencePrompt && mood) {
+    const voiceBullets = mood.voiceStyle.map((rule) => `  - ${rule}`).join('\n')
+    parts.push(
+      `\nCOPY VOICE (${mood.label} / ${mood.copyTone}):\n${voiceBullets}\n  - Imagery mood: ${mood.imageryKeywords.slice(0, 3).join(', ')}.`,
+    )
   }
 
-  // Inject dynamically generated block composition hint
-  if (!referencePrompt) {
-    const categoryLower = info.industry.toLowerCase()
-    const matchedCategory = Object.keys(CATEGORY_SIGNATURE_BLOCKS).find(
-      cat => categoryLower.includes(cat) || (CATEGORY_HINTS[cat] && CATEGORY_HINTS[cat].split(', ').some(kw => categoryLower.includes(kw)))
+  // Plan 260414-2249 phase-04: inject ordered RHYTHM section when a recipe
+  // is provided. This is a HARD constraint (not "feel free to modify") —
+  // GPT should produce blocks in this exact order. Replaces the legacy
+  // generateCompositionHint which used a shuffled CATEGORY_SIGNATURE_BLOCKS
+  // lookup (deleted by Plan 2253 follow-up audit-unused-code cleanup).
+  if (!referencePrompt && recipe) {
+    const sequence = recipe.blocks.join(' → ')
+    const required = recipe.required.join(', ')
+    parts.push(
+      `\nRHYTHM: ${recipe.label} (${recipe.rhythm})\nBlock sequence: ${sequence}\nRequired blocks (must be present): ${required}\nRationale: ${recipe.description}\nIMPORTANT: Emit blocks in this exact order. You may omit optional blocks but do not reorder them.`,
     )
-    if (matchedCategory) {
-      const hint = generateCompositionHint(matchedCategory)
-      parts.push(`\nSuggested block composition (feel free to modify): ${hint}`)
-    }
   }
 
   // Append reference content from ContentBrief (URL/Image extraction)

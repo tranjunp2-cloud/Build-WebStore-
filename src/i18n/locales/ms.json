@@ -8,7 +8,11 @@
         "learnMore": "Ketahui Lagi",
         "copyright": "© 2026 Web Store. Hak cipta terpelihara.",
         "language": "Bahasa",
-        "search": "Cari..."
+        "search": "Cari...",
+        "desktop": "Desktop",
+        "mobile": "Mudah alih",
+        "preview": "Pratonton",
+        "back": "Kembali"
     },
     "nav": {
         "platform": "Platform",
@@ -166,7 +170,40 @@
             "stepGenerating": "Menjana kandungan & reka bentuk",
             "stepPreparing": "Menyediakan pratonton",
             "progressLabel": "Membina laman web anda",
-            "processing": "Memproses..."
+            "processing": "Memproses...",
+            "elapsed": "Masa berlalu: {seconds}s",
+            "timeoutWarning": "Mengambil masa lebih lama daripada dijangka...",
+            "cancelButton": "Batalkan penjanaan",
+            "draftExpired": "Draf AI Builder sebelumnya anda telah tamat tempoh selepas 24 jam.",
+            "saveFailed": "Gagal menyimpan perubahan pratonton terkini."
+        },
+        "completion": {
+            "successMessage": "telah berjaya dicipta!",
+            "sectionsGenerated": "+{count} bahagian",
+            "sectionsGeneratedLabel": "dijana",
+            "generationTimeLabel": "masa penjanaan",
+            "description": "Anda boleh melihat Pratonton di sebelah kanan, buka Editor untuk membuat perubahan, atau Terbitkan sekarang!",
+            "previewTitle": "Pratonton Laman Web",
+            "previewSubtitle": "Laman web anda yang dijana oleh AI",
+            "viewFullPreview": "Lihat Pratonton Penuh",
+            "startingMessage": "Memulakan penciptaan laman web...",
+            "mobilePreviewTitle": "Pratonton mudah alih",
+            "mobilePreviewDescription": "Buka pratonton mendalam untuk menyemak laman web yang dijana pada mudah alih.",
+            "openPreviewButton": "Buka Pratonton",
+            "arrangeSectionsTitle": "Susun bahagian",
+            "arrangeSectionsDescription": "Gunakan mod senarai pada mudah alih untuk mengalih bahagian ke atas atau ke bawah dengan selamat.",
+            "openEditor": "Buka Editor",
+            "publishing": "Menerbitkan...",
+            "publishWebsite": "Terbitkan Laman Web",
+            "publishSuccess": "Laman web berjaya diterbitkan!",
+            "loading": "Memuatkan...",
+            "goToDashboard": "Pergi ke Papan Pemuka",
+            "congratulations": "Tahniah!",
+            "websiteLiveMessage": "Laman web anda {name} kini tersiar dan diterbitkan ke internet.",
+            "copyLink": "Salin Pautan",
+            "copied": "Disalin",
+            "linkCopied": "Pautan disalin! 🎉",
+            "copyFailed": "Gagal menyalin pautan"
         },
         "form": {
             "businessName": "Nama Perniagaan",
@@ -212,7 +249,18 @@
             "errorUnsafe": "URL ini mengandungi kandungan yang tidak dibenarkan.",
             "errorRateLimit": "Terlalu banyak permintaan. Sila tunggu sebentar.",
             "errorGeneric": "Sesuatu telah berlaku. Sila cuba lagi atau masukkan maklumat secara manual.",
-            "tryManual": "Cuba masukkan secara manual"
+            "tryManual": "Cuba masukkan secara manual",
+            "initializing": "Memulakan...",
+            "slugLabel": "Alamat laman web anda",
+            "slugPlaceholder": "nama-kedai-anda",
+            "slugMinLength": "Sekurang-kurangnya 3 aksara diperlukan",
+            "slugInvalidFormat": "Format tidak sah",
+            "slugReserved": "Sub-domain ini telah ditempah",
+            "slugTaken": "Telah digunakan",
+            "slugAvailable": "Tersedia",
+            "slugChecking": "Memeriksa ketersediaan...",
+            "slugCheckError": "Tidak dapat menyemak. Sila cuba lagi.",
+            "slugHelperText": "Anda boleh menukar ini kemudian di Tetapan > Domain"
         }
     },
     "email": {

@@ -8,12 +8,21 @@
  * (Unsplash only supports English search).
  */
 
+import { translateProductTerm } from './product-translator'
+import type { ThemeMood } from './theme-moods'
+
 export type KeywordLanguage = 'en' | 'ms' | 'vi' | 'auto'
 
 export interface KeywordContext {
     businessName?: string
     industry?: string
     language?: KeywordLanguage
+    // Plan 260414-2249 phase-01: top product term drives the primary Unsplash
+    // query when present (translated via product-translator for vi/ms input).
+    products?: string[]
+    // Plan 260414-2249 phase-02: mood appends 1-2 imagery adjectives to the
+    // query for coherent visual style (warm/candlelit/minimalist/...).
+    mood?: ThemeMood
 }
 
 /** Category → 3-5 specific English base terms. Covers all 14 CATEGORY_SIGNATURE_BLOCKS keys. */
@@ -175,6 +184,10 @@ function pickRandom<T>(arr: T[]): T | undefined {
 /**
  * Derive search keywords for a given (category, blockType, ctx).
  * Returns 1-3 non-empty strings ready for `.join(' ')` into an Unsplash query.
+ *
+ * Plan 260414-2249 phase-01: when `ctx.products[0]` is present, it becomes
+ * the PRIMARY term (translated via `translateProductTerm` for vi/ms input).
+ * This makes Unsplash searches actually reflect what the user is selling.
  */
 export function deriveKeywords(
     category: string,
@@ -187,9 +200,38 @@ export function deriveKeywords(
     const modifier = pickRandom(modifiers)
     const industryBoost = translateIndustryToEn(ctx.industry, ctx.language)
 
-    const keywords: string[] = [base]
-    if (modifier) keywords.push(modifier)
-    if (industryBoost && industryBoost !== base) keywords.push(industryBoost)
+    // Product-primary path: user's top product → translated term → primary
+    // keyword. Fall back to category base for downstream variety.
+    const topProduct = ctx.products && ctx.products.length > 0 ? ctx.products[0] : undefined
+    const keywords: string[] = []
+
+    if (topProduct) {
+        const productTerm = translateProductTerm(topProduct)
+        keywords.push(productTerm)
+        if (modifier) keywords.push(modifier)
+        if (industryBoost && industryBoost !== productTerm) keywords.push(industryBoost)
+        else if (base && base !== productTerm) keywords.push(base)
+    } else {
+        keywords.push(base)
+        if (modifier) keywords.push(modifier)
+        if (industryBoost && industryBoost !== base) keywords.push(industryBoost)
+    }
+
+    // Plan 260414-2249 phase-02: append top 1-2 mood imagery adjectives.
+    // Capped at 5 total terms to keep Unsplash queries specific, not soup.
+    if (ctx.mood && ctx.mood.imageryKeywords.length > 0) {
+        const MAX_TERMS = 5
+        const existing = new Set(keywords.map((k) => k.toLowerCase()))
+        for (const adj of ctx.mood.imageryKeywords) {
+            if (keywords.length >= MAX_TERMS) break
+            if (!existing.has(adj.toLowerCase())) {
+                keywords.push(adj)
+                existing.add(adj.toLowerCase())
+            }
+        }
+        // Hard cap (defensive)
+        if (keywords.length > MAX_TERMS) keywords.length = MAX_TERMS
+    }
 
     return keywords.filter((k) => k && k.length > 0)
 }

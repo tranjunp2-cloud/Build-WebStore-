@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import type { ComponentProps, ReactNode } from 'react'
 import '@testing-library/jest-dom'
 
@@ -214,5 +214,72 @@ describe('AIDiscoveryWizard', () => {
         })
         
         consoleErrorSpy.mockRestore()
+    })
+
+    // Safety net: restore real timers if any test fails mid-execution
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    it('[TC-F06.05] Slide navigation: Continue advances to next slide', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        expect(screen.getByText('AI Editor')).toBeVisible()
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+
+        expect(screen.getByText('AI Content')).toBeVisible()
+    })
+
+    it('[TC-F06.07] Slide 3 shows Explore CTA instead of Continue', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Navigate to slide 3
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+
+        expect(screen.getByText('AI SEO')).toBeVisible()
+        expect(screen.getByText('Explore CMS')).toBeVisible()
+        expect(screen.queryByText('Continue')).not.toBeInTheDocument()
+    })
+
+    it('[TC-F06.08] Go back button navigates to previous slide', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI Content')).toBeVisible()
+
+        fireEvent.click(screen.getByText('Go back'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI Editor')).toBeVisible()
+    })
+
+    it('[BUG-F06-011] Swipe left on last slide does NOT dismiss wizard', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Navigate to last slide (slide 3)
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI SEO')).toBeVisible()
+
+        // Simulate swipe left on the modal container
+        const modal = screen.getByText('AI SEO').closest('[class*="touch-pan-y"]')!
+        fireEvent.touchStart(modal, { targetTouches: [{ clientX: 300 }] })
+        fireEvent.touchMove(modal, { targetTouches: [{ clientX: 100 }] })
+        fireEvent.touchEnd(modal)
+
+        // Wizard should still be open — NOT dismissed
+        expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+        expect(screen.getByText('AI SEO')).toBeVisible()
+        expect(global.fetch).not.toHaveBeenCalled()
     })
 })

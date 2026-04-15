@@ -996,3 +996,376 @@ import { sanitizeBlockData } from '@/lib/ai/openai-generator'
 - TC-F01-V.38 (diversity test sẽ fail vì deterministic)
 
 Đây là **test-first approach**: các test này FAIL xác nhận feature chưa có, sau khi implement feature thì test sẽ PASS.
+
+---
+
+## 10. Phase 01 — User Data Threading (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-01-user-data-threading.md`
+> PR: `feat(F01): [US-F01-07] thread user data into ai gen pipeline`
+
+### Mục tiêu
+
+Thread user-supplied `phone`, `email`, `address`, `products`, `shortDescription`, `tagline` từ `BusinessInfoInput` xuyên suốt pipeline — cả composer fallback path lẫn AI happy path. Trước phase này: `composeFallbackResult` chỉ nhận `extractedName` → composer block builders (`buildFeatures`, `buildContact`, `buildServiceCards`, `buildProductQuickView`) dùng canned content bất kể user type gì.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.01** | `business-info-mapper.test.ts` | Mapper parse + dedupe products string, normalize phone/email, derive tagline | ✅ |
+| **TC-F01-W.02** | `contact-override.test.ts` | Contact block dùng user phone/email/address verbatim khi provided; fallback canned khi empty; bizOverride deep-clone không pollute cache | ✅ |
+| **TC-F01-W.03** | `features-from-products.test.ts` | Features block emit cards từ user products khi ≥2; icons rotate từ `PRODUCT_FEATURE_ICONS[category]`; description dùng `FEATURE_BODY_TEMPLATES[category]`; fallback canned khi <2 | ✅ |
+| **TC-F01-W.04** | `service-cards-from-products.test.ts` | Service-cards emit user products khi provided; fallback canned khi empty | ✅ |
+| **TC-F01-W.05** | `service-cards-from-products.test.ts` | Product-quick-view emit user products, pad từ canned khi <3 | ✅ |
+| **TC-F01-W.06** | `image-keywords-products.test.ts` | `deriveKeywords` primary-inject English product vào Unsplash query | ✅ |
+| **TC-F01-W.06b** | `product-translator.test.ts` + `image-keywords-products.test.ts` | `nasi lemak` → `malaysian coconut rice`; `phở` → `vietnamese pho noodle soup`; unknown vi/ms pass-through | ✅ |
+| **TC-F01-W.07** | `build-user-prompt.test.ts` | `buildUserPrompt` serialize phone/email/address/tagline khi provided; omit khi empty | ✅ |
+| **TC-F01-W.08** | `user-data-e2e-fixture.test.ts` | End-to-end: ramen shop + nasi lemak shop fixtures — composer + keywords + prompt đồng bộ | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/content/types.ts` — extend `BusinessSample` với optional `products?: string[]` (runtime-only, NO DB migration)
+- `src/lib/ai/system-prompt.ts` — extend `BusinessInfoInput` type; `buildUserPrompt` serialize optional fields
+- `src/lib/ai/business-info-mapper.ts` — NEW: pure mapper `BusinessInfoInput → Partial<BusinessSample>`
+- `src/lib/ai/product-translator.ts` — NEW: vi/ms → en dict (60+ terms) + `franc-min` language detection
+- `src/lib/ai/fallback-adapter.ts` — `composeFallbackResult` signature nhận full `BusinessInfoInput` (backward compat với string overload)
+- `src/lib/ai/openai-generator.ts` — forward full `businessInfo` vào `generateWithFallback`
+- `src/lib/ai/template-composer.ts` — `featuresFromProducts` helper + `PRODUCT_FEATURE_ICONS` + `FEATURE_BODY_TEMPLATES`; `buildFeatures`/`buildServiceCards`/`buildProductQuickView` prefer user products
+- `src/lib/ai/image-keywords.ts` — `KeywordContext.products`; `deriveKeywords` primary-inject translated product term
+- `src/lib/ai/media-injector.ts` — forward `ctx.products` to `deriveKeywords`
+- `src/lib/ai/media-pipeline.ts` — `MediaPipelineContext.products` optional
+- `src/lib/validations/ai.ts` — Zod schema `generateSiteSchema` optional `tagline/phone/email/address`
+- `src/app/api/ai/generate-site/route.ts` — parse products string, pass into media pipeline
+- `package.json` — add `franc-min ^6.2.0`, `dompurify` (fix pre-existing vitest resolver issue)
+
+### Acceptance Criteria
+
+- Restaurant gen với `{ products: ["ramen", "sushi"], phone: "+60..." }` → features block reference ramen/sushi, contact block có phone verbatim, first Unsplash query contains `"ramen"`.
+- Malay restaurant với `products: ["nasi lemak"]` → first Unsplash query contains `"malaysian coconut rice"`.
+- Empty `BusinessInfoInput` → fallback canned content, no crash.
+- All 69 new unit tests pass; existing `fallback-adapter.test.ts` (22 tests) still green.
+
+---
+
+## 11. Phase 02 — Theme Moods System (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-02-theme-moods-system.md`
+> PR: `feat(f01): [US-F01-08] theme moods system — imagery, voice, cta bundle`
+
+### Mục tiêu
+
+Bundle imagery mood, copy voice, photography filter, và category-tuned CTAs vào 6 **ThemeMood archetypes** (Playful, Elegant, Bold, Serene, Editorial, Tech-Minimal). Mỗi trong 70 `ThemePreset` được gán 1 mood duy nhất qua field `moodId`. Mood wire xuyên suốt 3 consumer: (a) `buildUserPrompt` voice block, (b) `deriveKeywords` imagery adjective append, (c) composer `getCategoryCTA` helper thay thế hardcoded `"Get Started"/"Learn More"`.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.09** | `mood-cta-coverage.test.ts` | ThemeMood shape: 6 moods, 14 cats, voiceStyle 4-6 rules, imageryKeywords 3-6, copyTone enum, every field non-empty | ✅ |
+| **TC-F01-W.09b** | `preset-mood-assignment.test.ts` | Every preset có moodId hợp lệ; mỗi mood dùng bởi ≥3 presets; không có mood chiếm >30%; mỗi category có ≥2 distinct moods | ✅ |
+| **TC-F01-W.10** | `voice-prompt-mood.test.ts` | `buildUserPrompt` inject COPY VOICE block với mood label, copyTone, bulleted rules, imagery hint; backward compat với legacy personality path | ✅ |
+| **TC-F01-W.11** | `image-keywords-mood.test.ts` | `deriveKeywords` append mood imagery adjectives; total cap ≤5; no duplicates; tương tác với Phase 01 products | ✅ |
+| **TC-F01-W.12** | `mood-cta-coverage.test.ts` | **168-cell CTA coverage** — 6 moods × 14 cats × 2 roles: non-empty, ≤25 chars, primary ≠ secondary, no TODO markers, không mood nào fall back generic >2 cells | ✅ |
+| **TC-F01-W.12b** | `mood-cta-composer.test.ts` | End-to-end: hero/nav/CTA block dùng mood-resolved labels qua `composeFallbackResult`; seed variety produces distinct CTAs; no "Get Started" dominance | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/theme-moods.ts` — **NEW** 350 lines: MoodId/MoodCategory/PhotographyFilter/CopyTone types, ThemeMood interface, 6 hand-curated mood records với 168 CTA cells, getMood + getCategoryCTA helpers
+- `src/lib/ai/theme-presets.ts` — extended `ThemePreset` type với `moodId: MoodId` field, assigned mood cho tất cả 70 presets (distribution: elegant 16, playful 13, bold 11, tech-minimal 11, editorial 10, serene 9)
+- `src/lib/ai/category-theme-picker.ts` — new `CategoryTheme` interface + `pickCategoryThemeWithMood()` entry point, legacy `pickCategoryTheme` preserved
+- `src/lib/ai/system-prompt.ts` — `buildUserPrompt` nhận `BuildUserPromptOptions.mood`, inject COPY VOICE bulleted block khi có mood
+- `src/lib/ai/image-keywords.ts` — `KeywordContext.mood` optional, append top 1-2 imagery adjectives, cap 5 total, no dupes
+- `src/lib/ai/template-composer.ts` — `resolveCTA(mood, category, role)` helper; `buildNavigation`/`buildHero`/`buildCTA` prefer mood CTAs; `composeFromBlueprint` resolve mood từ `preset.themePreset.moodId`; `buildBlockFromSpec` thread mood xuống
+- **6 new test files**: `theme-moods` helpers + 168 coverage, preset assignment, voice injection, imagery append, end-to-end composer CTAs
+
+### Acceptance Criteria
+
+- `pickCategoryThemeWithMood("restaurant", hashBusinessName("Rose Garden"))` trả về theme có `mood.copyTone === 'aspirational'` (Heritage Gold preset → elegant mood).
+- 5 generations restaurant × 5 different names produce CTAs từ ≥3 distinct mood-driven phrasings (verified by seed variety test).
+- GPT prompt cho beauty × playful run chứa voice rules "texting a close friend", "one exclamation per section max", "skip corporate buzzwords".
+- Unsplash query cho `{ products: ["nasi lemak"], mood: serene }` = `"malaysian coconut rice restaurant minimalist ..."` — verified via `deriveKeywords` test.
+- 168 non-empty CTA strings, all ≤25 chars, coverage test xanh.
+- 6 new test files + 202 new assertions (W.09/W.09b/W.10/W.11/W.12/W.12b). Phase 01 regression tests vẫn xanh 170/170.
+
+### Test Summary (cumulative Phase 01 + 02)
+
+| Suite | Count | Status |
+|---|---|---|
+| Phase 01 tests (7 files) | 69 | ✅ |
+| Phase 02 tests (6 files) | 235+ | ✅ |
+| Legacy regression (`fallback-adapter.test.ts`) | 22 | ✅ |
+| **Total new since pre-Phase-01** | **330+** | ✅ |
+
+---
+
+## 12. Phase 03 — Image Pool + Visual Consistency (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-03-image-pool-consistency.md`
+> PR: `feat(f01): [US-F01-09] image pool per site for visual cohesion`
+
+### Mục tiêu
+
+Replace per-block Unsplash searches với ONE per-site **image pool**. Một gen site chỉ gọi 1-2 `searchPhotos` thay vì 6-8 → tất cả blocks share cùng photographer, lighting, mood → visual cohesion by design. Pool inherits mood qua `mood.imageryKeywords` + `mood.photographyFilter`.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.13** | `image-pool.test.ts` | `buildImagePool` shape: ImagePool structure, PoolPhoto fields, aspect ratio derivation | ✅ |
+| **TC-F01-W.14** | `image-pool.test.ts` | Query construction: product + mood imagery adjectives, category fallback, 2 searchPhotos calls (landscape + squarish), dedupe | ✅ |
+| **TC-F01-W.15** | `image-pool.test.ts` | `pickFromPool` determinism: same seed same photo, role → bucket mapping, role salting prevents collision, `pickManyFromPool` distinct ids | ✅ |
+| **TC-F01-W.16** | `image-pool.test.ts` | Underfill backoff: relaxed retry, `pool.underfill` flag, searchPhotos rejection → empty bucket | ✅ |
+| **TC-F01-W.17** | `image-pool.test.ts` | Integration spy: 5 same-seed runs = 10 Unsplash calls total; query stable across reruns | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/image-pool.ts` — **NEW** 350 lines: types, `buildImagePool` 2-search + backoff, `pickFromPool` mulberry32, `pickManyFromPool` Fisher-Yates, `mergePool`, `poolSize`
+- `src/lib/ai/media-pipeline.ts` — `MediaPipelineContext.pool?: ImagePool`; new `batchFetchFromPool` + `fetchAndStorePoolPhoto` helpers (download + upload PoolPhotos, skip search)
+- `src/lib/ai/media-injector.ts` — `fulfillImageNeeds` pool-aware fast path: when `ctx.pool` present, picks via `pickManyFromPool` → `batchFetchFromPool` → media IDs; legacy per-block search kept as fallback. `roleForBlock` + `hashBlockSeed` helpers
+- `src/app/api/ai/generate-site/route.ts` — builds `imagePool` once per gen, passes into fulfillment ctx, logs `[Image Pool]` line with counts + underfill flag
+
+### Acceptance Criteria
+
+- Restaurant × `elegant` mood gen → pool query contains `refined|candlelit|marble|timeless`.
+- `pickFromPool(pool, 'hero', seed)` and `pickFromPool(pool, 'gallery', seed)` pick DIFFERENT photos at same seed (role salt).
+- Pool underfill backoff fires when initial < 3 landscape photos, retries with relaxed query, sets `pool.underfill=true`.
+- Full gen: hero + features + gallery + team blocks ALL receive Media IDs sourced from the same pool — verified by `[Image Pool] query="..." landscape=N square=M` log line.
+- Legacy path preserved: `ctx.pool === undefined` falls through to `getMediaForBlock` per-block search (no regression).
+
+---
+
+## 13. Phase 04 — Layout Recipes A/B/C (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-04-layout-recipes.md`
+> PR: `feat(f01): [US-F01-10] layout recipes a/b/c per category`
+
+### Mục tiêu
+
+Replace single `CATEGORY_SIGNATURE_BLOCKS[category]` với **3 hand-curated recipes per category** (14 × 3 = 42 total). Mỗi recipe có rhythm archetype (story/menu/gallery/services/portfolio/team/features/social-proof/demo-first) + ordered block sequence + required subset. Composer picks via `seed % 3` deterministic. GPT happy path receives RHYTHM section as hard sequence constraint.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.18** | `category-recipes.test.ts` | **407 assertions** — 42 recipes × 10 checks each: shape, rhythm enum, id format, hero+footer locked, blocks ≥5, every blockId in SUPPORTED_BLOCK_IDS, required ⊆ blocks, middleShuffleRange bounds, id uniqueness, ≥2 distinct rhythms per category, distribution ≤40% | ✅ |
+| **TC-F01-W.18a** | `category-recipes.test.ts` | `pickRecipe` determinism + rotation across 30 seeds + unknown category fallback + negative seed | ✅ |
+| **TC-F01-W.19** | `recipe-rhythm-prompt.test.ts` | **22 assertions** — `buildUserPrompt` RHYTHM section: header, label, rhythm enum, block sequence with arrow separators, required list, rationale, hard-order instruction, 14 cats × 3 recipes coverage, recipe + mood coexistence, pickRecipe → prompt end-to-end, seed variety | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/category-recipes.ts` — **NEW** 380 lines: `RecipeRhythm` / `RecipeCategory` / `CategoryRecipe` types, `SUPPORTED_BLOCK_IDS` whitelist (34 block types), 42 hand-curated recipes, `pickRecipe(category, seed)` selector, `getRecipesForCategory`, `isSupportedBlockId`
+- `src/lib/ai/system-prompt.ts` — `BuildUserPromptOptions.recipe?: CategoryRecipe`. When recipe provided, injects RHYTHM section with label + block sequence + required + rationale + hard-order instruction. Legacy `generateCompositionHint` path kept as fallback when no recipe passed.
+- `src/lib/ai/openai-generator.ts` — picks `layoutRecipe = pickRecipe(category, themeSeed)` at same point as mood resolution, passes into `buildUserPrompt` options, logs `recipe=<id>` in theme line
+
+### Acceptance Criteria
+
+- `pickRecipe('restaurant', seed)` rotates across `rest-story` / `rest-menu` / `rest-gallery` — verified by 30-seed distribution test.
+- GPT prompt contains `RHYTHM: Story-first (story-first)\nBlock sequence: hero → about → menu-display → ...` instead of shuffled `CATEGORY_SIGNATURE_BLOCKS` hint.
+- Different business names at same category → 3 distinct recipes observed in prod logs `[Theme] ... recipe=<id>`.
+- Composer path (no recipe passed) backward compat — legacy `generateCompositionHint` still fires for non-AI callers.
+- 42 recipes non-empty + all block IDs valid + rhythm distribution sanity (no rhythm > 40%).
+
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04)
+
+| Suite | Count | Status |
+|---|---|---|
+| Phase 01 tests | 69 | ✅ |
+| Phase 02 tests | 235+ | ✅ |
+| Phase 03 tests | 23 (image-pool) + 14 (media-injector regression) | ✅ |
+| Phase 04 tests | 407 + 22 = 429 | ✅ |
+| Legacy regression | 22 | ✅ |
+| **Total** | **790+** | ✅ |
+
+---
+
+## 14. Phase 05 — Multi-page Completeness (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-05-multipage-completeness.md`
+> PR: `feat(f01): [US-F01-11] multi-page completeness — blog seeds + contact enrich + about hero`
+
+### Mục tiêu
+
+Kill sub-page stubs. Every site ships ≥5 pages: Home / About / Contact / Blog (+ Services/Menu per blueprint). Each core page ≥4 blocks. Blog renders 3-5 curated posts per category. About hero weaves user description. Contact page has Google Maps + opening-hours FAQ.
+
+### Test Cases
+
+| TC ID | Test File | Status |
+|-------|-----------|--------|
+| **TC-F01-W.20** blog shape | `blog-seeds-coverage.test.ts` | ✅ |
+| **TC-F01-W.21** 14 cats × ≥3 posts | `blog-seeds-coverage.test.ts` | ✅ |
+| **TC-F01-W.22** About weaves description | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.23** Contact user fields + map + FAQ | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.24** Blog renders seeded posts | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.25** Core 5 pages ≥4 blocks | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.26** Empty-input regression | `multipage-completeness.test.ts` | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/content/blog-seeds.ts` — **NEW** 180 lines: 14 categories × 4 posts = 56 curated blog stubs + helpers
+- `src/lib/ai/content/types.ts` — new `BlogPost` type + optional `blogSeeds` on CategoryContent
+- `src/lib/ai/template-composer.ts`:
+  - `buildAboutPage` / `buildContactPage` / `buildBlogPage` rewritten to emit ≥5 blocks with meaningful content
+  - **NEW `enrichSubPages(pages, biz, category)` post-processor** runs inside `composeFromBlueprint` — overrides About hero with description excerpt, injects google-maps + FAQ into Contact, appends Blog page with seeded posts when blueprint lacks it, fills empty blog-list items from seeds
+- `src/lib/ai/system-prompt.ts` STRUCTURE RULES — `Generate 5 pages` (adds Blog), `every page ≥4 blocks`, `Blog page MUST include blog-list with ≥3 seeded posts`
+
+### Acceptance Criteria
+
+- Every gen has Home / About / Contact / Blog minimum (blueprint extras preserved).
+- Blog page renders ≥3 real posts from seeds — no empty "Latest Articles".
+- About hero subheadline = user description excerpt when provided.
+- Contact page has Google Maps block with user address + FAQ with opening-hours items.
+- Empty input regression: canned fills gaps, blog still has ≥3 seeds.
+- 14 categories × ≥3 seeds = ≥42 total (currently 56).
+
+---
+
+## 15. Phase 06 — SEO + Consistency Guard
+
+**Problem**: Fallback path writes the SAME truncated site tagline as the meta description for every page (home/about/contact/blog share identical `seo.description`). Google flags these as duplicate meta descriptions. No page carries JSON-LD structured data → zero rich-results eligibility. No post-gen quality checks → silent quality drift.
+
+**Fix**: Three bundled additions —
+
+1. **Per-page SEO generator** (`src/lib/ai/seo-generator.ts`): mines unique title + description + og:image from each page's first text/image block. Home title `{biz.name} · {tagline}`, sub-pages `{page.title} · {biz.name}`. Defensive dedupe step forces uniqueness.
+2. **JSON-LD templates** (`src/lib/ai/json-ld-templates.ts`): category → schema.org `@type` mapping (`restaurant`→`Restaurant`, `health`→`MedicalClinic`, `education`→`EducationalOrganization`, `ecommerce`→`Store`, `beauty`→`BeautySalon`). LocalBusiness schema embeds user phone/email/address verbatim. FAQPage schema attached only to pages with an FAQ block.
+3. **Consistency validator** (`src/lib/ai/consistency-validator.ts`): warn-only post-gen check. Rules C1 palette, C2 image mood, C3 headline length (>10 words), C4 CTA rhythm (<3 CTAs/page), C5 recipe adherence (nav/hero/footer on homepage). Logged via `console.warn`; never blocks save.
+
+### Test Cases (TC-F01-W.27 .. W.42)
+
+| TC | Scenario | Expected |
+|---|---|---|
+| W.27 | Home + About + Contact gen from ramen fixture | 3 distinct meta descriptions |
+| W.28 | Homepage SEO title format | `{biz.name} · {tagline}`, truncated ≤ 60 chars |
+| W.28b | Sub-page SEO title format | `{page.title} · {biz.name}` |
+| W.29 | Title + description length caps | ≤ 60 chars title, ≤ 155 chars description |
+| W.30 | LocalBusiness JSON-LD contact fields | phone/email/address from user input |
+| W.31 | Category → schema @type | restaurant→Restaurant, health→MedicalClinic, etc. |
+| W.31b | Restaurant `servesCuisine` | populated from `biz.products[]` |
+| W.32 | FAQPage schema | attached only to pages with `faq` block |
+| W.33 | ogImage fallback | page image → site hero fallback |
+| W.34 | Duplicate description dedupe | appends page title to disambiguate |
+| W.35 | Fallback-adapter integration | every page has unique desc + jsonLd[] |
+| W.36 | C1 palette missing color | warning emitted |
+| W.37 | C2 homepage w/o image | warning emitted |
+| W.37b | C2 mixed http/local sources | warning emitted |
+| W.38 | C3 headline > 10 words | warning emitted |
+| W.39 | C4 page < 3 CTAs | warning emitted |
+| W.40 | C5 homepage missing nav/footer | warning emitted |
+| W.41 | Clean site | `passed=true`, zero warnings |
+| W.42 | Degenerate single-page shape | runConsistencyCheck does not throw |
+
+### Files touched
+
+- `src/lib/ai/seo-generator.ts` — **NEW** 200 lines: `generatePageSeo`, `generateAllPageSeo`, `minePageText`, `minePageImage`, `truncateOnWord`, dedupe
+- `src/lib/ai/json-ld-templates.ts` — **NEW** 193 lines: `LocalBusinessSchema` / `FaqPageSchema` types, `schemaTypeFor`, `parseAddress`, `defaultPriceRange`, `buildLocalBusinessJsonLd`, `buildFaqJsonLd`
+- `src/lib/ai/consistency-validator.ts` — **NEW** 220 lines: `runConsistencyCheck`, `logConsistencyReport`, rules C1-C5
+- `src/lib/ai/fallback-adapter.ts` — uses `generateAllPageSeo` per-page in `adaptTemplateSeedToGenerationResult`; runs consistency check in `composeFallbackResult`
+- `src/lib/ai/openai-generator.ts` — overrides AI-returned per-page SEO with deterministic `generateAllPageSeo`; runs consistency check before `done` event
+- `src/lib/ai/generate-blocks.ts` — `GeneratedPage['seo']` gains optional `ogImage` + `jsonLd`
+
+### Acceptance Criteria
+
+- Fallback gen: every page in `result.pages[].seo.description` is unique (no more shared tagline).
+- Every page ships `seo.jsonLd[]` with at least a `LocalBusiness`-family schema; FAQ blocks attach an additional `FAQPage` schema.
+- Consistency validator runs on both fallback + AI paths, logs warnings via `console.warn`, never blocks save.
+- Title ≤ 60 chars, description ≤ 155 chars — enforced by `truncateOnWord`.
+- `buildLocalBusinessJsonLd` embeds user phone/email/address verbatim when supplied.
+
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04 + 05 + 06)
+
+| Suite | Count | Status |
+|---|---|---|
+| Phase 01 tests | 69 | ✅ |
+| Phase 02 tests | 235+ | ✅ |
+| Phase 03 tests | 23 (image-pool) + 14 (media-injector regression) | ✅ |
+| Phase 04 tests | 407 + 22 = 429 | ✅ |
+| Phase 05 tests | 50 (blog seeds + multipage) | ✅ |
+| Phase 06 tests | 39 (seo-generator + consistency-validator) | ✅ |
+| Legacy regression | 22 | ✅ |
+| **Total** | **880+** | ✅ |
+
+## Section 16 — Phase 07 Variety Retrofit (US-F01-13)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-07-variety-retrofit.md`
+> Diagnostic repro (pre-fix): 11 same / 2 diff fields across 3 restaurant fixtures at seed=42.
+> Post-fix gate: ≥ 8 of 13 fields differ (TC-F01-W.44).
+
+### Goal
+
+Thread user biz data into the SHARED block-library builder (`buildBlockFromLibrary`)
+and the fallback composer hero (`buildHero`), extend the image pool query to use
+the full top-3 translated products, make `pickRecipe` biz-aware, template the blog
+seeds, and reroute SEO mining so the homepage prefers `biz.description` over the
+enforcer-padded hero subheadline.
+
+### Test Cases (TC-F01-W.43 .. W.50)
+
+| TC | File | Scenario | Status |
+|---|---|---|---|
+| **TC-F01-W.43** | `image-pool.test.ts` | `buildPoolQuery` threads top-3 products, joins with mood imagery, drops duplicates | ✅ (covered by existing W.14/W.15) |
+| **TC-F01-W.44** | `variety-repro.test.ts` | **Gate** — 3 restaurant fixtures @ seed=42 differ on ≥ 8 of 13 fields (hero headline / sub / CTA / features items / about body / home SEO desc / blog first title / contact phone / site name / site SEO) | ✅ |
+| **TC-F01-W.45** | `block-library-biz.test.ts` | `buildBlockFromLibrary` threads `userBiz` into hero / about / features / contact / cta / newsletter / footer; backward-compat when `userBiz` omitted; testimonials + FAQ stay canned | ✅ |
+| **TC-F01-W.46** | `hero-user-data.test.ts` | Composer `buildHero` uses biz.name + description excerpt + mood CTA; 3 fixtures produce 3 distinct headlines; headline ≤ 10 words (C3 rule) | ✅ |
+| **TC-F01-W.47** | `recipe-picker-biz.test.ts` | `pickRecipe(category, seed, { name })` uses djb2(name) ^ seed so 10 names rotate across ≥ 2 recipes; `composeFromBlueprint` reorders homepage blocks per recipe best-effort; backward-compat when biz omitted | ✅ |
+| **TC-F01-W.48** | `block-library-biz.test.ts` | Contact block emits user `phone/email/address` verbatim when provided; features headline includes biz.name | ✅ |
+| **TC-F01-W.49** | `blog-seeds-coverage.test.ts` + `variety-repro.test.ts` | `getBlogSeeds(category, biz?)` substitutes `{business}` / `{product}` placeholders; backward-compat (biz omitted) returns raw strings | ✅ |
+| **TC-F01-W.50** | `seo-generator.test.ts` + `variety-repro.test.ts` | Homepage SEO description prefers `biz.description` over hero subheadline when `biz.description.length > 40`; sub-pages keep legacy mining priority | ✅ |
+
+### Files touched
+
+- `src/lib/ai/content-injection.ts` — `InjectionContext` gains `userBiz?` + `mood?`; `buildBlockFromLibrary` threads biz into hero/about/features/contact/cta/newsletter/footer; new helpers `threadHeroBiz`, `truncateOnWord`, `capWords`, `resolveLibraryCTA`
+- `src/lib/ai/structure-enforcer.ts` — unchanged (ctx already forwarded)
+- `src/lib/ai/openai-generator.ts` — builds `enforcerBizOverride = mapBusinessInfo(businessInfo)` once, passes it + `themeMood` into both enforcer ctx (multi-page + single-page branches) and the SEO override step
+- `src/lib/ai/template-composer.ts` — `buildHero` rewritten to use biz.name + description + mood CTA; `composeFromBlueprint` calls `pickRecipe(category, seed, { name: biz.name })` and applies `reorderSpecsByRecipe` to homepage specs; `getBlogSeeds` now passed `biz`
+- `src/lib/ai/image-pool.ts` — `BuildPoolCtx.products?: string[]` + `buildPoolQuery` joins top-3 products
+- `src/app/api/ai/generate-site/route.ts` — passes `parsedProducts.slice(0, 3)` to `buildImagePool`
+- `src/lib/ai/category-recipes.ts` — `pickRecipe` accepts optional `biz?: { name?: string }`; djb2(biz.name) XOR seed gates the index
+- `src/lib/ai/content/blog-seeds.ts` — a handful of restaurant / ecommerce / fnb seeds gain `{business}` / `{product}` templates; `getBlogSeeds(category, biz?)` substitutes placeholders
+- `src/lib/ai/seo-generator.ts` — `minePageText(page, biz?, isHomepage)` prefers user biz.description on homepage when non-empty + > 40 chars
+
+### New test files
+
+- `src/__tests__/unit/ai/block-library-biz.test.ts` — 15 tests, TC-F01-W.45 + W.48
+- `src/__tests__/unit/ai/hero-user-data.test.ts` — 5 tests, TC-F01-W.46
+- `src/__tests__/unit/ai/recipe-picker-biz.test.ts` — 6 tests, TC-F01-W.47
+- `src/__tests__/unit/ai/variety-repro.test.ts` — 3 tests, TC-F01-W.44 **(gate)**
+
+### Acceptance Criteria
+
+- `variety-repro.test.ts` asserts ≥ 8 of 13 fields differ across the 3 restaurant
+  fixtures at seed=42. Failing this test is a revert trigger.
+- Fallback composer path: hero headline + subheadline + CTA labels all reflect
+  user data when `biz.name` / `biz.description` / `biz.products` are provided.
+- AI happy path: when the enforcer injects blocks to meet `minBlocks`, the
+  injected content references `biz.name` + `biz.products` instead of canned
+  category phrases — because `enforcerCtx.userBiz` now threads through to
+  `buildBlockFromLibrary`.
+- Production `route.ts:generate-site` passes `parsedProducts.slice(0, 3)` into
+  `buildImagePool`; staging gen for 3 different restaurants yields 3 different
+  Unsplash queries.
+- Layout recipes: 3 same-seed `composeFromBlueprint` calls with different
+  `biz.name` emit at least 2 distinct homepage block sequences via `pickRecipe`
+  + `reorderSpecsByRecipe`.
+- Cumulative: 965/965 AI unit tests + 5205/5205 full project unit tests green.
+
+### Risk Notes
+
+- **Recipe reorder is best-effort**, not strict. When a recipe lists blocks the
+  preset blueprint doesn't have (commonly `contact` / `about` — those live on
+  sub-pages in our blueprints), the recipe silently skips those entries and
+  reorders what it can. No block is ever dropped — leftover specs append after
+  the recipe-matched middle. This is the documented "fall back to preset
+  sequence when no compatible recipe exists" pattern from the plan's risk
+  mitigation (Risk 3), loosened from a hard compat gate to best-effort.
+- **Hero headline cap at 10 words** (C3 consistency rule) may truncate very
+  long biz names + tails. The fallback is `biz.heroHeadline` from the canned
+  pool when biz.name is empty.
+- **Blog seed placeholders** default to "our" / "menu" when biz fields are
+  empty — the seeds never ship with visible `{placeholder}` braces.
+
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04 + 05 + 06 + 07)
+
+| Suite | Count | Status |
+|---|---|---|
+| Phase 01-06 carry | 880+ | ✅ |
+| Phase 07 new tests | 29 (15 block-library + 5 hero + 6 recipe + 3 variety-repro) | ✅ |
+| **Total AI suite** | **965** (across 29 files) | ✅ |
+| Full project suite | **5205** (across 264 files) | ✅ |
