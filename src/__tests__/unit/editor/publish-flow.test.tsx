@@ -37,6 +37,7 @@ vi.mock('@/i18n', () => ({
                     unpublishSuccess: 'Đã gỡ website',
                     unpublishFailed: 'Gỡ website thất bại',
                     versionConflict: 'Version conflict',
+                    viewAction: 'View',
                 },
             },
             dashboard: { overview: {} },
@@ -223,7 +224,7 @@ describe('Publish and Save Flows (TC-F05)', () => {
 
         await waitFor(() => {
             // Verify 409 toast fires with server error message
-            expect(toast.error).toHaveBeenCalledWith('Save failed', expect.objectContaining({ description: 'Version conflict' }))
+            expect(toast.error).toHaveBeenCalledWith('Lưu thất bại', expect.objectContaining({ description: 'Version conflict' }))
         })
     })
 
