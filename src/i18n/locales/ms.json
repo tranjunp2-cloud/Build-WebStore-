@@ -1756,6 +1756,24 @@
             "description": "Dapatkan pemberitahuan tentang pesanan baharu dan kemas kini walaupun tab ini di latar belakang.",
             "enable": "Aktifkan",
             "later": "Nanti"
+        },
+        "types": {
+            "BLOG_PUBLISHED": {
+                "title": "Blog Diterbitkan",
+                "message": "{blogTitle} telah diterbitkan"
+            },
+            "PRODUCT_LOW_STOCK": {
+                "title": "Amaran Stok Rendah",
+                "message": "{productName} hampir habis ({quantity} unit tinggal)"
+            },
+            "ORDER_NEW": {
+                "title": "Pesanan Baharu #{orderNumber} - {currency} {total}",
+                "message": "Pesanan dibuat oleh {customerName}"
+            },
+            "SYSTEM_ALERT": {
+                "title": "Pembayaran Gagal - Pesanan #{orderNumber}",
+                "message": "Pembayaran untuk pesanan #{orderNumber} telah gagal. Pelanggan boleh cuba semula."
+            }
         }
     },
     "Staff": {

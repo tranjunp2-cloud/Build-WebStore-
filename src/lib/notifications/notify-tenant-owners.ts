@@ -23,6 +23,7 @@ export async function notifyTenantOwners(
         title: string
         message: string
         actionUrl: string
+        metadata?: Record<string, string>
         roles?: string[]
     },
 ) {
@@ -60,6 +61,7 @@ export async function notifyTenantOwners(
                     title: data.title,
                     message: data.message,
                     actionUrl: data.actionUrl,
+                    ...(data.metadata ? { metadata: data.metadata } : {}),
                     isRead: false,
                     expiresAt,
                 },
