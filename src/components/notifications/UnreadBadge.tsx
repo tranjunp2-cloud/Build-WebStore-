@@ -21,7 +21,7 @@ export function UnreadBadge({ count }: UnreadBadgeProps) {
 
     return (
         <span
-            aria-label={t.notifications.ariaUnread.replace('{count}', label)}
+            aria-label={(t.notifications.ariaUnread ?? '{count} unread notifications').replace('{count}', label)}
             style={{
                 position: 'absolute',
                 top: '-2px',
