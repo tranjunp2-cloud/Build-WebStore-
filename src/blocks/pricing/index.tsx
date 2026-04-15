@@ -20,6 +20,22 @@ void _HoverCard
 
 const PRICING_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
+// Plan 260415 Lỗi A (P1 SILENT) — dynamic `md:grid-cols-${n}` không được
+// Tailwind JIT scan → class không sinh ra → cards/toggle/tiered variants kẹt
+// 1 cột desktop. Fix bằng object map với class literal để JIT detect.
+// Clamp max 4 để grid rộng không overflow.
+const GRID_COLS_MD: Record<number, string> = {
+    1: 'md:grid-cols-1',
+    2: 'md:grid-cols-2',
+    3: 'md:grid-cols-3',
+    4: 'md:grid-cols-4',
+}
+
+function gridColsFor(count: number): string {
+    const clamped = Math.min(Math.max(count, 1), 4)
+    return GRID_COLS_MD[clamped] || GRID_COLS_MD[3]!
+}
+
 type PricingSectionProps = {
     showBlob?: boolean
     children: ReactNode
@@ -261,7 +277,15 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
     // ── comparison variant ────────────────────────────────────────────────
     if (variant === 'comparison') {
         // Collect all unique features across plans
-        const allFeatures = Array.from(new Set(plans.flatMap(p => p.features)))
+        // Plan 260415 Lỗi F (P1 SILENT) — features là mix string | { text } object.
+        // Trước: Set dedupe by reference + .includes() reference compare → comparison
+        // table luôn hiện "—" vì features references khác nhau giữa plans. Fix:
+        // normalize to plain string (feature text) rồi dedupe + compare by string.
+        const allFeatures = Array.from(
+            new Set(
+                plans.flatMap(p => p.features.map(f => (typeof f === 'string' ? f : f.text))),
+            ),
+        )
         return (
             <PricingSection>
                 <SectionHeader headline={headline} subheadline={subheadline} />
@@ -296,20 +320,26 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                         className="border-t"
                                         style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.06)' }}
                                     >
-                                        <td className="p-4 text-sm">{typeof feature === 'string' ? feature : feature.text}</td>
-                                        {plans.map((plan, pi) => (
-                                            <td
-                                                key={pi}
-                                                className="p-4 text-center"
-                                                style={plan.highlighted ? { background: 'rgba(var(--brand-primary-rgb), 0.04)' } : {}}
-                                            >
-                                                {plan.features.includes(feature) ? (
-                                                    <span className="text-lg" style={{ color: 'var(--brand-primary)' }}>&#10003;</span>
-                                                ) : (
-                                                    <span className="opacity-20">&mdash;</span>
-                                                )}
-                                            </td>
-                                        ))}
+                                        <td className="p-4 text-sm">{feature}</td>
+                                        {plans.map((plan, pi) => {
+                                            // Plan 260415 Lỗi F — compare bằng text string thay vì reference
+                                            const hasFeature = plan.features.some(
+                                                f => (typeof f === 'string' ? f : f.text) === feature,
+                                            )
+                                            return (
+                                                <td
+                                                    key={pi}
+                                                    className="p-4 text-center"
+                                                    style={plan.highlighted ? { background: 'rgba(var(--brand-primary-rgb), 0.04)' } : {}}
+                                                >
+                                                    {hasFeature ? (
+                                                        <span className="text-lg" style={{ color: 'var(--brand-primary)' }}>&#10003;</span>
+                                                    ) : (
+                                                        <span className="opacity-40" aria-label="not included">&mdash;</span>
+                                                    )}
+                                                </td>
+                                            )
+                                        })}
                                     </tr>
                                 ))}
                             </tbody>
@@ -465,9 +495,10 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
     return (
         <PricingSection showBlob={false}>
             <SectionHeader headline={headline} subheadline={subheadline} />
-            <div className={`grid grid-cols-1 md:grid-cols-${Math.min(plans.length, 3)} gap-8 max-w-5xl mx-auto`}>
+            <div className={`grid grid-cols-1 ${gridColsFor(Math.min(plans.length, 3))} gap-8 max-w-5xl mx-auto`}>
                 {plans.map((plan, i) => (
-                    <div key={i} className={`${CARD_PADDING.lg} rounded-2xl border ${plan.highlighted ? 'ring-2 scale-105' : ''}`}
+                    /* Plan 260415 Lỗi L — scale-105 mobile overlap. md:scale-105 chỉ desktop */
+                    <div key={i} className={`${CARD_PADDING.lg} rounded-2xl border transition-transform ${plan.highlighted ? 'ring-2 md:scale-105' : ''}`}
                         style={{ borderColor: plan.highlighted ? 'var(--brand-primary)' : 'rgba(var(--brand-primary-rgb), 0.12)', ...(plan.highlighted ? { boxShadow: `0 0 0 2px var(--brand-primary)` } : {}) }}>
                         <Heading level={3} className="mb-2">{plan.name}</Heading>
                         {plan.description && <Body size="small" className="opacity-60 mb-4">{plan.description}</Body>}
@@ -565,12 +596,12 @@ function PricingToggle({ block, theme: _theme }: { block: BlockProps<PricingConf
                 </div>
 
             {/* Plan cards */}
-            <div className={`grid grid-cols-1 md:grid-cols-${Math.min(plans.length, 3)} gap-8 max-w-5xl mx-auto`}>
+            <div className={`grid grid-cols-1 ${gridColsFor(Math.min(plans.length, 3))} gap-8 max-w-5xl mx-auto`}>
                 {plans.map((plan, i) => (
                     <motion.div
                         key={i}
                         layout
-                        className={`${CARD_PADDING.lg} rounded-2xl border ${plan.highlighted ? 'scale-105' : ''}`}
+                        className={`${CARD_PADDING.lg} rounded-2xl border transition-transform ${plan.highlighted ? 'md:scale-105' : ''}`}
                         style={{
                             borderColor: plan.highlighted ? 'var(--brand-primary)' : 'rgba(var(--brand-primary-rgb), 0.12)',
                             ...(plan.highlighted ? { boxShadow: '0 0 0 2px var(--brand-primary)' } : {}),
@@ -616,7 +647,7 @@ function PricingMinimal({ block, theme: _theme }: { block: BlockProps<PricingCon
     return (
         <PricingSection>
             <SectionHeader headline={headline} subheadline={subheadline} />
-            <div className={`grid grid-cols-1 md:grid-cols-${Math.min(plans.length, 3)} gap-10 max-w-5xl mx-auto`}>
+            <div className={`grid grid-cols-1 ${gridColsFor(Math.min(plans.length, 3))} gap-10 max-w-5xl mx-auto`}>
                 {plans.map((plan, i) => (
                     <div
                         key={i}

@@ -2355,6 +2355,35 @@ const MIGRATIONS = [
     name: 'subscribers.email_site_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
   },
+  // ── Contact Submissions (Plan 260415 contact-bugfix) ──
+  {
+    name: 'contact_submissions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS contact_submissions (
+      id serial PRIMARY KEY,
+      name varchar NOT NULL,
+      email varchar NOT NULL,
+      phone varchar,
+      message text NOT NULL,
+      site_id integer NOT NULL,
+      status varchar DEFAULT 'new',
+      source varchar DEFAULT 'contact-block',
+      ip_address varchar,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'contact_submissions.site_created_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_site_created_idx ON contact_submissions (site_id, created_at DESC);`,
+  },
+  {
+    name: 'contact_submissions.status_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_status_idx ON contact_submissions (status);`,
+  },
+  {
+    name: 'contact_submissions.email_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_email_idx ON contact_submissions (email);`,
+  },
   // ── Sites: SEO auto meta toggle ──
   {
     name: 'sites.seo_auto_meta_enabled',
@@ -2487,6 +2516,7 @@ const COLLECTION_SLUGS = [
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
   'seo_meta_jobs', 'notifications', 'subscribers',
+  'contact_submissions',
   'ai_usage_logs',
 ];
 
