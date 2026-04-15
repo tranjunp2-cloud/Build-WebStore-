@@ -10,7 +10,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -405,6 +405,34 @@ export async function POST(req: NextRequest) {
                 for (const bucket of allBuckets) {
                     cleanupNonNumericImageFields(bucket)
                 }
+
+                // Plan 260415 fix-500 — additionally query Payload to verify each
+                // referenced media row is complete (has filename or url). Payload's
+                // s3 adapter sometimes logs "Failed to persist upload data: g: Not
+                // Found" which leaves media rows half-written, and any gallery/team
+                // block referencing those rows will 500 the whole gen when
+                // pages_blocks_*_images tries to insert. This runs ONE find query
+                // per gen to catch those orphans.
+                for (const bucket of allBuckets) {
+                    try {
+                        const { stripped, checked } = await stripOrphanMediaRefs(
+                            bucket,
+                            payload as unknown as Parameters<typeof stripOrphanMediaRefs>[1],
+                        )
+                        if (stripped > 0) {
+                            console.warn(
+                                `[generate-site] Stripped ${stripped}/${checked} orphan media refs from bucket`,
+                            )
+                        }
+                    } catch (stripErr) {
+                        // Non-fatal — if the verify query fails, fall through and
+                        // let the page create attempt succeed (or retry wrapper fire).
+                        console.warn(
+                            '[generate-site] stripOrphanMediaRefs failed (non-fatal):',
+                            stripErr instanceof Error ? stripErr.message : stripErr,
+                        )
+                    }
+                }
             } catch (unsplashErr) {
                 console.error('[AI Generate] Unsplash pipeline error (non-fatal):', unsplashErr)
                 // Best-effort cleanup on any unexpected throw — still run
@@ -590,8 +618,60 @@ export async function POST(req: NextRequest) {
                 // deadlock / pages_blocks_*_parent_id_fk races observed on
                 // /api/sites/*/save also hit AI gen create (1 hit / 6h
                 // window). Reuses the save-route retry wrapper.
-                const createdPage = await withPayloadRetry(
-                    () => payload.create({
+                let createdPage: Record<string, unknown>
+                try {
+                    createdPage = await withPayloadRetry(
+                        () => payload.create({
+                            collection: 'pages',
+                            data: {
+                                title: pageDefinition.title,
+                                slug: pageDefinition.slug,
+                                site: site.id,
+                                isHomepage: pageDefinition.isHomepage,
+                                _status: 'published',
+                                layout: sanitizedLayout,
+                                seo: pageDefinition.seo,
+                            },
+                        }),
+                        {
+                            onRetry: (attempt, kind) => {
+                                console.warn(
+                                    `[generate-site] Retry page create attempt=${attempt} kind=${kind} slug=${pageDefinition.slug}`,
+                                )
+                            },
+                        },
+                    ) as Record<string, unknown>
+                } catch (firstErr) {
+                    // Plan 260415 fix-500 — fallback: when the first create fails
+                    // with a "pages_blocks_*_images" / upload foreign-key error,
+                    // strip ALL image refs from the page and retry once without
+                    // them. A site without images is better than a 500.
+                    const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr)
+                    const isImageFkError = /pages_blocks_[a-z_]+_images|image_id|upload/i.test(firstMsg)
+                    if (!isImageFkError) throw firstErr
+
+                    console.warn(
+                        `[generate-site] Retry without image refs after: ${firstMsg.slice(0, 160)}`,
+                    )
+                    cleanupNonNumericImageFields(sanitizedLayout as Record<string, unknown>[])
+                    // Also null numeric image refs so Payload doesn't try them again.
+                    for (const block of sanitizedLayout as Record<string, unknown>[]) {
+                        for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
+                            if (typeof block[field] === 'number') delete block[field]
+                        }
+                        for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos']) {
+                            const arr = block[arrayField]
+                            if (!Array.isArray(arr)) continue
+                            for (const item of arr as Record<string, unknown>[]) {
+                                if (item && typeof item === 'object') {
+                                    for (const f of ['image', 'logo', 'avatar']) {
+                                        if (typeof item[f] === 'number') delete item[f]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    createdPage = await payload.create({
                         collection: 'pages',
                         data: {
                             title: pageDefinition.title,
@@ -602,15 +682,8 @@ export async function POST(req: NextRequest) {
                             layout: sanitizedLayout,
                             seo: pageDefinition.seo,
                         },
-                    }),
-                    {
-                        onRetry: (attempt, kind) => {
-                            console.warn(
-                                `[generate-site] Retry page create attempt=${attempt} kind=${kind} slug=${pageDefinition.slug}`,
-                            )
-                        },
-                    },
-                )
+                    }) as Record<string, unknown>
+                }
                 createdPages.push(createdPage)
                 _createdPagesCount++
             } catch (pageErr) {

@@ -214,6 +214,129 @@ export function cleanupNonNumericImageFields(blocks: AIBlock[]): void {
     }
 }
 
+/**
+ * Plan 260415 fix-500 — strip references to media rows that failed the
+ * Payload upload persist step (logs: "Failed to persist upload data for
+ * collection media document N: g: Not Found"). Those rows exist in the
+ * `media` table but are missing the `filename` / `url` fields, so when
+ * Payload tries to insert `pages_blocks_gallery_images` rows referencing
+ * them the whole transaction fails and the entire gen 500s.
+ *
+ * Run AFTER `fulfillImageNeeds` and BEFORE `payload.create pages`. Returns
+ * how many refs were stripped so the caller can warn/telemetry.
+ *
+ * Expensive (1 `payload.find media` call) — only call once per gen.
+ */
+// Minimal payload interface needed for the orphan media verify step.
+// Accepts any object with a find method — avoids importing the full Payload
+// type from the deep-bundled payload package.
+export interface MediaFinder {
+    find: (args: {
+        collection: 'media'
+        where: { id: { in: number[] } }
+        limit: number
+        pagination?: boolean
+        depth?: number
+    }) => Promise<{ docs: Array<Record<string, unknown>> }>
+}
+
+export async function stripOrphanMediaRefs(
+    blocks: AIBlock[],
+    payload: MediaFinder,
+): Promise<{ stripped: number; checked: number }> {
+    const UNIVERSAL_UPLOAD_FIELDS = ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']
+
+    // 1. Collect every numeric media ID referenced by the block tree.
+    const mediaIds = new Set<number>()
+    for (const block of blocks) {
+        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+        const spec = BLOCK_IMAGE_SPEC[blockType]
+
+        for (const field of UNIVERSAL_UPLOAD_FIELDS) {
+            const val = block[field]
+            if (typeof val === 'number' && Number.isFinite(val)) mediaIds.add(val)
+        }
+
+        if (spec?.nestedArray) {
+            for (const { arrayField, itemField } of spec.nestedArray) {
+                const arr = block[arrayField]
+                if (!Array.isArray(arr)) continue
+                for (const item of arr as AIBlock[]) {
+                    if (item && typeof item === 'object') {
+                        const val = item[itemField]
+                        if (typeof val === 'number' && Number.isFinite(val)) mediaIds.add(val)
+                    }
+                }
+            }
+        }
+    }
+
+    if (mediaIds.size === 0) return { stripped: 0, checked: 0 }
+
+    // 2. Query Payload to verify each media row has a usable filename or url.
+    let found: Array<Record<string, unknown>> = []
+    try {
+        const result = await payload.find({
+            collection: 'media',
+            where: { id: { in: Array.from(mediaIds) } },
+            limit: mediaIds.size,
+            pagination: false,
+            depth: 0,
+        })
+        found = result.docs as Array<Record<string, unknown>>
+    } catch (err) {
+        console.warn('[stripOrphanMediaRefs] media lookup failed, skipping', err instanceof Error ? err.message : err)
+        return { stripped: 0, checked: mediaIds.size }
+    }
+
+    // 3. Build the "valid" set. A row is valid iff it has either filename or url.
+    //    Payload upload persist failures leave filename/url null which causes
+    //    downstream block inserts to fail.
+    const valid = new Set<number>()
+    for (const doc of found) {
+        const hasFilename = typeof doc.filename === 'string' && (doc.filename as string).length > 0
+        const hasUrl = typeof doc.url === 'string' && (doc.url as string).length > 0
+        if (hasFilename || hasUrl) valid.add(doc.id as number)
+    }
+
+    if (valid.size === mediaIds.size) {
+        return { stripped: 0, checked: mediaIds.size }
+    }
+
+    // 4. Walk blocks again and strip / null out orphan refs.
+    let stripped = 0
+    for (const block of blocks) {
+        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+        const spec = BLOCK_IMAGE_SPEC[blockType]
+
+        for (const field of UNIVERSAL_UPLOAD_FIELDS) {
+            const val = block[field]
+            if (typeof val === 'number' && !valid.has(val)) {
+                delete block[field]
+                stripped++
+            }
+        }
+
+        if (spec?.nestedArray) {
+            for (const { arrayField, itemField } of spec.nestedArray) {
+                const arr = block[arrayField]
+                if (!Array.isArray(arr)) continue
+                for (const item of arr as AIBlock[]) {
+                    if (item && typeof item === 'object') {
+                        const val = item[itemField]
+                        if (typeof val === 'number' && !valid.has(val)) {
+                            delete item[itemField]
+                            stripped++
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return { stripped, checked: mediaIds.size }
+}
+
 export async function fulfillImageNeeds(
     needs: ImageNeed[],
     ctx: FulfillmentContext,
