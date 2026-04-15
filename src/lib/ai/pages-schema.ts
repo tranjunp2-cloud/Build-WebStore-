@@ -94,6 +94,55 @@ export const CONTENT_FIELDS: Record<string, string[]> = Object.fromEntries(
 )
 
 /**
+ * Plan 260415 fix-500 — walk nested array sub-items and strip `id` fields.
+ * Payload generates its own `id` column for array sub-tables, and passing
+ * a non-matching value causes "The following field is invalid: id" on
+ * apply-template when the template JSON was authored by the composer.
+ * Also normalize pricing.plans[].features from `string[]` to
+ * `[{text, included}]` so the Payload pricing schema accepts them.
+ */
+function sanitizeNestedItems(block: Record<string, unknown>): void {
+    const ARRAY_FIELDS = [
+        'features', 'testimonials', 'faqs', 'items', 'images', 'plans',
+        'members', 'columns', 'links', 'services', 'stats', 'formFields',
+        'ctaButtons', 'logos', 'projects',
+    ] as const
+
+    for (const field of ARRAY_FIELDS) {
+        const arr = block[field]
+        if (!Array.isArray(arr)) continue
+        block[field] = (arr as unknown[]).map((item) => {
+            if (!item || typeof item !== 'object') return item
+            const copy: Record<string, unknown> = { ...(item as Record<string, unknown>) }
+            // Strip `id` — Payload auto-generates for array sub-items.
+            delete copy.id
+            delete copy._uuid
+            return copy
+        })
+    }
+
+    // Special-case: pricing.plans[].features may be string[] or object[].
+    // Normalize to the Payload-required {text, included} shape.
+    if (block.blockType === 'pricing' && Array.isArray(block.plans)) {
+        block.plans = (block.plans as Array<Record<string, unknown>>).map((plan) => {
+            if (!plan || typeof plan !== 'object') return plan
+            const features = plan.features
+            if (Array.isArray(features)) {
+                return {
+                    ...plan,
+                    features: features.map((f) =>
+                        typeof f === 'string'
+                            ? { text: f, included: true }
+                            : f,
+                    ),
+                }
+            }
+            return plan
+        })
+    }
+}
+
+/**
  * Sanitize a single block: keep only whitelisted fields, coerce variant/layout
  * to valid Pages.ts enum, drop everything else. Returns a new object.
  */
@@ -123,6 +172,8 @@ export function sanitizeBlockForPayload(block: Record<string, unknown>): Record<
         delete result.layout
     }
 
+    // Strip nested `id` + normalize pricing plan feature shape.
+    sanitizeNestedItems(result)
     return result
 }
 

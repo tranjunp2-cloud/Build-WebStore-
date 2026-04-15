@@ -708,8 +708,20 @@ export function buildPricing(category: string): Record<string, unknown> {
     { name: 'Enterprise', price: 'Custom', period: '', features: ['Custom Solution', 'Dedicated Team', 'Custom SLA', 'On-site Support'], highlighted: false },
   ]
 
+  // Plan 260415 fix-500 — Payload Pages.ts pricing.plans[].features schema
+  // requires `[{text: string, included: boolean}]`, but the composer maps
+  // above declare features as raw `string[]`. When apply-template or page
+  // save runs the plan through Payload, it throws
+  //   TypeError: Cannot create property 'text' on string 'Core Features'
+  // because Payload tries to `feature.text = ...` on each item assuming it
+  // is an object. Normalize to the required shape here so downstream code
+  // paths don't have to branch on string vs object.
   const plans = (pricingMap[category] ?? defaultPlans).map((p) => ({
     ...p,
+    features: (p.features ?? []).map((f) =>
+      typeof f === 'string' ? { text: f, included: true } : f,
+    ),
+    isPopular: p.highlighted,
     ctaLabel: p.highlighted ? 'Get Started' : 'Learn More',
     ctaUrl: '/contact',
   }))
