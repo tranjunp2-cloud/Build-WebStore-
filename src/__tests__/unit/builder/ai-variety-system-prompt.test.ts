@@ -138,8 +138,8 @@ describe('buildSystemPrompt — design quality rules', () => {
     expect(prompt).toContain('Anti-Patterns')
   })
 
-  it('should contain composition hint in user prompt for known category', () => {
+  it('should not contain legacy composition hint (replaced by RHYTHM recipes)', () => {
     const prompt = buildUserPrompt(businessInfo)
-    expect(prompt).toContain('Suggested block composition')
+    expect(prompt).not.toContain('Suggested block composition')
   })
 })
