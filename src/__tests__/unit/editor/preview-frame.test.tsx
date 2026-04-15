@@ -6,7 +6,22 @@ vi.mock('@/store/editorStore', () => ({
     useEditorStore: vi.fn().mockReturnValue({
         blocks: [],
         updateBlock: vi.fn(),
+        performSave: vi.fn(),
+        theme: null,
     })
+}))
+
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            editor: {
+                toolbar: { sitePreview: 'Site Preview', dragToReorder: 'Drag to reorder section' },
+                preview: { mapImageError: 'Could not map image to block field', imageReplaceSuccess: 'Image replaced successfully', imageReplaceFailed: 'Failed to replace image', inlineEditFailed: 'Inline edit failed', aiContextLocked: 'AI Generation context locked to: {blockType}' },
+            },
+        },
+        locale: 'en',
+    }),
+    I18nProvider: ({ children }: any) => children,
 }))
 
 type PreviewFrameProps = React.ComponentProps<typeof PreviewFrame>

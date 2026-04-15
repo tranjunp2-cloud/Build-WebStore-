@@ -296,7 +296,7 @@ function SettingsPanelInner({
                 <div className="mt-1 flex items-center gap-2">
                     <input type="color" value={(theme.primaryColor as string) || '#0ea5e9'}
                         onChange={e => onThemeChange('primaryColor', e.target.value)}
-                        aria-label="Primary color picker"
+                        aria-label={t.editor.settingsValidation.primaryColorLabel}
                         className="h-7 w-7 rounded border-0 cursor-pointer bg-transparent" />
                     <input value={(theme.primaryColor as string) || '#0ea5e9'}
                         onChange={e => onThemeChange('primaryColor', e.target.value)}
@@ -383,7 +383,7 @@ function SettingsPanelInner({
                                 if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
                                     void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
                                 } else {
-                                    toast.error('Please enter a valid phone number (digits, +, -, spaces)')
+                                    toast.error(t.editor.settingsValidation.invalidPhone)
                                 }
                             }}
                             variant="editor"
@@ -629,7 +629,11 @@ function SettingsPanelInner({
                                     if (data.hasExisting) {
                                         toast.dismiss(loadingToastId)
                                         const confirmed = window.confirm(
-                                            `Existing meta will be replaced:\n\nTitle: "${data.existing?.title || '(empty)'}"\n→ "${proposed.title}"\n\nDescription: "${data.existing?.description || '(empty)'}"\n→ "${proposed.description}"\n\nApply changes?`
+                                            t.editor.settingsValidation.seoConfirmReplace
+                                                .replace('{oldTitle}', data.existing?.title || '(empty)')
+                                                .replace('{newTitle}', proposed.title)
+                                                .replace('{oldDesc}', data.existing?.description || '(empty)')
+                                                .replace('{newDesc}', proposed.description)
                                         )
                                         if (!confirmed) {
                                             toast.info(s.seoCancelled)

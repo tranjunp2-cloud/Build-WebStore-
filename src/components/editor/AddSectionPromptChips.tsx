@@ -1,55 +1,13 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 type AddSectionPrompt = {
     label: string
     compactLabel: string
     prompt: string
 }
-
-const sectionPrompts: AddSectionPrompt[] = [
-    {
-        label: 'Add testimonials',
-        compactLabel: '💬 Add testimonials',
-        prompt: 'Add a testimonials section with 3 customer reviews',
-    },
-    {
-        label: 'Add FAQ',
-        compactLabel: '❓ Add FAQ',
-        prompt: 'Add an FAQ section with 3 common customer questions',
-    },
-    {
-        label: 'Add gallery',
-        compactLabel: '🖼️ Add gallery',
-        prompt: 'Add a gallery section with 6 placeholder images',
-    },
-    {
-        label: 'Add features',
-        compactLabel: '✨ Add features',
-        prompt: 'Add a features section with 3 key service highlights',
-    },
-    {
-        label: 'Add team',
-        compactLabel: '👥 Add team',
-        prompt: 'Add a team section with 3 team members',
-    },
-    {
-        label: 'Add newsletter',
-        compactLabel: '✉️ Add newsletter',
-        prompt: 'Add a newsletter signup section',
-    },
-    {
-        label: 'Add banner',
-        compactLabel: '📣 Add banner',
-        prompt: 'Add a banner section for a promotion campaign',
-    },
-    {
-        label: 'Add CTA',
-        compactLabel: '🚀 Add CTA',
-        prompt: 'Add a call to action section with a strong offer',
-    },
-]
 
 interface AddSectionPromptChipsProps {
     compact?: boolean
@@ -64,6 +22,20 @@ export function AddSectionPromptChips({
     desktopLabelOverride,
     onPromptSelect,
 }: AddSectionPromptChipsProps) {
+    const { t } = useI18n()
+    const as = t.editor.addSection
+
+    const sectionPrompts: AddSectionPrompt[] = [
+        { label: as.testimonials, compactLabel: as.testimonialsCompact, prompt: as.testimonialsPrompt },
+        { label: as.faq, compactLabel: as.faqCompact, prompt: as.faqPrompt },
+        { label: as.gallery, compactLabel: as.galleryCompact, prompt: as.galleryPrompt },
+        { label: as.features, compactLabel: as.featuresCompact, prompt: as.featuresPrompt },
+        { label: as.team, compactLabel: as.teamCompact, prompt: as.teamPrompt },
+        { label: as.newsletter, compactLabel: as.newsletterCompact, prompt: as.newsletterPrompt },
+        { label: as.banner, compactLabel: as.bannerCompact, prompt: as.bannerPrompt },
+        { label: as.cta, compactLabel: as.ctaCompact, prompt: as.ctaPrompt },
+    ]
+
     const prompts = !compact && desktopMinimal ? [sectionPrompts[0]] : sectionPrompts
 
     return (

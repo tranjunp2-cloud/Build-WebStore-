@@ -1,8 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import '@testing-library/jest-dom'
+
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            editor: {
+                inlineEditComponent: {
+                    clickToEdit: 'Click to edit', defaultPlaceholder: 'Click to edit...',
+                    save: 'Save', cancel: 'Cancel', aiRewrite: 'AI Rewrite',
+                    aiPlaceholder: 'e.g. Make it shorter, add emoji...', rewrite: 'Rewrite',
+                },
+            },
+        },
+        locale: 'en',
+    }),
+    I18nProvider: ({ children }: any) => children,
+}))
+
 import { InlineEdit } from '@/components/editor/InlineEdit'
 import { processImageFile } from '@/lib/utils/image'
-import '@testing-library/jest-dom'
 
 // Note: To test AIChatPanel, you would normally import it here.
 // But we are focusing on InlineEdit and image process util to isolate DOM validation limits.
