@@ -8,27 +8,29 @@ import type { BlockProps } from '../types'
 import type { NewsletterConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 // ── Local helpers (Plan 260415 newsletter-compliance) ──────────────────────
 // Brand identity vars preserved per Option C additive strategy.
 
-const NEWSLETTER_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 const POPUP_STORAGE_KEY = 'newsletter-popup-dismissed'
 const POPUP_DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const POPUP_AUTO_OPEN_DELAY_MS = 30_000 // 30 seconds
 
 type NewsletterSectionProps = {
     children: ReactNode
-    paddingClass?: string
+    padding?: 'compact' | 'default'
     style?: React.CSSProperties
 }
 
 /** Outer wrapper cho inline + banner variants. AnimatedSection + token container. */
-function NewsletterSection({ children, paddingClass = SECTION_PADDING.default, style }: NewsletterSectionProps) {
+function NewsletterSection({ children, padding = 'default', style }: NewsletterSectionProps) {
     return (
-        <AnimatedSection className={paddingClass} style={style}>
-            <div className={NEWSLETTER_CONTAINER}>{children}</div>
+        <AnimatedSection style={style}>
+            <SectionWrapper as="div" padding={padding} container="default" background="transparent">
+                {children}
+            </SectionWrapper>
         </AnimatedSection>
     )
 }
@@ -201,7 +203,7 @@ function EmailForm({ placeholder, buttonLabel, siteId, layout = 'row', onSuccess
 function InlineVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
     const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
     return (
-        <NewsletterSection paddingClass={SECTION_PADDING.compact} style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
+        <NewsletterSection padding="compact" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
             <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
                 <div className="flex-1 text-center lg:text-left">
                     <Heading level={2} className="mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>

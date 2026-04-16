@@ -9,7 +9,8 @@ import { GradientBlob } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 void _StaggerGrid
 void _StaggerItem
@@ -17,8 +18,6 @@ void _HoverCard
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 // Brand identity vars preserved per Option C additive strategy.
-
-const PRICING_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
 // Plan 260415 Lỗi A (P1 SILENT) — dynamic `md:grid-cols-${n}` không được
 // Tailwind JIT scan → class không sinh ra → cards/toggle/tiered variants kẹt
@@ -43,18 +42,18 @@ type PricingSectionProps = {
 
 /**
  * Outer wrapper used by 7/8 variants. AnimatedSection + GradientBlob +
- * token container. Cards (default) variant skips the blob historically —
+ * SectionWrapper container. Cards (default) variant skips the blob historically —
  * keep that by passing showBlob={false}.
  */
 function PricingSection({ showBlob = true, children }: PricingSectionProps) {
     return (
-        <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden`}>
+        <AnimatedSection className="relative overflow-hidden">
             {showBlob && (
                 <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
             )}
-            <div className={`${PRICING_CONTAINER} relative z-10`}>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                 {children}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

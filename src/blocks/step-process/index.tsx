@@ -7,16 +7,16 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 void _CSS_VARS
 
-const SP_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
-
 function StepProcessSection({ children }: { children: ReactNode }) {
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={SP_CONTAINER}>{children}</div>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                {children}
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

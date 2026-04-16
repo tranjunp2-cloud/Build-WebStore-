@@ -9,18 +9,22 @@ import { SectionLabel } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 // ── Local helpers (Plan 260415 team polish) ─────────────────────────────────
 
-const TEAM_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
-const TEAM_CONTAINER_4XL = `max-w-4xl mx-auto ${INNER_PADDING}`
-
 function TeamSection({ children, container = 'default' }: { children: ReactNode; container?: 'default' | '4xl' }) {
     return (
-        <AnimatedSection className={SECTION_PADDING.default} style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
-            <div className={container === '4xl' ? TEAM_CONTAINER_4XL : TEAM_CONTAINER}>{children}</div>
-        </AnimatedSection>
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="default"
+            container="default"
+            innerClassName={container === '4xl' ? '!max-w-4xl' : ''}
+            style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
+        >
+            {children}
+        </SectionWrapper>
     )
 }
 

@@ -7,9 +7,8 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
-
-const CAR_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 export function CarouselBlock({ block, theme: _theme }: BlockProps<CarouselConfig>) {
     void _theme
@@ -78,107 +77,7 @@ export function CarouselBlock({ block, theme: _theme }: BlockProps<CarouselConfi
     // Images variant
     if (variant === 'images') {
         return (
-            <AnimatedSection className={SECTION_PADDING.default}>
-                <div className={CAR_CONTAINER}>
-                    {headline && (
-                        <div className="text-center mb-12">
-                            <Heading level={2}>
-                                <RichText text={headline} as="span" />
-                            </Heading>
-                        </div>
-                    )}
-                    <div className="relative overflow-hidden rounded-2xl">
-                        <div
-                            className="flex transition-transform duration-500 ease-in-out"
-                            style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-                        >
-                            {items.map((item, i) => (
-                                <div key={i} className="w-full shrink-0">
-                                    <div className="aspect-[16/9] relative">
-                                        <img
-                                            src={item.imageUrl}
-                                            alt={item.title || `Slide ${i + 1}`}
-                                            className="w-full h-full object-cover"
-                                        />
-                                        {(item.title || item.description) && (
-                                            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 bg-gradient-to-t from-black/70 to-transparent">
-                                                {item.title && <Heading level={3} className="text-white mb-2">{item.title}</Heading>}
-                                                {item.description && <Body size="small" className="text-white/80">{item.description}</Body>}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        {total > 1 && (
-                            <>
-                                <ArrowButton direction="left" onClick={prev} />
-                                <ArrowButton direction="right" onClick={next} />
-                            </>
-                        )}
-                    </div>
-                    {total > 1 && <Dots />}
-                </div>
-            </AnimatedSection>
-        )
-    }
-
-    // Cards variant
-    if (variant === 'cards') {
-        return (
-            <AnimatedSection className={SECTION_PADDING.default}>
-                <div className={CAR_CONTAINER}>
-                    {headline && (
-                        <div className="text-center mb-12">
-                            <Heading level={2}>
-                                <RichText text={headline} as="span" />
-                            </Heading>
-                        </div>
-                    )}
-                    <div className="relative overflow-hidden">
-                        <div
-                            className="flex transition-transform duration-500 ease-in-out"
-                            style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-                        >
-                            {items.map((item, i) => {
-                                const Wrapper = item.linkUrl ? 'a' : 'div'
-                                const linkProps = item.linkUrl ? { href: item.linkUrl, target: '_blank' as const, rel: 'noopener noreferrer' } : {}
-                                return (
-                                    <div key={i} className="w-full shrink-0 px-4">
-                                        <Wrapper
-                                            {...linkProps}
-                                            className="block rounded-2xl overflow-hidden transition-shadow hover:shadow-lg"
-                                            style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
-                                        >
-                                            <div className="aspect-[16/10] overflow-hidden">
-                                                <img src={item.imageUrl} alt={item.title || ''} className="w-full h-full object-cover" />
-                                            </div>
-                                            <div className={CARD_PADDING.md}>
-                                                {item.title && <Heading level={4} className="text-lg mb-2">{item.title}</Heading>}
-                                                {item.description && <Body size="small" className="opacity-50 leading-relaxed">{item.description}</Body>}
-                                            </div>
-                                        </Wrapper>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                        {total > 1 && (
-                            <>
-                                <ArrowButton direction="left" onClick={prev} />
-                                <ArrowButton direction="right" onClick={next} />
-                            </>
-                        )}
-                    </div>
-                    {total > 1 && <Dots />}
-                </div>
-            </AnimatedSection>
-        )
-    }
-
-    // Testimonials variant
-    if (variant === 'testimonials') return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={CAR_CONTAINER}>
+            <SectionWrapper as={AnimatedSection} padding="default" container="wide" background="transparent">
                 {headline && (
                     <div className="text-center mb-12">
                         <Heading level={2}>
@@ -186,32 +85,24 @@ export function CarouselBlock({ block, theme: _theme }: BlockProps<CarouselConfi
                         </Heading>
                     </div>
                 )}
-                <div className="relative max-w-3xl mx-auto overflow-hidden">
+                <div className="relative overflow-hidden rounded-2xl">
                     <div
                         className="flex transition-transform duration-500 ease-in-out"
                         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
                     >
                         {items.map((item, i) => (
-                            <div key={i} className="w-full shrink-0 px-4">
-                                <div
-                                    className="p-8 md:p-12 rounded-2xl text-center"
-                                    style={{ background: `rgba(var(--brand-primary-rgb), 0.024)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
-                                >
-                                    {item.imageUrl && (
-                                        <img
-                                            src={item.imageUrl}
-                                            alt={item.title || ''}
-                                            className="w-16 h-16 rounded-full mx-auto mb-6 object-cover"
-                                            style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.188)` }}
-                                        />
-                                    )}
-                                    {item.description && (
-                                        <blockquote className="text-lg md:text-xl leading-relaxed opacity-80 mb-6 italic">
-                                            &ldquo;{item.description}&rdquo;
-                                        </blockquote>
-                                    )}
-                                    {item.title && (
-                                        <p className="font-bold font-heading" style={{ color: 'var(--brand-primary)' }}>{item.title}</p>
+                            <div key={i} className="w-full shrink-0">
+                                <div className="aspect-[16/9] relative">
+                                    <img
+                                        src={item.imageUrl}
+                                        alt={item.title || `Slide ${i + 1}`}
+                                        className="w-full h-full object-cover"
+                                    />
+                                    {(item.title || item.description) && (
+                                        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 bg-gradient-to-t from-black/70 to-transparent">
+                                            {item.title && <Heading level={3} className="text-white mb-2">{item.title}</Heading>}
+                                            {item.description && <Body size="small" className="text-white/80">{item.description}</Body>}
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -225,8 +116,110 @@ export function CarouselBlock({ block, theme: _theme }: BlockProps<CarouselConfi
                     )}
                 </div>
                 {total > 1 && <Dots />}
+            </SectionWrapper>
+        )
+    }
+
+    // Cards variant
+    if (variant === 'cards') {
+        return (
+            <SectionWrapper as={AnimatedSection} padding="default" container="wide" background="transparent">
+                {headline && (
+                    <div className="text-center mb-12">
+                        <Heading level={2}>
+                            <RichText text={headline} as="span" />
+                        </Heading>
+                    </div>
+                )}
+                <div className="relative overflow-hidden">
+                    <div
+                        className="flex transition-transform duration-500 ease-in-out"
+                        style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+                    >
+                        {items.map((item, i) => {
+                            const Wrapper = item.linkUrl ? 'a' : 'div'
+                            const linkProps = item.linkUrl ? { href: item.linkUrl, target: '_blank' as const, rel: 'noopener noreferrer' } : {}
+                            return (
+                                <div key={i} className="w-full shrink-0 px-4">
+                                    <Wrapper
+                                        {...linkProps}
+                                        className="block rounded-2xl overflow-hidden transition-shadow hover:shadow-lg"
+                                        style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
+                                    >
+                                        <div className="aspect-[16/10] overflow-hidden">
+                                            <img src={item.imageUrl} alt={item.title || ''} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className={CARD_PADDING.md}>
+                                            {item.title && <Heading level={4} className="text-lg mb-2">{item.title}</Heading>}
+                                            {item.description && <Body size="small" className="opacity-50 leading-relaxed">{item.description}</Body>}
+                                        </div>
+                                    </Wrapper>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    {total > 1 && (
+                        <>
+                            <ArrowButton direction="left" onClick={prev} />
+                            <ArrowButton direction="right" onClick={next} />
+                        </>
+                    )}
+                </div>
+                {total > 1 && <Dots />}
+            </SectionWrapper>
+        )
+    }
+
+    // Testimonials variant
+    if (variant === 'testimonials') return (
+        <SectionWrapper as={AnimatedSection} padding="default" container="wide" background="transparent">
+            {headline && (
+                <div className="text-center mb-12">
+                    <Heading level={2}>
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                </div>
+            )}
+            <div className="relative max-w-3xl mx-auto overflow-hidden">
+                <div
+                    className="flex transition-transform duration-500 ease-in-out"
+                    style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+                >
+                    {items.map((item, i) => (
+                        <div key={i} className="w-full shrink-0 px-4">
+                            <div
+                                className="p-8 md:p-12 rounded-2xl text-center"
+                                style={{ background: `rgba(var(--brand-primary-rgb), 0.024)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
+                            >
+                                {item.imageUrl && (
+                                    <img
+                                        src={item.imageUrl}
+                                        alt={item.title || ''}
+                                        className="w-16 h-16 rounded-full mx-auto mb-6 object-cover"
+                                        style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.188)` }}
+                                    />
+                                )}
+                                {item.description && (
+                                    <blockquote className="text-lg md:text-xl leading-relaxed opacity-80 mb-6 italic">
+                                        &ldquo;{item.description}&rdquo;
+                                    </blockquote>
+                                )}
+                                {item.title && (
+                                    <p className="font-bold font-heading" style={{ color: 'var(--brand-primary)' }}>{item.title}</p>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {total > 1 && (
+                    <>
+                        <ArrowButton direction="left" onClick={prev} />
+                        <ArrowButton direction="right" onClick={next} />
+                    </>
+                )}
             </div>
-        </AnimatedSection>
+            {total > 1 && <Dots />}
+        </SectionWrapper>
     )
 
     // Default: images

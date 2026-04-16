@@ -1,6 +1,6 @@
 'use client'
 
-import React, { type ReactNode } from 'react'
+import React from 'react'
 import type { BlockProps } from '../types'
 import type { ProductsFeaturedConfig } from './config'
 import { GradientBlob, SectionLabel } from '../shared/decorative'
@@ -8,17 +8,14 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
-const PF_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
-
-function ProductsFeaturedSection({ children }: { children: ReactNode }) {
+function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
     return (
-        <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden`}>
-            <div className={`${PF_CONTAINER} relative z-10`}>
-                {children}
-            </div>
-        </AnimatedSection>
+        <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
+            {children}
+        </SectionWrapper>
     )
 }
 
@@ -49,29 +46,27 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
 
     if (variant === 'carousel') {
         return (
-            <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden`}>
+            <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
                 <GradientBlob color={CSS_VARS.primary} className="top-1/4 right-0" size={600} opacity={0.05} />
-                <div className={`${PF_CONTAINER} relative z-10`}>
-                    <div className="text-center max-w-2xl mx-auto mb-16">
-                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                        {subheadline && <RichText text={subheadline} as="p" className="opacity-60 text-lg" />}
-                    </div>
-
-                    <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 hide-scrollbar">
-                        {products.map((p) => (
-                            <div key={p.id} className="snap-center w-[85vw] sm:w-[500px] flex-shrink-0 relative rounded-3xl overflow-hidden group">
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
-                                <img src={p.image} alt={p.name} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
-                                <div className="absolute bottom-0 left-0 p-8 z-20 w-full text-white">
-                                    <Heading level={3} className="mb-2">{p.name}</Heading>
-                                    <Body size="lg" className="font-medium" style={{ color: 'var(--brand-primary)' }}>{p.price}</Body>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                <div className="text-center max-w-2xl mx-auto mb-16">
+                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
+                    {subheadline && <RichText text={subheadline} as="p" className="opacity-60 text-lg" />}
                 </div>
-            </AnimatedSection>
+
+                <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 hide-scrollbar">
+                    {products.map((p) => (
+                        <div key={p.id} className="snap-center w-[85vw] sm:w-[500px] flex-shrink-0 relative rounded-3xl overflow-hidden group">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
+                            <img src={p.image} alt={p.name} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
+                            <div className="absolute bottom-0 left-0 p-8 z-20 w-full text-white">
+                                <Heading level={3} className="mb-2">{p.name}</Heading>
+                                <Body size="lg" className="font-medium" style={{ color: 'var(--brand-primary)' }}>{p.price}</Body>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </SectionWrapper>
         )
     }
 
