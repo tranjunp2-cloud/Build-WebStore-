@@ -27,6 +27,7 @@ interface PreviewFrameProps {
     onDeleteBlock?: (index: number) => void
     onDuplicateBlock?: (index: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
+    onImageReplaced?: () => void
     onPageNavigate?: (pageId: string) => void
     disableDragDrop?: boolean
 }
@@ -157,7 +158,7 @@ function findStringFieldPathTwoPass(
 function updateValueAtPath(
     source: Record<string, unknown>,
     path: Array<string | number>,
-    nextValue: string,
+    nextValue: string | number,
 ): Record<string, unknown> {
     const clone = JSON.parse(JSON.stringify(source)) as Record<string, unknown>
     let cursor: Record<string, unknown> | Array<unknown> = clone
@@ -195,6 +196,7 @@ function PreviewFrameInner({
     onDeleteBlock,
     onDuplicateBlock,
     onBlockDrop,
+    onImageReplaced,
     onPageNavigate,
     disableDragDrop = false,
 }: PreviewFrameProps) {
@@ -533,55 +535,139 @@ function PreviewFrameInner({
             formData.append('file', file)
             formData.append('alt', t.editor.preview.altUploadedImage)
 
-            const uploadedMedia = await uploadMediaAction(formData)
+            // Timeout after 30s to prevent frozen button on S3/network issues
+            const uploadedMedia = await Promise.race([
+                uploadMediaAction(formData),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('Upload timeout')), 30000)
+                ),
+            ])
             const newUrl = uploadedMedia.url
 
             const { blockIndex, src } = imageClickData
             const block = blocks[blockIndex]
+            const newMediaId = uploadedMedia.id
+
+            // Strategy 1: Find URL string match in block data (text fields with URL)
             const fieldPath = block ? findStringFieldPath(block, src, src) : null
 
             if (block && fieldPath) {
                 const clone = JSON.parse(JSON.stringify(blocks))
                 const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, newUrl)
                 updateBlock(blockIndex, nextBlock)
-            } else {
-                // Fallback image swapping logic if exact src fieldPath didn't match absolute vs relative URL
-                const clone = JSON.parse(JSON.stringify(blocks))
-                // Try finding with partial match
-                let foundPath = null
-                const findPartialPath = (obj: unknown, target: string, path: Array<string | number> = []): Array<string | number> | null => {
-                    if (typeof obj === 'string' && (target.includes(obj) || obj.includes(target))) return path
-                    if (Array.isArray(obj)) {
-                        for (let i=0; i<obj.length; i++) {
-                            const p = findPartialPath(obj[i], target, [...path, i])
-                            if (p) return p
-                        }
-                    } else if (obj && typeof obj === 'object') {
-                        for (const k in obj) {
-                            const p = findPartialPath((obj as Record<string, unknown>)[k], target, [...path, k])
-                            if (p) return p
+            } else if (block) {
+                // Strategy 2: Find image/upload field by name convention
+                // Payload upload fields: image, backgroundImage, posterImage, logo, avatar, etc.
+                // Values can be: number (ID), populated object {id,url}, or null (cleared/stripped by save)
+                const IMAGE_FIELD_NAMES = ['image', 'backgroundImage', 'background_image', 'posterImage', 'logo', 'avatar', 'thumbnail']
+                const blockData = block as Record<string, unknown>
+                let matched = false
+
+                // Try matching: non-null fields first (ID or populated object with matching URL)
+                for (const fieldName of IMAGE_FIELD_NAMES) {
+                    const val = blockData[fieldName]
+                    if (val !== undefined && val !== null) {
+                        const isMatch = typeof val === 'number' ||
+                            (typeof val === 'object' && 'url' in (val as Record<string, unknown>) &&
+                                src.includes(String((val as Record<string, unknown>).url)))
+                        if (isMatch) {
+                            updateBlock(blockIndex, { [fieldName]: newMediaId })
+                            matched = true
+                            break
                         }
                     }
-                    return null
                 }
-                const partialPath = findPartialPath(clone[blockIndex], new URL(src, window.location.origin).pathname)
-                if (partialPath) {
-                    const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
-                    updateBlock(blockIndex, nextBlock)
-                } else {
+
+                // Strategy 3: field exists but is null (save may have stripped the ID)
+                // — set it to the new media ID
+                if (!matched) {
+                    for (const fieldName of IMAGE_FIELD_NAMES) {
+                        if (fieldName in blockData && (blockData[fieldName] === null || typeof blockData[fieldName] === 'number')) {
+                            updateBlock(blockIndex, { [fieldName]: newMediaId })
+                            matched = true
+                            break
+                        }
+                    }
+                }
+
+                // Strategy 4: Deep search nested arrays for image fields with URL match
+                // Only matches populated objects where URL matches clicked src (safe for arrays)
+                if (!matched) {
+                    const NESTED_IMAGE_KEYS = new Set(['image', 'avatar', 'logo', 'backgroundImage', 'posterImage', 'thumbnail'])
+                    const srcPathname = new URL(src, window.location.origin).pathname
+                    const findNestedImageByUrl = (obj: unknown, path: Array<string | number> = []): Array<string | number> | null => {
+                        if (Array.isArray(obj)) {
+                            for (let i = 0; i < obj.length; i++) {
+                                const p = findNestedImageByUrl(obj[i], [...path, i])
+                                if (p) return p
+                            }
+                        } else if (obj && typeof obj === 'object') {
+                            for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+                                if (NESTED_IMAGE_KEYS.has(k) && v && typeof v === 'object' && 'url' in (v as Record<string, unknown>)) {
+                                    const url = String((v as Record<string, unknown>).url)
+                                    if (src.includes(url) || url.includes(srcPathname)) {
+                                        return [...path, k]
+                                    }
+                                }
+                                if (typeof v === 'object' && v !== null) {
+                                    const p = findNestedImageByUrl(v, [...path, k])
+                                    if (p) return p
+                                }
+                            }
+                        }
+                        return null
+                    }
+                    const clone = JSON.parse(JSON.stringify(blocks))
+                    const nestedPath = findNestedImageByUrl(clone[blockIndex])
+                    if (nestedPath) {
+                        const nextBlock = updateValueAtPath(clone[blockIndex], nestedPath, newMediaId)
+                        updateBlock(blockIndex, nextBlock)
+                        matched = true
+                    }
+                }
+
+                // Strategy 5: Partial URL match in nested strings
+                if (!matched) {
+                    const findPartialPath = (obj: unknown, target: string, path: Array<string | number> = []): Array<string | number> | null => {
+                        if (typeof obj === 'string' && (target.includes(obj) || obj.includes(target))) return path
+                        if (Array.isArray(obj)) {
+                            for (let i = 0; i < obj.length; i++) {
+                                const p = findPartialPath(obj[i], target, [...path, i])
+                                if (p) return p
+                            }
+                        } else if (obj && typeof obj === 'object') {
+                            for (const k in obj) {
+                                const p = findPartialPath((obj as Record<string, unknown>)[k], target, [...path, k])
+                                if (p) return p
+                            }
+                        }
+                        return null
+                    }
+                    const clone = JSON.parse(JSON.stringify(blocks))
+                    const partialPath = findPartialPath(clone[blockIndex], new URL(src, window.location.origin).pathname)
+                    if (partialPath) {
+                        const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
+                        updateBlock(blockIndex, nextBlock)
+                        matched = true
+                    }
+                }
+
+                if (!matched) {
                     toast.error(t.editor.preview.mapImageError)
                 }
             }
 
             toast.success(t.editor.preview.imageReplaceSuccess)
             setImageClickData(null)
+            // Trigger save + iframe refresh so preview shows the new image
+            onImageReplaced?.()
         } catch (error) {
             console.error('Image replace error:', error)
             toast.error(t.editor.preview.imageReplaceFailed)
         } finally {
             setIsImageProcessing(false)
         }
-    }, [blocks, imageClickData, updateBlock])
+    }, [blocks, imageClickData, onImageReplaced, updateBlock])
 
     const isDragging = dragState !== null
     const dragSourceIndex = dragState?.sourceIndex

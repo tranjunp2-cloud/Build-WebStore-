@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { ImagePlus, Sparkles, Loader2 } from 'lucide-react'
+import { ImagePlus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 
@@ -57,11 +57,19 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
             const formData = new FormData()
             formData.append('file', compressed)
             formData.append('alt', altText || 'Block image')
-            const uploaded = await uploadMediaAction(formData)
+
+            // Timeout after 30s to prevent frozen button on S3/network issues
+            const uploaded = await Promise.race([
+                uploadMediaAction(formData),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('Upload timeout — check your connection')), 30000)
+                ),
+            ])
             onImageChange(uploaded.url)
             toast.success('Image updated')
-        } catch {
-            toast.error('Failed to upload image')
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to upload image'
+            toast.error(msg)
         } finally {
             setIsUploading(false)
             if (fileRef.current) fileRef.current.value = ''
@@ -101,15 +109,7 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
                     <ImagePlus className="h-3.5 w-3.5" />
                     Change
                 </button>
-                <button
-                    type="button"
-                    disabled
-                    className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-amber-300/60 cursor-not-allowed opacity-50"
-                    title="AI image generation coming soon"
-                >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    AI
-                </button>
+                {/* AI image generation — hidden until feature is implemented */}
             </div>
 
             <input

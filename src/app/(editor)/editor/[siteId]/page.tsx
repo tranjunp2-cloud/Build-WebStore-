@@ -1051,6 +1051,10 @@ export default function EditorPage() {
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
+                            onImageReplaced={async () => {
+                                await handleSave({ showToast: false, refreshPreview: false })
+                                setIframeKey(key => key + 1)
+                            }}
                             onPageNavigate={handlePageSelected}
                         />
                     </div>
