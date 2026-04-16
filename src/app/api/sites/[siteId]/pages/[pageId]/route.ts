@@ -80,6 +80,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const page = await payload.findByID({
             collection: 'pages',
             id: pageId,
+            draft: true,
         })
         const pageSiteId = typeof page?.site === 'object' ? page.site?.id : page?.site
 
@@ -137,6 +138,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             collection: 'pages',
             id: pageId,
             data: updateData,
+            draft: true,
         })
 
         return NextResponse.json({

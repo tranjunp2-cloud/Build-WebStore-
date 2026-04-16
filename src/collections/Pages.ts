@@ -437,6 +437,9 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
     if ((isPublishingUpdate || isPublishingCreate) && !doc.seo?.title) {
         const siteId = typeof doc.site === 'object' ? doc.site.id : doc.site
 
+        // Guard: req.payload may be unavailable when called from custom API routes
+        if (!req?.payload) return
+
         // Check if auto meta generation is enabled for this site
         try {
             const site = await req.payload.findByID({ collection: 'sites', id: siteId, depth: 0 })
