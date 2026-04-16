@@ -692,3 +692,93 @@ describe('normalizeAddSectionBlock — socialWidget [TC-F05.26]', () => {
         expect(links[0].platform).toBe('facebook')
     })
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// BUG-F05-04: Placeholder images & normalize whitelist
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('BUG-F05-04: Gallery placeholder images', () => {
+    it('createAddSectionBlock returns gallery images with valid image structure', () => {
+        const result = createAddSectionBlock({ instruction: 'add gallery', siteName: 'Test' })
+        expect(result?.blockType).toBe('gallery')
+        const images = (result as Record<string, unknown>).images as Record<string, unknown>[]
+        expect(images.length).toBeGreaterThan(0)
+        expect(images[0]).toHaveProperty('image')
+        expect(images[0]).toHaveProperty('caption')
+        const img = images[0].image as Record<string, unknown>
+        expect(img).toHaveProperty('url')
+        expect(typeof img.url).toBe('string')
+        expect((img.url as string).length).toBeGreaterThan(0)
+    })
+
+    it('normalizeAddSectionBlock preserves gallery image structure', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add gallery', siteName: 'Test' },
+            { blockType: 'gallery', variant: 'grid' },
+        ) as Record<string, unknown>
+        const images = result.images as Record<string, unknown>[]
+        expect(images.length).toBeGreaterThan(0)
+        expect(images[0]).toHaveProperty('image')
+        const img = images[0].image as Record<string, unknown>
+        expect(img).toHaveProperty('url')
+    })
+
+    it('normalizeAddSectionBlock strips unknown fields from gallery images', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add gallery', siteName: 'Test' },
+            { blockType: 'gallery', variant: 'grid', images: [{ image: { url: '/test.jpg', alt: 'Test' }, caption: 'C', unknownField: 'junk' }] },
+        ) as Record<string, unknown>
+        const images = result.images as Record<string, unknown>[]
+        expect(images[0]).not.toHaveProperty('unknownField')
+        expect(images[0]).toHaveProperty('image')
+        expect(images[0]).toHaveProperty('caption')
+    })
+})
+
+describe('BUG-F05-04: Team placeholder avatars', () => {
+    it('createAddSectionBlock returns team members with avatar', () => {
+        const result = createAddSectionBlock({ instruction: 'add team', siteName: 'Test' })
+        expect(result?.blockType).toBe('team')
+        const members = (result as Record<string, unknown>).members as Record<string, unknown>[]
+        expect(members.length).toBeGreaterThan(0)
+        expect(members[0]).toHaveProperty('avatar')
+        const avatar = members[0].avatar as Record<string, unknown>
+        expect(avatar).toHaveProperty('url')
+        expect(typeof avatar.url).toBe('string')
+    })
+
+    it('normalizeAddSectionBlock whitelists team member fields', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add team', siteName: 'Test' },
+            { blockType: 'team', members: [{ name: 'A', role: 'Dev', bio: 'Bio', avatar: { url: '/a.jpg' }, extraField: 'junk' }] },
+        ) as Record<string, unknown>
+        const members = result.members as Record<string, unknown>[]
+        expect(members[0]).not.toHaveProperty('extraField')
+        expect(members[0]).toHaveProperty('name')
+        expect(members[0]).toHaveProperty('avatar')
+    })
+})
+
+describe('BUG-F05-04: Testimonials normalize', () => {
+    it('normalizeAddSectionBlock whitelists testimonial fields', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add testimonials', siteName: 'Test' },
+            { blockType: 'testimonials', variant: 'grid', testimonials: [{ quote: 'Great', name: 'A', title: 'CEO', company: 'Co', rating: 5, avatar: { url: '/a.jpg' }, junk: true }] },
+        ) as Record<string, unknown>
+        const testimonials = result.testimonials as Record<string, unknown>[]
+        expect(testimonials[0]).not.toHaveProperty('junk')
+        expect(testimonials[0]).toHaveProperty('quote')
+        expect(testimonials[0]).toHaveProperty('avatar')
+    })
+
+    it('normalizeAddSectionBlock works without avatar in testimonials', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add testimonials', siteName: 'Test' },
+            { blockType: 'testimonials', variant: 'grid' },
+        ) as Record<string, unknown>
+        const testimonials = result.testimonials as Record<string, unknown>[]
+        expect(testimonials.length).toBeGreaterThan(0)
+        expect(testimonials[0]).toHaveProperty('quote')
+        expect(testimonials[0]).toHaveProperty('name')
+    })
+})

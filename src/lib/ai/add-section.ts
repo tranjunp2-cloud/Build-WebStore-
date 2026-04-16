@@ -741,7 +741,9 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return {
             ...mergedBlock,
             variant: safeVariant,
-            testimonials: rawTestimonials,
+            testimonials: rawTestimonials.map(({ quote, name, title, company, rating, avatar }: Record<string, unknown>) => ({
+                quote, name, title, company, rating, ...(avatar ? { avatar } : {}),
+            })),
         }
     }
 
@@ -770,7 +772,9 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return {
             ...mergedBlock,
             layout: safeLayout,
-            images: rawImages,
+            images: rawImages.map(({ image, caption }: Record<string, unknown>) => ({
+                ...(image ? { image } : {}), ...(caption !== undefined ? { caption } : {}),
+            })),
         }
     }
 
@@ -779,7 +783,9 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         const rawMembers = (Array.isArray((block as Record<string, unknown>).members) ? (block as Record<string, unknown>).members : fallbackBlock.members) as Record<string, unknown>[]
         return {
             ...mergedBlock,
-            members: rawMembers,
+            members: rawMembers.map(({ name, role, bio, avatar, socials }: Record<string, unknown>) => ({
+                name, role, ...(bio ? { bio } : {}), ...(avatar ? { avatar } : {}), ...(socials ? { socials } : {}),
+            })),
         }
     }
 
