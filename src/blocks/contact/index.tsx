@@ -101,12 +101,12 @@ function ContactInfoCard({ icon: Icon, label, value, type, layout = 'inline', ic
             href={href}
             target={isExternal ? '_blank' : undefined}
             rel={isExternal ? 'noopener noreferrer' : undefined}
-            className="font-medium break-words hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40 rounded"
+            className="font-medium break-all hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40 rounded"
         >
             {value}
         </a>
     ) : (
-        <span className="font-medium break-words">{value}</span>
+        <span className="font-medium break-all">{value}</span>
     )
 
     if (layout === 'center') {
