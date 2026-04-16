@@ -25,6 +25,8 @@ import { pickCategoryThemeWithMood, hashBusinessName } from '@/lib/ai/category-t
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool } from '@/lib/ai/image-pool'
 import { resolveTheme } from '@/lib/theme/resolve'
+import { ensureNavigationBlocks, type PageShape } from '@/lib/ai/ensure-navigation'
+import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
 
@@ -590,11 +592,20 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const pageDefinitions = buildGeneratedPages({
+        const rawPageDefinitions = buildGeneratedPages({
             blocks: sanitizedBlocks,
             businessInfo,
             result,
         })
+
+        // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
+        // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
+        const pageDefinitions = enforcePageVariety(
+            ensureNavigationBlocks(
+                rawPageDefinitions as unknown as PageShape[],
+                businessInfo.businessName,
+            ),
+        )
 
         const createdPages: Record<string, unknown>[] = []
         const pageFailures: Array<{ slug: string; title: string; error: string }> = []

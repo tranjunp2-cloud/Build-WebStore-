@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 const SSO_FORGOT_PASSWORD_URL =
     process.env.SSO_FORGOT_PASSWORD_URL ||
@@ -21,6 +22,16 @@ const SSO_FORGOT_PASSWORD_URL =
  */
 export async function POST(req: NextRequest) {
     try {
+        // BUG-F01-05: Rate limit by IP — 10/min (prevent enum/spray)
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anonymous'
+        const rateLimit = await checkRateLimit(`check-reset:${ip}`, 10, 60_000)
+        if (!rateLimit.allowed) {
+            return NextResponse.json({ flow: 'internal' }, {
+                status: 429,
+                headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) },
+            })
+        }
+
         const { email } = await req.json()
 
         if (!email) {

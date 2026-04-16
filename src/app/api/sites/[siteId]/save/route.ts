@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
+import { checkRateLimit } from '@/lib/rateLimit'
 import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
 import { stripOrphanMediaRefs, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
 
@@ -44,6 +45,18 @@ export async function PATCH(
         const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        // BUG-F01-05: Rate limit save — 60/min per user (allows autosave at 1/sec)
+        const rateLimit = await checkRateLimit(`save:${user.id}`, 60, 60_000)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                {
+                    error: 'Too many save requests. Try again later.',
+                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                },
+                { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } }
+            )
         }
 
         const payload = await getPayload({ config })
