@@ -722,6 +722,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     onBack={() => setIsFullPreviewOpen(false)}
                     onModeChange={setPreviewMode}
                     previewContent={readonlyPreviewContent}
+                    siteId={siteId}
                 />
             )
         }
@@ -742,6 +743,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     onPreviewModeChange={setPreviewMode}
                     previewContent={previewContent}
                     previewMode={previewMode}
+                    siteId={siteId}
                     siteName={siteName || businessInfo?.businessName || 'your-site'}
                     totalBlocks={blocks.length || 7}
                 />
