@@ -829,6 +829,7 @@ export default function EditorPage() {
         <>
             {activeSidebarTab === 'chat' ? (
                 <AIChatPanel
+                    siteId={siteId}
                     blocks={blocks}
                     selectedBlock={selectedBlock}
                     onAIAction={handleAIAction}
@@ -1012,14 +1013,29 @@ export default function EditorPage() {
                             onBlockSelect={handleBlockSelectWithContext}
                             onDeleteBlock={handleDeleteBlock}
                             onDuplicateBlock={handleDuplicateBlock}
-                            onInlineEditApplied={(content, blockIndex) => {
+                            onInlineEditApplied={async (content, blockIndex, detail) => {
                                 setSelectedBlock(blockIndex)
                                 setActiveSidebarTab('chat')
-                                setChatActivity({
-                                    id: `inline-${Date.now()}`,
-                                    content,
-                                })
-                                void handleSave({ showToast: false, refreshPreview: true })
+                                // BUG-F05-13: Show instruction + result separately in chat
+                                if (detail) {
+                                    setChatActivity({
+                                        id: `inline-req-${Date.now()}`,
+                                        content: `✏️ **${detail.blockType}**: ${detail.instruction}`,
+                                    })
+                                    setTimeout(() => {
+                                        setChatActivity({
+                                            id: `inline-res-${Date.now()}`,
+                                            content: `✅ "${detail.originalText}" → "${detail.rewrittenText}"`,
+                                        })
+                                    }, 100)
+                                } else {
+                                    setChatActivity({
+                                        id: `inline-${Date.now()}`,
+                                        content,
+                                    })
+                                }
+                                // BUG-F05-13: await save BEFORE iframe reload
+                                await handleSave({ showToast: false, refreshPreview: false })
                                 setIframeKey(key => key + 1)
                             }}
                             onReorderBlocks={handleReorderBlocks}
