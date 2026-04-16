@@ -751,27 +751,33 @@ describe('POST /api/ai/apply-template', () => {
         // ── TC-F07.048: usageCount failure doesn't crash apply ────────────────
 
         it('TC-F07.048: template usageCount update failure does not fail the apply', async () => {
+            // Save original implementation to restore after test
+            const originalImpl = mockPayloadInstance.update.getMockImplementation()
+
             // Make template update throw on usageCount (but not on other updates)
-            const originalUpdate = mockPayloadInstance.update.getMockImplementation()
-            let callCount = 0
             mockPayloadInstance.update.mockImplementation(async (args: Record<string, unknown>) => {
-                callCount++
                 if (args.collection === 'templates') {
                     throw new Error('Category validation failed')
                 }
-                return originalUpdate ? originalUpdate(args) : {}
+                return {}
             })
 
-            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
-            const res = await POST(req)
-            const body = await res.json()
+            try {
+                const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+                const res = await POST(req)
+                const body = await res.json()
 
-            // Apply should still succeed despite usageCount failure
-            expect(res.status).toBe(200)
-            expect(body.applied).toBe(true)
-
-            // Restore mock
-            mockPayloadInstance.update.mockResolvedValue({})
+                // Apply should still succeed despite usageCount failure
+                expect(res.status).toBe(200)
+                expect(body.applied).toBe(true)
+            } finally {
+                // Restore original mock to avoid polluting subsequent tests
+                if (originalImpl) {
+                    mockPayloadInstance.update.mockImplementation(originalImpl)
+                } else {
+                    mockPayloadInstance.update.mockResolvedValue({})
+                }
+            }
         })
 
         // ── TC-F07.042: siteId as empty string ────────────────────────────────
