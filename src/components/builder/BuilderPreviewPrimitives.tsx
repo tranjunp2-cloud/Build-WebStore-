@@ -51,9 +51,10 @@ export function BuilderPreviewModeToggle({
 
 interface BuilderMobilePreviewShellProps {
     children: ReactNode
+    siteId?: string | null
 }
 
-function BuilderMobilePreviewShell({ children }: BuilderMobilePreviewShellProps) {
+function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShellProps) {
     return (
         <div className="relative h-[812px] w-[375px] rounded-[48px] bg-[linear-gradient(114.79deg,#1e2939_0%,#101828_100%)] shadow-[0px_25px_50px_0px_rgba(0,0,0,0.25)]">
             <div className="absolute inset-[12px] overflow-hidden rounded-[40px] bg-[#0b1120]">
@@ -65,11 +66,19 @@ function BuilderMobilePreviewShell({ children }: BuilderMobilePreviewShellProps)
                         <div className="h-3 w-4 rounded-lg bg-white opacity-40" />
                     </div>
                 </div>
-                <div className="h-full overflow-y-auto pr-[11px]">
-                    <div className="w-[351px]">
-                        {children}
+                {siteId ? (
+                    <iframe
+                        src={`/preview/${siteId}?v=${Date.now()}`}
+                        className="h-full w-full border-0"
+                        title="Mobile preview"
+                    />
+                ) : (
+                    <div className="h-full overflow-y-auto pr-[11px]">
+                        <div className="w-[351px]">
+                            {children}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
             <div className="absolute bottom-2 left-1/2 h-1 w-32 -translate-x-1/2 rounded-full bg-white/30" />
             <div className="absolute left-1/2 top-0 h-7 w-40 -translate-x-1/2 rounded-b-[24px] bg-[linear-gradient(170.07deg,#1e2939_0%,#101828_100%)]" />
@@ -82,17 +91,19 @@ interface BuilderPreviewSurfaceProps {
     mode: BuilderPreviewMode
     variant: 'panel' | 'fullwidth'
     children: ReactNode
+    siteId?: string | null
 }
 
 export function BuilderPreviewSurface({
     mode,
     variant,
     children,
+    siteId,
 }: BuilderPreviewSurfaceProps) {
     if (mode === 'mobile') {
         return (
             <div className="flex h-full items-center justify-center">
-                <BuilderMobilePreviewShell>{children}</BuilderMobilePreviewShell>
+                <BuilderMobilePreviewShell siteId={siteId}>{children}</BuilderMobilePreviewShell>
             </div>
         )
     }
