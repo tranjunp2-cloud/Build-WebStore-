@@ -100,11 +100,11 @@ export default async function BlogDetailPage({ params }: Props) {
             <article className="max-w-3xl mx-auto px-4 py-8">
                 {/* Breadcrumb */}
                 <nav className="flex items-center gap-2 text-sm text-gray-500 mb-8">
-                    <Link href={`/sites/${slug}`} className="hover:text-gray-300 transition-colors">
+                    <Link href="/" className="hover:text-gray-300 transition-colors">
                         <I18nText render={t => t.storefront.products.home} />
                     </Link>
                     <span>/</span>
-                    <Link href={`/sites/${slug}/blogs`} className="hover:text-gray-300 transition-colors">
+                    <Link href="/blogs" className="hover:text-gray-300 transition-colors">
                         <I18nText render={t => t.storefront.blog.title} />
                     </Link>
                     <span>/</span>
@@ -161,7 +161,7 @@ export default async function BlogDetailPage({ params }: Props) {
                 {/* Back to Blog */}
                 <div className="mt-12 pt-8 border-t border-white/10">
                     <Link
-                        href={`/sites/${slug}/blogs`}
+                        href="/blogs"
                         className="text-sm font-medium hover:opacity-80 transition-opacity"
                         style={{ color: primaryColor }}
                     >
