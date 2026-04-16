@@ -22,6 +22,7 @@ interface BuilderCompletionViewProps {
     onPreviewModeChange: (mode: BuilderPreviewMode) => void
     isPublishing?: boolean
     isNavigating?: boolean
+    siteId?: string | null
 }
 
 function getBlockDisplayLabel(block: {
@@ -137,11 +138,13 @@ function CompletionPreviewPanel({
     onModeChange,
     previewContent,
     onOpenPreview,
+    siteId,
 }: {
     mode: BuilderPreviewMode
     onModeChange: (mode: BuilderPreviewMode) => void
     previewContent: ReactNode
     onOpenPreview: () => void
+    siteId?: string | null
 }) {
     const { t } = useI18n()
     const c = t.onboarding.completion
@@ -178,7 +181,7 @@ function CompletionPreviewPanel({
                 </div>
 
                 <div className="relative flex-1 overflow-hidden px-6 pb-6 pt-4">
-                    <BuilderPreviewSurface mode={mode} variant="panel">
+                    <BuilderPreviewSurface mode={mode} variant="panel" siteId={siteId}>
                         {previewContent}
                     </BuilderPreviewSurface>
                 </div>
@@ -203,6 +206,7 @@ export default function BuilderCompletionView({
     onPreviewModeChange,
     isPublishing = false,
     isNavigating = false,
+    siteId,
 }: BuilderCompletionViewProps) {
     const { t } = useI18n()
     const c = t.onboarding.completion
@@ -345,6 +349,7 @@ export default function BuilderCompletionView({
                     onModeChange={onPreviewModeChange}
                     onOpenPreview={onOpenPreview}
                     previewContent={previewContent}
+                    siteId={siteId}
                 />
             )}
             rightContentClassName="h-full max-w-none px-0 xl:px-0"
