@@ -397,7 +397,7 @@
   }
 
 /* Notification dropdown inside editor sidebar — open upward instead of downward */
-.notification-bell-sidebar [class*="top-"][class*="rounded-"] {
+.notification-bell-sidebar > .relative > [class*="top-"][class*="rounded-"] {
   top: auto !important;
   bottom: 60px !important;
   left: 12px !important;
