@@ -8,10 +8,12 @@ type TabMessage = {
     type: 'CLAIM_AUTHORITY' | 'YIELD_AUTHORITY'
     siteId: string
     tabId: string
+    createdAt: number
 }
 
 export function useTabAuthority(siteId: string) {
     const tabIdRef = useRef(`tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
+    const createdAtRef = useRef(Date.now())
     const [isMaster, setIsMaster] = useState(true)
     const channelRef = useRef<BroadcastChannel | null>(null)
 
@@ -26,6 +28,7 @@ export function useTabAuthority(siteId: string) {
             type: 'CLAIM_AUTHORITY',
             siteId,
             tabId: tabIdRef.current,
+            createdAt: createdAtRef.current,
         } satisfies TabMessage)
 
         channel.onmessage = (e: MessageEvent<TabMessage>) => {
@@ -33,9 +36,11 @@ export function useTabAuthority(siteId: string) {
             if (msg.siteId !== siteId) return
 
             if (msg.type === 'CLAIM_AUTHORITY' && msg.tabId !== tabIdRef.current) {
-                // Deterministic: tab with higher ID wins (newer tab takes over)
-                // This prevents both tabs from yielding simultaneously
-                if (msg.tabId > tabIdRef.current) {
+                // Deterministic: newer tab (higher createdAt) wins
+                // Tie-break by tabId string compare
+                const theyWin = msg.createdAt > createdAtRef.current
+                    || (msg.createdAt === createdAtRef.current && msg.tabId > tabIdRef.current)
+                if (theyWin) {
                     setIsMaster(false)
                 }
             }
@@ -46,6 +51,7 @@ export function useTabAuthority(siteId: string) {
                 type: 'YIELD_AUTHORITY',
                 siteId,
                 tabId: tabIdRef.current,
+                createdAt: createdAtRef.current,
             } satisfies TabMessage)
             channel.close()
             channelRef.current = null
@@ -53,11 +59,13 @@ export function useTabAuthority(siteId: string) {
     }, [siteId])
 
     const reclaimAuthority = useCallback(() => {
+        createdAtRef.current = Date.now()
         setIsMaster(true)
         channelRef.current?.postMessage({
             type: 'CLAIM_AUTHORITY',
             siteId,
             tabId: tabIdRef.current,
+            createdAt: createdAtRef.current,
         } satisfies TabMessage)
     }, [siteId])
 
