@@ -26,6 +26,20 @@ export async function PATCH(
             )
         }
 
+        // BUG-F01-05: Rate limit publish — 5/min burst + 30/hr sustained
+        const rateLimit = await checkTwoTierRateLimit(`publish:${user.id}`, 5, 30)
+        if (!rateLimit.allowed) {
+            const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' },
+                    retryAfter,
+                },
+                { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+            )
+        }
+
         const payload = await getPayload({ config })
         const { siteId } = await params
 
@@ -63,6 +77,56 @@ export async function PATCH(
                 publishedAt: new Date().toISOString(),
             },
         })
+
+        // BUG-F05-01: Promote all draft pages to published.
+        // Editor saves with isDraft:true, so pages only have draft versions.
+        // Without this step, live site fetches get stale published versions.
+        // Paginate to handle sites with >100 pages.
+        const failedPageIds: string[] = []
+        let hasMore = true
+        let pageNum = 1
+        while (hasMore) {
+            const sitePages = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: Number(siteId) } },
+                limit: 50,
+                page: pageNum,
+                sort: 'id',
+                draft: true,
+            })
+
+            for (const pg of sitePages.docs) {
+                try {
+                    await payload.update({
+                        collection: 'pages',
+                        id: pg.id,
+                        data: { layout: pg.layout },
+                        draft: false,
+                    })
+                } catch (err) {
+                    console.warn(`[Publish] Failed to promote page ${pg.id}:`, err instanceof Error ? err.message : err)
+                    failedPageIds.push(String(pg.id))
+                }
+            }
+
+            hasMore = sitePages.hasNextPage ?? (sitePages.docs.length === 50)
+            pageNum++
+        }
+
+        if (failedPageIds.length > 0) {
+            console.error(`[Publish] ${failedPageIds.length} page(s) failed to promote:`, failedPageIds)
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: {
+                        code: 'PARTIAL_PUBLISH_FAILURE',
+                        message: `Failed to publish ${failedPageIds.length} page(s). Please try again.`,
+                        failedPages: failedPageIds,
+                    },
+                },
+                { status: 207 },
+            )
+        }
 
         // Get tenant slug for the domain URL
         let tenantSlug = 'site'
@@ -151,13 +215,14 @@ export async function DELETE(
         // BUG-F01-05: Rate limit unpublish — 5/min burst + 30/hr sustained
         const rateLimit = await checkTwoTierRateLimit(`unpublish:${user.id}`, 5, 30)
         if (!rateLimit.allowed) {
+            const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
             return NextResponse.json(
                 {
                     success: false,
                     error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' },
-                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                    retryAfter,
                 },
-                { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } }
+                { status: 429, headers: { 'Retry-After': String(retryAfter) } }
             )
         }
 

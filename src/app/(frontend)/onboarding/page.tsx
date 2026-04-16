@@ -31,9 +31,15 @@ export default async function OnboardingPage() {
             const sites = await payload.find({
                 collection: 'sites',
                 where: { tenant: { in: tenantIds } },
-                limit: 1,
+                limit: 5,
             })
-            shouldRedirect = sites.docs.length > 0
+            // Only redirect if user has at least one usable (completed) site
+            // Incomplete/failed generation should NOT redirect — let user re-enter builder
+            const hasUsableSite = sites.docs.some((s) => {
+                const gs = (s as Record<string, unknown>).generationStatus
+                return !gs || gs === 'none' || gs === 'completed'
+            })
+            shouldRedirect = hasUsableSite
         } catch (error) {
             console.error('[Onboarding] Failed to check user sites:', error)
         }

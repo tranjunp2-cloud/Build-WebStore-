@@ -50,11 +50,11 @@ function computeOverlap(prev: PageBlockShape[], curr: PageBlockShape[]): number 
     return matches / curr.length
 }
 
-function pickDifferentVariant(blockType: string, currentVariant: string): string | null {
+function pickDifferentVariant(blockType: string, currentVariant: string, pageIndex: number): string | null {
     const cycle = VARIANT_CYCLES[blockType]
     if (!cycle || cycle.length < 2) return null
-    const next = cycle.find((v) => v !== currentVariant)
-    return next ?? null
+    const filtered = cycle.filter((v) => v !== currentVariant)
+    return filtered[pageIndex % filtered.length] ?? null
 }
 
 /**
@@ -83,7 +83,7 @@ export function enforcePageVariety(
                 const variant = typeof (block as { variant?: unknown })?.variant === 'string'
                     ? ((block as { variant: string }).variant)
                     : ''
-                const next = pickDifferentVariant(type, variant)
+                const next = pickDifferentVariant(type, variant, i)
                 if (next) {
                     currLayout[j] = { ...block, variant: next }
                     swaps += 1

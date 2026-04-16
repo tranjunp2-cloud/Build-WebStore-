@@ -19,6 +19,7 @@ import type { MissingSeoItem } from './SEOView'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
+import { DashboardOnboarding } from '@/components/dashboard/DashboardOnboarding'
 import { PendingOrder } from '@/components/dashboard/DashboardActionList'
 
 interface MetricRow {
@@ -42,6 +43,9 @@ interface PageWithSEO {
 }
 
 interface BlogWithSEO {
+    id: string | number
+    title?: string
+    excerpt?: string
     seo?: { metaTitle?: string, metaDescription?: string }
 }
 
@@ -79,10 +83,20 @@ export async function OverviewView({ searchParams }: Props) {
             const hasFailed = allSites.docs.some(
                 (s) => (s as Record<string, unknown>).generationStatus === 'failed',
             )
+            const hasIncompleteSite = allSites.docs.length > 0 && usable.length === 0
+            const aiStatusFailed = typeof resolvedParams.ai_status === 'string' && resolvedParams.ai_status === 'failed'
 
             return (
                 <div className="space-y-8">
                     {hasFailed ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
+                    {(hasIncompleteSite || aiStatusFailed) && (
+                        <DashboardOnboarding
+                            hasWebsite={false}
+                            hasPublishedSite={false}
+                            hasIncompleteSite={hasIncompleteSite}
+                            aiStatusFailed={aiStatusFailed}
+                        />
+                    )}
                 </div>
             )
         }
@@ -93,6 +107,17 @@ export async function OverviewView({ searchParams }: Props) {
             </div>
         )
     }
+
+    // Check if site is published — for onboarding checklist
+    const hasPublishedSite = tenantId ? (await payload.count({
+        collection: 'sites',
+        where: {
+            and: [
+                { tenant: { equals: tenantId } },
+                { status: { equals: 'published' } },
+            ],
+        },
+    })).totalDocs > 0 : false
 
     const now = new Date()
     let startDate = subDays(startOfDay(now), 7)
@@ -311,6 +336,21 @@ export async function OverviewView({ searchParams }: Props) {
                 const b = blog as BlogWithSEO
                 if (!b.seo?.metaTitle) invalidBlogTitleCount++
                 if (!b.seo?.metaDescription) missingDescCount++
+
+                const missing: string[] = []
+                if (!b.seo?.metaTitle) missing.push('title')
+                if (!b.seo?.metaDescription) missing.push('description')
+                if (missing.length > 0) {
+                    missingSeoItems.push({
+                        collection: 'blogs',
+                        id: b.id,
+                        title: b.title || 'Untitled Blog',
+                        context: (b.excerpt || '').slice(0, 150),
+                        missingFields: missing,
+                        currentTitle: b.seo?.metaTitle || undefined,
+                        currentDescription: b.seo?.metaDescription || undefined,
+                    })
+                }
             })
             
             seoIssueCounts.missingTitle = missingTitleCount
@@ -352,6 +392,14 @@ export async function OverviewView({ searchParams }: Props) {
 
     return (
         <div className="space-y-6 mt-6">
+            {/* Setup Checklist — shown until site is published */}
+            {!hasPublishedSite && (
+                <DashboardOnboarding
+                    hasWebsite={true}
+                    hasPublishedSite={false}
+                />
+            )}
+
             {/* Stats Cards */}
                     {/* Main Content Grid: Combined Stats and SEO Health */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">

@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
+import { BlockImageEditor } from './BlockImageEditor'
+import { BreadcrumbEditor } from './BreadcrumbEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
@@ -828,6 +830,49 @@ function SettingsPanelInner({
                     </div>
                 )}
 
+                {/* Layout & Spacing */}
+                {block.blockType !== 'navigation' && block.blockType !== 'footer' && (
+                    <div className={sectionCls}>
+                        <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
+                        <div className="mt-3 space-y-3">
+                            <div>
+                                <div className="flex items-center justify-between">
+                                    <span className={labelCls}>Top Spacing</span>
+                                    <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingTop ?? 32))}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={0} max={120} step={4}
+                                    defaultValue={Number((block.style as Record<string, unknown>)?.paddingTop ?? 32)}
+                                    onChange={(e) => {
+                                        const val = Number(e.target.value)
+                                        const prevStyle = (block.style as Record<string, unknown>) || {}
+                                        onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingTop: val } })
+                                    }}
+                                    className="mt-1 w-full accent-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <div className="flex items-center justify-between">
+                                    <span className={labelCls}>Bottom Spacing</span>
+                                    <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32))}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min={0} max={120} step={4}
+                                    defaultValue={Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32)}
+                                    onChange={(e) => {
+                                        const val = Number(e.target.value)
+                                        const prevStyle = (block.style as Record<string, unknown>) || {}
+                                        onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingBottom: val } })
+                                    }}
+                                    className="mt-1 w-full accent-blue-500"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* ─── Common Text Fields ──────────────────────── */}
                 {block.logoText !== undefined && (
                     <div>
@@ -1070,27 +1115,99 @@ function SettingsPanelInner({
                     </div>
                 )}
 
-                {/* ─── Footer Columns ─────────────────────────── */}
+                {/* ─── Footer Columns with Nested Links ─────────────────────────── */}
                 {bt === 'footer' && (
                     <div className={sectionCls}>
                         <label className="text-xs font-medium uppercase text-gray-500">{s.footerColumns} ({((block.columns || []) as FooterColumn[]).length})</label>
-                        {((block.columns || []) as FooterColumn[]).map((col, i) => (
-                            <div key={`col-${(col as FooterColumn).title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
+                        {((block.columns || []) as FooterColumn[]).map((col, colIdx) => (
+                            <div key={`col-${(col as FooterColumn).title}-${colIdx}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">{ti(s.columnN, { n: i + 1 })}</span>
-                                    <button onClick={() => removeArrayItem('columns', i)} aria-label={`Remove column ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
+                                    <span className="text-[10px] text-gray-500">{ti(s.columnN, { n: colIdx + 1 })}</span>
+                                    <button onClick={() => removeArrayItem('columns', colIdx)} aria-label={`Remove column ${colIdx + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
                                 <Input defaultValue={col.title || ''} placeholder={s.columnTitle}
                                     onBlur={(e: FieldBlurEvent) => {
                                         const cols = [...((block.columns || []) as FooterColumn[])]
-                                        cols[i] = { ...cols[i], title: e.target.value }
+                                        cols[colIdx] = { ...cols[colIdx], title: e.target.value }
                                         onBlockUpdate(currentBlockIndex, { columns: cols })
                                     }}
                                     variant="editor"
                                     className={editorInputClassName} />
-                                <div className="text-[10px] text-gray-500 mt-1">{(col.links || []).length} {s.links}</div>
+
+                                {/* Nested links */}
+                                <div className="mt-2 space-y-1">
+                                    {(col.links || []).map((link: { label?: string; url?: string }, linkIdx: number) => (
+                                        <div key={`link-${colIdx}-${linkIdx}`} className="flex gap-1.5">
+                                            <Input
+                                                defaultValue={link.label || ''}
+                                                placeholder="Label"
+                                                onBlur={(e: FieldBlurEvent) => {
+                                                    const cols = [...((block.columns || []) as FooterColumn[])]
+                                                    const links = [...(cols[colIdx].links || [])]
+                                                    links[linkIdx] = { ...links[linkIdx], label: e.target.value }
+                                                    cols[colIdx] = { ...cols[colIdx], links }
+                                                    onBlockUpdate(currentBlockIndex, { columns: cols })
+                                                }}
+                                                variant="editor"
+                                                className="h-7 text-[11px] flex-1"
+                                            />
+                                            <Input
+                                                defaultValue={link.url || ''}
+                                                placeholder="/page"
+                                                onBlur={(e: FieldBlurEvent) => {
+                                                    const cols = [...((block.columns || []) as FooterColumn[])]
+                                                    const links = [...(cols[colIdx].links || [])]
+                                                    links[linkIdx] = { ...links[linkIdx], url: e.target.value }
+                                                    cols[colIdx] = { ...cols[colIdx], links }
+                                                    onBlockUpdate(currentBlockIndex, { columns: cols })
+                                                }}
+                                                variant="editor"
+                                                className="h-7 text-[11px] w-20"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const cols = [...((block.columns || []) as FooterColumn[])]
+                                                    const links = [...(cols[colIdx].links || [])].filter((_, i) => i !== linkIdx)
+                                                    cols[colIdx] = { ...cols[colIdx], links }
+                                                    onBlockUpdate(currentBlockIndex, { columns: cols })
+                                                }}
+                                                className="shrink-0 text-red-400 hover:text-red-300 text-[10px]"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(col.links || []).length < 10 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const cols = [...((block.columns || []) as FooterColumn[])]
+                                                const links = [...(cols[colIdx].links || []), { label: '', url: '' }]
+                                                cols[colIdx] = { ...cols[colIdx], links }
+                                                onBlockUpdate(currentBlockIndex, { columns: cols })
+                                            }}
+                                            className="mt-1 flex w-full items-center justify-center gap-1 rounded border border-dashed border-white/10 py-1 text-[10px] text-slate-400 hover:border-white/20 hover:text-slate-300"
+                                        >
+                                            + Add link
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ))}
+                        {/* Add Column button — max 4 */}
+                        {((block.columns || []) as FooterColumn[]).length < 4 && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const cols = [...((block.columns || []) as FooterColumn[]), { title: 'New Column', links: [] }]
+                                    onBlockUpdate(currentBlockIndex, { columns: cols })
+                                }}
+                                className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-white/10 py-2 text-xs text-slate-400 hover:border-white/20 hover:text-slate-300"
+                            >
+                                + Add column
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -1255,6 +1372,46 @@ function SettingsPanelInner({
                                 </div>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* Image Editor — for blocks with image/backgroundImage fields */}
+                {block && (block.image || block.backgroundImage || block.heroImage) && (
+                    <div className={sectionCls}>
+                        <label className="text-xs font-medium uppercase text-gray-500">Image</label>
+                        <div className="mt-2">
+                            <BlockImageEditor
+                                imageUrl={String(block.image || block.backgroundImage || block.heroImage || '')}
+                                altText={String(block.imageAlt || block.alt || '')}
+                                onImageChange={(url) => {
+                                    const field = block.image ? 'image' : block.backgroundImage ? 'backgroundImage' : 'heroImage'
+                                    onBlockFieldChange(currentBlockIndex, field, url)
+                                }}
+                                onAltTextChange={(alt) => {
+                                    const field = block.imageAlt !== undefined ? 'imageAlt' : 'alt'
+                                    onBlockFieldChange(currentBlockIndex, field, alt)
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Breadcrumb Editor */}
+                {block && block.blockType === 'breadcrumb' && (
+                    <div className={sectionCls}>
+                        <BreadcrumbEditor
+                            items={Array.isArray(block.items) ? block.items as { label: string; url: string }[] : []}
+                            mode={(block.mode as 'auto' | 'manual') || 'auto'}
+                            homeLabel={String(block.homeLabel || 'Home')}
+                            separator={String(block.separator || '/')}
+                            showIcon={Boolean(block.showIcon)}
+                            onChange={(changes) => {
+                                onBlockUpdate(currentBlockIndex, {
+                                    ...changes,
+                                    ...(changes.showIcon !== undefined ? { variant: changes.showIcon ? 'with-icon' : 'simple' } : {}),
+                                })
+                            }}
+                        />
                     </div>
                 )}
 

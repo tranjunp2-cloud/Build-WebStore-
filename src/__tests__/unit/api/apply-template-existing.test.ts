@@ -724,6 +724,62 @@ describe('POST /api/ai/apply-template', () => {
             expect(formFields.map(f => f.fieldName)).toEqual(['name', 'email', 'message'])
         })
 
+        // ── TC-F07.047: google-maps embedUrl sanitization ─────────────────────
+
+        it('TC-F07.047: empty google-maps embedUrl gets default placeholder', async () => {
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    { blockType: 'google-maps', headline: 'Find Us', embedUrl: '', address: '123 Street' },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            await POST(req)
+
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const mapsBlock = layout.find(b => b.blockType === 'google-maps')!
+            expect(typeof mapsBlock.embedUrl).toBe('string')
+            expect((mapsBlock.embedUrl as string).length).toBeGreaterThan(0)
+        })
+
+        // ── TC-F07.048: usageCount failure doesn't crash apply ────────────────
+
+        it('TC-F07.048: template usageCount update failure does not fail the apply', async () => {
+            // Save original implementation to restore after test
+            const originalImpl = mockPayloadInstance.update.getMockImplementation()
+
+            // Make template update throw on usageCount (but not on other updates)
+            mockPayloadInstance.update.mockImplementation(async (args: Record<string, unknown>) => {
+                if (args.collection === 'templates') {
+                    throw new Error('Category validation failed')
+                }
+                return {}
+            })
+
+            try {
+                const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+                const res = await POST(req)
+                const body = await res.json()
+
+                // Apply should still succeed despite usageCount failure
+                expect(res.status).toBe(200)
+                expect(body.applied).toBe(true)
+            } finally {
+                // Restore original mock to avoid polluting subsequent tests
+                if (originalImpl) {
+                    mockPayloadInstance.update.mockImplementation(originalImpl)
+                } else {
+                    mockPayloadInstance.update.mockResolvedValue({})
+                }
+            }
+        })
+
         // ── TC-F07.042: siteId as empty string ────────────────────────────────
 
         it('TC-F07.042: siteId as empty string "" is treated as falsy, creates new site', async () => {

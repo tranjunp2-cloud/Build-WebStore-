@@ -19,6 +19,10 @@ import { PrePublishModal } from '@/components/editor/PrePublishModal'
 import { UnpublishModal } from '@/components/editor/UnpublishModal'
 import { EditorTemplateModal, type TemplateApplyResult } from '@/components/editor/EditorTemplateModal'
 import { cn } from '@/lib/utils'
+import { useConnectivity } from '@/hooks/useConnectivity'
+import { useTabAuthority } from '@/hooks/useTabAuthority'
+import { OfflineBanner } from '@/components/editor/OfflineBanner'
+import { TabSuspendedOverlay } from '@/components/editor/TabSuspendedOverlay'
 
 type SiteData = {
     id: string
@@ -100,6 +104,9 @@ export default function EditorPage() {
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
     const [showSaveGuard, setShowSaveGuard] = useState(false)
+
+    const { isOnline, isSyncing } = useConnectivity()
+    const { isMaster, reclaimAuthority } = useTabAuthority(siteId)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -525,6 +532,10 @@ export default function EditorPage() {
     }, [addBlock, theme])
 
     const handleAIAction = useCallback(async (action: AIAction) => {
+        // Cancel any pending debounced auto-save to prevent race conditions
+        const { autoSaveTimer } = useEditorStore.getState()
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+
         switch (action.action) {
             case 'update_block': {
                 const blockIndex = action.blockIndex ?? selectedBlock ?? 0
@@ -552,10 +563,6 @@ export default function EditorPage() {
                 if (nextBlock) {
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
-                    // Auto-save + refresh preview to show new block
-                    setTimeout(() => {
-                        void handleSave({ showToast: false, refreshPreview: true })
-                    }, 300)
                 } else {
                     toast.error('Unable to add this section yet')
                 }
@@ -571,10 +578,6 @@ export default function EditorPage() {
                     if (prev > blockIndex) return prev - 1
                     return prev
                 })
-                // Auto-save + refresh preview
-                setTimeout(() => {
-                    void handleSave({ showToast: false, refreshPreview: true })
-                }, 300)
                 break
             }
 
@@ -584,12 +587,19 @@ export default function EditorPage() {
                     setIframeKey(key => key + 1)
                 } else {
                     toast.error('Nothing to undo')
+                    return // Nothing changed, skip save
                 }
                 break
             }
         }
 
-        await handleSave({ showToast: false, refreshPreview: true })
+        // Single save + preview refresh after any mutation (including undo).
+        // Undo must also save to persist the reverted state to DB,
+        // otherwise a page reload would lose the undo.
+        // setTimeout lets Zustand state settle before reading snapshot.
+        setTimeout(() => {
+            void handleSave({ showToast: false, refreshPreview: true })
+        }, 300)
     }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo])
 
     const handleUndo = useCallback(() => {
@@ -665,7 +675,13 @@ export default function EditorPage() {
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
             if (process.env.NODE_ENV === 'development') console.error('[Editor] Publish failed:', err)
-            toast.error(t.editor.toast.publishFailed)
+            toast.error(t.editor.toast.publishFailed, {
+                duration: 10000,
+                action: {
+                    label: 'Retry',
+                    onClick: () => void handlePublish(),
+                },
+            })
         } finally {
             setIsPublishing(false)
         }
@@ -712,7 +728,13 @@ export default function EditorPage() {
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
             if (process.env.NODE_ENV === 'development') console.error('[Editor] Re-publish failed:', err)
-            toast.error(t.editor.toast.publishFailed)
+            toast.error(t.editor.toast.publishFailed, {
+                duration: 10000,
+                action: {
+                    label: 'Retry',
+                    onClick: () => void handleRepublish(),
+                },
+            })
         } finally {
             setIsPublishing(false)
         }
@@ -896,6 +918,8 @@ export default function EditorPage() {
                 onViewportChange={setViewport}
             />
 
+            <OfflineBanner isOnline={isOnline} isSyncing={isSyncing} />
+
             {isCompactLayout ? (
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <EditorSidebar
@@ -986,6 +1010,8 @@ export default function EditorPage() {
                             viewport={viewport}
                             selectedBlock={selectedBlock}
                             onBlockSelect={handleBlockSelectWithContext}
+                            onDeleteBlock={handleDeleteBlock}
+                            onDuplicateBlock={handleDuplicateBlock}
                             onInlineEditApplied={(content, blockIndex) => {
                                 setSelectedBlock(blockIndex)
                                 setActiveSidebarTab('chat')
@@ -1104,6 +1130,14 @@ export default function EditorPage() {
                     }
                 }}
             />
+
+            {/* Tab authority — suspend this tab if another tab claimed the editor */}
+            {!isMaster && (
+                <TabSuspendedOverlay
+                    onReclaim={reclaimAuthority}
+                    onReload={() => window.location.reload()}
+                />
+            )}
 
             {/* Save guard modal — warns user that saving after template apply is permanent */}
             {showSaveGuard && (

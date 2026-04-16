@@ -28,6 +28,8 @@ interface ProposedFix {
 
 type ModalState = 'loading' | 'review' | 'applying' | 'done' | 'error'
 
+const fixKey = (fix: ProposedFix) => `${fix.collection}-${fix.id}`
+
 const UNDO_STORAGE_KEY = 'seo-fix-undo-backup'
 const UNDO_TTL_MS = 5 * 60 * 1000
 
@@ -198,14 +200,14 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
             const titleIsReplace = !!(fix.proposedTitle && fix.currentTitle)
             const descIsReplace = !!(fix.proposedDescription && fix.currentDescription)
             // Only uncheck if ALL proposed fields are replacements
-            if (!titleIsReplace && !descIsReplace) defaultSelected.add(fix.id)
+            if (!titleIsReplace && !descIsReplace) defaultSelected.add(fixKey(fix))
         })
         setSelectedIds(defaultSelected)
     }
 
     // ── Apply selected fixes ───────────────────────────────────────────────
     const applyFixes = async () => {
-        const selected = fixes.filter(f => selectedIds.has(f.id))
+        const selected = fixes.filter(f => selectedIds.has(fixKey(f)))
         if (selected.length === 0) return
 
         setState('applying')
@@ -283,7 +285,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
         })
     }
     const toggleAll = () => {
-        setSelectedIds(selectedIds.size === fixes.length ? new Set() : new Set(fixes.map(f => f.id)))
+        setSelectedIds(selectedIds.size === fixes.length ? new Set() : new Set(fixes.map(f => fixKey(f))))
     }
 
     if (!isOpen) return null
@@ -386,14 +388,14 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                     const titleIsReplace = !!(fix.proposedTitle && fix.currentTitle)
                                     const descIsReplace = !!(fix.proposedDescription && fix.currentDescription)
                                     const hasReplace = titleIsReplace || descIsReplace
-                                    const isChecked = selectedIds.has(fix.id)
+                                    const isChecked = selectedIds.has(fixKey(fix))
                                     return (
-                                        <label key={fix.id} className={`flex gap-3 p-4 rounded-xl border cursor-pointer transition-colors duration-200 ${isChecked ? 'bg-[#064E3B]/40 border-emerald-500/30' : 'bg-[#0F172A]/80 border-[#1F2937] hover:border-[#374151]'}`}>
+                                        <label key={fixKey(fix)} className={`flex gap-3 p-4 rounded-xl border cursor-pointer transition-colors duration-200 ${isChecked ? 'bg-[#064E3B]/40 border-emerald-500/30' : 'bg-[#0F172A]/80 border-[#1F2937] hover:border-[#374151]'}`}>
                                             <div className="relative flex items-center justify-center mt-0.5 shrink-0">
                                                 <input
                                                     type="checkbox"
                                                     checked={isChecked}
-                                                    onChange={() => toggleFix(fix.id)}
+                                                    onChange={() => toggleFix(fixKey(fix))}
                                                     className="peer appearance-none w-[18px] h-[18px] rounded-[4px] border-2 border-[#6B7280] bg-[#1F2937] checked:bg-[#10B981] checked:border-[#10B981] cursor-pointer transition-colors"
                                                 />
                                                 <svg className="absolute w-3 h-3 text-white pointer-events-none opacity-0 peer-checked:opacity-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>

@@ -47,14 +47,26 @@ vi.mock('payload', () => ({
             }
             return null
         }),
+        find: vi.fn().mockImplementation(async () => ({
+            docs: [
+                { id: 'page-1', layout: [{ blockType: 'hero', headline: 'Hello' }] },
+            ],
+        })),
         update: vi.fn().mockImplementation(async ({ collection, id, data }) => {
             if (collection === 'sites' && id === mockSiteRecord.id) {
                 mockSiteRecord = { ...mockSiteRecord, ...data }
                 return mockSiteRecord
             }
-            return null
+            return { id, ...data }
         }),
     })),
+}))
+
+// ── Rate limiter mock (added by PR #589 review fixes) ───────────────────────
+import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+vi.mock('@/lib/rateLimit', () => ({
+    checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 9, resetAt: Date.now() + 60000 }),
+    checkTwoTierRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 9, resetAt: Date.now() + 60000 }),
 }))
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -194,6 +206,25 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(body.success).toBe(false)
         expect(body.error.code).toBe('NOT_FOUND')
     })
+
+    it('TC-F01-pub-08: returns 429 when publish rate limit exceeded', async () => {
+        // Arrange
+        const resetAt = Date.now() + 60000
+        vi.mocked(checkTwoTierRateLimit).mockResolvedValueOnce({ allowed: false, remaining: 0, resetAt })
+        const req = makePatchReq('site-123')
+
+        // Act
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(429)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('RATE_LIMITED')
+        expect(body.retryAfter).toBeGreaterThan(0)
+        expect(res.headers.get('Retry-After')).toBeTruthy()
+        expect(checkTwoTierRateLimit).toHaveBeenCalledWith('publish:user-1', 5, 30)
+    })
 })
 
 // ── TC-F01-unpublish: DELETE /api/sites/[siteId]/publish ─────────────────────
@@ -308,5 +339,24 @@ describe('[TC-F01-unpublish] DELETE /api/sites/[siteId]/publish', () => {
         expect(body.data).toHaveProperty('status', 'draft')
         expect(body.data).not.toHaveProperty('url')
         expect(body.data).not.toHaveProperty('domain')
+    })
+
+    it('TC-F01-unp-07: returns 429 when unpublish rate limit exceeded', async () => {
+        // Arrange
+        const resetAt = Date.now() + 60000
+        vi.mocked(checkTwoTierRateLimit).mockResolvedValueOnce({ allowed: false, remaining: 0, resetAt })
+        const req = makeDeleteReq('site-123')
+
+        // Act
+        const res = await UnpublishDELETE(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(429)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('RATE_LIMITED')
+        expect(body.retryAfter).toBeGreaterThan(0)
+        expect(res.headers.get('Retry-After')).toBeTruthy()
+        expect(checkTwoTierRateLimit).toHaveBeenCalledWith('unpublish:user-1', 5, 30)
     })
 })

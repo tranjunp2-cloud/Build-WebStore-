@@ -10,12 +10,14 @@ import BuilderCompletionView from '@/components/builder/BuilderCompletionView'
 import BuilderFullPreview from '@/components/builder/BuilderFullPreview'
 import BuilderGenerationView from '@/components/builder/BuilderGenerationView'
 import { CongratsModal } from '@/components/builder/CongratsModal'
+import { DraftRecoveryDialog } from '@/components/builder/DraftRecoveryDialog'
+import { PaywallCard } from '@/components/builder/PaywallCard'
 import type { BuilderPreviewMode } from '@/components/builder/BuilderPreviewPrimitives'
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
-import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
+import { useBuilderStore, getDraftStatus, getDraftMeta, type BusinessInfo } from '@/store/builderStore'
 import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { useI18n } from '@/i18n'
@@ -164,6 +166,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const hardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
     const [showTimeoutWarning, setShowTimeoutWarning] = useState(false)
+    const sseRetryCountRef = useRef(0)
+    const sseRetryTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const [showDraftDialog, setShowDraftDialog] = useState(false)
+    const [showPaywall, setShowPaywall] = useState(false)
 
     const {
         step,
@@ -231,6 +237,19 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             window.localStorage.removeItem(BUILDER_SESSION_META_KEY)
         }
     }, [reset])
+
+    // Draft recovery dialog — show on mount if a valid draft exists
+    useEffect(() => {
+        const stored = useBuilderStore.getState()
+        if (stored.businessInfo && stored.step === 'info' && stored.status !== 'streaming') {
+            const status = getDraftStatus()
+            if (status === 'valid') {
+                setShowDraftDialog(true)
+            } else if (status === 'expired' || status === 'corrupted' || status === 'wrong-user') {
+                stored.clearDraft()
+            }
+        }
+    }, [])
 
     useEffect(() => {
         if (typeof window === 'undefined') return
@@ -447,6 +466,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         return () => {
             abortControllerRef.current?.abort()
             clearGenerationTimers()
+            if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
         }
     }, [clearGenerationTimers])
 
@@ -501,6 +521,14 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 const errorBody = await response.json().catch(() => null)
                 const genError = getGenerationError(response.status, errorBody)
                 const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
+
+                // 402 → show PaywallCard instead of form
+                if (response.status === 402) {
+                    setShowPaywall(true)
+                    setStep('info')
+                    return
+                }
+
                 setError({ code: genError.code, message, retryable: genError.retryable })
                 setStep('info')
                 toast.error(message)
@@ -551,12 +579,38 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 // User cancelled or hard timeout — already handled
                 return
             }
-            // SSE disconnect or network error
+            // SSE disconnect or network error — show banner, auto-retry up to 3x
             const genError = getGenerationError(0, 'SSE_DISCONNECT')
+            const retryIntervals = genError.retryIntervals || [2000, 5000, 10000]
+            const maxRetries = genError.maxRetries || 3
+            const currentRetry = sseRetryCountRef.current
+
+            if (currentRetry < maxRetries) {
+                const delay = retryIntervals[currentRetry] || retryIntervals[retryIntervals.length - 1]
+                sseRetryCountRef.current += 1
+                toast.warning('Lost connection. Retrying...', { duration: delay })
+                // Store timer ref to prevent duplicate streams on new generation start
+                if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
+                sseRetryTimerRef.current = setTimeout(() => {
+                    sseRetryTimerRef.current = null
+                    void startSSEGeneration(info, extraInstructions, briefSnapshot)
+                }, delay)
+                return
+            }
+
+            // All retries exhausted — show fatal error, redirect to dashboard
+            sseRetryCountRef.current = 0
             const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
             setError({ code: genError.code, message, retryable: genError.retryable })
             setStep('info')
-            toast.error(message)
+            toast.error('Cannot create website', {
+                description: 'Connection failed after multiple retries.',
+                duration: 10000,
+                action: {
+                    label: 'Go to Dashboard',
+                    onClick: () => router.push('/dashboard?ai_status=failed'),
+                },
+            })
         } finally {
             clearGenerationTimers()
             abortControllerRef.current = null
@@ -566,6 +620,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
         // Capture contentBrief BEFORE reset() clears it from the store
         const briefSnapshot = useBuilderStore.getState().contentBrief
+        sseRetryCountRef.current = 0
+        if (sseRetryTimerRef.current) { clearTimeout(sseRetryTimerRef.current); sseRetryTimerRef.current = null }
         prepareGenerationSession(info)
         void startSSEGeneration(info, undefined, briefSnapshot)
     }, [prepareGenerationSession, startSSEGeneration])
@@ -715,7 +771,21 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     ) : null
 
     if (step === 'info') {
+        if (showPaywall) {
+            return <PaywallCard onBack={() => setShowPaywall(false)} />
+        }
         return (
+            <>
+            {showDraftDialog && (
+                <DraftRecoveryDialog
+                    draft={getDraftMeta()}
+                    onContinue={() => setShowDraftDialog(false)}
+                    onDiscard={() => {
+                        useBuilderStore.getState().clearDraft()
+                        setShowDraftDialog(false)
+                    }}
+                />
+            )}
             <BusinessInfoForm
                 errorMessage={status === 'error' ? error?.message || null : null}
                 initialValues={businessInfo}
@@ -723,6 +793,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 onRetry={status === 'error' && error?.retryable ? handleRetryGeneration : undefined}
                 onSubmit={handleGenerateStart}
             />
+            </>
         )
     }
 

@@ -88,6 +88,9 @@ type BuilderActions = {
     // Error
     setError: (error: BuilderState['error']) => void
 
+    // Draft recovery
+    clearDraft: () => void
+
     // Reset
     reset: () => void
 }
@@ -184,6 +187,14 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             setError: (error) => set({ error, status: 'error' }),
 
             reset: () => set(INITIAL_STATE),
+
+            clearDraft: () => {
+                set(INITIAL_STATE)
+                if (typeof window !== 'undefined') {
+                    localStorage.removeItem('prime-builder-session')
+                    localStorage.removeItem('prime-builder-session-meta')
+                }
+            },
         }),
         {
             name: 'prime-builder-session', // name of the item in localStorage
@@ -213,3 +224,41 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         }
     )
 )
+
+/** Check draft validity without triggering store circular ref */
+export function getDraftStatus(): 'valid' | 'expired' | 'corrupted' | 'wrong-user' | 'none' {
+    const state = useBuilderStore.getState()
+    if (!state.businessInfo) return 'none'
+    const metaRaw = typeof window !== 'undefined' ? localStorage.getItem('prime-builder-session-meta') : null
+    if (metaRaw) {
+        try {
+            const meta = JSON.parse(metaRaw) as { lastTouchedAt?: number; userId?: string }
+            if (meta.userId && state.userId && meta.userId !== state.userId) return 'wrong-user'
+            if (meta.lastTouchedAt && Date.now() - meta.lastTouchedAt > 24 * 60 * 60 * 1000) return 'expired'
+        } catch (err) {
+            if (process.env.NODE_ENV === 'development') console.error('[BuilderDraft] parse meta failed', err)
+            return 'corrupted'
+        }
+    }
+    return 'valid'
+}
+
+/** Get draft display metadata without triggering store circular ref */
+export function getDraftMeta(): { siteName: string; industry: string; status: string; savedAt: number } {
+    const state = useBuilderStore.getState()
+    const metaRaw = typeof window !== 'undefined' ? localStorage.getItem('prime-builder-session-meta') : null
+    let savedAt = Date.now()
+    if (metaRaw) {
+        try {
+            savedAt = (JSON.parse(metaRaw) as { lastTouchedAt?: number }).lastTouchedAt || savedAt
+        } catch (err) {
+            if (process.env.NODE_ENV === 'development') console.error('[BuilderDraft] parse meta failed', err)
+        }
+    }
+    return {
+        siteName: state.businessInfo?.businessName || '',
+        industry: state.businessInfo?.industry || '',
+        status: state.step || 'info',
+        savedAt,
+    }
+}

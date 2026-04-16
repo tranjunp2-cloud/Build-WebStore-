@@ -14,6 +14,7 @@ import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepSc
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 import { useI18n } from '@/i18n'
 import SlugPicker from '@/components/onboarding/SlugPicker'
+import { ExtractionReview } from '@/components/builder/ExtractionReview'
 
 type IndustryOption = {
     value: string
@@ -84,6 +85,7 @@ export default function BusinessInfoForm({
     const [urlExtracting, setUrlExtracting] = useState(false)
     const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null)
     const [extractionError, setExtractionError] = useState<string | null>(null)
+    const [showReview, setShowReview] = useState(false)
     const abortControllerRef = useRef<AbortController | null>(null)
 
     const isFormReady =
@@ -262,7 +264,7 @@ export default function BusinessInfoForm({
                 source: 'url',
             }
 
-            // If all required fields extracted → generate immediately (skip review)
+            // If all required fields extracted → show review step before applying
             const canAutoGenerate =
                 extractedInfo.businessName.trim().length >= 3 &&
                 extractedInfo.industry.trim().length > 0 &&
@@ -270,12 +272,8 @@ export default function BusinessInfoForm({
                 extractedInfo.products.trim().length >= 3
 
             if (canAutoGenerate) {
-                // Direct generation — no review step needed
-                if (onSubmit) {
-                    onSubmit(extractedInfo)
-                } else {
-                    setBusinessInfo(extractedInfo)
-                }
+                // Show review step instead of auto-generating
+                setShowReview(true)
                 return
             }
 
@@ -458,6 +456,48 @@ export default function BusinessInfoForm({
                 </div>
             )}
 
+            {/* Extraction Review */}
+            {showReview && extractionResult && !urlExtracting && (
+                <div className="mt-6">
+                    <ExtractionReview
+                        extractedData={{
+                            businessName: extractionResult.businessName || '',
+                            industry: extractionResult.industry || '',
+                            shortDescription: extractionResult.shortDescription || '',
+                            products: extractionResult.products || '',
+                        }}
+                        onApply={(data) => {
+                            const payload: BusinessInfo = {
+                                ...form,
+                                ...data,
+                                businessUrl: urlValue,
+                                source: 'url',
+                                ...(chosenSlug ? { slug: chosenSlug } : {}),
+                            }
+                            setShowReview(false)
+                            if (onSubmit) {
+                                onSubmit(payload)
+                            } else {
+                                setBusinessInfo(payload)
+                            }
+                        }}
+                        onSkip={() => {
+                            setShowReview(false)
+                            setInputMode('manual')
+                            if (extractionResult) {
+                                setForm((current) => ({
+                                    ...current,
+                                    businessName: extractionResult.businessName || current.businessName,
+                                    industry: extractionResult.industry || current.industry,
+                                    shortDescription: extractionResult.shortDescription || current.shortDescription,
+                                    products: extractionResult.products || current.products,
+                                }))
+                            }
+                        }}
+                    />
+                </div>
+            )}
+
             {/* Error */}
             {extractionError && !urlExtracting && (
                 <div className="mt-6 rounded-2xl border border-[rgba(248,113,113,0.35)] bg-[rgba(127,29,29,0.18)] px-4 py-3 text-sm text-[#fecaca]" role="alert">
@@ -528,15 +568,19 @@ export default function BusinessInfoForm({
                         required
                     >
                         <BuilderOptionGrid>
-                            {industryOptions.map((option) => (
-                                <BuilderOptionCard
-                                    icon={option.icon}
-                                    key={option.value}
-                                    label={option.label}
-                                    onClick={() => setForm((current) => ({ ...current, industry: option.value }))}
-                                    selected={form.industry === option.value}
-                                />
-                            ))}
+                            {industryOptions.map((option) => {
+                                const i18nLabels = (t.onboarding.form as Record<string, unknown>).industryOptions as Record<string, string> | undefined
+                                const translatedLabel = i18nLabels?.[option.value] || option.label
+                                return (
+                                    <BuilderOptionCard
+                                        icon={option.icon}
+                                        key={option.value}
+                                        label={translatedLabel}
+                                        onClick={() => setForm((current) => ({ ...current, industry: option.value }))}
+                                        selected={form.industry === option.value}
+                                    />
+                                )
+                            })}
                         </BuilderOptionGrid>
                         {isLoadingIndustries ? (
                             <p className="text-xs text-[#94a3b8]">{t.onboarding.form.loadingIndustries}</p>
