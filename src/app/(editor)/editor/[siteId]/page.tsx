@@ -570,7 +570,7 @@ export default function EditorPage() {
                 } else {
                     toast.error('Nothing to undo')
                 }
-                return // Undo only reverts state + refreshes iframe, no save needed
+                break
             }
         }
 
