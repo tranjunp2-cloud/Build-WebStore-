@@ -33,12 +33,11 @@ export function useTabAuthority(siteId: string) {
             if (msg.siteId !== siteId) return
 
             if (msg.type === 'CLAIM_AUTHORITY' && msg.tabId !== tabIdRef.current) {
-                // Another tab is claiming authority — yield
-                setIsMaster(false)
-            }
-
-            if (msg.type === 'YIELD_AUTHORITY' && msg.tabId !== tabIdRef.current) {
-                // Another tab yielded — we can reclaim if needed
+                // Deterministic: tab with higher ID wins (newer tab takes over)
+                // This prevents both tabs from yielding simultaneously
+                if (msg.tabId > tabIdRef.current) {
+                    setIsMaster(false)
+                }
             }
         }
 

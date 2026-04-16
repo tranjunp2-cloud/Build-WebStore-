@@ -235,7 +235,10 @@ export function getDraftStatus(): 'valid' | 'expired' | 'corrupted' | 'wrong-use
             const meta = JSON.parse(metaRaw) as { lastTouchedAt?: number; userId?: string }
             if (meta.userId && state.userId && meta.userId !== state.userId) return 'wrong-user'
             if (meta.lastTouchedAt && Date.now() - meta.lastTouchedAt > 24 * 60 * 60 * 1000) return 'expired'
-        } catch { return 'corrupted' }
+        } catch (err) {
+            if (process.env.NODE_ENV === 'development') console.error('[BuilderDraft] parse meta failed', err)
+            return 'corrupted'
+        }
     }
     return 'valid'
 }
@@ -246,7 +249,11 @@ export function getDraftMeta(): { siteName: string; industry: string; status: st
     const metaRaw = typeof window !== 'undefined' ? localStorage.getItem('prime-builder-session-meta') : null
     let savedAt = Date.now()
     if (metaRaw) {
-        try { savedAt = (JSON.parse(metaRaw) as { lastTouchedAt?: number }).lastTouchedAt || savedAt } catch {}
+        try {
+            savedAt = (JSON.parse(metaRaw) as { lastTouchedAt?: number }).lastTouchedAt || savedAt
+        } catch (err) {
+            if (process.env.NODE_ENV === 'development') console.error('[BuilderDraft] parse meta failed', err)
+        }
     }
     return {
         siteName: state.businessInfo?.businessName || '',
