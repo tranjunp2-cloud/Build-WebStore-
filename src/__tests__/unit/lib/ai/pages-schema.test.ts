@@ -190,7 +190,7 @@ describe('pages-schema sanitizer', () => {
     })
 
     describe('whitelist coverage invariants', () => {
-        it('PAGES_FIELDS covers all 14 PAGES_BLOCK_WHITELIST entries', () => {
+        it('PAGES_FIELDS covers all PAGES_BLOCK_WHITELIST entries', () => {
             for (const bt of PAGES_BLOCK_WHITELIST) {
                 expect(PAGES_FIELDS[bt]).toBeDefined()
                 expect(PAGES_FIELDS[bt]!.length).toBeGreaterThan(0)
