@@ -54,7 +54,7 @@ describe('POST /api/auth/check-reset-flow', () => {
 
     it('returns internal flow if no email provided', async () => {
         const req = createMockRequest({})
-        const response = await POST(req) as unknown as { data: any, status: number }
+        const response = await POST(req) as unknown as { data: Record<string, unknown>, status: number }
 
         expect(response.data).toEqual({ flow: 'internal' })
         expect(mockPayload.find).not.toHaveBeenCalled()
@@ -64,7 +64,7 @@ describe('POST /api/auth/check-reset-flow', () => {
         mockPayload.find.mockResolvedValue({ docs: [] })
 
         const req = createMockRequest({ email: 'notfound@test.com' })
-        const response = await POST(req) as unknown as { data: any, status: number }
+        const response = await POST(req) as unknown as { data: Record<string, unknown>, status: number }
 
         expect(response.data).toEqual({ flow: 'internal' })
         expect(mockPayload.find).toHaveBeenCalledWith(expect.objectContaining({
@@ -79,7 +79,7 @@ describe('POST /api/auth/check-reset-flow', () => {
         })
 
         const req = createMockRequest({ email: 'owner@test.com' })
-        const response = await POST(req) as unknown as { data: any, status: number }
+        const response = await POST(req) as unknown as { data: Record<string, unknown>, status: number }
 
         expect(response.data).toEqual({
             flow: 'sso',
@@ -93,7 +93,7 @@ describe('POST /api/auth/check-reset-flow', () => {
         })
 
         const req = createMockRequest({ email: 'staff@test.com' })
-        const response = await POST(req) as unknown as { data: any, status: number }
+        const response = await POST(req) as unknown as { data: Record<string, unknown>, status: number }
 
         expect(response.data).toEqual({ flow: 'internal' })
     })
@@ -102,7 +102,7 @@ describe('POST /api/auth/check-reset-flow', () => {
         mockPayload.find.mockRejectedValue(new Error('DB Error'))
 
         const req = createMockRequest({ email: 'error@test.com' })
-        const response = await POST(req) as unknown as { data: any, status: number }
+        const response = await POST(req) as unknown as { data: Record<string, unknown>, status: number }
 
         expect(response.data).toEqual({ flow: 'internal' })
     })
@@ -112,7 +112,7 @@ describe('POST /api/auth/check-reset-flow', () => {
         vi.mocked(checkRateLimit).mockResolvedValueOnce({ allowed: false, remaining: 0, resetAt })
 
         const req = createMockRequest({ email: 'test@test.com' })
-        const response = await POST(req) as unknown as { data: any, status: number }
+        const response = await POST(req) as unknown as { data: Record<string, unknown>, status: number }
 
         expect(response.status).toBe(429)
         expect(response.data).toEqual({ flow: 'internal' })
