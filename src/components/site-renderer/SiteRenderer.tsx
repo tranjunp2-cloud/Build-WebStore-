@@ -219,6 +219,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
           .container { max-width: 1200px; margin: 0 auto; }
           img { max-width: 100%; height: auto; }
           a { color: inherit; text-decoration: none; }
+          /* Default block spacing — overridden by inline style when user customizes */
+          :root { --block-spacing-default: 32px; }
+          @media (max-width: 768px) { :root { --block-spacing-default: 24px; } }
           /* Dark-mode opacity boost — blocks widely use opacity-50/40/60 for muted
              text. On dark backgrounds this drops below WCAG AA. Boost to 0.78+
              via scoped rules so muted text stays readable without touching 195
@@ -273,7 +276,17 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                     : block
 
                 const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
-                
+
+                // Block spacing — navigation/footer default to 0, others use custom or default
+                const isGlobalBlock = block.blockType === 'navigation' || block.blockType === 'footer'
+                const blockStyle = (block as Record<string, unknown>).style as { paddingTop?: number; paddingBottom?: number } | undefined
+                const spacingStyle = isGlobalBlock
+                    ? {}
+                    : {
+                        paddingTop: blockStyle?.paddingTop !== undefined ? `${blockStyle.paddingTop}px` : 'var(--block-spacing-default)',
+                        paddingBottom: blockStyle?.paddingBottom !== undefined ? `${blockStyle.paddingBottom}px` : 'var(--block-spacing-default)',
+                    }
+
                 const blockContent = (
                     <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
                         <HeadingProvider level={headingLevel}>
@@ -284,17 +297,20 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
 
                 if (isEditor) {
                     return (
-                        <div 
+                        <div
                             key={`${block.blockType}-${index}`}
                             data-block-index={index}
                             data-block-type={block.blockType}
                             className="group/block relative w-full"
+                            style={spacingStyle}
                         >
                             {blockContent}
                         </div>
                     )
                 }
 
+                // Public site: no extra wrapper div to avoid breaking CSS selectors.
+                // Spacing is applied via the global CSS variable on block root elements.
                 return blockContent
             })}
         </OwnerProvider>

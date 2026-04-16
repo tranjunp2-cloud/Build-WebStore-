@@ -9,6 +9,8 @@ export type GenerationErrorCode =
     | 'SERVICE_UNAVAILABLE'
     | 'SSE_DISCONNECT'
 
+export type GenerationErrorUIType = 'toast' | 'banner' | 'inline' | 'fullscreen'
+
 export type GenerationError = {
     code: GenerationErrorCode
     messageEN: string
@@ -16,6 +18,9 @@ export type GenerationError = {
     action: { label: string; type: 'upgrade' | 'retry' | 'edit' | 'signin' | 'dashboard' }
     retryable: boolean
     retryAfterSeconds?: number
+    uiType: GenerationErrorUIType
+    maxRetries?: number
+    retryIntervals?: number[]
 }
 
 const ERROR_MAP: Record<string, GenerationError> = {
@@ -25,6 +30,7 @@ const ERROR_MAP: Record<string, GenerationError> = {
         messageMS: 'Anda telah menggunakan penjanaan AI percuma anda. Naik taraf ke Pro untuk penciptaan tanpa had.',
         action: { label: 'Upgrade to Pro', type: 'upgrade' },
         retryable: false,
+        uiType: 'fullscreen',
     },
     '429': {
         code: 'RATE_LIMIT',
@@ -33,6 +39,7 @@ const ERROR_MAP: Record<string, GenerationError> = {
         action: { label: 'Retry in {seconds}s', type: 'retry' },
         retryable: true,
         retryAfterSeconds: 30,
+        uiType: 'toast',
     },
     '400_CONTENT_UNSAFE': {
         code: 'CONTENT_UNSAFE',
@@ -40,6 +47,7 @@ const ERROR_MAP: Record<string, GenerationError> = {
         messageMS: 'Input anda mengandungi kandungan yang tidak dapat diproses. Sila semak semula penerangan perniagaan anda.',
         action: { label: 'Edit description', type: 'edit' },
         retryable: false,
+        uiType: 'inline',
     },
     '400': {
         code: 'VALIDATION_ERROR',
@@ -47,6 +55,7 @@ const ERROR_MAP: Record<string, GenerationError> = {
         messageMS: 'Beberapa medan tidak sah. Sila semak input anda dan cuba lagi.',
         action: { label: 'Fix & retry', type: 'edit' },
         retryable: false,
+        uiType: 'inline',
     },
     '401': {
         code: 'UNAUTHORIZED',
@@ -54,20 +63,23 @@ const ERROR_MAP: Record<string, GenerationError> = {
         messageMS: 'Sesi anda telah tamat. Sila log masuk semula.',
         action: { label: 'Sign in', type: 'signin' },
         retryable: false,
+        uiType: 'toast',
     },
     '408': {
         code: 'TIMEOUT',
-        messageEN: 'Generation timed out. Please try again — your input has been saved.',
-        messageMS: 'Penjanaan telah tamat masa. Sila cuba lagi — input anda telah disimpan.',
+        messageEN: 'Taking too long. Your input has been saved — please try again.',
+        messageMS: 'Terlalu lama. Input anda telah disimpan — sila cuba lagi.',
         action: { label: 'Retry', type: 'retry' },
         retryable: true,
+        uiType: 'toast',
     },
     '500': {
         code: 'SERVER_ERROR',
-        messageEN: 'Something went wrong on our end. Please try again in a moment.',
-        messageMS: 'Sesuatu telah berlaku di pihak kami. Sila cuba lagi sebentar.',
+        messageEN: 'Server error. Please try again later.',
+        messageMS: 'Ralat pelayan. Sila cuba lagi kemudian.',
         action: { label: 'Retry', type: 'retry' },
         retryable: true,
+        uiType: 'toast',
     },
     '503': {
         code: 'SERVICE_UNAVAILABLE',
@@ -76,13 +88,17 @@ const ERROR_MAP: Record<string, GenerationError> = {
         action: { label: 'Retry', type: 'retry' },
         retryable: true,
         retryAfterSeconds: 60,
+        uiType: 'toast',
     },
     SSE_DISCONNECT: {
         code: 'SSE_DISCONNECT',
-        messageEN: 'Connection lost during generation. Please try again.',
-        messageMS: 'Sambungan terputus semasa penjanaan. Sila cuba lagi.',
+        messageEN: 'Lost connection. Retrying...',
+        messageMS: 'Sambungan terputus. Mencuba semula...',
         action: { label: 'Retry', type: 'retry' },
         retryable: true,
+        uiType: 'banner',
+        maxRetries: 3,
+        retryIntervals: [2000, 5000, 10000],
     },
 }
 
@@ -92,6 +108,7 @@ const DEFAULT_ERROR: GenerationError = {
     messageMS: 'Sesuatu telah berlaku. Sila cuba lagi.',
     action: { label: 'Retry', type: 'retry' },
     retryable: true,
+    uiType: 'toast',
 }
 
 /**

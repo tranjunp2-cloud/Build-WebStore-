@@ -235,6 +235,22 @@
             "promoStep1": "Enter business information",
             "promoStep2": "AI creates content & design",
             "promoStep3": "Preview & Publish",
+            "industryOptions": {
+                "restaurant": "Restaurant / Cafe / F&B",
+                "ecommerce": "Shop / Fashion / E-commerce",
+                "beauty": "Beauty / Spa / Wellness",
+                "tech": "Tech / IT / SaaS",
+                "health": "Health / Dental / Clinic",
+                "education": "Education / Training",
+                "realestate": "Real Estate / Property",
+                "fitness": "Gym / Fitness / Yoga",
+                "creative": "Portfolio / Freelancer / Agency",
+                "business": "Business / Corporate",
+                "fnb": "F&B / Cafe / Bakery",
+                "events": "Events / Wedding",
+                "blog": "Blog / Media / Magazine",
+                "travel": "Travel / Tourism"
+            },
             "errors": {
                 "businessName": "Please enter your business name",
                 "industry": "Please select an industry",

@@ -235,6 +235,22 @@
             "promoStep1": "Masukkan maklumat perniagaan",
             "promoStep2": "AI mencipta kandungan & reka bentuk",
             "promoStep3": "Pratonton & Terbit",
+            "industryOptions": {
+                "restaurant": "Restoran / Kafe / F&B",
+                "ecommerce": "Kedai / Fesyen / E-dagang",
+                "beauty": "Kecantikan / Spa / Kesejahteraan",
+                "tech": "Teknologi / IT / SaaS",
+                "health": "Kesihatan / Pergigian / Klinik",
+                "education": "Pendidikan / Latihan",
+                "realestate": "Hartanah / Properti",
+                "fitness": "Gim / Kecergasan / Yoga",
+                "creative": "Portfolio / Freelancer / Agensi",
+                "business": "Perniagaan / Korporat",
+                "fnb": "F&B / Kafe / Bakeri",
+                "events": "Acara / Perkahwinan",
+                "blog": "Blog / Media / Majalah",
+                "travel": "Pelancongan / Pelancongan"
+            },
             "errors": {
                 "businessName": "Sila masukkan nama perniagaan anda",
                 "industry": "Sila pilih industri",
