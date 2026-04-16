@@ -358,22 +358,28 @@ export const POST = withAuth(async (user, req) => {
                     // Strip system fields — Payload rejects 'id' in layout block data
                     const cleanLayout = stripSystemFields(newLayout) as Record<string, unknown>[]
 
-                    // Sanitize contact formFields — Payload requires fieldName + label + fieldType
+                    // Sanitize blocks with required fields that may be empty/invalid
                     const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
                     for (const block of cleanLayout) {
+                        // Contact: formFields array items need fieldName + label + fieldType
                         if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
                             block.formFields = (block.formFields as Record<string, unknown>[]).filter(f =>
                                 typeof f.fieldName === 'string' && f.fieldName.trim().length > 0 &&
                                 typeof f.label === 'string' && f.label.trim().length > 0 &&
                                 typeof f.fieldType === 'string' && VALID_FIELD_TYPES.has(f.fieldType)
                             )
-                            // If all items were invalid, use sensible defaults
                             if ((block.formFields as unknown[]).length === 0) {
                                 block.formFields = [
                                     { fieldName: 'name', fieldType: 'text', label: 'Your Name', required: true },
                                     { fieldName: 'email', fieldType: 'email', label: 'Email Address', required: true },
                                     { fieldName: 'message', fieldType: 'textarea', label: 'Message', required: true },
                                 ]
+                            }
+                        }
+                        // Google Maps: embedUrl is required
+                        if (block.blockType === 'google-maps') {
+                            if (!block.embedUrl || (typeof block.embedUrl === 'string' && block.embedUrl.trim().length === 0)) {
+                                block.embedUrl = 'https://www.google.com/maps/embed?pb=!1m18!1m12'
                             }
                         }
                     }
@@ -422,12 +428,16 @@ export const POST = withAuth(async (user, req) => {
                 )
             }
 
-            // 5. Increment template usage count
-            await payload.update({
-                collection: 'templates',
-                id: templateId,
-                data: { usageCount: (Number(template.usageCount) || 0) + 1 },
-            })
+            // 5. Increment template usage count (non-critical — don't fail the whole apply)
+            try {
+                await payload.update({
+                    collection: 'templates',
+                    id: templateId,
+                    data: { usageCount: (Number(template.usageCount) || 0) + 1 },
+                })
+            } catch (err) {
+                console.warn('[Apply Template] Failed to increment usageCount:', templateId, err instanceof Error ? err.message : err)
+            }
 
             return NextResponse.json({
                 success: true,
@@ -514,12 +524,16 @@ export const POST = withAuth(async (user, req) => {
             data: { generationStatus: 'completed' },
         })
 
-        // Increment template usage count
-        await payload.update({
-            collection: 'templates',
-            id: templateId,
-            data: { usageCount: (Number(template.usageCount) || 0) + 1 },
-        })
+        // Increment template usage count (non-critical)
+        try {
+            await payload.update({
+                collection: 'templates',
+                id: templateId,
+                data: { usageCount: (Number(template.usageCount) || 0) + 1 },
+            })
+        } catch (err) {
+            console.warn('[Apply Template] Failed to increment usageCount:', templateId, err instanceof Error ? err.message : err)
+        }
 
         return NextResponse.json({
             success: true,
