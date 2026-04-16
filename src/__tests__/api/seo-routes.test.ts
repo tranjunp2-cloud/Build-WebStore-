@@ -115,6 +115,7 @@ describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
         expect(body.success).toBe(true)
     })
 
+    // Route context unused by handler — `{} as any` follows existing test pattern (lines 58, 85, 111)
     it('maps blog fields metaTitle/metaDescription on apply [TC-F03.40]', async () => {
         // Arrange — blog uses seo.metaTitle / seo.metaDescription
         mockFindByID.mockResolvedValue({

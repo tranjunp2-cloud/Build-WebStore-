@@ -116,6 +116,7 @@ describe('POST /api/seo/fix-all [TC-F03.33, TC-F03.34]', () => {
             }),
         } as unknown as Request
 
+        // Route context unused by handler — safe to stub as empty object
         const res = await POST(req, {} as any)
         const text = await res.text()
         const dataLines = text.split('\n').filter(line => line.startsWith('data: '))

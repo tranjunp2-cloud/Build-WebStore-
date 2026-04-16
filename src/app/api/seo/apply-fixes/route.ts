@@ -58,8 +58,8 @@ export const POST = withAuth(async (_user, request) => {
             const seoUpdate = fix.collection === 'blogs'
                 ? {
                     ...(current.seo || {}),
-                    ...(fix.seo.title && { metaTitle: fix.seo.title }),
-                    ...(fix.seo.description && { metaDescription: fix.seo.description }),
+                    ...(fix.seo.title !== undefined && { metaTitle: fix.seo.title }),
+                    ...(fix.seo.description !== undefined && { metaDescription: fix.seo.description }),
                 }
                 : {
                     ...(current.seo || {}),
