@@ -9,7 +9,7 @@ import { generateAutoSEOMeta } from '@/lib/ai/generate-meta'
 const fixAllSchema = z.object({
     siteId: z.string().min(1),
     missingSeo: z.array(z.object({
-        collection: z.enum(['pages', 'products']),
+        collection: z.enum(['pages', 'products', 'blogs']),
         id: z.union([z.string(), z.number()]),
         title: z.string(),
         context: z.string().optional(),
