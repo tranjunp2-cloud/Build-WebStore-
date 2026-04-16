@@ -1,7 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
 import type { BlockProps } from '../types'
 import type { BlogListConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -33,13 +32,9 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
 
-    // BUG-F05-06: Extract site base path from current URL for correct blog links.
-    // Middleware rewrites subdomain → /sites/{slug}/..., so pathname always has /sites/{slug} prefix.
-    const pathname = usePathname()
-    const siteBasePath = useMemo(() => {
-        const match = pathname.match(/^\/sites\/[^/]+/)
-        return match ? match[0] : ''
-    }, [pathname])
+    // BUG-F05-06: build blog links using tenant slug from server-injected site prop
+    const tenantSlug = (site as Record<string, unknown>)?.tenantSlug as string | undefined
+    const blogBasePath = tenantSlug ? `/sites/${tenantSlug}/blogs` : '/blogs'
 
     useEffect(() => {
         const tenantId = site?.tenant
@@ -123,7 +118,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                 {variant === 'list' ? (
                     <div className="max-w-4xl mx-auto flex flex-col gap-10">
                         {posts.map((post) => (
-                            <a href={`${siteBasePath}/blogs/${post.slug}`} key={post.id} className="group grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-black/10 dark:border-white/10 pb-10">
+                            <a href={`${blogBasePath}/${post.slug}`} key={post.id} className="group grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-black/10 dark:border-white/10 pb-10">
                                 <div className="relative overflow-hidden rounded-xl aspect-[4/3] md:aspect-video bg-black/5 dark:bg-white/5">
                                     <div className="absolute inset-0 bg-black/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity z-10" />
                                     {post.image ? (
@@ -153,7 +148,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                     <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {posts.map((post) => (
                             <StaggerItem key={post.id}>
-                                <a href={`${siteBasePath}/blogs/${post.slug}`} className="block h-full">
+                                <a href={`${blogBasePath}/${post.slug}`} className="block h-full">
                                     <HoverCard className="group flex flex-col h-full rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500"
                                         style={{
                                             border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,

@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { useEffect, useState, useRef } from 'react'
 
 interface BlogPost {
     id: string
@@ -16,11 +15,12 @@ interface BlogPost {
 
 interface StorefrontBlogListProps {
     tenantId: string
+    tenantSlug?: string
 }
 
 const POSTS_PER_PAGE = 12
 
-export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
+export function StorefrontBlogList({ tenantId, tenantSlug }: StorefrontBlogListProps) {
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [totalDocs, setTotalDocs] = useState(0)
     const [page, setPage] = useState(1)
@@ -30,12 +30,8 @@ export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
     const [searchInput, setSearchInput] = useState('')
     const [search, setSearch] = useState('')
 
-    // BUG-F05-06: detect site base path for correct blog links
-    const pathname = usePathname()
-    const siteBasePath = useMemo(() => {
-        const match = pathname.match(/^\/sites\/[^/]+/)
-        return match ? match[0] : ''
-    }, [pathname])
+    // BUG-F05-06: build blog links using server-provided tenant slug
+    const blogBasePath = tenantSlug ? `/sites/${tenantSlug}/blogs` : '/blogs'
 
     // Restore scroll position when returning from blog detail
     useEffect(() => {
@@ -184,7 +180,7 @@ export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
                 {posts.map(post => (
                     <a
                         key={post.id}
-                        href={`${siteBasePath}/blogs/${post.slug}`}
+                        href={`${blogBasePath}/${post.slug}`}
                         onClick={() => sessionStorage.setItem('blog-list-scroll', String(window.scrollY))}
                         className="group rounded-2xl overflow-hidden border border-white/5 hover:border-white/15 transition-all hover:shadow-2xl"
                     >

@@ -236,7 +236,7 @@ export default async function TenantSitePage({ params }: Props) {
                 <div className="max-w-5xl mx-auto px-6 py-16">
                     <h1 className="text-4xl md:text-5xl font-bold mb-4"><I18nText render={t => t.storefront.blog.title} /></h1>
                     <p className="text-lg opacity-60 mb-12"><I18nText render={t => t.storefront.blog.latestStories} /></p>
-                    <StorefrontBlogList tenantId={String(tenant.id)} />
+                    <StorefrontBlogList tenantId={String(tenant.id)} tenantSlug={slug} />
                 </div>
             </div>
         )
@@ -320,7 +320,7 @@ export default async function TenantSitePage({ params }: Props) {
 
     return (
         <SiteRenderer
-            site={site as unknown as SiteData}
+            site={{ ...site, tenantSlug: slug } as unknown as SiteData}
             page={page as unknown as PageData}
             pages={pages as unknown as NavPage[]}
             siteId={String(site.id)}
