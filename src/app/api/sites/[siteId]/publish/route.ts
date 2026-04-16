@@ -78,6 +78,56 @@ export async function PATCH(
             },
         })
 
+        // BUG-F05-01: Promote all draft pages to published.
+        // Editor saves with isDraft:true, so pages only have draft versions.
+        // Without this step, live site fetches get stale published versions.
+        // Paginate to handle sites with >100 pages.
+        const failedPageIds: string[] = []
+        let hasMore = true
+        let pageNum = 1
+        while (hasMore) {
+            const sitePages = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: Number(siteId) } },
+                limit: 50,
+                page: pageNum,
+                sort: 'id',
+                draft: true,
+            })
+
+            for (const pg of sitePages.docs) {
+                try {
+                    await payload.update({
+                        collection: 'pages',
+                        id: pg.id,
+                        data: { layout: pg.layout },
+                        draft: false,
+                    })
+                } catch (err) {
+                    console.warn(`[Publish] Failed to promote page ${pg.id}:`, err instanceof Error ? err.message : err)
+                    failedPageIds.push(String(pg.id))
+                }
+            }
+
+            hasMore = sitePages.hasNextPage ?? (sitePages.docs.length === 50)
+            pageNum++
+        }
+
+        if (failedPageIds.length > 0) {
+            console.error(`[Publish] ${failedPageIds.length} page(s) failed to promote:`, failedPageIds)
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: {
+                        code: 'PARTIAL_PUBLISH_FAILURE',
+                        message: `Failed to publish ${failedPageIds.length} page(s). Please try again.`,
+                        failedPages: failedPageIds,
+                    },
+                },
+                { status: 207 },
+            )
+        }
+
         // Get tenant slug for the domain URL
         let tenantSlug = 'site'
         const fullSite = await payload.findByID({

@@ -181,6 +181,7 @@ describe('Sites APIs', () => {
             getPayload.mockResolvedValueOnce({
                 auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
                 findByID: vi.fn().mockResolvedValue({ id: '123', status: 'draft', tenant: 'tenant-1' }),
+                find: vi.fn().mockResolvedValue({ docs: [{ id: 'page-1', layout: [] }], hasNextPage: false }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'published', publishedAt: new Date().toISOString() })
             })
 
