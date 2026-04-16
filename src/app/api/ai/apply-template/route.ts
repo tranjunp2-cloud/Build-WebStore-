@@ -363,8 +363,8 @@ export const POST = withAuth(async (user, req) => {
                     for (const block of cleanLayout) {
                         if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
                             block.formFields = (block.formFields as Record<string, unknown>[]).filter(f =>
-                                typeof f.fieldName === 'string' && f.fieldName.length > 0 &&
-                                typeof f.label === 'string' && f.label.length > 0 &&
+                                typeof f.fieldName === 'string' && f.fieldName.trim().length > 0 &&
+                                typeof f.label === 'string' && f.label.trim().length > 0 &&
                                 typeof f.fieldType === 'string' && VALID_FIELD_TYPES.has(f.fieldType)
                             )
                             // If all items were invalid, use sensible defaults

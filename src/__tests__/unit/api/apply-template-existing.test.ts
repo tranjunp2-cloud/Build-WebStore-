@@ -649,16 +649,17 @@ describe('POST /api/ai/apply-template', () => {
 
             await POST(req)
 
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
             const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
             )
             expect(pageUpdateCall).toBeDefined()
-            const contactBlock = (pageUpdateCall[0].data.layout as any[]).find(
-                (b: any) => b.blockType === 'contact'
-            )
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')
             expect(contactBlock).toBeDefined()
-            expect(contactBlock.formFields).toHaveLength(2)
-            expect(contactBlock.formFields[0].fieldName).toBe('name')
+            const formFields = contactBlock!.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(2)
+            expect(formFields[0].fieldName).toBe('name')
         })
 
         it('TC-F07.045: invalid formFields items are filtered out (missing/wrong type)', async () => {
@@ -673,6 +674,7 @@ describe('POST /api/ai/apply-template', () => {
                             { fieldName: 123, fieldType: 'text', label: 'Number name' },        // invalid: non-string
                             { fieldName: 'x', fieldType: 'bogus', label: 'Bad type' },          // invalid: unknown fieldType
                             { fieldName: 'msg', fieldType: 'textarea', label: '' },             // invalid: empty label
+                            { fieldName: '   ', fieldType: 'text', label: 'Whitespace' },       // invalid: whitespace-only
                         ],
                     },
                     { blockType: 'footer', logoText: 'Footer' },
@@ -682,14 +684,15 @@ describe('POST /api/ai/apply-template', () => {
 
             await POST(req)
 
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
             const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
             )
-            const contactBlock = (pageUpdateCall[0].data.layout as any[]).find(
-                (b: any) => b.blockType === 'contact'
-            )
-            expect(contactBlock.formFields).toHaveLength(1) // only 'name' survives
-            expect(contactBlock.formFields[0].fieldName).toBe('name')
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')!
+            const formFields = contactBlock.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(1) // only 'name' survives
+            expect(formFields[0].fieldName).toBe('name')
         })
 
         it('TC-F07.046: all-invalid formFields falls back to default 3 fields', async () => {
@@ -710,14 +713,15 @@ describe('POST /api/ai/apply-template', () => {
 
             await POST(req)
 
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
             const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
             )
-            const contactBlock = (pageUpdateCall[0].data.layout as any[]).find(
-                (b: any) => b.blockType === 'contact'
-            )
-            expect(contactBlock.formFields).toHaveLength(3)
-            expect(contactBlock.formFields.map((f: any) => f.fieldName)).toEqual(['name', 'email', 'message'])
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')!
+            const formFields = contactBlock.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(3)
+            expect(formFields.map(f => f.fieldName)).toEqual(['name', 'email', 'message'])
         })
 
         // ── TC-F07.042: siteId as empty string ────────────────────────────────
