@@ -30,6 +30,25 @@ describe('classifyTransientError', () => {
             expect(classifyTransientError(err)).toBe('fk-violation')
         })
 
+        it('detects image FK violation in nested block table', () => {
+            const err = new Error(
+                'insert or update on table "pages_blocks_testimonials_testimonials" violates foreign key constraint "pages_blocks_testimonials_testimonials_avatar_id"',
+            )
+            expect(classifyTransientError(err)).toBe('fk-violation')
+        })
+
+        it('detects logo FK violation in nested block table', () => {
+            const err = new Error(
+                'insert on "pages_blocks_clients_logos" violates foreign key constraint "pages_blocks_clients_logos_image_id"',
+            )
+            expect(classifyTransientError(err)).toBe('fk-violation')
+        })
+
+        it('does not match image_id without FK violation keyword', () => {
+            const err = new Error('pages_blocks_hero image_id is null')
+            expect(classifyTransientError(err)).toBe(null)
+        })
+
         it('detects TypeError reading title (post-deadlock symptom)', () => {
             const err = new TypeError("Cannot read properties of undefined (reading 'title')")
             expect(classifyTransientError(err)).toBe('type-error-title')

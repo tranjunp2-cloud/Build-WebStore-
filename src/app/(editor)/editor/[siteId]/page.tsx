@@ -309,8 +309,8 @@ export default function EditorPage() {
             window.setTimeout(() => setSaveSuccess(false), 2000)
             return true
         } catch (err) {
-            // BUG-F05-01: always log save errors (not just dev) for staging diagnosis
-            console.error('[Editor] Save failed:', err instanceof Error ? err.message : err)
+            // BUG-F05-01: log sanitized error code (no internal details in production console)
+            console.error('[Editor] Save failed:', { code: 'SAVE_FAILED', env: process.env.NODE_ENV })
             toast.error(t.editor.toast.saveFailed)
             return false
         } finally {
@@ -474,8 +474,7 @@ export default function EditorPage() {
         if (!ok) {
             console.warn('[Editor] First save failed, retrying in 1s...')
             await new Promise(r => setTimeout(r, 1000))
-            // Second attempt shows toast on failure
-            await handleSave(options)
+            await handleSave({ ...options, showToast: true })
         }
     }, [handleSave])
 
