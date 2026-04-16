@@ -358,6 +358,25 @@ export const POST = withAuth(async (user, req) => {
                     // Strip system fields — Payload rejects 'id' in layout block data
                     const cleanLayout = stripSystemFields(newLayout) as Record<string, unknown>[]
 
+                    // Sanitize contact formFields — Payload requires fieldName + label + fieldType
+                    const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
+                    for (const block of cleanLayout) {
+                        if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
+                            block.formFields = (block.formFields as Record<string, unknown>[]).filter(f =>
+                                typeof f.fieldName === 'string' && f.fieldName.trim().length > 0 &&
+                                typeof f.label === 'string' && f.label.trim().length > 0 &&
+                                typeof f.fieldType === 'string' && VALID_FIELD_TYPES.has(f.fieldType)
+                            )
+                            // If all items were invalid, use sensible defaults
+                            if ((block.formFields as unknown[]).length === 0) {
+                                block.formFields = [
+                                    { fieldName: 'name', fieldType: 'text', label: 'Your Name', required: true },
+                                    { fieldName: 'email', fieldType: 'email', label: 'Email Address', required: true },
+                                    { fieldName: 'message', fieldType: 'textarea', label: 'Message', required: true },
+                                ]
+                            }
+                        }
+                    }
 
                     await payload.update({
                         collection: 'pages',
