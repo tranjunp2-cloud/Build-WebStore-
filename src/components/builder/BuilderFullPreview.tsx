@@ -10,6 +10,7 @@ interface BuilderFullPreviewProps {
     onModeChange: (mode: BuilderPreviewMode) => void
     onBack: () => void
     previewContent: ReactNode
+    siteId?: string | null
 }
 
 export default function BuilderFullPreview({
@@ -17,6 +18,7 @@ export default function BuilderFullPreview({
     onModeChange,
     onBack,
     previewContent,
+    siteId,
 }: BuilderFullPreviewProps) {
     const { t } = useI18n()
     return (
@@ -41,7 +43,7 @@ export default function BuilderFullPreview({
             </div>
 
             <div className="h-[calc(100vh-64px)] overflow-hidden">
-                <BuilderPreviewSurface mode={mode} variant="fullwidth">
+                <BuilderPreviewSurface mode={mode} variant="fullwidth" siteId={siteId}>
                     {previewContent}
                 </BuilderPreviewSurface>
             </div>
