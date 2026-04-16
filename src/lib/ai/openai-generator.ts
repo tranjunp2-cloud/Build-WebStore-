@@ -1951,6 +1951,39 @@ async function generateTemplateFirst(
         }
     }
 
+    // ── Structure enforcement ──
+    // Composer output can be sparse (beauty has only 2 industry blocks).
+    // Run the same enforcer that the AI-first path uses to pad homepage
+    // to minBlocks and fill thin arrays (testimonials, FAQ, features).
+    const enforcerBizOverride = mapBusinessInfo(businessInfo)
+    const { mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
+    const enforcerCtx = {
+        businessName: businessInfo.businessName,
+        industry: businessInfo.industry,
+        seed: themeSeed,
+        userBiz: enforcerBizOverride,
+        mood: themeMood,
+    }
+
+    // Enforce homepage blocks
+    let homepageBlocks = composerResult.blocks as Record<string, unknown>[]
+    homepageBlocks = enforceMinimumStructure(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
+    homepageBlocks = enforceMinItems(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
+    composerResult.blocks = homepageBlocks as GeneratedBlock[]
+
+    // Enforce sub-pages too (at least 4 blocks each)
+    if (composerResult.pages) {
+        for (const page of composerResult.pages) {
+            if (page.isHomepage) {
+                page.blocks = homepageBlocks as GeneratedBlock[]
+                continue
+            }
+            let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
+            pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
+            page.blocks = pageBlocks as GeneratedBlock[]
+        }
+    }
+
     console.info(
         `[Template-First] OK blocks=${composerResult.blocks.length} pages=${composerResult.pages?.length ?? 0} personalized=${personalizeApplied} gptFailed=${personalizeSettled.status === 'rejected'}`,
     )
