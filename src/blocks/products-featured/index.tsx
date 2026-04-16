@@ -10,6 +10,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
+import { getGalleryImages } from '@/lib/images/industry-images'
 
 function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
     return (
@@ -38,11 +39,17 @@ const MOCK_FEATURED = [
     }
 ]
 
-export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeaturedConfig>) {
+export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<ProductsFeaturedConfig>) {
     const { headline = 'Featured Collection', subheadline, variant = 'hero-product' } = block
+    const category = (site?.siteType as string) || 'business'
 
-    const product = MOCK_FEATURED[0] // For hero-product we just show the first one
-    const products = MOCK_FEATURED // For carousel we'd show all
+    // Fallback to industry images when mock/real product images lack URLs
+    const hasAnyImage = MOCK_FEATURED.some((p) => p.image)
+    const fallbackUrls = hasAnyImage ? [] : getGalleryImages(category, MOCK_FEATURED.length)
+    const products = hasAnyImage
+        ? MOCK_FEATURED
+        : MOCK_FEATURED.map((p, i) => ({ ...p, image: fallbackUrls[i] || fallbackUrls[0] }))
+    const product = products[0] // For hero-product we just show the first one
 
     if (variant === 'carousel') {
         return (

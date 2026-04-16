@@ -13,7 +13,7 @@ import { composeFallbackResult } from './fallback-adapter'
 import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
-import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
+import { enforceMinimumStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
 import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { pickRecipe } from './category-recipes'
@@ -337,6 +337,7 @@ export async function generateSiteWithAI(
                         detectedCategory,
                         enforcerCtx,
                     ) as typeof pageBlocks
+                    enforceGridAlignment(pageBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
                 }
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
@@ -450,6 +451,7 @@ export async function generateSiteWithAI(
                     detectedCategory,
                     enforcerCtx,
                 ) as typeof validBlocks
+                enforceGridAlignment(validBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
             }
 
             // Phase 04 — page-level guards for single-page path
@@ -1969,6 +1971,7 @@ async function generateTemplateFirst(
     let homepageBlocks = composerResult.blocks as Record<string, unknown>[]
     homepageBlocks = enforceMinimumStructure(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
     homepageBlocks = enforceMinItems(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
+    enforceGridAlignment(homepageBlocks, presetCategory, enforcerCtx)
     composerResult.blocks = homepageBlocks as GeneratedBlock[]
 
     // Enforce sub-pages too (at least 4 blocks each)
@@ -1980,6 +1983,7 @@ async function generateTemplateFirst(
             }
             let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
             pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
+            enforceGridAlignment(pageBlocks, presetCategory, enforcerCtx)
             page.blocks = pageBlocks as GeneratedBlock[]
         }
     }
