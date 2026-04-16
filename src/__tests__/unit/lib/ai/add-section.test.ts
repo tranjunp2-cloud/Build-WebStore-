@@ -534,16 +534,17 @@ describe('normalizeAddSectionBlock — faq normalization [TC-F05.13]', () => {
 })
 
 describe('normalizeAddSectionBlock — testimonials normalization [TC-F05.13]', () => {
-    it('strips avatar field from each testimonial', () => {
+    it('preserves avatar field and whitelists valid testimonial fields', () => {
         const aiBlock = {
             blockType: 'testimonials',
             testimonials: [
-                { quote: 'Great!', name: 'Ali', avatar: 'url/avatar.jpg', rating: 5 },
+                { quote: 'Great!', name: 'Ali', avatar: 'url/avatar.jpg', rating: 5, junk: true },
             ],
         }
         const result = normalizeAddSectionBlock({ instruction: 'add testimonials' }, aiBlock) as Record<string, unknown>
         const testimonials = result?.testimonials as Record<string, unknown>[]
-        expect(testimonials[0]).not.toHaveProperty('avatar')
+        expect(testimonials[0]).toHaveProperty('avatar')
+        expect(testimonials[0]).not.toHaveProperty('junk')
         expect(testimonials[0].quote).toBe('Great!')
     })
 
@@ -564,14 +565,15 @@ describe('normalizeAddSectionBlock — testimonials normalization [TC-F05.13]', 
 })
 
 describe('normalizeAddSectionBlock — gallery normalization [TC-F05.13]', () => {
-    it('strips image field from each gallery item', () => {
+    it('preserves image field and whitelists valid gallery fields', () => {
         const aiBlock = {
             blockType: 'gallery',
-            images: [{ caption: 'Photo 1', image: 'url/photo.jpg' }],
+            images: [{ caption: 'Photo 1', image: 'url/photo.jpg', junk: true }],
         }
         const result = normalizeAddSectionBlock({ instruction: 'add gallery' }, aiBlock) as Record<string, unknown>
         const images = result?.images as Record<string, unknown>[]
-        expect(images[0]).not.toHaveProperty('image')
+        expect(images[0]).toHaveProperty('image')
+        expect(images[0]).not.toHaveProperty('junk')
         expect(images[0].caption).toBe('Photo 1')
     })
 
