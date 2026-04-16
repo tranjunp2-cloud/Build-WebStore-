@@ -514,6 +514,10 @@ export default function EditorPage() {
     }, [addBlock, theme])
 
     const handleAIAction = useCallback(async (action: AIAction) => {
+        // Cancel any pending debounced auto-save to prevent race conditions
+        const { autoSaveTimer } = useEditorStore.getState()
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+
         switch (action.action) {
             case 'update_block': {
                 const blockIndex = action.blockIndex ?? selectedBlock ?? 0
@@ -541,10 +545,6 @@ export default function EditorPage() {
                 if (nextBlock) {
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
-                    // Auto-save + refresh preview to show new block
-                    setTimeout(() => {
-                        void handleSave({ showToast: false, refreshPreview: true })
-                    }, 300)
                 } else {
                     toast.error('Unable to add this section yet')
                 }
@@ -560,10 +560,6 @@ export default function EditorPage() {
                     if (prev > blockIndex) return prev - 1
                     return prev
                 })
-                // Auto-save + refresh preview
-                setTimeout(() => {
-                    void handleSave({ showToast: false, refreshPreview: true })
-                }, 300)
                 break
             }
 
@@ -574,11 +570,15 @@ export default function EditorPage() {
                 } else {
                     toast.error('Nothing to undo')
                 }
-                break
+                return // Undo only reverts state + refreshes iframe, no save needed
             }
         }
 
-        await handleSave({ showToast: false, refreshPreview: true })
+        // Single save + preview refresh after any mutation (except undo)
+        // Use setTimeout to let Zustand state settle before reading snapshot
+        setTimeout(() => {
+            void handleSave({ showToast: false, refreshPreview: true })
+        }, 300)
     }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo])
 
     const handleUndo = useCallback(() => {
