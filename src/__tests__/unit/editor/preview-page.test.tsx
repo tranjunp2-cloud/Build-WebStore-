@@ -44,6 +44,12 @@ vi.mock('@/components/editor/PreviewScripts', () => ({
     PreviewScripts: () => <div data-testid="preview-scripts">Scripts</div>,
 }))
 
+vi.mock('@/app/(preview)/preview/[siteId]/PreviewErrors', () => ({
+    PreviewAccessDenied: () => <div>Access Denied</div>,
+    PreviewNoPage: () => <div>No page found for this preview.</div>,
+    PreviewLoadError: () => <div>Error loading preview.</div>,
+}))
+
 // ── Tests ────────────────────────────────────────────────────────────
 
 describe('PreviewPage — Security & Authorization', () => {

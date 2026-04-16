@@ -12,7 +12,8 @@
         "desktop": "Desktop",
         "mobile": "Mobile",
         "preview": "Preview",
-        "back": "Back"
+        "back": "Back",
+        "close": "Close"
     },
     "nav": {
         "platform": "Platform",
@@ -401,6 +402,26 @@
                 "save": "Save Changes"
             }
         },
+        "banner": {
+            "notLive": "is not live yet.",
+            "publishNow": "Publish now →"
+        },
+        "resetAccount": {
+            "dangerZone": "Danger Zone",
+            "stagingOnly": "Staging only — not visible in production",
+            "title": "Reset Account",
+            "description": "Delete ALL data including tenants, sites, products, orders, media, templates, and analytics. You will go through onboarding again. Your email and password will be preserved.",
+            "cannotUndo": "This action cannot be undone.",
+            "resetButton": "Reset Account",
+            "typeConfirm": "Type {keyword} to confirm:",
+            "typeConfirmPlaceholder": "Type RESET to confirm",
+            "cancel": "Cancel",
+            "resetting": "Resetting...",
+            "confirmReset": "Confirm Reset",
+            "resetSuccess": "Account reset! {count} records deleted.",
+            "resetFailed": "Reset failed",
+            "resetFailedRetry": "Reset failed. Try again."
+        },
         "empty": {
             "title": "No website data available",
             "description": "Create your first website to start tracking business performance.",
@@ -426,7 +447,18 @@
             "createWebsite": "Create Website",
             "incomplete": "Incomplete",
             "retryAi": "Retry with AI",
-            "template": "Template"
+            "template": "Template",
+            "newSite": "New Site",
+            "untitledSite": "Untitled Site",
+            "updatedLabel": "Updated",
+            "updatedRecently": "recently",
+            "siteTypes": {
+                "business": "Business",
+                "ecommerce": "E-commerce",
+                "blog": "Blog",
+                "portfolio": "Portfolio",
+                "restaurant": "Restaurant"
+            }
         },
         "analytics": {
             "title": "Analytics",
@@ -701,8 +733,12 @@
                 "title": "Cancel Order",
                 "orderLabel": "Order",
                 "reasonLabel": "Reason for cancellation",
-                "reasonPlaceholder": "Enter reason for cancellation...",
+                "reasonRequired": "Cancel reason is required.",
+                "reasonPlaceholder": "e.g., Customer requested via phone, out of stock, false order...",
+                "warning": "This action cannot be undone. The inventory components associated with this order will be restocked automatically.",
                 "back": "Back",
+                "keepOrder": "Keep Order",
+                "confirmCancellation": "Confirm Cancellation",
                 "confirm": "Confirm Cancel",
                 "confirming": "Cancelling..."
             },
@@ -848,6 +884,8 @@
                 "deleteConfirmRestorable": "This product can be restored later.",
                 "cancel": "Cancel",
                 "confirmDeleteBtn": "Confirm Delete",
+                "deleteWarning": "This action cannot be undone. The product will be permanently deleted from the system.",
+                "deleting": "Deleting...",
                 "toastSaved": "Product saved successfully",
                 "toastDraft": "Saved as draft. Switch to Active to display on storefront.",
                 "toastDeleted": "Product deleted.",
@@ -1207,7 +1245,9 @@
             },
             "noPostsTitle": "No blog posts yet",
             "noPostsSubtitle": "Create your first blog post to engage customers",
-            "unknownAuthor": "Author",
+            "unknownAuthor": "Unknown",
+            "loadFailed": "Failed to load blog posts",
+            "tryAgain": "Try Again",
             "editor": {
                 "home": "Home",
                 "blog": "Blog",
@@ -1287,7 +1327,14 @@
                 "aiMakeShorter": "Make Shorter",
                 "aiImproveWriting": "Improve Writing",
                 "aiRewriting": "Rewriting...",
-                "cancel": "Cancel"
+                "cancel": "Cancel",
+                "aiToneProfessionalDesc": "Formal & authoritative",
+                "aiToneFriendlyDesc": "Casual & approachable",
+                "aiTonePersuasiveDesc": "Compelling & action-driven",
+                "generateFailed": "Failed to generate",
+                "noContentGenerated": "No content generated.",
+                "authorLoading": "Loading...",
+                "authorFallback": "User"
             },
             "categoryModal": {
                 "title": "Manage Category",
@@ -1365,8 +1412,17 @@
             "connection": "Connection error. Please try again.",
             "serviceAccountUI": "Service accounts cannot access the web UI.",
             "missingCredentials": "Email and password are required",
-            "accountLocked": "This user is locked due to having too many failed login attempts."
+            "accountLocked": "This user is locked due to having too many failed login attempts.",
+            "sessionExpired": "Your session has expired. Please log in again."
         },
+        "emailPlaceholder": "you@example.com",
+        "passwordPlaceholder": "••••••••",
+        "checking": "Checking...",
+        "loading": "Loading...",
+        "otpSentTitle": "Verification code sent!",
+        "otpSentDesc": "Check your email for the 6-digit code.",
+        "otpEmailIssue": "Email delivery issue",
+        "otpEmailIssueDesc": "OTP saved but email may not arrive. Try \"Resend code\" on the next screen.",
         "success": {
             "welcomeBackTitle": "Welcome back!",
             "redirecting": "Redirecting to your dashboard..."
@@ -1404,7 +1460,16 @@
             "sentTo": "We've sent a password reset link to",
             "notReceive": "Didn't receive the email? Check your spam folder or",
             "tryAgain": "try again",
-            "submit": "Send reset link"
+            "submit": "Send reset link",
+            "emailRequired": "Email is required",
+            "invalidEmail": "Please enter a valid email",
+            "resetLinkSent": "Reset link sent!",
+            "checkInbox": "Check your email inbox.",
+            "somethingWrong": "Something went wrong. Please try again.",
+            "connectionError": "Connection error. Please try again.",
+            "linkResent": "Reset link resent!",
+            "checkInboxAgain": "Check your email inbox again.",
+            "resendFailed": "Failed to resend. Please try again later."
         },
         "reset": {
             "title": "Reset Password",
@@ -1841,6 +1906,11 @@
                     "Store Design": "Store Design",
                     "Pages": "Pages"
                 }
+            },
+            "features": {
+                "blog": "Blog Management",
+                "builder": "Store Design (Builder)",
+                "settings": "Settings & Domain"
             }
         },
         "removeModal": {
@@ -1937,6 +2007,67 @@
         "errorNoTld": "Domain must include an extension (e.g., .com, .my)",
         "errorInvalidChars": "Domain contains invalid characters",
         "errorInvalidFormat": "Invalid domain format"
+    },
+    "accountSettings": {
+        "title": "Settings",
+        "subtitle": "Manage your account and preferences",
+        "profile": {
+            "title": "Profile",
+            "email": "Email",
+            "firstName": "First Name",
+            "lastName": "Last Name",
+            "role": "Role",
+            "memberSince": "Member Since",
+            "saveChanges": "Save Changes",
+            "loadFailed": "Failed to load profile",
+            "firstNameRequired": "First name is required",
+            "updated": "Profile updated",
+            "updateFailed": "Failed to update profile"
+        },
+        "password": {
+            "title": "Change Password",
+            "newPassword": "New Password",
+            "confirmPassword": "Confirm Password",
+            "placeholder": "At least 8 characters",
+            "confirmPlaceholder": "Repeat new password",
+            "mismatch": "Passwords do not match",
+            "tooShort": "Password must be at least 8 characters",
+            "changed": "Password changed successfully",
+            "changeFailed": "Failed to change password",
+            "changeButton": "Change Password"
+        },
+        "danger": {
+            "title": "Danger Zone",
+            "description": "Once you delete your account, there is no going back. All your sites, media, and data will be permanently deleted.",
+            "deleteAccount": "Delete Account (Coming Soon)"
+        }
+    },
+    "mediaLibrary": {
+        "title": "Media Library",
+        "upload": "Upload",
+        "uploading": "Uploading...",
+        "searchPlaceholder": "Search files...",
+        "filterAll": "All",
+        "filterImages": "Images",
+        "filterVideos": "Videos",
+        "filterPdf": "PDF",
+        "emptyTitle": "No media files",
+        "emptyDescription": "Upload images, videos, or PDFs to get started",
+        "uploadFiles": "Upload Files",
+        "noMatch": "No files match your search",
+        "copyUrl": "Copy URL",
+        "copied": "Copied!",
+        "delete": "Delete",
+        "altText": "Alt Text",
+        "loadFailed": "Failed to load media",
+        "uploadFailed": "Failed to upload {name}",
+        "uploadedCount": "Uploaded {count} file(s)",
+        "fileDeleted": "File deleted",
+        "deleteFailed": "Failed to delete file",
+        "urlCopied": "URL copied"
+    },
+    "payments": {
+        "imageTooLarge": "Image must be smaller than 2MB"
     },
     "editor": {
         "toolbar": {
@@ -2417,6 +2548,99 @@
         },
         "menuDrawer": {
             "defaultUserName": "User"
+        }
+    },
+    "previewPage": {
+        "accessDenied": "Access Denied",
+        "noPermission": "You do not have permission to preview this site.",
+        "backToDashboard": "Back to Dashboard",
+        "noPage": "No page found for this preview.",
+        "loadError": "Error loading preview. Please ensure you are logged in and have access to this site."
+    },
+    "storefront": {
+        "products": {
+            "home": "Home",
+            "title": "Products",
+            "ourProducts": "Our Products",
+            "layoutGrid": "Layout Grid",
+            "layoutList": "Layout List",
+            "noMatch": "No products match your filters.",
+            "clearFilters": "Clear all filters",
+            "specifications": "Specifications",
+            "description": "Description",
+            "sku": "SKU:",
+            "outOfStock": "Out of Stock",
+            "addToCart": "🛒 Add to Cart",
+            "allProducts": "All Products",
+            "priceRange": "Price Range",
+            "applyFilter": "Apply Filter"
+        },
+        "blog": {
+            "title": "Blog",
+            "latestPosts": "Latest posts from",
+            "latestStories": "Latest stories and insights",
+            "noPosts": "No blog posts yet.",
+            "noImage": "No image",
+            "backToAll": "← Back to all posts",
+            "backToBlog": "← Back to Blog"
+        },
+        "cart": {
+            "title": "Cart",
+            "empty": "Your cart is empty",
+            "subtotal": "Subtotal",
+            "proceedToCheckout": "Proceed to Checkout",
+            "checkoutUnavailable": "Checkout feature is coming soon",
+            "qty": "Qty:"
+        },
+        "checkout": {
+            "title": "Checkout",
+            "backToProducts": "Back to Products",
+            "contactInfo": "Contact Information",
+            "fullName": "Full Name *",
+            "emailAddress": "Email Address *",
+            "phone": "Phone (e.g. +60 12-345 6789)",
+            "shippingAddress": "Shipping Address",
+            "addressLine1": "Address Line 1",
+            "addressLine2": "Address Line 2 (optional)",
+            "city": "City",
+            "state": "State",
+            "postcode": "Postcode",
+            "paymentMethod": "Payment Method",
+            "cod": "Cash on Delivery (COD)",
+            "codDesc": "Pay when you receive your order",
+            "qrBanking": "QR Banking / DuitNow",
+            "qrBankingDesc": "Scan QR code and upload payment proof",
+            "scanToPay": "Scan to pay via DuitNow QR",
+            "merchantQr": "Merchant QR Code",
+            "amount": "Amount:",
+            "uploadProof": "Upload Payment Proof",
+            "clickToUpload": "Click to upload receipt / screenshot",
+            "uploadHint": "JPG or PNG, max 2MB",
+            "placingOrder": "Placing Order...",
+            "placeOrder": "Place Order — ",
+            "uploadRequired": "Please upload payment proof to proceed",
+            "orderSummary": "Order Summary",
+            "subtotal": "Subtotal",
+            "shipping": "Shipping",
+            "free": "Free",
+            "sst": "SST (6%)",
+            "total": "Total",
+            "orderConfirmed": "Order Confirmed!",
+            "thankYou": "Thank you for your purchase",
+            "orderNumber": "Order Number",
+            "confirmationEmail": "A confirmation email will be sent to your inbox",
+            "continueShopping": "Continue Shopping",
+            "cartEmpty": "Your cart is empty",
+            "browseProducts": "← Browse Products",
+            "invalidImage": "Only JPG / PNG images are accepted",
+            "fileTooLarge": "File size must be under 2MB",
+            "uploadFailed": "Failed to upload payment proof",
+            "networkError": "Network error. Please try again."
+        },
+        "notFound": {
+            "code": "404",
+            "title": "Page Not Found",
+            "backHome": "Back to Homepage"
         }
     }
 }

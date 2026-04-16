@@ -150,7 +150,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
         if (!file) return;
 
         if (file.size > 2 * 1024 * 1024) {
-            toast.error("Image must be smaller than 2MB");
+            toast.error(t.payments.imageTooLarge);
             return;
         }
 

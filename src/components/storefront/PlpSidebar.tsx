@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useState } from 'react'
+import { useI18n } from '@/i18n'
 
 type Category = {
     id: string
@@ -28,6 +29,7 @@ export function PlpSidebar({ categories, attributes, minPrice, maxPrice, primary
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
+    const { t } = useI18n()
 
     const currentCat = searchParams.get('category')
     const currentMinPrice = searchParams.get('minPrice') || ''
@@ -94,7 +96,7 @@ export function PlpSidebar({ categories, attributes, minPrice, maxPrice, primary
                             fontSize: '15px'
                         }}
                     >
-                        All Products
+                        {t.storefront.products.allProducts}
                     </button>
                     {level1.map(c1 => {
                         const level2 = categories.filter(c => (typeof c.parent === 'object' ? c.parent?.id : c.parent) === c1.id)
@@ -160,7 +162,7 @@ export function PlpSidebar({ categories, attributes, minPrice, maxPrice, primary
 
             {/* Price Filter */}
             <div style={{ marginBottom: '32px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#333' }}>Price Range</h3>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#333' }}>{t.storefront.products.priceRange}</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                     <input
                         type="number"
@@ -188,14 +190,14 @@ export function PlpSidebar({ categories, attributes, minPrice, maxPrice, primary
                     onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
                     onMouseOut={(e) => e.currentTarget.style.background = '#f9fafb'}
                 >
-                    Apply Filter
+                    {t.storefront.products.applyFilter}
                 </button>
             </div>
 
             {/* Dynamic Attributes */}
             {attributes.length > 0 && (
                 <div>
-                    <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#333' }}>Specifications</h3>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#333' }}>{t.storefront.products.specifications}</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         {attributes.map(attr => {
                             const selectedValues = searchParams.getAll(`attr_${attr.key}`)

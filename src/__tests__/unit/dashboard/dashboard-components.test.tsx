@@ -84,6 +84,17 @@ vi.mock('@/i18n', () => ({
                     incomplete: 'Incomplete',
                     retryAi: 'Retry with AI',
                     template: 'Template',
+                    newSite: 'New Site',
+                    untitledSite: 'Untitled Site',
+                    updatedLabel: 'Updated',
+                    updatedRecently: 'recently',
+                    siteTypes: {
+                        business: 'Business',
+                        ecommerce: 'E-commerce',
+                        blog: 'Blog',
+                        portfolio: 'Portfolio',
+                        restaurant: 'Restaurant',
+                    },
                 },
                 analytics: {
                     topPages: 'Top Pages',

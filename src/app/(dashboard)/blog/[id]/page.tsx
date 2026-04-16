@@ -129,8 +129,8 @@ export default function BlogEditorPage() {
     }, [])
 
     const getAuthorName = () => {
-        if (!currentUser) return 'Loading...'
-        return currentUser.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : currentUser.email?.split('@')[0] || 'User'
+        if (!currentUser) return t.dashboard.blog.editor.authorLoading
+        return currentUser.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : currentUser.email?.split('@')[0] || t.dashboard.blog.editor.authorFallback
     }
 
     // Load existing blog post when editing
@@ -473,12 +473,12 @@ export default function BlogEditorPage() {
             })
 
             const json = await res.json()
-            if (!res.ok || !json.success) throw new Error(json.error || 'Failed to generate')
+            if (!res.ok || !json.success) throw new Error(json.error || t.dashboard.blog.editor.generateFailed)
 
             const { title, content, seoTitle, seoDescription } = json.data
 
             setGeneratedAiData({ title, content, seoTitle, seoDescription })
-            setGeneratedAiContent(content || 'No content generated.')
+            setGeneratedAiContent(content || t.dashboard.blog.editor.noContentGenerated)
 
             toast.success(t.dashboard.blog.editor.aiGenerated, { id: 'ai-blog' })
         } catch (error: unknown) {
@@ -942,9 +942,9 @@ export default function BlogEditorPage() {
                                 </div>
                                 <div className="flex flex-col xl:flex-row justify-between gap-[8px] xl:gap-[12px] w-full">
                                     {([
-                                        { key: 'Professional', emoji: '💼', label: t.dashboard.blog.editor.aiToneProfessional, desc: 'Formal & authoritative' },
-                                        { key: 'Friendly', emoji: '😊', label: t.dashboard.blog.editor.aiToneFriendly, desc: 'Casual & approachable' },
-                                        { key: 'Persuasive', emoji: '🎯', label: t.dashboard.blog.editor.aiTonePersuasive, desc: 'Compelling & action-driven' },
+                                        { key: 'Professional', emoji: '💼', label: t.dashboard.blog.editor.aiToneProfessional, desc: t.dashboard.blog.editor.aiToneProfessionalDesc },
+                                        { key: 'Friendly', emoji: '😊', label: t.dashboard.blog.editor.aiToneFriendly, desc: t.dashboard.blog.editor.aiToneFriendlyDesc },
+                                        { key: 'Persuasive', emoji: '🎯', label: t.dashboard.blog.editor.aiTonePersuasive, desc: t.dashboard.blog.editor.aiTonePersuasiveDesc },
                                     ] as const).map((tone) => (
                                         <button
                                             key={tone.key}
