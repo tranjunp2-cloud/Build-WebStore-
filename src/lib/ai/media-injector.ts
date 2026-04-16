@@ -53,6 +53,24 @@ export const BLOCK_IMAGE_SPEC: Record<string, BlockImageSpec> = {
     },
 }
 
+/**
+ * Which block types should fetch images from Unsplash during gen.
+ * Env var `UNSPLASH_BLOCKS` overrides (comma-separated list).
+ * Default: hero-only to stay within Demo rate limit (50 req/hr).
+ * Set to `all` to enable all block types (for Production 5000/hr).
+ *
+ * BLOCK_IMAGE_SPEC above is still used by cleanupNonNumericImageFields
+ * and stripOrphanMediaRefs regardless — those only clean refs, not fetch.
+ */
+function getUnsplashEnabledBlocks(): ReadonlySet<string> {
+    const env = process.env.UNSPLASH_BLOCKS?.trim()
+    if (!env) return UNSPLASH_BLOCKS_DEFAULT
+    if (env === 'all') return new Set(Object.keys(BLOCK_IMAGE_SPEC))
+    return new Set(env.split(',').map((s) => s.trim()).filter(Boolean))
+}
+const UNSPLASH_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
+
+
 export interface ImageNeed {
     blockType: string
     count: number
@@ -108,11 +126,13 @@ function hashBlockSeed(blockType: string, businessName: string): number {
  */
 export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
     const needs: ImageNeed[] = []
+    const enabledBlocks = getUnsplashEnabledBlocks()
 
     for (const block of blocks) {
         const blockType = typeof block.blockType === 'string' ? block.blockType : ''
         const spec = BLOCK_IMAGE_SPEC[blockType]
         if (!spec) continue
+        if (!enabledBlocks.has(blockType)) continue
 
         // Top-level image fields — one need per block (shared Media ID across all
         // top-level fields). Avoids burning 2 API calls for hero.image + hero.backgroundImage.
@@ -273,7 +293,7 @@ export async function stripOrphanMediaRefs(
 
     if (mediaIds.size === 0) return { stripped: 0, checked: 0 }
 
-    // 2. Query Payload to verify each media row has a usable filename or url.
+    // 2. Query Payload to verify each media row has a usable file.
     let found: Array<Record<string, unknown>> = []
     try {
         const result = await payload.find({
@@ -289,14 +309,44 @@ export async function stripOrphanMediaRefs(
         return { stripped: 0, checked: mediaIds.size }
     }
 
-    // 3. Build the "valid" set. A row is valid iff it has either filename or url.
-    //    Payload upload persist failures leave filename/url null which causes
-    //    downstream block inserts to fail.
+    // 3. Build the "valid" set.
+    //
+    // Plan 260415 F01-gen-audit hardening: the previous predicate
+    // `filename || url` was trivially satisfied because Payload populates
+    // `filename` via a hook BEFORE the S3 upload runs, and `url` is a
+    // virtual field computed from filename+endpoint regardless of whether
+    // the PUT succeeded. Every partial row looked valid → no stripping →
+    // downstream FK failures on page insert.
+    //
+    // Stricter check: require BOTH filename AND mimeType AND filesize > 0.
+    // These three are only written after the upload handler has buffered
+    // the file; if the PUT to S3 later fails the row does exist but
+    // filesize/mimeType can be null. This matches the "Failed to persist
+    // upload data" warning pattern observed in staging logs.
     const valid = new Set<number>()
+    const invalidReasons: string[] = []
     for (const doc of found) {
-        const hasFilename = typeof doc.filename === 'string' && (doc.filename as string).length > 0
-        const hasUrl = typeof doc.url === 'string' && (doc.url as string).length > 0
-        if (hasFilename || hasUrl) valid.add(doc.id as number)
+        const id = doc.id as number
+        const filename = typeof doc.filename === 'string' ? doc.filename : ''
+        const mimeType = typeof doc.mimeType === 'string' ? doc.mimeType : ''
+        const filesize = typeof doc.filesize === 'number' ? doc.filesize : 0
+        if (filename.length > 0 && mimeType.length > 0 && filesize > 0) {
+            valid.add(id)
+        } else {
+            invalidReasons.push(`#${id}(fn=${filename ? 'y' : 'n'} mt=${mimeType ? 'y' : 'n'} sz=${filesize})`)
+        }
+    }
+    // Also treat any id that wasn't returned by the find as invalid — Payload
+    // may have rolled back the row entirely if the upload handler threw hard.
+    for (const id of mediaIds) {
+        if (!valid.has(id) && !invalidReasons.some((r) => r.startsWith(`#${id}(`))) {
+            invalidReasons.push(`#${id}(missing row)`)
+        }
+    }
+    if (invalidReasons.length > 0) {
+        console.warn(
+            `[stripOrphanMediaRefs] ${invalidReasons.length} orphan media ref(s) flagged: ${invalidReasons.slice(0, 10).join(', ')}${invalidReasons.length > 10 ? '…' : ''}`,
+        )
     }
 
     if (valid.size === mediaIds.size) {
@@ -344,8 +394,6 @@ export async function fulfillImageNeeds(
 ): Promise<{ succeeded: number; failed: number }> {
     if (needs.length === 0) return { succeeded: 0, failed: 0 }
 
-    let succeeded = 0
-    let failed = 0
     const category = ctx.category ?? 'business'
 
     // Group needs by blockType so we can do a single search per block type
@@ -356,92 +404,90 @@ export async function fulfillImageNeeds(
         groupedByBlock.set(need.blockType, list)
     }
 
-    for (const [blockType, groupNeeds] of groupedByBlock.entries()) {
-        const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
-        if (totalCount === 0) continue
+    // Plan 260415 F01-gen-audit — parallelize across block types.
+    // Each block-type fetch is independent (different Unsplash query + different
+    // media upload targets). Running them concurrently cuts wall-clock from
+    // ~sum(blockType) to ~max(blockType) — typically 30-60s → 5-10s.
+    // batchFetch / batchFetchFromPool already use an internal semaphore
+    // (CONCURRENCY) so we won't spike Unsplash beyond their rate limit.
+    const start = Date.now()
+    const perBlockResults = await Promise.all(
+        Array.from(groupedByBlock.entries()).map(async ([blockType, groupNeeds]) => {
+            const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
+            if (totalCount === 0) return { blockType, succeeded: 0, failed: 0, groupNeeds, ids: [] as number[] }
 
-        // Plan 260414-2249 phase-03: pool-aware fast path.
-        // When ctx.pool is present, pick from the pre-built site pool
-        // instead of calling Unsplash search per block. This is what
-        // delivers visual cohesion — all blocks share the same source.
-        if (ctx.pool) {
-            const role = roleForBlock(blockType)
-            // Pool seed derived from blockType so different blocks pick
-            // different pool entries (no collision on the same hero photo
-            // across features + gallery).
-            const poolSeed = hashBlockSeed(blockType, ctx.businessName)
-            const picks = pickManyFromPool(ctx.pool, role, poolSeed, totalCount)
-            if (picks.length > 0) {
-                try {
-                    const result = await batchFetchFromPool(picks, blockType, ctx, payload)
-                    const ids = [...result.mediaIds]
-                    for (const need of groupNeeds) {
-                        const slice = ids.splice(0, need.count)
-                        if (slice.length > 0) {
-                            need.assign(slice)
-                            succeeded += slice.length
-                            failed += need.count - slice.length
-                        } else {
-                            failed += need.count
+            // Phase-03 pool-aware fast path: pick from pre-built site pool to
+            // preserve visual cohesion across blocks.
+            if (ctx.pool) {
+                const role = roleForBlock(blockType)
+                const poolSeed = hashBlockSeed(blockType, ctx.businessName)
+                const picks = pickManyFromPool(ctx.pool, role, poolSeed, totalCount)
+                if (picks.length > 0) {
+                    try {
+                        const result = await batchFetchFromPool(picks, blockType, ctx, payload)
+                        if (result.failures.length > 0) {
+                            console.warn(
+                                `[Media Injector] ${blockType}: ${result.failures.length} pool photo(s) failed`,
+                            )
                         }
+                        return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                    } catch (err) {
+                        const msg = err instanceof Error ? err.message : String(err)
+                        console.warn(`[Media Injector] ${blockType} pool path failed, falling back to search: ${msg}`)
                     }
-                    if (result.failures.length > 0) {
-                        console.warn(
-                            `[Media Injector] ${blockType}: ${result.failures.length} pool photo(s) failed`,
-                        )
-                    }
-                    // Pool path succeeded — skip legacy search below
-                    continue
-                } catch (err) {
-                    const msg = err instanceof Error ? err.message : String(err)
-                    console.warn(`[Media Injector] ${blockType} pool path failed, falling back to search: ${msg}`)
-                    // Fall through to legacy search path as backfill
-                }
-            } else {
-                console.warn(
-                    `[Media Injector] ${blockType} pool picks empty (role=${role}) — falling back to legacy search`,
-                )
-                // Fall through to legacy search path
-            }
-        }
-
-        // Legacy path: per-block searchPhotos (pool absent or pool picks empty)
-        const keywords = deriveKeywords(category, blockType, {
-            businessName: ctx.businessName,
-            industry: ctx.category,
-            language: ctx.language,
-            products: ctx.products,
-            mood: ctx.mood,
-        })
-
-        try {
-            const result = await getMediaForBlock(blockType, keywords, totalCount, ctx, payload)
-            const ids = [...result.mediaIds]
-            // Distribute IDs across needs in order
-            for (const need of groupNeeds) {
-                const slice = ids.splice(0, need.count)
-                if (slice.length > 0) {
-                    need.assign(slice)
-                    succeeded += slice.length
-                    failed += need.count - slice.length
                 } else {
-                    failed += need.count
+                    console.warn(
+                        `[Media Injector] ${blockType} pool picks empty (role=${role}) — falling back to legacy search`,
+                    )
                 }
             }
-            if (result.failures.length > 0) {
-                console.warn(
-                    `[Media Injector] ${blockType}: ${result.failures.length} photo(s) failed`,
-                )
+
+            // Legacy path: per-block Unsplash search (pool absent or empty).
+            const keywords = deriveKeywords(category, blockType, {
+                businessName: ctx.businessName,
+                industry: ctx.category,
+                language: ctx.language,
+                products: ctx.products,
+                mood: ctx.mood,
+            })
+
+            try {
+                const result = await getMediaForBlock(blockType, keywords, totalCount, ctx, payload)
+                if (result.failures.length > 0) {
+                    console.warn(
+                        `[Media Injector] ${blockType}: ${result.failures.length} photo(s) failed`,
+                    )
+                }
+                return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err)
+                console.warn(`[Media Injector] ${blockType} fulfillment failed: ${msg}`)
+                return { blockType, groupNeeds, ids: [] as number[], succeeded: 0, failed: totalCount }
             }
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err)
-            console.warn(`[Media Injector] ${blockType} fulfillment failed: ${msg}`)
-            failed += totalCount
+        }),
+    )
+
+    // Assign IDs to needs — must happen after the fetch phase so mutations on
+    // the shared `blocks` tree are serialized (not concurrent with themselves).
+    let succeeded = 0
+    let failed = 0
+    for (const r of perBlockResults) {
+        const ids = [...r.ids]
+        for (const need of r.groupNeeds) {
+            const slice = ids.splice(0, need.count)
+            if (slice.length > 0) {
+                need.assign(slice)
+                succeeded += slice.length
+                failed += need.count - slice.length
+            } else {
+                failed += need.count
+            }
         }
+        failed += r.failed
     }
 
     console.info(
-        `[Media Injector] fulfilled ${succeeded}/${succeeded + failed} image slots across ${groupedByBlock.size} block type(s)`,
+        `[Media Injector] fulfilled ${succeeded}/${succeeded + failed} image slots across ${groupedByBlock.size} block type(s) in ${Date.now() - start}ms`,
     )
     return { succeeded, failed }
 }
