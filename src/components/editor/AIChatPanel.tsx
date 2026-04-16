@@ -74,7 +74,12 @@ function AIChatPanelInner({
         if (typeof window !== 'undefined' && chatStorageKey) {
             const saved = sessionStorage.getItem(chatStorageKey)
             if (saved) {
-                try { return JSON.parse(saved) as ChatMessage[] } catch { /* corrupt data — ignore */ }
+                try {
+                    return JSON.parse(saved) as ChatMessage[]
+                } catch (err) {
+                    if (process.env.NODE_ENV === 'development') console.error('[AIChatPanel] invalid cache', err)
+                    sessionStorage.removeItem(chatStorageKey)
+                }
             }
         }
         return [{
