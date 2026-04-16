@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AlertCircle, X, Loader2 } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 export function CancelOrderModal({
     isOpen,
@@ -12,6 +13,8 @@ export function CancelOrderModal({
     onConfirm: (reason: string) => void
     isSubmitting: boolean
 }) {
+    const { t } = useI18n()
+    const c = t.dashboard.orders.cancel
     const [reason, setReason] = useState('')
     const [error, setError] = useState('')
 
@@ -20,7 +23,7 @@ export function CancelOrderModal({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (!reason.trim()) {
-            setError('Cancel reason is required.')
+            setError(c.reasonRequired)
             return
         }
         setError('')
@@ -38,7 +41,7 @@ export function CancelOrderModal({
                     <div className="flex items-center gap-2 text-red-500">
                         <AlertCircle className="h-5 w-5" />
                         <h2 className="text-lg font-bold">
-                            Cancel Order
+                            {c.title}
                         </h2>
                     </div>
                     <button
@@ -51,13 +54,13 @@ export function CancelOrderModal({
                 </div>
 
                 <p className="text-sm text-gray-400 mb-6">
-                    This action cannot be undone. The inventory components associated with this order will be restocked automatically.
+                    {c.warning}
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                            Reason for cancellation <span className="text-red-500">*</span>
+                            {c.reasonLabel} <span className="text-red-500">*</span>
                         </label>
                         <textarea
                             value={reason}
@@ -65,7 +68,7 @@ export function CancelOrderModal({
                                 setReason(e.target.value)
                                 if (error) setError('')
                             }}
-                            placeholder="e.g., Customer requested via phone, out of stock, false order..."
+                            placeholder={c.reasonPlaceholder}
                             className="w-full min-h-[100px] rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white placeholder:text-gray-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 transition-colors"
                             disabled={isSubmitting}
                             autoFocus
@@ -80,7 +83,7 @@ export function CancelOrderModal({
                             disabled={isSubmitting}
                             className="rounded-lg px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors disabled:opacity-50"
                         >
-                            Keep Order
+                            {c.keepOrder}
                         </button>
                         <button
                             type="submit"
@@ -88,7 +91,7 @@ export function CancelOrderModal({
                             className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20 disabled:opacity-50"
                         >
                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                            Confirm Cancellation
+                            {c.confirmCancellation}
                         </button>
                     </div>
                 </form>

@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
@@ -8,6 +7,7 @@ import { AppShell } from '@/components/AppShell'
 import { getCurrentUser } from '@/lib/auth'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
+import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
 
 interface PreviewPageProps {
     params: Promise<{ siteId: string }>
@@ -45,17 +45,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
         
         if (!userTenants.includes(siteTenantId)) {
-            return (
-                <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                    <div className="p-8 bg-white rounded-lg shadow-xl max-w-md text-center">
-                        <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-                        <p className="text-slate-600 mb-6">You do not have permission to preview this site.</p>
-                        <Link href="/dashboard" className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
-                            Back to Dashboard
-                        </Link>
-                    </div>
-                </div>
-            )
+            return <PreviewAccessDenied />
         }
 
         // 4. Fetch Page Data
@@ -91,7 +81,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             page = pagesResult.docs[0] || null
         }
 
-        if (!page) return <div>No page found for this preview.</div>
+        if (!page) return <PreviewNoPage />
 
         // 4b. For non-homepage pages without nav/footer, inherit from homepage
         const pageLayout = (page.layout as Array<{ blockType: string }>) || []
@@ -157,6 +147,6 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
 
     } catch (error) {
         console.error('[Preview] Error:', error)
-        return <div>Error loading preview. Please ensure you are logged in and have access to this site.</div>
+        return <PreviewLoadError />
     }
 }

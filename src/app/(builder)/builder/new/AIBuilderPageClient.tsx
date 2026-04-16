@@ -747,7 +747,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 />
                 <CongratsModal
                     dashboardHref="/dashboard"
-                    dashboardLabel="Go to Dashboard"
+                    dashboardLabel={t.onboarding.completion.goToDashboard}
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
                         if (!open) {

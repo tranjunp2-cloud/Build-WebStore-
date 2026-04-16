@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, X } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 export function DashboardBanner({ siteId, siteName }: { siteId: string; siteName: string }) {
+    const { t } = useI18n()
     const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
@@ -14,12 +16,12 @@ export function DashboardBanner({ siteId, siteName }: { siteId: string; siteName
             <div className="flex items-center gap-3">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
                 <p className="text-sm text-yellow-200">
-                    <strong>{siteName}</strong> is not live yet.{' '}
+                    <strong>{siteName}</strong> {t.dashboard.banner.notLive}{' '}
                     <Link
                         href={`/editor/${siteId}`}
                         className="font-medium text-yellow-400 underline underline-offset-2 hover:text-yellow-300"
                     >
-                        Publish ngay →
+                        {t.dashboard.banner.publishNow}
                     </Link>
                 </p>
             </div>

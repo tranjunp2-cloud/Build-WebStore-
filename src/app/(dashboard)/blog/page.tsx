@@ -233,7 +233,7 @@ export default function BlogListPage() {
 
     const getAuthorName = (author: BlogPost['author']) => {
         if (typeof author === 'string') return author
-        return author?.name || author?.email || 'Unknown'
+        return author?.name || author?.email || t.dashboard.blog.unknownAuthor
     }
 
     const getCategoryName = (category: BlogPost['category']) => {
@@ -281,13 +281,13 @@ export default function BlogListPage() {
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
                         <FileText className="h-8 w-8 text-red-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-white">Failed to load blog posts</h3>
+                    <h3 className="text-lg font-semibold text-white">{t.dashboard.blog.loadFailed}</h3>
                     <p className="text-sm text-gray-400">{error}</p>
                     <button
                         onClick={fetchPosts}
                         className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
                     >
-                        Try Again
+                        {t.dashboard.blog.tryAgain}
                     </button>
                 </div>
             </div>

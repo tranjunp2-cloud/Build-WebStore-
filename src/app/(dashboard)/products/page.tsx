@@ -153,10 +153,10 @@ export default function ProductsPage() {
 
             setProducts(fetchedDocs as Product[])
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Failed to load products'
+            const message = err instanceof Error ? err.message : t.dashboard.products.list.failedToLoad
             setError(message)
-            toast.error('Failed to load products', {
-                action: { label: 'Retry', onClick: () => loadProducts() },
+            toast.error(t.dashboard.products.list.failedToLoad, {
+                action: { label: t.dashboard.products.list.retry, onClick: () => loadProducts() },
             })
         } finally {
             setIsLoading(false)
