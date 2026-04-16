@@ -135,11 +135,14 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             return new NextResponse('No fields to update', { status: 400 })
         }
 
+        // Visibility/deletion changes must update the published version
+        // so live site reflects them immediately (not just draft).
+        const isVisibilityChange = updateData.deletedAt !== undefined || updateData.isVisible !== undefined
         const updatedPage = await payload.update({
             collection: 'pages',
             id: pageId,
             data: updateData,
-            draft: true,
+            draft: !isVisibilityChange,
         })
 
         // BUG-F05-11: revalidate site cache when page is deleted/hidden
