@@ -25,6 +25,7 @@ type ChatMessage = {
 }
 
 interface AIChatPanelProps {
+    siteId?: string
     blocks: BlockData[]
     selectedBlock: number | null
     onAIAction: (action: AIAction) => Promise<void> | void
@@ -48,6 +49,7 @@ function formatChatTime(date = new Date()) {
 }
 
 function AIChatPanelInner({
+    siteId,
     blocks,
     selectedBlock,
     onAIAction,
@@ -63,17 +65,37 @@ function AIChatPanelInner({
     const { t } = useI18n()
     const ac = t.editor.aiChat
 
+    // BUG-F05-13: Persist chat history per site in sessionStorage
+    const chatStorageKey = siteId ? `editor-chat-${siteId}` : null
+
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
-    const [messages, setMessages] = useState<ChatMessage[]>([
-        {
+    const [messages, setMessages] = useState<ChatMessage[]>(() => {
+        if (typeof window !== 'undefined' && chatStorageKey) {
+            const saved = sessionStorage.getItem(chatStorageKey)
+            if (saved) {
+                try {
+                    return JSON.parse(saved) as ChatMessage[]
+                } catch (err) {
+                    if (process.env.NODE_ENV === 'development') console.error('[AIChatPanel] invalid cache', err)
+                    sessionStorage.removeItem(chatStorageKey)
+                }
+            }
+        }
+        return [{
             id: 'welcome',
             role: 'assistant',
             content: ac.welcomeMessage,
             createdAt: formatChatTime(),
-        },
-    ])
+        }]
+    })
     const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    // BUG-F05-13: Save messages to sessionStorage on change
+    useEffect(() => {
+        if (typeof window === 'undefined' || !chatStorageKey) return
+        sessionStorage.setItem(chatStorageKey, JSON.stringify(messages))
+    }, [messages, chatStorageKey])
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
