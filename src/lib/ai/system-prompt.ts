@@ -375,3 +375,32 @@ export function buildUserPrompt(
 
   return parts.join('\n')
 }
+
+/**
+ * Lightweight prompt for template-first pipeline. GPT only personalizes
+ * 4 fields: hero headline, hero subheadline, SEO title, SEO description.
+ * ~200 tokens input → ~80 tokens output → 2-3s with gpt-4.1-nano.
+ */
+export function buildPersonalizePrompt(
+  info: BusinessInfoInput,
+  category: string,
+  language: 'en' | 'ms' | 'vi',
+): { system: string; user: string } {
+  const langLabel = language === 'ms' ? 'Malay (Bahasa Melayu)'
+    : language === 'vi' ? 'Vietnamese' : 'English'
+
+  return {
+    system: `You personalize website copy for a ${category} business. Return ONLY valid JSON:
+{
+  "heroHeadline": "5-8 words, benefit-focused, mention business name",
+  "heroSubheadline": "12-20 words expanding on the headline with specifics",
+  "seoTitle": "max 60 chars, includes business name",
+  "seoDescription": "max 160 chars, compelling meta description"
+}
+Write in ${langLabel}. Be specific to this business — no generic phrases like "Quality Service" or "Welcome to our website".`,
+    user: `Business: "${info.businessName}"
+Industry: ${info.industry}
+Products/services: ${info.products}
+Description: ${info.shortDescription}`,
+  }
+}
