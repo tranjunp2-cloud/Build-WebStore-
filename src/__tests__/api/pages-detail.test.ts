@@ -30,11 +30,13 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
 
     it('updates page visibility', async () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] })
-        mockFindByID.mockResolvedValueOnce({ id: '10', site: 1, slug: '/about', title: 'About' })
-        mockUpdate.mockResolvedValue({
-            id: '10', title: 'About', slug: '/about',
-            _status: 'draft', isVisible: false, seo: {}, updatedAt: '2026-04-01',
-        })
+        mockFindByID
+            .mockResolvedValueOnce({ id: '10', site: 1, slug: '/about', title: 'About' }) // initial lookup
+            .mockResolvedValueOnce({ // re-read after update
+                id: '10', title: 'About', slug: '/about',
+                _status: 'published', isVisible: false, seo: {}, updatedAt: '2026-04-01',
+            })
+        mockUpdate.mockResolvedValue({})
 
         const req = { json: () => Promise.resolve({ isVisible: false }) } as unknown as Request
         const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
@@ -46,13 +48,15 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
 
     it('updates page SEO fields', async () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] })
-        mockFindByID.mockResolvedValueOnce({ id: '10', site: 1, slug: '/about', title: 'About' })
-        mockUpdate.mockResolvedValue({
-            id: '10', title: 'About', slug: '/about',
-            _status: 'draft', isVisible: true,
-            seo: { title: 'New SEO', description: 'New desc' },
-            updatedAt: '2026-04-01',
-        })
+        mockFindByID
+            .mockResolvedValueOnce({ id: '10', site: 1, slug: '/about', title: 'About' }) // initial lookup
+            .mockResolvedValueOnce({ // re-read after update
+                id: '10', title: 'About', slug: '/about',
+                _status: 'draft', isVisible: true,
+                seo: { title: 'New SEO', description: 'New desc' },
+                updatedAt: '2026-04-01',
+            })
+        mockUpdate.mockResolvedValue({})
 
         const req = { json: () => Promise.resolve({ seoTitle: 'New SEO', seoDescription: 'New desc' }) } as unknown as Request
         const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
