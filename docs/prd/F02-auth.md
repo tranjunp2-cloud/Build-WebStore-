@@ -87,6 +87,16 @@ Hệ thống yêu cầu luồng xác thực (Auth Flow) tích hợp kết nối 
 - **BR-02 (Mandatory 2FA):** Việc bảo mật OTP qua Email là BẮT BUỘC 100% người dùng, kích hoạt NGAY LẬP TỨC khi phiên truy cập bắt đầu.
 - **BR-03 (Reset Password Routing):** Owner phải và chỉ có thể đổi mật khẩu bên hệ thống SSO. Staff phải và chỉ có thể truy cập Đổi mật khẩu Native tại `/login`.
 - **BR-04 (Staff Constraints):** Không ai được tự đăng ký luồng Staff. Phải do hệ thống phân quyền/mời người vào Payload CMS.
+- **BR-05 (SSO Account Status):** SSO quản lý trạng thái tài khoản Owner gồm 3 trạng thái:
+  - **activated** — đang hoạt động, Owner + Staff đăng nhập bình thường.
+  - **inactivated** (deactivated) — bị khóa tạm thời. Workspace status = suspended. Owner + tất cả Staff thuộc workspace đó KHÔNG đăng nhập được. Có thể mở lại từ SSO.
+  - **terminated** (deactivated) — gói bị xóa vĩnh viễn. Workspace status = terminated. Owner + Staff KHÔNG đăng nhập được. Website bị unpublish. Dữ liệu giữ 90 ngày. Phải tạo lại tài khoản SSO mới.
+- **BR-06 (Login Block khi Workspace suspended/terminated):** Khi user (Owner hoặc Staff) cố đăng nhập mà workspace đang ở trạng thái `suspended` hoặc `terminated`, hệ thống PHẢI:
+  - Block đăng nhập (không gửi OTP, không cấp session).
+  - Hiển thị thông báo rõ ràng:
+    - suspended: "Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ nhà cung cấp dịch vụ."
+    - terminated: "Tài khoản của bạn đã bị xóa. Vui lòng liên hệ nhà cung cấp dịch vụ để tạo lại."
+- **BR-07 (Staff theo workspace):** Staff bị ảnh hưởng theo trạng thái workspace, không cần khóa từng Staff riêng. Khi workspace activated lại → Staff tự động truy cập được.
 
 ---
 
@@ -96,15 +106,25 @@ Hệ thống yêu cầu luồng xác thực (Auth Flow) tích hợp kết nối 
 1. Owner Provisioning (SSO Webhook Flow):
    SSO System (Create User) → Gọi POST Payload API sang Webstore 2.0 
    → Webstore Validate đủ 6 trường unique + pack_code
-   → Tạo Account Owner & Tenant 
+   → Tạo Account Owner & Tenant (status = 'active')
    → (Optional) Gửi Welcome Email có nút "Tới Webstore"
 
-2. Đăng nhập (Login) + Mandatory 2FA:
+2. SSO Status Change (MỚI):
+   SSO gửi status change → Webstore API cập nhật:
+   - inactivated → tenants.status = 'suspended' → Owner + Staff bị block login
+   - terminated → tenants.status = 'terminated' → website unpublish + block login
+   - activated → tenants.status = 'active' → Owner + Staff đăng nhập được lại
+
+3. Đăng nhập (Login) + Mandatory 2FA:
    - Truy cập `/login`.
+   - Hệ thống check workspace status TRƯỚC:
+     - Nếu workspace suspended → hiển thị "Tài khoản đang bị tạm khóa" → DỪNG
+     - Nếu workspace terminated → hiển thị "Tài khoản đã bị xóa" → DỪNG
+     - Nếu workspace active → tiếp tục luồng đăng nhập
    - [Chạy Luồng Owner]: Bấm "Đăng nhập với SSO" → Hệ thống SSO Auth → Trả về Webstore (Callback) → Trigger Gửi OTP Email → [Màn hình Xác thực OTP] → Cấp Session Cookie (Dashboard).
    - [Chạy Luồng Staff]: Điền Email/Pass nội bộ → Trigger Gửi OTP Email → [Màn hình Xác thực OTP] → Cấp Session Cookie (CMS Admin).
 
-3. Đổi Mật Khẩu (Forgot/Reset):
+4. Đổi Mật Khẩu (Forgot/Reset):
    - Vào mục Quên mật khẩu.
    - Owner → Điều hướng External sang domain hệ thống SSO /reset-password (URL mẫu: `https://sso-dev.ech.primecommerce.asia/auth/forgot-password`).
    - Staff → Nhập email → Nhận link về email → Khôi phục tại Cổng Webstore 2.0.
@@ -174,7 +194,7 @@ Authorization: ********
 | `company_name` | `tenants.companyName` | Bắt buộc | Tên Workspace/Cửa hàng |
 | `customer_id_number`| `tenants.customerId` | Bắt buộc (Unique) | Đối soát (Reconciliation) dữ liệu Owner |
 | `service_id` | `tenants.serviceId` | Bắt buộc (Unique) | Định danh dịch vụ gói (Reject/Báo lỗi nếu nhận giá trị "NA" hoặc rỗng) |
-| `pack_code` | `tenants.packCode` | Bắt buộc | Quyết định limit các tính năng hệ thống |
+| `pack_code` | `tenants.packCode` | Bắt buộc | Phân loại gói doanh nghiệp (freemium/starter/standard/professional). Hiện tại tất cả gói giới hạn giống nhau — chưa có rate limits khác nhau. |
 | `unifi_order_id` | `tenants.orderId` | Tuỳ chọn | Lưu log tracking mã đơn hàng |
 | *(Các trường Địa chỉ)* | `tenants.address` (JSON) | Tuỳ chọn | Tham khảo cho Auto-fill Billing |
 

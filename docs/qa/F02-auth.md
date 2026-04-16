@@ -6,7 +6,7 @@
 
 ## 1. Mục Tiêu Kiểm Thử (Objective)
 
-Tài liệu cung cấp kế hoạch kiểm thử nghiệm thu toàn diện (Release Gate) đối với tính năng F02 Auth Flow. Đảm bảo cấu trúc chuẩn 42 Test Cases bao gồm UI/UX, Automation (Playwright), Server API (Payload CMS), Performance (K6) và Security. Không phát sinh rò rỉ chức năng.
+Tài liệu cung cấp kế hoạch kiểm thử nghiệm thu toàn diện (Release Gate) đối với tính năng F02 Auth Flow. Đảm bảo cấu trúc chuẩn 46 Test Cases bao gồm UI/UX, Automation (Playwright), Server API (Payload CMS), Performance (K6), Security, và SSO Status Blocking. Không phát sinh rò rỉ chức năng.
 
 Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 1. `UI/UX & RWD` — Giao diện ứng dụng và hiển thị đa thiết bị.
@@ -24,7 +24,7 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 |:---|:---|:---|:---:|
 | **1. UI/UX & Responsive Web Design** | US-F02-02 | FR-07, FR-10 | 6 |
 | **2. Đăng Ký (Register - Owner)** | US-F02-01 | FR-01 → FR-06 | 8 |
-| **3. Đăng Nhập (Login) & 2FA** | US-F02-02, 07 | FR-08, 09 | 8 |
+| **3. Đăng Nhập (Login) & 2FA & SSO Status** | US-F02-02, 07 | FR-08, 09, BR-05→07 | 12 |
 | **4. Quên / Đặt Lại Mật Khẩu** | US-F02-05, 06 | FR-14, 15 | 7 |
 | **5. Auth Guard & Role Access** | US-F02-03, 04 | FR-11, 12, 13 | 7 |
 | **6. Hiệu Năng & Non-Functional** | N/A | BR-03, BR-05 | 3 |
@@ -75,6 +75,10 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | **TC-F02.24** | `Valid` | Từ chối khi nhập OTP sai | 1. Ở màn hình nhập OTP.<br>2. Nhập mã ngẫu nhiên không đúng (vd: `000000`).<br>3. Nhấn xác nhận. | - Hệ thống từ chối, không cấp session.<br>- Hiện thông báo "Mã không hợp lệ". | High |
 | **TC-F02.25** | `Bound` | OTP hết hạn sau 5 phút | 1. Nhận mã OTP hợp lệ qua email.<br>2. Chờ hơn 5 phút không nhập.<br>3. Nhập mã vào form, nhấn xác nhận. | - Hệ thống báo mã đã hết hạn.<br>- Hiện nút yêu cầu gửi lại mã mới. | High |
 | **TC-F02.26** | `UX` | Nút Resend OTP bị khóa 60 giây (Cooldown) | 1. Ở màn hình nhập OTP, nhấn **Gửi lại mã**.<br>2. Tiếp tục nhấn nhiều lần liên tiếp.<br>3. Chờ đủ 60 giây, quan sát lại. | - Sau lần nhấn đầu, nút chuyển Disabled.<br>- Nút bị khóa đúng 60 giây.<br>- Sau 60 giây, nút trở về bình thường. | Medium |
+| **TC-F02.26b** | `Func` | Chặn đăng nhập khi workspace bị khóa tạm thời (SSO inactivated) | 1. Owner (hoặc Staff) nhập đúng email + password.<br>2. Workspace mà user thuộc về đang ở trạng thái `suspended` (SSO inactivated). | - KHÔNG gửi OTP, KHÔNG cấp session.<br>- Hiển thị thông báo: "Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ nhà cung cấp dịch vụ."<br>- KHÔNG redirect, giữ nguyên trang login. | Blocker |
+| **TC-F02.26c** | `Func` | Chặn đăng nhập khi workspace đã bị xóa (SSO terminated) | 1. Owner (hoặc Staff) nhập đúng email + password.<br>2. Workspace đang ở trạng thái `terminated`. | - KHÔNG gửi OTP, KHÔNG cấp session.<br>- Hiển thị thông báo: "Tài khoản của bạn đã bị xóa. Vui lòng liên hệ nhà cung cấp dịch vụ để tạo lại."<br>- KHÔNG redirect, giữ nguyên trang login. | Blocker |
+| **TC-F02.26d** | `Func` | Staff bị chặn khi Owner workspace bị inactivated | 1. Owner workspace bị SSO inactivated → workspace status = suspended.<br>2. Staff thuộc workspace đó cố đăng nhập. | - Staff KHÔNG đăng nhập được (workspace bị suspended, không phải từng user).<br>- Hiển thị thông báo tương tự Owner.<br>- Khi Owner activated lại → Staff tự động truy cập được lại. | Blocker |
+| **TC-F02.26e** | `API` | SSO status change cập nhật workspace status | 1. SSO gửi status change cho Owner.<br>2. Kiểm tra `tenants.status` trong DB sau khi nhận. | - inactivated → `tenants.status` = 'suspended'.<br>- terminated → `tenants.status` = 'terminated', website bị unpublish.<br>- activated → `tenants.status` = 'active', Owner + Staff đăng nhập được lại. | Blocker |
 
 ---
 
@@ -125,6 +129,9 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | 3 | Owner đăng nhập: nhập mật khẩu đúng → nhận OTP → nhập OTP. | Cấp session, redirect vào `/dashboard`. |
 | 4 | Staff đăng nhập tương tự. | Redirect vào Payload Admin CMS. |
 | 5 | Owner invite Staff → Staff nhận email, thiết lập mật khẩu, đăng nhập. | Toàn bộ luồng invite và đăng nhập thành công. |
+| 6 | SSO gửi inactivated → Owner cố đăng nhập. | Hiện "Tài khoản đang bị tạm khóa". Staff cũng bị chặn. |
+| 7 | SSO gửi activated lại → Owner + Staff đăng nhập. | Cả hai đăng nhập thành công, workspace trở lại active. |
+| 8 | SSO gửi terminated → Owner cố đăng nhập. | Hiện "Tài khoản đã bị xóa". Website bị unpublish. |
 
 ---
 
@@ -132,15 +139,17 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 
 | Hạng mục (10-Point) | Trạng thái | Coverage Traceability |
 |:---|:---:|:---|
-| **1. Happy Path** | [ ] Untested | TC-F02.07, 08, 17, 19, 21, 23, 26, 28, 30 |
+| **1. Happy Path** | [ ] Untested | TC-F02.07, 08, 17, 19, 21, 23, 26, 26e, 28, 30 |
 | **2. UI/UX** | [ ] Untested | TC-F02.01, 02, 03, 04, 24, 29 |
 | **3. Validation** | [ ] Untested | TC-F02.09, 10, 22, 24 |
 | **4. Boundary** | [ ] Untested | TC-F02.11, 25, 26 |
 | **5. Data** | [ ] Untested | TC-F02.15, 16, 18 |
 | **6. Performance** | [ ] Untested | TC-F02.40, 41 |
-| **7. Security** | [ ] Untested | TC-F02.15, 19, 22, 27, 31, 32, 36, 42 |
+| **7. Security & SSO Status** | [ ] Untested | TC-F02.15, 19, 22, 26b, 26c, 26d, 27, 31, 32, 36, 42 |
 | **8. Navigation** | [ ] Untested | TC-F02.33, 34, 35 |
 | **9. Interruption** | [ ] Untested | TC-F02.38, 39 |
 | **10. Compatibility** | [ ] Untested | TC-F02.05, 06, 06b |
 
-> **Quyết Định Ký Phát Hành:** Hệ thống đã phủ kín 10 yếu tố khắt khe nhất. Vui lòng bàn giao 42 Test Cases tích hợp chuẩn BDD/Auto này cho Developer chạy kiểm thử chéo (Cross-Testing).
+> **Quyết Định Ký Phát Hành:** Hệ thống đã phủ kín 10 yếu tố khắt khe nhất. Vui lòng bàn giao 46 Test Cases tích hợp chuẩn BDD/Auto này cho Developer chạy kiểm thử chéo (Cross-Testing).
+>
+> **Lưu ý:** TC-F02.26b→26e (SSO Status Blocking) là **Blocker** — phải PASS trước khi release. Workspace bị khóa/xóa PHẢI chặn đăng nhập cho cả Owner lẫn Staff.

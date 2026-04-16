@@ -50,11 +50,12 @@ Dashboard `/orders`: stats bar (by status), table với order list (có search, 
 ### In Scope
 - Giao diện List view: Search, Sort, Filter linh hoạt (US-F10-04)
 - 2 luồng trạng thái đơn hàng: Manual (COD, QR Banking) (US-F10-01, US-F10-02)
+- Quản lý **Order Status** (Pending, Confirmed, Ready to Ship, Shipped, Completed, Cancelled) tách biệt với **Payment Status** (Unpaid, Paid, Cancelled, Refunded).
 - Order detail trực quan với status timeline, cho phép đổi status trên list/detail (US-F10-01)
-- Các Status: Pending, Confirmed, Ready to Ship, Shipped, Completed, Cancelled, Refunded (US-F10-01)
 - Cancel order: Quy định phải có Cancel reason, auto-restock ngoại trừ product bị xoá (US-F10-03)
 - Hỗ trợ Refund thủ công khi đơn đang Shipped hoặc Completed (US-F10-01)
 - Bulk status update: Thao tác Confirm đồng loạt nhiều đơn Pending (US-F10-01)
+
 
 ### Out of Scope
 - WhatsApp Business API (P1 — Wave 7+)
@@ -94,12 +95,14 @@ SO THAT tôi quản lý fulfilment hiệu quả
 | FR-03 | Bulk Action: Chọn nhiều đơn "Pending" -> Update thành "Confirmed" | US-F10-01 | P0 | Áp dụng cho manual flow |
 | FR-04 | New order notification: in-app toast + email to merchant trong < 60s | US-F10-01 | P0 | |
 | FR-05 | Order detail: customer info, items, subtotal, SST, shipping, total, payment proof (đối với QR Banking) | US-F10-01 | P0 | Cho phép đổi status ở list/drawer |
-| FR-06 | Status workflow: Pending → Confirmed → Ready to Ship → Shipped → Completed / Cancelled / Refunded | US-F10-01 | P0 | |
+| FR-06 | Order Status workflow: Pending → Confirmed → Ready to Ship → Shipped → Completed / Cancelled | US-F10-01 | P0 | Tách biệt với Payment Status |
 | FR-07 | Status update → customer notification email auto-sent (áp dụng Confirm, Shipped, Cancelled) | US-F10-01 | P1 | |
 | FR-08 | Cancel order: Yêu cầu nhập Cancel Reason & inventory auto-restock | US-F10-03 | P0 | Bỏ qua restock nếu product bị xoá |
-| FR-09 | Refund: Chuyển order sang Refund thủ công khi ở trạng thái hợp lệ (Shipped, Completed) | US-F10-01 | P0 | |
+| FR-09 | Refund: Chuyển order sang Refund thủ công khi ở trạng thái hợp lệ (Shipped, Completed), tự cập nhật Payment Status -> Refunded | US-F10-01 | P0 | |
 | FR-10 | Customer payment flow: COD, QR Banking (Manual). Stripe tạm ẩn. | US-F10-02 | P0 | |
-| FR-11 | QR Payment Checkout: Hiển thị hình QR mã hoá, bắt buộc upload ảnh biên lai (<2MB, JPG/PNG) | US-F10-02 | P0 | Nút continue bị block nếu chưa upload |
+| FR-11 | QR Payment Checkout: Bắt buộc upload ảnh biên lai (<2MB). Trạng thái thanh toán (Payment Status) khởi tạo mặc định là `Paid`. | US-F10-02 | P0 | Lọc file JPG/PNG/PDF. |
+| FR-11.1 | Payment Status Sync: Khi đơn hàng được `Cancelled`, `Payment Status` cập nhật thành `Cancelled`. Khi đơn hàng thực hiện thao tác hoàn tiền, `Payment Status` thành `Refunded`. | US-F10-01 | P0 | Đồng bộ state. |
+| FR-11.2 | Payment Status Data: Hệ thống hỗ trợ tách bạch Order Status và các Payment Statuses: `Unpaid`, `Paid`, `Cancelled`, `Refunded`. | US-F10-01 | P0 | COD là `Unpaid`. QR là `Paid`. |
 | FR-12 | **[Mobile]** Danh sách đơn hàng trên viewport < 768px chuyển đổi từ Bảng (Table) sang dạng Thẻ Card dọc (Stacked Cards). | US-F10-05 | P1 | UX chống cuộn ngang |
 | FR-13 | **[Mobile]** Chi tiết đơn hàng mở thành dạng Fullscreen thay vì Drawer, với các nút Action (Update Status, Cancel) sticky ở mép dưới màn hình. | US-F10-05 | P1 | Thumb-friendly |
 
@@ -109,9 +112,11 @@ SO THAT tôi quản lý fulfilment hiệu quả
 
 - **BR-01:** Valid status base transitions: Pending→Confirmed→Ready to Ship→Shipped→Completed.
 - **BR-Cancel-01:** Bắt buộc nhập **Lý do huỷ** (Cancel Reason) khi thực hiện Cancel order.
-- **BR-Cancel-02:** Với đơn thanh toán kiểu Manual (COD/QR), chỉ cho phép Cancel khi ở trạng thái `Pending` hoặc `Confirmed`.
-- **BR-Refund-01:** Chỉ cho phép chuyển sang `Refunded` (thủ công) khi đơn đang ở trạng thái `Shipped` (Đang vận chuyển) hoặc `Completed` (Hoàn thành đơn hàng).
-- **BR-Restock-01:** Khi trạng thái chuyển sang `Cancelled`, hệ thống tự động cộng lại tồn kho. Bỏ qua nếu sản phẩm đã bị xoá khỏi hệ thống.
+- **BR-Cancel-02:** Với đơn thanh toán kiểu Manual (COD/QR), chỉ cho phép Cancel khi ở trạng thái `Pending` hoặc `Confirmed`. Khi được chuyển sang `Cancelled` thì `Payment Status` cũng tự động được đồng bộ về `Cancelled`.
+- **BR-Refund-01:** Chỉ cho phép thực hiện Refund (thủ công) khi đơn đang ở trạng thái `Shipped` (Đang vận chuyển) hoặc `Completed` (Hoàn thành đơn hàng). Lúc này Order Status sẽ tự fallback về Cancelled và `Payment Status` là `Refunded`.
+- **BR-Restock-01:** Khi trạng thái Order chuyển sang `Cancelled`, hệ thống tự động cộng lại tồn kho. Bỏ qua logic này nếu sản phẩm đã bị xoá khỏi database.
+- **BR-Payment-01 (QR Banking):** Mặc định khi khách đặt hàng và upload thành công biên lai (Payment Proof), hệ thống tự động mark `Payment Status` của họ là `Paid`.
+- **BR-Payment-02 (COD):** Khi khách chọn COD, Payment Status khởi tạo bằng `Unpaid`. Admin vẫn tiến hành chuyển trạng thái Order theo luồng giao vận bình thường. Khi Admin update Order Status thành `Completed`, hệ thống **tự động cập nhật** Payment Status thành `Paid`.
 - **BR-06:** Order scope theo tenant — không cross-tenant.
 - **BR-07:** Inventory reservation released nếu API payment fail sau 30 phút.
 
@@ -212,13 +217,14 @@ THEN  the system prompts me to enter a "Cancel Reason"
 ```
 
 ### AC-4: Checkout with QR Banking (Proof Upload)
-> 📌 Source: [US-F10-02](../stories/F10-orders-stories.md) — AC-4
+> 📌 Source: [US-F10-02](../stories/F10-orders-stories.md) — AC-3
 
 ```gherkin
 GIVEN I am at the checkout page
 WHEN  I select "QR Banking" as my payment method
 THEN  the system displays the Merchant's QR Code image
   AND the "Proceed/Confirm Order" button is disabled until I upload a Payment Proof Image
+  AND upon success, order `paymentStatus` is set to `Paid`
   AND if I upload an image > 2MB or invalid format, an error is shown
 ```
 
@@ -244,11 +250,18 @@ THEN  the system displays the Merchant's QR Code image
 | `OrderDetailDrawer` | `components/dashboard/OrderDetailDrawer.tsx` | Detail + status |
 | `StatusTimeline` | `components/dashboard/StatusTimeline.tsx` | Progress steps |
 
-### 13.2 API Endpoints
+### 13.2 Data Models & Structure
+Order Collection (Payload CMS) cần lưu rõ các Fields:
+- `orderStatus`: `pending` | `confirmed` | `ready_to_ship` | `shipped` | `completed` | `cancelled`
+- `paymentMethod`: `cod` | `qr_banking`
+- `paymentStatus`: `unpaid` | `paid` | `cancelled` | `refunded`
+- `paymentDetails`: Group field (hoặc JSON object) chứa `proofThumbnailUrl` và transaction info liên quan.
+
+### 13.3 API Endpoints
 
 ```
 GET /api/orders?where[site][equals]={id}  → list (tenant-scoped)
-PATCH /api/orders/:id                      → update status
+PATCH /api/orders/:id                      → update status (order_status hoặc payment_status)
 POST /api/orders/:id/cancel                → cancel + inventory restore
 ```
 

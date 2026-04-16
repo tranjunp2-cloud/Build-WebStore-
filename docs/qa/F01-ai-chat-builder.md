@@ -12,10 +12,10 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 **Phạm vi bao phủ:**
 - 10 User Stories (US-F01-01 → US-F01-10) với 26 Acceptance Criteria
 - 26 Functional Requirements (FR-01 → FR-26)
-- 9 Business Rules (BR-01 → BR-09)
+- 11 Business Rules (BR-01 → BR-11, thêm BR-10 SSO Status Block, BR-11 Terminated Auto Unpublish)
 - Responsive Design: Desktop (1920×1080) + Mobile (375px)
 
-**Tổng số kịch bản:** **130 test cases** (Positive + Negative + Edge + Mobile + Recovery + Race Condition)
+**Tổng số kịch bản:** **136 test cases** (Positive + Negative + Edge + Mobile + Recovery + Race Condition + SSO Status)
 
 ---
 
@@ -238,7 +238,8 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | TC-F01.46 | FR-15 | API | **[Negative]** Chống tấn công Rate Limit (API Flood) | **1.** Gửi 10 request/giây tới `POST /api/ai/generate-site` bằng script. | Middleware chặn trước khi request tới OpenAI. Trả mã `HTTP 429 Too Many Requests`. | Blocker | [x] |
-| TC-F01.47 | FR-15 | DB | **[Negative]** Giới hạn tạo website cho gói Free | **1.** Tài khoản Free đã tạo 1 website thành công. Nhấn tạo website lần 2. | Hiển thị modal "Nâng cấp gói để tạo thêm website". API không gửi request tới OpenAI. | Blocker | [x] |
+| TC-F01.47 | FR-15 | DB | **[Negative]** Giới hạn tạo website — tất cả gói chỉ 1 lần | **1.** Tài khoản (bất kỳ gói: freemium/starter/standard/professional) đã tạo 1 website thành công. **2.** Truy cập lại `/builder/new`. | Builder UI ẩn hoặc disable nút "Tạo Website". KHÔNG gọi AI API. User chỉ có thể chỉnh sửa site đã tạo, không thể gen lại. | Blocker | [x] |
+| TC-F01.47b | FR-15 | Logic | **[Positive]** Retry khi generate thất bại — không tính quota | **1.** User generate site nhưng gặp lỗi (timeout, API fail). **2.** User quay lại builder. | Cho phép retry (không tính vào quota). Form giữ nguyên dữ liệu đã nhập. Sau retry thành công → ẩn builder, tính 1 lần. | Blocker | [ ] |
 | TC-F01.48 | BR-01 | Sec | **[Negative]** Cách ly dữ liệu theo Tenant (Tenant Isolation) | **1.** Dùng JWT của User A gửi GET request lấy dữ liệu website của User B bằng ID trực tiếp. | Server trả `HTTP 403 Forbidden`. Không trả dữ liệu của user khác. | Blocker | [x] |
 | TC-F01.49 | BR-06 | Data | **[Negative]** Chặn nội dung phản cảm (NSFW Content Filter) | **1.** Nhập prompt chứa nội dung bạo lực, khiêu dâm, hoặc lừa đảo. | API từ chối xử lý, trả HTTP 400. Không gọi tới OpenAI. Hiển thị thông báo lỗi vi phạm chính sách. | Blocker | [x] |
 | TC-F01.50 | BR-09 | Cron | **[Positive]** Tự động xóa bản nháp quá 30 ngày | **1.** Tạo document Draft trong MongoDB với `createdAt` > 30 ngày. Kích hoạt Cron Job. | Payload CMS xóa bản nháp cũ (hard delete). Giải phóng dung lượng DB. | High | [x] |
@@ -247,6 +248,10 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.65 | BR-02 | DB | **[Negative]** Chỉ Soft Delete — Không Hard Delete website | **1.** Gọi API xóa website.<br>**2.** Kiểm tra database. | Website chỉ được đánh dấu `deletedAt` (soft delete). Record vẫn tồn tại trong DB. Không hard delete. | High | [ ] |
 | TC-F01.66 | BR-04 | UI | **[Positive]** Nhãn "AI Generated ✨" hiện trong Editor, ẩn trên Storefront | **1.** Mở website trong Editor → kiểm tra ảnh/nội dung AI tạo.<br>**2.** Mở website live (storefront) cùng vị trí. | Trong Editor: hiển thị nhãn "AI Generated ✨" trên các ảnh/nội dung do AI tạo. Trên Storefront: nhãn không hiển thị cho khách truy cập. | Medium | [ ] |
 | TC-F01.67 | BR-07 | Logic | **[Negative]** Không trừ quota khi tạo website thất bại | **1.** Tạo website, để API OpenAI timeout (simulate server error).<br>**2.** Kiểm tra quota còn lại. | Quota không bị trừ khi lỗi server. Sau khi Retry thành công, quota mới bị trừ. | High | [ ] |
+| TC-F01.67b | BR-10 | Sec | **[Negative]** Chặn generate khi workspace bị suspended (SSO inactivated) | **1.** Workspace đang ở trạng thái `suspended` (SSO inactivated).<br>**2.** User truy cập `/builder/new`. | KHÔNG hiển thị form tạo website. Hiện thông báo toàn trang: "Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ nhà cung cấp dịch vụ." Nút "Liên hệ hỗ trợ" hoặc redirect về `/login`. | Blocker | [ ] |
+| TC-F01.67c | BR-10 | Sec | **[Negative]** Chặn generate khi workspace bị terminated (SSO terminated) | **1.** Workspace đang ở trạng thái `terminated`.<br>**2.** User truy cập `/builder/new`. | KHÔNG hiển thị form tạo website. Hiện thông báo: "Tài khoản của bạn đã bị xóa. Vui lòng liên hệ nhà cung cấp dịch vụ." | Blocker | [ ] |
+| TC-F01.67d | BR-10 | API | **[Negative]** API generate trả 403 khi workspace suspended/terminated | **1.** Gọi trực tiếp API POST /api/ai/generate-site với JWT hợp lệ nhưng workspace suspended. | API trả 403 với message tương ứng. KHÔNG gọi AI API, KHÔNG tốn chi phí. | Blocker | [ ] |
+| TC-F01.67e | BR-11 | Logic | **[Negative]** Auto unpublish website khi workspace terminated | **1.** Workspace có website đang live (`{slug}.primeweb.app`).<br>**2.** Workspace chuyển sang trạng thái `terminated`. | Hệ thống tự động unpublish tất cả website của workspace đó. URL `{slug}.primeweb.app` trả về 404. | Blocker | [ ] |
 | TC-F01.95 | PRD §17 | Sec | **[Security]** Truy cập /builder/new không xác thực (Unauthenticated) | **1.** Mở trình duyệt ẩn danh (không đăng nhập).<br>**2.** Truy cập trực tiếp `/builder/new`. | Server trả HTTP 401. Chuyển hướng tự động về `/login`. Không hiển thị form nhập liệu. | Blocker | [x] |
 | TC-F01.96 | AC-2 (07) | Sec | **[Security]** JWT hết hạn khi redirect vào CMS Admin | **1.** Nhấn "Go to Admin Dashboard".<br>**2.** Simulate JWT token đã expired. | Hệ thống yêu cầu đăng nhập lại. Redirect về `/login` với return URL về `/admin`. Không hiển thị trang trắng hoặc lỗi 500. | High | [ ] |
 | TC-F01.97 | FR-15 | Concu | **[Race]** Mở 2 Tab cùng /builder/new đồng thời | **1.** Mở Tab A và Tab B cùng truy cập `/builder/new`.<br>**2.** Điền form và nhấn Generate ở cả 2 Tab. | Chỉ 1 request được xử lý. Tab thứ 2 nhận thông báo conflict hoặc tải lại draft từ Tab 1. Không tạo 2 site trùng lặp. | Blocker | [ ] |
