@@ -338,3 +338,55 @@ export function enforceMinItems(
 
     return blocks
 }
+
+/**
+ * Pad grid-based blocks to the nearest multiple of their column count.
+ * Prevents orphan items (e.g., 4 items on 3-col grid → pad to 6).
+ * Mutates blocks in place.
+ *
+ * Strategy: pad UP to next multiple (not trim down) — more content is
+ * always better than less. Uses padItems to fill from content library.
+ */
+const GRID_COLS: Record<string, Record<string, number>> = {
+    testimonials: { cards: 3, masonry: 3 },
+    features: { 'grid-2': 2, 'grid-3': 3, 'grid-4': 4 },
+    gallery: { grid: 3 },
+    'social-proof': { cards: 3, grid: 3 },
+    team: { grid: 3 },
+}
+
+export function enforceGridAlignment(
+    blocks: Block[],
+    category: string,
+    ctx: InjectionContext = {},
+): Block[] {
+    for (const block of blocks) {
+        const blockType = typeof block.blockType === 'string' ? block.blockType : ''
+        const variant = typeof block.variant === 'string' ? block.variant : ''
+        if (!blockType || !variant) continue
+
+        const colMap = GRID_COLS[blockType]
+        if (!colMap) continue
+        const cols = colMap[variant]
+        if (!cols) continue
+
+        const itemField = ITEM_FIELD_BY_BLOCK[blockType]
+        if (!itemField) continue
+
+        const items = block[itemField]
+        if (!Array.isArray(items) || items.length === 0) continue
+        if (items.length % cols === 0) continue
+
+        // Pad UP to next multiple
+        const target = Math.ceil(items.length / cols) * cols
+        if (target > items.length) {
+            const padded = padItems(blockType, items, target, category, ctx)
+            block[itemField] = padded
+            console.info(
+                `[Grid Alignment] padded ${blockType}.${itemField}: ${items.length} → ${padded.length} (${cols}-col)`,
+            )
+        }
+    }
+
+    return blocks
+}
