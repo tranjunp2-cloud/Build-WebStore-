@@ -26,6 +26,11 @@ vi.mock('payload', () => {
     }
 })
 
+// Mock rate limiter (added by PR #589)
+vi.mock('@/lib/rateLimit', () => ({
+    checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 9, resetAt: Date.now() + 60000 }),
+}))
+
 describe('POST /api/auth/check-reset-flow', () => {
     let mockPayload: any
 
@@ -42,6 +47,7 @@ describe('POST /api/auth/check-reset-flow', () => {
     const createMockRequest = (body: any) => {
         return {
             json: vi.fn().mockResolvedValue(body),
+            headers: new Headers({ 'x-forwarded-for': '127.0.0.1' }),
         } as unknown as NextRequest
     }
 
