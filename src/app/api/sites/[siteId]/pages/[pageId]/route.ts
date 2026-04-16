@@ -167,11 +167,13 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             })
         }
 
-        // Re-read the page to return latest state
+        // Re-read page — use draft:true only when content fields were updated,
+        // otherwise read published version to reflect visibility changes accurately
+        const hasContentChanges = Object.keys(contentFields).length > 0
         const updatedPage = await payload.findByID({
             collection: 'pages',
             id: pageId,
-            draft: true,
+            draft: hasContentChanges,
         })
 
         // BUG-F05-11: revalidate site cache when page is deleted/hidden
