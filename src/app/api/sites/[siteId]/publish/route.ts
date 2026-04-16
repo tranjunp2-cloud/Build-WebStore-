@@ -78,6 +78,34 @@ export async function PATCH(
             },
         })
 
+        // BUG-F05-03: Also publish all draft pages belonging to this site
+        // New pages are created with _status:'draft' but never promoted.
+        // Payload auto-filters draft docs from queries without draft:true,
+        // so draft pages are invisible on the published storefront.
+        try {
+            const draftPages = await payload.find({
+                collection: 'pages',
+                where: {
+                    and: [
+                        { site: { equals: Number(siteId) } },
+                        { _status: { equals: 'draft' } },
+                    ],
+                },
+                limit: 100,
+                draft: true,
+            })
+            for (const page of draftPages.docs) {
+                if ((page as Record<string, unknown>).deletedAt) continue
+                await payload.update({
+                    collection: 'pages',
+                    id: page.id,
+                    data: { _status: 'published' },
+                })
+            }
+        } catch (err) {
+            console.warn('[Publish] Failed to publish draft pages:', err instanceof Error ? err.message : err)
+        }
+
         // Get tenant slug for the domain URL
         let tenantSlug = 'site'
         const fullSite = await payload.findByID({
