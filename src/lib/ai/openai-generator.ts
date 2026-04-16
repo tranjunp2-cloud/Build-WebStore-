@@ -122,12 +122,12 @@ export async function generateSiteWithAI(
                     { role: 'user', content: userPromptText },
                 ],
                 temperature: 0.7,
-                // Plan 260415 F01-gen-audit — down from 8000. Staging eval
-                // (eval-2026-04-14) showed p95 completion output ~5200
-                // tokens; 6000 gives headroom without burning wall-clock
-                // budget on GPT writing past the cap. Saves ~15s per gen
-                // worst-case and forces tighter block copy.
-                max_tokens: 6000,
+                // Plan 260416: 6000 was too tight — 5-page sites need
+                // ~6500-7500 tokens, so JSON was truncated on every gen
+                // causing 100% fallback to legacy composer. 10000 gives
+                // safe headroom. Cost unchanged (GPT charges actual output,
+                // not the cap — typical output stays ~5200-7000 tokens).
+                max_tokens: 10000,
                 response_format: { type: 'json_object' },
             })
         } catch (err) {

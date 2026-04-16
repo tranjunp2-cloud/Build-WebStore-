@@ -42,6 +42,9 @@ interface PageWithSEO {
 }
 
 interface BlogWithSEO {
+    id: string | number
+    title?: string
+    excerpt?: string
     seo?: { metaTitle?: string, metaDescription?: string }
 }
 
@@ -311,6 +314,21 @@ export async function OverviewView({ searchParams }: Props) {
                 const b = blog as BlogWithSEO
                 if (!b.seo?.metaTitle) invalidBlogTitleCount++
                 if (!b.seo?.metaDescription) missingDescCount++
+
+                const missing: string[] = []
+                if (!b.seo?.metaTitle) missing.push('title')
+                if (!b.seo?.metaDescription) missing.push('description')
+                if (missing.length > 0) {
+                    missingSeoItems.push({
+                        collection: 'blogs',
+                        id: b.id,
+                        title: b.title || 'Untitled Blog',
+                        context: (b.excerpt || '').slice(0, 150),
+                        missingFields: missing,
+                        currentTitle: b.seo?.metaTitle || undefined,
+                        currentDescription: b.seo?.metaDescription || undefined,
+                    })
+                }
             })
             
             seoIssueCounts.missingTitle = missingTitleCount

@@ -9,7 +9,7 @@ import type { TrackedKeyword } from './SEOKeywordTracker'
 export const dynamic = 'force-dynamic'
 
 export interface MissingSeoItem {
-    collection: 'pages' | 'products'
+    collection: 'pages' | 'products' | 'blogs'
     id: string | number
     title: string
     context?: string
@@ -34,6 +34,9 @@ interface PageWithSEO {
 }
 
 interface BlogWithSEO {
+    id: string | number
+    title?: string
+    excerpt?: string
     seo?: { metaTitle?: string, metaDescription?: string }
 }
 
@@ -139,6 +142,21 @@ export async function SEOView() {
                     const b = blog as BlogWithSEO
                     if (!b.seo?.metaTitle) invalidBlogTitleCount++
                     if (!b.seo?.metaDescription) missingDescCount++
+
+                    const missing: string[] = []
+                    if (!b.seo?.metaTitle) missing.push('title')
+                    if (!b.seo?.metaDescription) missing.push('description')
+                    if (missing.length > 0) {
+                        missingSeoItems.push({
+                            collection: 'blogs',
+                            id: b.id,
+                            title: b.title || 'Untitled Blog',
+                            context: (b.excerpt || '').slice(0, 150),
+                            missingFields: missing,
+                            currentTitle: b.seo?.metaTitle || undefined,
+                            currentDescription: b.seo?.metaDescription || undefined,
+                        })
+                    }
                 })
 
                 const metaTitleDeduction = Math.min(20, missingTitleCount * 5) + Math.min(20, invalidPageTitleCount * 5) + Math.min(10, invalidBlogTitleCount * 5)

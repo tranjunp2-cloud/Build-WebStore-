@@ -152,6 +152,11 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const [publishedSiteUrl, setPublishedSiteUrl] = useState<string | null>(null)
     const [draftSaveState, setDraftSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle')
     const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+    // BUG-F01-26: Track whether user has made manual edits (reorder, etc.)
+    // after generation. Pages are already saved correctly by the gen route;
+    // auto-save should only fire when user actually changes something,
+    // otherwise it overwrites the properly-split page layouts with raw blocks.
+    const hasUserEditsRef = useRef(false)
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
     const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -240,8 +245,19 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         )
     }, [blocks.length, businessInfo, messages.length, siteId, status])
 
+    // BUG-F01-26: Only auto-save when user has made manual edits.
+    // The gen route already creates pages with correct layouts, nav blocks,
+    // Unsplash images, and per-page structure. Auto-saving the raw SSE blocks
+    // (flat array, no images, no nav) would overwrite the homepage layout and
+    // cause the preview to show different content than what was generated.
     useEffect(() => {
         if (!siteId || status !== 'done' || blocks.length === 0 || !theme) return
+        if (!hasUserEditsRef.current) {
+            // Pages already persisted by gen route — mark as saved without hitting API
+            setDraftSaveState('saved')
+            setLastSavedAt(Date.now())
+            return
+        }
 
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
 
@@ -273,7 +289,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [blocks, siteId, status, theme])
 
     useEffect(() => {
-        if (status === 'done' && blocks.length > 0 && theme) {
+        if (status === 'done' && blocks.length > 0 && theme && hasUserEditsRef.current) {
             setDraftSaveState((current) => (current === 'saving' ? current : 'dirty'))
         }
     }, [blocks, status, theme])
@@ -345,6 +361,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const prepareGenerationSession = useCallback((info: BusinessInfo) => {
         reset()
+        hasUserEditsRef.current = false
         setGenerationTimeMs(0)
         setBusinessInfo(info)
         setStatus('streaming')
@@ -375,7 +392,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 setGenerationTimeMs(data.timeMs || 0)
                 setSiteId(data.siteId)
                 setSiteName(data.siteName)
-                setDraftSaveState('dirty')
+                // BUG-F01-26: Don't mark dirty — gen route already saved pages correctly.
+                // Setting 'dirty' here triggers auto-save which overwrites processed
+                // homepage layout (with nav, images, page split) with raw SSE blocks.
+                hasUserEditsRef.current = false
                 void trackBuilderEvent(data.siteId, 'builder_generation_completed', {
                     totalBlocks: data.totalBlocks,
                     totalPages: data.totalPages || 1,
@@ -556,8 +576,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const handleDashboard = useCallback(async () => {
         setIsNavigating(true)
-        // Save draft in background — don't block navigation
-        void saveDraftNow()
+        // BUG-F01-26: Only save if user made manual edits
+        if (hasUserEditsRef.current) {
+            void saveDraftNow()
+        }
         // Navigate FIRST, then clear state (prevents flash of empty form)
         router.push('/dashboard')
         // Delay reset so navigation starts before component re-renders
@@ -569,8 +591,12 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const handleOpenEditor = useCallback(async () => {
         if (!siteId) return
-        const saved = await saveDraftNow()
-        if (!saved) return
+        // BUG-F01-26: Only save if user made manual edits. Gen route already
+        // saved pages correctly — saving raw SSE blocks would overwrite them.
+        if (hasUserEditsRef.current) {
+            const saved = await saveDraftNow()
+            if (!saved) return
+        }
         reset()
         clearBuilderSessionStorage()
         router.push(`/editor/${siteId}`)
@@ -609,6 +635,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [isPublishing, saveDraftNow, siteId])
 
     const handleMoveBlock = useCallback((blockId: string, direction: 'up' | 'down') => {
+        hasUserEditsRef.current = true
         const movableIndices = blocks.reduce<number[]>((acc, block, index) => {
             if (block._id && block.blockType !== 'navigation' && block.blockType !== 'footer') {
                 acc.push(index)
@@ -637,7 +664,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const previewContent = blocks.length > 0 && theme ? (
         <div className="h-full overflow-y-auto bg-[#06090F]">
-            <LivePreview blocks={blocks} onReorder={setBlocks} theme={theme} siteType={businessInfo?.industry} />
+            <LivePreview blocks={blocks} onReorder={(newOrder) => { hasUserEditsRef.current = true; setBlocks(newOrder) }} theme={theme} siteType={businessInfo?.industry} />
         </div>
     ) : (
         <div className="flex h-full items-center justify-center bg-[#06090F]">

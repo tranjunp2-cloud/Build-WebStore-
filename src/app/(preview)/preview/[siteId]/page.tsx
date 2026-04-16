@@ -96,21 +96,24 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
 
         if (!page) return <PreviewNoPage />
 
-        // 4b. For non-homepage pages without nav/footer, inherit from homepage
+        // 4b. Ensure nav/footer on EVERY page (including homepage).
+        // BUG-F01-26: Previously only non-homepage pages got injection,
+        // so homepage with missing nav (from auto-save overwrite or AI omit)
+        // would render without menu. Now all pages get the fallback.
         const pageLayout = (page.layout as Array<{ blockType: string }>) || []
         const hasNav = pageLayout.some((b: { blockType: string }) => b.blockType === 'navigation')
         const hasFooter = pageLayout.some((b: { blockType: string }) => b.blockType === 'footer')
 
-        if (!page.isHomepage && (!hasNav || !hasFooter)) {
+        if (!hasNav || !hasFooter) {
             // Check site-level headerBlock/footerBlock first
             const siteHeaderBlock = site.headerBlock as Record<string, unknown> | null
             const siteFooterBlock = site.footerBlock as Record<string, unknown> | null
 
-            let navBlock = siteHeaderBlock ? { ...siteHeaderBlock, blockType: siteHeaderBlock.blockType || 'navigation' } : null
-            let footerBlock = siteFooterBlock ? { ...siteFooterBlock, blockType: siteFooterBlock.blockType || 'footer' } : null
+            let navBlock: Record<string, unknown> | null = siteHeaderBlock ? { ...siteHeaderBlock, blockType: siteHeaderBlock.blockType || 'navigation' } : null
+            let footerBlock: Record<string, unknown> | null = siteFooterBlock ? { ...siteFooterBlock, blockType: siteFooterBlock.blockType || 'footer' } : null
 
-            // Fallback: extract from homepage layout if site-level blocks are not set
-            if (!navBlock || !footerBlock) {
+            // Fallback: extract from homepage layout if current page is not homepage
+            if ((!navBlock || !footerBlock) && !page.isHomepage) {
                 const homepageResult = await payload.find({
                     collection: 'pages',
                     where: { site: { equals: siteId }, isHomepage: { equals: true } },
@@ -124,6 +127,32 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     if (!navBlock) navBlock = homeLayout.find(b => b.blockType === 'navigation') || null
                     if (!footerBlock) footerBlock = homeLayout.find(b => b.blockType === 'footer') || null
                 }
+            }
+
+            // Last resort: build minimal default nav/footer
+            if (!navBlock && !hasNav) {
+                const siteName = (site.name as string) || 'My Website'
+                navBlock = {
+                    blockType: 'navigation',
+                    variant: 'minimal',
+                    logoText: siteName,
+                    links: [
+                        { label: 'Home', url: '/' },
+                        { label: 'About', url: '/about' },
+                        { label: 'Products', url: '/products' },
+                        { label: 'Contact', url: '/contact' },
+                    ],
+                } as Record<string, unknown>
+            }
+            if (!footerBlock && !hasFooter) {
+                const siteName = (site.name as string) || 'My Website'
+                footerBlock = {
+                    blockType: 'footer',
+                    variant: 'simple',
+                    logoText: siteName,
+                    description: `© ${new Date().getFullYear()} ${siteName}. All rights reserved.`,
+                    columns: [],
+                } as Record<string, unknown>
             }
 
             const injectedLayout = [
