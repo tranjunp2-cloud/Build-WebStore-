@@ -22,8 +22,10 @@ const SSO_FORGOT_PASSWORD_URL =
  */
 export async function POST(req: NextRequest) {
     try {
-        // BUG-F01-05: Rate limit by IP — 10/min (prevent enum/spray)
-        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anonymous'
+        // BUG-F01-05: Multi-source IP resolution to avoid shared anonymous bucket
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || req.headers.get('x-real-ip')?.trim()
+            || 'anonymous'
         const rateLimit = await checkRateLimit(`check-reset:${ip}`, 10, 60_000)
         if (!rateLimit.allowed) {
             return NextResponse.json({ flow: 'internal' }, {

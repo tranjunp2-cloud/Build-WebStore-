@@ -26,6 +26,20 @@ export async function PATCH(
             )
         }
 
+        // BUG-F01-05: Rate limit publish — 5/min burst + 30/hr sustained
+        const rateLimit = await checkTwoTierRateLimit(`publish:${user.id}`, 5, 30)
+        if (!rateLimit.allowed) {
+            const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' },
+                    retryAfter,
+                },
+                { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+            )
+        }
+
         const payload = await getPayload({ config })
         const { siteId } = await params
 
@@ -151,13 +165,14 @@ export async function DELETE(
         // BUG-F01-05: Rate limit unpublish — 5/min burst + 30/hr sustained
         const rateLimit = await checkTwoTierRateLimit(`unpublish:${user.id}`, 5, 30)
         if (!rateLimit.allowed) {
+            const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
             return NextResponse.json(
                 {
                     success: false,
                     error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' },
-                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                    retryAfter,
                 },
-                { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } }
+                { status: 429, headers: { 'Retry-After': String(retryAfter) } }
             )
         }
 

@@ -50,12 +50,13 @@ export async function PATCH(
         // BUG-F01-05: Rate limit save — 60/min per user (allows autosave at 1/sec)
         const rateLimit = await checkRateLimit(`save:${user.id}`, 60, 60_000)
         if (!rateLimit.allowed) {
+            const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
             return NextResponse.json(
                 {
                     error: 'Too many save requests. Try again later.',
-                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                    retryAfter,
                 },
-                { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } }
+                { status: 429, headers: { 'Retry-After': String(retryAfter) } }
             )
         }
 

@@ -73,13 +73,14 @@ export async function POST() {
         // BUG-F01-05: Rate limit reset — 3/hr per user (destructive op)
         const rateLimit = await checkRateLimit(`account-reset:${user.id}`, 3, 3_600_000)
         if (!rateLimit.allowed) {
+            const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
             return NextResponse.json(
                 {
                     success: false,
                     error: { code: 'RATE_LIMITED', message: 'Too many reset attempts. Try again later.' },
-                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                    retryAfter,
                 },
-                { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } },
+                { status: 429, headers: { 'Retry-After': String(retryAfter) } },
             )
         }
 

@@ -98,6 +98,37 @@ describe('enforcePageVariety', () => {
         expect(result[1].layout[1]).toEqual({ blockType: 'unknown-block', variant: 'foo' })
     })
 
+    it('TC-F01.VAR.07 — 3+ identical pages get different variant swaps', () => {
+        const layout = [
+            { blockType: 'navigation', variant: 'minimal' },
+            { blockType: 'hero', variant: 'centered' },
+            { blockType: 'features', variant: 'grid-3' },
+            { blockType: 'about', variant: 'split-image' },
+            { blockType: 'footer', variant: 'simple' },
+        ]
+        const pages = [
+            makePage('/', [...layout]),
+            makePage('/about', [...layout]),
+            makePage('/products', [...layout]),
+            makePage('/contact', [...layout]),
+        ]
+        const result = enforcePageVariety(pages)
+
+        // Collect all hero variants across all 4 pages
+        const heroVariants = result.map(p => (p.layout[1] as { variant: string }).variant)
+        const uniqueVariants = new Set(heroVariants)
+        // Must have at least 2 different hero variants (not all identical)
+        expect(uniqueVariants.size).toBeGreaterThanOrEqual(2)
+        // Page 2 (index 1) must differ from homepage — it has 100% overlap with page 0
+        expect(heroVariants[1]).not.toBe('centered')
+        // Page 2 and page 3 should not share the same swapped variant
+        // (pageIndex rotation: i=1 picks filtered[1%4]=filtered[1], i=2 picks filtered[2%4]=filtered[2])
+        if (heroVariants[2] !== 'centered') {
+            // If page 3 was also swapped, it should differ from page 2
+            expect(heroVariants[2]).not.toBe(heroVariants[1])
+        }
+    })
+
     it('TC-F01.VAR.06 — uses configurable threshold (>1.0 disables swap)', () => {
         const layout = [
             { blockType: 'navigation', variant: 'minimal' },
