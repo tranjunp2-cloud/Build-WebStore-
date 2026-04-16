@@ -122,7 +122,12 @@ export async function generateSiteWithAI(
                     { role: 'user', content: userPromptText },
                 ],
                 temperature: 0.7,
-                max_tokens: 8000,
+                // Plan 260415 F01-gen-audit — down from 8000. Staging eval
+                // (eval-2026-04-14) showed p95 completion output ~5200
+                // tokens; 6000 gives headroom without burning wall-clock
+                // budget on GPT writing past the cap. Saves ~15s per gen
+                // worst-case and forces tighter block copy.
+                max_tokens: 6000,
                 response_format: { type: 'json_object' },
             })
         } catch (err) {
@@ -135,6 +140,24 @@ export async function generateSiteWithAI(
                 success: false,
                 errorCode: err instanceof Error ? err.name : 'unknown',
             })
+            // Plan 260415 F01-gen-audit — surface OpenAI API error body so the
+            // outer route log captures the failure reason instead of a generic
+            // "fallback" message. Staging has been masking "400 could not parse
+            // the JSON body" failures inside the outer catch for weeks without
+            // a clear attribution.
+            if (err && typeof err === 'object') {
+                const apiErr = err as { status?: number; message?: string; error?: unknown }
+                console.error(
+                    `[AI] OpenAI call FAILED status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} msg=${String(apiErr.message).slice(0, 300)}`,
+                )
+                if (apiErr.error) {
+                    try {
+                        console.error(`[AI] OpenAI error body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
+                    } catch {
+                        // ignore serialization failures
+                    }
+                }
+            }
             throw err
         }
 

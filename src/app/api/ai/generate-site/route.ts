@@ -280,8 +280,23 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Plan 260415 F01-gen-audit — track wall-clock for each pipeline stage
+        // so the end-of-gen log shows where time is actually going. Before this,
+        // we only had total `timeMs` and couldn't tell if a 3-minute gen was
+        // OpenAI-bound (normal, ~60-100s) or media-bound (problem, 30-60s that
+        // should be parallelized) or DB-bound (FK-retry thrashing).
+        const phaseTimings: Record<string, number> = {}
+        const trackPhase = <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+            const t = Date.now()
+            return fn().finally(() => {
+                phaseTimings[name] = (phaseTimings[name] ?? 0) + (Date.now() - t)
+            })
+        }
+
         // Generate with AI (or fallback)
-        const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt)
+        const { result, events } = await trackPhase('ai', () =>
+            generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt),
+        )
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null
@@ -385,18 +400,20 @@ export async function POST(req: NextRequest) {
                         `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
                     )
 
-                    await fulfillImageNeeds(
-                        needs,
-                        {
-                            businessName: businessInfo.businessName,
-                            tenantId: String(resolvedTenantId),
-                            category: businessInfo.industry,
-                            language: resolvedLang,
-                            products: parsedProducts.length > 0 ? parsedProducts : undefined,
-                            mood: themeMood,
-                            pool: imagePool,
-                        },
-                        payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
+                    await trackPhase('media', () =>
+                        fulfillImageNeeds(
+                            needs,
+                            {
+                                businessName: businessInfo.businessName,
+                                tenantId: String(resolvedTenantId),
+                                category: businessInfo.industry,
+                                language: resolvedLang,
+                                products: parsedProducts.length > 0 ? parsedProducts : undefined,
+                                mood: themeMood,
+                                pool: imagePool,
+                            },
+                            payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
+                        ),
                     )
                 }
                 // Strip any slot still holding a URL/object (Unsplash failed or missing) —
@@ -582,6 +599,7 @@ export async function POST(req: NextRequest) {
         const createdPages: Record<string, unknown>[] = []
         const pageFailures: Array<{ slug: string; title: string; error: string }> = []
 
+        const dbPhaseStart = Date.now()
         for (const pageDefinition of pageDefinitions) {
             // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
             // Plan 260415 — also run sanitizeBlocksForPayload on EVERY page's
@@ -731,6 +749,8 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
+        phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
+
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
 
         // FR-15: Increment AI generation count
@@ -750,6 +770,17 @@ export async function POST(req: NextRequest) {
         })
 
         const timeMs = Date.now() - startTime
+
+        // Plan 260415 F01-gen-audit — single summary line per gen so ops can
+        // scan Vercel logs for phase breakdown without correlating manually.
+        // Use compact key=value so grep/jq can pull it out easily.
+        const phaseOther = Math.max(
+            0,
+            timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
+        )
+        console.info(
+            `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length}`,
+        )
 
         // ── SSE Streaming Response ──
         if (isStreaming) {
