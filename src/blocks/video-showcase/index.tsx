@@ -4,9 +4,13 @@ import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { VideoShowcaseConfig, VideoItem } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+
+void _CSS_VARS
 
 function PlayIcon({ size = 48 }: { size?: number }) {
     return (
@@ -215,11 +219,17 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
     )
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-50 leading-relaxed">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {variant === 'grid' && renderGrid()}

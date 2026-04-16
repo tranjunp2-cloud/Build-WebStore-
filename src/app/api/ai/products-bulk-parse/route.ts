@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { selectModel } from '@/lib/ai/config'
+import { logAiUsage } from '@/lib/ai/log-usage'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -95,15 +97,42 @@ Rules:
 - Output ONLY valid JSON matching this exact schema, no other text
 `
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: promptText },
-            ],
-            temperature: 0.2,
-            max_tokens: 3000,
-            response_format: { type: 'json_object' },
+        const callStart = Date.now()
+        const modelName = selectModel('bulk-parse')
+        let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
+        try {
+            completion = await openai.chat.completions.create({
+                model: modelName,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: promptText },
+                ],
+                temperature: 0.2,
+                max_tokens: 3000,
+                response_format: { type: 'json_object' },
+            })
+        } catch (err) {
+            logAiUsage({
+                endpoint: 'bulk-parse',
+                model: modelName,
+                tokensIn: 0,
+                tokensOut: 0,
+                durationMs: Date.now() - callStart,
+                success: false,
+                userId: user?.id ?? null,
+                errorCode: err instanceof Error ? err.name : 'unknown',
+            })
+            throw err
+        }
+
+        logAiUsage({
+            endpoint: 'bulk-parse',
+            model: completion.model,
+            tokensIn: completion.usage?.prompt_tokens ?? 0,
+            tokensOut: completion.usage?.completion_tokens ?? 0,
+            durationMs: Date.now() - callStart,
+            success: true,
+            userId: user?.id ?? null,
         })
 
         const content = completion.choices[0]?.message?.content

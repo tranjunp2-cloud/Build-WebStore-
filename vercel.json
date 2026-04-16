@@ -13,6 +13,9 @@
       "maxDuration": 60
     }
   },
+  "git": {
+    "deploymentEnabled": false
+  },
   "crons": [
     {
       "path": "/api/cron/keep-alive",

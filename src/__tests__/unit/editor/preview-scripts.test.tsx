@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { PreviewScripts } from '@/components/editor/PreviewScripts'
+import { PreviewScripts, replaceDropHintCSS } from '@/components/editor/PreviewScripts'
 
 describe('PreviewScripts', () => {
     let mockPostMessage: ReturnType<typeof vi.fn>
@@ -115,5 +115,30 @@ describe('PreviewScripts', () => {
         expect(removeEventListenerSpy).toHaveBeenCalledWith('click', expect.any(Function))
         expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseover', expect.any(Function))
         removeEventListenerSpy.mockRestore()
+    })
+
+    describe('replaceDropHintCSS', () => {
+        it('should replace drop hint text in CSS', () => {
+            const css = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
+            const result = replaceDropHintCSS(css, 'Lepaskan untuk tambah blok')
+
+            expect(result).toContain("content: 'Lepaskan untuk tambah blok'")
+            expect(result).toContain('/*drop-hint*/')
+            expect(result).not.toContain('Drop to add block')
+        })
+
+        it('should escape single quotes in replacement text', () => {
+            const css = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
+            const result = replaceDropHintCSS(css, "Drop it's here")
+
+            expect(result).toContain("content: 'Drop it\\'s here'")
+        })
+
+        it('should return CSS unchanged when marker is missing', () => {
+            const css = `.insert-marker::after { content: 'no marker here'; }`
+            const result = replaceDropHintCSS(css, 'Test')
+
+            expect(result).toBe(css)
+        })
     })
 })

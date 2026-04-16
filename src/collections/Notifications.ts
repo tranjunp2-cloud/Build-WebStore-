@@ -56,14 +56,18 @@ export const Notifications: CollectionConfig = {
                 if (operation !== 'create') return doc
                 // Fire-and-forget push notification — never block the response
                 import('@/lib/notifications/send-push')
-                    .then(({ sendPushToUser }) =>
-                        sendPushToUser(doc.user, doc.tenant, {
+                    .then(({ sendPushToUser }) => {
+                        const userId = typeof doc.user === 'object' ? doc.user?.id : doc.user
+                        const tenantId = typeof doc.tenant === 'object' ? doc.tenant?.id : doc.tenant
+                        if (!userId || !tenantId) return
+                        return sendPushToUser(userId, tenantId, {
+                            id: String(doc.id),
                             title: doc.title,
                             body: doc.message || undefined,
                             tag: doc.type,
                             actionUrl: doc.actionUrl || undefined,
-                        }, req.payload),
-                    )
+                        }, req.payload)
+                    })
                     .catch((err) => console.error('[Push] Hook failed', err))
                 return doc
             },
@@ -111,6 +115,11 @@ export const Notifications: CollectionConfig = {
             name: 'actionUrl',
             type: 'text',
             admin: { description: 'Optional URL to navigate to when notification is clicked' },
+        },
+        {
+            name: 'metadata',
+            type: 'json',
+            admin: { description: 'Dynamic values for client-side i18n template interpolation' },
         },
         {
             name: 'isRead',

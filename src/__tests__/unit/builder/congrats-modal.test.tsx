@@ -3,6 +3,18 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
+import en from '@/i18n/locales/en.json'
+
+// Plan 260415 — stub useI18n so the modal renders with real EN strings.
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: en,
+        ti: (template: string, vars: Record<string, string | number>) =>
+            template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? '')),
+    }),
+    I18nProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
 import { CongratsModal } from '../../../components/builder/CongratsModal'
 
 // ── Mocks ────────────────────────────────────────────────────────────────
@@ -198,16 +210,13 @@ describe('CongratsModal', () => {
     // ── TC-F01.23: Navigation buttons ────────────────────────────────────
 
     describe('Navigation buttons (TC-F01.23, TC-F01.24, TC-F01.25)', () => {
-        it('renders "View Live Site" link pointing to siteUrl', () => {
+        // Design update 2026-04-14: primary action is now "Open Editor" (internal nav)
+        // instead of "View Live Site" (external). The live URL is still surfaced via
+        // the Copy Link row. "Continue Editing" text link removed — editor is the primary CTA.
+        it('renders "Open Editor" link pointing to /editor/:siteId', () => {
             renderModal()
-            const link = screen.getByRole('link', { name: /View Live Site/i })
-            expect(link).toHaveAttribute('href', 'https://my-coffee-shop.primeweb.app')
-        })
-
-        it('"View Live Site" opens in new tab (target=_blank)', () => {
-            renderModal()
-            const link = screen.getByRole('link', { name: /View Live Site/i })
-            expect(link).toHaveAttribute('target', '_blank')
+            const link = screen.getByRole('link', { name: /Open Editor/i })
+            expect(link).toHaveAttribute('href', '/editor/site-abc-123')
         })
 
         it('renders "Go to Dashboard" link with default href /dashboard', () => {
@@ -227,16 +236,16 @@ describe('CongratsModal', () => {
             expect(screen.getByRole('link', { name: /Go to Admin Dashboard/i })).toBeInTheDocument()
         })
 
-        it('renders "Continue Editing" link pointing to /editor/:siteId', () => {
+        it('surfaces the site URL for copying', () => {
             renderModal()
-            const link = screen.getByRole('link', { name: /Continue Editing/i })
-            expect(link).toHaveAttribute('href', '/editor/site-abc-123')
+            // URL text is rendered in the Copy row (no longer in a button href).
+            expect(screen.getByText('https://my-coffee-shop.primeweb.app')).toBeInTheDocument()
         })
 
-        it('calls onNavigate when "View Live Site" is clicked', () => {
+        it('calls onNavigate when "Open Editor" is clicked', () => {
             const onNavigate = vi.fn()
             renderModal({ onNavigate })
-            fireEvent.click(screen.getByRole('link', { name: /View Live Site/i }))
+            fireEvent.click(screen.getByRole('link', { name: /Open Editor/i }))
             expect(onNavigate).toHaveBeenCalledTimes(1)
         })
 
@@ -244,13 +253,6 @@ describe('CongratsModal', () => {
             const onNavigate = vi.fn()
             renderModal({ onNavigate })
             fireEvent.click(screen.getByRole('link', { name: /Go to Dashboard/i }))
-            expect(onNavigate).toHaveBeenCalledTimes(1)
-        })
-
-        it('calls onNavigate when "Continue Editing" is clicked', () => {
-            const onNavigate = vi.fn()
-            renderModal({ onNavigate })
-            fireEvent.click(screen.getByRole('link', { name: /Continue Editing/i }))
             expect(onNavigate).toHaveBeenCalledTimes(1)
         })
     })
@@ -280,19 +282,17 @@ describe('CongratsModal', () => {
     // ── Edge cases ────────────────────────────────────────────────────────
 
     describe('Edge cases', () => {
-        it('renders correct siteUrl in link and domain display for different URL', () => {
+        it('renders the siteUrl in the copy row for different URLs', () => {
             renderModal({
                 siteUrl: 'https://another-store.primeweb.app',
                 siteId: 'site-xyz-999',
             })
             expect(screen.getByText('https://another-store.primeweb.app')).toBeInTheDocument()
-            const liveLink = screen.getByRole('link', { name: /View Live Site/i })
-            expect(liveLink).toHaveAttribute('href', 'https://another-store.primeweb.app')
         })
 
-        it('renders correct Continue Editing link for different siteId', () => {
+        it('renders correct Open Editor link for different siteId', () => {
             renderModal({ siteId: 'site-xyz-999' })
-            const editLink = screen.getByRole('link', { name: /Continue Editing/i })
+            const editLink = screen.getByRole('link', { name: /Open Editor/i })
             expect(editLink).toHaveAttribute('href', '/editor/site-xyz-999')
         })
 
@@ -300,7 +300,7 @@ describe('CongratsModal', () => {
             // Should not throw even if onNavigate is undefined
             renderModal({ onNavigate: undefined })
             expect(() => {
-                fireEvent.click(screen.getByRole('link', { name: /Continue Editing/i }))
+                fireEvent.click(screen.getByRole('link', { name: /Open Editor/i }))
             }).not.toThrow()
         })
     })

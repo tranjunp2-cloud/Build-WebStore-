@@ -37,6 +37,7 @@ vi.mock('@/i18n', () => ({
                     unpublishSuccess: 'Đã gỡ website',
                     unpublishFailed: 'Gỡ website thất bại',
                     versionConflict: 'Version conflict',
+                    viewAction: 'View',
                 },
             },
             dashboard: { overview: {} },
@@ -213,7 +214,7 @@ describe('Publish and Save Flows (TC-F05)', () => {
         ;(global.fetch as any).mockImplementation(async (url: string | URL) => {
             const urlStr = url.toString()
             if (urlStr.includes('/save')) {
-                return Promise.resolve({ ok: false, status: 409 })
+                return Promise.resolve({ ok: false, status: 409, json: async () => ({ error: 'Version conflict' }) })
             }
             return Promise.resolve({ ok: true, json: async () => ({}) })
         })
@@ -222,8 +223,8 @@ describe('Publish and Save Flows (TC-F05)', () => {
         fireEvent.click(screen.getByTestId('save-btn'))
 
         await waitFor(() => {
-            // Verify 409 toast fires for generic save failure 
-            expect(toast.error).toHaveBeenCalledWith('Save failed', expect.objectContaining({ description: 'Server returned 409' }))
+            // Verify 409 toast fires with server error message
+            expect(toast.error).toHaveBeenCalledWith('Lưu thất bại')
         })
     })
 

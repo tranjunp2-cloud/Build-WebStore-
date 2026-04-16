@@ -1,0 +1,22 @@
+STAGED=$(git diff --cached --name-only | grep -E "^(pnpm-lock\.yaml|yarn\.lock)$" || true)
+if [ -n "$STAGED" ]; then
+  echo ""
+  echo "❌ Attempted to commit stray lockfile:"
+  echo "   $STAGED"
+  echo ""
+  echo "   This repo uses npm only. Did you run 'pnpm install' by mistake,"
+  echo "   or is there a 'pnpm run dev' zombie process regenerating the file?"
+  echo ""
+  echo "   Vercel CLI auto-detects pnpm/yarn from the lockfile and spawns a"
+  echo "   binary that is not installed on the CI runner → ENOENT → broken deploy."
+  echo ""
+  echo "   Fix:"
+  echo "     1. Check for zombie dev processes:"
+  echo "        ps aux | grep -E 'pnpm|yarn' | grep -v grep"
+  echo "        kill any matching 'pnpm run dev' / 'yarn dev' processes"
+  echo "     2. Unstage and remove the file:"
+  echo "        git restore --staged $STAGED && rm $STAGED"
+  echo "     3. Retry the commit"
+  echo ""
+  exit 1
+fi

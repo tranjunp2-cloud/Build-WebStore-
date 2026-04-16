@@ -1,6 +1,9 @@
 'use client'
 
 import { useCartStore } from '@/store/cartStore'
+import { trackEvent } from '@/lib/analytics/track-event'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useI18n } from '@/i18n'
 
 type AddToCartButtonProps = {
     product: {
@@ -15,10 +18,13 @@ type AddToCartButtonProps = {
     }
     primaryColor: string
     siteSlug: string
+    siteId?: string
 }
 
-export function AddToCartButton({ product, primaryColor, siteSlug }: AddToCartButtonProps) {
+export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: AddToCartButtonProps) {
     const { addItem, setSiteSlug } = useCartStore()
+    const isOwner = useIsOwner()
+    const { t } = useI18n()
     const isOutOfStock = product.inventory <= 0
 
     const handleClick = () => {
@@ -33,6 +39,14 @@ export function AddToCartButton({ product, primaryColor, siteSlug }: AddToCartBu
             currency: product.currency || 'MYR',
             imageUrl: product.imageUrl,
         })
+        if (siteId) {
+            trackEvent({
+                siteId,
+                event: 'add_to_cart',
+                metadata: { productId: product.id, productSlug: product.slug, price: product.price },
+                isOwner,
+            })
+        }
     }
 
     return (
@@ -54,7 +68,7 @@ export function AddToCartButton({ product, primaryColor, siteSlug }: AddToCartBu
                 transition: 'opacity 0.2s',
             }}
         >
-            {isOutOfStock ? 'Out of Stock' : '🛒 Add to Cart'}
+            {isOutOfStock ? t.storefront.products.outOfStock : t.storefront.products.addToCart}
         </button>
     )
 }

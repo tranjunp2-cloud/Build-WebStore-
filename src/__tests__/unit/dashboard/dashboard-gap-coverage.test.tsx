@@ -145,13 +145,13 @@ describe('DashboardCustomizeModal', () => {
         expect(screen.getByText('Customize Dashboard')).toBeInTheDocument()
     })
 
-    it('[TC-F03.17] modal contains all 4 metric items by default', () => {
+    it('[TC-F03.17] modal contains all 3 metric items by default (revenue disabled for F10)', () => {
         render(<DashboardCustomizeModal />)
         fireEvent.click(screen.getByText('Customize'))
         expect(screen.getByText('Views')).toBeInTheDocument()
         expect(screen.getByText('Leads')).toBeInTheDocument()
         expect(screen.getByText('Engagement')).toBeInTheDocument()
-        expect(screen.getByText('Revenue')).toBeInTheDocument()
+        expect(screen.queryByText('Revenue')).not.toBeInTheDocument()
     })
 
     it('[TC-F03.17] closes modal when Cancel is clicked', () => {
@@ -176,7 +176,7 @@ describe('DashboardCustomizeModal', () => {
         fireEvent.click(screen.getByText('Save'))
         await waitFor(() => {
             expect(mockUpdatePreferences).toHaveBeenCalledWith(
-                expect.arrayContaining(['views', 'leads', 'engagement', 'revenue'])
+                expect.arrayContaining(['views', 'leads', 'engagement'])
             )
         })
     })

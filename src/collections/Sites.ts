@@ -72,6 +72,22 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'generationStatus',
+            type: 'select',
+            defaultValue: 'none',
+            admin: {
+                position: 'sidebar',
+                readOnly: true,
+                description: 'Tracks AI site generation state (system-managed)',
+            },
+            options: [
+                { label: 'None', value: 'none' },
+                { label: 'Generating', value: 'generating' },
+                { label: 'Completed', value: 'completed' },
+                { label: 'Failed', value: 'failed' },
+            ],
+        },
+        {
             name: 'siteType',
             type: 'select',
             required: true,

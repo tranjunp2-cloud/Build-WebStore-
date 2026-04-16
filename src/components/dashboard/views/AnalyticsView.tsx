@@ -4,6 +4,7 @@ import { getCurrentTenantId } from '@/lib/auth'
 import { AnalyticsChart, ChartData } from '@/components/dashboard/AnalyticsChart'
 import { TopPerformingList, PerformingItem } from '@/components/dashboard/TopPerformingList'
 import { AnalyticsEmptyState } from '@/components/dashboard/AnalyticsEmptyState'
+import { subDays, startOfDay } from 'date-fns'
 export const dynamic = 'force-dynamic'
 
 interface Props {
@@ -18,28 +19,27 @@ export async function AnalyticsView({ searchParams }: Props) {
     const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
     const days = period === 'today' ? 1 : period === '30d' ? 30 : 7
     
-    // Current period
-    const since = new Date()
-    since.setDate(since.getDate() - days)
-    since.setHours(0, 0, 0, 0)
+    // Current period — match OverviewView date range pattern
+    const since = period === 'today' ? startOfDay(new Date()) : subDays(startOfDay(new Date()), days)
 
     // Previous period (for comparison)
-    const prevSince = new Date(since)
-    prevSince.setDate(prevSince.getDate() - days)
+    const prevSince = subDays(since, days)
 
     const payload = await getPayload({ config })
 
-    const clickEvents = ['click', 'add_to_cart', 'checkout']
+    // Match Overview's "leads" metric — only 'click' events
+    const clickEvents = ['click']
 
-    // Use count() for accurate summary metrics (no limit issue)
+    // Views (Traffic) = total pageview count per PRD: "Lượt views (Traffic)"
+    // Tenant isolation via tenantId from getCurrentTenantId() (JWT auth).
     const [currentViewsRes, prevViewsRes, currentClicksRes, prevClicksRes] = await Promise.all([
         payload.count({
             collection: 'analytics',
-            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { not_in: clickEvents } }
+            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { equals: 'pageview' } }
         }),
         payload.count({
             collection: 'analytics',
-            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { not_in: clickEvents } }
+            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { equals: 'pageview' } }
         }),
         payload.count({
             collection: 'analytics',
@@ -63,7 +63,9 @@ export async function AnalyticsView({ searchParams }: Props) {
         )
     }
 
-    // Fetch current period docs for chart/list aggregation (capped at 5000, most recent first)
+    // NOTE: Capped at 5000 docs for chart/list aggregation. Summary totals above use
+    // SQL COUNT (no limit) and are accurate. For high-traffic tenants, chart bars may
+    // under-count vs summary — acceptable: chart is illustrative, summary is authoritative.
     const { docs: currentDocs } = await payload.find({
         collection: 'analytics',
         where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() } },
@@ -71,8 +73,9 @@ export async function AnalyticsView({ searchParams }: Props) {
         sort: '-createdAt',
     })
 
-    // Aggregation for lists and charts (only for current period)
-    const dailyCounts: Record<string, { views: number, clicks: number }> = {}
+    // Aggregation: raw event counts per PRD ("Lượt views", "Lượt mở trang nhiều nhất")
+    const dailyViews: Record<string, number> = {}
+    const dailyClicks: Record<string, number> = {}
     const pageViews: Record<string, number> = {}
     const productClicks: Record<string, number> = {}
     const blogViews: Record<string, number> = {}
@@ -80,40 +83,32 @@ export async function AnalyticsView({ searchParams }: Props) {
 
     for (const doc of currentDocs) {
         const date = new Date(doc.createdAt).toISOString().split('T')[0]
-        if (!dailyCounts[date]) dailyCounts[date] = { views: 0, clicks: 0 }
-
-        const isClick = doc.event === 'click' || doc.event === 'add_to_cart' || doc.event === 'checkout' || doc.event === 'purchase'
-        if (isClick) {
-            dailyCounts[date].clicks += 1
-        } else {
-            dailyCounts[date].views += 1
-        }
-
-        // Top Pages
         const url = doc.pageUrl || '/'
-        pageViews[url] = (pageViews[url] || 0) + 1
 
-        // Top Blogs
-        if (url.startsWith('/blog/')) {
-            blogViews[url] = (blogViews[url] || 0) + 1
+        if (doc.event === 'pageview') {
+            dailyViews[date] = (dailyViews[date] || 0) + 1
+            pageViews[url] = (pageViews[url] || 0) + 1
+
+            if (url.startsWith('/blog/')) {
+                blogViews[url] = (blogViews[url] || 0) + 1
+            }
+        } else if (doc.event === 'click') {
+            dailyClicks[date] = (dailyClicks[date] || 0) + 1
         }
 
-        // Top Products
-        if (url.startsWith('/product/') || isClick) {
+        if (url.startsWith('/product/') || doc.event === 'click') {
             productClicks[url] = (productClicks[url] || 0) + 1
         }
 
-        // Top Referrers
+        // Referrers
         if (doc.referrer) {
             try {
                 const refUrl = new URL(doc.referrer)
-                // Filter out internal traffic or empty domains
                 if (refUrl.hostname && !refUrl.hostname.includes('localhost') && !refUrl.hostname.includes(process.env.NEXT_PUBLIC_SERVER_URL || '')) {
                     const domain = refUrl.hostname.replace(/^www\./, '')
                     referrers[domain] = (referrers[domain] || 0) + 1
                 }
             } catch {
-                // Not a valid URL, could be a UTM source string
                 if (doc.referrer.length < 100 && !doc.referrer.startsWith('/')) {
                     referrers[doc.referrer] = (referrers[doc.referrer] || 0) + 1
                 }
@@ -121,20 +116,18 @@ export async function AnalyticsView({ searchParams }: Props) {
         }
     }
 
-    // Fill daily views
+    // Fill daily chart data
     const chartData: ChartData[] = []
     for (let i = days - 1; i >= 0; i--) {
         const d = new Date()
         d.setDate(d.getDate() - i)
         const key = d.toISOString().split('T')[0]
-        
-        // Format date string to D/M for chart display to match Figma
         const displayDate = `${d.getDate()}/${d.getMonth() + 1}`
 
         chartData.push({
             date: displayDate,
-            views: dailyCounts[key]?.views || 0,
-            clicks: dailyCounts[key]?.clicks || 0
+            views: dailyViews[key] || 0,
+            clicks: dailyClicks[key] || 0
         })
     }
 
@@ -161,7 +154,8 @@ export async function AnalyticsView({ searchParams }: Props) {
 
             <TopPerformingList 
                 pages={topPages}
-                products={topProducts}
+                // TODO: Re-enable when F10 Commerce is ready
+                // products={topProducts}
                 blogs={topBlogs}
                 referrers={topReferrers}
             />

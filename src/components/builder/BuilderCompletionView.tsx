@@ -1,7 +1,10 @@
+'use client'
+
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowUp, Check, Clock3, ExternalLink, LayoutDashboard, Loader2, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, Clock3, ExternalLink, LayoutDashboard, Loader2, Rocket } from 'lucide-react'
 import { BuilderPreviewMode, BuilderPreviewModeToggle, BuilderPreviewSurface } from '@/components/builder/BuilderPreviewPrimitives'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
+import { useI18n } from '@/i18n'
 
 interface BuilderCompletionViewProps {
     siteName: string
@@ -94,33 +97,35 @@ function CompletionStatusCard({
     totalBlocks: number
     generationTimeLabel: string
 }) {
+    const { t, ti } = useI18n()
+    const c = t.onboarding.completion
     return (
         <div className="relative h-auto min-h-[174px] w-full max-w-[448px] rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[21px] pb-4 pt-[17px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
             <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
             <div className="relative flex flex-col items-start gap-4">
                 <p className="text-sm font-medium leading-5 text-[#f8fafc]">
-                    Website <span className="bg-[linear-gradient(158.2deg,#3b82f6_0%,#2dd4bf_100%)] bg-clip-text font-semibold text-transparent">&quot;{siteName}&quot;</span> has been created successfully!
+                    <span className="bg-[linear-gradient(158.2deg,#3b82f6_0%,#2dd4bf_100%)] bg-clip-text font-semibold text-transparent">&quot;{siteName}&quot;</span> {c.successMessage}
                 </p>
 
                 <div className="flex h-12 w-full flex-col items-start gap-2">
                     <div className="flex h-5 w-full items-center gap-2">
                         <LayoutDashboard className="size-4 text-[#94a3b8]" />
                         <p className="text-sm leading-5 text-[#f8fafc]">
-                            <span className="font-medium">+{totalBlocks} sections</span>
-                            <span className="text-[#94a3b8]"> generated</span>
+                            <span className="font-medium">{ti(c.sectionsGenerated, { count: totalBlocks })}</span>
+                            <span className="text-[#94a3b8]"> {c.sectionsGeneratedLabel}</span>
                         </p>
                     </div>
                     <div className="flex h-5 w-full items-center gap-2">
                         <Clock3 className="size-4 text-[#94a3b8]" />
                         <p className="text-sm leading-5 text-[#f8fafc]">
                             <span className="font-medium">+{generationTimeLabel}</span>
-                            <span className="text-[#94a3b8]"> generation time</span>
+                            <span className="text-[#94a3b8]"> {c.generationTimeLabel}</span>
                         </p>
                     </div>
                 </div>
 
                 <p className="max-w-[377px] text-sm leading-5 text-[#94a3b8]">
-                    You can view the Preview on the right, open the Editor to make changes, or Publish now!
+                    {c.description}
                 </p>
             </div>
         </div>
@@ -138,6 +143,8 @@ function CompletionPreviewPanel({
     previewContent: ReactNode
     onOpenPreview: () => void
 }) {
+    const { t } = useI18n()
+    const c = t.onboarding.completion
     return (
         <div className="relative h-screen overflow-hidden">
             <div className="absolute inset-0 bg-[linear-gradient(104.73deg,#0b1120_0%,#0b1120_50%,rgba(59,130,246,0.05)_100%)]" />
@@ -146,10 +153,10 @@ function CompletionPreviewPanel({
                     <div className="grid min-h-[50px] grid-cols-[1fr_auto_1fr] items-center gap-4">
                         <div className="flex min-w-0 flex-col gap-0.5">
                             <h2 className="text-[18px] font-semibold leading-7 text-[#2dd4bf]">
-                                Website Preview
+                                {c.previewTitle}
                             </h2>
                             <p className="text-xs leading-4 text-[rgba(248,250,252,0.7)]">
-                                Your AI-generated website
+                                {c.previewSubtitle}
                             </p>
                         </div>
 
@@ -164,7 +171,7 @@ function CompletionPreviewPanel({
                                 type="button"
                             >
                                 <ExternalLink className="size-4" />
-                                <span>View Full Preview</span>
+                                <span>{c.viewFullPreview}</span>
                             </button>
                         </div>
                     </div>
@@ -197,6 +204,9 @@ export default function BuilderCompletionView({
     isPublishing = false,
     isNavigating = false,
 }: BuilderCompletionViewProps) {
+    const { t } = useI18n()
+    const c = t.onboarding.completion
+    const g = t.onboarding.generating
     const movableBlocks = blocks.filter(
         (block) => block._id && block.blockType !== 'navigation' && block.blockType !== 'footer',
     )
@@ -210,7 +220,7 @@ export default function BuilderCompletionView({
                 <div className="relative rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[17px] py-[13px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
                     <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
                     <p className="relative text-sm leading-5 text-[#f8fafc]">
-                        Starting website creation...
+                        {g.startingMessage}
                     </p>
                 </div>
             </div>
@@ -229,9 +239,9 @@ export default function BuilderCompletionView({
             <div className="rounded-2xl border border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <p className="text-sm font-semibold text-[#f8fafc]">Mobile preview</p>
+                        <p className="text-sm font-semibold text-[#f8fafc]">{c.mobilePreviewTitle}</p>
                         <p className="mt-1 text-xs leading-5 text-[#94a3b8]">
-                            Open the immersive preview to review the generated site on mobile.
+                            {c.mobilePreviewDescription}
                         </p>
                     </div>
                     <button
@@ -239,7 +249,7 @@ export default function BuilderCompletionView({
                         onClick={onOpenPreview}
                         type="button"
                     >
-                        Open Preview
+                        {c.openPreviewButton}
                     </button>
                 </div>
             </div>
@@ -247,9 +257,9 @@ export default function BuilderCompletionView({
             {movableBlocks.length > 0 && onMoveBlock ? (
                 <div className="rounded-2xl border border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
                     <div className="mb-3">
-                        <p className="text-sm font-semibold text-[#f8fafc]">Arrange sections</p>
+                        <p className="text-sm font-semibold text-[#f8fafc]">{c.arrangeSectionsTitle}</p>
                         <p className="mt-1 text-xs leading-5 text-[#94a3b8]">
-                            Use list mode on mobile to move sections up or down safely.
+                            {c.arrangeSectionsDescription}
                         </p>
                     </div>
 
@@ -294,26 +304,33 @@ export default function BuilderCompletionView({
         </div>
     )
 
+    // Design 2026-04-14: two primary actions side-by-side (Open Editor + Publish Website)
+    // with a tertiary "Go To Dashboard" text link below. Matches the approved reference
+    // at docs/design/F01 completion screen.
     const leftFooter = (
-        <div className="flex flex-col gap-3">
-            <CompletionPrimaryButton
-                icon={isNavigating ? <Loader2 className="size-4 animate-spin" /> : <LayoutDashboard className="size-4" />}
+        <div className="flex flex-col items-center gap-4">
+            <div className="flex w-full gap-3">
+                <CompletionPrimaryButton
+                    icon={<ExternalLink className="size-4" />}
+                    label={c.openEditor}
+                    onClick={onOpenEditor}
+                    disabled={isPublishing || isNavigating}
+                />
+                <CompletionSecondaryButton
+                    icon={isPublishing ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+                    label={isPublishing ? c.publishing : c.publishWebsite}
+                    onClick={onPublish}
+                    disabled={isPublishing}
+                />
+            </div>
+            <button
+                className="text-sm font-medium text-[#3b82f6] underline underline-offset-4 transition-colors hover:text-[#60a5fa] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isPublishing || isNavigating}
-                label={isNavigating ? 'Loading...' : 'Dashboard'}
                 onClick={onDashboard}
-            />
-            <CompletionPrimaryButton
-                disabled={isPublishing}
-                icon={isPublishing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                label={isPublishing ? 'Publishing...' : 'Publish Website'}
-                onClick={onPublish}
-            />
-            <CompletionSecondaryButton
-                disabled={isPublishing}
-                icon={<ExternalLink className="size-4" />}
-                label="Open Editor"
-                onClick={onOpenEditor}
-            />
+                type="button"
+            >
+                {isNavigating ? c.loading : c.goToDashboard}
+            </button>
         </div>
     )
 
@@ -332,8 +349,8 @@ export default function BuilderCompletionView({
             )}
             rightContentClassName="h-full max-w-none px-0 xl:px-0"
             rightPaneClassName="lg:items-stretch lg:justify-stretch"
-            subtitle="Website Generation"
-            title="Create Website with AI"
+            subtitle={g.subtitle}
+            title={g.title}
         />
     )
 }

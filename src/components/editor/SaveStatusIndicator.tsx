@@ -6,8 +6,11 @@ import { useEditorStore } from '@/store/editorStore'
 import { formatDistanceToNow } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 export const SaveStatusIndicator: React.FC = () => {
+    const { t } = useI18n()
+    const ss = t.editor.saveStatus
     const { saveStatus, lastSavedAt, hasUnsavedChanges } = useEditorStore()
     const [timeAgo, setTimeAgo] = useState<string>('')
 
@@ -34,7 +37,7 @@ export const SaveStatusIndicator: React.FC = () => {
                         className="flex items-center gap-1.5 text-blue-400"
                     >
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span className="text-xs font-medium hidden md:inline">Saving...</span>
+                        <span className="text-xs font-medium hidden md:inline">{ss.saving}</span>
                     </motion.div>
                 )
             case 'saved':
@@ -47,7 +50,7 @@ export const SaveStatusIndicator: React.FC = () => {
                     >
                         <Cloud className="h-3.5 w-3.5" />
                         <span className="text-xs font-medium hidden md:inline">
-                            {lastSavedAt ? `Saved ${timeAgo}` : 'Saved'}
+                            {lastSavedAt ? ss.savedAgo.replace('{timeAgo}', timeAgo) : ss.saved}
                         </span>
                     </motion.div>
                 )
@@ -60,7 +63,7 @@ export const SaveStatusIndicator: React.FC = () => {
                         className="flex items-center gap-1.5 text-red-400"
                     >
                         <AlertCircle className="h-3.5 w-3.5" />
-                        <span className="text-xs font-medium hidden md:inline">Not saved</span>
+                        <span className="text-xs font-medium hidden md:inline">{ss.notSaved}</span>
                     </motion.div>
                 )
             case 'idle':
@@ -73,7 +76,7 @@ export const SaveStatusIndicator: React.FC = () => {
                             className="flex items-center gap-1.5 text-yellow-400/80"
                         >
                             <CloudUpload className="h-3.5 w-3.5 animate-pulse" />
-                            <span className="text-xs font-medium hidden md:inline">Draft saving in 3s...</span>
+                            <span className="text-xs font-medium hidden md:inline">{ss.draftSaving}</span>
                         </motion.div>
                     )
                 }

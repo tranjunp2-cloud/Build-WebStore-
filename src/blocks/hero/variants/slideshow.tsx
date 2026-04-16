@@ -5,8 +5,10 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
-import { CTAButtons } from '../shared'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CTAButtons, HERO_CONTAINER, HeroBadge, SlideshowDot } from '../shared'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
+
+void _CSS_VARS
 import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
 
@@ -33,7 +35,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
     }, [slides.length])
 
     return (
-        <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             {/* Image layers with crossfade */}
             {slides.map((slide, i) => (
                 <div
@@ -48,7 +50,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
             {/* Dark overlay */}
             <div className="absolute inset-0 bg-black/50" />
 
-            <div className="container mx-auto px-6 relative z-10 text-center max-w-3xl">
+            <div className={`${HERO_CONTAINER} relative z-10 text-center max-w-3xl`}>
                 {badge?.show && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
@@ -56,17 +58,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                         viewport={{ once: true }}
                         transition={{ duration: 0.4 }}
                     >
-                        <div
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6"
-                            style={{
-                                background: 'rgba(255,255,255,0.1)',
-                                color: '#fff',
-                                border: '1px solid rgba(255,255,255,0.2)',
-                            }}
-                        >
-                            <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                            {badge.text}
-                        </div>
+                        <HeroBadge text={badge.text} />
                     </motion.div>
                 )}
                 <motion.h1
@@ -96,22 +88,18 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                     transition={{ duration: 0.5, delay: 0.25 }}
                     className="flex flex-wrap gap-4 justify-center"
                 >
-                    <CTAButtons buttons={ctaButtons} variant="glass" />
+                    <CTAButtons buttons={ctaButtons} variant="glass" siteId={site?.id ? String(site.id) : undefined} />
                 </motion.div>
 
-                {/* Dot indicators */}
+                {/* Dot indicators — 10px visual dot in 44px hit area (WCAG 2.5.5) */}
                 {slides.length > 1 && (
                     <div className="flex gap-2 justify-center mt-10">
                         {slides.map((_, i) => (
-                            <button
+                            <SlideshowDot
                                 key={i}
+                                active={i === currentIndex}
                                 onClick={() => setCurrentIndex(i)}
-                                className="w-2.5 h-2.5 rounded-full transition-all duration-300"
-                                style={{
-                                    background: i === currentIndex ? '#fff' : 'rgba(255,255,255,0.4)',
-                                    transform: i === currentIndex ? 'scale(1.3)' : 'scale(1)',
-                                }}
-                                aria-label={`Go to slide ${i + 1}`}
+                                label={`Go to slide ${i + 1}`}
                             />
                         ))}
                     </div>

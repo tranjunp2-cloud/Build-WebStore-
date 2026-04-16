@@ -9,6 +9,8 @@ import { useEditorStore } from '@/store/editorStore'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useI18n } from '@/i18n'
 
 interface PreviewFrameProps {
     siteId: string
@@ -17,7 +19,7 @@ interface PreviewFrameProps {
     isLoading: boolean
     viewport: 'desktop' | 'mobile'
     selectedBlock: number | null
-    onBlockSelect?: (blockIndex: number | null) => void
+    onBlockSelect?: (blockIndex: number | null, blockType?: string) => void
     onInlineEditApplied?: (content: string, blockIndex: number) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
@@ -190,6 +192,7 @@ function PreviewFrameInner({
     onPageNavigate,
     disableDragDrop = false,
 }: PreviewFrameProps) {
+    const { t } = useI18n()
     const { blocks, updateBlock, performSave, theme: storeTheme } = useEditorStore()
     const blocksRef = useRef(blocks)
     useEffect(() => { blocksRef.current = blocks }, [blocks])
@@ -226,6 +229,21 @@ function PreviewFrameInner({
             window.location.origin,
         )
     }, [frameElement, storeTheme])
+
+    // Send translated drop hint text to iframe for CSS pseudo-element
+    useEffect(() => {
+        if (!frameElement) return
+        const sendHint = () => {
+            frameElement.contentWindow?.postMessage(
+                { type: 'SET_DROP_HINT', text: t.editor.blockLibrary.dropToAdd },
+                window.location.origin,
+            )
+        }
+        frameElement.addEventListener('load', sendHint)
+        // Also send immediately in case iframe is already loaded
+        sendHint()
+        return () => frameElement.removeEventListener('load', sendHint)
+    }, [frameElement, t.editor.blockLibrary.dropToAdd])
 
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
     const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null)
@@ -362,7 +380,7 @@ function PreviewFrameInner({
                         setHoverData(null)
                         setBlockHover(null)
                         clearHoverTimerRef.current = null
-                    }, 120)
+                    }, 250)
                 }
             } else if (e.data?.type === 'PREVIEW_POINTER_DOWN') {
                 if (isEditingRef.current) {
@@ -370,8 +388,9 @@ function PreviewFrameInner({
                 }
             } else if (e.data?.type === 'BLOCK_CONTAINER_CLICKED') {
                 const blockIndex = Number(e.data.blockIndex)
+                const blockType = e.data.layout?.blockType as string | undefined
                 if (!Number.isNaN(blockIndex)) {
-                    onBlockSelect?.(blockIndex)
+                    onBlockSelect?.(blockIndex, blockType)
                     setHoverData(null)
                     setBlockHover(e.data.layout as BlockLayoutRect)
                     setIsEditing(false)
@@ -422,7 +441,7 @@ function PreviewFrameInner({
                         setWysiwygState({})
                     }
                 }, 100)
-            } else if (e.data?.type === 'IMAGE_CLICKED') {
+            } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
@@ -505,17 +524,10 @@ function PreviewFrameInner({
         try {
             const formData = new FormData()
             formData.append('file', file)
-            formData.append('alt', 'Uploaded image')
+            formData.append('alt', t.editor.preview.altUploadedImage)
 
-            const uploadRes = await fetch('/api/media', {
-                method: 'POST',
-                body: formData
-            })
-
-            if (!uploadRes.ok) throw new Error('Upload failed')
-            
-            const uploadedMedia = await uploadRes.json()
-            const newUrl = uploadedMedia.doc.url
+            const uploadedMedia = await uploadMediaAction(formData)
+            const newUrl = uploadedMedia.url
 
             const { blockIndex, src } = imageClickData
             const block = blocks[blockIndex]
@@ -550,15 +562,15 @@ function PreviewFrameInner({
                     const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
                     updateBlock(blockIndex, nextBlock)
                 } else {
-                    toast.error('Could not map image to block field')
+                    toast.error(t.editor.preview.mapImageError)
                 }
             }
 
-            toast.success('Image replaced successfully')
+            toast.success(t.editor.preview.imageReplaceSuccess)
             setImageClickData(null)
         } catch (error) {
             console.error('Image replace error:', error)
-            toast.error('Failed to replace image')
+            toast.error(t.editor.preview.imageReplaceFailed)
         } finally {
             setIsImageProcessing(false)
         }
@@ -723,7 +735,7 @@ function PreviewFrameInner({
             setHoverData(prev => prev ? { ...prev, text: rewritten } : prev)
         } catch (error) {
             console.error('Inline rewrite failed', error)
-            toast.error('Inline edit failed', {
+            toast.error(t.editor.preview.inlineEditFailed, {
                 description: 'Please try again.',
             })
         } finally {
@@ -775,9 +787,9 @@ function PreviewFrameInner({
                 className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4"
             >
                 <div
-                    className="relative h-full overflow-hidden rounded-[24px] border border-white/10 bg-transparent shadow-2xl transition-all"
+                    className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
                     style={{
-                        width: viewport === 'mobile' ? 390 : '100%',
+                        width: viewport === 'mobile' ? 'min(390px, 100%)' : '100%',
                         maxWidth: viewport === 'mobile' ? 390 : 1280,
                     }}
                 >
@@ -786,7 +798,7 @@ function PreviewFrameInner({
                         key={iframeKey}
                         src={previewUrl.pathname + previewUrl.search}
                         className="h-full w-full border-0"
-                        title="Site Preview"
+                        title={t.editor.toolbar.sitePreview}
                         sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
                     />
                 </div>
@@ -825,8 +837,8 @@ function PreviewFrameInner({
                         return (
                         <button
                             type="button"
-                            title="Drag to reorder section"
-                            className="group/drag absolute inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-2 text-slate-700 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 cursor-grab active:cursor-grabbing"
+                            title={t.editor.toolbar.dragToReorder}
+                            className="group/drag absolute inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-2 text-slate-700 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all duration-150 hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 cursor-grab active:cursor-grabbing animate-in fade-in"
                             style={{
                                 top: overlayOffset.top + activeLayout.top + 10,
                                 left: overlayOffset.left + activeLayout.left - 24,
@@ -872,7 +884,7 @@ function PreviewFrameInner({
                             }}
                         >
                             <GripVertical className="h-4 w-4 text-slate-400 group-hover/drag:text-slate-600" />
-                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 group-hover/drag:text-slate-700">Drag</span>
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 group-hover/drag:text-slate-700">{t.editor.toolbar.drag}</span>
                         </button>
                         )
                     })()}
@@ -961,7 +973,7 @@ function PreviewFrameInner({
                             }}
                             onClick={() => setIsEditing(true)}
                         >
-                            ✨ Edit with AI
+                            ✨ {t.editor.preview.editWithAI}
                         </div>
                     )}
                     {isEditing && canInlineEdit && (
@@ -1036,7 +1048,7 @@ function PreviewFrameInner({
                         <ImageToolbar 
                             onImageSelect={handleImageReplace} 
                             isProcessing={isImageProcessing}
-                            onAiGenerate={() => { toast.info('AI Generation context locked to: ' + imageClickData.blockType) }} 
+                            onAiGenerate={() => { toast.info(t.editor.preview.aiContextLocked.replace('{blockType}', imageClickData.blockType)) }} 
                         />
                     </div>
                 )

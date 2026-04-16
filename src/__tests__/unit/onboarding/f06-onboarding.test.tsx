@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import type { ComponentProps, ReactNode } from 'react'
 import '@testing-library/jest-dom'
 
@@ -162,6 +162,36 @@ describe('AIDiscoveryWizard', () => {
         expect(screen.getByTestId('dashboard-content')).toBeVisible()
     })
 
+    it('[TC-F06.13] X button chỉ đóng UI, không gọi API dismiss', () => {
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Find the X close button (aria-label="Close")
+        const closeBtn = screen.getByLabelText('Close')
+        fireEvent.click(closeBtn)
+
+        // Assert: Wizard closed
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+
+        // Assert: API was NOT called (close ≠ dismiss)
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F06.14] X button close → wizard reappears on re-mount', () => {
+        const { unmount } = render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Close via X
+        fireEvent.click(screen.getByLabelText('Close'))
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+        expect(global.fetch).not.toHaveBeenCalled()
+
+        // Re-mount simulates next page visit
+        unmount()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Wizard should reappear since flag was not persisted
+        expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+    })
+
     it('[TC-F06.17] Security Integrity - Unauthorized Patch Fallback', async () => {
         // Arrange
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -184,5 +214,72 @@ describe('AIDiscoveryWizard', () => {
         })
         
         consoleErrorSpy.mockRestore()
+    })
+
+    // Safety net: restore real timers if any test fails mid-execution
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    it('[TC-F06.05] Slide navigation: Continue advances to next slide', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        expect(screen.getByText('AI Editor')).toBeVisible()
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+
+        expect(screen.getByText('AI Content')).toBeVisible()
+    })
+
+    it('[TC-F06.07] Slide 3 shows Explore CTA instead of Continue', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Navigate to slide 3
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+
+        expect(screen.getByText('AI SEO')).toBeVisible()
+        expect(screen.getByText('Explore CMS')).toBeVisible()
+        expect(screen.queryByText('Continue')).not.toBeInTheDocument()
+    })
+
+    it('[TC-F06.08] Go back button navigates to previous slide', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI Content')).toBeVisible()
+
+        fireEvent.click(screen.getByText('Go back'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI Editor')).toBeVisible()
+    })
+
+    it('[BUG-F06-011] Swipe left on last slide does NOT dismiss wizard', () => {
+        vi.useFakeTimers()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Navigate to last slide (slide 3)
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        fireEvent.click(screen.getByText('Continue'))
+        act(() => { vi.advanceTimersByTime(300) })
+        expect(screen.getByText('AI SEO')).toBeVisible()
+
+        // Simulate swipe left on the modal container
+        const modal = screen.getByText('AI SEO').closest('[class*="touch-pan-y"]')!
+        fireEvent.touchStart(modal, { targetTouches: [{ clientX: 300 }] })
+        fireEvent.touchMove(modal, { targetTouches: [{ clientX: 100 }] })
+        fireEvent.touchEnd(modal)
+
+        // Wizard should still be open — NOT dismissed
+        expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+        expect(screen.getByText('AI SEO')).toBeVisible()
+        expect(global.fetch).not.toHaveBeenCalled()
     })
 })

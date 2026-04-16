@@ -155,6 +155,23 @@ const ContactBlock = {
     slug: 'contact',
     labels: { singular: 'Contact Section', plural: 'Contact Sections' },
     fields: [
+        {
+            // Plan 260415 — contact block previously had no variant field,
+            // so Payload stripped the variant set by AI gen / composer and
+            // every contact rendered as `form`. Now persisted + rotated
+            // per category via CONTACT_VARIANT_BY_CATEGORY.
+            name: 'variant',
+            type: 'select',
+            defaultValue: 'form',
+            options: [
+                { label: 'Form (info left, form right)', value: 'form' },
+                { label: 'Info Only', value: 'info-only' },
+                { label: 'Split (form left, info right)', value: 'split' },
+                { label: 'Card Float', value: 'card-float' },
+                { label: 'Map Split', value: 'map-split' },
+                { label: 'Minimal Inline', value: 'minimal-inline' },
+            ],
+        },
         { name: 'headline', type: 'text', defaultValue: 'Contact Us' },
         { name: 'subtext', type: 'textarea' },
         { name: 'email', type: 'email' },
@@ -194,6 +211,21 @@ const FooterBlock = {
     slug: 'footer',
     labels: { singular: 'Footer Section', plural: 'Footer Sections' },
     fields: [
+        {
+            // Plan 260415 — persist footer variant so same-category sites
+            // rotate across footer shapes via FOOTER_VARIANT_BY_CATEGORY.
+            name: 'variant',
+            type: 'select',
+            defaultValue: 'simple',
+            options: [
+                { label: 'Simple', value: 'simple' },
+                { label: 'Expanded', value: 'expanded' },
+                { label: 'Minimal', value: 'minimal' },
+                { label: 'Centered Stack', value: 'centered-stack' },
+                { label: 'Mega Footer', value: 'mega-footer' },
+                { label: 'Dark Gradient', value: 'dark-gradient' },
+            ],
+        },
         { name: 'logoText', type: 'text' },
         { name: 'logo', type: 'upload', relationTo: 'media' },
         { name: 'tagline', type: 'text' },
@@ -427,6 +459,18 @@ const StatsBlock = {
     slug: 'stats',
     labels: { singular: 'Stats Section', plural: 'Stats Sections' },
     fields: [
+        {
+            // Plan 260415 — previously the stats block persisted no variant
+            // so every gen rendered the same `row` default.
+            name: 'variant',
+            type: 'select',
+            defaultValue: 'row',
+            options: [
+                { label: 'Row', value: 'row' },
+                { label: 'Grid', value: 'grid' },
+                { label: 'Highlight', value: 'highlight' },
+            ],
+        },
         { name: 'headline', type: 'text' },
         {
             name: 'stats',
@@ -489,6 +533,16 @@ const TeamBlock = {
     slug: 'team',
     labels: { singular: 'Team Section', plural: 'Team Sections' },
     fields: [
+        {
+            // Plan 260415 — persist team variant (grid vs list).
+            name: 'variant',
+            type: 'select',
+            defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'List', value: 'list' },
+            ],
+        },
         { name: 'headline', type: 'text', defaultValue: 'Meet Our Team' },
         {
             name: 'members',

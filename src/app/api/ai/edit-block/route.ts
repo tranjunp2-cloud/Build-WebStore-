@@ -7,6 +7,8 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import { selectModel } from '@/lib/ai/config'
+import { logAiUsage } from '@/lib/ai/log-usage'
 import {
     createAddSectionBlock,
     getAddSectionLabel,
@@ -26,10 +28,13 @@ type AIEditPayload = {
     allBlocks?: Record<string, unknown>[]
     theme?: Record<string, unknown>
     siteName?: string
+    currentPageSlug?: string
+    currentPageTitle?: string
+    chatHistory?: { role: string; content: string }[]
 }
 
 type AIEditResult = {
-    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block'
+    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block' | 'none'
     changes?: Record<string, unknown>
     blockIndex?: number
     afterIndex?: number
@@ -62,7 +67,7 @@ function describeAction(result: AIEditResult): string {
 }
 
 async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
-    const { instruction, block, allBlocks, theme, siteName } = data
+    const { instruction, block, allBlocks, theme, siteName, currentPageSlug, currentPageTitle, chatHistory } = data
     const blockIndex = data.blockIndex ?? 0
     const inferredSectionType = inferAddSectionType(instruction)
     const defaultAfterIndex = Math.max(-1, (allBlocks?.length || 0) - 1)
@@ -70,13 +75,32 @@ async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
     const blockMetas = blockRegistry.getAllMeta()
     const availableTypes = blockMetas.map(m => `${m.type} (${m.name}): variants=[${m.variants.join(',')}]`).join('\n')
 
+    // Build a concise block summary so AI knows the page structure and current content
+    // Spec §1.3: "compact summary, NOT full JSON" — limit to key text fields, truncate long values
+    const TEXT_FIELD_ALLOW = new Set(['headline', 'subheadline', 'title', 'subtitle', 'description', 'ctaText', 'buttonText', 'label', 'tagline', 'copyright', 'bodyText', 'sectionLabel', 'name', 'quote'])
+    const blockSummary = (allBlocks || []).map((b: Record<string, unknown>, i: number) => {
+        const fields: string[] = []
+        for (const [k, v] of Object.entries(b)) {
+            if (['blockType', 'variant'].includes(k)) continue
+            if (typeof v === 'string' && v.length > 0 && TEXT_FIELD_ALLOW.has(k)) {
+                fields.push(`${k}: "${v.length > 80 ? v.slice(0, 80) + '…' : v}"`)
+            }
+        }
+        const selected = i === blockIndex ? ' ← SELECTED' : ''
+        return `  [${i}] ${(b as Record<string, unknown>).blockType}${selected}\n      ${fields.join(' | ') || '(no text fields)'}`
+    }).join('\n')
+
     const systemPrompt = `You are an AI website editor. The user wants to modify their website.
 
 ## CONTEXT
 - Site name: "${siteName || 'Website'}"
+- Current page: "${currentPageTitle || 'Home'}" (slug: /${currentPageSlug || 'home'})
 - Current theme: ${JSON.stringify(theme || {})}
 - Total blocks on page: ${allBlocks?.length || 0}
 ${block ? `- Currently editing block #${blockIndex + 1}: type="${block.blockType}"` : '- No specific block selected'}
+
+## CURRENT PAGE BLOCKS
+${blockSummary || '(empty page)'}
 
 ## AVAILABLE BLOCK TYPES
 ${availableTypes}
@@ -88,10 +112,11 @@ Based on the user's instruction, return a JSON response with the action to take.
 For modifying an existing block:
 {
   "action": "update_block",
-  "blockIndex": ${blockIndex ?? 0},
+  "blockIndex": <index from CURRENT PAGE BLOCKS list above>,
   "changes": { "field": "new_value", ... },
   "message": "A short explanation of what was changed."
 }
+${block ? `The user has selected block #${blockIndex + 1}, so use blockIndex ${blockIndex} unless the instruction clearly refers to a different block.` : 'No block is selected — determine the correct blockIndex from the CURRENT PAGE BLOCKS list based on the user instruction.'}
 
 For changing the theme:
 {
@@ -103,7 +128,7 @@ For changing the theme:
 For adding a new block:
 {
   "action": "add_block",
-  "afterIndex": ${blockIndex ?? -1},
+  "afterIndex": <index after which to insert, or -1 for top>,
   "block": { "blockType": "...", "variant": "...", ... },
   "message": "A short explanation of what was changed."
 }
@@ -111,7 +136,7 @@ For adding a new block:
 For deleting a block:
 {
   "action": "delete_block",
-  "blockIndex": ${blockIndex ?? 0},
+  "blockIndex": <index from CURRENT PAGE BLOCKS list>,
   "message": "A short explanation of what was changed."
 }
 
@@ -131,7 +156,15 @@ For undoing the previous action:
 7. If the user asks to add a section, use add_block with appropriate content
 8. Supported add-section types: testimonials, faq, gallery, features, team, newsletter, banner, cta
 9. New sections should be appended to the bottom by default unless the user explicitly asks otherwise
-10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.`
+10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.
+
+## SCOPE RESTRICTIONS
+- You are ONLY allowed to edit this website's content, layout, theme, and blocks.
+- If the user asks anything unrelated to website editing (general knowledge, coding help, personal questions, etc.), respond with:
+  {"action": "none", "message": "I can only help with editing your website. Please ask me to change text, colors, layout, or add/remove sections."}
+- When a specific block is selected, PREFER "update_block" targeting that block. Only use "update_theme" if the user explicitly asks to change the overall theme/colors/fonts.
+- Do NOT use "update_theme" when the user asks to change a specific section's color — use "update_block" with the block's own color/style fields instead.
+- IMPORTANT: Always set "blockIndex" to the correct index from the CURRENT PAGE BLOCKS list. Do NOT guess — use the index shown in square brackets [N].`
 
     const openai = getOpenAI()
     if (!openai) {
@@ -161,15 +194,50 @@ For undoing the previous action:
         }
     }
 
-    const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: instruction },
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
-        response_format: { type: 'json_object' },
+    const callStart = Date.now()
+    let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
+    try {
+        // Spec §1.3: include last 10 chat messages for conversational context
+        // Cap each message at 300 chars to control token cost
+        const historyMessages: { role: 'user' | 'assistant'; content: string }[] = (chatHistory || [])
+            .slice(-10)
+            .filter((m): m is { role: 'user' | 'assistant'; content: string } =>
+                (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+            .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content.slice(0, 300) }))
+
+        completion = await openai.chat.completions.create({
+            model: selectModel('chat-edit'),
+            messages: [
+                { role: 'system', content: systemPrompt },
+                ...historyMessages,
+                { role: 'user', content: instruction },
+            ],
+            // phase-04: lower temperature 0.7 → 0.3 — edit-block needs fidelity, not variety.
+            // User request "change hero headline to X" should return X verbatim, not a creative rephrasing.
+            temperature: 0.3,
+            max_tokens: 2000,
+            response_format: { type: 'json_object' },
+        })
+    } catch (err) {
+        logAiUsage({
+            endpoint: 'chat-edit',
+            model: selectModel('chat-edit'),
+            tokensIn: 0,
+            tokensOut: 0,
+            durationMs: Date.now() - callStart,
+            success: false,
+            errorCode: err instanceof Error ? err.name : 'unknown',
+        })
+        throw err
+    }
+
+    logAiUsage({
+        endpoint: 'chat-edit',
+        model: completion.model,
+        tokensIn: completion.usage?.prompt_tokens ?? 0,
+        tokensOut: completion.usage?.completion_tokens ?? 0,
+        durationMs: Date.now() - callStart,
+        success: true,
     })
 
     const content = completion.choices[0]?.message?.content
@@ -178,6 +246,11 @@ For undoing the previous action:
     }
 
     const result = JSON.parse(content) as AIEditResult
+
+    // Handle scope rejection — AI determined the request is out of scope
+    if (result.action === 'none') {
+        return result
+    }
 
     if (result.action === 'add_block') {
         const normalizedBlock = normalizeAddSectionBlock(

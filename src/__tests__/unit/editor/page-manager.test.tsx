@@ -88,7 +88,7 @@ describe('PageManagerPanel', () => {
         render(<TestWrapper />)
 
         // Act
-        fireEvent.click(screen.getByText('+ Add New Page'))
+        fireEvent.click(screen.getByText('Add New Page'))
         
         const input = screen.getByPlaceholderText('Page name (e.g. Promotions)')
         fireEvent.change(input, { target: { value: 'Khuyến mãi' } })
@@ -119,7 +119,7 @@ describe('PageManagerPanel', () => {
         render(<TestWrapper />)
 
         // Act
-        fireEvent.click(screen.getByText('+ Add New Page'))
+        fireEvent.click(screen.getByText('Add New Page'))
         const input = screen.getByPlaceholderText('Page name (e.g. Promotions)')
         fireEvent.change(input, { target: { value: 'Duplicate Slug' } })
         const form = input.closest('form')!

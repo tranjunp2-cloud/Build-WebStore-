@@ -6,8 +6,13 @@ import type { CarouselConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 
-export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
+const CAR_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+
+export function CarouselBlock({ block, theme: _theme }: BlockProps<CarouselConfig>) {
+    void _theme
     const { headline, items = [], variant = 'images', autoplay = true, interval = 5000 } = block
     const [currentIndex, setCurrentIndex] = useState(0)
     const total = items.length
@@ -31,8 +36,9 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
 
     const ArrowButton = ({ direction, onClick }: { direction: 'left' | 'right'; onClick: () => void }) => (
         <button
+            type="button"
             onClick={onClick}
-            className="absolute top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 z-20 backdrop-blur-sm"
+            className={`absolute top-1/2 -translate-y-1/2 ${TOUCH_TARGET.min} min-w-[44px] md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 z-20 backdrop-blur-sm`}
             style={{
                 [direction === 'left' ? 'left' : 'right']: '12px',
                 background: `rgba(var(--brand-primary-rgb), 0.188)`,
@@ -40,7 +46,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
             }}
             aria-label={direction === 'left' ? 'Previous slide' : 'Next slide'}
         >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d={direction === 'left' ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'} />
             </svg>
         </button>
@@ -51,14 +57,20 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
             {items.map((_, i) => (
                 <button
                     key={i}
+                    type="button"
                     onClick={() => goTo(i)}
-                    className="w-2.5 h-2.5 rounded-full transition-all duration-300"
-                    style={{
-                        background: i === currentIndex ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.188)`,
-                        transform: i === currentIndex ? 'scale(1.3)' : 'scale(1)',
-                    }}
+                    className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full transition-all duration-300`}
                     aria-label={`Go to slide ${i + 1}`}
-                />
+                    aria-current={i === currentIndex}
+                >
+                    <span
+                        className="w-2.5 h-2.5 rounded-full transition-all duration-300"
+                        style={{
+                            background: i === currentIndex ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.188)`,
+                            transform: i === currentIndex ? 'scale(1.3)' : 'scale(1)',
+                        }}
+                    />
+                </button>
             ))}
         </div>
     )
@@ -66,11 +78,13 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
     // Images variant
     if (variant === 'images') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6">
+            <AnimatedSection className={SECTION_PADDING.default}>
+                <div className={CAR_CONTAINER}>
                     {headline && (
                         <div className="text-center mb-12">
-                            <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
+                            <Heading level={2}>
+                                <RichText text={headline} as="span" />
+                            </Heading>
                         </div>
                     )}
                     <div className="relative overflow-hidden rounded-2xl">
@@ -88,8 +102,8 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                                         />
                                         {(item.title || item.description) && (
                                             <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 bg-gradient-to-t from-black/70 to-transparent">
-                                                {item.title && <h3 className="text-xl md:text-2xl font-bold font-heading text-white mb-2">{item.title}</h3>}
-                                                {item.description && <p className="text-sm md:text-base text-white/80">{item.description}</p>}
+                                                {item.title && <Heading level={3} className="text-white mb-2">{item.title}</Heading>}
+                                                {item.description && <Body size="small" className="text-white/80">{item.description}</Body>}
                                             </div>
                                         )}
                                     </div>
@@ -112,11 +126,13 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
     // Cards variant
     if (variant === 'cards') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6">
+            <AnimatedSection className={SECTION_PADDING.default}>
+                <div className={CAR_CONTAINER}>
                     {headline && (
                         <div className="text-center mb-12">
-                            <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
+                            <Heading level={2}>
+                                <RichText text={headline} as="span" />
+                            </Heading>
                         </div>
                     )}
                     <div className="relative overflow-hidden">
@@ -137,9 +153,9 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                                             <div className="aspect-[16/10] overflow-hidden">
                                                 <img src={item.imageUrl} alt={item.title || ''} className="w-full h-full object-cover" />
                                             </div>
-                                            <div className="p-6">
-                                                {item.title && <h3 className="text-lg font-bold font-heading mb-2">{item.title}</h3>}
-                                                {item.description && <p className="text-sm opacity-50 leading-relaxed">{item.description}</p>}
+                                            <div className={CARD_PADDING.md}>
+                                                {item.title && <Heading level={4} className="text-lg mb-2">{item.title}</Heading>}
+                                                {item.description && <Body size="small" className="opacity-50 leading-relaxed">{item.description}</Body>}
                                             </div>
                                         </Wrapper>
                                     </div>
@@ -161,11 +177,13 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
 
     // Testimonials variant
     if (variant === 'testimonials') return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={CAR_CONTAINER}>
                 {headline && (
                     <div className="text-center mb-12">
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
+                        <Heading level={2}>
+                            <RichText text={headline} as="span" />
+                        </Heading>
                     </div>
                 )}
                 <div className="relative max-w-3xl mx-auto overflow-hidden">

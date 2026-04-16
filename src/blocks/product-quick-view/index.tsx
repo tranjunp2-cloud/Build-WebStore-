@@ -4,9 +4,64 @@ import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { ProductQuickViewConfig, QuickViewProduct } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body, Caption } from '../shared/Typography'
+import {
+    CONTAINER,
+    INNER_PADDING,
+    SECTION_PADDING,
+    CARD_PADDING,
+    TOUCH_TARGET,
+} from '@/lib/design-tokens'
+
+// ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
+
+const PRODUCT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+
+/** Image placeholder used in card + modal. */
+function ImagePlaceholder({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
+    const iconSize = size === 'lg' ? 'w-16 h-16' : size === 'md' ? 'w-12 h-12' : 'w-8 h-8'
+    return (
+        <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ background: `rgba(var(--brand-primary-rgb), 0.04)` }}
+        >
+            <svg className={`${iconSize} opacity-20`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+            </svg>
+        </div>
+    )
+}
+
+/** Carousel arrow button — used in carousel variant (prev/next). */
+function CarouselArrow({
+    direction,
+    onClick,
+    label,
+}: {
+    direction: 'left' | 'right'
+    onClick: () => void
+    label: string
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`rounded-full flex items-center justify-center transition-opacity hover:opacity-80 ${TOUCH_TARGET.min} min-w-[44px]`}
+            style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
+            aria-label={label}
+        >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                {direction === 'left' ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                )}
+            </svg>
+        </button>
+    )
+}
 
 function QuickViewModal({
     product,
@@ -45,30 +100,32 @@ function QuickViewModal({
                         {images.length > 0 ? (
                             <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
-                                <svg className="w-16 h-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-                                </svg>
-                            </div>
+                            <ImagePlaceholder size="lg" />
                         )}
                         {images.length > 1 && (
                             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                                 {images.map((_, i) => (
                                     <button
                                         key={i}
+                                        type="button"
                                         onClick={() => setSelectedImage(i)}
-                                        className="w-2 h-2 rounded-full transition-colors"
-                                        style={{ background: i === selectedImage ? '#fff' : 'rgba(255,255,255,0.5)' }}
+                                        className={`flex items-center justify-center ${TOUCH_TARGET.min} min-w-[44px]`}
                                         aria-label={`View image ${i + 1}`}
-                                    />
+                                        aria-current={i === selectedImage}
+                                    >
+                                        <span
+                                            className="w-2 h-2 rounded-full transition-colors block"
+                                            style={{ background: i === selectedImage ? '#fff' : 'rgba(255,255,255,0.5)' }}
+                                        />
+                                    </button>
                                 ))}
                             </div>
                         )}
                     </div>
 
                     {/* Details */}
-                    <div className="p-6">
-                        <div className="flex items-center justify-between mb-4">
+                    <div className={CARD_PADDING.md}>
+                        <div className="flex items-start justify-between mb-4">
                             <div>
                                 {product.badge && (
                                     <span
@@ -78,14 +135,15 @@ function QuickViewModal({
                                         {product.badge}
                                     </span>
                                 )}
-                                <h3 className="text-xl font-bold font-heading">{product.name}</h3>
+                                <Heading level={3}>{product.name}</Heading>
                             </div>
                             <button
+                                type="button"
                                 onClick={onClose}
-                                className="w-8 h-8 flex items-center justify-center rounded-full opacity-50 hover:opacity-100 transition-opacity"
+                                className={`flex items-center justify-center rounded-full opacity-50 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px]`}
                                 aria-label="Close"
                             >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
@@ -96,17 +154,19 @@ function QuickViewModal({
                                 {currency} {product.price.toFixed(2)}
                             </span>
                             {product.originalPrice && product.originalPrice > product.price && (
-                                <span className="text-sm line-through opacity-40">
+                                <Body size="small" className="line-through opacity-40">
                                     {currency} {product.originalPrice.toFixed(2)}
-                                </span>
+                                </Body>
                             )}
                         </div>
 
-                        {product.description && <p className="text-sm opacity-60 leading-relaxed mb-4">{product.description}</p>}
+                        {product.description && (
+                            <Body size="small" className="opacity-60 leading-relaxed mb-4">{product.description}</Body>
+                        )}
 
                         {product.variants && product.variants.length > 0 && (
                             <div className="mb-6">
-                                <p className="text-xs font-semibold uppercase tracking-wider opacity-40 mb-2">Options</p>
+                                <Caption className="font-semibold uppercase tracking-wider opacity-40 mb-2 block">Options</Caption>
                                 <div className="flex flex-wrap gap-2">
                                     {product.variants.map((v, i) => (
                                         <span
@@ -124,14 +184,15 @@ function QuickViewModal({
                         {product.ctaUrl ? (
                             <a
                                 href={product.ctaUrl}
-                                className="block w-full py-3 rounded-xl font-semibold text-center text-white transition-opacity hover:opacity-90"
+                                className={`block w-full py-3 rounded-xl font-semibold text-center text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                                 style={{ background: 'var(--brand-primary)' }}
                             >
                                 {product.ctaLabel || 'Add to Cart'}
                             </a>
                         ) : (
                             <button
-                                className="w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
+                                type="button"
+                                className={`w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                                 style={{ background: 'var(--brand-primary)' }}
                             >
                                 {product.ctaLabel || 'Add to Cart'}
@@ -173,11 +234,7 @@ export function ProductQuickViewBlock({ block }: BlockProps<ProductQuickViewConf
                 {product.imageUrls[0] ? (
                     <img src={product.imageUrls[0]} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.04)` }}>
-                        <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-                        </svg>
-                    </div>
+                    <ImagePlaceholder size="md" />
                 )}
                 {product.badge && (
                     <span
@@ -190,8 +247,9 @@ export function ProductQuickViewBlock({ block }: BlockProps<ProductQuickViewConf
                 {!minimal && showQuickView && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors duration-300">
                         <button
+                            type="button"
                             onClick={() => setQuickViewProduct(product)}
-                            className="px-4 py-2 rounded-xl font-semibold text-sm text-white opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0"
+                            className={`px-4 rounded-xl font-semibold text-sm text-white opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 ${TOUCH_TARGET.min}`}
                             style={{ background: 'var(--brand-primary)' }}
                         >
                             Quick View
@@ -199,16 +257,16 @@ export function ProductQuickViewBlock({ block }: BlockProps<ProductQuickViewConf
                     </div>
                 )}
             </div>
-            <div className="p-4">
-                <h4 className="font-bold font-heading text-sm mb-1 line-clamp-1">{product.name}</h4>
+            <div className={CARD_PADDING.sm}>
+                <Heading level={4} className="text-sm mb-1 line-clamp-1">{product.name}</Heading>
                 <div className="flex items-center gap-2">
                     <span className="font-bold" style={{ color: 'var(--brand-primary)' }}>
                         {currency} {product.price.toFixed(2)}
                     </span>
                     {product.originalPrice && product.originalPrice > product.price && (
-                        <span className="text-xs line-through opacity-40">
+                        <Caption className="line-through opacity-40">
                             {currency} {product.originalPrice.toFixed(2)}
-                        </span>
+                        </Caption>
                     )}
                 </div>
             </div>
@@ -252,26 +310,8 @@ export function ProductQuickViewBlock({ block }: BlockProps<ProductQuickViewConf
                 </div>
                 {products.length > 4 && (
                     <div className="flex justify-center gap-3 mt-6">
-                        <button
-                            onClick={() => scroll('left')}
-                            className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
-                            style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
-                            aria-label="Previous products"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                        <button
-                            onClick={() => scroll('right')}
-                            className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
-                            style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
-                            aria-label="Next products"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
+                        <CarouselArrow direction="left" onClick={() => scroll('left')} label="Previous products" />
+                        <CarouselArrow direction="right" onClick={() => scroll('right')} label="Next products" />
                     </div>
                 )}
             </div>
@@ -296,11 +336,17 @@ export function ProductQuickViewBlock({ block }: BlockProps<ProductQuickViewConf
     )
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={PRODUCT_CONTAINER}>
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-50 leading-relaxed">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {variant === 'grid' && renderGrid()}

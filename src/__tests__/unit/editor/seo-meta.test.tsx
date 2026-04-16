@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
+import { I18nProvider } from '@/i18n'
 import { toast } from 'sonner'
 import '@testing-library/jest-dom'
 
@@ -32,16 +33,18 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
     describe('SettingsPanel SEO Controls', () => {
         it('TC-F05.30: Soft Limit length warning checks (60 / 160 chars)', async () => {
             render(
-                <SettingsPanel 
-                    block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
-                    onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
-                    site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
-                    currentPageId="page-1"
-                    pages={[{ id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc' }] as unknown as React.ComponentProps<typeof SettingsPanel>['pages']}
-                    onPageUpdate={vi.fn().mockImplementation(async (id, changes) => {
-                        return { id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc', ...changes }
-                    })}
-                />
+                <I18nProvider defaultLocale="en">
+                    <SettingsPanel
+                        block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
+                        onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
+                        site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
+                        currentPageId="page-1"
+                        pages={[{ id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc' }] as unknown as React.ComponentProps<typeof SettingsPanel>['pages']}
+                        onPageUpdate={vi.fn().mockImplementation(async (id, changes) => {
+                            return { id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc', ...changes }
+                        })}
+                    />
+                </I18nProvider>
             )
             
             const seoTab = screen.getByText('🔍')
@@ -60,17 +63,19 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
         it('TC-F05.29b: Auto-Gen AI LLM API Call flow', async () => {
             let mockPage = { id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc' }
             render(
-                <SettingsPanel 
-                    block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
-                    onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
-                    site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
-                    currentPageId="page-1"
-                    pages={[mockPage as unknown as React.ComponentProps<typeof SettingsPanel>['pages'][0]]}
-                    onPageUpdate={vi.fn().mockImplementation(async (id, changes) => {
-                        mockPage = { ...mockPage, ...changes }
-                        return mockPage
-                    })}
-                />
+                <I18nProvider defaultLocale="en">
+                    <SettingsPanel
+                        block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
+                        onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
+                        site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
+                        currentPageId="page-1"
+                        pages={[mockPage as unknown as React.ComponentProps<typeof SettingsPanel>['pages'][0]]}
+                        onPageUpdate={vi.fn().mockImplementation(async (id, changes) => {
+                            mockPage = { ...mockPage, ...changes }
+                            return mockPage
+                        })}
+                    />
+                </I18nProvider>
             )
             fireEvent.click(screen.getByText('🔍'))
             

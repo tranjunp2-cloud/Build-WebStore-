@@ -161,6 +161,23 @@ function pushSnapshot(
     return newHistory
 }
 
+function syncSystemBlockInLayout(
+    blocks: BlockData[],
+    blockType: 'navigation' | 'footer',
+    changes: BlockPatch,
+) {
+    let updated = false
+    const nextBlocks = blocks.map((block) => {
+        if (!updated && block.blockType === blockType) {
+            updated = true
+            return { ...block, ...changes }
+        }
+        return block
+    })
+
+    return updated ? nextBlocks : blocks
+}
+
 export const useEditorStore = create<EditorState & EditorActions>((set, get) => ({
     // Initial state
     siteId: null,
@@ -493,11 +510,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     updateHeaderBlock: (changes) => {
         const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
         const newHeader = headerBlock ? { ...headerBlock, ...changes } : { blockType: 'navigation', ...changes }
+        const newBlocks = syncSystemBlockInLayout(blocks, 'navigation', changes)
 
-        const snapshot = createSnapshot(blocks, theme, newHeader, footerBlock, 'Updated Header', 'inline_edit')
+        const snapshot = createSnapshot(newBlocks, theme, newHeader, footerBlock, 'Updated Header', 'inline_edit')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
+            blocks: newBlocks,
             headerBlock: newHeader,
             history: newHistory,
             historyIndex: newHistory.length - 1,
@@ -508,11 +527,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     updateFooterBlock: (changes) => {
         const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
         const newFooter = footerBlock ? { ...footerBlock, ...changes } : { blockType: 'footer', ...changes }
+        const newBlocks = syncSystemBlockInLayout(blocks, 'footer', changes)
 
-        const snapshot = createSnapshot(blocks, theme, headerBlock, newFooter, 'Updated Footer', 'inline_edit')
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, newFooter, 'Updated Footer', 'inline_edit')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
+            blocks: newBlocks,
             footerBlock: newFooter,
             history: newHistory,
             historyIndex: newHistory.length - 1,

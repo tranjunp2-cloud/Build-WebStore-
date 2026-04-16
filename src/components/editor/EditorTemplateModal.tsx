@@ -6,33 +6,40 @@ import { toast } from 'sonner'
 import { TemplateCard, type Template } from '@/components/frontend/TemplateCard'
 import { TemplatePreviewModal } from '@/components/frontend/TemplatePreviewModal'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
-const CATEGORIES = [
-    { value: 'all', label: 'All' },
-    { value: 'restaurant', label: 'Restaurant' },
-    { value: 'ecommerce', label: 'E-Commerce' },
-    { value: 'beauty', label: 'Beauty' },
-    { value: 'tech', label: 'Tech' },
-    { value: 'health', label: 'Health' },
-    { value: 'education', label: 'Education' },
-    { value: 'realestate', label: 'Real Estate' },
-    { value: 'fitness', label: 'Fitness' },
-    { value: 'creative', label: 'Creative' },
-    { value: 'business', label: 'Business' },
-    { value: 'fnb', label: 'Cafe & Bakery' },
-    { value: 'events', label: 'Events' },
-    { value: 'blog', label: 'Blog' },
-    { value: 'travel', label: 'Travel' },
-]
+const CATEGORY_KEYS = [
+    'all', 'restaurant', 'ecommerce', 'beauty', 'tech', 'health',
+    'education', 'realEstate', 'fitness', 'creative', 'business',
+    'cafeBakery', 'events', 'blog', 'travel',
+] as const
+
+const CATEGORY_VALUES: Record<string, string> = {
+    all: 'all', restaurant: 'restaurant', ecommerce: 'ecommerce',
+    beauty: 'beauty', tech: 'tech', health: 'health', education: 'education',
+    realEstate: 'realestate', fitness: 'fitness', creative: 'creative',
+    business: 'business', cafeBakery: 'fnb', events: 'events',
+    blog: 'blog', travel: 'travel',
+}
+
+export interface TemplateApplyResult {
+    templateName: string
+    siteId: string | number
+    unmatchedBlocks?: string[]
+}
 
 interface EditorTemplateModalProps {
     isOpen: boolean
     onClose: () => void
     siteId: string
-    onApplied: () => void
+    onBeforeApply?: () => Promise<void>
+    onApplied: (result: TemplateApplyResult) => void
 }
 
-export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: EditorTemplateModalProps) {
+export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, onApplied }: EditorTemplateModalProps) {
+    const { t } = useI18n()
+    const tt = t.editor.template
+    const categories = CATEGORY_KEYS.map(key => ({ value: CATEGORY_VALUES[key], label: tt[key] }))
     const [templates, setTemplates] = useState<Template[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [searchInput, setSearchInput] = useState('')
@@ -74,7 +81,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
             })
             .catch((err) => {
                 console.error('[EditorTemplateModal] Load error:', err)
-                toast.error('Failed to load templates')
+                toast.error(tt.loadError)
             })
             .finally(() => setIsLoading(false))
     }, [isOpen])
@@ -121,6 +128,9 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
         setIsApplying(confirmTemplate.id)
 
         try {
+            // Save unsaved changes before applying template
+            if (onBeforeApply) await onBeforeApply()
+
             const res = await fetch('/api/ai/apply-template', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -139,12 +149,16 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                 throw new Error(errMsg)
             }
 
-            toast.success(`Template "${confirmTemplate.name}" applied!`)
+            const data = await res.json().catch(() => ({}))
             setConfirmTemplate(null)
-            onApplied()
+            onApplied({
+                templateName: confirmTemplate.name,
+                siteId: data.siteId ?? siteId,
+                unmatchedBlocks: data.unmatchedBlocks,
+            })
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Failed to apply template'
-            toast.error('Failed to apply template', { description: message })
+            const message = err instanceof Error ? err.message : tt.applyFailed
+            toast.error(tt.applyFailed, { description: message })
         } finally {
             setIsApplying(null)
         }
@@ -177,7 +191,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-                        <h2 className="text-lg font-bold text-white">Choose a Template</h2>
+                        <h2 className="text-lg font-bold text-white">{tt.title}</h2>
                         <button
                             onClick={onClose}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
@@ -192,14 +206,14 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
                             <input
                                 type="text"
-                                placeholder="Search templates..."
+                                placeholder={tt.searchPlaceholder}
                                 value={searchInput}
                                 onChange={(e) => setSearchInput(e.target.value)}
                                 className="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-9 pr-3 text-sm text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:outline-none sm:w-auto"
                             />
                         </div>
                         <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide sm:flex-wrap sm:pb-0">
-                            {CATEGORIES.map((cat) => (
+                            {categories.map((cat) => (
                                 <button
                                     key={cat.value}
                                     onClick={() => setActiveCategory(cat.value)}
@@ -219,7 +233,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                     {/* Results info */}
                     {!isLoading && templates.length > 0 && (
                         <div className="px-6 pt-3 text-xs text-gray-500">
-                            Showing {filtered.length} of {templates.length} templates
+                            {tt.showingCount.replace('{filtered}', String(filtered.length)).replace('{total}', String(templates.length))}
                         </div>
                     )}
 
@@ -228,18 +242,18 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                         {isLoading ? (
                             <div className="flex h-40 flex-col items-center justify-center gap-2">
                                 <Loader2 className="h-6 w-6 animate-spin text-white/30" />
-                                <span className="text-xs text-gray-600">Loading templates...</span>
+                                <span className="text-xs text-gray-600">{tt.loading}</span>
                             </div>
                         ) : templates.length === 0 ? (
                             <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-gray-500">
-                                <p>No templates available yet.</p>
+                                <p>{tt.noTemplates}</p>
                                 <p className="text-xs text-gray-600">
-                                    Run POST /api/templates/seed to create templates.
+                                    {tt.seedHint}
                                 </p>
                             </div>
                         ) : filtered.length === 0 ? (
                             <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                                No templates match this filter
+                                {tt.noMatch}
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -283,7 +297,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                             src={`/api/templates/preview?id=${hoverPreview.template.id}`}
                             className="w-[1200px] h-[900px] origin-top-left scale-[0.34] pointer-events-none border-0"
                             loading="lazy"
-                            title={`Preview: ${hoverPreview.template.name}`}
+                            title={tt.previewTitle.replace('{name}', hoverPreview.template.name)}
                         />
                     </div>
                     <h4 className="font-semibold text-sm text-white">{hoverPreview.template.name}</h4>
@@ -318,10 +332,10 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                             </div>
                             <div>
                                 <h3 className="font-semibold text-white">
-                                    Apply &ldquo;{confirmTemplate.name}&rdquo;?
+                                    {tt.applyConfirmTitle.replace('{name}', confirmTemplate.name)}
                                 </h3>
                                 <p className="mt-1 text-sm text-gray-400">
-                                    This will replace all your pages and theme with the new template. This action cannot be undone.
+                                    {tt.applyConfirmDesc}
                                 </p>
                             </div>
                         </div>
@@ -331,7 +345,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                                 disabled={!!isApplying}
                                 className="rounded-lg bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10 disabled:opacity-50"
                             >
-                                Cancel
+                                {tt.cancel}
                             </button>
                             <button
                                 onClick={handleConfirmApply}
@@ -340,10 +354,10 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                             >
                                 {isApplying ? (
                                     <>
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Applying...
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> {tt.applying}
                                     </>
                                 ) : (
-                                    'Apply Template'
+                                    tt.applyButton
                                 )}
                             </button>
                         </div>

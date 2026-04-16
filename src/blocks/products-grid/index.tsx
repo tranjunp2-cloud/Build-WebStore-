@@ -7,6 +7,8 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 
 // Mock Data
 const MOCK_PRODUCTS = [
@@ -32,15 +34,21 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
     }[variant] || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
 
     return (
-        <AnimatedSection className="py-24 relative overflow-hidden">
+        <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden`}>
             <GradientBlob color={CSS_VARS.primary} className="bottom-[10%] left-[-5%]" size={500} opacity={0.04} />
 
-            <div className="container mx-auto px-6 relative z-10">
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} relative z-10`}>
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                    {subheadline && <RichText text={subheadline} as="p" className="opacity-60 text-lg" />}
+                    <Heading level={2} className="mb-4">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-60">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {/* Grid */}
@@ -64,21 +72,22 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
                                     {/* Quick View Overlay */}
                                     {variant !== 'list' && (
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
-                                            <button className="px-6 py-2 bg-white text-black font-semibold rounded-full transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
+                                            <button type="button" className={`px-6 py-2 bg-white text-black font-semibold rounded-full transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 ${TOUCH_TARGET.min}`}>
                                                 Quick View
                                             </button>
                                         </div>
                                     )}
                                 </div>
 
-                                <div className={variant === 'list' ? 'flex-1 py-2' : 'p-6 flex flex-col flex-1'}>
-                                    <h3 className="font-body font-semibold text-lg mb-2">{product.name}</h3>
+                                <div className={variant === 'list' ? 'flex-1 py-2' : `${CARD_PADDING.md} flex flex-col flex-1`}>
+                                    <Heading level={4} className="font-body mb-2">{product.name}</Heading>
                                     <p className="text-xl font-heading mb-4" style={{ color: 'var(--brand-primary)' }}>{product.price}</p>
-                                    
+
                                     {variant !== 'list' && <div className="mt-auto" />}
-                                    
-                                    <button 
-                                        className={`px-4 py-2 font-medium transition-all duration-300 ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
+
+                                    <button
+                                        type="button"
+                                        className={`px-4 py-2 font-medium transition-all duration-300 ${TOUCH_TARGET.min} ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
                                         style={{ 
                                             backgroundColor: variant === 'list' ? `rgba(var(--brand-primary-rgb), 0.082)` : 'transparent',
                                             color: 'var(--brand-primary)',

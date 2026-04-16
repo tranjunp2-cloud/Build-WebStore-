@@ -24,11 +24,11 @@ export function RemoveStaffModal({
         startTransition(async () => {
             const res = await removeStaff(user.id);
             if (res.success) {
-                toast.success('User removed from workspace');
+                toast.success(t?.Staff?.toast?.removed || 'User removed from workspace');
                 onSuccess(user.id);
                 onClose();
             } else {
-                toast.error(res.error || 'Failed to remove user');
+                toast.error(res.error || t?.Staff?.toast?.removeFailed || 'Failed to remove user');
             }
         });
     };
@@ -50,7 +50,7 @@ export function RemoveStaffModal({
                 {/* Header */}
                 <div className="flex flex-col items-stretch px-[24px] py-[24px] pb-[23px]" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     <h2 className="text-[24px] font-bold text-[#F8FAFC] leading-[1.333em] font-['Inter'] m-0 p-0 tracking-tight">
-                        Remove Staff Access
+                        {t?.Staff?.removeModal?.title || 'Remove Staff Access'}
                     </h2>
                 </div>
 
@@ -66,10 +66,10 @@ export function RemoveStaffModal({
                     {/* Text Block */}
                     <div className="flex flex-col gap-[12px] text-center">
                         <h3 className="text-[18px] font-bold text-[#F8FAFC] leading-[1.556em] font-['Inter'] m-0 p-0">
-                            Are you sure you want to remove access for this user?
+                            {t?.Staff?.removeModal?.desc1 || 'Are you sure you want to remove access for this user?'}
                         </h3>
                         <p className="text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter'] m-0 p-0 px-[8px]">
-                            This person will immediately lose access to the system and all store data. This action cannot be undone.
+                            {t?.Staff?.removeModal?.desc2 || 'This person will immediately lose access to the system and all store data. This action cannot be undone.'}
                         </p>
                     </div>
 
@@ -109,7 +109,7 @@ export function RemoveStaffModal({
                         disabled={isPending}
                         className="flex items-center justify-center h-[46px] px-[24px] rounded-[12px] bg-[#0B1120]/50 border border-white/[0.08] text-[16px] font-medium text-[#F8FAFC] hover:bg-[#0B1120]/80 transition-colors focus:outline-none"
                     >
-                        Cancel
+                        {t?.Staff?.removeModal?.cancel || 'Cancel'}
                     </button>
                     <button
                         type="button"
@@ -122,7 +122,7 @@ export function RemoveStaffModal({
                         }}
                     >
                         {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                        Yes, Remove
+                        {t?.Staff?.removeModal?.confirm || 'Yes, Remove'}
                     </button>
                 </div>
             </div>

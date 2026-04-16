@@ -18,14 +18,17 @@ import {
     Indent,
     Undo,
     FileRepository,
+    Code,
     type UploadAdapter,
     type FileLoader,
     type Editor,
     Plugin,
 } from 'ckeditor5'
+import { AutoLink } from '@ckeditor/ckeditor5-link'
 import 'ckeditor5/ckeditor5.css'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useI18n } from '@/i18n'
 
 // Custom Upload Adapter — uses server action to upload to Payload CMS
 class PayloadUploadAdapter implements UploadAdapter {
@@ -48,11 +51,10 @@ class PayloadUploadAdapter implements UploadAdapter {
         // Use server action — bypasses REST API cookie auth
         const doc = await uploadMediaAction(formData)
 
-        // Fix Docker-internal minio URL to browser-accessible URL
+        // Fix Docker-internal MinIO URL to browser-accessible URL
         const s3Public = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
         const fixUrl = (url: string) => {
             if (!url) return url
-            // Replace Docker hostname (minio:9000) with public endpoint
             return url.replace(/https?:\/\/minio:\d+/, s3Public)
         }
 
@@ -98,11 +100,112 @@ interface BlogRichEditorProps {
     placeholder?: string
 }
 
-export function BlogRichEditor({ content, onChange, placeholder = 'Start writing...' }: BlogRichEditorProps) {
+export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEditorProps) {
+    const { t } = useI18n()
+    const resolvedPlaceholder = placeholder ?? t.dashboard.blog.editor.startWriting
     const [charCount, setCharCount] = useState(0)
+    const [editorInstance, setEditorInstance] = useState<Editor | null>(null)
+    const [selectedText, setSelectedText] = useState('')
+    const [showImproveMenu, setShowImproveMenu] = useState(false)
+    const [improveMenuPos, setImproveMenuPos] = useState({ top: 0, left: 0 })
+    const [isRewriting, setIsRewriting] = useState(false)
+
+    // Sync placeholder text when locale changes (CKEditor config only applies on mount)
+    useEffect(() => {
+        if (!editorInstance) return
+        const root = editorInstance.editing.view.document.getRoot()
+        if (root) {
+            editorInstance.editing.view.change(writer => {
+                writer.setAttribute('data-placeholder', resolvedPlaceholder, root)
+            })
+        }
+    }, [editorInstance, resolvedPlaceholder])
+
+    // Sync character count to the custom DOM element injected in toolbar
+    useEffect(() => {
+        const update = () => {
+            const el = document.getElementById('ck-char-count')
+            if (el) el.textContent = `${charCount} ${t.dashboard.blog.editor.characters}`
+        }
+        update()
+        const id = setTimeout(update, 150)
+        return () => clearTimeout(id)
+    }, [charCount, t.dashboard.blog.editor.characters])
+
+    const handleImproveText = async (instruction: string) => {
+        if (!editorInstance || !selectedText.trim()) return
+        setIsRewriting(true)
+        setShowImproveMenu(false)
+        try {
+            const res = await fetch('/api/ai/rewrite-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ text: selectedText, instruction }),
+            })
+            if (res.ok) {
+                const { rewritten } = await res.json()
+                if (rewritten && rewritten !== selectedText) {
+                    const viewDoc = editorInstance.editing.view.document
+                    const selection = viewDoc.selection
+                    if (!selection.isCollapsed) {
+                        editorInstance.model.change(writer => {
+                            const modelSelection = editorInstance.model.document.selection
+                            const range = modelSelection.getFirstRange()
+                            if (range) {
+                                writer.remove(range)
+                                writer.insertText(rewritten, range.start)
+                            }
+                        })
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('[Improve Text]', err)
+        } finally {
+            setIsRewriting(false)
+            setSelectedText('')
+        }
+    }
 
     return (
-        <div className="blog-ckeditor-wrapper flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] overflow-hidden">
+        <div className="blog-ckeditor-wrapper relative flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] overflow-hidden">
+            {/* Improve Text floating menu */}
+            {showImproveMenu && selectedText && (
+                <div
+                    className="absolute z-50 flex flex-col gap-1 p-2 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl min-w-[180px]"
+                    style={{ top: improveMenuPos.top, left: improveMenuPos.left }}
+                >
+                    <span className="text-[10px] uppercase tracking-wider text-gray-500 px-2 py-1">{t.dashboard.blog.editor.aiImproveLabel}</span>
+                    {[
+                        { label: t.dashboard.blog.editor.aiMakeProfessional, instruction: 'Rewrite this text to sound more professional and polished' },
+                        { label: t.dashboard.blog.editor.aiMakeShorter, instruction: 'Make this text shorter and more concise while keeping the meaning' },
+                        { label: t.dashboard.blog.editor.aiImproveWriting, instruction: 'Improve the grammar, clarity, and readability of this text' },
+                    ].map((action) => (
+                        <button
+                            key={action.label}
+                            onClick={() => handleImproveText(action.instruction)}
+                            className="text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
+                        >
+                            {action.label}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setShowImproveMenu(false)}
+                        className="text-left px-3 py-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                    >
+                        {t.dashboard.blog.editor.cancel}
+                    </button>
+                </div>
+            )}
+            {isRewriting && (
+                <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded-[16px]">
+                    <div className="flex items-center gap-2 text-sm text-white bg-[#1E293B] px-4 py-2 rounded-lg border border-white/10">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        {t.dashboard.blog.editor.aiRewriting}
+                    </div>
+                </div>
+            )}
             <CKEditor
                 editor={ClassicEditor}
                 config={{
@@ -113,6 +216,7 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                         Italic,
                         Underline,
                         Link,
+                        AutoLink,
                         Image,
                         ImageInsert,
                         ImageUpload,
@@ -122,22 +226,20 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                         Heading,
                         Indent,
                         Undo,
+                        Code,
                         PayloadUploadAdapterPlugin,
                     ],
                     toolbar: {
                         items: [
                             'bold', 'italic', 'underline',
                             '|',
-                            'link', 'insertImage',
-                            '|',
                             'bulletedList', 'numberedList',
                             '|',
-                            'blockQuote',
-                            '|',
-                            'undo', 'redo',
+                            'link', 'blockQuote',
+                            'code'
                         ],
                     },
-                    placeholder,
+                    placeholder: resolvedPlaceholder,
                     link: {
                         addTargetToExternalLinks: true,
                         defaultProtocol: 'https://',
@@ -158,17 +260,78 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     setCharCount(div.textContent?.length || 0)
                 }}
                 onReady={(editor) => {
+                    setEditorInstance(editor)
                     const html = editor.getData()
                     const div = document.createElement('div')
                     div.innerHTML = html
                     setCharCount(div.textContent?.length || 0)
+
+                    // DOM manipulation to match Figma toolbar
+                    const toolbar = editor.ui.view.toolbar.element
+                    if (toolbar) {
+                        const itemsContainer = toolbar.querySelector('.ck-toolbar__items') as HTMLElement
+                        if (itemsContainer) {
+                            itemsContainer.style.flexWrap = 'wrap'
+                            
+                            // Add a flex-grow spacer to push character count to the right
+                            const spacerDiv = document.createElement('div')
+                            spacerDiv.style.flexGrow = '1'
+                            itemsContainer.appendChild(spacerDiv)
+
+                            // Inject character count to the right side (inline styles — Tailwind classes unreliable on DOM-created elements)
+                            const charCountDiv = document.createElement('div')
+                            charCountDiv.id = 'ck-char-count'
+                            Object.assign(charCountDiv.style, {
+                                fontFamily: "'Inter', sans-serif",
+                                fontWeight: '400',
+                                fontSize: '12px',
+                                lineHeight: '1.333',
+                                color: 'rgba(248, 250, 252, 0.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                paddingRight: '8px',
+                            })
+                            charCountDiv.textContent = `${div.textContent?.length || 0} ${t.dashboard.blog.editor.characters}`
+                            itemsContainer.appendChild(charCountDiv)
+                        }
+                    }
+
+                    // Listen for selection changes to show "Improve Text" menu
+                    editor.editing.view.document.on('selectionChange', () => {
+                        const modelSel = editor.model.document.selection
+                        const range = modelSel.getFirstRange()
+                        if (!range || modelSel.isCollapsed) {
+                            setSelectedText('')
+                            setShowImproveMenu(false)
+                            return
+                        }
+                        let text = ''
+                        for (const item of range.getItems()) {
+                            if (item.is('$textProxy')) text += item.data
+                        }
+                        setSelectedText(text)
+                    })
+
+                    // Show improve menu on mouseup when text is selected
+                    editor.editing.view.document.on('mouseup', () => {
+                        setTimeout(() => {
+                            const nativeSel = window.getSelection()
+                            if (nativeSel && nativeSel.toString().trim().length > 3) {
+                                const rect = nativeSel.getRangeAt(0).getBoundingClientRect()
+                                const wrapper = (editor.editing.view.getDomRoot() as HTMLElement)?.closest('.blog-ckeditor-wrapper')
+                                if (wrapper) {
+                                    const wrapperRect = wrapper.getBoundingClientRect()
+                                    setImproveMenuPos({
+                                        top: rect.bottom - wrapperRect.top + 8,
+                                        left: Math.min(rect.left - wrapperRect.left, wrapperRect.width - 200),
+                                    })
+                                    setShowImproveMenu(true)
+                                }
+                            }
+                        }, 50)
+                    })
                 }}
             />
-            <div className="flex items-center justify-end px-[16px] py-[8px] border-t border-[rgba(255,255,255,0.08)]">
-                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[rgba(248,250,252,0.5)]">
-                    {charCount} characters
-                </span>
-            </div>
 
             {/* Complete dark theme CSS overrides */}
             <style jsx global>{`
@@ -179,41 +342,34 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                 .blog-ckeditor-wrapper .ck.ck-editor {
                     width: 100%;
                     border: none !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__top,
                 .blog-ckeditor-wrapper .ck.ck-editor__top .ck-sticky-panel,
                 .blog-ckeditor-wrapper .ck.ck-editor__top .ck-sticky-panel__content {
                     border: none !important;
                     box-shadow: none !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
                 }
-                .blog-ckeditor-wrapper .ck.ck-editor__top {
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+                .blog-ckeditor-wrapper .ck.ck-editor__top .ck-sticky-panel__placeholder {
+                    display: none !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                 }
-
-                /* ===== TOOLBAR ===== */
-                .blog-ckeditor-wrapper .ck.ck-toolbar {
-                    background: rgba(11, 17, 32, 0.5) !important;
-                    border: none !important;
+                /* ===== DISABLE STICKY TOOLBAR TO FIX GAP AND OVERLAP ISSUES ===== */
+                .blog-ckeditor-wrapper .ck.ck-sticky-panel .ck-sticky-panel__content_sticky {
+                    position: static !important;
+                    top: auto !important;
+                    width: auto !important;
                     box-shadow: none !important;
-                    padding: 8px 12px !important;
-                    border-radius: 0 !important;
-                    flex-wrap: wrap !important;
                 }
-
-                /* ===== AC-1: STICKY TOOLBAR ON MOBILE ===== */
+                
                 @media (max-width: 1279px) {
-                    .blog-ckeditor-wrapper .ck.ck-editor__top {
-                        position: sticky !important;
-                        bottom: 0 !important;
-                        z-index: 50 !important;
-                        order: 2 !important;
-                        border-bottom: none !important;
-                        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-                        background: rgba(11, 17, 32, 0.95) !important;
-                        backdrop-filter: blur(8px) !important;
-                    }
                     .blog-ckeditor-wrapper .ck.ck-editor__main {
-                        order: 1 !important;
+                        order: 2 !important;
                     }
                     .blog-ckeditor-wrapper .ck.ck-editor {
                         display: flex !important;
@@ -223,13 +379,38 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                         min-height: 300px !important;
                     }
                     .blog-ckeditor-wrapper .ck.ck-toolbar {
-                        padding: 6px 8px !important;
+                        padding: 0 8px 8px 8px !important;
                     }
                     .blog-ckeditor-wrapper .ck.ck-button {
-                        min-width: 32px !important;
-                        min-height: 32px !important;
-                        padding: 4px !important;
+                        min-width: 44px !important;
+                        min-height: 44px !important;
+                        padding: 8px !important;
                     }
+                }
+                .blog-ckeditor-wrapper .ck.ck-editor__top {
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+                }
+
+                /* ===== TOOLBAR ===== */
+                .blog-ckeditor-wrapper .ck.ck-toolbar {
+                    background: rgba(11, 17, 32, 0.5) !important;
+                    border: none !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    min-height: unset !important;
+                }
+                .blog-ckeditor-wrapper .ck.ck-toolbar__items {
+                    padding: 12px !important;
+                    margin: 0 !important;
+                    gap: 8px !important;
+                    align-items: center !important;
+                    align-content: flex-start !important;
+                }
+                .blog-ckeditor-wrapper .ck.ck-toolbar__separator {
+                    background: rgba(255, 255, 255, 0.08) !important;
+                    width: 1px !important;
+                    height: 24px !important;
+                    margin: 0 8px !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-toolbar .ck-toolbar__separator {
                     background: rgba(255, 255, 255, 0.08) !important;
@@ -245,8 +426,14 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     color: rgba(248, 250, 252, 0.6) !important;
                     background: transparent !important;
                     border: none !important;
-                    border-radius: 8px !important;
+                    border-radius: 12px !important;
                     cursor: pointer !important;
+                    margin: 0 !important;
+                    width: 32px !important;
+                    height: 32px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-button:hover,
                 .blog-ckeditor-wrapper .ck.ck-button.ck-off:hover {
@@ -257,7 +444,7 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     background: rgba(59, 130, 246, 0.15) !important;
                     color: #3B82F6 !important;
                     border: none !important;
-                    border-radius: 8px !important;
+                    border-radius: 12px !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-button .ck-icon {
                     color: inherit !important;
@@ -299,6 +486,14 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                 .blog-ckeditor-wrapper .ck.ck-editor__editable a {
                     color: #2DD4BF !important;
                     text-decoration: underline !important;
+                }
+                .blog-ckeditor-wrapper .ck.ck-editor__editable a:empty::after {
+                    content: attr(href);
+                    color: #2DD4BF;
+                }
+                .blog-ckeditor-wrapper .ck.ck-editor__editable .ck-link_selected {
+                    color: #2DD4BF !important;
+                    background: rgba(45, 212, 191, 0.15) !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable blockquote {
                     border-left: 3px solid #3B82F6 !important;
@@ -696,6 +891,9 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                 }
 
                 /* ===== CK BODY WRAPPER (global panel container) ===== */
+                .ck-body-wrapper {
+                    z-index: 35 !important;
+                }
                 .ck-body-wrapper .ck.ck-balloon-panel,
                 .ck-body-wrapper .ck.ck-balloon-panel_visible {
                     background: #1E293B !important;

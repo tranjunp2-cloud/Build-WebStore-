@@ -5,16 +5,16 @@ import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
-import { CTAButtons } from '../shared'
+import { CTAButtons, HERO_CONTAINER, safeAltText } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 
-export function CenteredHero({ block }: BlockProps<HeroConfig>) {
+export function CenteredHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], image, badge } = block
 
     return (
         <AnimatedSection
-            className="relative min-h-[92vh] flex items-center overflow-hidden"
+            className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden"
         >
             {/* Multi-layer background */}
             <div className="absolute inset-0" style={{
@@ -27,7 +27,7 @@ export function CenteredHero({ block }: BlockProps<HeroConfig>) {
             <GradientBlob color={CSS_VARS.primary} className="top-[-20%] left-[10%]" size={600} opacity={0.1} />
             <GradientBlob color={CSS_VARS.primary} className="bottom-[-10%] right-[5%]" size={400} opacity={0.08} />
 
-            <div className="container mx-auto px-6 relative z-10">
+            <div className={`${HERO_CONTAINER} relative z-10`}>
                 <div className="text-center max-w-4xl mx-auto">
                     {badge?.show && (
                         <motion.div
@@ -70,7 +70,7 @@ export function CenteredHero({ block }: BlockProps<HeroConfig>) {
                             transition={{ duration: 0.5, delay: 0.25 }}
                             className="flex flex-wrap gap-4 justify-center"
                         >
-                            <CTAButtons buttons={ctaButtons} />
+                            <CTAButtons buttons={ctaButtons} siteId={site?.id ? String(site.id) : undefined} />
                         </motion.div>
                     )}
 
@@ -85,7 +85,7 @@ export function CenteredHero({ block }: BlockProps<HeroConfig>) {
                         >
                             <img
                                 src={image?.url}
-                                alt={image?.alt || headline}
+                                alt={safeAltText(image?.alt, headline)}
                                 className="w-full rounded-2xl object-cover"
                             />
                             {/* Gradient overlay for polish */}

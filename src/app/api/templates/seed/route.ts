@@ -42,7 +42,19 @@ async function handleSeed(request: Request): Promise<NextResponse> {
             }
 
             const batchSize = 5
-            const seeds = TEMPLATE_PRESETS.map((preset) => composeFromBlueprint(preset))
+            // Plan 260415 fix-500 — composeFromBlueprint now returns null on
+            // unrecoverable composer failure (unknown category / missing
+            // content pack) instead of throwing. Keep the preset→seed pair so
+            // index mapping stays correct, then filter null pairs out.
+            const seedPairs = TEMPLATE_PRESETS.map((preset) => ({
+                preset,
+                seed: composeFromBlueprint(preset),
+            }))
+            const validPairs = seedPairs.filter(
+                (p): p is { preset: typeof p.preset; seed: NonNullable<typeof p.seed> } => p.seed !== null,
+            )
+            const composerSkipped = seedPairs.length - validPairs.length
+            const seeds = validPairs.map((p) => p.seed)
 
             if (dry) {
                 return NextResponse.json({
@@ -50,10 +62,11 @@ async function handleSeed(request: Request): Promise<NextResponse> {
                     data: {
                         total: seeds.length,
                         created: 0, skipped: 0, failed: 0, dry: true,
-                        templates: seeds.map((s) => ({
+                        composerSkipped,
+                        templates: validPairs.map(({ preset, seed: s }) => ({
                             name: s.name,
                             category: s.category,
-                            personality: TEMPLATE_PRESETS.find(p => p.name === s.name)?.personality ?? 'unknown',
+                            personality: preset.personality,
                             isPremium: s.isPremium,
                             pageCount: s.pages.length,
                             blockCount: s.pages.reduce((acc, p) => acc + p.layout.length, 0),
@@ -79,11 +92,10 @@ async function handleSeed(request: Request): Promise<NextResponse> {
             const results: { status: 'fulfilled' | 'rejected'; value?: { name: string; category: string; personality: string; status: string }; reason?: string }[] = []
             let skipped = 0
 
-            for (let i = 0; i < seeds.length; i += batchSize) {
-                const batch = seeds.slice(i, i + batchSize)
+            for (let i = 0; i < validPairs.length; i += batchSize) {
+                const batch = validPairs.slice(i, i + batchSize)
                 const batchResults = await Promise.allSettled(
-                    batch.map(async (seed, idx) => {
-                        const preset = TEMPLATE_PRESETS[i + idx]!
+                    batch.map(async ({ preset, seed }) => {
                         if (existingNames.has(seed.name)) {
                             skipped++
                             return { name: seed.name, category: seed.category, personality: preset.personality, status: 'skipped' as const }
@@ -138,7 +150,10 @@ async function handleSeed(request: Request): Promise<NextResponse> {
         // ── v2: Composed templates (legacy) ────────────────────────────
         if (v2) {
             const batchSize = 10
-            const seeds = TEMPLATE_DEFINITIONS.map((def) => composeTemplate(def))
+            // Plan 260415 fix-500 — composeTemplate returns null on failure.
+            const seeds = TEMPLATE_DEFINITIONS
+                .map((def) => composeTemplate(def))
+                .filter((s): s is NonNullable<typeof s> => s !== null)
 
             if (dry) {
                 return NextResponse.json({

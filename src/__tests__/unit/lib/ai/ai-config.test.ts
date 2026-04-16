@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
     selectModel,
     checkRateLimit,
@@ -14,33 +14,113 @@ import {
 const ALL_TASKS: AITask[] = [
     'site-generation', 'chat-edit', 'inline-edit',
     'seo-generation', 'content-rewrite', 'product-description',
+    'url-extraction', 'bulk-parse',
 ]
 
 const ALL_PLANS: SubscriptionPlan[] = ['free', 'starter', 'pro', 'business']
 
-describe('selectModel [TC-F01.08, TC-F01.10]', () => {
-    it('returns gpt-4o for site-generation (highest quality)', () => {
+describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
+    // Clear env overrides for default-route tests
+    const originalEnv: Record<string, string | undefined> = {}
+    const ENV_KEYS = [
+        'AI_MODEL_SITEGEN', 'AI_MODEL_EDIT', 'AI_MODEL_INLINE_EDIT',
+        'AI_MODEL_SEO', 'AI_MODEL_REWRITE', 'AI_MODEL_PRODUCT_DESC',
+        'AI_MODEL_URL_EXTRACT', 'AI_MODEL_BULK_PARSE',
+    ]
+
+    beforeEach(() => {
+        for (const k of ENV_KEYS) {
+            originalEnv[k] = process.env[k]
+            delete process.env[k]
+        }
+    })
+
+    afterEach(() => {
+        for (const k of ENV_KEYS) {
+            if (originalEnv[k] === undefined) delete process.env[k]
+            else process.env[k] = originalEnv[k]
+        }
+    })
+
+    it('returns gpt-4.1-mini for site-generation (phase-03a default, 9.9x cheaper than gpt-4o)', () => {
+        expect(selectModel('site-generation')).toBe('gpt-4.1-mini')
+    })
+
+    it('returns gpt-4.1-mini for chat-edit (phase-04: better instruction following)', () => {
+        expect(selectModel('chat-edit')).toBe('gpt-4.1-mini')
+    })
+
+    it('returns gpt-4.1-mini for inline-edit (phase-04)', () => {
+        expect(selectModel('inline-edit')).toBe('gpt-4.1-mini')
+    })
+
+    it('returns gpt-4.1-nano for seo-generation (phase-04: 4x cheaper lightweight)', () => {
+        expect(selectModel('seo-generation')).toBe('gpt-4.1-nano')
+    })
+
+    it('returns gpt-4.1-nano for content-rewrite (phase-04)', () => {
+        expect(selectModel('content-rewrite')).toBe('gpt-4.1-nano')
+    })
+
+    it('returns gpt-4.1-nano for product-description (phase-04)', () => {
+        expect(selectModel('product-description')).toBe('gpt-4.1-nano')
+    })
+
+    it('returns gpt-4.1-nano for bulk-parse (phase-04: 50x cheaper for CSV extraction)', () => {
+        expect(selectModel('bulk-parse')).toBe('gpt-4.1-nano')
+    })
+
+    it('returns gpt-4.1-nano for url-extraction (phase-04)', () => {
+        expect(selectModel('url-extraction')).toBe('gpt-4.1-nano')
+    })
+})
+
+describe('selectModel — env override', () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>
+    const savedSiteGen = process.env.AI_MODEL_SITEGEN
+    const savedEdit = process.env.AI_MODEL_EDIT
+
+    beforeEach(() => {
+        warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        delete process.env.AI_MODEL_SITEGEN
+        delete process.env.AI_MODEL_EDIT
+    })
+
+    afterEach(() => {
+        warnSpy.mockRestore()
+        if (savedSiteGen === undefined) delete process.env.AI_MODEL_SITEGEN
+        else process.env.AI_MODEL_SITEGEN = savedSiteGen
+        if (savedEdit === undefined) delete process.env.AI_MODEL_EDIT
+        else process.env.AI_MODEL_EDIT = savedEdit
+    })
+
+    it('AI_MODEL_SITEGEN=gpt-4.1-mini overrides site-generation default', () => {
+        process.env.AI_MODEL_SITEGEN = 'gpt-4.1-mini'
+        expect(selectModel('site-generation')).toBe('gpt-4.1-mini')
+    })
+
+    it('AI_MODEL_EDIT=gpt-4.1-nano overrides chat-edit default', () => {
+        process.env.AI_MODEL_EDIT = 'gpt-4.1-nano'
+        expect(selectModel('chat-edit')).toBe('gpt-4.1-nano')
+    })
+
+    it('invalid override falls back to default + console.warn', () => {
+        process.env.AI_MODEL_SITEGEN = 'nonexistent-model'
+        // Default is gpt-4.1-mini after phase-03a flip
+        expect(selectModel('site-generation')).toBe('gpt-4.1-mini')
+        expect(warnSpy).toHaveBeenCalledOnce()
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent-model'))
+    })
+
+    it('empty-string override treated as no override', () => {
+        process.env.AI_MODEL_SITEGEN = ''
+        expect(selectModel('site-generation')).toBe('gpt-4.1-mini')
+        expect(warnSpy).not.toHaveBeenCalled()
+    })
+
+    it('canary rollback via env var: AI_MODEL_SITEGEN=gpt-4o restores legacy', () => {
+        process.env.AI_MODEL_SITEGEN = 'gpt-4o'
         expect(selectModel('site-generation')).toBe('gpt-4o')
-    })
-
-    it('returns gpt-4o-mini for chat-edit (cost-optimized)', () => {
-        expect(selectModel('chat-edit')).toBe('gpt-4o-mini')
-    })
-
-    it('returns gpt-4o-mini for inline-edit', () => {
-        expect(selectModel('inline-edit')).toBe('gpt-4o-mini')
-    })
-
-    it('returns gpt-4o-mini for seo-generation', () => {
-        expect(selectModel('seo-generation')).toBe('gpt-4o-mini')
-    })
-
-    it('returns gpt-4o-mini for content-rewrite', () => {
-        expect(selectModel('content-rewrite')).toBe('gpt-4o-mini')
-    })
-
-    it('returns gpt-4o-mini for product-description', () => {
-        expect(selectModel('product-description')).toBe('gpt-4o-mini')
     })
 })
 
@@ -132,7 +212,10 @@ describe('ESTIMATED_COSTS structure', () => {
         }
     })
 
-    it('site-generation costs more than other tasks (uses gpt-4o)', () => {
+    it('site-generation costs more than other tasks (heavier prompt + output)', () => {
+        // Note: ESTIMATED_COSTS still reflects pre-phase-03 gpt-4o pricing.
+        // Post-phase-03 actual cost is ~$0.004 (gpt-4.1-mini). Estimate table
+        // will be refreshed when phase-05 wires real observability.
         const siteGenCost = ESTIMATED_COSTS['site-generation']
         for (const task of ALL_TASKS.filter(t => t !== 'site-generation')) {
             expect(siteGenCost).toBeGreaterThan(ESTIMATED_COSTS[task])

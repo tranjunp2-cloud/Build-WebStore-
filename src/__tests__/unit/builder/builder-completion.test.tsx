@@ -3,6 +3,19 @@ import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
+import en from '@/i18n/locales/en.json'
+
+// Plan 260415 — stub useI18n so the component renders with real EN strings
+// without needing a wrapping I18nProvider in every test.
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: en,
+        ti: (template: string, vars: Record<string, string | number>) =>
+            template.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? '')),
+    }),
+    I18nProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
 import BuilderCompletionView from '../../../components/builder/BuilderCompletionView'
 import type { BuilderPreviewMode } from '../../../components/builder/BuilderPreviewPrimitives'
 

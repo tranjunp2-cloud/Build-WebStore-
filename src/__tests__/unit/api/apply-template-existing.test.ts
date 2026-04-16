@@ -74,7 +74,15 @@ const DEFAULT_SITE = {
     status: 'published',
 }
 
-const DEFAULT_HOMEPAGE = { id: 201, slug: 'home', isHomepage: true }
+const DEFAULT_HOMEPAGE = {
+    id: 201,
+    slug: 'home',
+    isHomepage: true,
+    layout: [
+        { blockType: 'hero', variant: 'centered', headline: 'Old Hero' },
+        { blockType: 'footer', logoText: 'Old Footer' },
+    ],
+}
 
 // Mutable references — reset in beforeEach, overridden in specific tests
 let mockTemplate: Record<string, unknown> | null = { ...DEFAULT_TEMPLATE }
@@ -372,31 +380,29 @@ describe('POST /api/ai/apply-template', () => {
 
             // Assert — sites.update called with the template theme
             const siteUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'sites'
+                (c: [{ collection: string; data?: { theme?: unknown }; id?: number | string }]) => c[0].collection === 'sites' && c[0].data?.theme
             )
             expect(siteUpdateCall).toBeDefined()
             expect(siteUpdateCall[0].id).toBe(101)
             expect(siteUpdateCall[0].data.theme).toEqual(DEFAULT_TEMPLATE.defaultTheme)
         })
 
-        it('deletes existing pages and creates new homepage with template defaultBlocks', async () => {
+        it('updates existing homepage layout via smart mapping (not delete+create)', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
             await POST(req)
 
-            // Assert — old page deleted, new page created with template blocks
-            expect(mockPayloadInstance.delete).toHaveBeenCalledWith(
-                expect.objectContaining({ collection: 'pages', id: 201 })
+            // Assert — page UPDATED in-place (smart mapping), NOT deleted+created
+            expect(mockPayloadInstance.delete).not.toHaveBeenCalledWith(
+                expect.objectContaining({ collection: 'pages' })
             )
-            const pageCreateCall = mockPayloadInstance.create.mock.calls.find(
-                (c: any[]) => c[0].collection === 'pages'
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
             )
-            expect(pageCreateCall).toBeDefined()
-            // Layout is sanitized (variants resolved, unknown blocks filtered)
-            // Just verify blocks are present with correct blockTypes
-            const layout = pageCreateCall[0].data.layout as Record<string, unknown>[]
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
             expect(layout.length).toBeGreaterThan(0)
             expect(layout[0].blockType).toBe('hero')
         })
@@ -432,18 +438,18 @@ describe('POST /api/ai/apply-template', () => {
             expect(templateUpdateCall[0].data.usageCount).toBe(6) // 5 + 1
         })
 
-        it('creates new pages from template when applying to existing site (multi-page)', async () => {
+        it('updates existing pages in-place when applying template (smart mapping)', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
             await POST(req)
 
-            // Assert — creates pages (delete old + create new is the new flow)
-            const pageCreateCalls = mockPayloadInstance.create.mock.calls.filter(
+            // Assert — pages are UPDATED, not created anew
+            const pageUpdateCalls = mockPayloadInstance.update.mock.calls.filter(
                 (c: any[]) => c[0].collection === 'pages'
             )
-            expect(pageCreateCalls.length).toBeGreaterThanOrEqual(1)
+            expect(pageUpdateCalls.length).toBeGreaterThanOrEqual(1)
         })
 
         it('finds all existing pages by site ID for deletion', async () => {
@@ -529,20 +535,22 @@ describe('POST /api/ai/apply-template', () => {
 
     describe('Edge cases', () => {
 
-        it('uses empty array for blocks when template has no defaultBlocks', async () => {
-            // Arrange
+        it('keeps existing layout when template has no defaultBlocks (re-skin path)', async () => {
+            // Arrange — template has no blocks → templateBlocksClean is empty
+            // → smart mapping skipped → re-skin path keeps existing blocks
             mockTemplate = { ...DEFAULT_TEMPLATE, defaultBlocks: undefined }
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
             await POST(req)
 
-            // Assert — page created with empty array layout (not undefined/null)
-            const pageCreateCall = mockPayloadInstance.create.mock.calls.find(
-                (c: any[]) => c[0].collection === 'pages'
+            // Assert — page UPDATED (re-skin), existing layout preserved
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
             )
-            expect(pageCreateCall).toBeDefined()
-            expect(pageCreateCall[0].data.layout).toEqual([])
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            expect(layout.length).toBeGreaterThan(0)
         })
 
         it('passes siteId as Number when calling payload.findByID and payload.update for sites', async () => {
@@ -580,20 +588,22 @@ describe('POST /api/ai/apply-template', () => {
 
         // ── TC-F07.040: null defaultBlocks ────────────────────────────────────
 
-        it('TC-F07.040: apply template with null defaultBlocks uses empty array for layout', async () => {
-            // Arrange — template.defaultBlocks is explicitly null (not undefined)
+        it('TC-F07.040: apply template with null defaultBlocks keeps existing layout (re-skin)', async () => {
+            // Arrange — template.defaultBlocks is null → templateBlocksClean = []
+            // → re-skin path preserves existing blocks
             mockTemplate = { ...DEFAULT_TEMPLATE, defaultBlocks: null }
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
             await POST(req)
 
-            // Assert — page created with [] layout, not null
-            const pageCreateCall = mockPayloadInstance.create.mock.calls.find(
-                (c: any[]) => c[0].collection === 'pages'
+            // Assert — page updated with existing layout preserved (re-skin)
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
             )
-            expect(pageCreateCall).toBeDefined()
-            expect(pageCreateCall[0].data.layout).toEqual([])
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            expect(layout.length).toBeGreaterThan(0)
         })
 
         // ── TC-F07.041: null defaultTheme ─────────────────────────────────────
@@ -608,7 +618,7 @@ describe('POST /api/ai/apply-template', () => {
 
             // Assert — site theme must contain hardcoded fallback values
             const siteUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'sites'
+                (c: [{ collection: string; data?: { theme?: unknown }; id?: number | string }]) => c[0].collection === 'sites' && c[0].data?.theme
             )
             expect(siteUpdateCall).toBeDefined()
             expect(siteUpdateCall[0].data.theme).toMatchObject({

@@ -68,7 +68,12 @@ describe('getBlogCategoriesAction [TC-F17.01]', () => {
         expect(mockFind).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'blog_categories',
-                where: { tenant: { equals: 'tenant-1' } },
+                where: {
+                    and: [
+                        { status: { not_equals: 'deleted' } },
+                        { tenant: { equals: 'tenant-1' } },
+                    ],
+                },
             }),
         )
         expect(result).toEqual([{ id: 'cat-1', name: 'Tech' }])
@@ -98,7 +103,9 @@ describe('createBlogCategoryAction [TC-F17.02]', () => {
 
     it('creates category with correct tenant and slug', async () => {
         vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any)
-        mockFind.mockResolvedValue({ docs: [{ id: 'site-1' }] })
+        // First call: site lookup, Second call: duplicate name check (empty = no duplicate)
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1' }] })
+        mockFind.mockResolvedValueOnce({ docs: [] })
         mockCreate.mockResolvedValue({ id: 'cat-new', name: 'My Category', slug: 'my-category' })
 
         const result = await createBlogCategoryAction({ name: 'My Category' })
@@ -165,14 +172,15 @@ describe('deleteBlogCategoryAction [TC-F17.04]', () => {
         mockFindByID.mockResolvedValue({ id: 'cat-1', tenant: { id: 'tenant-other' } })
 
         const result = await deleteBlogCategoryAction('cat-1')
-        expect(result).toEqual({ error: 'Unauthorized delete access' })
+        expect(result).toEqual({ error: 'ERR_UNAUTHORIZED' })
         expect(mockDelete).not.toHaveBeenCalled()
     })
 
-    it('deletes category when tenant matches', async () => {
+    it('hard-deletes category when tenant matches', async () => {
         vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any)
         mockFindByID.mockResolvedValue({ id: 'cat-1', tenant: { id: 'tenant-1' } })
-        mockDelete.mockResolvedValue({})
+        mockFind.mockResolvedValue({ docs: [] })
+        mockDelete.mockResolvedValue({ id: 'cat-1' })
 
         const result = await deleteBlogCategoryAction('cat-1')
         expect(result).toEqual({ success: true })
@@ -213,7 +221,9 @@ describe('listBlogsAction [TC-F17.05]', () => {
             expect.objectContaining({
                 collection: 'blogs',
                 where: expect.objectContaining({
-                    tenant: { equals: 'tenant-1' },
+                    and: expect.arrayContaining([
+                        { tenant: { equals: 'tenant-1' } },
+                    ]),
                 }),
             }),
         )

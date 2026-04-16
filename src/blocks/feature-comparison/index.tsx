@@ -1,10 +1,23 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import type { BlockProps } from '../types'
 import type { FeatureComparisonConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Caption } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING } from '@/lib/design-tokens'
+
+const FC_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+
+function FeatureComparisonSection({ children }: { children: ReactNode }) {
+    return (
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={FC_CONTAINER}>{children}</div>
+        </AnimatedSection>
+    )
+}
 
 function CheckIcon({ color }: { color: string }) {
     return (
@@ -22,100 +35,97 @@ function CrossIcon() {
     )
 }
 
-export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureComparisonConfig>) {
+export function FeatureComparisonBlock({ block }: BlockProps<FeatureComparisonConfig>) {
     const { variant = 'table', headline, products = [], features = [] } = block
 
     if (variant === 'cards') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6">
-                    {headline && (
-                        <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {products.map((product, pIdx) => (
-                            <div
-                                key={pIdx}
-                                className="rounded-2xl p-6 md:p-8"
-                                style={{
-                                    background: product.highlighted ? `rgba(var(--brand-primary-rgb), 0.063)` : `rgba(var(--brand-primary-rgb), 0.024)`,
-                                    border: `1px solid ${product.highlighted ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.125)`}`,
-                                }}
+            <FeatureComparisonSection>
+                {headline && (
+                    <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {products.map((product, pIdx) => (
+                        <div
+                            key={pIdx}
+                            className={`rounded-2xl ${CARD_PADDING.md} md:${CARD_PADDING.lg}`}
+                            style={{
+                                background: product.highlighted ? `rgba(var(--brand-primary-rgb), 0.063)` : `rgba(var(--brand-primary-rgb), 0.024)`,
+                                border: `1px solid ${product.highlighted ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.125)`}`,
+                            }}
+                        >
+                            <Heading
+                                level={3}
+                                className="mb-6"
+                                style={product.highlighted ? { color: 'var(--brand-primary)' } : undefined}
                             >
-                                <h3
-                                    className="text-xl font-bold font-heading mb-6"
-                                    style={product.highlighted ? { color: 'var(--brand-primary)' } : undefined}
-                                >
-                                    {product.name}
-                                </h3>
-                                <ul className="space-y-3">
-                                    {features.map((feature, fIdx) => {
-                                        const has = feature.values[pIdx] ?? false
-                                        return (
-                                            <li key={fIdx} className="flex items-center gap-3">
-                                                {has ? <CheckIcon color={CSS_VARS.primary} /> : <CrossIcon />}
-                                                <span className={has ? '' : 'opacity-40 line-through'}>{feature.name}</span>
-                                            </li>
-                                        )
-                                    })}
-                                </ul>
-                            </div>
-                        ))}
-                    </div>
+                                {product.name}
+                            </Heading>
+                            <ul className="space-y-3">
+                                {features.map((feature, fIdx) => {
+                                    const has = feature.values[pIdx] ?? false
+                                    return (
+                                        <li key={fIdx} className="flex items-center gap-3">
+                                            {has ? <CheckIcon color={CSS_VARS.primary} /> : <CrossIcon />}
+                                            <span className={has ? '' : 'opacity-40 line-through'}>{feature.name}</span>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
+                        </div>
+                    ))}
                 </div>
-            </AnimatedSection>
+            </FeatureComparisonSection>
         )
     }
 
     // table (default)
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
-                {headline && (
-                    <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
-                )}
-                <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr style={{ background: `rgba(var(--brand-primary-rgb), 0.031)` }}>
-                                <th className="p-4 md:p-6 font-heading font-semibold text-sm uppercase tracking-wider opacity-60">
-                                    Feature
+        <FeatureComparisonSection>
+            {headline && (
+                <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
+            )}
+            <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
+                <table className="w-full text-left">
+                    <thead>
+                        <tr style={{ background: `rgba(var(--brand-primary-rgb), 0.031)` }}>
+                            <th className="p-4 md:p-6 font-heading font-semibold uppercase tracking-wider opacity-60">
+                                <Caption>Feature</Caption>
+                            </th>
+                            {products.map((product, pIdx) => (
+                                <th
+                                    key={pIdx}
+                                    className="p-4 md:p-6 text-center font-heading font-bold"
+                                    style={product.highlighted ? { color: 'var(--brand-primary)', background: `rgba(var(--brand-primary-rgb), 0.071)` } : undefined}
+                                >
+                                    {product.name}
                                 </th>
-                                {products.map((product, pIdx) => (
-                                    <th
-                                        key={pIdx}
-                                        className="p-4 md:p-6 text-center font-heading font-bold"
-                                        style={product.highlighted ? { color: 'var(--brand-primary)', background: `rgba(var(--brand-primary-rgb), 0.071)` } : undefined}
-                                    >
-                                        {product.name}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {features.map((feature, fIdx) => (
-                                <tr key={fIdx} className="border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.071)` }}>
-                                    <td className="p-4 md:p-6 font-medium">{feature.name}</td>
-                                    {products.map((product, pIdx) => {
-                                        const has = feature.values[pIdx] ?? false
-                                        return (
-                                            <td
-                                                key={pIdx}
-                                                className="p-4 md:p-6 text-center"
-                                                style={product.highlighted ? { background: `rgba(var(--brand-primary-rgb), 0.024)` } : undefined}
-                                            >
-                                                <span className="inline-flex justify-center">
-                                                    {has ? <CheckIcon color={CSS_VARS.primary} /> : <CrossIcon />}
-                                                </span>
-                                            </td>
-                                        )
-                                    })}
-                                </tr>
                             ))}
-                        </tbody>
-                    </table>
-                </div>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {features.map((feature, fIdx) => (
+                            <tr key={fIdx} className="border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.071)` }}>
+                                <td className="p-4 md:p-6 font-medium">{feature.name}</td>
+                                {products.map((product, pIdx) => {
+                                    const has = feature.values[pIdx] ?? false
+                                    return (
+                                        <td
+                                            key={pIdx}
+                                            className="p-4 md:p-6 text-center"
+                                            style={product.highlighted ? { background: `rgba(var(--brand-primary-rgb), 0.024)` } : undefined}
+                                        >
+                                            <span className="inline-flex justify-center">
+                                                {has ? <CheckIcon color={CSS_VARS.primary} /> : <CrossIcon />}
+                                            </span>
+                                        </td>
+                                    )
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
-        </AnimatedSection>
+        </FeatureComparisonSection>
     )
 }

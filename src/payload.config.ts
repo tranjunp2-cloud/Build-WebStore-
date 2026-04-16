@@ -15,6 +15,7 @@ import { Media } from './collections/Media'
 import { Templates } from './collections/Templates'
 import { Subscriptions } from './collections/Subscriptions'
 import { Subscribers } from './collections/Subscribers'
+import { ContactSubmissions } from './collections/ContactSubmissions'
 import { Products } from './collections/Products'
 import { Orders } from './collections/Orders'
 import { Analytics } from './collections/Analytics'
@@ -25,6 +26,7 @@ import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import { Categories } from './collections/Categories'
 import { Notifications } from './collections/Notifications'
 import { PushSubscriptions } from './collections/PushSubscriptions'
+import { AiUsageLogs } from './collections/AiUsageLogs'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -113,6 +115,7 @@ export default buildConfig({
     Templates,
     Subscriptions,
     Subscribers,
+    ContactSubmissions,
     Products,
     Orders,
     Analytics,
@@ -122,6 +125,7 @@ export default buildConfig({
     Categories,
     Notifications,
     PushSubscriptions,
+    AiUsageLogs,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

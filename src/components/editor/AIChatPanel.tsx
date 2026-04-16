@@ -8,6 +8,7 @@ import { AddSectionPromptChips } from './AddSectionPromptChips'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData, ThemeData } from '@/types/editor'
+import { useI18n } from '@/i18n'
 
 /** Strip all HTML tags from content — defense-in-depth against XSS in AI responses */
 function sanitizeContent(content: string): string {
@@ -30,6 +31,8 @@ interface AIChatPanelProps {
     onUndoLastAction: () => void
     siteName: string
     theme: ThemeData | undefined
+    currentPageSlug?: string
+    currentPageTitle?: string
     externalActivity?: {
         id: string
         content: string
@@ -51,9 +54,14 @@ function AIChatPanelInner({
     onUndoLastAction,
     siteName,
     theme,
+    currentPageSlug,
+    currentPageTitle,
     externalActivity,
     compact = false,
 }: AIChatPanelProps) {
+
+    const { t } = useI18n()
+    const ac = t.editor.aiChat
 
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
@@ -61,7 +69,7 @@ function AIChatPanelInner({
         {
             id: 'welcome',
             role: 'assistant',
-            content: 'Hello! What would you like to edit?',
+            content: ac.welcomeMessage,
             createdAt: formatChatTime(),
         },
     ])
@@ -140,18 +148,27 @@ function AIChatPanelInner({
             const payload = JSON.parse(dataLines.join('\n'))
 
             if (eventName === 'status') {
-                updateAssistantMessage(messageId, { content: payload.message || 'AI is drafting...' })
+                updateAssistantMessage(messageId, { content: payload.message || ac.drafting })
                 return
             }
 
             if (eventName === 'action') {
+                const actionType = payload?.result?.action ?? payload?.action
+                if (actionType === 'none') {
+                    updateAssistantMessage(messageId, {
+                        content: payload.result?.message || payload.message || ac.outOfScope,
+                        isStreaming: false,
+                        undoable: false,
+                    })
+                    return
+                }
                 await onAIAction(payload as AIAction)
                 return
             }
 
             if (eventName === 'done') {
                 updateAssistantMessage(messageId, {
-                    content: payload.message || 'Applied changes to website.',
+                    content: payload.message || ac.appliedChanges,
                     isStreaming: false,
                     undoable: true,
                 })
@@ -159,7 +176,7 @@ function AIChatPanelInner({
             }
 
             if (eventName === 'error') {
-                handleAIError(messageId, payload.error || 'AI editing failed')
+                handleAIError(messageId, payload.error || ac.editFailed)
             }
         }
 
@@ -196,7 +213,7 @@ function AIChatPanelInner({
             {
                 id: assistantMessageId,
                 role: 'assistant',
-                content: 'AI is drafting...',
+                content: ac.drafting,
                 createdAt: formatChatTime(),
                 isStreaming: true,
             },
@@ -205,6 +222,13 @@ function AIChatPanelInner({
 
         try {
             const currentBlock = selectedBlock !== null ? (blocks[selectedBlock] || null) : null
+
+            // Spec §1.3: send last 10 chat messages as context
+            const recentMessages = messages
+                .filter(m => !m.isStreaming)
+                .slice(-10)
+                .map(m => ({ role: m.role, content: m.content }))
+
             const res = await fetch('/api/ai/edit-block?stream=true', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -216,12 +240,15 @@ function AIChatPanelInner({
                     allBlocks: blocks,
                     theme,
                     siteName,
+                    currentPageSlug: currentPageSlug || 'home',
+                    currentPageTitle: currentPageTitle || '',
+                    chatHistory: recentMessages,
                 }),
             })
 
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}))
-                handleAIError(assistantMessageId, data.error || 'Failed to edit website')
+                handleAIError(assistantMessageId, data.error || ac.failedToEdit)
                 return
             }
 
@@ -233,12 +260,22 @@ function AIChatPanelInner({
             }
 
             const data = await res.json()
-            await onAIAction(data as AIAction)
-            updateAssistantMessage(assistantMessageId, {
-                content: data.message || 'Applied changes to website.',
-                isStreaming: false,
-                undoable: true,
-            })
+            const resultAction = data?.result?.action ?? data?.action
+            if (resultAction === 'none') {
+                // Out-of-scope request — show message only, no changes applied
+                updateAssistantMessage(assistantMessageId, {
+                    content: data.result?.message || data.description || ac.outOfScope,
+                    isStreaming: false,
+                    undoable: false,
+                })
+            } else {
+                await onAIAction(data as AIAction)
+                updateAssistantMessage(assistantMessageId, {
+                    content: data.message || data.description || ac.appliedChanges,
+                    isStreaming: false,
+                    undoable: true,
+                })
+            }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Unknown error'
             handleAIError(assistantMessageId, message)
@@ -283,7 +320,7 @@ function AIChatPanelInner({
                                                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:150ms]" />
                                                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:300ms]" />
                                                 </div>
-                                                <span className="text-[13px] leading-relaxed text-slate-300">{msg.content || 'AI is thinking...'}</span>
+                                                <span className="text-[13px] leading-relaxed text-slate-300">{msg.content || ac.thinking}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -302,7 +339,7 @@ function AIChatPanelInner({
                                                     className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#2DD4BF] transition-all hover:bg-[#2DD4BF]/10 hover:text-[#5EEAD4]"
                                                 >
                                                     <RotateCcw className="h-3 w-3" />
-                                                    Undo
+                                                    {ac.undo}
                                                 </button>
                                                 {msg.createdAt ? (
                                                     <span className="text-[10px] text-white/40">{msg.createdAt}</span>
@@ -339,12 +376,12 @@ function AIChatPanelInner({
                             onClick={() => setInput('Change web color to mint green')}
                             className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-300 transition-all hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-white"
                         >
-                            Change color
+                            {ac.changeColorPrompt}
                         </button>
                         <AddSectionPromptChips
                             compact={compact}
                             desktopMinimal={!compact}
-                            desktopLabelOverride="+ Add section"
+                            desktopLabelOverride={ac.addSectionPrompt}
                             onPromptSelect={prompt => setInput(prompt)}
                         />
                     </div>
@@ -362,7 +399,7 @@ function AIChatPanelInner({
                                     void handleSendChat()
                                 }
                             }}
-                            placeholder="Tell AI what to change..."
+                            placeholder={ac.inputPlaceholder}
                             aria-label="Chat message"
                             rows={1}
                             className="w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[13px] leading-relaxed text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
@@ -388,9 +425,9 @@ function AIChatPanelInner({
                     <div className="mt-2 flex items-center justify-between px-0.5">
                         <p className="flex items-center gap-1 text-[11px] text-slate-500">
                             <kbd className="rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Enter</kbd>
-                            <span>send</span>
+                            <span>{ac.send}</span>
                             <kbd className="ml-1 rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Shift+Enter</kbd>
-                            <span>new line</span>
+                            <span>{ac.newLine}</span>
                         </p>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { FilterDropdown } from './_components/FilterDropdown'
@@ -18,7 +18,7 @@ import {
     ChevronRight,
     ArrowUpDown,
     Tag,
-    AlertTriangle,
+
     X,
     Loader2,
     Eye,
@@ -33,9 +33,9 @@ type BlogPost = {
     title: string
     slug: string
     status: 'draft' | 'published'
-    author: { name?: string; email: string } | string
+    author: { name?: string; email?: string; firstName?: string; lastName?: string } | string
     category: { name: string; id: string } | string | null
-    thumbnail?: any
+    thumbnail?: { url?: string; id?: string } | string | null
     createdAt: string
     updatedAt: string
 }
@@ -79,23 +79,33 @@ export default function BlogListPage() {
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [meta, setMeta] = useState<BlogMeta | null>(null)
     const [loading, setLoading] = useState(true)
+    const hasLoaded = useRef(false)
     const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<'' | 'draft' | 'published'>('')
     const [page, setPage] = useState(1)
-    const [sortBy, setSortBy] = useState('-createdAt')
+    const [sortBy, setSortBy] = useState('-updatedAt')
     const [categoryFilter, setCategoryFilter] = useState('')
     const [categories, setCategories] = useState<BlogCategory[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [bulkActionLoading, setBulkActionLoading] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
+    // Debounce search input — wait 400ms after user stops typing before fetching
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    useEffect(() => {
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+        searchTimerRef.current = setTimeout(() => setDebouncedSearch(search), 400)
+        return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+    }, [search])
+
     const fetchPosts = useCallback(async () => {
         setLoading(true)
         setError(null)
         try {
             const res = await listBlogsAction({
-                search: search || undefined,
+                search: debouncedSearch || undefined,
                 status: statusFilter || undefined,
                 category: categoryFilter || undefined,
                 page: page,
@@ -104,12 +114,13 @@ export default function BlogListPage() {
 
             setPosts(res.data || [])
             setMeta(res.meta || null)
-        } catch (err: any) {
-            setError(err.message || 'Something went wrong')
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Something went wrong')
         } finally {
             setLoading(false)
+            hasLoaded.current = true
         }
-    }, [search, statusFilter, categoryFilter, sortBy, page])
+    }, [debouncedSearch, statusFilter, categoryFilter, sortBy, page])
 
     useEffect(() => {
         fetchPosts()
@@ -216,9 +227,13 @@ export default function BlogListPage() {
         })
     }
 
+    const hasPublishedInSelection = posts.some(
+        (p) => selectedIds.has(p.id) && p.status === 'published'
+    )
+
     const getAuthorName = (author: BlogPost['author']) => {
         if (typeof author === 'string') return author
-        return author?.name || author?.email || 'Unknown'
+        return author?.name || author?.email || t.dashboard.blog.unknownAuthor
     }
 
     const getCategoryName = (category: BlogPost['category']) => {
@@ -237,8 +252,8 @@ export default function BlogListPage() {
 
     // --- RENDER ---
 
-    // Loading skeleton
-    if (loading && posts.length === 0) {
+    // Loading skeleton — only on first load, not during filter refetch
+    if (!hasLoaded.current && loading) {
         return (
             <div className="space-y-6 p-6 md:p-8">
                 <div className="flex items-center justify-between">
@@ -266,13 +281,13 @@ export default function BlogListPage() {
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
                         <FileText className="h-8 w-8 text-red-400" />
                     </div>
-                    <h3 className="text-lg font-semibold text-white">Failed to load blog posts</h3>
+                    <h3 className="text-lg font-semibold text-white">{t.dashboard.blog.loadFailed}</h3>
                     <p className="text-sm text-gray-400">{error}</p>
                     <button
                         onClick={fetchPosts}
                         className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
                     >
-                        Try Again
+                        {t.dashboard.blog.tryAgain}
                     </button>
                 </div>
             </div>
@@ -302,7 +317,7 @@ export default function BlogListPage() {
     }
 
     return (
-        <div className="flex flex-col w-full max-w-[1594px] mx-auto p-[24px] font-['Inter'] h-[calc(100vh-120px)] overflow-hidden">
+        <div className="flex flex-col w-full max-w-[1594px] mx-auto p-[12px] md:p-[24px] font-['Inter'] h-[calc(100vh-120px)] overflow-hidden">
             {/* Header Container */}
             <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center w-full gap-4 xl:gap-0">
                 <div className="flex flex-col items-stretch gap-[4px] min-w-[242.98px] h-[56px]">
@@ -383,8 +398,8 @@ export default function BlogListPage() {
                         onChange={setSortBy}
                         placeholder={t.dashboard.blog.filters.sortNewest}
                         options={[
-                            { label: t.dashboard.blog.filters.sortNewest, value: '-createdAt' },
-                            { label: t.dashboard.blog.filters.sortOldest, value: 'createdAt' },
+                            { label: t.dashboard.blog.filters.sortNewest, value: '-updatedAt' },
+                            { label: t.dashboard.blog.filters.sortOldest, value: 'updatedAt' },
                             { label: t.dashboard.blog.filters.sortNameAsc, value: 'title' },
                             { label: t.dashboard.blog.filters.sortNameDesc, value: '-title' }
                         ]}
@@ -489,7 +504,7 @@ export default function BlogListPage() {
                                 {/* Author & Date */}
                                 <div className="flex flex-row justify-between items-center">
                                     <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[rgba(248,250,252,0.6)] truncate max-w-[100px]">
-                                        {typeof post.author === 'object' && post.author ? ((post.author as any).firstName ? `${(post.author as any).firstName} ${(post.author as any).lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
+                                        {typeof post.author === 'object' && post.author ? (post.author.firstName ? `${post.author.firstName} ${post.author.lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
                                     </span>
                                     <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[rgba(248,250,252,0.6)]">
                                         {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(post.updatedAt))}
@@ -512,14 +527,14 @@ export default function BlogListPage() {
                                 className="flex items-center justify-center gap-1.5 bg-[rgba(59,130,246,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
                             >
                                 <SquarePen className="w-4 h-4 text-[#3B82F6]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#3B82F6]">Edit</span>
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#3B82F6]">{t.dashboard.blog.actions.edit}</span>
                             </button>
                             <button
                                 onClick={() => openDeleteConfirm(post)}
                                 className="flex items-center justify-center gap-1.5 bg-[rgba(251,44,54,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
                             >
                                 <Trash2 className="w-4 h-4 text-[#FF6467]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#FF6467]">Delete</span>
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#FF6467]">{t.dashboard.blog.actions.delete}</span>
                             </button>
                         </div>
                     </div>
@@ -635,7 +650,7 @@ export default function BlogListPage() {
 
                                     <div className="w-[157.33px] h-[80.5px] pl-[24px] flex items-center shrink-0">
                                         <span className="truncate font-['Inter'] text-[14px] font-[400] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">
-                                            {typeof post.author === 'object' && post.author ? ((post.author as any).firstName ? `${(post.author as any).firstName} ${(post.author as any).lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
+                                            {typeof post.author === 'object' && post.author ? (post.author.firstName ? `${post.author.firstName} ${post.author.lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
                                         </span>
                                     </div>
 
@@ -671,57 +686,72 @@ export default function BlogListPage() {
             </div>
 
 
-            {/* Delete Confirmation Modal — AC-2 */}
+            {/* Delete Confirmation Modal — AC-2, Figma: 31958-7172 */}
             {
                 deleteTarget && typeof document !== 'undefined' && createPortal(
                     <div className="fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
-                        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-6 shadow-2xl">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                    <AlertTriangle className="w-5 h-5 text-red-400" />
-                                    {t.dashboard.blog.actions.deleteConfirmTitle}
-                                </h3>
-                                <button
-                                    onClick={() => setDeleteTarget(null)}
-                                    className="text-gray-400 hover:text-white transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                        <div
+                            className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
+                            style={{
+                                maxWidth: 347,
+                                background: 'linear-gradient(135deg, rgba(30,41,59,1) 0%, rgba(28,38,56,1) 11%, rgba(26,35,53,1) 22%, rgba(23,33,50,1) 33%, rgba(21,30,47,1) 44%, rgba(19,27,44,1) 56%, rgba(17,25,41,1) 67%, rgba(15,22,38,1) 78%, rgba(13,20,35,1) 89%, rgba(11,17,32,1) 100%)',
+                                border: '1px solid rgba(59,130,246,0.3)',
+                            }}
+                        >
+                            {/* Icon */}
+                            <div className="flex justify-center items-center w-[64px] h-[64px] rounded-full bg-[rgba(251,44,54,0.1)] border border-[rgba(251,44,54,0.3)] shrink-0">
+                                <Trash2 className="w-[27px] h-[24px] text-[#FF6467]" strokeWidth={1.5} />
                             </div>
 
-                            <p className="text-sm text-gray-400 mb-2">
-                                {(t.dashboard.blog.actions.bulkDeleteConfirm || 'Are you sure you want to delete {count} posts?').replace('{count}', '1')}
-                            </p>
-                            <p className="text-xs text-gray-600 mb-4">
-                                {t.dashboard.blog.actions.bulkDeleteWarning}
-                            </p>
+                            {/* Text block */}
+                            <div className="flex flex-col gap-[4px] w-full">
+                                {/* Title */}
+                                <div className="flex justify-center items-center w-full px-[92px]">
+                                    <h3 className="font-['Inter'] font-[600] text-[20px] leading-[1.2em] text-center text-[#F8FAFC]">
+                                        {t.dashboard.blog.actions.deleteConfirmTitle}
+                                    </h3>
+                                </div>
+                                {/* Body */}
+                                <p className="font-['Inter'] font-[400] text-[16px] leading-[1.5em] text-center text-[#94A3B8] w-full">
+                                    {t.dashboard.blog.actions.deleteConfirmDetails.replace('{title}', deleteTarget.title)}
+                                    {'\n'}{t.dashboard.blog.actions.deleteConfirmWarn}
+                                </p>
+                            </div>
 
+                            {/* Warning box — only for published */}
                             {deleteTarget.status === 'published' && (
-                                <div className="mb-5 flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-4 py-3">
-                                    <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                                    <p className="text-xs text-yellow-400">
-                                        {t.dashboard.blog.actions.deletePublishedWarning || 'Warning: This post is currently published and visible to your customers. Deleting it will immediately remove it from your storefront.'}
+                                <div className="flex justify-center items-center gap-[10px] rounded-[6px] p-[6px] bg-[rgba(245,158,11,0.1)] w-full">
+                                    <p className="font-['Inter'] font-[400] text-[12px] leading-[1.333em] text-center text-[#F59E0B]" style={{ maxWidth: 296 }}>
+                                        {t.dashboard.blog.actions.deletePublishedWarning}
                                     </p>
                                 </div>
                             )}
 
-                            <div className="flex justify-end gap-3">
+                            {/* Buttons */}
+                            <div className="flex flex-row justify-center items-center gap-[16px] w-full">
+                                {/* Cancel */}
                                 <button
                                     onClick={() => setDeleteTarget(null)}
-                                    className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-[10px] py-[8px] px-[16px] rounded-[10px] bg-[#0B1120] border border-[rgba(255,255,255,0.1)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 transition-colors"
                                 >
-                                    {t.dashboard.blog.actions.cancel || 'Cancel'}
+                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-[#FAFAFA]">
+                                        {t.dashboard.blog.actions.cancel}
+                                    </span>
                                 </button>
+                                {/* Delete */}
                                 <button
                                     onClick={handleConfirmDelete}
                                     disabled={isDeleting}
-                                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    className="flex-1 flex flex-row items-center justify-center gap-[6px] px-[10px] h-[36px] rounded-[10px] bg-[#FF6467] border border-[rgba(255,255,255,0.1)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isDeleting ? (
-                                        <><Loader2 className="w-4 h-4 animate-spin" /> {t.dashboard.blog.actions.deleting || 'Deleting...'}</>
+                                        <Loader2 className="w-4 h-4 animate-spin text-[#FAFAFA]" />
                                     ) : (
-                                        <><Trash2 className="w-4 h-4" /> {t.dashboard.blog.actions.delete}</>
+                                        <Trash2 className="w-[16px] h-[16px] text-[#FAFAFA]" />
                                     )}
+                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-[#FAFAFA]">
+                                        {isDeleting ? t.dashboard.blog.actions.deleting : t.dashboard.blog.actions.delete}
+                                    </span>
                                 </button>
                             </div>
                         </div>
@@ -730,51 +760,75 @@ export default function BlogListPage() {
                 )
             }
 
-            {/* Bulk Delete Confirmation Modal — TC-F17-01-12 */}
+            {/* Bulk Delete Confirmation Modal — TC-F17-01-12, Figma: 31958-7197 */}
             {
                 showBulkDeleteModal && typeof document !== 'undefined' && createPortal(
                     <div className="fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
-                        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-6 shadow-2xl">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                    <AlertTriangle className="w-5 h-5 text-red-400" />
-                                    {t.dashboard.blog.actions.delete}
-                                </h3>
-                                <button
-                                    onClick={() => setShowBulkDeleteModal(false)}
-                                    className="text-gray-400 hover:text-white transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                        <div
+                            className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
+                            style={{
+                                maxWidth: 347,
+                                background: 'linear-gradient(135deg, rgba(30,41,59,1) 0%, rgba(28,38,56,1) 11%, rgba(26,35,53,1) 22%, rgba(23,33,50,1) 33%, rgba(21,30,47,1) 44%, rgba(19,27,44,1) 56%, rgba(17,25,41,1) 67%, rgba(15,22,38,1) 78%, rgba(13,20,35,1) 89%, rgba(11,17,32,1) 100%)',
+                                border: '1px solid rgba(59,130,246,0.3)',
+                            }}
+                        >
+                            {/* Icon */}
+                            <div className="flex justify-center items-center w-[64px] h-[64px] rounded-full bg-[rgba(251,44,54,0.1)] border border-[rgba(251,44,54,0.3)] shrink-0">
+                                <Trash2 className="w-[27px] h-[24px] text-[#FF6467]" strokeWidth={1.5} />
                             </div>
 
-                            <p className="text-sm text-gray-400 mb-2">
-                                {(t.dashboard.blog.actions.bulkDeleteConfirm || 'Bạn có chắc muốn xóa {count} bài viết?').replace('{count}', selectedIds.size.toString())}
-                            </p>
-                            <p className="text-xs text-gray-600 mb-4">
-                                {t.dashboard.blog.actions.bulkDeleteWarning || 'Hành động này không thể hoàn tác.'}
-                            </p>
+                            {/* Text block */}
+                            <div className="flex flex-col gap-[4px] w-full">
+                                {/* Title */}
+                                <div className="flex justify-center items-center w-full px-[92px]">
+                                    <h3 className="font-['Inter'] font-[600] text-[20px] leading-[1.2em] text-center text-[#F8FAFC]">
+                                        {t.dashboard.blog.actions.bulkDeleteTitle.replace('{count}', selectedIds.size.toString())}
+                                    </h3>
+                                </div>
+                                {/* Body */}
+                                <p className="font-['Inter'] font-[400] text-[16px] leading-[1.5em] text-center text-[#94A3B8] w-full">
+                                    {t.dashboard.blog.actions.bulkDeleteConfirm.replace('{count}', selectedIds.size.toString())}
+                                    {'\n'}{t.dashboard.blog.actions.bulkDeleteWarning}
+                                </p>
+                            </div>
 
-                            <div className="flex justify-end gap-3">
+                            {/* Warning box — only when selection has published posts */}
+                            {hasPublishedInSelection && (
+                                <div className="flex justify-center items-center gap-[10px] rounded-[6px] p-[6px] bg-[rgba(245,158,11,0.1)] w-full">
+                                    <p className="font-['Inter'] font-[400] text-[12px] leading-[1.333em] text-center text-[#F59E0B]" style={{ maxWidth: 296 }}>
+                                        {t.dashboard.blog.actions.bulkDeletePublishedWarning}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Buttons */}
+                            <div className="flex flex-row justify-center items-center gap-[16px] w-full">
+                                {/* Cancel */}
                                 <button
                                     onClick={() => setShowBulkDeleteModal(false)}
-                                    className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                                    className="flex-1 flex items-center justify-center gap-[10px] py-[8px] px-[16px] rounded-[10px] bg-[#0B1120] border border-[rgba(255,255,255,0.1)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:bg-white/5 transition-colors"
                                 >
-                                    {t.dashboard.blog.actions.cancel || 'Hủy'}
+                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-[#FAFAFA]">
+                                        {t.dashboard.blog.actions.cancel}
+                                    </span>
                                 </button>
+                                {/* Delete */}
                                 <button
                                     onClick={async () => {
                                         await handleBulkDelete()
                                         setShowBulkDeleteModal(false)
                                     }}
                                     disabled={bulkActionLoading}
-                                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    className="flex-1 flex flex-row items-center justify-center gap-[6px] px-[10px] h-[36px] rounded-[10px] bg-[#FF6467] border border-[rgba(255,255,255,0.1)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {bulkActionLoading ? (
-                                        <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
+                                        <Loader2 className="w-4 h-4 animate-spin text-[#FAFAFA]" />
                                     ) : (
-                                        <><Trash2 className="w-4 h-4" /> {t.dashboard.blog.actions.delete}</>
+                                        <Trash2 className="w-[16px] h-[16px] text-[#FAFAFA]" />
                                     )}
+                                    <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4286em] text-[#FAFAFA]">
+                                        {bulkActionLoading ? t.dashboard.blog.actions.deleting : t.dashboard.blog.actions.delete}
+                                    </span>
                                 </button>
                             </div>
                         </div>

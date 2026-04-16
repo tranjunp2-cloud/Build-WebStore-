@@ -1495,6 +1495,41 @@ const MIGRATIONS = [
     name: '_pages_v_blocks_gallery.variant',
     sql: `ALTER TABLE _pages_v_blocks_gallery ADD COLUMN IF NOT EXISTS variant varchar;`,
   },
+  // ── Plan 260415 — variant column for blocks whose Payload schemas were
+  // missing a variant field entirely. Without this, AI gen + composer
+  // rotation had zero effect because Payload stripped the variant on save.
+  {
+    name: 'pages_blocks_contact.variant',
+    sql: `ALTER TABLE pages_blocks_contact ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_footer.variant',
+    sql: `ALTER TABLE pages_blocks_footer ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_stats.variant',
+    sql: `ALTER TABLE pages_blocks_stats ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_team.variant',
+    sql: `ALTER TABLE pages_blocks_team ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_contact.variant',
+    sql: `ALTER TABLE _pages_v_blocks_contact ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_footer.variant',
+    sql: `ALTER TABLE _pages_v_blocks_footer ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_stats.variant',
+    sql: `ALTER TABLE _pages_v_blocks_stats ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_team.variant',
+    sql: `ALTER TABLE _pages_v_blocks_team ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
   // ── Tenants: Payment Methods ──
   {
     name: 'tenants.payments_payment_cod',
@@ -1607,8 +1642,22 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
-      cta_label varchar, cta_url varchar, cta_style varchar
+      cta_label varchar, cta_url varchar, cta_style varchar,
+      secondary_cta_label varchar, secondary_cta_url varchar
     );`,
+  },
+  // Plan 260415 cta-bugfix — add secondary_cta fields + rename floating → card
+  {
+    name: 'pages_blocks_cta.secondary_cta_label',
+    sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_label varchar;`,
+  },
+  {
+    name: 'pages_blocks_cta.secondary_cta_url',
+    sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
+  },
+  {
+    name: 'pages_blocks_cta.rename_floating_to_card',
+    sql: `UPDATE pages_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
   },
   {
     name: 'pages_blocks_newsletter.create_table',
@@ -1932,8 +1981,22 @@ const MIGRATIONS = [
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
       _path text NOT NULL, _uuid varchar, block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
-      cta_label varchar, cta_url varchar, cta_style varchar
+      cta_label varchar, cta_url varchar, cta_style varchar,
+      secondary_cta_label varchar, secondary_cta_url varchar
     );`,
+  },
+  // Plan 260415 cta-bugfix — version table sync
+  {
+    name: '_pages_v_blocks_cta.secondary_cta_label',
+    sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_label varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_cta.secondary_cta_url',
+    sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_cta.rename_floating_to_card',
+    sql: `UPDATE _pages_v_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
   },
   {
     name: '_pages_v_blocks_newsletter.create_table',
@@ -2292,6 +2355,35 @@ const MIGRATIONS = [
     name: 'subscribers.email_site_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
   },
+  // ── Contact Submissions (Plan 260415 contact-bugfix) ──
+  {
+    name: 'contact_submissions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS contact_submissions (
+      id serial PRIMARY KEY,
+      name varchar NOT NULL,
+      email varchar NOT NULL,
+      phone varchar,
+      message text NOT NULL,
+      site_id integer NOT NULL,
+      status varchar DEFAULT 'new',
+      source varchar DEFAULT 'contact-block',
+      ip_address varchar,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'contact_submissions.site_created_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_site_created_idx ON contact_submissions (site_id, created_at DESC);`,
+  },
+  {
+    name: 'contact_submissions.status_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_status_idx ON contact_submissions (status);`,
+  },
+  {
+    name: 'contact_submissions.email_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_email_idx ON contact_submissions (email);`,
+  },
   // ── Sites: SEO auto meta toggle ──
   {
     name: 'sites.seo_auto_meta_enabled',
@@ -2346,6 +2438,59 @@ const MIGRATIONS = [
     name: 'rate_limits.expires_index',
     sql: `CREATE INDEX IF NOT EXISTS idx_rate_limits_expires ON rate_limits(expires_at);`,
   },
+  {
+    name: 'blogs.published_at',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS published_at timestamp(3) with time zone;`,
+  },
+  {
+    name: 'blogs.scheduled_publish_date',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS scheduled_publish_date timestamp(3) with time zone;`,
+  },
+  // ── AI Usage Logs (plan 260414-0914 phase-05) — per-call observability ──
+  {
+    name: 'ai_usage_logs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_usage_logs (
+      id serial PRIMARY KEY,
+      user_id integer,
+      tenant_id integer,
+      endpoint varchar NOT NULL,
+      model varchar NOT NULL,
+      tokens_in integer NOT NULL DEFAULT 0,
+      tokens_out integer NOT NULL DEFAULT 0,
+      cost_usd numeric(12, 6) NOT NULL DEFAULT 0,
+      duration_ms integer NOT NULL DEFAULT 0,
+      success boolean NOT NULL DEFAULT true,
+      error_code varchar,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'ai_usage_logs.created_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_created_at_idx ON ai_usage_logs (created_at DESC);`,
+  },
+  {
+    name: 'ai_usage_logs.endpoint_model_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_endpoint_model_idx ON ai_usage_logs (endpoint, model);`,
+  },
+  {
+    name: 'ai_usage_logs.user_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_user_idx ON ai_usage_logs (user_id) WHERE user_id IS NOT NULL;`,
+  },
+  // ── Sites: AI generation status tracking ──
+  {
+    name: 'sites.generation_status',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS generation_status varchar DEFAULT 'none';`,
+  },
+  {
+    name: 'sites.generation_status_backfill',
+    sql: `UPDATE sites SET generation_status = 'completed' WHERE generation_status IS NULL;`,
+  },
+  // ── F16-04: Add metadata column for notification i18n ──
+  {
+    name: 'notifications.metadata',
+    sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata jsonb;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -2371,6 +2516,8 @@ const COLLECTION_SLUGS = [
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
   'seo_meta_jobs', 'notifications', 'subscribers',
+  'contact_submissions',
+  'ai_usage_logs',
 ];
 
 /**

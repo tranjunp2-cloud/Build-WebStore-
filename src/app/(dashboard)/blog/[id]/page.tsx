@@ -36,7 +36,7 @@ type BlogForm = {
     title: string
     slug: string
     content: string
-    status: 'draft' | 'published'
+    status: 'draft' | 'published' | 'scheduled'
     category: string
     seoTitle: string
     seoDescription: string
@@ -98,6 +98,9 @@ export default function BlogEditorPage() {
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false)
     const [publishDate, setPublishDate] = useState<Date | undefined>()
 
+    // Editor key — increment to force CKEditor remount when AI inserts content
+    const [editorKey, setEditorKey] = useState(0)
+
     // AI Generator State
     const [showAIGenerator, setShowAIGenerator] = useState(false)
     const [aiPrompt, setAiPrompt] = useState('')
@@ -126,8 +129,8 @@ export default function BlogEditorPage() {
     }, [])
 
     const getAuthorName = () => {
-        if (!currentUser) return 'Loading...'
-        return currentUser.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : currentUser.email?.split('@')[0] || 'User'
+        if (!currentUser) return t.dashboard.blog.editor.authorLoading
+        return currentUser.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : currentUser.email?.split('@')[0] || t.dashboard.blog.editor.authorFallback
     }
 
     // Load existing blog post when editing
@@ -146,24 +149,27 @@ export default function BlogEditorPage() {
                         seoTitle: data.seo?.metaTitle || '',
                         seoDescription: data.seo?.metaDescription || '',
                     })
-                    if (data.thumbnail?.url) {
-                        const s3Public = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
-                        const thumbUrl = data.thumbnail.url ? data.thumbnail.url.replace(/https?:\/\/minio:\d+/, s3Public) : ''
-                        setThumbnailPreview(thumbUrl)
-                        const existingThumbId = typeof data.thumbnail === 'object' ? data.thumbnail.id : data.thumbnail
-                        if (existingThumbId) setThumbnailId(existingThumbId)
+                    if (data.thumbnail) {
+                        const thumb = typeof data.thumbnail === 'object' ? data.thumbnail : null
+                        if (thumb?.url) {
+                            // Fix Docker-internal MinIO URL to browser-accessible URL
+                            // On local: minio:9000 → localhost:9000 (port-mapped)
+                            // On staging/prod: S3 URL is already correct, no replacement needed
+                            const thumbUrl = thumb.url.replace(/https?:\/\/minio:\d+/, process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000')
+                            setThumbnailPreview(thumbUrl)
+                        }
+                        const existingThumbId = thumb?.id || (typeof data.thumbnail === 'number' ? String(data.thumbnail) : data.thumbnail)
+                        if (existingThumbId) setThumbnailId(String(existingThumbId))
                     }
 
-                    if (data.createdAt) {
-                        setPublishDate(new Date(data.createdAt))
-                    }
+                    setPublishDate(new Date(data.publishedAt || data.createdAt))
                 } else {
-                    toast.error('Failed to load post')
-                    setError('Failed to load post')
+                    toast.error(t.dashboard.blog.editor.loadFailed)
+                    setError(t.dashboard.blog.editor.loadFailed)
                 }
             } catch {
-                toast.error('Network error')
-                setError('Network error')
+                toast.error(t.dashboard.blog.editor.networkError)
+                setError(t.dashboard.blog.editor.networkError)
             } finally {
                 setIsLoading(false)
             }
@@ -210,7 +216,7 @@ export default function BlogEditorPage() {
                     seoTitle: draft.seoTitle ?? prev.seoTitle,
                     seoDescription: draft.seoDescription ?? prev.seoDescription,
                 }))
-                toast.success('Draft restored')
+                toast.success(t.dashboard.blog.editor.draftRestored)
             }
         } catch (err) {
             console.error('[Draft] Failed to restore draft', err)
@@ -254,17 +260,49 @@ export default function BlogEditorPage() {
         setError(null)
     }, [isNew])
 
+    type RichTextNode = { text?: string; children?: RichTextNode[]; root?: RichTextNode }
+    const getContentText = (content: string | RichTextNode | null): string => {
+        if (!content) return ''
+        if (typeof content === 'string') return content.replace(/<[^>]*>/g, '')
+        try {
+            const extractText = (node: RichTextNode): string => {
+                if (!node) return ''
+                if (node.text) return node.text
+                if (node.children) return node.children.map(extractText).join(' ')
+                return ''
+            }
+            return extractText(content.root || content).trim()
+        } catch {
+            return ''
+        }
+    }
+
     const validate = (): string | null => {
-        if (!form.title.trim()) return 'Title is required'
-        if (form.title.length > 100) return 'Title must be less than 100 characters'
+        if (!form.title.trim()) return 'title_required'
+        if (form.title.length > 255) return 'title_max_length'
+        if (form.slug && !/^[a-z0-9-]+$/.test(form.slug)) return 'slug_invalid'
+        const contentText = getContentText(form.content)
+        if (!contentText.trim()) return 'content_required'
         return null
     }
 
+    const isSubmittingRef = useRef(false)
+
     const handleSave = async (overrideStatus?: 'draft' | 'published') => {
+        if (isSubmittingRef.current) return
+        isSubmittingRef.current = true
+
         const validationError = validate()
         if (validationError) {
             setError(validationError)
-            toast.error(validationError)
+            const messages: Record<string, string> = {
+                title_required: t.dashboard.blog.editor.titleRequired,
+                title_max_length: t.dashboard.blog.editor.titleMaxLength,
+                slug_invalid: t.dashboard.blog.editor.slugInvalid,
+                content_required: t.dashboard.blog.editor.contentRequired,
+            }
+            toast.error(messages[validationError] || validationError)
+            isSubmittingRef.current = false
             return
         }
 
@@ -280,9 +318,21 @@ export default function BlogEditorPage() {
                     const uploadDoc = await uploadMediaAction(formData)
                     resolvedThumbnailId = uploadDoc?.id || null
                     if (resolvedThumbnailId) setThumbnailId(resolvedThumbnailId)
-                } catch {
-                    toast.error('Thumbnail upload error')
+                } catch (uploadErr) {
+                    console.error('[Blog] Thumbnail upload failed:', uploadErr)
+                    toast.error(t.dashboard.blog.editor.thumbnailUploadError)
                 }
+            }
+
+            // If publishing with a future date, schedule instead of publish immediately
+            const finalStatus = overrideStatus ?? form.status
+            let effectiveStatus = finalStatus
+            const effectivePublishDate = publishDate || new Date()
+            let scheduledPublishDate: string | null = null
+            if (finalStatus === 'published' && effectivePublishDate > new Date()) {
+                effectiveStatus = 'scheduled'
+                scheduledPublishDate = effectivePublishDate.toISOString()
+                toast.info(t.dashboard.blog.editor.scheduledPublishWarning)
             }
 
             const result = await saveBlogAction({
@@ -290,9 +340,11 @@ export default function BlogEditorPage() {
                 title: form.title.trim(),
                 slug: form.slug || slugify(form.title),
                 content: form.content,
-                status: overrideStatus ?? form.status,
+                status: effectiveStatus,
                 category: form.category || null,
                 thumbnail: resolvedThumbnailId || (thumbnailPreview ? undefined : null),
+                publishedAt: effectivePublishDate.toISOString(),
+                scheduledPublishDate,
                 seo: {
                     metaTitle: form.seoTitle,
                     metaDescription: form.seoDescription,
@@ -302,43 +354,29 @@ export default function BlogEditorPage() {
             if (result) {
                 setSuccess(true)
                 localStorage.removeItem(DRAFT_KEY)
-                toast.success(isNew ? 'Post created!' : 'Post saved!')
+                toast.success(isNew ? t.dashboard.blog.editor.postCreated : t.dashboard.blog.editor.postSaved)
                 if (overrideStatus) {
-                    setForm(prev => ({ ...prev, status: overrideStatus }))
+                    setForm(prev => ({ ...prev, status: effectiveStatus }))
                 }
                 setTimeout(() => {
                     router.push('/blog')
                 }, 1000)
             }
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : 'Failed to save post'
-            setError(msg)
-            toast.error(msg)
+            console.error('[Blog] Save failed:', err)
+            setError(t.dashboard.blog.editor.saveFailed)
+            toast.error(t.dashboard.blog.editor.saveFailed)
         } finally {
             setIsSaving(false)
+            isSubmittingRef.current = false
         }
     }
 
-    const getContentText = (content: any): string => {
-        if (!content) return ''
-        if (typeof content === 'string') return content.replace(/<[^>]*>/g, '')
-        try {
-            const extractText = (node: any): string => {
-                if (!node) return ''
-                if (node.text) return node.text
-                if (node.children) return node.children.map(extractText).join(' ')
-                return ''
-            }
-            return extractText(content.root || content).trim()
-        } catch {
-            return ''
-        }
-    }
 
     const handleGenerateSEO = async () => {
         const contentText = getContentText(form.content)
         if (!form.title.trim() && !contentText) {
-            toast.error('Enter title or content first')
+            toast.error(t.dashboard.blog.editor.enterTitleOrContent)
             return
         }
         setIsGeneratingSEO(true)
@@ -364,7 +402,7 @@ export default function BlogEditorPage() {
                         seoDescription: data.seoDescription || data.metaDescription || prev.seoDescription,
                     }))
                     setShowSEO(true)
-                    toast.success('SEO metadata generated!')
+                    toast.success(t.dashboard.blog.editor.seoGenerated)
                 } else {
                     setForm(prev => ({
                         ...prev,
@@ -372,7 +410,7 @@ export default function BlogEditorPage() {
                         seoDescription: contentText.substring(0, 155),
                     }))
                     setShowSEO(true)
-                    toast.success('SEO auto-filled from content')
+                    toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
                 }
             } else {
                 setForm(prev => ({
@@ -381,7 +419,7 @@ export default function BlogEditorPage() {
                     seoDescription: contentText.substring(0, 155),
                 }))
                 setShowSEO(true)
-                toast.success('SEO auto-filled from content')
+                toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
             }
         } catch {
             setForm(prev => ({
@@ -390,7 +428,7 @@ export default function BlogEditorPage() {
                 seoDescription: contentText.substring(0, 155),
             }))
             setShowSEO(true)
-            toast.success('SEO auto-filled from content')
+            toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
         } finally {
             setIsGeneratingSEO(false)
         }
@@ -435,16 +473,17 @@ export default function BlogEditorPage() {
             })
 
             const json = await res.json()
-            if (!res.ok || !json.success) throw new Error(json.error || 'Failed to generate')
+            if (!res.ok || !json.success) throw new Error(json.error || t.dashboard.blog.editor.generateFailed)
 
             const { title, content, seoTitle, seoDescription } = json.data
 
             setGeneratedAiData({ title, content, seoTitle, seoDescription })
-            setGeneratedAiContent(content || 'No content generated.')
+            setGeneratedAiContent(content || t.dashboard.blog.editor.noContentGenerated)
 
-            toast.success('Post generated successfully!', { id: 'ai-blog' })
-        } catch (error: any) {
-            toast.error(error.message || 'Generation failed', { id: 'ai-blog' })
+            toast.success(t.dashboard.blog.editor.aiGenerated, { id: 'ai-blog' })
+        } catch (error: unknown) {
+            console.error('[Blog] AI generation failed:', error)
+            toast.error(t.dashboard.blog.editor.aiGenerationFailed, { id: 'ai-blog' })
         } finally {
             setIsGenerating(false)
         }
@@ -452,9 +491,9 @@ export default function BlogEditorPage() {
 
     return (
         <div className="w-full h-full space-y-6">
-            <div className="flex flex-col gap-[12px] w-full">
+            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-[12px] w-full">
                 {/* Row 1: Back + Breadcrumb + Title */}
-                <div className="flex flex-row items-center gap-[16px]">
+                <div className="flex flex-row items-center gap-[16px] min-w-0">
                     <button
                         onClick={() => router.push('/blog')}
                         aria-label="Back to blog list"
@@ -464,7 +503,7 @@ export default function BlogEditorPage() {
                     </button>
                     <div className="flex flex-col gap-[4px] min-w-0">
                         <div className="flex flex-row items-center gap-[8px] flex-wrap">
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)] cursor-pointer hover:underline" onClick={() => router.push('/')}>{t.dashboard.blog.editor.home}</span>
+                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)] cursor-pointer hover:underline" onClick={() => router.push('/dashboard')}>{t.dashboard.blog.editor.home}</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)]">&gt;</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)] cursor-pointer hover:underline" onClick={() => router.push('/blog')}>{t.dashboard.blog.editor.blog}</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)]">&gt;</span>
@@ -480,8 +519,8 @@ export default function BlogEditorPage() {
                     </div>
                 </div>
 
-                {/* Row 2: Action Buttons — stacks below header on mobile, inline on desktop */}
-                <div className="flex flex-row items-center gap-[12px]">
+                {/* Row 2: Action Buttons — below on mobile, right-aligned on desktop */}
+                <div className="flex flex-row items-center gap-[12px] shrink-0">
                     {/* AI Assistant Button — icon-only on mobile per Figma */}
                     <button
                         onClick={() => setShowAIGenerator(true)}
@@ -548,11 +587,7 @@ export default function BlogEditorPage() {
 
             <div className="flex flex-col xl:flex-row items-start gap-[24px] w-full mt-6">
                 <div className="flex-1 flex flex-col gap-[24px] min-w-0 w-full">
-                    {error && (
-                        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400">
-                            {error}
-                        </div>
-                    )}
+
 
                     {showDraftRecovery && (
                         <div className="flex items-center justify-between rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-4 py-3">
@@ -586,8 +621,8 @@ export default function BlogEditorPage() {
                         <div className="flex flex-col gap-[8px]">
                             <div className="flex flex-row justify-between items-center h-[20px]">
                                 <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{t.dashboard.blog.editor.postTitle}</label>
-                                <span className={"text-[10px] " + (form.title.length > 100 ? "text-red-400" : "text-gray-600")}>
-                                    {form.title.length}/100
+                                <span className={"font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] " + (form.title.length > 255 ? "text-red-400" : "text-[rgba(248,250,252,0.5)]")}>
+                                    {form.title.length}/255 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
                             <div className="flex flex-row items-center gap-[10px] pl-[8px] pr-[12px] py-[4px] h-[48px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500">
@@ -595,18 +630,15 @@ export default function BlogEditorPage() {
                                     type="text"
                                     value={form.title}
                                     onChange={(e) => updateField('title', e.target.value)}
-                                    maxLength={100}
+                                    maxLength={255}
                                     className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA] placeholder:text-[#737373]"
                                     placeholder={t.dashboard.blog.editor.titlePlaceholder}
                                 />
                             </div>
-                            {!form.title.trim() && error === 'Title is required' && (
-                                <p className="text-xs text-red-400">{t.dashboard.blog.editor.titleRequired}</p>
-                            )}
                         </div>
                     </div>
 
-                    <div className="flex flex-col px-[25px] pt-[25px] pb-[1px] gap-[8px] h-[116px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px] flex-shrink-0">
+                    <div className="flex flex-col p-[25px] gap-[8px] min-h-[116px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px] flex-shrink-0">
                         <div className="h-[20px]">
                             <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">
                                 {t.dashboard.blog.editor.urlSlugLabel}
@@ -627,6 +659,9 @@ export default function BlogEditorPage() {
                                 />
                             </div>
                         </div>
+                        {error === 'slug_invalid' && (
+                            <p className="text-xs text-red-400">{t.dashboard.blog.editor.slugInvalid || 'Slug can only contain lowercase letters, numbers, and hyphens'}</p>
+                        )}
                     </div>
 
                     <div className="flex flex-col p-[25px] gap-[16px] h-[342px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px] flex-shrink-0">
@@ -655,8 +690,8 @@ export default function BlogEditorPage() {
                                 <div className="flex items-center justify-center w-[64px] h-[64px] rounded-[33554400px] bg-[rgba(59,130,246,0.1)]">
                                     <Upload className="w-[32px] h-[32px] text-[#3B82F6]" strokeWidth={1.5} />
                                 </div>
-                                <div className="flex flex-col items-center w-[169.84px] h-[40px] gap-[4px]">
-                                    <div className="flex items-center justify-center w-full h-[20px]">
+                                <div className="flex flex-col items-center w-full max-w-[250px] gap-[4px]">
+                                    <div className="flex items-center justify-center w-full min-h-[20px] text-center">
                                         <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{t.dashboard.blog.editor.clickToUpload}</span>
                                     </div>
                                     <div className="flex flex-row justify-center w-full">
@@ -693,6 +728,7 @@ export default function BlogEditorPage() {
                     </div>
 
                     <BlogRichEditor
+                        key={editorKey}
                         content={form.content}
                         onChange={(html: string) => updateField('content', html)}
                         placeholder={t.dashboard.blog.editor.startWriting}
@@ -799,7 +835,7 @@ export default function BlogEditorPage() {
                                     e.preventDefault()
                                     handleGenerateSEO()
                                 }}
-                                disabled={isGeneratingSEO || (!form.title.trim() && !form.content.trim())}
+                                disabled={isGeneratingSEO || (!form.title.trim() && !getContentText(form.content).trim())}
                                 className="flex flex-row items-center justify-center w-[151.23px] h-[32px] gap-[8px] rounded-[12px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
                                 style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(57,137,243,1) 7%, rgba(55,143,239,1) 14%, rgba(53,150,236,1) 21%, rgba(51,156,233,1) 29%, rgba(50,162,229,1) 36%, rgba(48,168,225,1) 43%, rgba(47,174,222,1) 50%, rgba(46,179,218,1) 57%, rgba(45,185,214,1) 64%, rgba(45,191,209,1) 71%, rgba(44,196,205,1) 79%, rgba(44,201,201,1) 86%, rgba(45,207,196,1) 93%, rgba(45,212,191,1) 100%)' }}
                             >
@@ -906,9 +942,9 @@ export default function BlogEditorPage() {
                                 </div>
                                 <div className="flex flex-col xl:flex-row justify-between gap-[8px] xl:gap-[12px] w-full">
                                     {([
-                                        { key: 'Professional', emoji: '💼', label: t.dashboard.blog.editor.aiToneProfessional, desc: 'Formal & authoritative' },
-                                        { key: 'Friendly', emoji: '😊', label: t.dashboard.blog.editor.aiToneFriendly, desc: 'Casual & approachable' },
-                                        { key: 'Persuasive', emoji: '🎯', label: t.dashboard.blog.editor.aiTonePersuasive, desc: 'Compelling & action-driven' },
+                                        { key: 'Professional', emoji: '💼', label: t.dashboard.blog.editor.aiToneProfessional, desc: t.dashboard.blog.editor.aiToneProfessionalDesc },
+                                        { key: 'Friendly', emoji: '😊', label: t.dashboard.blog.editor.aiToneFriendly, desc: t.dashboard.blog.editor.aiToneFriendlyDesc },
+                                        { key: 'Persuasive', emoji: '🎯', label: t.dashboard.blog.editor.aiTonePersuasive, desc: t.dashboard.blog.editor.aiTonePersuasiveDesc },
                                     ] as const).map((tone) => (
                                         <button
                                             key={tone.key}
@@ -1019,6 +1055,9 @@ export default function BlogEditorPage() {
                                                 seoTitle: generatedAiData.seoTitle || generatedAiData.title || prev.seoTitle,
                                                 seoDescription: generatedAiData.seoDescription || prev.seoDescription
                                             }))
+                                            if (generatedAiData.content) {
+                                                setEditorKey(k => k + 1)
+                                            }
                                         }
                                         setShowAIGenerator(false);
                                     }}
