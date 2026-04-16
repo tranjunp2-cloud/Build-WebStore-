@@ -428,12 +428,16 @@ export const POST = withAuth(async (user, req) => {
                 )
             }
 
-            // 5. Increment template usage count
-            await payload.update({
-                collection: 'templates',
-                id: templateId,
-                data: { usageCount: (Number(template.usageCount) || 0) + 1 },
-            })
+            // 5. Increment template usage count (non-critical — don't fail the whole apply)
+            try {
+                await payload.update({
+                    collection: 'templates',
+                    id: templateId,
+                    data: { usageCount: (Number(template.usageCount) || 0) + 1 },
+                })
+            } catch {
+                // Category validation may fail on legacy templates — usage count is non-critical
+            }
 
             return NextResponse.json({
                 success: true,
@@ -520,12 +524,16 @@ export const POST = withAuth(async (user, req) => {
             data: { generationStatus: 'completed' },
         })
 
-        // Increment template usage count
-        await payload.update({
-            collection: 'templates',
-            id: templateId,
-            data: { usageCount: (Number(template.usageCount) || 0) + 1 },
-        })
+        // Increment template usage count (non-critical)
+        try {
+            await payload.update({
+                collection: 'templates',
+                id: templateId,
+                data: { usageCount: (Number(template.usageCount) || 0) + 1 },
+            })
+        } catch {
+            // Category validation may fail on legacy templates — usage count is non-critical
+        }
 
         return NextResponse.json({
             success: true,
