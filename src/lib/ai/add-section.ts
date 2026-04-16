@@ -741,9 +741,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return {
             ...mergedBlock,
             variant: safeVariant,
-            testimonials: rawTestimonials.map(({ quote, name, title, company, rating, avatar }: Record<string, unknown>) => ({
-                quote, name, title, company, rating, ...(avatar ? { avatar } : {}),
-            })),
+            testimonials: rawTestimonials
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ quote, name, title, company, rating, avatar }) => ({
+                    quote, name, title, company, rating, ...(avatar ? { avatar } : {}),
+                })),
         }
     }
 
@@ -772,9 +774,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return {
             ...mergedBlock,
             layout: safeLayout,
-            images: rawImages.map(({ image, caption }: Record<string, unknown>) => ({
-                ...(image ? { image } : {}), ...(caption !== undefined ? { caption } : {}),
-            })),
+            images: rawImages
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ image, caption }) => ({
+                    ...(image ? { image } : {}), ...(caption !== undefined ? { caption } : {}),
+                })),
         }
     }
 
@@ -783,9 +787,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         const rawMembers = (Array.isArray((block as Record<string, unknown>).members) ? (block as Record<string, unknown>).members : fallbackBlock.members) as Record<string, unknown>[]
         return {
             ...mergedBlock,
-            members: rawMembers.map(({ name, role, bio, avatar, socials }: Record<string, unknown>) => ({
-                name, role, ...(bio ? { bio } : {}), ...(avatar ? { avatar } : {}), ...(socials ? { socials } : {}),
-            })),
+            members: rawMembers
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ name, role, bio, avatar, socials }) => ({
+                    name, role, ...(bio ? { bio } : {}), ...(avatar ? { avatar } : {}), ...(socials ? { socials } : {}),
+                })),
         }
     }
 
