@@ -435,8 +435,8 @@ export const POST = withAuth(async (user, req) => {
                     id: templateId,
                     data: { usageCount: (Number(template.usageCount) || 0) + 1 },
                 })
-            } catch {
-                // Category validation may fail on legacy templates — usage count is non-critical
+            } catch (err) {
+                console.warn('[Apply Template] Failed to increment usageCount:', templateId, err instanceof Error ? err.message : err)
             }
 
             return NextResponse.json({
@@ -531,8 +531,8 @@ export const POST = withAuth(async (user, req) => {
                 id: templateId,
                 data: { usageCount: (Number(template.usageCount) || 0) + 1 },
             })
-        } catch {
-            // Category validation may fail on legacy templates — usage count is non-critical
+        } catch (err) {
+            console.warn('[Apply Template] Failed to increment usageCount:', templateId, err instanceof Error ? err.message : err)
         }
 
         return NextResponse.json({
