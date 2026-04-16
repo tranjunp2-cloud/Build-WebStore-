@@ -7,7 +7,8 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 void _CSS_VARS
 
@@ -51,8 +52,8 @@ export function AccordionBlock({ block, theme: _theme }: BlockProps<AccordionCon
     })()
 
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} max-w-3xl`}>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="max-w-3xl">
                 {headline && (
                     <Heading level={2} className="text-center mb-4">
                         <RichText text={headline} as="span" />
@@ -101,7 +102,7 @@ export function AccordionBlock({ block, theme: _theme }: BlockProps<AccordionCon
                         )
                     })}
                 </div>
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

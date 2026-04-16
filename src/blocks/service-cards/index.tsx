@@ -6,7 +6,8 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 void _CSS_VARS
 
@@ -135,8 +136,8 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
     }
 
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     <Heading level={2} className="mb-5 leading-tight">
@@ -163,7 +164,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                 )}
 
                 {variant === 'featured' && renderFeatured()}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

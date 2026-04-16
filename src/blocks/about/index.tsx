@@ -10,12 +10,9 @@ import { SectionLabel } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 // ── Local helpers (Plan 260415 about-bugfix) ────────────────────────────────
-
-const ABOUT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
-const ABOUT_CONTAINER_NARROW = `${CONTAINER.narrow} mx-auto ${INNER_PADDING}`
 
 type AboutSectionProps = {
     children: ReactNode
@@ -23,15 +20,21 @@ type AboutSectionProps = {
     className?: string
 }
 
-/** Outer wrapper for all variants. AnimatedSection + token container. */
+/** Outer wrapper for all variants. AnimatedSection + SectionWrapper container. */
 function AboutSection({ children, narrow = false, className = '' }: AboutSectionProps) {
-    const containerCls = narrow ? ABOUT_CONTAINER_NARROW : ABOUT_CONTAINER
     return (
         <AnimatedSection
-            className={`${SECTION_PADDING.default} ${className}`.trim()}
+            className={className}
             style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
         >
-            <div className={containerCls}>{children}</div>
+            <SectionWrapper
+                as="div"
+                padding="default"
+                container={narrow ? 'narrow' : 'default'}
+                background="transparent"
+            >
+                {children}
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

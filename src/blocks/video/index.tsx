@@ -4,7 +4,7 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 void _CSS_VARS
 
@@ -52,22 +52,20 @@ export function VideoBlock({ block, theme: _theme }: BlockProps<VideoConfig>) {
 
     // ── Default: embed variant ───────────────────────────────────────────
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} max-w-4xl`}>
-                {headline && (
-                    <Heading level={2} className="text-center mb-4">
-                        <RichText text={headline} as="span" />
-                    </Heading>
-                )}
-                {subheadline && (
-                    <Body size="lg" className="text-center opacity-70 mb-10">
-                        <RichText text={subheadline} as="span" />
-                    </Body>
-                )}
-                <div className="rounded-2xl overflow-hidden aspect-video" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
-                    <iframe src={embedUrl} className="w-full h-full" allowFullScreen title={headline || 'Video'} />
-                </div>
+        <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" innerClassName="max-w-4xl">
+            {headline && (
+                <Heading level={2} className="text-center mb-4">
+                    <RichText text={headline} as="span" />
+                </Heading>
+            )}
+            {subheadline && (
+                <Body size="lg" className="text-center opacity-70 mb-10">
+                    <RichText text={subheadline} as="span" />
+                </Body>
+            )}
+            <div className="rounded-2xl overflow-hidden aspect-video" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
+                <iframe src={embedUrl} className="w-full h-full" allowFullScreen title={headline || 'Video'} />
             </div>
-        </AnimatedSection>
+        </SectionWrapper>
     )
 }
