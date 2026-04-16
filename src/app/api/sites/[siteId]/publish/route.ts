@@ -64,6 +64,29 @@ export async function PATCH(
             },
         })
 
+        // BUG-F05-01: Promote all draft pages to published.
+        // Editor saves with isDraft:true, so pages only have draft versions.
+        // Without this step, live site fetches get stale published versions.
+        const sitePages = await payload.find({
+            collection: 'pages',
+            where: { site: { equals: Number(siteId) } },
+            limit: 100,
+            draft: true, // Read draft versions (latest content)
+        })
+
+        for (const page of sitePages.docs) {
+            try {
+                await payload.update({
+                    collection: 'pages',
+                    id: page.id,
+                    data: { layout: page.layout },
+                    draft: false, // Promote draft → published
+                })
+            } catch (err) {
+                console.warn(`[Publish] Failed to promote page ${page.id}:`, err instanceof Error ? err.message : err)
+            }
+        }
+
         // Get tenant slug for the domain URL
         let tenantSlug = 'site'
         const fullSite = await payload.findByID({
