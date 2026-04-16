@@ -173,7 +173,7 @@ describe('getRecipesForCategory helper', () => {
 describe('isSupportedBlockId', () => {
   it('returns true for registered block types', () => {
     expect(isSupportedBlockId('hero')).toBe(true)
-    expect(isSupportedBlockId('menu-display')).toBe(true)
+    expect(isSupportedBlockId('features')).toBe(true)
     expect(isSupportedBlockId('property-card')).toBe(true)
   })
 
