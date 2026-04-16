@@ -9,10 +9,23 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
+import { getGalleryImages } from '@/lib/images/industry-images'
 
-export function CarouselBlock({ block, theme: _theme }: BlockProps<CarouselConfig>) {
+export function CarouselBlock({ block, theme: _theme, site }: BlockProps<CarouselConfig>) {
     void _theme
-    const { headline, items = [], variant = 'images', autoplay = true, interval = 5000 } = block
+    const { headline, items: rawItems = [], variant = 'images', autoplay = true, interval = 5000 } = block
+    const category = (site?.siteType as string) || 'business'
+
+    // Fallback to industry images when all items lack image URLs
+    const hasAnyImage = rawItems.some((item) => item.imageUrl)
+    const items = hasAnyImage
+        ? rawItems
+        : getGalleryImages(category, rawItems.length || 4).map((url, i) => ({
+            ...rawItems[i],
+            imageUrl: url,
+            title: rawItems[i]?.title || '',
+            description: rawItems[i]?.description || '',
+        }))
     const [currentIndex, setCurrentIndex] = useState(0)
     const total = items.length
 

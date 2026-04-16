@@ -8,6 +8,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { getTeamAvatar } from '@/lib/images/industry-images'
 
 function StarRating({ rating, color }: { rating: number; color: string }) {
     return (
@@ -81,9 +82,16 @@ function ReviewCard({ review, color, variant }: { review: SocialProofReview; col
     )
 }
 
-export function SocialProofBlock({ block, theme: _theme }: BlockProps<SocialProofConfig>) {
+export function SocialProofBlock({ block, theme: _theme, site }: BlockProps<SocialProofConfig>) {
     void _theme
-    const { variant = 'cards', headline, reviews = [] } = block
+    const { variant = 'cards', headline, reviews: rawReviews = [] } = block
+    const category = (site?.siteType as string) || 'business'
+
+    // Fallback: add avatar from industry images for reviews missing avatars (per-item)
+    const reviews = rawReviews.map((review, i) => ({
+        ...review,
+        avatar: review.avatar || getTeamAvatar(category, i),
+    }))
 
     return (
         <AnimatedSection>

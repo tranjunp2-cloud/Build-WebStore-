@@ -9,6 +9,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { getGalleryImages } from '@/lib/images/industry-images'
 
 void _CSS_VARS
 
@@ -54,8 +55,18 @@ function ProjectCard({ project, className = '' }: ProjectCardProps) {
     )
 }
 
-export function PortfolioGridBlock({ block }: BlockProps<PortfolioGridConfig>) {
-    const { headline, subheadline, projects = [], variant = 'grid' } = block
+export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConfig>) {
+    const { headline, subheadline, projects: rawProjects = [], variant = 'grid' } = block
+    const category = (site?.siteType as string) || 'business'
+
+    // Fallback to industry images when all projects lack image URLs
+    const hasAnyImage = rawProjects.some((p) => p.imageUrl)
+    const projects = hasAnyImage
+        ? rawProjects
+        : rawProjects.map((p, i) => ({
+            ...p,
+            imageUrl: getGalleryImages(category, rawProjects.length)[i] || getGalleryImages(category, 1)[0],
+        }))
 
     const categories = useMemo(() => {
         const cats = Array.from(new Set(projects.map((p) => p.category)))

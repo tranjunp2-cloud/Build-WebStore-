@@ -54,4 +54,5 @@ export const productQuickViewMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'products', 'columns', 'showQuickView', 'currency'],
     quickActions: ['Add product', 'Change columns', 'Update prices'],
+    aiVisible: false,
 }
