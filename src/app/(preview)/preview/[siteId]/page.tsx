@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
+import type { Viewport } from 'next'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
@@ -15,6 +16,18 @@ interface PreviewPageProps {
 }
 
 export const dynamic = 'force-dynamic'
+
+// Re-export viewport at the preview page level. Root layout.tsx also exports
+// viewport, but force-dynamic pages rendered inside the editor mobile iframe
+// (390px wide) occasionally drop the inherited viewport meta in Next.js 15,
+// causing blocks to render at the legacy 980px fallback. Explicit re-export
+// guarantees the iframe content always gets `width=device-width` so Tailwind
+// sm:/md:/lg: breakpoints fire at the correct physical width.
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+}
 
 export default async function PreviewPage({ params, searchParams }: PreviewPageProps) {
     const { siteId } = await params
