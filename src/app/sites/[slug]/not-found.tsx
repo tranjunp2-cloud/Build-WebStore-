@@ -43,16 +43,21 @@ export default async function NotFound() {
     const tenant = tenantsResult.docs[0]
     if (!tenant) return <Fallback404 />
 
-    // Find published site (also check draft for owner preview)
+    // Only show published sites to public visitors
     const sitesResult = await payload.find({
         collection: 'sites',
-        where: { tenant: { equals: tenant.id } },
+        where: {
+            and: [
+                { tenant: { equals: tenant.id } },
+                { status: { equals: 'published' } },
+            ],
+        },
         limit: 1,
     })
     const site = sitesResult.docs[0]
     if (!site) return <Fallback404 />
 
-    // Find 404 page — use draft:true so draft pages are also found (BUG-F05-09)
+    // Find 404 page — only published version for public visitors (BUG-F05-09)
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
@@ -68,7 +73,6 @@ export default async function NotFound() {
         },
         limit: 1,
         depth: 3,
-        draft: true,
     })
     const page404 = pagesResult.docs[0]
 
@@ -77,7 +81,6 @@ export default async function NotFound() {
         where: { site: { equals: site.id } },
         limit: 100,
         sort: 'createdAt',
-        draft: true,
     })
 
     // If 404 page exists WITH actual layout content, render it via SiteRenderer
