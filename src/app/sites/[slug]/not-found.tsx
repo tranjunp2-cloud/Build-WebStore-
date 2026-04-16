@@ -11,10 +11,10 @@ const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app
 
 export default async function NotFound() {
     const headersList = await headers()
-    
+
     // Attempt to extract tenant slug from request headers
     let tenantSlug = headersList.get('x-tenant-slug')
-    
+
     // Fallback: parse from host header exactly like middleware does
     if (!tenantSlug) {
         const host = headersList.get('host') || ''
@@ -24,7 +24,6 @@ export default async function NotFound() {
             host !== `admin.${PLATFORM_DOMAIN}`
 
         if (isSubdomain) {
-            // e.g. "tenant.primeweb.app:3000" -> "tenant"
             tenantSlug = host.replace(`.${PLATFORM_DOMAIN}`, '').split(':')[0]
         }
     }
@@ -44,7 +43,7 @@ export default async function NotFound() {
     const tenant = tenantsResult.docs[0]
     if (!tenant) return <Fallback404 />
 
-    // Find published site
+    // Only show published sites to public visitors
     const sitesResult = await payload.find({
         collection: 'sites',
         where: {
@@ -58,7 +57,7 @@ export default async function NotFound() {
     const site = sitesResult.docs[0]
     if (!site) return <Fallback404 />
 
-    // Find 404 page
+    // Find 404 page — only published version for public visitors (BUG-F05-09)
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
@@ -79,24 +78,37 @@ export default async function NotFound() {
 
     const navigationPages = await payload.find({
         collection: 'pages',
-        where: {
-            site: { equals: site.id },
-        },
+        where: { site: { equals: site.id } },
         limit: 100,
         sort: 'createdAt',
     })
 
-    // Render exact matching 404 page from Payload
-    if (page404) {
-        return <SiteRenderer 
-            site={site as SiteRendererProps['site']} 
-            page={page404 as SiteRendererProps['page']} 
-            pages={navigationPages.docs as unknown as NavPage[]} 
+    // If 404 page exists WITH actual layout content, render it via SiteRenderer
+    const layout = (page404 as Record<string, unknown> | undefined)?.layout as unknown[] | undefined
+    if (page404 && Array.isArray(layout) && layout.length > 0) {
+        return <SiteRenderer
+            site={site as SiteRendererProps['site']}
+            page={page404 as SiteRendererProps['page']}
+            pages={navigationPages.docs as unknown as NavPage[]}
         />
     }
 
-    // Default UI if site exists but missing 404 page in DB
-    return <Fallback404 />
+    // Themed 404: render with site's navigation + footer + centered 404 message
+    // This covers: empty 404 page layout, missing 404 page, or any other fallback
+    return (
+        <SiteRenderer
+            site={site as SiteRendererProps['site']}
+            page={{
+                id: 0,
+                title: '404 — Page Not Found',
+                slug: '404',
+                layout: [
+                    { blockType: 'hero', variant: 'centered', headline: '404', subheadline: 'Page Not Found — The page you are looking for does not exist or has been moved.' },
+                ],
+            } as SiteRendererProps['page']}
+            pages={navigationPages.docs as unknown as NavPage[]}
+        />
+    )
 }
 
 function Fallback404() {
