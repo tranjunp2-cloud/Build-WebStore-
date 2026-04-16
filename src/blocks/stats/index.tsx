@@ -8,12 +8,10 @@ import type { StatsConfig, StatItem } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING } from '@/lib/design-tokens'
+import { CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
-
-const STATS_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
-const STATS_CONTAINER_NARROW = `${CONTAINER.narrow} mx-auto ${INNER_PADDING}`
 
 type StatsSectionProps = {
     children: ReactNode
@@ -23,8 +21,15 @@ type StatsSectionProps = {
 
 function StatsSection({ children, narrow = false, style }: StatsSectionProps) {
     return (
-        <AnimatedSection className={SECTION_PADDING.compact} style={style}>
-            <div className={narrow ? STATS_CONTAINER_NARROW : STATS_CONTAINER}>{children}</div>
+        <AnimatedSection style={style}>
+            <SectionWrapper
+                as="div"
+                padding="compact"
+                container={narrow ? 'narrow' : 'default'}
+                background="transparent"
+            >
+                {children}
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

@@ -22,7 +22,7 @@ interface PreviewFrameProps {
     viewport: 'desktop' | 'mobile'
     selectedBlock: number | null
     onBlockSelect?: (blockIndex: number | null, blockType?: string) => void
-    onInlineEditApplied?: (content: string, blockIndex: number) => void
+    onInlineEditApplied?: (content: string, blockIndex: number, detail?: { instruction: string; originalText: string; rewrittenText: string; blockType: string }) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
     onDeleteBlock?: (index: number) => void
     onDuplicateBlock?: (index: number) => void
@@ -736,6 +736,7 @@ function PreviewFrameInner({
             onInlineEditApplied?.(
                 `Updated ${blockType} text: "${text}" → "${rewritten}"`,
                 blockIndex,
+                { instruction, originalText: text, rewrittenText: rewritten, blockType },
             )
 
             setIsEditing(false)

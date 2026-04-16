@@ -8,7 +8,8 @@ import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/
 import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING } from '@/lib/design-tokens'
+import { CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 interface BlogPost {
     id: string
@@ -31,6 +32,10 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     const { headline = 'Latest Insights', subheadline, limit = 3, variant = 'cards' } = block
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
+
+    // BUG-F05-06: build blog links using tenant slug from server-injected site prop
+    const tenantSlug = (site as Record<string, unknown>)?.tenantSlug as string | undefined
+    const blogBasePath = tenantSlug ? `/sites/${tenantSlug}/blogs` : '/blogs'
 
     useEffect(() => {
         const tenantId = site?.tenant
@@ -71,34 +76,38 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
 
     if (loading) {
         return (
-            <AnimatedSection className="py-24 relative overflow-hidden">
-                <div className="container mx-auto px-6 text-center">
-                    <div className="animate-pulse flex flex-col items-center gap-4">
-                        <div className="h-8 w-64 bg-white/10 rounded" />
-                        <div className="h-4 w-48 bg-white/5 rounded" />
+            <AnimatedSection className="relative overflow-hidden">
+                <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                    <div className="text-center">
+                        <div className="animate-pulse flex flex-col items-center gap-4">
+                            <div className="h-8 w-64 bg-white/10 rounded" />
+                            <div className="h-4 w-48 bg-white/5 rounded" />
+                        </div>
                     </div>
-                </div>
+                </SectionWrapper>
             </AnimatedSection>
         )
     }
 
     if (posts.length === 0) {
         return (
-            <AnimatedSection className="py-24 relative overflow-hidden">
-                <div className="container mx-auto px-6 text-center">
-                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                    <p className="opacity-60 text-lg">No published posts yet. Check back soon!</p>
-                </div>
+            <AnimatedSection className="relative overflow-hidden">
+                <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                    <div className="text-center">
+                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
+                        <p className="opacity-60 text-lg">No published posts yet. Check back soon!</p>
+                    </div>
+                </SectionWrapper>
             </AnimatedSection>
         )
     }
 
     return (
-        <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden`}>
+        <AnimatedSection className="relative overflow-hidden">
             <GradientBlob color={CSS_VARS.primary} className="bottom-0 left-1/4" size={400} opacity={0.05} />
 
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} relative z-10`}>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                     <Heading level={2} className="mb-4">
@@ -114,7 +123,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                 {variant === 'list' ? (
                     <div className="max-w-4xl mx-auto flex flex-col gap-10">
                         {posts.map((post) => (
-                            <a href={`/blogs/${post.slug}`} key={post.id} className="group grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-black/10 dark:border-white/10 pb-10">
+                            <a href={`${blogBasePath}/${post.slug}`} key={post.id} className="group grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-black/10 dark:border-white/10 pb-10">
                                 <div className="relative overflow-hidden rounded-xl aspect-[4/3] md:aspect-video bg-black/5 dark:bg-white/5">
                                     <div className="absolute inset-0 bg-black/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity z-10" />
                                     {post.image ? (
@@ -144,7 +153,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                     <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {posts.map((post) => (
                             <StaggerItem key={post.id}>
-                                <a href={`/blogs/${post.slug}`} className="block h-full">
+                                <a href={`${blogBasePath}/${post.slug}`} className="block h-full">
                                     <HoverCard className="group flex flex-col h-full rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500"
                                         style={{
                                             border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
@@ -179,7 +188,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                         ))}
                     </StaggerGrid>
                 )}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

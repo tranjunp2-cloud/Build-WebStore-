@@ -86,12 +86,18 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     // BUG-F05-01: explicitly fetch published versions for live site.
     // Editor saves with draft:true; publish route promotes to published.
     // Owner previewing unpublished site sees drafts; visitors see published.
+    // BUG-F05-08: hide pages with isVisible=false from visitors (owner can still preview)
+    // BUG-F05-11: exclude soft-deleted pages (deletedAt set) from live site
+    const visibilityFilter = !isOwner ? [{ isVisible: { not_equals: false } }] : []
+    const deletedFilter = [{ deletedAt: { exists: false } }]
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
             and: [
                 { site: { equals: site.id } },
                 { slug: { equals: pageSlug } },
+                ...visibilityFilter,
+                ...deletedFilter,
             ],
         },
         limit: 1,
@@ -109,6 +115,8 @@ async function getTenantAndPage(slug: string, pagePath: string) {
                 and: [
                     { site: { equals: site.id } },
                     { isHomepage: { equals: true } },
+                    ...visibilityFilter,
+                    ...deletedFilter,
                 ],
             },
             limit: 1,
@@ -121,7 +129,11 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     const navigationPages = await payload.find({
         collection: 'pages',
         where: {
-            site: { equals: site.id },
+            and: [
+                { site: { equals: site.id } },
+                ...visibilityFilter,
+                ...deletedFilter,
+            ],
         },
         limit: 100,
         sort: 'createdAt',
@@ -236,7 +248,7 @@ export default async function TenantSitePage({ params }: Props) {
                 <div className="max-w-5xl mx-auto px-6 py-16">
                     <h1 className="text-4xl md:text-5xl font-bold mb-4"><I18nText render={t => t.storefront.blog.title} /></h1>
                     <p className="text-lg opacity-60 mb-12"><I18nText render={t => t.storefront.blog.latestStories} /></p>
-                    <StorefrontBlogList tenantId={String(tenant.id)} />
+                    <StorefrontBlogList tenantId={String(tenant.id)} tenantSlug={slug} />
                 </div>
             </div>
         )
@@ -303,7 +315,7 @@ export default async function TenantSitePage({ params }: Props) {
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">
-                        <Link href="/blogs" className="text-blue-500 hover:text-blue-400 font-medium">
+                        <Link href={`/sites/${slug}/blogs`} className="text-blue-500 hover:text-blue-400 font-medium">
                             <I18nText render={t => t.storefront.blog.backToAll} />
                         </Link>
                     </div>
@@ -320,7 +332,7 @@ export default async function TenantSitePage({ params }: Props) {
 
     return (
         <SiteRenderer
-            site={site as unknown as SiteData}
+            site={{ ...site, tenantSlug: slug } as unknown as SiteData}
             page={page as unknown as PageData}
             pages={pages as unknown as NavPage[]}
             siteId={String(site.id)}

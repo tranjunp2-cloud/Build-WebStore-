@@ -7,16 +7,17 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 void _CSS_VARS
 
-const PG_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
-
 function PortfolioGridSection({ children }: { children: ReactNode }) {
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={PG_CONTAINER}>{children}</div>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                {children}
+            </SectionWrapper>
         </AnimatedSection>
     )
 }
