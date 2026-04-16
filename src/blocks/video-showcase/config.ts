@@ -46,4 +46,5 @@ export const videoShowcaseMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'videos', 'showCategories', 'autoplay'],
     quickActions: ['Add video', 'Filter categories', 'Toggle autoplay'],
+    aiVisible: false,
 }
