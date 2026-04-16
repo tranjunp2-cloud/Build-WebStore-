@@ -145,8 +145,8 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         if (updateData.deletedAt !== undefined || updateData.isVisible !== undefined) {
             try {
                 revalidateTag(`site-${siteId}`)
-            } catch {
-                // revalidateTag requires Next.js request context
+            } catch (err) {
+                console.warn(`[Pages] revalidateTag failed for site-${siteId}:`, err instanceof Error ? err.message : err)
             }
         }
 
