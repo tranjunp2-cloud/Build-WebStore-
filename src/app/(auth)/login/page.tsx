@@ -107,9 +107,9 @@ function LoginFormContent() {
         } else if (errorMsg === 'missingCredentials') {
             toast.error(authErrors.missingCredentials || 'Missing credentials.')
         } else if (errorMsg === 'sessionExpired') {
-            toast.error(authErrors.sessionExpired || 'Your session has expired. Please log in again.')
+            toast.error(t.auth.errors.sessionExpired)
         } else {
-            toast.error(t.auth.errors.connection || 'An error occurred.')
+            toast.error(t.auth.errors.connection)
         }
     }, [searchParams, t])
 
@@ -190,7 +190,7 @@ function LoginFormContent() {
     const onSubmit = async (data: LoginForm) => {
         if (data.email.trim().toLowerCase() === 'sso-service@primeweb.app') {
             const authErrors = t.auth.errors as Record<string, string | undefined>
-            const msg = authErrors.serviceAccountUI || 'Service accounts cannot access the web UI.'
+            const msg = authErrors.serviceAccountUI
             setFormError('root', { message: 'serviceAccountUI' })
             toast.error(msg)
             return
@@ -279,12 +279,12 @@ function LoginFormContent() {
             sessionStorage.removeItem('otp_expiry_end')
 
             if (otpEmailSent) {
-                toast.success('Verification code sent!', {
-                    description: 'Check your email for the 6-digit code.',
+                toast.success(t.auth.otpSentTitle, {
+                    description: t.auth.otpSentDesc,
                 })
             } else {
-                toast.warning('Email delivery issue', {
-                    description: 'OTP saved but email may not arrive. Try "Resend code" on the next screen.',
+                toast.warning(t.auth.otpEmailIssue, {
+                    description: t.auth.otpEmailIssueDesc,
                     duration: 8000,
                 })
             }
@@ -341,7 +341,7 @@ function LoginFormContent() {
                         <input
                             id="email"
                             type="email"
-                            placeholder="you@example.com"
+                            placeholder={t.auth.emailPlaceholder}
                             className={`
                                 w-full h-11 rounded-2xl pl-10 pr-4 text-sm text-white
                                 placeholder:text-[#94A3B8] outline-none
@@ -375,7 +375,7 @@ function LoginFormContent() {
                         <input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••••"
+                            placeholder={t.auth.passwordPlaceholder}
                             className={`
                                 w-full h-11 rounded-2xl pl-10 pr-10 text-sm text-white
                                 placeholder:text-[#94A3B8] outline-none
@@ -426,7 +426,7 @@ function LoginFormContent() {
                             )}
                         </div>
                         <span className="text-sm font-medium text-[#94A3B8]" style={{ lineHeight: '1.43' }}>
-                            {t.auth.rememberMe || 'Remember me'}
+                            {t.auth.rememberMe}
                         </span>
                     </label>
                     <button
@@ -436,7 +436,7 @@ function LoginFormContent() {
                         className="text-sm font-medium text-[#3B82F6] hover:text-blue-400 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
                         style={{ lineHeight: '1.43' }}
                     >
-                        {checkingReset ? 'Checking...' : t.auth.forgotPassword}
+                        {checkingReset ? t.auth.checking : t.auth.forgotPassword}
                     </button>
                 </div>
 
@@ -487,8 +487,9 @@ function LoginFormContent() {
 }
 
 export default function LoginPage() {
+    const { t } = useI18n()
     return (
-        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center text-[#94A3B8]">Loading...</div>}>
+        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center text-[#94A3B8]">{t.auth.loading}</div>}>
             <LoginFormContent />
         </Suspense>
     )

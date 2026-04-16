@@ -83,7 +83,7 @@ export function DeleteProductModal({
                             {t.dashboard.products.form.deleteConfirmText} <span className="font-semibold">&quot;{productName}&quot;</span>?
                         </p>
                         <p className="text-[16px] font-normal leading-[1.625] text-[#F8FAFC]/90 m-0">
-                            This action cannot be undone. The product will be permanently deleted from the system.
+                            {t.dashboard.products.form.deleteWarning}
                         </p>
                     </div>
 
@@ -103,7 +103,7 @@ export function DeleteProductModal({
                             disabled={isDeleting}
                             className="flex h-14 flex-1 items-center justify-center rounded-[16px] border-none outline-none bg-gradient-to-r from-[#E7000B] to-[#FB2C36] text-[16px] font-bold text-white shadow-[0_4px_6px_-4px_rgba(251,44,54,0.3),0_10px_15px_-3px_rgba(251,44,54,0.3)] transition-opacity hover:opacity-90 disabled:opacity-50"
                         >
-                            {isDeleting ? 'Deleting...' : t.dashboard.products.form.confirmDeleteBtn}
+                            {isDeleting ? t.dashboard.products.form.deleting : t.dashboard.products.form.confirmDeleteBtn}
                         </button>
                     </div>
                 </div>

@@ -8,6 +8,7 @@ import { blockRegistry } from '@/blocks/registry'
 import type { ThemePreset } from './theme-presets'
 import { resolveFontPairing } from './font-pairings'
 import { THEME_MOODS } from './theme-moods'
+import { isUnsupportedBlock } from './unsupported-blocks'
 
 // ── Theme context for soft guidance injection ─────────────────────────────
 
@@ -57,7 +58,16 @@ export function buildSystemPrompt(
   // so GPT-4o prompt lists only blocks the AI should actually output. Blocks
   // like divider/breadcrumb/whatsapp-button/cart-widget are still available in
   // the editor library UI for manual user drag-drop, just hidden from AI.
-  const blockMetas = blockRegistry.getAllMeta().filter((m) => m.aiVisible !== false)
+  //
+  // Plan 260415 F01-gen-audit — also drop blocks on the unsupported list
+  // (menu-display, booking-widget, before-after, review-cards). Every prior
+  // prompt included them, AI dutifully emitted them, then validateBlocks()
+  // silently dropped them. Result: wasted input+output tokens, fewer good
+  // blocks per response, slower gen. Filter at prompt-build time so GPT
+  // never sees them in the first place.
+  const blockMetas = blockRegistry
+    .getAllMeta()
+    .filter((m) => m.aiVisible !== false && !isUnsupportedBlock(m.type))
 
   const blockList = blockMetas.map(m =>
     `- **${m.type}** (${m.name}): ${m.description}. Variants: [${m.variants.join(', ')}]. Fields: ${m.editableFields.join(', ')}`

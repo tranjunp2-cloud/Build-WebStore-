@@ -13,6 +13,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Sparkles, Loader2, Check, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 type InlineEditProps = {
     value: string
@@ -29,7 +30,7 @@ type InlineEditProps = {
 export function InlineEdit({
     value,
     onSave,
-    placeholder = 'Click to edit...',
+    placeholder: placeholderProp,
     multiline = false,
     maxLength,
     blockType,
@@ -37,6 +38,9 @@ export function InlineEdit({
     className,
     previewClassName,
 }: InlineEditProps) {
+    const { t } = useI18n()
+    const ie = t.editor.inlineEditComponent
+    const placeholder = placeholderProp ?? ie.defaultPlaceholder
     const [isEditing, setIsEditing] = useState(false)
     const [editValue, setEditValue] = useState(value)
     const [isRewriting, setIsRewriting] = useState(false)
@@ -124,7 +128,7 @@ export function InlineEdit({
                     !value && 'text-gray-500 italic',
                     previewClassName
                 )}
-                title="Click to edit"
+                title={ie.clickToEdit}
             >
                 {value || placeholder}
             </span>
@@ -153,16 +157,16 @@ export function InlineEdit({
                     />
                 )}
                 <div className="flex flex-col gap-0.5">
-                    <button onClick={handleSave} className="rounded p-1 text-green-400 hover:bg-green-500/10" title="Save">
+                    <button onClick={handleSave} className="rounded p-1 text-green-400 hover:bg-green-500/10" title={ie.save}>
                         <Check className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={handleCancel} className="rounded p-1 text-red-400 hover:bg-red-500/10" title="Cancel">
+                    <button onClick={handleCancel} className="rounded p-1 text-red-400 hover:bg-red-500/10" title={ie.cancel}>
                         <X className="h-3.5 w-3.5" />
                     </button>
                     <button
                         onClick={() => setShowAIInput(!showAIInput)}
                         className={cn('rounded p-1 transition-colors', showAIInput ? 'text-purple-400 bg-purple-500/10' : 'text-gray-500 hover:bg-purple-500/10 hover:text-purple-400')}
-                        title="AI Rewrite"
+                        title={ie.aiRewrite}
                     >
                         <Sparkles className="h-3.5 w-3.5" />
                     </button>
@@ -178,7 +182,7 @@ export function InlineEdit({
                         value={aiInstruction}
                         onChange={e => setAIInstruction(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') handleAIRewrite(); if (e.key === 'Escape') setShowAIInput(false) }}
-                        placeholder="e.g. Make it shorter, add emoji..."
+                        placeholder={ie.aiPlaceholder}
                         className="flex-1 bg-transparent text-xs text-white placeholder-gray-500 outline-none"
                         disabled={isRewriting}
                     />
@@ -187,7 +191,7 @@ export function InlineEdit({
                     ) : (
                         <button onClick={handleAIRewrite} disabled={!aiInstruction.trim()}
                             className="rounded px-2 py-0.5 text-[10px] font-medium bg-purple-600 text-white disabled:opacity-30 hover:bg-purple-500">
-                            Rewrite
+                            {ie.rewrite}
                         </button>
                     )}
                 </div>

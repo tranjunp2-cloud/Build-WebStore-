@@ -64,6 +64,21 @@ export type GenerationResult = {
         borderRadius?: 'sharp' | 'subtle' | 'rounded' | 'soft' | 'pill'
         shadowPreset?: 'none' | 'subtle' | 'medium' | 'dramatic'
     }
+    /**
+     * Plan 260415 Phase 04 — post-AI swap telemetry (optional).
+     * One entry per swappable block considered. Populated only by the AI
+     * happy path when AI_POST_SWAP_ENABLED is true. Fallback path doesn't emit.
+     * Consumed by Phase 07 measurement harness.
+     */
+    postAISwap?: {
+        enabled: boolean
+        swapCount: number
+        decisions: Array<{
+            blockType: string
+            action: string
+            reason: string | null
+        }>
+    }
 }
 
 // ─── Seeded PRNG Utilities ─────────────────────────────────────────────

@@ -1,6 +1,9 @@
+'use client'
+
 import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { BuilderPreviewMode, BuilderPreviewModeToggle, BuilderPreviewSurface } from '@/components/builder/BuilderPreviewPrimitives'
+import { useI18n } from '@/i18n'
 
 interface BuilderFullPreviewProps {
     mode: BuilderPreviewMode
@@ -15,6 +18,7 @@ export default function BuilderFullPreview({
     onBack,
     previewContent,
 }: BuilderFullPreviewProps) {
+    const { t } = useI18n()
     return (
         <div className="h-screen overflow-hidden bg-[#0b1120] text-white">
             <div className="flex h-16 items-center justify-between border-b border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.3)] px-6">
@@ -25,11 +29,11 @@ export default function BuilderFullPreview({
                         type="button"
                     >
                         <ArrowLeft className="size-4" />
-                        <span>Back</span>
+                        <span>{t.common.back}</span>
                     </button>
                     <div className="h-6 w-px bg-[rgba(59,130,246,0.15)]" />
                     <h1 className="text-[18px] font-semibold leading-7 text-[#f8fafc]">
-                        Website Preview
+                        {t.onboarding.completion.previewTitle}
                     </h1>
                 </div>
 

@@ -93,9 +93,17 @@ describe('unsplash-client [plan-260414-unsplash]', () => {
             expect(result[0]!.id).toBe('photo-1')
         })
 
-        it('throws UnsplashError NO_KEY when env missing', async () => {
+        it('returns [] gracefully when UNSPLASH_ACCESS_KEY is missing', async () => {
+            // Plan 260415 — searchPhotos no longer throws on missing key so
+            // local dev without the Unsplash secret can still gen sites.
+            // buildImagePool + media-injector already handle empty results
+            // via their underfill/fallback paths.
             delete process.env.UNSPLASH_ACCESS_KEY
-            await expect(searchPhotos('cafe', 5)).rejects.toThrow(UnsplashError)
+            const fetchSpy = vi.fn()
+            global.fetch = fetchSpy
+            const result = await searchPhotos('cafe', 5)
+            expect(result).toEqual([])
+            expect(fetchSpy).not.toHaveBeenCalled()
         })
 
         it('throws UNAUTHORIZED on 401', async () => {

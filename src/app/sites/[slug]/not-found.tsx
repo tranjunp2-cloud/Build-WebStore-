@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { SiteRenderer, type SiteRendererProps, type NavPage } from '@/components/site-renderer/SiteRenderer'
+import { I18nText } from '@/components/storefront/I18nText'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,9 +102,9 @@ export default async function NotFound() {
 function Fallback404() {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-            <h1 style={{ fontSize: '3rem', margin: 0, fontWeight: 700 }}>404</h1>
-            <p style={{ fontSize: '1.25rem', color: '#666', marginTop: '0.5rem' }}>Page Not Found</p>
-            <Link href="/" style={{ marginTop: '1.5rem', color: '#0ea5e9', textDecoration: 'none', fontWeight: 500, padding: '0.5rem 1rem', border: '1px solid #0ea5e9', borderRadius: '0.375rem' }}>Back to Homepage</Link>
+            <h1 style={{ fontSize: '3rem', margin: 0, fontWeight: 700 }}><I18nText render={t => t.storefront.notFound.code} /></h1>
+            <p style={{ fontSize: '1.25rem', color: '#666', marginTop: '0.5rem' }}><I18nText render={t => t.storefront.notFound.title} /></p>
+            <Link href="/" style={{ marginTop: '1.5rem', color: '#0ea5e9', textDecoration: 'none', fontWeight: 500, padding: '0.5rem 1rem', border: '1px solid #0ea5e9', borderRadius: '0.375rem' }}><I18nText render={t => t.storefront.notFound.backHome} /></Link>
         </div>
     )
 }

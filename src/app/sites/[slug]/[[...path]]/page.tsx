@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -10,6 +11,7 @@ import type { SiteData } from '@/blocks/types'
 import type { PageData } from '@/store/editorStore'
 import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogList'
 import DOMPurify from 'isomorphic-dompurify'
+import { I18nText } from '@/components/storefront/I18nText'
 
 // Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
 export const dynamic = 'force-dynamic'
@@ -227,8 +229,8 @@ export default async function TenantSitePage({ params }: Props) {
         return (
             <div className="min-h-screen bg-[#0B1120] text-white">
                 <div className="max-w-5xl mx-auto px-6 py-16">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4">Blog</h1>
-                    <p className="text-lg opacity-60 mb-12">Latest stories and insights</p>
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4"><I18nText render={t => t.storefront.blog.title} /></h1>
+                    <p className="text-lg opacity-60 mb-12"><I18nText render={t => t.storefront.blog.latestStories} /></p>
                     <StorefrontBlogList tenantId={String(tenant.id)} />
                 </div>
             </div>
@@ -296,9 +298,9 @@ export default async function TenantSitePage({ params }: Props) {
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">
-                        <a href="/blogs" className="text-blue-500 hover:text-blue-400 font-medium">
-                            ← Back to all posts
-                        </a>
+                        <Link href="/blogs" className="text-blue-500 hover:text-blue-400 font-medium">
+                            <I18nText render={t => t.storefront.blog.backToAll} />
+                        </Link>
                     </div>
                 </article>
             </div>

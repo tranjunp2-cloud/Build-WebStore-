@@ -10,7 +10,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
-import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -25,6 +25,8 @@ import { pickCategoryThemeWithMood, hashBusinessName } from '@/lib/ai/category-t
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool } from '@/lib/ai/image-pool'
 import { resolveTheme } from '@/lib/theme/resolve'
+import { resolveSiteType } from '@/lib/ai/site-type'
+import { withPayloadRetry } from '@/lib/payload-retry'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -186,7 +188,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // F23: Auto-upgrade legacy store-{id} slug to smart slug from business name
+        // F23: Sync tenant slug with builder — ensure Domain page shows same URL as the builder
         if (resolvedTenantId) {
             try {
                 const tenant = await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
@@ -194,8 +196,19 @@ export async function POST(req: NextRequest) {
                 const userChosenSlug = (businessInfo as Record<string, unknown>)?.slug as string | undefined
                 const businessName = businessInfo?.businessName || ''
 
-                if (currentSlug && /^store-\d+$/.test(currentSlug) && (userChosenSlug || businessName)) {
-                    const baseSlug = userChosenSlug || slugify(businessName)
+                // Case 1: User explicitly chose a slug in the builder → always sync, regardless of current slug
+                if (userChosenSlug && userChosenSlug !== currentSlug) {
+                    // Slug was already verified available on client-side, but double-check uniqueness
+                    const newSlug = await ensureUniqueSlug(payload, userChosenSlug, user.id)
+                    await payload.update({
+                        collection: 'tenants',
+                        id: resolvedTenantId,
+                        data: { slug: newSlug } as Record<string, unknown>,
+                    })
+                }
+                // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade from business name
+                else if (!userChosenSlug && currentSlug && /^store-\d+$/.test(currentSlug) && businessName) {
+                    const baseSlug = slugify(businessName)
                     if (baseSlug && baseSlug !== currentSlug) {
                         const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
                         await payload.update({
@@ -205,8 +218,9 @@ export async function POST(req: NextRequest) {
                         })
                     }
                 }
-            } catch {
-                // Non-critical — slug upgrade failure shouldn't block site generation
+            } catch (err) {
+                // Non-critical — slug sync failure shouldn't block site generation
+                payload.logger.error({ err, tenantId: resolvedTenantId }, 'AI generation: Tenant slug sync failed')
             }
         }
 
@@ -266,8 +280,23 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Plan 260415 F01-gen-audit — track wall-clock for each pipeline stage
+        // so the end-of-gen log shows where time is actually going. Before this,
+        // we only had total `timeMs` and couldn't tell if a 3-minute gen was
+        // OpenAI-bound (normal, ~60-100s) or media-bound (problem, 30-60s that
+        // should be parallelized) or DB-bound (FK-retry thrashing).
+        const phaseTimings: Record<string, number> = {}
+        const trackPhase = <T>(name: string, fn: () => Promise<T>): Promise<T> => {
+            const t = Date.now()
+            return fn().finally(() => {
+                phaseTimings[name] = (phaseTimings[name] ?? 0) + (Date.now() - t)
+            })
+        }
+
         // Generate with AI (or fallback)
-        const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt)
+        const { result, events } = await trackPhase('ai', () =>
+            generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt),
+        )
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
         const brief = rawContentBrief as Record<string, unknown> | null
@@ -371,18 +400,20 @@ export async function POST(req: NextRequest) {
                         `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
                     )
 
-                    await fulfillImageNeeds(
-                        needs,
-                        {
-                            businessName: businessInfo.businessName,
-                            tenantId: String(resolvedTenantId),
-                            category: businessInfo.industry,
-                            language: resolvedLang,
-                            products: parsedProducts.length > 0 ? parsedProducts : undefined,
-                            mood: themeMood,
-                            pool: imagePool,
-                        },
-                        payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
+                    await trackPhase('media', () =>
+                        fulfillImageNeeds(
+                            needs,
+                            {
+                                businessName: businessInfo.businessName,
+                                tenantId: String(resolvedTenantId),
+                                category: businessInfo.industry,
+                                language: resolvedLang,
+                                products: parsedProducts.length > 0 ? parsedProducts : undefined,
+                                mood: themeMood,
+                                pool: imagePool,
+                            },
+                            payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
+                        ),
                     )
                 }
                 // Strip any slot still holding a URL/object (Unsplash failed or missing) —
@@ -390,6 +421,34 @@ export async function POST(req: NextRequest) {
                 // Run over every bucket so multi-page subpages get cleaned too.
                 for (const bucket of allBuckets) {
                     cleanupNonNumericImageFields(bucket)
+                }
+
+                // Plan 260415 fix-500 — additionally query Payload to verify each
+                // referenced media row is complete (has filename or url). Payload's
+                // s3 adapter sometimes logs "Failed to persist upload data: g: Not
+                // Found" which leaves media rows half-written, and any gallery/team
+                // block referencing those rows will 500 the whole gen when
+                // pages_blocks_*_images tries to insert. This runs ONE find query
+                // per gen to catch those orphans.
+                for (const bucket of allBuckets) {
+                    try {
+                        const { stripped, checked } = await stripOrphanMediaRefs(
+                            bucket,
+                            payload as unknown as Parameters<typeof stripOrphanMediaRefs>[1],
+                        )
+                        if (stripped > 0) {
+                            console.warn(
+                                `[generate-site] Stripped ${stripped}/${checked} orphan media refs from bucket`,
+                            )
+                        }
+                    } catch (stripErr) {
+                        // Non-fatal — if the verify query fails, fall through and
+                        // let the page create attempt succeed (or retry wrapper fire).
+                        console.warn(
+                            '[generate-site] stripOrphanMediaRefs failed (non-fatal):',
+                            stripErr instanceof Error ? stripErr.message : stripErr,
+                        )
+                    }
                 }
             } catch (unsplashErr) {
                 console.error('[AI Generate] Unsplash pipeline error (non-fatal):', unsplashErr)
@@ -418,6 +477,13 @@ export async function POST(req: NextRequest) {
         // Resolve complete theme before saving (prevents color mismatch between builder preview and editor)
         const resolvedTheme = resolveTheme(result.theme)
 
+        // Plan 260415 fix-500 — coerce AI/fallback category to a valid Sites
+        // enum value. Previously `result.siteType` could be 'portfolio' (from
+        // fallback-adapter creative→portfolio mapping) which Payload rejected
+        // → "The following field is invalid: Site Type" → 500. Logs showed
+        // this was the dominant 500 source (~7 hits / 6h window).
+        const safeSiteType = resolveSiteType(result.siteType)
+
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
             site = await payload.update({
@@ -427,7 +493,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     generationStatus: 'generating',
-                    siteType: result.siteType,
+                    siteType: safeSiteType,
                     locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
                     theme: resolvedTheme,
                     seo: {
@@ -437,7 +503,7 @@ export async function POST(req: NextRequest) {
                     aiGenerationMetadata: {
                         generatedAt: new Date().toISOString(),
                         originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
-                        businessType: result.siteType,
+                        businessType: safeSiteType,
                     },
                 },
             })
@@ -460,7 +526,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     generationStatus: 'generating',
-                    siteType: result.siteType,
+                    siteType: safeSiteType,
                     locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
                     theme: resolvedTheme,
                     seo: {
@@ -470,7 +536,7 @@ export async function POST(req: NextRequest) {
                     aiGenerationMetadata: {
                         generatedAt: new Date().toISOString(),
                         originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
-                        businessType: result.siteType,
+                        businessType: safeSiteType,
                     },
                 },
             })
@@ -531,10 +597,17 @@ export async function POST(req: NextRequest) {
         })
 
         const createdPages: Record<string, unknown>[] = []
+        const pageFailures: Array<{ slug: string; title: string; error: string }> = []
 
+        const dbPhaseStart = Date.now()
         for (const pageDefinition of pageDefinitions) {
             // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
-            const sanitizedLayout = Array.isArray(pageDefinition.layout)
+            // Plan 260415 — also run sanitizeBlocksForPayload on EVERY page's
+            // layout (not just homepage), so sub-page team/testimonials/faq
+            // blocks get defensive name/role/question/etc fallback. Without
+            // this the AI happy path could ship a team block with an empty
+            // member name on /about and crash payload.create.
+            const variantFixed = Array.isArray(pageDefinition.layout)
                 ? pageDefinition.layout.map((block: AIBlock | null) => {
                     if (!block) return block
                     if (typeof block.blockType === 'string' && blockRegistry.has(block.blockType)) {
@@ -548,22 +621,108 @@ export async function POST(req: NextRequest) {
                     return block
                 })
                 : pageDefinition.layout
+            const sanitizedLayout = Array.isArray(variantFixed)
+                ? sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b)))
+                : variantFixed
 
-            const createdPage = await payload.create({
-                collection: 'pages',
-                data: {
-                    title: pageDefinition.title,
+            // Plan 260415 fix-500 — per-page try/catch so one bad page (FK
+            // violation, block validation, stale _parent_id from drizzle
+            // transaction race) does NOT abort the entire generation. If
+            // homepage fails, outer catch still fires. Sub-page failures are
+            // logged and skipped; user gets a site with fewer pages instead
+            // of a full 500 + "try again".
+            try {
+                // Plan 260415 fix-500 — wrap create in retry. Same transient
+                // deadlock / pages_blocks_*_parent_id_fk races observed on
+                // /api/sites/*/save also hit AI gen create (1 hit / 6h
+                // window). Reuses the save-route retry wrapper.
+                let createdPage: Record<string, unknown>
+                try {
+                    createdPage = await withPayloadRetry(
+                        () => payload.create({
+                            collection: 'pages',
+                            data: {
+                                title: pageDefinition.title,
+                                slug: pageDefinition.slug,
+                                site: site.id,
+                                isHomepage: pageDefinition.isHomepage,
+                                _status: 'published',
+                                layout: sanitizedLayout,
+                                seo: pageDefinition.seo,
+                            },
+                        }),
+                        {
+                            onRetry: (attempt, kind) => {
+                                console.warn(
+                                    `[generate-site] Retry page create attempt=${attempt} kind=${kind} slug=${pageDefinition.slug}`,
+                                )
+                            },
+                        },
+                    ) as Record<string, unknown>
+                } catch (firstErr) {
+                    // Plan 260415 fix-500 — fallback: when the first create fails
+                    // with a "pages_blocks_*_images" / upload foreign-key error,
+                    // strip ALL image refs from the page and retry once without
+                    // them. A site without images is better than a 500.
+                    const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr)
+                    const isImageFkError = /pages_blocks_[a-z_]+_images|image_id|upload/i.test(firstMsg)
+                    if (!isImageFkError) throw firstErr
+
+                    console.warn(
+                        `[generate-site] Retry without image refs after: ${firstMsg.slice(0, 160)}`,
+                    )
+                    cleanupNonNumericImageFields(sanitizedLayout as Record<string, unknown>[])
+                    // Also null numeric image refs so Payload doesn't try them again.
+                    for (const block of sanitizedLayout as Record<string, unknown>[]) {
+                        for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
+                            if (typeof block[field] === 'number') delete block[field]
+                        }
+                        for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos']) {
+                            const arr = block[arrayField]
+                            if (!Array.isArray(arr)) continue
+                            for (const item of arr as Record<string, unknown>[]) {
+                                if (item && typeof item === 'object') {
+                                    for (const f of ['image', 'logo', 'avatar']) {
+                                        if (typeof item[f] === 'number') delete item[f]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    createdPage = await payload.create({
+                        collection: 'pages',
+                        data: {
+                            title: pageDefinition.title,
+                            slug: pageDefinition.slug,
+                            site: site.id,
+                            isHomepage: pageDefinition.isHomepage,
+                            _status: 'published',
+                            layout: sanitizedLayout,
+                            seo: pageDefinition.seo,
+                        },
+                    }) as Record<string, unknown>
+                }
+                createdPages.push(createdPage)
+                _createdPagesCount++
+            } catch (pageErr) {
+                const errMsg = pageErr instanceof Error ? pageErr.message : String(pageErr)
+                pageFailures.push({
                     slug: pageDefinition.slug,
-                    site: site.id,
+                    title: pageDefinition.title,
+                    error: errMsg,
+                })
+                console.error('[generate-site] Page create failed', JSON.stringify({
+                    slug: pageDefinition.slug,
                     isHomepage: pageDefinition.isHomepage,
-                    _status: 'published',
-                    layout: sanitizedLayout,
-                    seo: pageDefinition.seo,
-                },
-            })
-
-            createdPages.push(createdPage)
-            _createdPagesCount++
+                    blockCount: Array.isArray(sanitizedLayout) ? sanitizedLayout.length : 0,
+                    errMsg,
+                }))
+                // Homepage failure is fatal — rethrow so outer catch returns 500
+                if (pageDefinition.isHomepage) {
+                    throw pageErr
+                }
+                // Sub-page failure is soft — continue loop, gen still ships
+            }
         }
 
         // BUG-F05-005: Auto-create 404 page for every new site
@@ -590,6 +749,8 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
+        phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
+
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
 
         // FR-15: Increment AI generation count
@@ -609,6 +770,17 @@ export async function POST(req: NextRequest) {
         })
 
         const timeMs = Date.now() - startTime
+
+        // Plan 260415 F01-gen-audit — single summary line per gen so ops can
+        // scan Vercel logs for phase breakdown without correlating manually.
+        // Use compact key=value so grep/jq can pull it out easily.
+        const phaseOther = Math.max(
+            0,
+            timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
+        )
+        console.info(
+            `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length}`,
+        )
 
         // ── SSE Streaming Response ──
         if (isStreaming) {
@@ -659,7 +831,7 @@ export async function POST(req: NextRequest) {
             pageId: homepagePage.id,
             siteName: result.siteName,
             siteLanguage: result.language || language,
-            siteType: result.siteType,
+            siteType: safeSiteType,
             blockCount: result.blocks.length,
             totalPages: createdPages.length,
             theme: result.theme,
@@ -679,9 +851,25 @@ export async function POST(req: NextRequest) {
 
         const errMsg = error instanceof Error ? error.message : String(error)
         const errStack = error instanceof Error ? error.stack : ''
-        console.error('[AI Generate Site Error]', errMsg, errStack)
+
+        // Plan 260415 fix-500 — structured error log with debugId + stage
+        // context so Vercel log search can group failures + PM can cite a
+        // support ID when users report "it broke". Stop leaking raw errMsg
+        // into the user response body (security + UX smell).
+        const debugId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+        console.error('[AI Generate Site Error]', JSON.stringify({
+            debugId,
+            errMsg,
+            pagesCreated: _createdPagesCount,
+            siteId: _site?.id ?? null,
+        }))
+        if (errStack) console.error('[AI Generate Site Error Stack]', debugId, errStack)
+
         return NextResponse.json(
-            { error: `Failed to generate website. Please try again. (${errMsg})` },
+            {
+                error: 'Failed to generate website. Please try again in a moment.',
+                debugId,
+            },
             { status: 500 },
         )
     }
@@ -1093,25 +1281,39 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             delete sanitized.items
         }
 
-        // ── Team: members[].socials[] requires { platform, url } ──
+        // ── Team: members[] requires { name (required) } + socials[] ──
+        // Plan 260415 — defensive name + role fallback. Payload schema marks
+        // `members.name` as `required: true`, so any member with empty/missing
+        // name crashes the whole `payload.create` with a ValidationError.
+        // Historical gens have surfaced this when GPT returned 4+ members and
+        // left the last one with only `bio` + `image`. Run this as a final
+        // pre-save sanitize so neither the AI happy path nor the fallback
+        // composer can ship a nameless team member.
         if (sanitized.blockType === 'team' && Array.isArray(sanitized.members)) {
-            sanitized.members = sanitized.members.map((memberRaw: unknown) => {
-                const member = (typeof memberRaw === 'object' && memberRaw !== null) ? memberRaw as Record<string, unknown> : {};
-                const safeMember = { ...member }
-                if (Array.isArray(safeMember.socials)) {
-                    safeMember.socials = safeMember.socials.map((socialRaw: unknown) => {
-                        if (typeof socialRaw === 'string') {
-                            return { platform: socialRaw.toLowerCase(), url: '#' }
-                        }
-                        const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
-                        return {
-                            platform: String(social.platform || social.name || 'twitter').toLowerCase(),
-                            url: String(social.url || social.link || '#'),
-                        }
-                    })
-                }
-                return safeMember
-            })
+            sanitized.members = sanitized.members
+                .map((memberRaw: unknown, idx: number) => {
+                    const member = (typeof memberRaw === 'object' && memberRaw !== null) ? memberRaw as Record<string, unknown> : {};
+                    const safeMember = { ...member }
+                    const rawName = (member.name ?? member.fullName ?? member.displayName ?? '') as string
+                    const trimmedName = typeof rawName === 'string' ? rawName.trim() : ''
+                    safeMember.name = trimmedName || `Team Member ${idx + 1}`
+                    const rawRole = (member.role ?? member.position ?? member.title ?? '') as string
+                    const trimmedRole = typeof rawRole === 'string' ? rawRole.trim() : ''
+                    safeMember.role = trimmedRole || 'Team Member'
+                    if (Array.isArray(safeMember.socials)) {
+                        safeMember.socials = safeMember.socials.map((socialRaw: unknown) => {
+                            if (typeof socialRaw === 'string') {
+                                return { platform: socialRaw.toLowerCase(), url: '#' }
+                            }
+                            const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
+                            return {
+                                platform: String(social.platform || social.name || 'twitter').toLowerCase(),
+                                url: String(social.url || social.link || '#'),
+                            }
+                        })
+                    }
+                    return safeMember
+                })
         }
 
         // ── About: ensure headline ──

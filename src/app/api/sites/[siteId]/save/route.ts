@@ -6,6 +6,8 @@ import { getCurrentUser } from '@/lib/auth'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
+import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
+import { stripOrphanMediaRefs, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
 
 
 /** Only persist theme fields defined in the Sites collection schema.
@@ -164,12 +166,75 @@ export async function PATCH(
             }
 
             if (page) {
-                await payload.update({
-                    collection: 'pages',
-                    id: page.id,
-                    data: { layout: normalizedBlocks },
-                    draft: isDraft ?? false,
-                })
+                // Plan 260415 fix-500 — orphan media preflight. Client may send
+                // layout with avatar_id/image_id refs to media rows that had
+                // "Failed to persist upload data: g: Not Found" during upload
+                // (half-written rows). Editor autosave saw ~14 hits/2h on
+                // pages_blocks_testimonials_testimonials avatar_id inserts
+                // failing. Strip orphan refs before update attempts.
+                try {
+                    const { stripped, checked } = await stripOrphanMediaRefs(
+                        normalizedBlocks as Record<string, unknown>[],
+                        payload as unknown as Parameters<typeof stripOrphanMediaRefs>[1],
+                    )
+                    if (stripped > 0) {
+                        console.warn(`[Save] Stripped ${stripped}/${checked} orphan media refs`)
+                    }
+                } catch (stripErr) {
+                    console.warn('[Save] stripOrphanMediaRefs failed (non-fatal):', stripErr instanceof Error ? stripErr.message : stripErr)
+                }
+
+                // Plan 260415 fix-500: wrap in retry — Payload drafts/versions
+                // system races cause deadlocks + FK violations on _pages_v_blocks_*
+                // under concurrent autosave. Transient — retry with backoff.
+                try {
+                    await withPayloadRetry(
+                        () => payload.update({
+                            collection: 'pages',
+                            id: page!.id,
+                            data: { layout: normalizedBlocks },
+                            draft: isDraft ?? false,
+                        }),
+                        {
+                            onRetry: (attempt, kind, err) => {
+                                const msg = err instanceof Error ? err.message : String(err)
+                                console.warn(`[Save Retry] attempt=${attempt} kind=${kind} pageId=${page!.id} msg=${msg.slice(0, 200)}`)
+                            },
+                        },
+                    )
+                } catch (updateErr) {
+                    // Plan 260415 fix-500 — fallback for pages_blocks_*_images /
+                    // _testimonials / avatar_id FK errors that slipped past the
+                    // preflight. Strip ALL image refs + retry once.
+                    const errMsg = updateErr instanceof Error ? updateErr.message : String(updateErr)
+                    const isImageFkError = /pages_blocks_[a-z_]+(_images|_testimonials|_members|_projects|_logos)?|image_id|avatar_id|upload/i.test(errMsg)
+                    if (!isImageFkError) throw updateErr
+
+                    console.warn(`[Save] Retry without image refs after: ${errMsg.slice(0, 160)}`)
+                    cleanupNonNumericImageFields(normalizedBlocks as Record<string, unknown>[])
+                    for (const block of normalizedBlocks as Record<string, unknown>[]) {
+                        for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
+                            if (typeof block[field] === 'number') delete block[field]
+                        }
+                        for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos']) {
+                            const arr = block[arrayField]
+                            if (!Array.isArray(arr)) continue
+                            for (const item of arr as Record<string, unknown>[]) {
+                                if (item && typeof item === 'object') {
+                                    for (const f of ['image', 'logo', 'avatar']) {
+                                        if (typeof item[f] === 'number') delete item[f]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    await payload.update({
+                        collection: 'pages',
+                        id: page!.id,
+                        data: { layout: normalizedBlocks },
+                        draft: isDraft ?? false,
+                    })
+                }
             }
         }
 
@@ -181,12 +246,36 @@ export async function PATCH(
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error)
         const errName = error instanceof Error ? error.name : 'Unknown'
-        console.error('[Save Error]', errName + ':', errMsg)
+        const transientKind = classifyTransientError(error)
+
+        // Plan 260415 fix-500 — structured log + debugId. If the error is a
+        // transient deadlock/FK that survived the retry wrapper, surface as
+        // 409 Conflict so the editor client can retry on its own without
+        // showing "something went wrong".
+        const debugId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+        console.error('[Save Error]', JSON.stringify({
+            debugId,
+            errName,
+            errMsg: errMsg.slice(0, 500),
+            transient: transientKind,
+        }))
         if (error && typeof error === 'object' && 'data' in error) {
-            console.error('[Save Error] Validation data:', JSON.stringify((error as Record<string, unknown>).data, null, 2))
+            console.error('[Save Error] Validation data:', debugId, JSON.stringify((error as Record<string, unknown>).data, null, 2).slice(0, 1000))
         }
+
+        if (transientKind) {
+            return NextResponse.json(
+                {
+                    error: 'Save conflicted with a concurrent edit. Please try again.',
+                    debugId,
+                    retryable: true,
+                },
+                { status: 409 },
+            )
+        }
+
         return NextResponse.json(
-            { error: 'Save failed: ' + errMsg },
+            { error: 'Save failed. Please try again in a moment.', debugId },
             { status: 500 },
         )
     }

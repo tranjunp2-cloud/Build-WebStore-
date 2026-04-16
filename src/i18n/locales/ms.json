@@ -8,7 +8,12 @@
         "learnMore": "Ketahui Lagi",
         "copyright": "© 2026 Web Store. Hak cipta terpelihara.",
         "language": "Bahasa",
-        "search": "Cari..."
+        "search": "Cari...",
+        "desktop": "Desktop",
+        "mobile": "Mudah alih",
+        "preview": "Pratonton",
+        "back": "Kembali",
+        "close": "Tutup"
     },
     "nav": {
         "platform": "Platform",
@@ -166,7 +171,51 @@
             "stepGenerating": "Menjana kandungan & reka bentuk",
             "stepPreparing": "Menyediakan pratonton",
             "progressLabel": "Membina laman web anda",
-            "processing": "Memproses..."
+            "processing": "Memproses...",
+            "elapsed": "Masa berlalu: {seconds}s",
+            "timeoutWarning": "Mengambil masa lebih lama daripada dijangka...",
+            "cancelButton": "Batalkan penjanaan",
+            "draftExpired": "Draf AI Builder sebelumnya anda telah tamat tempoh selepas 24 jam.",
+            "saveFailed": "Gagal menyimpan perubahan pratonton terkini."
+        },
+        "completion": {
+            "successMessage": "telah berjaya dicipta!",
+            "sectionsGenerated": "+{count} bahagian",
+            "sectionsGeneratedLabel": "dijana",
+            "generationTimeLabel": "masa penjanaan",
+            "description": "Anda boleh melihat Pratonton di sebelah kanan, buka Editor untuk membuat perubahan, atau Terbitkan sekarang!",
+            "previewTitle": "Pratonton Laman Web",
+            "previewSubtitle": "Laman web anda yang dijana oleh AI",
+            "viewFullPreview": "Lihat Pratonton Penuh",
+            "startingMessage": "Memulakan penciptaan laman web...",
+            "mobilePreviewTitle": "Pratonton mudah alih",
+            "mobilePreviewDescription": "Buka pratonton mendalam untuk menyemak laman web yang dijana pada mudah alih.",
+            "openPreviewButton": "Buka Pratonton",
+            "arrangeSectionsTitle": "Susun bahagian",
+            "arrangeSectionsDescription": "Gunakan mod senarai pada mudah alih untuk mengalih bahagian ke atas atau ke bawah dengan selamat.",
+            "openEditor": "Buka Editor",
+            "publishing": "Menerbitkan...",
+            "publishWebsite": "Terbitkan Laman Web",
+            "publishSuccess": "Laman web berjaya diterbitkan!",
+            "loading": "Memuatkan...",
+            "goToDashboard": "Pergi ke Papan Pemuka",
+            "congratulations": "Tahniah!",
+            "websiteLiveMessage": "Laman web anda {name} kini tersiar dan diterbitkan ke internet.",
+            "copyLink": "Salin Pautan",
+            "copied": "Disalin",
+            "linkCopied": "Pautan disalin! 🎉",
+            "copyFailed": "Gagal menyalin pautan",
+            "yourWebsite": "Laman web anda",
+            "previewPreparing": "Pratonton sedang disediakan.",
+            "savingDraft": "Menyimpan draf...",
+            "savedAt": "Disimpan {time}",
+            "saveFailed": "Gagal menyimpan",
+            "unsavedChanges": "Perubahan belum disimpan",
+            "pagesGenerated": "{count} halaman",
+            "generated": "dijana",
+            "generationTime": "{seconds}s",
+            "createdSuccessfully": "Laman web \"{name}\" telah berjaya dicipta!",
+            "viewPreviewHint": "Anda boleh melihat Pratonton di sebelah kanan, buka Editor untuk membuat perubahan, atau Terbitkan sekarang!"
         },
         "form": {
             "businessName": "Nama Perniagaan",
@@ -212,7 +261,18 @@
             "errorUnsafe": "URL ini mengandungi kandungan yang tidak dibenarkan.",
             "errorRateLimit": "Terlalu banyak permintaan. Sila tunggu sebentar.",
             "errorGeneric": "Sesuatu telah berlaku. Sila cuba lagi atau masukkan maklumat secara manual.",
-            "tryManual": "Cuba masukkan secara manual"
+            "tryManual": "Cuba masukkan secara manual",
+            "initializing": "Memulakan...",
+            "slugLabel": "Alamat laman web anda",
+            "slugPlaceholder": "nama-kedai-anda",
+            "slugMinLength": "Sekurang-kurangnya 3 aksara diperlukan",
+            "slugInvalidFormat": "Format tidak sah",
+            "slugReserved": "Sub-domain ini telah ditempah",
+            "slugTaken": "Telah digunakan",
+            "slugAvailable": "Tersedia",
+            "slugChecking": "Memeriksa ketersediaan...",
+            "slugCheckError": "Tidak dapat menyemak. Sila cuba lagi.",
+            "slugHelperText": "Anda boleh menukar ini kemudian di Tetapan > Domain"
         }
     },
     "email": {
@@ -342,6 +402,26 @@
                 "save": "Simpan Perubahan"
             }
         },
+        "banner": {
+            "notLive": "belum aktif.",
+            "publishNow": "Terbitkan sekarang →"
+        },
+        "resetAccount": {
+            "dangerZone": "Zon Bahaya",
+            "stagingOnly": "Hanya untuk staging — tidak kelihatan dalam produksi",
+            "title": "Tetapkan Semula Akaun",
+            "description": "Padam SEMUA data termasuk penyewa, laman, produk, pesanan, media, templat, dan analitik. Anda akan melalui proses onboarding semula. E-mel dan kata laluan anda akan dikekalkan.",
+            "cannotUndo": "Tindakan ini tidak boleh dibatalkan.",
+            "resetButton": "Tetapkan Semula Akaun",
+            "typeConfirm": "Taip {keyword} untuk mengesahkan:",
+            "typeConfirmPlaceholder": "Taip RESET untuk mengesahkan",
+            "cancel": "Batal",
+            "resetting": "Menetapkan semula...",
+            "confirmReset": "Sahkan Tetapan Semula",
+            "resetSuccess": "Akaun ditetapkan semula! {count} rekod dipadam.",
+            "resetFailed": "Gagal menetapkan semula",
+            "resetFailedRetry": "Gagal menetapkan semula. Cuba lagi."
+        },
         "empty": {
             "title": "Tiada data laman web",
             "description": "Cipta laman web pertama anda untuk mula menjejak prestasi perniagaan.",
@@ -367,7 +447,18 @@
             "createWebsite": "Cipta Laman Web",
             "incomplete": "Tidak lengkap",
             "retryAi": "Cuba semula dengan AI",
-            "template": "Templat"
+            "template": "Templat",
+            "newSite": "Laman Baru",
+            "untitledSite": "Laman Tanpa Tajuk",
+            "updatedLabel": "Dikemas kini",
+            "updatedRecently": "baru-baru ini",
+            "siteTypes": {
+                "business": "Perniagaan",
+                "ecommerce": "E-dagang",
+                "blog": "Blog",
+                "portfolio": "Portfolio",
+                "restaurant": "Restoran"
+            }
         },
         "analytics": {
             "title": "Analitis",
@@ -642,8 +733,12 @@
                 "title": "Batal Pesanan",
                 "orderLabel": "Pesanan",
                 "reasonLabel": "Sebab pembatalan",
-                "reasonPlaceholder": "Masukkan sebab pembatalan...",
+                "reasonRequired": "Sebab pembatalan diperlukan.",
+                "reasonPlaceholder": "cth., Pelanggan meminta melalui telefon, stok habis, pesanan palsu...",
+                "warning": "Tindakan ini tidak boleh dibatalkan. Komponen inventori yang berkaitan dengan pesanan ini akan disimpan semula secara automatik.",
                 "back": "Kembali",
+                "keepOrder": "Kekalkan Pesanan",
+                "confirmCancellation": "Sahkan Pembatalan",
                 "confirm": "Sahkan Pembatalan",
                 "confirming": "Membatalkan..."
             },
@@ -789,6 +884,8 @@
                 "deleteConfirmRestorable": "Produk ini boleh dipulihkan kemudian.",
                 "cancel": "Batal",
                 "confirmDeleteBtn": "Sahkan Padam",
+                "deleteWarning": "Tindakan ini tidak boleh dibatalkan. Produk akan dipadam secara kekal daripada sistem.",
+                "deleting": "Memadam...",
                 "toastSaved": "Produk berjaya disimpan",
                 "toastDraft": "Disimpan sebagai draf. Tukar kepada Aktif untuk dipaparkan di kedai.",
                 "toastDeleted": "Produk dipadamkan.",
@@ -1127,6 +1224,8 @@
                 "bulkDeleteConfirm": "Adakah anda pasti mahu memadamkan {count} kiriman?",
                 "bulkDeleteWarning": "Tindakan ini tidak dapat dibuat asal.",
                 "deletePublishedWarning": "Amaran: Kiriman ini sedang diterbitkan dan boleh dilihat oleh pelanggan anda. Memadamkannya akan segera mengalihkannya daripada etalase anda.",
+                "bulkDeleteTitle": "Padam {count} kiriman?",
+                "bulkDeletePublishedWarning": "Sesetengah kiriman yang dipilih sedang diterbitkan. Memadamnya akan segera mengalihkannya daripada etalase anda.",
                 "cancel": "Batal",
                 "deleting": "Memadamkan...",
                 "bulkPublish": "Terbitkan",
@@ -1146,7 +1245,9 @@
             },
             "noPostsTitle": "Tiada kiriman blog lagi",
             "noPostsSubtitle": "Cipta kiriman blog pertama anda untuk melibatkan pelanggan",
-            "unknownAuthor": "Pengarang",
+            "unknownAuthor": "Tidak diketahui",
+            "loadFailed": "Gagal memuatkan kiriman blog",
+            "tryAgain": "Cuba Lagi",
             "editor": {
                 "home": "Laman Utama",
                 "blog": "Blog",
@@ -1161,6 +1262,7 @@
                 "postTitle": "Tajuk kiriman",
                 "titlePlaceholder": "cth., Strategi Pemasaran E-dagang",
                 "titleRequired": "Tajuk diperlukan",
+                "contentRequired": "Kandungan diperlukan",
                 "titleMaxLength": "Tajuk mestilah kurang daripada 255 aksara",
                 "slugInvalid": "Slug hanya boleh mengandungi huruf kecil, nombor, dan sempang",
                 "urlSlugLabel": "Slug URL (dijana secara auto, boleh disunting)",
@@ -1225,7 +1327,14 @@
                 "aiMakeShorter": "Jadikan Lebih Pendek",
                 "aiImproveWriting": "Perbaiki Penulisan",
                 "aiRewriting": "Menulis semula...",
-                "cancel": "Batal"
+                "cancel": "Batal",
+                "aiToneProfessionalDesc": "Formal & berwibawa",
+                "aiToneFriendlyDesc": "Santai & mesra",
+                "aiTonePersuasiveDesc": "Menarik & mendorong tindakan",
+                "generateFailed": "Gagal menjana",
+                "noContentGenerated": "Tiada kandungan dijana.",
+                "authorLoading": "Memuatkan...",
+                "authorFallback": "Pengguna"
             },
             "categoryModal": {
                 "title": "Urus Kategori",
@@ -1238,7 +1347,7 @@
                 "saveBtn": "Simpan",
                 "closeBtn": "Tutup",
                 "removeTitle": "Buang kategori",
-                "removeConfirmMsg": "Adakah anda pasti ingin membuang kategori \"{name}\"?\nKiriman menggunakan kategori ini akan diubah kepada \"Tanpa Kategori\".",
+                "removeConfirmMsg": "Adakah anda pasti ingin membuang kategori \"{name}\"?\nKategori ini akan dipadam secara kekal.",
                 "cancelBtn": "Batal",
                 "deletingBtn": "Memadam...",
                 "deleteBtn": "Padam",
@@ -1248,7 +1357,8 @@
                 "toastUpdateSuccess": "Kategori dikemas kini",
                 "toastUpdateFail": "Gagal mengemas kini kategori",
                 "toastDeleteSuccess": "Kategori \"{name}\" telah dipadam",
-                "toastDeleteFail": "Gagal memadam kategori"
+                "toastDeleteFail": "Gagal memadam kategori",
+                "deletePublishedWarning": "Kategori ini diberikan kepada {count} kiriman yang diterbitkan. Memadamnya akan mengalih keluar kategori daripada kiriman tersebut, tetapi ia akan kekal diterbitkan."
             },
             "categoryPage": {
                 "title": "Urus Kategori",
@@ -1259,8 +1369,9 @@
                 "namePlaceholder": "Nama kategori",
                 "close": "Tutup",
                 "deleteTitle": "Padam Kategori",
-                "deleteConfirm": "Adakah anda pasti ingin memadam",
-                "deleteWarning": "Kiriman yang ditetapkan kepada kategori ini akan menjadi tanpa kategori. Tindakan ini tidak boleh dibatalkan.",
+                "deleteConfirm": "Adakah anda pasti mahu memadam \"{name}\"?",
+                "deletePublishedWarning": "Kategori ini diberikan kepada {count} kiriman yang diterbitkan. Memadamnya akan mengalih keluar kategori daripada kiriman tersebut, tetapi ia akan kekal diterbitkan.",
+                "deleteWarning": "Kategori ini akan dipadam secara kekal. Tindakan ini tidak boleh dibatalkan.",
                 "cancel": "Batal",
                 "delete": "Padam",
                 "deleting": "Memadam...",
@@ -1301,8 +1412,17 @@
             "connection": "Ralat sambungan. Sila cuba lagi.",
             "serviceAccountUI": "Akaun servis tidak dibenarkan mengakses UI web.",
             "missingCredentials": "E-mel dan kata laluan diperlukan",
-            "accountLocked": "Akaun ini telah dikunci kerana terlalu banyak percubaan log masuk yang gagal."
+            "accountLocked": "Akaun ini telah dikunci kerana terlalu banyak percubaan log masuk yang gagal.",
+            "sessionExpired": "Sesi anda telah tamat tempoh. Sila log masuk semula."
         },
+        "emailPlaceholder": "anda@contoh.com",
+        "passwordPlaceholder": "••••••••",
+        "checking": "Menyemak...",
+        "loading": "Memuatkan...",
+        "otpSentTitle": "Kod pengesahan dihantar!",
+        "otpSentDesc": "Semak e-mel anda untuk kod 6 digit.",
+        "otpEmailIssue": "Masalah penghantaran e-mel",
+        "otpEmailIssueDesc": "OTP disimpan tetapi e-mel mungkin tidak sampai. Cuba \"Hantar semula kod\" di skrin seterusnya.",
         "success": {
             "welcomeBackTitle": "Selamat kembali!",
             "redirecting": "Mengalihkan ke papan pemuka anda..."
@@ -1340,7 +1460,16 @@
             "sentTo": "Kami telah menghantar pautan tetapan semula ke",
             "notReceive": "Tidak menerima e-mel? Semak folder spam atau",
             "tryAgain": "cuba lagi",
-            "submit": "Hantar pautan"
+            "submit": "Hantar pautan",
+            "emailRequired": "E-mel diperlukan",
+            "invalidEmail": "Sila masukkan e-mel yang sah",
+            "resetLinkSent": "Pautan tetapan semula dihantar!",
+            "checkInbox": "Semak peti masuk e-mel anda.",
+            "somethingWrong": "Sesuatu telah berlaku. Sila cuba lagi.",
+            "connectionError": "Ralat sambungan. Sila cuba lagi.",
+            "linkResent": "Pautan tetapan semula dihantar semula!",
+            "checkInboxAgain": "Semak peti masuk e-mel anda sekali lagi.",
+            "resendFailed": "Gagal menghantar semula. Sila cuba lagi kemudian."
         },
         "reset": {
             "title": "Tetapkan Semula Kata Laluan",
@@ -1686,6 +1815,30 @@
             "newCount": "{count} pemberitahuan baharu",
             "justNow": "Baru sahaja",
             "dismiss": "Tutup"
+        },
+        "push": {
+            "title": "Aktifkan pemberitahuan desktop?",
+            "description": "Dapatkan pemberitahuan tentang pesanan baharu dan kemas kini walaupun tab ini di latar belakang.",
+            "enable": "Aktifkan",
+            "later": "Nanti"
+        },
+        "types": {
+            "BLOG_PUBLISHED": {
+                "title": "Blog Diterbitkan",
+                "message": "{blogTitle} telah diterbitkan"
+            },
+            "PRODUCT_LOW_STOCK": {
+                "title": "Amaran Stok Rendah",
+                "message": "{productName} hampir habis ({quantity} unit tinggal)"
+            },
+            "ORDER_NEW": {
+                "title": "Pesanan Baharu #{orderNumber} - {currency} {total}",
+                "message": "Pesanan dibuat oleh {customerName}"
+            },
+            "SYSTEM_ALERT": {
+                "title": "Pembayaran Gagal - Pesanan #{orderNumber}",
+                "message": "Pembayaran untuk pesanan #{orderNumber} telah gagal. Pelanggan boleh cuba semula."
+            }
         }
     },
     "Staff": {
@@ -1753,6 +1906,11 @@
                     "Store Design": "Reka Bentuk Kedai",
                     "Pages": "Halaman"
                 }
+            },
+            "features": {
+                "blog": "Pengurusan Blog",
+                "builder": "Reka Bentuk Kedai (Pembina)",
+                "settings": "Tetapan & Domain"
             }
         },
         "removeModal": {
@@ -1850,6 +2008,67 @@
         "errorInvalidChars": "Domain mengandungi aksara tidak sah",
         "errorInvalidFormat": "Format domain tidak sah"
     },
+    "accountSettings": {
+        "title": "Tetapan",
+        "subtitle": "Urus akaun dan keutamaan anda",
+        "profile": {
+            "title": "Profil",
+            "email": "E-mel",
+            "firstName": "Nama Pertama",
+            "lastName": "Nama Akhir",
+            "role": "Peranan",
+            "memberSince": "Ahli Sejak",
+            "saveChanges": "Simpan Perubahan",
+            "loadFailed": "Gagal memuatkan profil",
+            "firstNameRequired": "Nama pertama diperlukan",
+            "updated": "Profil dikemas kini",
+            "updateFailed": "Gagal mengemas kini profil"
+        },
+        "password": {
+            "title": "Tukar Kata Laluan",
+            "newPassword": "Kata Laluan Baru",
+            "confirmPassword": "Sahkan Kata Laluan",
+            "placeholder": "Sekurang-kurangnya 8 aksara",
+            "confirmPlaceholder": "Ulang kata laluan baru",
+            "mismatch": "Kata laluan tidak sepadan",
+            "tooShort": "Kata laluan mestilah sekurang-kurangnya 8 aksara",
+            "changed": "Kata laluan berjaya ditukar",
+            "changeFailed": "Gagal menukar kata laluan",
+            "changeButton": "Tukar Kata Laluan"
+        },
+        "danger": {
+            "title": "Zon Bahaya",
+            "description": "Setelah anda memadam akaun, tiada jalan kembali. Semua laman, media, dan data anda akan dipadam secara kekal.",
+            "deleteAccount": "Padam Akaun (Akan Datang)"
+        }
+    },
+    "mediaLibrary": {
+        "title": "Pustaka Media",
+        "upload": "Muat Naik",
+        "uploading": "Memuat naik...",
+        "searchPlaceholder": "Cari fail...",
+        "filterAll": "Semua",
+        "filterImages": "Imej",
+        "filterVideos": "Video",
+        "filterPdf": "PDF",
+        "emptyTitle": "Tiada fail media",
+        "emptyDescription": "Muat naik imej, video, atau PDF untuk bermula",
+        "uploadFiles": "Muat Naik Fail",
+        "noMatch": "Tiada fail sepadan dengan carian anda",
+        "copyUrl": "Salin URL",
+        "copied": "Disalin!",
+        "delete": "Padam",
+        "altText": "Teks Alt",
+        "loadFailed": "Gagal memuatkan media",
+        "uploadFailed": "Gagal memuat naik {name}",
+        "uploadedCount": "Dimuat naik {count} fail",
+        "fileDeleted": "Fail dipadam",
+        "deleteFailed": "Gagal memadam fail",
+        "urlCopied": "URL disalin"
+    },
+    "payments": {
+        "imageTooLarge": "Imej mestilah lebih kecil daripada 2MB"
+    },
     "editor": {
         "toolbar": {
             "publish": "Terbitkan",
@@ -1860,7 +2079,23 @@
             "updating": "Mengemaskini...",
             "preview": "Pratonton",
             "live": "Aktif",
-            "draft": "Draf"
+            "draft": "Draf",
+            "saving": "Menyimpan...",
+            "unsaved": "Belum disimpan",
+            "saved": "Disimpan",
+            "menu": "Menu",
+            "templates": "Templat",
+            "undo": "Buat Asal",
+            "redo": "Buat Semula",
+            "undoShortcut": "Buat Asal (Cmd/Ctrl+Z)",
+            "redoShortcut": "Buat Semula (Cmd/Ctrl+Shift+Z)",
+            "openMenu": "Buka menu",
+            "desktop": "Desktop",
+            "mobile": "Mudah Alih",
+            "changesPending": "Perubahan menunggu",
+            "sitePreview": "Pratonton Laman",
+            "dragToReorder": "Seret untuk susun semula bahagian",
+            "drag": "Seret"
         },
         "publishModal": {
             "title": "Sedia untuk Terbitkan?",
@@ -1872,7 +2107,35 @@
             "seoSet": "Metadata SEO telah ditetapkan",
             "seoSetDesc": "Semua halaman mempunyai tajuk dan penerangan meta.",
             "cancel": "Batal",
-            "publishNow": "Terbitkan Sekarang"
+            "publishNow": "Terbitkan Sekarang",
+            "publishingBtn": "Menerbitkan...",
+            "seoMissingOne": "{count} halaman tiada tajuk atau penerangan meta",
+            "seoMissingMany": "{count} halaman tiada tajuk atau penerangan meta"
+        },
+        "imageToolbar": {
+            "changeImage": "Tukar Gambar",
+            "generateAI": "Jana Gambar AI"
+        },
+        "saveStatus": {
+            "saving": "Menyimpan...",
+            "saved": "Disimpan",
+            "savedAgo": "Disimpan {timeAgo}",
+            "notSaved": "Tidak disimpan",
+            "draftSaving": "Draf disimpan dalam 3s..."
+        },
+        "richText": {
+            "heading1": "Tajuk 1",
+            "heading2": "Tajuk 2",
+            "heading3": "Tajuk 3",
+            "heading4": "Tajuk 4",
+            "paragraph": "Perenggan",
+            "bold": "Tebal",
+            "italic": "Italik",
+            "underline": "Garis Bawah",
+            "alignLeft": "Jajar Kiri",
+            "alignCenter": "Jajar Tengah",
+            "alignRight": "Jajar Kanan",
+            "justify": "Jajar Penuh"
         },
         "unpublishModal": {
             "title": "Nyahterbit Laman Web",
@@ -1895,7 +2158,10 @@
             "unpublishSuccess": "Laman web kini dalam mod penyelenggaraan.",
             "linkCopied": "Pautan disalin!",
             "publishFailed": "Gagal menerbitkan",
-            "updateSuccess": "Laman web dikemaskini!"
+            "updateSuccess": "Laman web dikemaskini!",
+            "viewAction": "Lihat",
+            "saveSuccess": "Perubahan disimpan",
+            "saveFailed": "Gagal menyimpan"
         },
         "maintenance": {
             "banner": "Laman web dalam Mod Penyelenggaraan. Pelanggan akan melihat halaman penyelenggaraan.",
@@ -1934,7 +2200,9 @@
             "customPage": "Halaman 404 Tersuai",
             "emptyTitle": "Tiada halaman lagi",
             "emptyDesc": "Cipta halaman pertama anda untuk bermula.",
-            "slugLocked": "Slug dikunci selepas diterbitkan untuk melindungi SEO dan pautan luaran."
+            "slugLocked": "Slug dikunci selepas diterbitkan untuk melindungi SEO dan pautan luaran.",
+            "statusLive": "Aktif",
+            "statusDraft": "Draf"
         },
         "aiChat": {
             "welcomeMessage": "Hai! Apa yang anda ingin ubah?",
@@ -1965,7 +2233,48 @@
         "blockLibrary": {
             "searchPlaceholder": "Cari blok...",
             "dragHint": "klik atau seret",
-            "footerHint": "Klik untuk tambah atau seret blok ke pratonton"
+            "footerHint": "Klik untuk tambah atau seret blok ke pratonton",
+            "dropToAdd": "Lepaskan untuk tambah blok",
+            "categories": {
+                "basics": "Asas",
+                "content": "Kandungan",
+                "media": "Media",
+                "store": "Perniagaan",
+                "commerce": "Perdagangan",
+                "form": "Borang & Hubungi",
+                "widgets": "Widget",
+                "layout": "Susun Atur"
+            },
+            "blocks": {
+                "hero": { "name": "Hero", "description": "Sepanduk hero dengan tajuk dan CTA" },
+                "cta": { "name": "CTA", "description": "Sepanduk seruan tindakan" },
+                "about": { "name": "Tentang Kami", "description": "Bahagian tentang kami" },
+                "features": { "name": "Ciri-ciri", "description": "Sorotan ciri dengan ikon" },
+                "step-process": { "name": "Proses Langkah", "description": "Aliran proses langkah demi langkah" },
+                "service-cards": { "name": "Kad Perkhidmatan", "description": "Tawaran perkhidmatan dengan kad" },
+                "faq": { "name": "Soalan Lazim", "description": "Soalan yang kerap ditanya" },
+                "testimonials": { "name": "Testimoni", "description": "Ulasan dan testimoni pelanggan" },
+                "social-proof": { "name": "Bukti Sosial", "description": "Ulasan pelanggan dengan penilaian bintang" },
+                "portfolio-grid": { "name": "Grid Portfolio", "description": "Pameran portfolio dalam grid" },
+                "gallery": { "name": "Galeri", "description": "Galeri gambar dengan susun atur" },
+                "video": { "name": "Video", "description": "Bahagian video terbenam" },
+                "carousel": { "name": "Karusel", "description": "Karusel gambar atau kandungan" },
+                "pricing": { "name": "Harga", "description": "Perbandingan pelan harga" },
+                "feature-comparison": { "name": "Perbandingan Ciri", "description": "Bandingkan produk dengan matriks ciri" },
+                "menu-food": { "name": "Menu Makanan", "description": "Menu makanan restoran" },
+                "products-grid": { "name": "Grid Produk", "description": "Grid senarai produk" },
+                "products-featured": { "name": "Produk Pilihan", "description": "Pameran produk yang ditonjolkan" },
+                "cartWidget": { "name": "Butang Troli", "description": "Widget troli beli-belah" },
+                "contact": { "name": "Hubungi", "description": "Borang hubungi dan maklumat perniagaan" },
+                "newsletter": { "name": "Surat Berita", "description": "Borang langganan e-mel" },
+                "whatsapp-button": { "name": "Butang WhatsApp", "description": "Butang hubungi WhatsApp" },
+                "stats": { "name": "Statistik", "description": "Metrik dan statistik utama" },
+                "logo-cloud": { "name": "Awan Logo", "description": "Logo rakan kongsi dan pelanggan" },
+                "socialWidget": { "name": "Media Sosial", "description": "Widget pautan media sosial" },
+                "team": { "name": "Pasukan", "description": "Profil ahli pasukan" },
+                "divider": { "name": "Pemisah", "description": "Pemisah visual antara bahagian" },
+                "announcement-bar": { "name": "Bar Pengumuman", "description": "Sepanduk atas untuk promosi" }
+            }
         },
         "inlineEdit": {
             "title": "Suntingan AI Sebaris",
@@ -1981,7 +2290,9 @@
             "faviconGenerated": " & Favicon dijana",
             "error": "Gagal mengemas kini logo",
             "uploading": "Memuat naik...",
-            "clickToUpload": "Klik untuk muat naik"
+            "clickToUpload": "Klik untuk muat naik",
+            "altSiteLogo": "Logo Laman",
+            "altFavicon": "Favicon"
         },
         "navigation": {
             "title": "Pautan Navigasi",
@@ -2013,6 +2324,15 @@
             "address": "Alamat",
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
             "socialLinks": "Pautan Sosial",
+            "socialPlatforms": {
+                "facebook": { "label": "Facebook", "placeholder": "facebook.com/yourbrand" },
+                "whatsapp": { "label": "WhatsApp", "placeholder": "60123456789" },
+                "instagram": { "label": "Instagram", "placeholder": "instagram.com/yourbrand" },
+                "linkedin": { "label": "LinkedIn", "placeholder": "linkedin.com/company/yourbrand" },
+                "youtube": { "label": "YouTube", "placeholder": "youtube.com/@yourbrand" }
+            },
+            "socialHintWhatsapp": "Nombor telefon atau pautan wa.me",
+            "socialHintDefault": "URL profil awam",
             "invalidSocialHtml": "Input tidak sah — HTML tidak dibenarkan",
             "invalidSocialUrl": "Sila masukkan URL yang sah (https://...)",
             "themeColors": "Tema & Warna",
@@ -2039,6 +2359,8 @@
             "generating": "Menjana...",
             "autoSeo": "Pengoptimuman SEO Automatik",
             "navStyle": "Gaya Navigasi",
+            "navStyleStandard": "Standard",
+            "navStyleCentered": "Berpusat",
             "globalSettings": "Tetapan Laman Global",
             "seoSettings": "Tetapan SEO",
             "menuSettings": "Tetapan Menu",
@@ -2099,7 +2421,226 @@
             "showTextLabel": "Tunjukkan Label Teks",
             "labelVisible": "Label terlihat",
             "iconOnly": "Ikon sahaja",
-            "badgeDesc": "Kiraan lencana sentiasa terlihat"
+            "badgeDesc": "Kiraan lencana sentiasa terlihat",
+            "buttonN": "Butang {n}",
+            "featureN": "Ciri {n}",
+            "reviewN": "Ulasan {n}",
+            "columnN": "Lajur {n}",
+            "defaultCustomerName": "Pelanggan",
+            "defaultReviewQuote": "Pengalaman yang hebat!"
+        },
+        "statusBar": {
+            "connected": "Disambungkan",
+            "pageLabel": "Halaman:",
+            "blocksCount": "{count} blok"
+        },
+        "undoRedo": {
+            "undo": "Buat Asal",
+            "redo": "Buat Semula",
+            "undoTooltip": "Buat Asal: {label} (Ctrl+Z)",
+            "redoTooltip": "Buat Semula: {label} (Ctrl+Y)",
+            "lastChange": "perubahan terakhir",
+            "lastUndoneChange": "perubahan asal terakhir",
+            "nothingToUndo": "Tiada untuk dibuat asal",
+            "nothingToRedo": "Tiada untuk dibuat semula",
+            "groupLabel": "Buat asal dan buat semula",
+            "mobileGroupLabel": "Buat asal dan buat semula mudah alih"
+        },
+        "template": {
+            "title": "Pilih Templat",
+            "searchPlaceholder": "Cari templat...",
+            "showingCount": "Menunjukkan {filtered} daripada {total} templat",
+            "loading": "Memuatkan templat...",
+            "loadError": "Gagal memuatkan templat",
+            "noTemplates": "Tiada templat tersedia lagi.",
+            "seedHint": "Jalankan POST /api/templates/seed untuk mencipta templat.",
+            "noMatch": "Tiada templat sepadan dengan penapis ini",
+            "applyConfirmTitle": "Guna \"{name}\"?",
+            "applyConfirmDesc": "Ini akan menggunakan susun atur dan tema templat baharu. Kandungan sedia ada (teks, imej) akan dikekalkan jika boleh.",
+            "cancel": "Batal",
+            "applying": "Menggunakan...",
+            "applyButton": "Guna Templat",
+            "appliedSuccess": "Templat \"{name}\" telah digunakan!",
+            "applyFailed": "Gagal menggunakan templat",
+            "previewTitle": "Pratonton: {name}",
+            "all": "Semua",
+            "restaurant": "Restoran",
+            "ecommerce": "E-Dagang",
+            "beauty": "Kecantikan",
+            "tech": "Teknologi",
+            "health": "Kesihatan",
+            "education": "Pendidikan",
+            "realEstate": "Hartanah",
+            "fitness": "Kecergasan",
+            "creative": "Kreatif",
+            "business": "Perniagaan",
+            "cafeBakery": "Kafe & Bakeri",
+            "events": "Acara",
+            "blog": "Blog",
+            "travel": "Pelancongan"
+        },
+        "addSection": {
+            "testimonials": "Tambah testimoni",
+            "testimonialsCompact": "💬 Tambah testimoni",
+            "testimonialsPrompt": "Tambah bahagian testimoni dengan 3 ulasan pelanggan",
+            "faq": "Tambah Soalan Lazim",
+            "faqCompact": "❓ Tambah Soalan Lazim",
+            "faqPrompt": "Tambah bahagian soalan lazim dengan 3 soalan pelanggan biasa",
+            "gallery": "Tambah galeri",
+            "galleryCompact": "🖼️ Tambah galeri",
+            "galleryPrompt": "Tambah bahagian galeri dengan 6 imej pemegang tempat",
+            "features": "Tambah ciri",
+            "featuresCompact": "✨ Tambah ciri",
+            "featuresPrompt": "Tambah bahagian ciri dengan 3 sorotan perkhidmatan utama",
+            "team": "Tambah pasukan",
+            "teamCompact": "👥 Tambah pasukan",
+            "teamPrompt": "Tambah bahagian pasukan dengan 3 ahli pasukan",
+            "newsletter": "Tambah surat berita",
+            "newsletterCompact": "✉️ Tambah surat berita",
+            "newsletterPrompt": "Tambah bahagian pendaftaran surat berita",
+            "banner": "Tambah sepanduk",
+            "bannerCompact": "📣 Tambah sepanduk",
+            "bannerPrompt": "Tambah bahagian sepanduk untuk kempen promosi",
+            "cta": "Tambah CTA",
+            "ctaCompact": "🚀 Tambah CTA",
+            "ctaPrompt": "Tambah bahagian seruan tindakan dengan tawaran yang kuat"
+        },
+        "inlineEditComponent": {
+            "clickToEdit": "Klik untuk sunting",
+            "defaultPlaceholder": "Klik untuk sunting...",
+            "save": "Simpan",
+            "cancel": "Batal",
+            "aiRewrite": "Tulis Semula AI",
+            "aiPlaceholder": "cth. Jadikan lebih pendek, tambah emoji...",
+            "rewrite": "Tulis Semula"
+        },
+        "preview": {
+            "altUploadedImage": "Gambar dimuat naik",
+            "editWithAI": "Sunting dengan AI",
+            "mapImageError": "Tidak dapat memetakan imej ke medan blok",
+            "imageReplaceSuccess": "Imej berjaya diganti",
+            "imageReplaceFailed": "Gagal mengganti imej",
+            "inlineEditFailed": "Suntingan sebaris gagal",
+            "aiContextLocked": "Konteks penjanaan AI dikunci ke: {blockType}"
+        },
+        "pageManagerPanel": {
+            "title": "Pengurus Halaman",
+            "description": "Cipta, pilih, sembunyikan dan padam halaman untuk laman ini.",
+            "createError": "Ralat mencipta halaman",
+            "slugConflict": "Slug halaman sudah wujud dalam laman ini",
+            "noPagesFound": "Tiada halaman dijumpai",
+            "noPagesSuggestion": "Cipta halaman baru atau cuba kata kunci carian lain."
+        },
+        "navigationValidation": {
+            "labelRequired": "Label pautan diperlukan",
+            "selectPageError": "Sila pilih halaman",
+            "urlRequired": "URL pautan diperlukan",
+            "invalidUrl": "Sila masukkan URL yang sah bermula dengan http:// atau https://",
+            "noDestination": "Tiada destinasi ditetapkan",
+            "linkType": "Jenis pautan",
+            "pageDestination": "Destinasi halaman",
+            "urlPlaceholder": "https://..."
+        },
+        "settingsValidation": {
+            "invalidPhone": "Sila masukkan nombor telefon yang sah (digit, +, -, ruang)",
+            "primaryColorLabel": "Pemilih warna utama",
+            "seoConfirmReplace": "Meta sedia ada akan diganti:\n\nTajuk: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nPenerangan: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nGunakan perubahan?"
+        },
+        "menuDrawer": {
+            "defaultUserName": "Pengguna"
+        }
+    },
+    "previewPage": {
+        "accessDenied": "Akses Ditolak",
+        "noPermission": "Anda tidak mempunyai kebenaran untuk pratonton laman ini.",
+        "backToDashboard": "Kembali ke Papan Pemuka",
+        "noPage": "Tiada halaman ditemui untuk pratonton ini.",
+        "loadError": "Ralat memuatkan pratonton. Sila pastikan anda telah log masuk dan mempunyai akses ke laman ini."
+    },
+    "storefront": {
+        "products": {
+            "home": "Utama",
+            "title": "Produk",
+            "ourProducts": "Produk Kami",
+            "layoutGrid": "Paparan Grid",
+            "layoutList": "Paparan Senarai",
+            "noMatch": "Tiada produk sepadan dengan penapis anda.",
+            "clearFilters": "Kosongkan semua penapis",
+            "specifications": "Spesifikasi",
+            "description": "Penerangan",
+            "sku": "SKU:",
+            "outOfStock": "Stok Habis",
+            "addToCart": "🛒 Tambah ke Troli",
+            "allProducts": "Semua Produk",
+            "priceRange": "Julat Harga",
+            "applyFilter": "Gunakan Penapis"
+        },
+        "blog": {
+            "title": "Blog",
+            "latestPosts": "Kiriman terkini daripada",
+            "latestStories": "Cerita dan pandangan terkini",
+            "noPosts": "Belum ada kiriman blog.",
+            "noImage": "Tiada imej",
+            "backToAll": "← Kembali ke semua kiriman",
+            "backToBlog": "← Kembali ke Blog"
+        },
+        "cart": {
+            "title": "Troli",
+            "empty": "Troli anda kosong",
+            "subtotal": "Jumlah kecil",
+            "proceedToCheckout": "Teruskan ke Pembayaran",
+            "checkoutUnavailable": "Ciri pembayaran akan datang tidak lama lagi",
+            "qty": "Kuantiti:"
+        },
+        "checkout": {
+            "title": "Pembayaran",
+            "backToProducts": "Kembali ke Produk",
+            "contactInfo": "Maklumat Hubungan",
+            "fullName": "Nama Penuh *",
+            "emailAddress": "Alamat E-mel *",
+            "phone": "Telefon (cth. +60 12-345 6789)",
+            "shippingAddress": "Alamat Penghantaran",
+            "addressLine1": "Alamat Baris 1",
+            "addressLine2": "Alamat Baris 2 (pilihan)",
+            "city": "Bandar",
+            "state": "Negeri",
+            "postcode": "Poskod",
+            "paymentMethod": "Kaedah Pembayaran",
+            "cod": "Bayar Semasa Penghantaran (COD)",
+            "codDesc": "Bayar semasa menerima pesanan anda",
+            "qrBanking": "QR Banking / DuitNow",
+            "qrBankingDesc": "Imbas kod QR dan muat naik bukti pembayaran",
+            "scanToPay": "Imbas untuk membayar melalui DuitNow QR",
+            "merchantQr": "Kod QR Pedagang",
+            "amount": "Jumlah:",
+            "uploadProof": "Muat Naik Bukti Pembayaran",
+            "clickToUpload": "Klik untuk muat naik resit / tangkapan skrin",
+            "uploadHint": "JPG atau PNG, maksimum 2MB",
+            "placingOrder": "Membuat Pesanan...",
+            "placeOrder": "Buat Pesanan — ",
+            "uploadRequired": "Sila muat naik bukti pembayaran untuk meneruskan",
+            "orderSummary": "Ringkasan Pesanan",
+            "subtotal": "Jumlah Kecil",
+            "shipping": "Penghantaran",
+            "free": "Percuma",
+            "sst": "SST (6%)",
+            "total": "Jumlah",
+            "orderConfirmed": "Pesanan Disahkan!",
+            "thankYou": "Terima kasih atas pembelian anda",
+            "orderNumber": "Nombor Pesanan",
+            "confirmationEmail": "E-mel pengesahan akan dihantar ke peti masuk anda",
+            "continueShopping": "Teruskan Membeli-belah",
+            "cartEmpty": "Troli anda kosong",
+            "browseProducts": "← Semak Produk",
+            "invalidImage": "Hanya imej JPG / PNG diterima",
+            "fileTooLarge": "Saiz fail mestilah kurang daripada 2MB",
+            "uploadFailed": "Gagal memuat naik bukti pembayaran",
+            "networkError": "Ralat rangkaian. Sila cuba lagi."
+        },
+        "notFound": {
+            "code": "404",
+            "title": "Halaman Tidak Ditemui",
+            "backHome": "Kembali ke Laman Utama"
         }
     }
 }

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 interface CongratsModalProps {
     isOpen: boolean
@@ -26,19 +27,21 @@ export function CongratsModal({
     siteName,
     siteId,
     dashboardHref = '/dashboard',
-    dashboardLabel = 'Go to Dashboard',
+    dashboardLabel,
     onNavigate,
 }: CongratsModalProps) {
+    const { t, ti } = useI18n()
+    const c = t.onboarding.completion
     const [copied, setCopied] = useState(false)
 
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(siteUrl)
             setCopied(true)
-            toast.success('Link copied! 🎉')
+            toast.success(c.linkCopied)
             setTimeout(() => setCopied(false), 2000)
         } catch {
-            toast.error('Failed to copy link')
+            toast.error(c.copyFailed)
         }
     }
 
@@ -69,7 +72,7 @@ export function CongratsModal({
                             >
                                 {/* Close button — subtle, top-right */}
                                 <Dialog.Close
-                                    aria-label="Close"
+                                    aria-label={t.common.close}
                                     className="absolute right-4 top-4 rounded-full p-1.5 text-gray-500 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                                 >
                                     <X className="h-4 w-4" />
@@ -82,11 +85,20 @@ export function CongratsModal({
                                     </div>
 
                                     <Dialog.Title className="mb-3 text-2xl font-bold tracking-tight text-white">
-                                        Congratulations!
+                                        {c.congratulations}
                                     </Dialog.Title>
 
                                     <Dialog.Description className="mb-6 text-sm leading-relaxed text-gray-400">
-                                        Your website <span className="font-semibold text-white">{siteName}</span> is now live and published to the internet.
+                                        {(() => {
+                                            const parts = ti(c.websiteLiveMessage, { name: `__SITE_NAME__` }).split('__SITE_NAME__')
+                                            return (
+                                                <>
+                                                    {parts[0]}
+                                                    <span className="font-semibold text-white">{siteName}</span>
+                                                    {parts[1]}
+                                                </>
+                                            )
+                                        })()}
                                     </Dialog.Description>
 
                                     {/* Domain Display & Copy */}
@@ -103,17 +115,17 @@ export function CongratsModal({
                                                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
                                                         : 'bg-white/10 text-gray-200 hover:bg-white/20 hover:text-white',
                                                 )}
-                                                title="Copy Link"
+                                                title={c.copyLink}
                                             >
                                                 {copied ? (
                                                     <>
                                                         <CheckCircle2 className="h-3.5 w-3.5" />
-                                                        <span>Copied</span>
+                                                        <span>{c.copied}</span>
                                                     </>
                                                 ) : (
                                                     <>
                                                         <Copy className="h-3.5 w-3.5" />
-                                                        <span>Copy Link</span>
+                                                        <span>{c.copyLink}</span>
                                                     </>
                                                 )}
                                             </button>
@@ -128,7 +140,7 @@ export function CongratsModal({
                                             className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-400 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition-all hover:shadow-cyan-400/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                                         >
                                             <ExternalLink className="h-4 w-4" />
-                                            <span>Open Editor</span>
+                                            <span>{c.openEditor}</span>
                                         </Link>
 
                                         <Link
@@ -137,7 +149,7 @@ export function CongratsModal({
                                             className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-sm font-medium text-gray-200 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                                         >
                                             <LayoutDashboard className="h-4 w-4" />
-                                            <span>{dashboardLabel}</span>
+                                            <span>{dashboardLabel ?? c.goToDashboard}</span>
                                         </Link>
                                     </div>
                                 </div>

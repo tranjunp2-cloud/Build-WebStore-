@@ -5,7 +5,7 @@ import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
-import { CTAButtons, HERO_CONTAINER } from '../shared'
+import { CTAButtons, HERO_CONTAINER, safeAltText } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
@@ -16,7 +16,7 @@ export function SplitHero({ block, site }: BlockProps<HeroConfig>) {
     const fallbackHeroUrl = getHeroImage(category)
 
     return (
-        <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             {/* Background decorations */}
             <GradientBlob color={CSS_VARS.primary} className="top-[-10%] right-[-5%]" size={600} opacity={0.12} />
             <GradientBlob color={CSS_VARS.primary} className="bottom-[-15%] left-[-8%]" size={500} opacity={0.08} />
@@ -51,7 +51,7 @@ export function SplitHero({ block, site }: BlockProps<HeroConfig>) {
                     >
                         <img
                             src={image?.url || fallbackHeroUrl}
-                            alt={image?.alt || headline}
+                            alt={safeAltText(image?.alt, headline)}
                             className="w-full h-auto rounded-3xl object-cover aspect-auto max-h-[500px]"
                             style={{ boxShadow: `0 25px 50px rgba(var(--brand-primary-rgb), 0.082), 0 10px 20px rgba(0,0,0,0.2)` }}
                         />

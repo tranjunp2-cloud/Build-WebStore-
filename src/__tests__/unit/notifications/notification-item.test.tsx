@@ -13,6 +13,24 @@ vi.mock('@/i18n', () => ({
                 tagSystem: 'System',
                 tagAnnouncement: 'Announcement',
                 broadcastTitle: 'System Notification',
+                types: {
+                    ORDER_NEW: {
+                        title: 'New Order #{orderNumber} - {currency} {total}',
+                        message: 'Order placed by {customerName}',
+                    },
+                    BLOG_PUBLISHED: {
+                        title: 'Blog Published',
+                        message: '{blogTitle} has been published',
+                    },
+                    PRODUCT_LOW_STOCK: {
+                        title: 'Low Stock Alert',
+                        message: '{productName} is running low ({quantity} units left)',
+                    },
+                    SYSTEM_ALERT: {
+                        title: 'Payment Failed - Order #{orderNumber}',
+                        message: 'Payment for order #{orderNumber} has failed. Customer may retry.',
+                    },
+                },
             },
         },
         locale: 'en',
@@ -80,6 +98,55 @@ describe('[TC-F16.04] NotificationItem — visual states', () => {
             expect(screen.getByText('New Order #100')).toBeInTheDocument()
             unmount()
         })
+    })
+})
+
+describe('[TC-F16.20] NotificationItem — i18n metadata interpolation', () => {
+    it('renders translated title/message when metadata + template exist', () => {
+        render(<NotificationItem notification={makeNotification({
+            type: 'ORDER_NEW',
+            title: 'New Order #ORD-001 - MYR 150.00',
+            message: 'Order placed by Alice',
+            metadata: { orderNumber: 'ORD-001', currency: 'MYR', total: '150.00', customerName: 'Alice' },
+        })} />)
+
+        expect(screen.getByText('New Order #ORD-001 - MYR 150.00')).toBeInTheDocument()
+        expect(screen.getByText('Order placed by Alice')).toBeInTheDocument()
+    })
+
+    it('falls back to raw DB values when metadata is absent', () => {
+        render(<NotificationItem notification={makeNotification({
+            type: 'ORDER_NEW',
+            title: 'Raw DB Title',
+            message: 'Raw DB Message',
+        })} />)
+
+        expect(screen.getByText('Raw DB Title')).toBeInTheDocument()
+        expect(screen.getByText('Raw DB Message')).toBeInTheDocument()
+    })
+
+    it('keeps placeholder when metadata key is missing', () => {
+        render(<NotificationItem notification={makeNotification({
+            type: 'PRODUCT_LOW_STOCK',
+            title: 'Low Stock Alert',
+            message: 'Widget is running low',
+            metadata: { productName: 'Widget' },
+        })} />)
+
+        // {quantity} missing → stays as placeholder
+        expect(screen.getByText('Widget is running low ({quantity} units left)')).toBeInTheDocument()
+    })
+
+    it('renders BLOG_PUBLISHED with interpolated blogTitle', () => {
+        render(<NotificationItem notification={makeNotification({
+            type: 'BLOG_PUBLISHED',
+            title: 'Blog Published',
+            message: 'My Post has been published',
+            metadata: { blogTitle: 'My Post' },
+        })} />)
+
+        expect(screen.getByText('Blog Published')).toBeInTheDocument()
+        expect(screen.getByText('My Post has been published')).toBeInTheDocument()
     })
 })
 

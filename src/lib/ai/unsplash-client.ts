@@ -114,12 +114,30 @@ export const UNSPLASH_ORIENTATION_BY_BLOCK: Record<string, UnsplashOrientation> 
     'logo-cloud': 'squarish',
 }
 
+function hasUnsplashKey(): boolean {
+    const key = process.env.UNSPLASH_ACCESS_KEY
+    return Boolean(key && key.length >= 10)
+}
+
 function getClientIdHeader(): Record<string, string> {
     const key = process.env.UNSPLASH_ACCESS_KEY
     if (!key || key.length < 10) {
         throw new UnsplashError('NO_KEY', 0, false, 'UNSPLASH_ACCESS_KEY not set or invalid')
     }
     return { Authorization: `Client-ID ${key}` }
+}
+
+// Plan 260415 — log the "no key" warning ONCE per process so we don't spam the
+// dev console on every gen. Production Vercel always has the key; local dev
+// without the key takes the graceful-skip path.
+let unsplashKeyWarningLogged = false
+function warnNoKeyOnce(): void {
+    if (unsplashKeyWarningLogged) return
+    unsplashKeyWarningLogged = true
+    console.warn(
+        '[Unsplash] UNSPLASH_ACCESS_KEY not set — image pipeline will skip pool + per-block searches. ' +
+            'Set the key in .env.local to enable stock photography (copy from Vercel Dashboard staging env).',
+    )
 }
 
 function logRateLimit(headers: Headers): void {
@@ -174,6 +192,11 @@ async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response
 /**
  * Search Unsplash photos. Returns first page (max 30 per request).
  * Empty array if no results — not thrown.
+ *
+ * Plan 260415 — when `UNSPLASH_ACCESS_KEY` is missing (common on fresh local
+ * dev), returns `[]` gracefully instead of throwing. Downstream callers
+ * (image-pool / media-injector) already handle empty results via backoff +
+ * cleanup paths, so the gen pipeline stays healthy with zero images.
  */
 export async function searchPhotos(
     query: string,
@@ -181,6 +204,10 @@ export async function searchPhotos(
     opts: SearchOptions = {},
 ): Promise<UnsplashPhoto[]> {
     if (!query.trim()) return []
+    if (!hasUnsplashKey()) {
+        warnNoKeyOnce()
+        return []
+    }
     const perPage = Math.min(Math.max(count, 1), 30)
     const params = new URLSearchParams({
         query: query.trim(),

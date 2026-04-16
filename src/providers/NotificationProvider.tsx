@@ -5,23 +5,30 @@ import { useNotificationStore } from '@/store/notificationStore'
 import { useI18n } from '@/i18n'
 import type { NotificationsResponse } from '@/types/notification'
 
-const POLL_INTERVAL_MS = 15_000
-const POLL_BACKOFF_MAX_MS = 60_000
+// Adaptive polling: fast for users without push, slow for users with push
+const POLL_FAST_MS = 15_000   // No push subscription → poll frequently
+const POLL_SLOW_MS = 60_000   // Has push → poll only for badge sync
+const POLL_BACKOFF_MAX_MS = 120_000
 const POLL_ERROR_MULTIPLIER = 2
+const SEEN_IDS_MAX = 200
+
+function getBasePollInterval(): number {
+    if (typeof window === 'undefined') return POLL_FAST_MS
+    // If user granted push permission, push handles real-time → slow poll
+    if ('Notification' in window && Notification.permission === 'granted') return POLL_SLOW_MS
+    return POLL_FAST_MS
+}
 
 /**
- * Headless provider that polls /api/notifications for new notifications.
+ * Headless provider that:
+ *  1. Listens for push messages from Service Worker (real-time, < 2s)
+ *  2. Falls back to polling /api/notifications every 60s (badge sync)
  *
- * On each poll cycle:
- *  1. Fetches notifications newer than last check
- *  2. Updates unread badge count
- *  3. Emits 'notification-toast' CustomEvent for new items:
- *     - Single new item → fetches details for specific toast
- *     - Multiple new items → generic "{count} new notifications" toast
+ * Push path: SW receives push → postMessage → this provider → emit toast + sync badge
+ * Poll path: fetch /api/notifications?since=... → update badge + detect new items (if no push)
  *
  * Pauses polling when tab is hidden (Visibility API).
- * Uses AbortController to prevent overlapping fetches.
- * Exponential backoff on consecutive errors.
+ * Resumes immediately on tab focus or network recovery.
  */
 export function NotificationProvider() {
     const { setUnreadCount } = useNotificationStore()
@@ -33,16 +40,20 @@ export function NotificationProvider() {
     tiRef.current = ti
 
     const lastPollRef = useRef<string>(new Date().toISOString())
-    const intervalRef = useRef(POLL_INTERVAL_MS)
-    const prevUnreadRef = useRef<number | null>(null)
+    const intervalRef = useRef(getBasePollInterval())
     const abortRef = useRef<AbortController | null>(null)
+    const pendingPollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // Track seen notification IDs to detect genuinely new items
+    const seenIdsRef = useRef<Set<string>>(new Set())
+    const initialPollDoneRef = useRef(false)
 
     const emitToast = useCallback((detail: { id: string; title: string; type?: string; message?: string }) => {
         window.dispatchEvent(new CustomEvent('notification-toast', { detail }))
     }, [])
 
+    // Lightweight poll: sync badge count + detect new items (fallback for no-push browsers)
     const poll = useCallback(async () => {
-        // Abort any in-flight request
         if (abortRef.current) abortRef.current.abort()
         const controller = new AbortController()
         abortRef.current = controller
@@ -56,40 +67,45 @@ export function NotificationProvider() {
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
             const data = (await res.json()) as NotificationsResponse
-            const newItems = data.items ?? []
+            const items = data.items ?? []
             const serverUnread = data.unreadCount ?? 0
 
-            // Update unread count from server (source of truth)
             setUnreadCount(serverUnread)
 
-            // Emit toast only for genuinely new notifications
-            const hadPrevCount = prevUnreadRef.current !== null
-            const countDelta = hadPrevCount ? serverUnread - (prevUnreadRef.current ?? 0) : 0
-            prevUnreadRef.current = serverUnread
+            if (!initialPollDoneRef.current) {
+                // First poll: seed seen IDs, don't toast
+                for (const item of items) seenIdsRef.current.add(item.id)
+                initialPollDoneRef.current = true
+            } else {
+                // Subsequent polls: toast genuinely new items (fallback if push missed)
+                const newItems = items.filter((item) => !seenIdsRef.current.has(item.id))
+                for (const item of items) seenIdsRef.current.add(item.id)
 
-            if (hadPrevCount && countDelta > 0 && newItems.length > 0) {
-                if (newItems.length === 1) {
-                    const item = newItems[0]
-                    emitToast({
-                        id: item.id,
-                        title: item.title,
-                        type: item.type,
-                        message: item.message,
-                    })
-                } else {
-                    const title = tiRef.current(tRef.current.notifications.toast.newCount, {
-                        count: newItems.length,
-                    })
-                    emitToast({ id: `burst-${Date.now()}`, title, type: 'BURST' })
+                // Cap seen IDs to prevent unbounded memory growth in long sessions
+                if (seenIdsRef.current.size > SEEN_IDS_MAX) {
+                    const arr = [...seenIdsRef.current]
+                    seenIdsRef.current = new Set(arr.slice(-SEEN_IDS_MAX / 2))
+                    // Advance watermark so evicted IDs are not re-fetched by next poll
+                    lastPollRef.current = new Date().toISOString()
+                }
+
+                if (newItems.length > 0) {
+                    if (newItems.length === 1) {
+                        const item = newItems[0]
+                        emitToast({ id: item.id, title: item.title, type: item.type, message: item.message })
+                    } else {
+                        const title = tiRef.current(tRef.current.notifications.toast.newCount, {
+                            count: newItems.length,
+                        })
+                        emitToast({ id: `burst-${Date.now()}`, title, type: 'BURST' })
+                    }
                 }
             }
 
             lastPollRef.current = new Date().toISOString()
-            // Reset interval on success
-            intervalRef.current = POLL_INTERVAL_MS
+            intervalRef.current = getBasePollInterval()
         } catch (err) {
             if ((err as Error).name === 'AbortError') return
-            // Exponential backoff on error
             intervalRef.current = Math.min(
                 intervalRef.current * POLL_ERROR_MULTIPLIER,
                 POLL_BACKOFF_MAX_MS,
@@ -101,8 +117,16 @@ export function NotificationProvider() {
         let mounted = true
         let timer: ReturnType<typeof setTimeout> | null = null
 
+        function clearTimer() {
+            if (timer) {
+                clearTimeout(timer)
+                timer = null
+            }
+        }
+
         function scheduleNext() {
             if (!mounted) return
+            clearTimer()
             timer = setTimeout(async () => {
                 await poll()
                 scheduleNext()
@@ -112,26 +136,61 @@ export function NotificationProvider() {
         // Initial poll immediately
         poll().then(() => scheduleNext())
 
-        // Pause/resume on visibility change
+        // ── Push message from Service Worker (real-time path) ──────────
+        function handlePushMessage(event: MessageEvent) {
+            if (event.data?.type !== 'PUSH_NOTIFICATION') return
+            const payload = event.data.payload
+            if (!payload?.id) return
+
+            // Mark as seen so polling doesn't duplicate the toast
+            seenIdsRef.current.add(payload.id)
+
+            // Emit in-app toast
+            emitToast({
+                id: payload.id,
+                title: payload.title || tRef.current.notifications.toast.newNotification,
+                type: payload.type,
+                message: payload.message,
+            })
+
+            // Sync badge count from server (debounced — batches burst pushes)
+            if (pendingPollRef.current) clearTimeout(pendingPollRef.current)
+            pendingPollRef.current = setTimeout(() => {
+                pendingPollRef.current = null
+                poll()
+            }, 2_000)
+        }
+        navigator.serviceWorker?.addEventListener('message', handlePushMessage)
+
+        // ── Visibility change (pause/resume polling) ──────────────────
         function handleVisibility() {
             if (document.hidden) {
-                if (timer) clearTimeout(timer)
-                timer = null
+                clearTimer()
             } else {
-                // Fetch immediately on tab focus, then resume schedule
+                clearTimer()
                 poll().then(() => scheduleNext())
             }
         }
-
         document.addEventListener('visibilitychange', handleVisibility)
+
+        // ── Network recovery ──────────────────────────────────────────
+        function handleOnline() {
+            intervalRef.current = getBasePollInterval()
+            clearTimer()
+            poll().then(() => scheduleNext())
+        }
+        window.addEventListener('online', handleOnline)
 
         return () => {
             mounted = false
-            if (timer) clearTimeout(timer)
+            clearTimer()
+            if (pendingPollRef.current) clearTimeout(pendingPollRef.current)
             if (abortRef.current) abortRef.current.abort()
+            navigator.serviceWorker?.removeEventListener('message', handlePushMessage)
             document.removeEventListener('visibilitychange', handleVisibility)
+            window.removeEventListener('online', handleOnline)
         }
-    }, [poll])
+    }, [poll, emitToast])
 
     return null
 }

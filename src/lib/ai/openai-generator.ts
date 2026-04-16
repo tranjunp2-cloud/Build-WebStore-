@@ -14,6 +14,7 @@ import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
+import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
@@ -121,7 +122,12 @@ export async function generateSiteWithAI(
                     { role: 'user', content: userPromptText },
                 ],
                 temperature: 0.7,
-                max_tokens: 8000,
+                // Plan 260415 F01-gen-audit — down from 8000. Staging eval
+                // (eval-2026-04-14) showed p95 completion output ~5200
+                // tokens; 6000 gives headroom without burning wall-clock
+                // budget on GPT writing past the cap. Saves ~15s per gen
+                // worst-case and forces tighter block copy.
+                max_tokens: 6000,
                 response_format: { type: 'json_object' },
             })
         } catch (err) {
@@ -134,6 +140,24 @@ export async function generateSiteWithAI(
                 success: false,
                 errorCode: err instanceof Error ? err.name : 'unknown',
             })
+            // Plan 260415 F01-gen-audit — surface OpenAI API error body so the
+            // outer route log captures the failure reason instead of a generic
+            // "fallback" message. Staging has been masking "400 could not parse
+            // the JSON body" failures inside the outer catch for weeks without
+            // a clear attribution.
+            if (err && typeof err === 'object') {
+                const apiErr = err as { status?: number; message?: string; error?: unknown }
+                console.error(
+                    `[AI] OpenAI call FAILED status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} msg=${String(apiErr.message).slice(0, 300)}`,
+                )
+                if (apiErr.error) {
+                    try {
+                        console.error(`[AI] OpenAI error body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
+                    } catch {
+                        // ignore serialization failures
+                    }
+                }
+            }
             throw err
         }
 
@@ -236,6 +260,12 @@ export async function generateSiteWithAI(
         // user data into library-built blocks. Done before both branches.
         const enforcerBizOverride = mapBusinessInfo(businessInfo)
 
+        // Plan 260415 Phase 04 — aggregate telemetry from post-AI swap across
+        // pages. Returned in generation metadata so Phase 07 measurement
+        // harness can count swap decisions without log scraping.
+        const swapTelemetry: SwapTelemetry[] = []
+        const postSwapEnabled = isPostAISwapEnabled()
+
         if (rawPages && rawPages.length > 0) {
             // Multi-page format
             generatedPages = []
@@ -255,6 +285,22 @@ export async function generateSiteWithAI(
             for (let p = 0; p < rawPages.length; p++) {
                 const rawPage = rawPages[p] as Record<string, unknown>
                 let pageBlocks = validateBlocks(Array.isArray(rawPage.blocks) ? rawPage.blocks : [])
+
+                // Plan 260415 Phase 04 — post-AI content swap runs on homepage
+                // only. Swaps generic AI-emitted blocks (hero/features/about/
+                // etc.) for curated composer output when content matches the
+                // generic blacklist AND doesn't reference user data.
+                if (p === 0 && postSwapEnabled && detectedCategory) {
+                    const swapResult = postAISwapStep(
+                        pageBlocks as Record<string, unknown>[],
+                        enforcerBizOverride,
+                        detectedCategory,
+                        themeMood,
+                    )
+                    pageBlocks = swapResult.blocks as typeof pageBlocks
+                    swapTelemetry.push(...swapResult.telemetry)
+                }
+
                 // Apply structure enforcer ONLY to homepage (other pages have own content requirements)
                 if (p === 0 && detectedCategory) {
                     pageBlocks = enforceMinimumStructure(
@@ -347,6 +393,19 @@ export async function generateSiteWithAI(
             // Single-page backward compat
             const rawBlocks = Array.isArray(parsed.blocks) ? parsed.blocks : []
             validBlocks = validateBlocks(rawBlocks)
+
+            // Plan 260415 Phase 04 — post-AI swap on single-page path too.
+            if (postSwapEnabled && detectedCategory) {
+                const swapResult = postAISwapStep(
+                    validBlocks as Record<string, unknown>[],
+                    enforcerBizOverride,
+                    detectedCategory,
+                    themeMood,
+                )
+                validBlocks = swapResult.blocks as typeof validBlocks
+                swapTelemetry.push(...swapResult.telemetry)
+            }
+
             // Apply structure enforcer to ensure min block count + item counts
             if (detectedCategory) {
                 const enforcerCtx = {
@@ -407,6 +466,16 @@ export async function generateSiteWithAI(
             seo,
             language: (['en', 'ms', 'vi'] as const).includes(parsed.language as 'en' | 'ms' | 'vi') ? (parsed.language as 'en' | 'ms' | 'vi') : 'en',
             theme,
+            // Plan 260415 Phase 04 — swap telemetry surfaced for Phase 07 harness.
+            postAISwap: {
+                enabled: postSwapEnabled,
+                swapCount: swapTelemetry.filter((t) => t.action === 'swapped').length,
+                decisions: swapTelemetry.map((t) => ({
+                    blockType: t.blockType,
+                    action: t.action,
+                    reason: t.reason,
+                })),
+            },
         }
 
         // Phase 06 — warn-only consistency check on the final AI happy-path
@@ -455,9 +524,19 @@ function generateWithFallback(
 
     const seed = Date.now()
 
+    // Plan 260415 fix-500 — composeFallbackResult now returns null (not
+    // throws) for unrecoverable states. Treat null exactly like a thrown
+    // exception: log + fall through to the legacy safety net.
+    let composerResult: GenerationResult | null = null
+    let composerErrMsg: string | null = null
     try {
-        const result = composeFallbackResult(prompt, seed, language, businessInfo)
+        composerResult = composeFallbackResult(prompt, seed, language, businessInfo)
+    } catch (composerError: unknown) {
+        composerErrMsg = composerError instanceof Error ? composerError.message : String(composerError)
+    }
 
+    if (composerResult) {
+        const result = composerResult
         events.push({ event: 'step', data: { step: 'fallback_validating', label: 'Validating content...', progress: 75 } })
         events.push({ event: 'theme_set', data: { theme: result.theme } })
 
@@ -483,10 +562,12 @@ function generateWithFallback(
         })
 
         return { result, events }
-    } catch (composerError: unknown) {
-        // Legacy safety net — runs only if composeFallbackResult throws.
-        // Do not extend generate-blocks.ts; see plans/260412-2156-ai-gen-website-audit/phase-06-step-7.
-        const errMsg = composerError instanceof Error ? composerError.message : String(composerError)
+    }
+
+    // Legacy safety net — runs when composeFallbackResult returned null OR threw.
+    // Do not extend generate-blocks.ts; see plans/260412-2156-ai-gen-website-audit/phase-06-step-7.
+    {
+        const errMsg = composerErrMsg ?? 'composeFallbackResult returned null'
         console.warn('[Fallback] composer failed, using legacy generateBlocks', errMsg)
 
         events.push({ event: 'step', data: { step: 'fallback_legacy', label: 'Using legacy templates...', progress: 55 } })

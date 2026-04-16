@@ -4,7 +4,6 @@ import { getCurrentTenantId } from '@/lib/auth'
 import { AnalyticsChart, ChartData } from '@/components/dashboard/AnalyticsChart'
 import { TopPerformingList, PerformingItem } from '@/components/dashboard/TopPerformingList'
 import { AnalyticsEmptyState } from '@/components/dashboard/AnalyticsEmptyState'
-import { sql } from 'drizzle-orm'
 import { subDays, startOfDay } from 'date-fns'
 export const dynamic = 'force-dynamic'
 
@@ -31,11 +30,17 @@ export async function AnalyticsView({ searchParams }: Props) {
     // Match Overview's "leads" metric — only 'click' events
     const clickEvents = ['click']
 
-    // Raw SQL: Payload API doesn't support COUNT(DISTINCT). Tenant isolation is manual
-    // via tenant_id filter — safe because tenantId is from getCurrentTenantId() (JWT auth).
+    // Views (Traffic) = total pageview count per PRD: "Lượt views (Traffic)"
+    // Tenant isolation via tenantId from getCurrentTenantId() (JWT auth).
     const [currentViewsRes, prevViewsRes, currentClicksRes, prevClicksRes] = await Promise.all([
-        payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${since.toISOString()}`),
-        payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${prevSince.toISOString()} AND created_at < ${since.toISOString()}`),
+        payload.count({
+            collection: 'analytics',
+            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { equals: 'pageview' } }
+        }),
+        payload.count({
+            collection: 'analytics',
+            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { equals: 'pageview' } }
+        }),
         payload.count({
             collection: 'analytics',
             where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { in: clickEvents } }
@@ -46,8 +51,8 @@ export async function AnalyticsView({ searchParams }: Props) {
         }),
     ])
 
-    const currentMetrics = { views: Number(currentViewsRes.rows[0]?.count || 0), clicks: currentClicksRes.totalDocs }
-    const prevMetrics = { views: Number(prevViewsRes.rows[0]?.count || 0), clicks: prevClicksRes.totalDocs }
+    const currentMetrics = { views: currentViewsRes.totalDocs, clicks: currentClicksRes.totalDocs }
+    const prevMetrics = { views: prevViewsRes.totalDocs, clicks: prevClicksRes.totalDocs }
 
     // If completely empty in current
     if (currentMetrics.views === 0 && currentMetrics.clicks === 0) {
@@ -68,9 +73,9 @@ export async function AnalyticsView({ searchParams }: Props) {
         sort: '-createdAt',
     })
 
-    // Aggregation for lists and charts (only for current period)
-    // Use Sets for unique session counting to match Overview's COUNT(DISTINCT session_id)
-    const dailySessions: Record<string, { viewSessions: Set<string>, clickSessions: Set<string> }> = {}
+    // Aggregation: raw event counts per PRD ("Lượt views", "Lượt mở trang nhiều nhất")
+    const dailyViews: Record<string, number> = {}
+    const dailyClicks: Record<string, number> = {}
     const pageViews: Record<string, number> = {}
     const productClicks: Record<string, number> = {}
     const blogViews: Record<string, number> = {}
@@ -78,44 +83,32 @@ export async function AnalyticsView({ searchParams }: Props) {
 
     for (const doc of currentDocs) {
         const date = new Date(doc.createdAt).toISOString().split('T')[0]
-        if (!dailySessions[date]) dailySessions[date] = { viewSessions: new Set(), clickSessions: new Set() }
-
-        const sessionId = (doc as { sessionId?: string }).sessionId
-
-        // Only count sessions with valid sessionId — matches SQL COUNT(DISTINCT session_id)
-        if (sessionId) {
-            if (doc.event === 'pageview') {
-                dailySessions[date].viewSessions.add(sessionId)
-            } else if (doc.event === 'click') {
-                dailySessions[date].clickSessions.add(sessionId)
-            }
-        }
-
-        // Top Pages
         const url = doc.pageUrl || '/'
-        pageViews[url] = (pageViews[url] || 0) + 1
 
-        // Top Blogs
-        if (url.startsWith('/blog/')) {
-            blogViews[url] = (blogViews[url] || 0) + 1
+        if (doc.event === 'pageview') {
+            dailyViews[date] = (dailyViews[date] || 0) + 1
+            pageViews[url] = (pageViews[url] || 0) + 1
+
+            if (url.startsWith('/blog/')) {
+                blogViews[url] = (blogViews[url] || 0) + 1
+            }
+        } else if (doc.event === 'click') {
+            dailyClicks[date] = (dailyClicks[date] || 0) + 1
         }
 
-        // Top Products
         if (url.startsWith('/product/') || doc.event === 'click') {
             productClicks[url] = (productClicks[url] || 0) + 1
         }
 
-        // Top Referrers
+        // Referrers
         if (doc.referrer) {
             try {
                 const refUrl = new URL(doc.referrer)
-                // Filter out internal traffic or empty domains
                 if (refUrl.hostname && !refUrl.hostname.includes('localhost') && !refUrl.hostname.includes(process.env.NEXT_PUBLIC_SERVER_URL || '')) {
                     const domain = refUrl.hostname.replace(/^www\./, '')
                     referrers[domain] = (referrers[domain] || 0) + 1
                 }
             } catch {
-                // Not a valid URL, could be a UTM source string
                 if (doc.referrer.length < 100 && !doc.referrer.startsWith('/')) {
                     referrers[doc.referrer] = (referrers[doc.referrer] || 0) + 1
                 }
@@ -123,20 +116,18 @@ export async function AnalyticsView({ searchParams }: Props) {
         }
     }
 
-    // Fill daily views
+    // Fill daily chart data
     const chartData: ChartData[] = []
     for (let i = days - 1; i >= 0; i--) {
         const d = new Date()
         d.setDate(d.getDate() - i)
         const key = d.toISOString().split('T')[0]
-        
-        // Format date string to D/M for chart display to match Figma
         const displayDate = `${d.getDate()}/${d.getMonth() + 1}`
 
         chartData.push({
             date: displayDate,
-            views: dailySessions[key]?.viewSessions.size || 0,
-            clicks: dailySessions[key]?.clickSessions.size || 0
+            views: dailyViews[key] || 0,
+            clicks: dailyClicks[key] || 0
         })
     }
 

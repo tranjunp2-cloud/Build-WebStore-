@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { notifyTenantOwners } from '@/lib/notifications/notify-tenant-owners'
 
-// ── TC-F16.12, TC-F16.14: Notification trigger helper ──────────────────
+// ── TC-F16.12, TC-F16.14, TC-F16.43: Notification trigger helper ──────
 
 const mockFind = vi.fn()
 const mockCreate = vi.fn()
@@ -40,10 +40,10 @@ describe('notifyTenantOwners [TC-F16.12]', () => {
             collection: 'users',
             where: {
                 'tenants.tenant': { equals: 10 },
-                'tenants.role': { equals: 'owner' },
+                'tenants.role': { in: ['owner', 'admin'] },
                 'tenants.status': { equals: 'active' },
             },
-            limit: 10,
+            limit: 200,
             depth: 0,
         })
         expect(mockCreate).toHaveBeenCalledTimes(2)
@@ -89,7 +89,7 @@ describe('notifyTenantOwners [TC-F16.12]', () => {
             type: 'BLOG_PUBLISHED',
             title: 'Blog Published',
             message: 'Test blog has been published',
-            actionUrl: '/blogs',
+            actionUrl: '/blog',
         })
 
         const after = Date.now()
@@ -118,6 +118,90 @@ describe('notifyTenantOwners [TC-F16.12]', () => {
         // Assert
         expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
             data: expect.objectContaining({ tenant: '10' }),
+        }))
+    })
+})
+
+describe('notifyTenantOwners — role targeting [TC-F16.43]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockFind.mockResolvedValue({ docs: [{ id: 1 }] })
+        mockCreate.mockResolvedValue({})
+    })
+
+    it('ORDER_NEW targets owner + admin', async () => {
+        await notifyTenantOwners(mockPayload, 10, {
+            type: 'ORDER_NEW',
+            title: 'New Order',
+            message: 'Test',
+            actionUrl: '/orders',
+        })
+
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                'tenants.role': { in: ['owner', 'admin'] },
+            }),
+        }))
+    })
+
+    it('PRODUCT_LOW_STOCK targets owner + admin + editor', async () => {
+        await notifyTenantOwners(mockPayload, 10, {
+            type: 'PRODUCT_LOW_STOCK',
+            title: 'Low Stock',
+            message: 'Test',
+            actionUrl: '/products',
+        })
+
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                'tenants.role': { in: ['owner', 'admin', 'editor'] },
+            }),
+        }))
+    })
+
+    it('BLOG_PUBLISHED targets owner + admin + editor', async () => {
+        await notifyTenantOwners(mockPayload, 10, {
+            type: 'BLOG_PUBLISHED',
+            title: 'Blog Published',
+            message: 'Test',
+            actionUrl: '/blog',
+        })
+
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                'tenants.role': { in: ['owner', 'admin', 'editor'] },
+            }),
+        }))
+    })
+
+    it('SYSTEM_ALERT targets all active roles', async () => {
+        await notifyTenantOwners(mockPayload, 10, {
+            type: 'SYSTEM_ALERT',
+            title: 'System Alert',
+            message: 'Test',
+            actionUrl: '/dashboard',
+        })
+
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                'tenants.role': { in: ['owner', 'admin', 'editor', 'viewer'] },
+            }),
+        }))
+    })
+
+    it('allows caller to override roles', async () => {
+        await notifyTenantOwners(mockPayload, 10, {
+            type: 'ORDER_NEW',
+            title: 'Test',
+            message: 'Test',
+            actionUrl: '/test',
+            roles: ['owner'],
+        })
+
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            where: expect.objectContaining({
+                'tenants.role': { equals: 'owner' },
+            }),
         }))
     })
 })

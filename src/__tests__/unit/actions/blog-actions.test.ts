@@ -172,19 +172,20 @@ describe('deleteBlogCategoryAction [TC-F17.04]', () => {
         mockFindByID.mockResolvedValue({ id: 'cat-1', tenant: { id: 'tenant-other' } })
 
         const result = await deleteBlogCategoryAction('cat-1')
-        expect(result).toEqual({ error: 'Unauthorized delete access' })
+        expect(result).toEqual({ error: 'ERR_UNAUTHORIZED' })
         expect(mockDelete).not.toHaveBeenCalled()
     })
 
-    it('soft-deletes category when tenant matches', async () => {
+    it('hard-deletes category when tenant matches', async () => {
         vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any)
         mockFindByID.mockResolvedValue({ id: 'cat-1', tenant: { id: 'tenant-1' } })
-        mockUpdate.mockResolvedValue({ id: 'cat-1', status: 'deleted' })
+        mockFind.mockResolvedValue({ docs: [] })
+        mockDelete.mockResolvedValue({ id: 'cat-1' })
 
         const result = await deleteBlogCategoryAction('cat-1')
         expect(result).toEqual({ success: true })
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({ collection: 'blog_categories', id: 'cat-1', data: { status: 'deleted' } }),
+        expect(mockDelete).toHaveBeenCalledWith(
+            expect.objectContaining({ collection: 'blog_categories', id: 'cat-1' }),
         )
     })
 })

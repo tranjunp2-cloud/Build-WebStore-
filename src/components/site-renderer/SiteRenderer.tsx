@@ -8,6 +8,7 @@ import { generatePageSchemas } from '@/lib/seo/json-ld'
 import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
+import { OwnerProvider } from './OwnerContext'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -203,7 +204,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
     const allBlockTypes = blocks.map(b => b.blockType).filter(Boolean)
 
     return (
-        <>
+        <OwnerProvider value={!!isOwner}>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`
           ${themeCSS}
@@ -296,6 +297,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
 
                 return blockContent
             })}
-        </>
+        </OwnerProvider>
     )
 }

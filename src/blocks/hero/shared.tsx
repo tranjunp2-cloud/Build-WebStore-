@@ -6,15 +6,36 @@ import type { HeroConfig } from './config'
 import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { trackEvent } from '@/lib/analytics/track-event'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
 // Token shortcut: hero containers consume CONTAINER.default + INNER_PADDING.
 export const HERO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+
+/**
+ * Plan 260415 Lỗi E — hero min-h responsive: mobile 75vh (không tràn dưới
+ * dải gesture iOS), desktop 92vh giữ cinematic feel. Các variants dùng helper
+ * này thay vì hardcode `min-h-[92vh]`.
+ */
+export const HERO_MIN_HEIGHT = 'min-h-[75vh] md:min-h-[92vh]'
+
+/**
+ * Plan 260415 Lỗi D — alt text helper cho hero images. headline có thể là
+ * Lexical JSON object (từ RichText editor) → render trực tiếp cho alt sẽ
+ * thành "[object Object]". Check type trước khi dùng headline làm fallback.
+ * Ưu tiên image.alt, rồi plain string headline, cuối cùng generic "Hero image".
+ */
+export function safeAltText(imageAlt: string | undefined, headline: unknown): string {
+    if (imageAlt && typeof imageAlt === 'string') return imageAlt
+    if (typeof headline === 'string' && headline.trim()) return headline
+    return 'Hero image'
+}
 
 // ── Shared CTA renderer ──────────────────────────────────────────────────────
 // CTA button has px-8 py-4 = ~56px effective height (passes WCAG 2.5.5).
 // TOUCH_TARGET.min added explicitly as a guarantee in case future restyles
 // shrink the padding. siteId prop threads through for click tracking.
 export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: HeroConfig['ctaButtons']; variant?: 'default' | 'glass'; siteId?: string }) {
+    const isOwner = useIsOwner()
     if (!buttons || buttons.length === 0) return null
 
     return (
@@ -24,7 +45,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
                     key={i}
                     href={btn?.url}
                     onClick={() => {
-                        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' } })
+                        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' }, isOwner })
                     }}
                     whileHover={{ scale: 1.03, y: -2 }}
                     whileTap={{ scale: 0.98 }}

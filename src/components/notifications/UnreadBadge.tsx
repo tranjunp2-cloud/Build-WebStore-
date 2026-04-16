@@ -1,5 +1,7 @@
 'use client'
 
+import { useI18n } from '@/i18n'
+
 /**
  * F16 — UnreadBadge component
  * Displays the red dot with unread count on the NotificationBell.
@@ -11,13 +13,15 @@ type UnreadBadgeProps = {
 }
 
 export function UnreadBadge({ count }: UnreadBadgeProps) {
+    const { t } = useI18n()
+
     if (count === 0) return null
 
     const label = count > 99 ? '99+' : String(count)
 
     return (
         <span
-            aria-label={`${label} unread notifications`}
+            aria-label={(t.notifications.ariaUnread ?? '{count} unread notifications').replace('{count}', label)}
             style={{
                 position: 'absolute',
                 top: '-2px',

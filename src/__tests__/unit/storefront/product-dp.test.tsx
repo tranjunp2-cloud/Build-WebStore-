@@ -54,6 +54,20 @@ vi.mock('next/headers', () => ({
     headers: vi.fn().mockResolvedValue(new Map([
         ['x-tenant-slug', 'demo'],
     ])),
+    cookies: vi.fn().mockResolvedValue({ get: () => undefined }),
+}))
+vi.mock('@/lib/auth', () => ({
+    getCurrentUser: vi.fn().mockResolvedValue(null),
+    getCurrentTenantId: vi.fn().mockResolvedValue(null),
+}))
+vi.mock('@/components/site-renderer/OwnerContext', () => ({
+    OwnerProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+vi.mock('@/components/storefront/I18nText', () => ({
+    I18nText: ({ render }: { render: (t: Record<string, unknown>) => React.ReactNode }) => {
+        const en = require('../../../i18n/locales/en.json')
+        return render(en)
+    },
 }))
 
 describe('Storefront Product Detail Page (US-F08-06)', () => {

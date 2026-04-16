@@ -4,6 +4,7 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { PlpSidebar } from '@/components/storefront/PlpSidebar'
+import { I18nText } from '@/components/storefront/I18nText'
 
 export const dynamic = 'force-dynamic'
 
@@ -191,8 +192,8 @@ export default async function StorefrontProductsPage(props: Props) {
                     {site.name}
                 </Link>
                 <div style={{ display: 'flex', gap: '24px', fontSize: '14px' }}>
-                    <Link href={`/sites/${params.slug}`} style={{ color: '#666', textDecoration: 'none' }}>Home</Link>
-                    <Link href={`/sites/${params.slug}/products`} style={{ color: primaryColor, fontWeight: 600, textDecoration: 'none' }}>Products</Link>
+                    <Link href={`/sites/${params.slug}`} style={{ color: '#666', textDecoration: 'none' }}><I18nText render={t => t.storefront.products.home} /></Link>
+                    <Link href={`/sites/${params.slug}/products`} style={{ color: primaryColor, fontWeight: 600, textDecoration: 'none' }}><I18nText render={t => t.storefront.products.title} /></Link>
                 </div>
             </nav>
 
@@ -202,7 +203,7 @@ export default async function StorefrontProductsPage(props: Props) {
                     fontSize: '32px', fontWeight: 700, color: '#111', margin: 0,
                     fontFamily: `${(site.theme as any)?.fontHeading || 'Outfit'}, sans-serif`,
                 }}>
-                    Our Products
+                    <I18nText render={t => t.storefront.products.ourProducts} />
                 </h1>
                 <p style={{ fontSize: '16px', color: '#666', marginTop: '8px' }}>
                     {products.length} product{products.length !== 1 ? 's' : ''} available 
@@ -227,8 +228,8 @@ export default async function StorefrontProductsPage(props: Props) {
                     {products.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '64px 16px', color: '#999', background: '#f9fafb', borderRadius: '12px' }}>
                             <p style={{ fontSize: '48px', marginBottom: '16px' }}>🛍️</p>
-                            <p>No products match your filters.</p>
-                            <Link href={`/sites/${params.slug}/products`} style={{ color: primaryColor, textDecoration: 'none', display: 'inline-block', marginTop: '16px', fontWeight: 500 }}>Clear all filters</Link>
+                            <p><I18nText render={t => t.storefront.products.noMatch} /></p>
+                            <Link href={`/sites/${params.slug}/products`} style={{ color: primaryColor, textDecoration: 'none', display: 'inline-block', marginTop: '16px', fontWeight: 500 }}><I18nText render={t => t.storefront.products.clearFilters} /></Link>
                         </div>
                     )}
 

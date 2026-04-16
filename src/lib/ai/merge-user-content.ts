@@ -1,35 +1,15 @@
 /**
  * Merge user content into new template blocks when switching templates.
- * Preserves user-edited content (text, arrays) while applying new template structure (variant/layout).
+ * Preserves user-edited content (text, arrays) while applying new template
+ * structure (variant/layout).
+ *
+ * PAGES_FIELDS + CONTENT_FIELDS live in `./pages-schema.ts` (single source
+ * of truth shared with apply-template sanitizer).
  */
 
-// Fields that define template structure (variant/layout) — NOT user content
-const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
+import { CONTENT_FIELDS, PAGES_FIELDS } from './pages-schema'
 
-// All allowed fields per block type (from Pages.ts Payload schema)
-export const PAGES_FIELDS: Record<string, string[]> = {
-    hero: ['variant', 'headline', 'subheadline', 'videoUrl'],
-    navigation: ['style', 'logoText', 'links'],
-    about: ['layout', 'sectionLabel', 'headline', 'body'],
-    features: ['sectionLabel', 'headline', 'subheadline', 'layout', 'features'],
-    testimonials: ['headline', 'variant', 'testimonials'],
-    gallery: ['headline', 'layout'],
-    contact: ['headline', 'subtext', 'email', 'phone', 'address', 'showMap', 'mapEmbedUrl'],
-    footer: ['logoText', 'logo', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
-    stats: ['headline', 'stats'],
-    pricing: ['headline', 'subheadline'],
-    faq: ['headline', 'faqs'],
-    team: ['headline'],
-    socialWidget: ['variant', 'headline', 'links'],
-    cartWidget: ['variant', 'label', 'showLabel'],
-}
-
-// Content fields per block type = PAGES_FIELDS minus structural fields
-// These are preserved from user's existing blocks when switching templates
-export const CONTENT_FIELDS: Record<string, string[]> = {}
-for (const [bt, fields] of Object.entries(PAGES_FIELDS)) {
-    CONTENT_FIELDS[bt] = fields.filter(f => !STRUCTURAL_FIELDS.has(f))
-}
+export { PAGES_FIELDS, CONTENT_FIELDS }
 
 /**
  * Merge user content into template blocks.
@@ -37,10 +17,25 @@ for (const [bt, fields] of Object.entries(PAGES_FIELDS)) {
  * take structural fields (variant/layout) from template,
  * take content fields (headline, body, etc.) from user's existing block.
  */
+export type MergeResult = {
+    mergedBlocks: Record<string, unknown>[]
+    unmatchedUserBlocks: Record<string, unknown>[]
+}
+
 export function mergeUserContent(
     templateBlocks: Record<string, unknown>[],
     existingBlocks: Record<string, unknown>[],
-): Record<string, unknown>[] {
+): Record<string, unknown>[]
+export function mergeUserContent(
+    templateBlocks: Record<string, unknown>[],
+    existingBlocks: Record<string, unknown>[],
+    options: { returnDetails: true },
+): MergeResult
+export function mergeUserContent(
+    templateBlocks: Record<string, unknown>[],
+    existingBlocks: Record<string, unknown>[],
+    options?: { returnDetails: boolean },
+): Record<string, unknown>[] | MergeResult {
     // Group existing blocks by blockType (preserve order for multiple same-type blocks)
     const existingByType: Record<string, Record<string, unknown>[]> = {}
     for (const block of existingBlocks) {
@@ -52,7 +47,7 @@ export function mergeUserContent(
     // Track usage index per blockType to handle multiple blocks of same type
     const usageIndex: Record<string, number> = {}
 
-    return templateBlocks.map(templateBlock => {
+    const mergedBlocks = templateBlocks.map(templateBlock => {
         const bt = templateBlock.blockType as string
         if (!bt) return templateBlock
 
@@ -76,4 +71,26 @@ export function mergeUserContent(
         }
         return merged
     })
+
+    if (!options?.returnDetails) return mergedBlocks
+
+    // Compute unmatched user blocks: blocks with types not in template, or extras beyond template count
+    const templateTypeCounts: Record<string, number> = {}
+    for (const tb of templateBlocks) {
+        const bt = tb.blockType as string
+        if (bt) templateTypeCounts[bt] = (templateTypeCounts[bt] || 0) + 1
+    }
+
+    const unmatchedUserBlocks: Record<string, unknown>[] = []
+    const existingCounts: Record<string, number> = {}
+    for (const eb of existingBlocks) {
+        const bt = eb.blockType as string
+        if (!bt || bt === 'navigation' || bt === 'footer') continue
+        existingCounts[bt] = (existingCounts[bt] || 0) + 1
+        if (!templateTypeCounts[bt] || existingCounts[bt] > templateTypeCounts[bt]) {
+            unmatchedUserBlocks.push(eb)
+        }
+    }
+
+    return { mergedBlocks, unmatchedUserBlocks }
 }

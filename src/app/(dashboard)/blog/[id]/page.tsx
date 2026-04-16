@@ -36,7 +36,7 @@ type BlogForm = {
     title: string
     slug: string
     content: string
-    status: 'draft' | 'published'
+    status: 'draft' | 'published' | 'scheduled'
     category: string
     seoTitle: string
     seoDescription: string
@@ -129,8 +129,8 @@ export default function BlogEditorPage() {
     }, [])
 
     const getAuthorName = () => {
-        if (!currentUser) return 'Loading...'
-        return currentUser.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : currentUser.email?.split('@')[0] || 'User'
+        if (!currentUser) return t.dashboard.blog.editor.authorLoading
+        return currentUser.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}`.trim() : currentUser.email?.split('@')[0] || t.dashboard.blog.editor.authorFallback
     }
 
     // Load existing blog post when editing
@@ -260,10 +260,29 @@ export default function BlogEditorPage() {
         setError(null)
     }, [isNew])
 
+    type RichTextNode = { text?: string; children?: RichTextNode[]; root?: RichTextNode }
+    const getContentText = (content: string | RichTextNode | null): string => {
+        if (!content) return ''
+        if (typeof content === 'string') return content.replace(/<[^>]*>/g, '')
+        try {
+            const extractText = (node: RichTextNode): string => {
+                if (!node) return ''
+                if (node.text) return node.text
+                if (node.children) return node.children.map(extractText).join(' ')
+                return ''
+            }
+            return extractText(content.root || content).trim()
+        } catch {
+            return ''
+        }
+    }
+
     const validate = (): string | null => {
         if (!form.title.trim()) return 'title_required'
         if (form.title.length > 255) return 'title_max_length'
         if (form.slug && !/^[a-z0-9-]+$/.test(form.slug)) return 'slug_invalid'
+        const contentText = getContentText(form.content)
+        if (!contentText.trim()) return 'content_required'
         return null
     }
 
@@ -280,6 +299,7 @@ export default function BlogEditorPage() {
                 title_required: t.dashboard.blog.editor.titleRequired,
                 title_max_length: t.dashboard.blog.editor.titleMaxLength,
                 slug_invalid: t.dashboard.blog.editor.slugInvalid,
+                content_required: t.dashboard.blog.editor.contentRequired,
             }
             toast.error(messages[validationError] || validationError)
             isSubmittingRef.current = false
@@ -304,13 +324,15 @@ export default function BlogEditorPage() {
                 }
             }
 
-            // If publishing with a future date, warn and keep as draft
+            // If publishing with a future date, schedule instead of publish immediately
             const finalStatus = overrideStatus ?? form.status
             let effectiveStatus = finalStatus
             const effectivePublishDate = publishDate || new Date()
+            let scheduledPublishDate: string | null = null
             if (finalStatus === 'published' && effectivePublishDate > new Date()) {
-                toast.warning(t.dashboard.blog.editor.scheduledPublishWarning)
-                effectiveStatus = 'draft'
+                effectiveStatus = 'scheduled'
+                scheduledPublishDate = effectivePublishDate.toISOString()
+                toast.info(t.dashboard.blog.editor.scheduledPublishWarning)
             }
 
             const result = await saveBlogAction({
@@ -322,6 +344,7 @@ export default function BlogEditorPage() {
                 category: form.category || null,
                 thumbnail: resolvedThumbnailId || (thumbnailPreview ? undefined : null),
                 publishedAt: effectivePublishDate.toISOString(),
+                scheduledPublishDate,
                 seo: {
                     metaTitle: form.seoTitle,
                     metaDescription: form.seoDescription,
@@ -349,22 +372,6 @@ export default function BlogEditorPage() {
         }
     }
 
-    type RichTextNode = { text?: string; children?: RichTextNode[]; root?: RichTextNode }
-    const getContentText = (content: string | RichTextNode | null): string => {
-        if (!content) return ''
-        if (typeof content === 'string') return content.replace(/<[^>]*>/g, '')
-        try {
-            const extractText = (node: RichTextNode): string => {
-                if (!node) return ''
-                if (node.text) return node.text
-                if (node.children) return node.children.map(extractText).join(' ')
-                return ''
-            }
-            return extractText(content.root || content).trim()
-        } catch {
-            return ''
-        }
-    }
 
     const handleGenerateSEO = async () => {
         const contentText = getContentText(form.content)
@@ -466,12 +473,12 @@ export default function BlogEditorPage() {
             })
 
             const json = await res.json()
-            if (!res.ok || !json.success) throw new Error(json.error || 'Failed to generate')
+            if (!res.ok || !json.success) throw new Error(json.error || t.dashboard.blog.editor.generateFailed)
 
             const { title, content, seoTitle, seoDescription } = json.data
 
             setGeneratedAiData({ title, content, seoTitle, seoDescription })
-            setGeneratedAiContent(content || 'No content generated.')
+            setGeneratedAiContent(content || t.dashboard.blog.editor.noContentGenerated)
 
             toast.success(t.dashboard.blog.editor.aiGenerated, { id: 'ai-blog' })
         } catch (error: unknown) {
@@ -828,7 +835,7 @@ export default function BlogEditorPage() {
                                     e.preventDefault()
                                     handleGenerateSEO()
                                 }}
-                                disabled={isGeneratingSEO || (!form.title.trim() && !form.content.trim())}
+                                disabled={isGeneratingSEO || (!form.title.trim() && !getContentText(form.content).trim())}
                                 className="flex flex-row items-center justify-center w-[151.23px] h-[32px] gap-[8px] rounded-[12px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
                                 style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(57,137,243,1) 7%, rgba(55,143,239,1) 14%, rgba(53,150,236,1) 21%, rgba(51,156,233,1) 29%, rgba(50,162,229,1) 36%, rgba(48,168,225,1) 43%, rgba(47,174,222,1) 50%, rgba(46,179,218,1) 57%, rgba(45,185,214,1) 64%, rgba(45,191,209,1) 71%, rgba(44,196,205,1) 79%, rgba(44,201,201,1) 86%, rgba(45,207,196,1) 93%, rgba(45,212,191,1) 100%)' }}
                             >
@@ -935,9 +942,9 @@ export default function BlogEditorPage() {
                                 </div>
                                 <div className="flex flex-col xl:flex-row justify-between gap-[8px] xl:gap-[12px] w-full">
                                     {([
-                                        { key: 'Professional', emoji: '💼', label: t.dashboard.blog.editor.aiToneProfessional, desc: 'Formal & authoritative' },
-                                        { key: 'Friendly', emoji: '😊', label: t.dashboard.blog.editor.aiToneFriendly, desc: 'Casual & approachable' },
-                                        { key: 'Persuasive', emoji: '🎯', label: t.dashboard.blog.editor.aiTonePersuasive, desc: 'Compelling & action-driven' },
+                                        { key: 'Professional', emoji: '💼', label: t.dashboard.blog.editor.aiToneProfessional, desc: t.dashboard.blog.editor.aiToneProfessionalDesc },
+                                        { key: 'Friendly', emoji: '😊', label: t.dashboard.blog.editor.aiToneFriendly, desc: t.dashboard.blog.editor.aiToneFriendlyDesc },
+                                        { key: 'Persuasive', emoji: '🎯', label: t.dashboard.blog.editor.aiTonePersuasive, desc: t.dashboard.blog.editor.aiTonePersuasiveDesc },
                                     ] as const).map((tone) => (
                                         <button
                                             key={tone.key}

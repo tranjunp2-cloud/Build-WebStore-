@@ -413,7 +413,7 @@ export default function BusinessInfoForm({
                             type="url"
                             value={urlValue}
                             disabled={urlExtracting}
-                            aria-label="Website URL"
+                            aria-label={t.onboarding.form.urlLabel}
                         />
                     </div>
                     <button

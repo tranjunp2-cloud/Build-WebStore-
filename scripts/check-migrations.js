@@ -74,6 +74,15 @@ function getNewFieldsFromDiff() {
 
       if (!diff) continue
 
+      // Pages.ts has a unique shape: the collection has many nested
+      // block definitions (NavigationBlock, ContactBlock, ...). A `name:`
+      // inside a block maps to `pages_blocks_{slug}`, NOT `pages`. The
+      // generic field extraction can't tell them apart from the diff
+      // alone, so `checkNewPagesBlockFields` handles Pages.ts separately
+      // (it parses the whole file, resolves which block owns each added
+      // field, and validates the right `pages_blocks_*.{col}` migration).
+      if (filename === 'Pages.ts') continue
+
       // Extract field names from added lines
       const regex = /name:\s*['"](\w+)['"]/g
       let match
@@ -265,6 +274,114 @@ function checkPagesVersionColumns() {
   }
 
   return missing
+}
+
+/**
+ * Check 4 — new fields added inside an existing Pages.ts block definition
+ * (e.g. `variant` added to ContactBlock) need a matching
+ * `pages_blocks_{slug}.{field}` migration in db-setup.js. The generic
+ * tracked-collection field extractor cannot tell the difference between
+ * a top-level Pages field and a nested block field, so Pages.ts is
+ * handled explicitly here: we walk the source file to map line numbers
+ * to the enclosing `const XxxBlock = { slug: 'xxx', ... }` definition,
+ * then check the current diff's added `name: 'field'` lines against
+ * those ranges.
+ */
+function checkNewPagesBlockFields() {
+  const filePath = 'src/collections/Pages.ts'
+  const missing = []
+
+  let diff
+  try {
+    diff = execSync(
+      `git diff ${BASE_BRANCH} -- ${filePath}`,
+      { encoding: 'utf8' }
+    ).trim()
+  } catch (err) {
+    console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
+    return missing
+  }
+  if (!diff) return missing
+
+  // Parse the CURRENT file content to find block boundaries.
+  const source = fs.readFileSync(path.join(__dirname, '..', filePath), 'utf8')
+  const lines = source.split('\n')
+
+  // Locate each `const XxxBlock = {` declaration, then find the slug
+  // literal that immediately follows inside that definition. Track the
+  // line range from the const declaration to the matching closing `}`.
+  const blockRanges = [] // { slug, startLine, endLine }
+  for (let i = 0; i < lines.length; i++) {
+    const declMatch = lines[i].match(/^const\s+\w+Block\s*=\s*\{/)
+    if (!declMatch) continue
+    // Find the matching closing brace at column 0.
+    let endLine = lines.length - 1
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j] === '}' || lines[j].startsWith('} ')) {
+        endLine = j
+        break
+      }
+    }
+    // Find the slug literal within this block definition.
+    let slug = null
+    for (let k = i + 1; k <= endLine; k++) {
+      const slugMatch = lines[k].match(/slug:\s*['"]([a-zA-Z0-9_-]+)['"]/)
+      if (slugMatch) {
+        slug = slugMatch[1]
+        break
+      }
+    }
+    if (slug) blockRanges.push({ slug, startLine: i + 1, endLine: endLine + 1 })
+  }
+
+  // Walk the diff and, for each added `name: 'field'`, find the hunk
+  // anchor (`@@ -a,b +c,d @@`) so we can map the added line to a line
+  // number in the current file; then resolve which block owns it.
+  const columns = getMigrationColumns()
+  const diffLines = diff.split('\n')
+  let currentPlusLine = 0
+  for (const line of diffLines) {
+    const hunk = line.match(/^@@\s+-\d+(?:,\d+)?\s+\+(\d+)/)
+    if (hunk) {
+      currentPlusLine = parseInt(hunk[1], 10)
+      continue
+    }
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      const addedLineNumber = currentPlusLine
+      currentPlusLine++
+      const nameMatch = line.match(/name:\s*['"](\w+)['"]/)
+      if (!nameMatch) continue
+      const fieldName = nameMatch[1]
+      // Find the enclosing block range.
+      const owner = blockRanges.find(
+        (b) => addedLineNumber >= b.startLine && addedLineNumber <= b.endLine,
+      )
+      if (!owner) continue // outside any block definition — collection-level fields handled by checkPagesVersionColumns
+      // Skip Payload-managed block auto-fields.
+      if (['id', 'blockType', 'blockName'].includes(fieldName)) continue
+      const snake = toSnakeCase(fieldName)
+      const snakeSlug = owner.slug.replace(/-/g, '_')
+      const liveTable = `pages_blocks_${snakeSlug}`
+      const versionTable = `_pages_v_blocks_${snakeSlug}`
+      if (!columns.has(`${liveTable}.${snake}`)) {
+        missing.push({ blockSlug: owner.slug, field: fieldName, snake, table: liveTable })
+      }
+      if (!columns.has(`${versionTable}.${snake}`)) {
+        missing.push({ blockSlug: owner.slug, field: fieldName, snake, table: versionTable })
+      }
+    } else if (!line.startsWith('-') && !line.startsWith('\\')) {
+      currentPlusLine++
+    }
+  }
+
+  // Dedup — one field may show up in multiple diff hunks.
+  const seen = new Set()
+  return missing.filter((m) => {
+    const key = `${m.table}.${m.snake}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function checkNewBlocks() {

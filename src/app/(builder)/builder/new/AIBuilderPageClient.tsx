@@ -18,6 +18,7 @@ import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
+import { useI18n } from '@/i18n'
 
 export interface AIBuilderPageClientProps {
     /** Server-resolved current user ID — used to detect cross-user localStorage contamination */
@@ -140,6 +141,7 @@ function LivePreview({
 }
 
 export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps) {
+    const { t } = useI18n()
     const router = useRouter()
     const [isFullPreviewOpen, setIsFullPreviewOpen] = useState(false)
     const [isMobileViewport, setIsMobileViewport] = useState(false)
@@ -218,7 +220,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             if (meta.lastTouchedAt && Date.now() - meta.lastTouchedAt > BUILDER_SESSION_TTL_MS) {
                 reset()
                 window.localStorage.removeItem(BUILDER_SESSION_META_KEY)
-                toast.message('Your previous AI builder draft expired after 24 hours.')
+                toast.message(t.onboarding.generating.draftExpired)
             }
         } catch {
             window.localStorage.removeItem(BUILDER_SESSION_META_KEY)
@@ -300,7 +302,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         } catch (error) {
             setDraftSaveState('error')
             console.error('[Save Draft] Failed to persist draft:', error)
-            toast.error('Failed to save the latest preview changes.')
+            toast.error(t.onboarding.generating.saveFailed)
             return false
         }
     }, [blocks, siteId, theme])
@@ -348,11 +350,11 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         setStatus('streaming')
         setProgress({
             step: 'generate',
-            label: 'Generating content & design',
+            label: t.onboarding.generating.stepGenerating,
             progress: 8,
         })
-        addMessage({ role: 'assistant', content: '🚀 Starting website creation...' })
-    }, [addMessage, reset, setBusinessInfo, setProgress, setStatus])
+        addMessage({ role: 'assistant', content: `🚀 ${t.onboarding.generating.startingMessage}` })
+    }, [addMessage, reset, setBusinessInfo, setProgress, setStatus, t])
 
     const handleSSEEvent = useCallback((event: string, data: any) => {
         switch (event) {
@@ -382,17 +384,17 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 addMessage({
                     role: 'assistant',
                     content:
-                        `✅ Website **"${data.siteName}"** has been created successfully!\n\n` +
-                        `📄 **${data.totalPages || 1} pages** generated\n` +
-                        `📊 **${data.totalBlocks} sections** generated\n` +
-                        `⏱️ **${Math.round(data.timeMs / 1000)}s** generation time\n\n` +
-                        'You can view the Preview on the right, open the Editor to make changes, or Publish now!',
+                        `✅ ${t.onboarding.completion.createdSuccessfully.replace('{name}', data.siteName)}\n\n` +
+                        `📄 **${t.onboarding.completion.pagesGenerated.replace('{count}', String(data.totalPages || 1))}** ${t.onboarding.completion.generated}\n` +
+                        `📊 **${t.onboarding.completion.sectionsGenerated.replace('{count}', String(data.totalBlocks))}** ${t.onboarding.completion.sectionsGeneratedLabel}\n` +
+                        `⏱️ **${t.onboarding.completion.generationTime.replace('{seconds}', String(Math.round(data.timeMs / 1000)))}** ${t.onboarding.completion.generationTimeLabel}\n\n` +
+                        t.onboarding.completion.viewPreviewHint,
                 })
                 break
             default:
                 break
         }
-    }, [addBlock, addMessage, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme])
+    }, [addBlock, addMessage, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme, t])
 
     const clearGenerationTimers = useCallback(() => {
         if (elapsedIntervalRef.current) {
@@ -598,7 +600,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     url: payload?.data?.url,
                 })
             }
-            toast.success('Website published successfully!')
+            toast.success(t.onboarding.completion.publishSuccess)
         } catch (error: any) {
             toast.error(error?.message || 'Failed to publish website')
         } finally {
@@ -631,7 +633,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const generationMessage =
         messages.find((message) => message.role === 'assistant')?.content.replace(/^🚀\s*/, '') ||
-        'Starting website creation...'
+        t.onboarding.generating.startingMessage
 
     const previewContent = blocks.length > 0 && theme ? (
         <div className="h-full overflow-y-auto bg-[#06090F]">
@@ -640,8 +642,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     ) : (
         <div className="flex h-full items-center justify-center bg-[#06090F]">
             <div className="text-center">
-                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || 'Your website'}</p>
-                <p className="mt-2 text-sm text-white/40">Preview is being prepared.</p>
+                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || t.onboarding.completion.yourWebsite}</p>
+                <p className="mt-2 text-sm text-white/40">{t.onboarding.completion.previewPreparing}</p>
             </div>
         </div>
     )
@@ -653,8 +655,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     ) : (
         <div className="flex h-full items-center justify-center bg-[#06090F]">
             <div className="text-center">
-                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || 'Your website'}</p>
-                <p className="mt-2 text-sm text-white/40">Preview is being prepared.</p>
+                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || t.onboarding.completion.yourWebsite}</p>
+                <p className="mt-2 text-sm text-white/40">{t.onboarding.completion.previewPreparing}</p>
             </div>
         </div>
     )
@@ -670,13 +672,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const saveStatusLabel =
         draftSaveState === 'saving'
-            ? 'Saving draft...'
+            ? t.onboarding.completion.savingDraft
             : draftSaveState === 'saved'
-                ? `Saved ${formatSavedAt(lastSavedAt) ?? ''}`.trim()
+                ? t.onboarding.completion.savedAt.replace('{time}', formatSavedAt(lastSavedAt) ?? '').trim()
                 : draftSaveState === 'error'
-                    ? 'Save failed'
+                    ? t.onboarding.completion.saveFailed
                     : draftSaveState === 'dirty'
-                        ? 'Unsaved changes'
+                        ? t.onboarding.completion.unsavedChanges
                         : null
 
     const saveStatusBadge = saveStatusLabel ? (
@@ -745,7 +747,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 />
                 <CongratsModal
                     dashboardHref="/dashboard"
-                    dashboardLabel="Go to Dashboard"
+                    dashboardLabel={t.onboarding.completion.goToDashboard}
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
                         if (!open) {
