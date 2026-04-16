@@ -68,10 +68,14 @@ describe('[TC-F17-03-03] Improve Text — Menu & Actions', () => {
     })
 
     it('[TC-13] shows rewriting overlay during API call', async () => {
-        global.fetch = vi.fn(() => new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify({ rewritten: 'ok' }))), 100)))
+        let resolveFetch: (v: Response) => void
+        global.fetch = vi.fn(() => new Promise<Response>(resolve => { resolveFetch = resolve }))
         render(<ImproveTextMenu />)
         fireEvent.click(screen.getByText('Make Professional'))
         await waitFor(() => expect(screen.getByTestId('rewriting-overlay')).toBeDefined())
+        // Resolve fetch so setState runs before teardown
+        resolveFetch!(new Response(JSON.stringify({ rewritten: 'ok' })))
+        await waitFor(() => expect(screen.queryByTestId('rewriting-overlay')).toBeNull())
     })
 
     it('[TC-14] calls /api/ai/rewrite-text with correct payload', async () => {

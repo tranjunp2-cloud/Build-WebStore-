@@ -5,6 +5,7 @@ import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
+import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 
 const updatePageSchema = z.object({
@@ -80,6 +81,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const page = await payload.findByID({
             collection: 'pages',
             id: pageId,
+            draft: true,
         })
         const pageSiteId = typeof page?.site === 'object' ? page.site?.id : page?.site
 
@@ -137,7 +139,18 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             collection: 'pages',
             id: pageId,
             data: updateData,
+            draft: true,
         })
+
+        // BUG-F05-11: revalidate site cache when page is deleted/hidden
+        // so live site reflects the change immediately
+        if (updateData.deletedAt !== undefined || updateData.isVisible !== undefined) {
+            try {
+                revalidateTag(`site-${siteId}`)
+            } catch (err) {
+                console.warn(`[Pages] revalidateTag failed for site-${siteId}:`, err instanceof Error ? err.message : err)
+            }
+        }
 
         return NextResponse.json({
             page: {
