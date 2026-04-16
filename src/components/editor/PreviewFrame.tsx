@@ -5,6 +5,8 @@ import { GripVertical, Loader2 } from 'lucide-react'
 import { InlineEditPopover } from './InlineEditPopover'
 import { RichTextToolbar } from './RichTextToolbar'
 import { ImageToolbar } from './ImageToolbar'
+import { BlockActionBar } from './BlockActionBar'
+import { DeleteBlockConfirm } from './DeleteBlockConfirm'
 import { useEditorStore } from '@/store/editorStore'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { toast } from 'sonner'
@@ -22,6 +24,8 @@ interface PreviewFrameProps {
     onBlockSelect?: (blockIndex: number | null, blockType?: string) => void
     onInlineEditApplied?: (content: string, blockIndex: number) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
+    onDeleteBlock?: (index: number) => void
+    onDuplicateBlock?: (index: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
     onPageNavigate?: (pageId: string) => void
     disableDragDrop?: boolean
@@ -188,6 +192,8 @@ function PreviewFrameInner({
     onBlockSelect,
     onInlineEditApplied,
     onReorderBlocks,
+    onDeleteBlock,
+    onDuplicateBlock,
     onBlockDrop,
     onPageNavigate,
     disableDragDrop = false,
@@ -218,6 +224,7 @@ function PreviewFrameInner({
     const [isImageProcessing, setIsImageProcessing] = useState(false)
     const [wysiwygState, setWysiwygState] = useState<Record<string, unknown>>({})
     const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
+    const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null)
 
     // Live theme update — send CSS variables to iframe without reload
     useEffect(() => {
@@ -824,6 +831,65 @@ function PreviewFrameInner({
                                     zIndex: 30,
                                 }}
                             />
+                        )
+                    })()}
+                    {/* Block Action Bar — shows on selected block */}
+                    {(() => {
+                        const selectedLayout = selectedBlock !== null
+                            ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
+                            : null
+                        if (!selectedLayout || !overlayOffset || dragState || textEditingData) return null
+
+                        return (
+                            <>
+                                <BlockActionBar
+                                    blockIndex={selectedLayout.blockIndex}
+                                    blockType={selectedLayout.blockType}
+                                    blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
+                                    totalBlocks={editableLayouts.length}
+                                    onMoveUp={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex - 1)}
+                                    onMoveDown={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex + 1)}
+                                    onDuplicate={() => {
+                                        onDuplicateBlock?.(selectedLayout.blockIndex)
+                                    }}
+                                    onAIEdit={() => {
+                                        onBlockSelect?.(selectedLayout.blockIndex)
+                                    }}
+                                    onDelete={() => setDeleteConfirmIndex(selectedLayout.blockIndex)}
+                                    position={{
+                                        top: overlayOffset.top + selectedLayout.top,
+                                        left: overlayOffset.left + selectedLayout.left,
+                                        width: selectedLayout.width,
+                                    }}
+                                />
+                                {deleteConfirmIndex === selectedLayout.blockIndex && (
+                                    <DeleteBlockConfirm
+                                        blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
+                                        onConfirm={() => {
+                                            const blockName = blocks[selectedLayout.blockIndex]?.blockType || 'block'
+                                            onDeleteBlock?.(selectedLayout.blockIndex)
+                                            onBlockSelect?.(null)
+                                            setDeleteConfirmIndex(null)
+                                            toast.success(`Deleted ${blockName.replace(/-/g, ' ')}`, {
+                                                duration: 5000,
+                                                action: {
+                                                    label: 'Undo',
+                                                    onClick: () => {
+                                                        const { undo: storeUndo } = useEditorStore.getState()
+                                                        storeUndo()
+                                                    },
+                                                },
+                                            })
+                                        }}
+                                        onCancel={() => setDeleteConfirmIndex(null)}
+                                        anchorRect={{
+                                            top: overlayOffset.top + selectedLayout.top,
+                                            left: overlayOffset.left + selectedLayout.left,
+                                            width: selectedLayout.width,
+                                        }}
+                                    />
+                                )}
+                            </>
                         )
                     })()}
                     {(() => {
