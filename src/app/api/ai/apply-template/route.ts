@@ -359,10 +359,13 @@ export const POST = withAuth(async (user, req) => {
                     const cleanLayout = stripSystemFields(newLayout) as Record<string, unknown>[]
 
                     // Sanitize contact formFields — Payload requires fieldName + label + fieldType
+                    const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
                     for (const block of cleanLayout) {
                         if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
                             block.formFields = (block.formFields as Record<string, unknown>[]).filter(f =>
-                                f.fieldName && f.label && f.fieldType
+                                typeof f.fieldName === 'string' && f.fieldName.length > 0 &&
+                                typeof f.label === 'string' && f.label.length > 0 &&
+                                typeof f.fieldType === 'string' && VALID_FIELD_TYPES.has(f.fieldType)
                             )
                             // If all items were invalid, use sensible defaults
                             if ((block.formFields as unknown[]).length === 0) {
