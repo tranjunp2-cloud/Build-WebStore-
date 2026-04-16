@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 
 interface BlogPost {
     id: string
@@ -28,6 +29,13 @@ export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
     const [loading, setLoading] = useState(true)
     const [searchInput, setSearchInput] = useState('')
     const [search, setSearch] = useState('')
+
+    // BUG-F05-06: detect site base path for correct blog links
+    const pathname = usePathname()
+    const siteBasePath = useMemo(() => {
+        const match = pathname.match(/^\/sites\/[^/]+/)
+        return match ? match[0] : ''
+    }, [pathname])
 
     // Restore scroll position when returning from blog detail
     useEffect(() => {
@@ -176,7 +184,7 @@ export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
                 {posts.map(post => (
                     <a
                         key={post.id}
-                        href={`/blogs/${post.slug}`}
+                        href={`${siteBasePath}/blogs/${post.slug}`}
                         onClick={() => sessionStorage.setItem('blog-list-scroll', String(window.scrollY))}
                         className="group rounded-2xl overflow-hidden border border-white/5 hover:border-white/15 transition-all hover:shadow-2xl"
                     >

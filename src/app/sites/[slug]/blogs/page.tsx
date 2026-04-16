@@ -106,7 +106,7 @@ export default async function BlogListingPage({ params }: Props) {
                             return (
                                 <Link
                                     key={post.id as string}
-                                    href={`/blogs/${post.slug}`}
+                                    href={`/sites/${slug}/blogs/${post.slug}`}
                                     className="group flex flex-col rounded-xl border border-white/10 bg-[#111827] overflow-hidden hover:border-white/20 transition-colors"
                                 >
                                     {/* Thumbnail */}

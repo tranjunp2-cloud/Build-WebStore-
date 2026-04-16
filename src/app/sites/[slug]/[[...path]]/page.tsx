@@ -303,7 +303,7 @@ export default async function TenantSitePage({ params }: Props) {
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">
-                        <Link href="/blogs" className="text-blue-500 hover:text-blue-400 font-medium">
+                        <Link href={`/sites/${slug}/blogs`} className="text-blue-500 hover:text-blue-400 font-medium">
                             <I18nText render={t => t.storefront.blog.backToAll} />
                         </Link>
                     </div>
