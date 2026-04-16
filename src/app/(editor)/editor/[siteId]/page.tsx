@@ -309,7 +309,8 @@ export default function EditorPage() {
             window.setTimeout(() => setSaveSuccess(false), 2000)
             return true
         } catch (err) {
-            if (process.env.NODE_ENV === 'development') console.error('[Editor] Save failed:', err)
+            // BUG-F05-01: always log save errors (not just dev) for staging diagnosis
+            console.error('[Editor] Save failed:', err instanceof Error ? err.message : err)
             toast.error(t.editor.toast.saveFailed)
             return false
         } finally {
@@ -467,16 +468,27 @@ export default function EditorPage() {
         void handleSave({ showToast: false, refreshPreview: true })
     }, [duplicateBlock, handleSave])
 
+    // BUG-F05-01: retry save once on failure to handle transient Payload errors
+    const saveWithRetry = useCallback(async (options: SaveOptions) => {
+        const ok = await handleSave({ ...options, showToast: false })
+        if (!ok) {
+            console.warn('[Editor] First save failed, retrying in 1s...')
+            await new Promise(r => setTimeout(r, 1000))
+            // Second attempt shows toast on failure
+            await handleSave(options)
+        }
+    }, [handleSave])
+
     const handleBlockFieldChange = useCallback((index: number, field: string, value: string) => {
         updateBlock(index, { [field]: value })
         // Save + reload preview to show changes
-        void handleSave({ showToast: false, refreshPreview: true })
-    }, [updateBlock, handleSave])
+        void saveWithRetry({ showToast: false, refreshPreview: true })
+    }, [updateBlock, saveWithRetry])
 
     const handleBlockUpdate = useCallback((index: number, changes: Record<string, unknown>) => {
         updateBlock(index, changes)
-        void handleSave({ showToast: false, refreshPreview: true })
-    }, [updateBlock, handleSave])
+        void saveWithRetry({ showToast: false, refreshPreview: true })
+    }, [updateBlock, saveWithRetry])
 
     const handleReorderBlocks = useCallback(async (fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return

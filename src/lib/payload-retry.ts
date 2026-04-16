@@ -32,6 +32,8 @@ export function classifyTransientError(err: unknown): TransientErrorKind | null 
     // Payload versions child-table FK races that resolve on retry
     if (msg.includes('_pages_v_blocks_') && msg.includes('parent_id_fk')) return 'fk-violation'
     if (msg.includes('pages_blocks_') && msg.includes('parent_id_fk')) return 'fk-violation'
+    // BUG-F05-01: image/avatar FK violations in nested block tables are also transient
+    if (/pages_blocks_[a-z_]*(image_id|avatar_id|logo_id)/.test(msg)) return 'fk-violation'
     // Known symptom of a post-deadlock stale doc (Payload internals trying
     // to read .title after the version rollback)
     if (err instanceof TypeError && msg.includes("reading 'title'")) return 'type-error-title'
