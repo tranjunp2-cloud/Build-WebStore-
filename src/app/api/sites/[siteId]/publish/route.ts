@@ -87,20 +87,18 @@ export async function PATCH(
 
             for (const pg of sitePages.docs) {
                 try {
-                    // Promote full draft doc — include all fields (layout, slug, SEO, etc.)
+                    // Promote full draft doc — strip system fields, keep everything else
                     // so published version matches the latest draft exactly.
-                    const pageData = pg as Record<string, unknown>
+                    const SYSTEM_FIELDS = new Set(['id', '_status', 'createdAt', 'updatedAt', 'sizes', '_verificationToken'])
+                    const draft = pg as Record<string, unknown>
+                    const data: Record<string, unknown> = {}
+                    for (const [key, val] of Object.entries(draft)) {
+                        if (!SYSTEM_FIELDS.has(key)) data[key] = val
+                    }
                     await payload.update({
                         collection: 'pages',
                         id: pg.id,
-                        data: {
-                            title: pageData.title,
-                            slug: pageData.slug,
-                            layout: pageData.layout,
-                            isHomepage: pageData.isHomepage,
-                            isVisible: pageData.isVisible,
-                            seo: pageData.seo,
-                        } as Record<string, unknown>,
+                        data,
                         draft: false,
                     })
                 } catch (err) {
