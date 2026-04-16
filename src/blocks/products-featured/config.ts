@@ -19,4 +19,5 @@ export const productsFeaturedMeta: BlockMeta = {
     defaultVariant: 'hero-product',
     editableFields: ['headline', 'subheadline'],
     quickActions: [],
+    aiVisible: false,
 }

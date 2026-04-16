@@ -36,4 +36,5 @@ export const stepProcessMeta = {
     defaultVariant: 'vertical',
     editableFields: ['headline', 'subheadline', 'steps'],
     quickActions: ['Add step', 'Rewrite steps', 'Change layout'],
+    aiVisible: false,
 }

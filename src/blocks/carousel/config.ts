@@ -40,4 +40,5 @@ export const carouselMeta = {
     defaultVariant: 'images',
     editableFields: ['headline', 'autoplay', 'interval', 'items'],
     quickActions: ['Add slide', 'Toggle autoplay', 'Change layout'],
+    aiVisible: false,
 }
