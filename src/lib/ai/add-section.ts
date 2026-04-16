@@ -1,5 +1,6 @@
 import type { BlockData, ThemeData } from '@/types/editor'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { getGalleryImages, getTeamAvatar } from '@/lib/images/industry-images'
 
 export type SupportedAddSectionType =
     | 'testimonials'
@@ -142,9 +143,10 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'products-featured': 'featured products',
 }
 
-function getPlaceholderImage(index: number) {
+function getPlaceholderImage(index: number, category = 'business') {
+    const galleryUrls = getGalleryImages(category, 6)
     return {
-        image: null,
+        image: { url: galleryUrls[index % galleryUrls.length] || '', alt: `Gallery image ${index + 1}` },
         caption: `Highlight ${index + 1}`,
     }
 }
@@ -265,9 +267,9 @@ export function createAddSectionBlock({
                 blockType: 'team',
                 headline: `Meet the team behind ${brandName}`,
                 members: [
-                    { name: 'Team Member 1', role: 'Founder', bio: 'Add a short founder introduction here.' },
-                    { name: 'Team Member 2', role: 'Operations Lead', bio: 'Highlight day-to-day operational excellence.' },
-                    { name: 'Team Member 3', role: 'Customer Success', bio: 'Show the human side of your brand experience.' },
+                    { name: 'Team Member 1', role: 'Founder', bio: 'Add a short founder introduction here.', avatar: { url: getTeamAvatar('business', 0), alt: 'Team Member 1' } },
+                    { name: 'Team Member 2', role: 'Operations Lead', bio: 'Highlight day-to-day operational excellence.', avatar: { url: getTeamAvatar('business', 1), alt: 'Team Member 2' } },
+                    { name: 'Team Member 3', role: 'Customer Success', bio: 'Show the human side of your brand experience.', avatar: { url: getTeamAvatar('business', 2), alt: 'Team Member 3' } },
                 ],
             }
 
@@ -739,11 +741,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return {
             ...mergedBlock,
             variant: safeVariant,
-            testimonials: rawTestimonials.map((t: Record<string, unknown>) => {
-                const newT = { ...t }
-                delete newT.avatar
-                return newT
-            }),
+            testimonials: rawTestimonials
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ quote, name, title, company, rating, avatar }) => ({
+                    quote, name, title, company, rating, ...(avatar ? { avatar } : {}),
+                })),
         }
     }
 
@@ -769,15 +771,14 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         if (!['masonry', 'grid', 'carousel', 'lightbox'].includes(String(safeLayout))) safeLayout = 'grid'
 
         const rawImages = (Array.isArray((block as Record<string, unknown>).images) ? (block as Record<string, unknown>).images : fallbackBlock.images) as Record<string, unknown>[]
-        const cleanedImages = rawImages.map((item: Record<string, unknown>) => {
-            const newItem = { ...item }
-            delete newItem.image
-            return newItem
-        })
         return {
             ...mergedBlock,
             layout: safeLayout,
-            images: cleanedImages,
+            images: rawImages
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ image, caption }) => ({
+                    ...(image ? { image } : {}), ...(caption !== undefined ? { caption } : {}),
+                })),
         }
     }
 
@@ -786,11 +787,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         const rawMembers = (Array.isArray((block as Record<string, unknown>).members) ? (block as Record<string, unknown>).members : fallbackBlock.members) as Record<string, unknown>[]
         return {
             ...mergedBlock,
-            members: rawMembers.map((m: Record<string, unknown>) => {
-                const newM = { ...m }
-                delete newM.image
-                return newM
-            }),
+            members: rawMembers
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ name, role, bio, avatar, socials }) => ({
+                    name, role, ...(bio ? { bio } : {}), ...(avatar ? { avatar } : {}), ...(socials ? { socials } : {}),
+                })),
         }
     }
 
