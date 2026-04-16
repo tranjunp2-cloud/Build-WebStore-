@@ -47,12 +47,17 @@ vi.mock('payload', () => ({
             }
             return null
         }),
+        find: vi.fn().mockImplementation(async () => ({
+            docs: [
+                { id: 'page-1', layout: [{ blockType: 'hero', headline: 'Hello' }] },
+            ],
+        })),
         update: vi.fn().mockImplementation(async ({ collection, id, data }) => {
             if (collection === 'sites' && id === mockSiteRecord.id) {
                 mockSiteRecord = { ...mockSiteRecord, ...data }
                 return mockSiteRecord
             }
-            return null
+            return { id, ...data }
         }),
     })),
 }))

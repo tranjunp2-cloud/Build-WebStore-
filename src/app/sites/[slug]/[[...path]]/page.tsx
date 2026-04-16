@@ -83,6 +83,9 @@ async function getTenantAndPage(slug: string, pagePath: string) {
 
     // Find the page by slug
     const pageSlug = pagePath === '' ? '/' : `/${pagePath}`
+    // BUG-F05-01: explicitly fetch published versions for live site.
+    // Editor saves with draft:true; publish route promotes to published.
+    // Owner previewing unpublished site sees drafts; visitors see published.
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
@@ -92,7 +95,8 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             ],
         },
         limit: 1,
-        depth: 3, // Resolve media relationships
+        depth: 3,
+        draft: isOwner && site.status !== 'published' ? true : false,
     })
 
     let page = pagesResult.docs[0]
@@ -109,6 +113,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             },
             limit: 1,
             depth: 3,
+            draft: isOwner && site.status !== 'published' ? true : false,
         })
         page = homepageFallback.docs[0]
     }
