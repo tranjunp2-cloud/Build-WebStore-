@@ -68,19 +68,9 @@ export async function PATCH(
         // Re-publish is allowed — user may have edited content after initial publish.
         // Just update publishedAt timestamp to mark the latest version.
 
-        // Publish the site
-        const site = await payload.update({
-            collection: 'sites',
-            id: siteId,
-            data: {
-                status: 'published',
-                publishedAt: new Date().toISOString(),
-            },
-        })
-
-        // BUG-F05-01: Promote all draft pages to published.
+        // BUG-F05-01/03: Promote all draft pages BEFORE publishing site.
+        // This ensures site is only marked published when all pages are ready.
         // Editor saves with isDraft:true, so pages only have draft versions.
-        // Without this step, live site fetches get stale published versions.
         // Paginate to handle sites with >100 pages.
         const failedPageIds: string[] = []
         let hasMore = true
@@ -97,10 +87,18 @@ export async function PATCH(
 
             for (const pg of sitePages.docs) {
                 try {
+                    // Promote full draft doc — strip system fields, keep everything else
+                    // so published version matches the latest draft exactly.
+                    const SYSTEM_FIELDS = new Set(['id', '_status', 'createdAt', 'updatedAt', 'sizes', '_verificationToken'])
+                    const draft = pg as Record<string, unknown>
+                    const data: Record<string, unknown> = {}
+                    for (const [key, val] of Object.entries(draft)) {
+                        if (!SYSTEM_FIELDS.has(key)) data[key] = val
+                    }
                     await payload.update({
                         collection: 'pages',
                         id: pg.id,
-                        data: { layout: pg.layout },
+                        data,
                         draft: false,
                     })
                 } catch (err) {
@@ -127,6 +125,16 @@ export async function PATCH(
                 { status: 207 },
             )
         }
+
+        // Publish the site AFTER all pages promoted successfully
+        const site = await payload.update({
+            collection: 'sites',
+            id: siteId,
+            data: {
+                status: 'published',
+                publishedAt: new Date().toISOString(),
+            },
+        })
 
         // Get tenant slug for the domain URL
         let tenantSlug = 'site'

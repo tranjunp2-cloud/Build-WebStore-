@@ -241,7 +241,17 @@ export default function EditorPage() {
 
                 if (pagesRes.ok) {
                     const pagesData = await pagesRes.json()
-                    setPages(pagesData.pages || [])
+                    const loadedPages = pagesData.pages || []
+                    setPages(loadedPages)
+
+                    // Derive hasUnpublishedChanges from data: if site is published
+                    // but any page is still draft, user needs to re-publish.
+                    // Set directly — don't use handleContentChange which also sets hasUnsavedChanges.
+                    const siteIsPublished = data.site?.status === 'published'
+                    const hasDraftPages = loadedPages.some((p: { status: string }) => p.status === 'draft')
+                    if (siteIsPublished && hasDraftPages) {
+                        useEditorStore.setState({ hasUnpublishedChanges: true })
+                    }
                 }
 
                 setSelectedBlock(null)
@@ -855,6 +865,7 @@ export default function EditorPage() {
                 <PageManagerPanel
                     siteId={siteId}
                     currentPageId={currentPageId}
+                    siteStatus={site?.status}
                     onPageSelected={handlePageSelected}
                     onPagesChanged={() => setIframeKey(key => key + 1)}
                     onEditPage={() => setActiveSidebarTab('chat')}
