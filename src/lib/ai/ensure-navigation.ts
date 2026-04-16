@@ -39,7 +39,7 @@ const FOOTER_BLOCK_TYPES = new Set(['footer'])
 function buildDefaultNavigation(businessName: string): PageBlockShape {
     return {
         blockType: 'navigation',
-        variant: 'minimal',
+        variant: 'simple',
         logoText: businessName,
         links: DEFAULT_NAV_LINKS.map((link) => ({ ...link })),
         ctaButton: {

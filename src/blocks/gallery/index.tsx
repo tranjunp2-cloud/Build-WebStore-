@@ -11,6 +11,7 @@ import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { getGalleryImages } from '@/lib/images/industry-images'
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 // Brand identity vars preserved per Option C additive strategy.
@@ -104,8 +105,19 @@ function GalleryImageCard({ item, aspect = 'square', className = '', overlayClic
     )
 }
 
-export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
-    const { headline, images = [], variant = 'grid' } = block
+export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) {
+    const { headline, images: rawImages = [], variant = 'grid' } = block
+    const category = (site?.siteType as string) || 'business'
+
+    // BUG-F01-26: Fallback to industry-specific images when all images lack URLs
+    // (e.g., Unsplash pipeline failed or image FK stripped during save)
+    const hasAnyImage = rawImages.some((img: Record<string, unknown>) => img?.image && typeof img.image === 'object' && (img.image as Record<string, unknown>)?.url)
+    const images = hasAnyImage
+        ? rawImages
+        : getGalleryImages(category, 6).map((url, i) => ({
+            image: { url, alt: `Gallery image ${i + 1}` },
+            caption: rawImages[i]?.caption || '',
+        }))
 
     // ── Lightbox variant ──────────────────────────────────────────────────
     if (variant === 'lightbox') {

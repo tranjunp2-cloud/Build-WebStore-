@@ -39,6 +39,7 @@ function isValidModel(value: string): value is AIModel {
 
 export type AITask =
     | 'site-generation'
+    | 'personalize'
     | 'chat-edit'
     | 'inline-edit'
     | 'seo-generation'
@@ -63,6 +64,9 @@ export type AITask =
 const DEFAULT_MODELS: Record<AITask, AIModel> = {
     // phase-03a: gpt-4o → gpt-4.1-mini (eval-2026-04-14 confirmed parity)
     'site-generation':    'gpt-4.1-mini',
+    // Template-first: GPT only personalizes 4 fields (hero headline/sub, SEO).
+    // nano is cheapest + fastest (~2-3s for ~200 tokens).
+    'personalize':        'gpt-4.1-nano',
     // phase-04: gpt-4o-mini → gpt-4.1-mini (better instruction following for chat edits)
     'chat-edit':          'gpt-4.1-mini',
     'inline-edit':        'gpt-4.1-mini',
@@ -85,6 +89,7 @@ const DEFAULT_MODELS: Record<AITask, AIModel> = {
  */
 const ENV_KEY: Record<AITask, string> = {
     'site-generation':    'AI_MODEL_SITEGEN',
+    'personalize':        'AI_MODEL_PERSONALIZE',
     'chat-edit':          'AI_MODEL_EDIT',
     'inline-edit':        'AI_MODEL_INLINE_EDIT',
     'seo-generation':     'AI_MODEL_SEO',
@@ -126,6 +131,7 @@ export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'business'
 export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     free: {
         'site-generation': 1,        // 1 total (lifetime)
+        'personalize':     1,        // tied to site-generation
         'chat-edit': 20,             // per day
         'inline-edit': 10,           // per day
         'seo-generation': 3,         // per day
@@ -136,6 +142,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     },
     starter: {
         'site-generation': 5,        // per month
+        'personalize':     5,
         'chat-edit': 100,            // per day
         'inline-edit': 50,           // per day
         'seo-generation': 10,        // per day
@@ -146,6 +153,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     },
     pro: {
         'site-generation': 20,       // per month
+        'personalize':     20,
         'chat-edit': 500,            // per day
         'inline-edit': 200,          // per day
         'seo-generation': 50,        // per day
@@ -156,6 +164,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     },
     business: {
         'site-generation': 999999,   // unlimited
+        'personalize':     999999,
         'chat-edit': 999999,
         'inline-edit': 999999,
         'seo-generation': 999999,
@@ -220,7 +229,8 @@ Output: product description (plain text).`,
  * Used for internal tracking and billing decisions
  */
 export const ESTIMATED_COSTS: Record<AITask, number> = {
-    'site-generation': 0.04,      // GPT-4o, ~4K in + 3K out (phase-03 flips to 4.1-mini → ~$0.004)
+    'site-generation': 0.004,     // gpt-4.1-mini, ~3.8K in + 7K out
+    'personalize':     0.0001,    // gpt-4.1-nano, ~200 in + 80 out
     'chat-edit': 0.0005,          // GPT-4o-mini, ~1.5K in + 500 out
     'inline-edit': 0.0002,        // GPT-4o-mini, ~500 in + 200 out
     'seo-generation': 0.0004,     // GPT-4o-mini, ~800 in + 400 out

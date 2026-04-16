@@ -104,10 +104,13 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         process.env.OPENAI_API_KEY = 'test-key'
+        // Force AI-first path so these tests still exercise the GPT code path
+        process.env.GEN_MODE = 'ai-first'
     })
 
     afterAll(() => {
         delete process.env.OPENAI_API_KEY
+        delete process.env.GEN_MODE
     })
 
     it('parses valid AI response and returns blocks', async () => {

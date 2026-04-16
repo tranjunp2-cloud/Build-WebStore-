@@ -7,4 +7,4 @@ export const GoogleMapsConfigSchema = BaseBlockSchema.extend({
     embedUrl: z.string(), headline: z.string().optional(), address: z.string().optional(),
     height: z.number().default(400),
 })
-export const googleMapsMeta = { type: 'google-maps' as const, name: 'Google Maps', description: 'Embedded Google Maps with optional address card', icon: '📍', variants: ['full-width', 'card'], defaultVariant: 'full-width', editableFields: ['embedUrl', 'headline', 'address', 'height'], quickActions: ['Change height', 'Edit address'] }
+export const googleMapsMeta = { type: 'google-maps' as const, name: 'Google Maps', description: 'Embedded Google Maps with optional address card', icon: '📍', variants: ['full-width', 'card'], defaultVariant: 'full-width', editableFields: ['embedUrl', 'headline', 'address', 'height'], quickActions: ['Change height', 'Edit address'], aiVisible: false }

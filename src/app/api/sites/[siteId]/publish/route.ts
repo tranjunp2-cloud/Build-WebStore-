@@ -68,7 +68,65 @@ export async function PATCH(
         // Re-publish is allowed — user may have edited content after initial publish.
         // Just update publishedAt timestamp to mark the latest version.
 
-        // Publish the site
+        // BUG-F05-01/03: Promote all draft pages BEFORE publishing site.
+        // This ensures site is only marked published when all pages are ready.
+        // Editor saves with isDraft:true, so pages only have draft versions.
+        // Paginate to handle sites with >100 pages.
+        const failedPageIds: string[] = []
+        let hasMore = true
+        let pageNum = 1
+        while (hasMore) {
+            const sitePages = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: Number(siteId) } },
+                limit: 50,
+                page: pageNum,
+                sort: 'id',
+                draft: true,
+            })
+
+            for (const pg of sitePages.docs) {
+                try {
+                    // Promote full draft doc — strip system fields, keep everything else
+                    // so published version matches the latest draft exactly.
+                    const SYSTEM_FIELDS = new Set(['id', '_status', 'createdAt', 'updatedAt', 'sizes', '_verificationToken'])
+                    const draft = pg as Record<string, unknown>
+                    const data: Record<string, unknown> = {}
+                    for (const [key, val] of Object.entries(draft)) {
+                        if (!SYSTEM_FIELDS.has(key)) data[key] = val
+                    }
+                    await payload.update({
+                        collection: 'pages',
+                        id: pg.id,
+                        data,
+                        draft: false,
+                    })
+                } catch (err) {
+                    console.warn(`[Publish] Failed to promote page ${pg.id}:`, err instanceof Error ? err.message : err)
+                    failedPageIds.push(String(pg.id))
+                }
+            }
+
+            hasMore = sitePages.hasNextPage ?? (sitePages.docs.length === 50)
+            pageNum++
+        }
+
+        if (failedPageIds.length > 0) {
+            console.error(`[Publish] ${failedPageIds.length} page(s) failed to promote:`, failedPageIds)
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: {
+                        code: 'PARTIAL_PUBLISH_FAILURE',
+                        message: `Failed to publish ${failedPageIds.length} page(s). Please try again.`,
+                        failedPages: failedPageIds,
+                    },
+                },
+                { status: 207 },
+            )
+        }
+
+        // Publish the site AFTER all pages promoted successfully
         const site = await payload.update({
             collection: 'sites',
             id: siteId,

@@ -13,6 +13,7 @@ import type { PageData } from '@/store/editorStore'
 interface PageManagerPanelProps {
     siteId: string
     currentPageId: string | null
+    siteStatus?: string
     onPageSelected: (pageId: string) => void
     onPageCreated?: (pageId: string) => void
     onPagesChanged?: () => void
@@ -35,8 +36,12 @@ function getPagePath(page: PageData) {
     return page.slug.startsWith('/') ? page.slug : `/${page.slug}`
 }
 
-function getStatusBadge(page: PageData, labels: { live: string; draft: string }) {
-    if (page.status === 'published') {
+function getStatusBadge(page: PageData, labels: { live: string; draft: string }, siteStatus?: string) {
+    // A page is only truly "Live" if BOTH the page is published AND the site is published.
+    // Pages generated with _status:'published' should show "Draft" if the site hasn't been published yet.
+    const isPageLive = page.status === 'published' && siteStatus === 'published'
+
+    if (isPageLive) {
         return {
             label: labels.live,
             className: 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]',
@@ -54,6 +59,7 @@ function getStatusBadge(page: PageData, labels: { live: string; draft: string })
 export function PageManagerPanel({
     siteId,
     currentPageId,
+    siteStatus,
     onPageSelected,
     onPageCreated,
     onPagesChanged,
@@ -314,7 +320,7 @@ export function PageManagerPanel({
                         {regularPages.map(page => {
                             const isCurrent = page.id === currentPageId
                             const isProtectedPage = Boolean(page.isHomepage) || SYSTEM_PAGE_SLUGS.has(page.slug)
-                            const statusBadge = getStatusBadge(page, { live: pm.statusLive, draft: pm.statusDraft })
+                            const statusBadge = getStatusBadge(page, { live: pm.statusLive, draft: pm.statusDraft }, siteStatus)
 
                             return (
                                 <div
