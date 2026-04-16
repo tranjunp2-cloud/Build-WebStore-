@@ -87,7 +87,9 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     // Editor saves with draft:true; publish route promotes to published.
     // Owner previewing unpublished site sees drafts; visitors see published.
     // BUG-F05-08: hide pages with isVisible=false from visitors (owner can still preview)
+    // BUG-F05-11: exclude soft-deleted pages (deletedAt set) from live site
     const visibilityFilter = !isOwner ? [{ isVisible: { not_equals: false } }] : []
+    const deletedFilter = [{ deletedAt: { exists: false } }]
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
@@ -95,6 +97,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
                 { site: { equals: site.id } },
                 { slug: { equals: pageSlug } },
                 ...visibilityFilter,
+                ...deletedFilter,
             ],
         },
         limit: 1,
@@ -113,6 +116,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
                     { site: { equals: site.id } },
                     { isHomepage: { equals: true } },
                     ...visibilityFilter,
+                    ...deletedFilter,
                 ],
             },
             limit: 1,
@@ -128,6 +132,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             and: [
                 { site: { equals: site.id } },
                 ...visibilityFilter,
+                ...deletedFilter,
             ],
         },
         limit: 100,
