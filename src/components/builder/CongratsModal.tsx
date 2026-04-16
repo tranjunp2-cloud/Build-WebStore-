@@ -72,7 +72,7 @@ export function CongratsModal({
                             >
                                 {/* Close button — subtle, top-right */}
                                 <Dialog.Close
-                                    aria-label="Close"
+                                    aria-label={t.common.close}
                                     className="absolute right-4 top-4 rounded-full p-1.5 text-gray-500 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                                 >
                                     <X className="h-4 w-4" />

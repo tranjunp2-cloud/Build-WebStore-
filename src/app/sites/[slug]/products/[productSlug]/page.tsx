@@ -11,6 +11,7 @@ import { TrackingManager } from '@/components/site-renderer/TrackingManager'
 import { OwnerProvider } from '@/components/site-renderer/OwnerContext'
 import { getCurrentUser } from '@/lib/auth'
 import type { TenantMembership } from '@/lib/normalize-tenants'
+import { I18nText } from '@/components/storefront/I18nText'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -194,8 +195,8 @@ export default async function ProductDetailPage({ params }: Props) {
                         {site.name}
                     </Link>
                     <div style={{ display: 'flex', gap: '24px', fontSize: '14px' }}>
-                        <Link href={`/sites/${slug}`} style={{ color: '#666', textDecoration: 'none' }}>Home</Link>
-                        <Link href={`/sites/${slug}/products`} style={{ color: '#666', textDecoration: 'none' }}>Products</Link>
+                        <Link href={`/sites/${slug}`} style={{ color: '#666', textDecoration: 'none' }}><I18nText render={t => t.storefront.products.home} /></Link>
+                        <Link href={`/sites/${slug}/products`} style={{ color: '#666', textDecoration: 'none' }}><I18nText render={t => t.storefront.products.title} /></Link>
                     </div>
                 </nav>
 
@@ -316,7 +317,7 @@ export default async function ProductDetailPage({ params }: Props) {
                         {/* Extended Attributes Grid (US-F08-06) */}
                         {attributes && attributes.length > 0 && (
                             <div style={{ marginTop: '32px' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '12px' }}>Specifications</h3>
+                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '12px' }}><I18nText render={t => t.storefront.products.specifications} /></h3>
                                 <div style={{ 
                                     display: 'grid', gridTemplateColumns: '1fr', gap: '1px', 
                                     background: '#eee', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' 
@@ -341,14 +342,14 @@ export default async function ProductDetailPage({ params }: Props) {
                         {/* Description */}
                         {p.shortDescription && (
                             <div style={{ borderTop: '1px solid #eee', paddingTop: '24px' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '8px' }}>Description</h3>
+                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '8px' }}><I18nText render={t => t.storefront.products.description} /></h3>
                                 <p style={{ fontSize: '14px', color: '#666', lineHeight: 1.7 }}>{p.shortDescription}</p>
                             </div>
                         )}
 
                         {/* SKU */}
                         {p.sku && (
-                            <p style={{ fontSize: '12px', color: '#bbb', marginTop: '24px' }}>SKU: {p.sku}</p>
+                            <p style={{ fontSize: '12px', color: '#bbb', marginTop: '24px' }}><I18nText render={t => t.storefront.products.sku} /> {p.sku}</p>
                         )}
                     </div>
                 </div>

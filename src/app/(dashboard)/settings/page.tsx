@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { User, Lock, Save, Eye, EyeOff, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 type UserProfile = {
     id: string
@@ -15,6 +16,8 @@ type UserProfile = {
 }
 
 export default function SettingsPage() {
+    const { t } = useI18n()
+    const s = t.accountSettings
     const [profile, setProfile] = useState<UserProfile | null>(null)
     const [isLoading, setIsLoading] = useState(true)
 
@@ -45,7 +48,7 @@ export default function SettingsPage() {
             setFirstName(user.firstName || '')
             setLastName(user.lastName || '')
         } catch {
-            toast.error('Failed to load profile')
+            toast.error(s.profile.loadFailed)
         } finally {
             setIsLoading(false)
         }
@@ -56,7 +59,7 @@ export default function SettingsPage() {
         if (!profile) return
 
         if (!firstName.trim()) {
-            toast.error('First name is required')
+            toast.error(s.profile.firstNameRequired)
             return
         }
 
@@ -69,9 +72,9 @@ export default function SettingsPage() {
                 body: JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim() }),
             })
             if (!res.ok) throw new Error('Failed to update profile')
-            toast.success('Profile updated')
+            toast.success(s.profile.updated)
         } catch {
-            toast.error('Failed to update profile')
+            toast.error(s.profile.updateFailed)
         } finally {
             setIsSavingProfile(false)
         }
@@ -81,11 +84,11 @@ export default function SettingsPage() {
         e.preventDefault()
 
         if (newPassword.length < 8) {
-            toast.error('Password must be at least 8 characters')
+            toast.error(s.password.tooShort)
             return
         }
         if (newPassword !== confirmPassword) {
-            toast.error('Passwords do not match')
+            toast.error(s.password.mismatch)
             return
         }
 
@@ -99,12 +102,12 @@ export default function SettingsPage() {
                 body: JSON.stringify({ password: newPassword }),
             })
             if (!res.ok) throw new Error('Failed to change password')
-            toast.success('Password changed successfully')
+            toast.success(s.password.changed)
             setCurrentPassword('')
             setNewPassword('')
             setConfirmPassword('')
         } catch {
-            toast.error('Failed to change password')
+            toast.error(s.password.changeFailed)
         } finally {
             setIsSavingPassword(false)
         }
@@ -130,21 +133,21 @@ export default function SettingsPage() {
         <div className="space-y-8 max-w-2xl">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-white">Settings</h1>
-                <p className="mt-1 text-sm text-gray-400">Manage your account and preferences</p>
+                <h1 className="text-2xl font-bold text-white">{s.title}</h1>
+                <p className="mt-1 text-sm text-gray-400">{s.subtitle}</p>
             </div>
 
             {/* Profile Section */}
             <form onSubmit={handleSaveProfile} className="rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden">
                 <div className="flex items-center gap-3 border-b border-white/10 px-6 py-4">
                     <User className="h-4 w-4 text-blue-400" />
-                    <h2 className="text-sm font-semibold text-white">Profile</h2>
+                    <h2 className="text-sm font-semibold text-white">{s.profile.title}</h2>
                 </div>
 
                 <div className="p-6 space-y-4">
                     {/* Email (read-only) */}
                     <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Email</label>
+                        <label className="block text-xs font-medium text-gray-400 mb-1.5">{s.profile.email}</label>
                         <input
                             type="email"
                             value={profile?.email || ''}
@@ -157,7 +160,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="firstName" className="block text-xs font-medium text-gray-400 mb-1.5">
-                                First Name <span className="text-red-400">*</span>
+                                {s.profile.firstName} <span className="text-red-400">*</span>
                             </label>
                             <input
                                 id="firstName"
@@ -169,7 +172,7 @@ export default function SettingsPage() {
                             />
                         </div>
                         <div>
-                            <label htmlFor="lastName" className="block text-xs font-medium text-gray-400 mb-1.5">Last Name</label>
+                            <label htmlFor="lastName" className="block text-xs font-medium text-gray-400 mb-1.5">{s.profile.lastName}</label>
                             <input
                                 id="lastName"
                                 type="text"
@@ -182,7 +185,7 @@ export default function SettingsPage() {
 
                     {/* Role (read-only) */}
                     <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Role</label>
+                        <label className="block text-xs font-medium text-gray-400 mb-1.5">{s.profile.role}</label>
                         <div className="flex items-center gap-2">
                             {(profile?.roles || ['tenant-owner']).map(role => (
                                 <span key={role} className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-400 capitalize">
@@ -194,7 +197,7 @@ export default function SettingsPage() {
 
                     {/* Account created */}
                     <div>
-                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Member Since</label>
+                        <label className="block text-xs font-medium text-gray-400 mb-1.5">{s.profile.memberSince}</label>
                         <p className="text-sm text-gray-300">
                             {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown'}
                         </p>
@@ -212,7 +215,7 @@ export default function SettingsPage() {
                             ) : (
                                 <Save className="h-4 w-4" />
                             )}
-                            Save Changes
+                            {s.profile.saveChanges}
                         </button>
                     </div>
                 </div>
@@ -222,20 +225,20 @@ export default function SettingsPage() {
             <form onSubmit={handleChangePassword} className="rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden">
                 <div className="flex items-center gap-3 border-b border-white/10 px-6 py-4">
                     <Lock className="h-4 w-4 text-purple-400" />
-                    <h2 className="text-sm font-semibold text-white">Change Password</h2>
+                    <h2 className="text-sm font-semibold text-white">{s.password.title}</h2>
                 </div>
 
                 <div className="p-6 space-y-4">
                     {/* New Password */}
                     <div>
-                        <label htmlFor="newPassword" className="block text-xs font-medium text-gray-400 mb-1.5">New Password</label>
+                        <label htmlFor="newPassword" className="block text-xs font-medium text-gray-400 mb-1.5">{s.password.newPassword}</label>
                         <div className="relative">
                             <input
                                 id="newPassword"
                                 type={showNewPassword ? 'text' : 'password'}
                                 value={newPassword}
                                 onChange={e => setNewPassword(e.target.value)}
-                                placeholder="At least 8 characters"
+                                placeholder={s.password.placeholder}
                                 minLength={8}
                                 required
                                 className="w-full rounded-lg border border-white/10 bg-[#1E293B] px-4 py-2.5 pr-10 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50"
@@ -252,13 +255,13 @@ export default function SettingsPage() {
 
                     {/* Confirm Password */}
                     <div>
-                        <label htmlFor="confirmPassword" className="block text-xs font-medium text-gray-400 mb-1.5">Confirm Password</label>
+                        <label htmlFor="confirmPassword" className="block text-xs font-medium text-gray-400 mb-1.5">{s.password.confirmPassword}</label>
                         <input
                             id="confirmPassword"
                             type="password"
                             value={confirmPassword}
                             onChange={e => setConfirmPassword(e.target.value)}
-                            placeholder="Repeat new password"
+                            placeholder={s.password.confirmPlaceholder}
                             required
                             className={cn(
                                 'w-full rounded-lg border bg-[#1E293B] px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50',
@@ -266,7 +269,7 @@ export default function SettingsPage() {
                             )}
                         />
                         {confirmPassword && confirmPassword !== newPassword && (
-                            <p className="mt-1 text-xs text-red-400">Passwords do not match</p>
+                            <p className="mt-1 text-xs text-red-400">{s.password.mismatch}</p>
                         )}
                     </div>
 
@@ -282,7 +285,7 @@ export default function SettingsPage() {
                             ) : (
                                 <Lock className="h-4 w-4" />
                             )}
-                            Change Password
+                            {s.password.changeButton}
                         </button>
                     </div>
                 </div>
@@ -291,18 +294,18 @@ export default function SettingsPage() {
             {/* Danger Zone */}
             <div className="rounded-xl border border-red-500/20 bg-red-500/5 overflow-hidden">
                 <div className="border-b border-red-500/20 px-6 py-4">
-                    <h2 className="text-sm font-semibold text-red-400">Danger Zone</h2>
+                    <h2 className="text-sm font-semibold text-red-400">{s.danger.title}</h2>
                 </div>
                 <div className="p-6">
                     <p className="text-sm text-gray-400">
-                        Once you delete your account, there is no going back. All your sites, media, and data will be permanently deleted.
+                        {s.danger.description}
                     </p>
                     <button
                         type="button"
                         disabled
                         className="mt-4 rounded-lg border border-red-500/30 bg-transparent px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        Delete Account (Coming Soon)
+                        {s.danger.deleteAccount}
                     </button>
                 </div>
             </div>

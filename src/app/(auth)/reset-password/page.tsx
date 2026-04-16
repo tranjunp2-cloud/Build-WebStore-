@@ -143,7 +143,7 @@ function ResetPasswordForm() {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null)
-                const message = errorData?.errors?.[0]?.message || 'Reset link has expired'
+                const message = errorData?.errors?.[0]?.message || t.auth.reset.linkExpired
 
                 if (message.toLowerCase().includes('token') || message.toLowerCase().includes('expired')) {
                     setFormError('root', { message: t.auth.reset.linkExpired })
@@ -293,7 +293,7 @@ function ResetPasswordForm() {
                         <input
                             id="confirmPassword"
                             type={showConfirm ? 'text' : 'password'}
-                            placeholder="••••••••"
+                            placeholder={t.auth.passwordPlaceholder}
                             className={inputClasses(!!errors.confirmPassword)}
                             style={{
                                 background: '#1E293B',

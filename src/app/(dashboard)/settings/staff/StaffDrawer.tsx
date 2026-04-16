@@ -7,13 +7,12 @@ import { toast } from 'sonner';
 import { inviteStaffAction, updateStaff } from './actions';
 import type { StaffMember } from './StaffDirectoryClient';
 
-const CUSTOM_FEATURES = [
-    // { id: 'products', label: 'Products & Inventory' },
-    // { id: 'orders', label: 'Orders & Fulfillment' },
-    { id: 'blog', label: 'Blog Management' },
-    { id: 'builder', label: 'Store Design (Builder)' },
-    { id: 'settings', label: 'Settings & Domain' },
-];
+const CUSTOM_FEATURE_IDS = ['blog', 'builder', 'settings'] as const;
+const CUSTOM_FEATURE_FALLBACKS: Record<string, string> = {
+    blog: 'Blog Management',
+    builder: 'Store Design (Builder)',
+    settings: 'Settings & Domain',
+};
 
 export function StaffDrawer({
     isOpen,
@@ -229,21 +228,22 @@ export function StaffDrawer({
                                 
                                 {role === 'custom' && (
                                     <div className="flex flex-col gap-[12px] pb-[20px] pr-[18px] pl-[54px] animate-in fade-in duration-200">
-                                        {CUSTOM_FEATURES.map(feature => {
-                                            const isChecked = selectedFeatures.includes(feature.id);
+                                        {CUSTOM_FEATURE_IDS.map(featureId => {
+                                            const isChecked = selectedFeatures.includes(featureId);
                                             const isFeatureDisabled = editData?.role === 'owner';
+                                            const label = (t?.Staff?.drawer?.features as Record<string, string> | undefined)?.[featureId] || CUSTOM_FEATURE_FALLBACKS[featureId];
                                             return (
                                                 <div
-                                                    key={feature.id}
+                                                    key={featureId}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if(!isFeatureDisabled) handleToggleFeature(feature.id);
+                                                        if(!isFeatureDisabled) handleToggleFeature(featureId);
                                                     }}
                                                     className={`flex items-center gap-[12px] cursor-pointer transition-all ${isFeatureDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 >
                                                     <div className={`flex shrink-0 items-center justify-center w-[18px] h-[18px] rounded-[4px] border border-solid transition-colors ${isChecked ? 'bg-blue-500 border-blue-500' : 'border-white/20 bg-transparent hover:border-white/40'}`} />
                                                     <span className={`text-[14px] leading-tight select-none ${isChecked ? 'text-slate-50 font-medium' : 'text-slate-50/80 font-normal'}`}>
-                                                        {feature.label}
+                                                        {label}
                                                     </span>
                                                 </div>
                                             );

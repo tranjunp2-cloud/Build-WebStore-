@@ -37,16 +37,11 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function SiteTypeBadge({ type }: { type: string }) {
-    const labels: Record<string, string> = {
-        business: 'Business',
-        ecommerce: 'E-commerce',
-        blog: 'Blog',
-        portfolio: 'Portfolio',
-        restaurant: 'Restaurant',
-    }
+    const { t } = useI18n()
+    const labels = t.dashboard.sites.siteTypes
     return (
         <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] font-medium text-gray-500">
-            {labels[type] || type}
+            {labels[type as keyof typeof labels] || type}
         </span>
     )
 }
@@ -105,7 +100,7 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                     href="/onboarding"
                     className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 transition-all"
                 >
-                    <Plus className="h-4 w-4" /> New Site
+                    <Plus className="h-4 w-4" /> {t.dashboard.sites.newSite}
                 </Link>
             </div>
 
@@ -123,7 +118,7 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                                 {/* Header */}
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="truncate text-base font-semibold text-white">{site.name || 'Untitled Site'}</h3>
+                                        <h3 className="truncate text-base font-semibold text-white">{site.name || t.dashboard.sites.untitledSite}</h3>
                                         {site.domain && (
                                             <p className="mt-0.5 truncate text-xs text-gray-500">{site.domain}</p>
                                         )}
@@ -141,7 +136,7 @@ export function SitesPageClient({ usableSites, failedSites, totalSites }: SitesP
                                 <div className="mt-3 flex items-center gap-2">
                                     <SiteTypeBadge type={site.siteType || 'business'} />
                                     <span className="text-[10px] text-gray-600">
-                                        Updated {site.updatedAt ? formatRelativeTime(site.updatedAt) : 'recently'}
+                                        {t.dashboard.sites.updatedLabel} {site.updatedAt ? formatRelativeTime(site.updatedAt) : t.dashboard.sites.updatedRecently}
                                     </span>
                                 </div>
 

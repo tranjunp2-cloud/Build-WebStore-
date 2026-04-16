@@ -4,6 +4,7 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
+import { I18nText } from '@/components/storefront/I18nText'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,8 +77,8 @@ export default async function BlogListingPage({ params }: Props) {
             {/* Header */}
             <div className="w-full border-b border-white/10 py-8">
                 <div className="max-w-5xl mx-auto px-4">
-                    <h1 className="text-3xl font-bold text-white">Blog</h1>
-                    <p className="text-gray-400 mt-2">Latest posts from {site.name}</p>
+                    <h1 className="text-3xl font-bold text-white"><I18nText render={t => t.storefront.blog.title} /></h1>
+                    <p className="text-gray-400 mt-2"><I18nText render={t => t.storefront.blog.latestPosts} /> {site.name}</p>
                 </div>
             </div>
 
@@ -85,7 +86,7 @@ export default async function BlogListingPage({ params }: Props) {
             <div className="max-w-5xl mx-auto px-4 py-8">
                 {blogs.length === 0 ? (
                     <div className="text-center py-16">
-                        <p className="text-gray-500 text-lg">No blog posts yet.</p>
+                        <p className="text-gray-500 text-lg"><I18nText render={t => t.storefront.blog.noPosts} /></p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

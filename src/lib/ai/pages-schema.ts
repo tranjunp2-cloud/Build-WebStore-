@@ -14,9 +14,17 @@
 
 /** Block types that have a persistence schema in Pages.ts layout blocks[]. */
 export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
+    // Core blocks
     'navigation', 'hero', 'about', 'features', 'testimonials',
     'contact', 'gallery', 'footer', 'stats', 'pricing',
     'faq', 'team', 'socialWidget', 'cartWidget',
+    // AI-generated / Block Library blocks
+    'cta', 'newsletter', 'video', 'logo-cloud', 'products-grid',
+    'products-featured', 'service-cards', 'carousel', 'step-process',
+    'divider', 'announcement-bar', 'whatsapp-button', 'menu-food',
+    'social-proof', 'portfolio-grid', 'google-maps', 'accordion',
+    'countdown-timer', 'custom-html', 'blog-list',
+    'breadcrumb', 'client-logos',
 ])
 
 /**
@@ -84,6 +92,29 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     team: ['variant', 'headline', 'members'],
     socialWidget: ['variant', 'headline', 'links'],
     cartWidget: ['variant', 'label', 'showLabel'],
+    // AI-generated / Block Library blocks (must be here for content merge during template switch)
+    cta: ['variant', 'headline', 'subheadline', 'ctaLabel', 'ctaUrl', 'ctaStyle'],
+    newsletter: ['variant', 'headline', 'subheadline', 'buttonLabel', 'placeholder'],
+    video: ['variant', 'headline', 'subheadline', 'videoUrl', 'posterImage'],
+    'logo-cloud': ['variant', 'headline', 'logos'],
+    'products-grid': ['variant', 'headline', 'subheadline', 'limit', 'category'],
+    'products-featured': ['variant', 'headline', 'subheadline'],
+    'service-cards': ['variant', 'headline', 'subheadline', 'services'],
+    carousel: ['variant', 'headline', 'autoplay', 'interval', 'items'],
+    'step-process': ['variant', 'headline', 'subheadline', 'steps'],
+    divider: ['variant', 'height', 'color'],
+    'announcement-bar': ['variant', 'message', 'linkText', 'linkUrl', 'dismissible', 'backgroundColor'],
+    'whatsapp-button': ['variant', 'phoneNumber', 'message', 'label', 'position'],
+    'menu-food': ['variant', 'headline', 'categories'],
+    'social-proof': ['variant', 'headline', 'reviews'],
+    'portfolio-grid': ['variant', 'headline', 'subheadline', 'projects'],
+    'google-maps': ['variant', 'headline', 'embedUrl', 'address', 'height'],
+    accordion: ['variant', 'headline', 'description', 'items'],
+    'countdown-timer': ['variant', 'headline', 'targetDate', 'expiredMessage', 'showDays', 'showHours', 'showMinutes', 'showSeconds'],
+    'custom-html': ['html'],
+    'blog-list': ['variant', 'headline', 'subheadline', 'limit'],
+    breadcrumb: ['variant', 'items'],
+    'client-logos': ['variant', 'headline', 'logos'],
 }
 
 const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
@@ -114,9 +145,21 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
         block[field] = (arr as unknown[]).map((item) => {
             if (!item || typeof item !== 'object') return item
             const copy: Record<string, unknown> = { ...(item as Record<string, unknown>) }
-            // Strip `id` — Payload auto-generates for array sub-items.
             delete copy.id
             delete copy._uuid
+            // Recurse 1 level deeper for nested sub-arrays (e.g.
+            // footer.columns[].links[], menu-food.categories[].items[]).
+            for (const subField of ARRAY_FIELDS) {
+                const subArr = copy[subField]
+                if (!Array.isArray(subArr)) continue
+                copy[subField] = (subArr as unknown[]).map((subItem) => {
+                    if (!subItem || typeof subItem !== 'object') return subItem
+                    const subCopy: Record<string, unknown> = { ...(subItem as Record<string, unknown>) }
+                    delete subCopy.id
+                    delete subCopy._uuid
+                    return subCopy
+                })
+            }
             return copy
         })
     }

@@ -16,6 +16,33 @@ import { mergeUserContent } from '@/lib/ai/merge-user-content'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 
+/** Recursively strip Payload system fields so Payload creates fresh records.
+ *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
+ *  back to just the numeric ID, which Payload expects for upload/relationship fields. */
+const STRIP_KEYS = new Set(['id', '_order', '_parent_id', '_path', '_uuid', 'createdAt', 'updatedAt'])
+function stripSystemFields(obj: unknown): unknown {
+    if (Array.isArray(obj)) return obj.map(stripSystemFields)
+    if (obj && typeof obj === 'object') {
+        const record = obj as Record<string, unknown>
+        const result: Record<string, unknown> = {}
+        for (const [key, val] of Object.entries(record)) {
+            if (STRIP_KEYS.has(key)) continue
+            // Detect populated relationship/upload objects: { id: number, url: string, ... }
+            // Normalize to just the ID so Payload accepts it
+            if (val && typeof val === 'object' && !Array.isArray(val)) {
+                const nested = val as Record<string, unknown>
+                if (typeof nested.id === 'number' && (nested.url || nested.filename || nested.mimeType)) {
+                    result[key] = nested.id
+                    continue
+                }
+            }
+            result[key] = stripSystemFields(val)
+        }
+        return result
+    }
+    return obj
+}
+
 /**
  * POST /api/ai/apply-template
  * Creates a new site from a template's default blocks and theme.
@@ -157,19 +184,34 @@ export const POST = withAuth(async (user, req) => {
 
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
         // Pick only valid theme fields — Payload select fields reject unknown values
-        const VALID_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
-        const VALID_BODY_FONTS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
-        const VALID_COLOR_MODES = ['light', 'dark']
+        const VALID_HEADING_FONTS = new Set(['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway', 'Plus Jakarta Sans'])
+        const VALID_BODY_FONTS = new Set(['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito', 'Poppins', 'Plus Jakarta Sans'])
+        const VALID_COLOR_MODES = new Set(['light', 'dark'])
+        const VALID_BORDER_RADIUS = new Set(['sharp', 'subtle', 'rounded', 'soft', 'pill'])
+        const VALID_SPACING = new Set(['compact', 'default', 'relaxed'])
+        const VALID_SHADOW = new Set(['none', 'subtle', 'medium', 'dramatic'])
         const rawHeading = String(rawTheme.fontHeading || '')
         const rawBody = String(rawTheme.fontBody || '')
         const rawColorMode = String(rawTheme.colorMode || '')
-        const templateTheme = {
+        const templateTheme: Record<string, unknown> = {
             primaryColor: String(rawTheme.primaryColor || '#0ea5e9'),
             secondaryColor: String(rawTheme.secondaryColor || '#d946ef'),
-            fontHeading: VALID_HEADING_FONTS.includes(rawHeading) ? rawHeading : 'Outfit',
-            fontBody: VALID_BODY_FONTS.includes(rawBody) ? rawBody : 'Inter',
-            colorMode: VALID_COLOR_MODES.includes(rawColorMode) ? rawColorMode : 'dark',
+            fontHeading: VALID_HEADING_FONTS.has(rawHeading) ? rawHeading : 'Outfit',
+            fontBody: VALID_BODY_FONTS.has(rawBody) ? rawBody : 'Inter',
+            colorMode: VALID_COLOR_MODES.has(rawColorMode) ? rawColorMode : 'dark',
         }
+        // Include optional theme fields if template defines them
+        if (rawTheme.backgroundColor) templateTheme.backgroundColor = String(rawTheme.backgroundColor)
+        if (rawTheme.accentColor) templateTheme.accentColor = String(rawTheme.accentColor)
+        if (rawTheme.surfaceColor) templateTheme.surfaceColor = String(rawTheme.surfaceColor)
+        if (rawTheme.textColor) templateTheme.textColor = String(rawTheme.textColor)
+        if (rawTheme.mutedColor) templateTheme.mutedColor = String(rawTheme.mutedColor)
+        const rawBorderRadius = String(rawTheme.borderRadius || '')
+        if (VALID_BORDER_RADIUS.has(rawBorderRadius)) templateTheme.borderRadius = rawBorderRadius
+        const rawSpacing = String(rawTheme.spacingPreset || '')
+        if (VALID_SPACING.has(rawSpacing)) templateTheme.spacingPreset = rawSpacing
+        const rawShadow = String(rawTheme.shadowPreset || '')
+        if (VALID_SHADOW.has(rawShadow)) templateTheme.shadowPreset = rawShadow
 
         // === APPLY TO EXISTING SITE (multi-page + transaction) ===
         if (siteId) {
@@ -191,85 +233,175 @@ export const POST = withAuth(async (user, req) => {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
             }
 
-            // Build pages list from templatePages or fallback to defaultBlocks
-            const templatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
-            const rawPages = templatePages?.length
-                ? templatePages
-                : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
-            const pagesToCreate = rawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
-            injectNavLinks(pagesToCreate)
-
             _siteId = Number(siteId)
 
-            // Mark as generating before destructive operations
+            // Build template variant map: blockType → variant/style/layout from template
+            const templatePages = (template.templatePages as Array<{ layout: unknown }>)
+            const templateBlockList = templatePages?.length
+                ? (templatePages.flatMap(p => (p.layout as Record<string, unknown>[]) || []))
+                : blocks
+            const sanitizedTemplateBlocks = sanitizeBlocks(templateBlockList)
+
+            // Extract structural + visual fields per blockType from template (first match wins)
+            // These fields define the template's look — user content (headlines, text, images) is preserved
+            const TEMPLATE_FIELDS = [
+                'variant', 'layout', 'style',           // structural
+                'badge',                                  // hero badge config
+                'showSocialLinks', 'showMap',             // toggle features
+            ]
+            const templateVariantMap: Record<string, Record<string, unknown>> = {}
+            for (const tb of sanitizedTemplateBlocks) {
+                const bt = tb.blockType as string
+                if (!bt || templateVariantMap[bt]) continue
+                const structural: Record<string, unknown> = {}
+                for (const field of TEMPLATE_FIELDS) {
+                    if (tb[field] !== undefined) structural[field] = tb[field]
+                }
+                templateVariantMap[bt] = structural
+            }
+
+            // Track unmatched blocks across all pages for notification
+            const allUnmatchedBlocks: Record<string, unknown>[] = []
+
+            // 2. Fetch existing pages + snapshot for rollback (BR-06)
+            // MUST use draft: true — editor saves blocks as drafts,
+            // reading published version would miss user's latest edits
+            const existingPages = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: Number(siteId) } },
+                limit: 100,
+                depth: 0,
+                draft: true,
+            })
+
+            const rollbackData = {
+                theme: existingSite.theme,
+                pages: existingPages.docs.map((page) => ({
+                    id: page.id,
+                    layout: (page as Record<string, unknown>).layout,
+                })),
+            }
+
+            // Mark as re-skinning
             await payload.update({
                 collection: 'sites',
                 id: Number(siteId),
                 data: { generationStatus: 'generating' },
             })
 
-            // 1. Collect existing pages + their blocks (to preserve user content)
-            const existingPages = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: Number(siteId) } },
-                limit: 100,
-            })
-
-            // Build lookup: homepage blocks + slug-matched blocks for content merging
-            const existingPageMap: Record<string, Record<string, unknown>[]> = {}
-            let homepageBlocks: Record<string, unknown>[] = []
-            for (const page of existingPages.docs) {
-                const pageData = page as Record<string, unknown>
-                const blocks = (pageData.layout as Record<string, unknown>[]) || []
-                const slug = pageData.slug as string
-                if (pageData.isHomepage) homepageBlocks = blocks
-                if (slug) existingPageMap[slug] = blocks
-            }
-
-            // 2. Delete old pages
-            for (const page of existingPages.docs) {
-                await payload.delete({ collection: 'pages', id: page.id })
-            }
-
-            // 3. Update site theme
-            await payload.update({
-                collection: 'sites',
-                id: Number(siteId),
-                data: { theme: templateTheme },
-            })
-
-            // 4. Create new pages from template, merging user content where possible
-            for (const [idx, page] of pagesToCreate.entries()) {
-                // Find matching existing blocks: homepage→homepage, then slug match
-                const matchingBlocks = page.isHomepage
-                    ? homepageBlocks
-                    : (existingPageMap[page.slug] || [])
-
-                const mergedLayout = matchingBlocks.length > 0
-                    ? mergeUserContent(page.layout, matchingBlocks)
-                    : page.layout
-
-                await payload.create({
-                    collection: 'pages',
-                    data: {
-                        title: page.title,
-                        slug: page.slug,
-                        site: Number(siteId),
-                        tenant: tenantId,
-                        isHomepage: page.isHomepage ?? idx === 0,
-                        _status: 'published',
-                        layout: mergedLayout,
-                    },
+            try {
+                // 1. Update site theme only
+                await payload.update({
+                    collection: 'sites',
+                    id: Number(siteId),
+                    data: { theme: templateTheme },
                 })
-                _createdPagesCount++
-            }
 
-            // 4. Mark generation completed
-            await payload.update({
-                collection: 'sites',
-                id: Number(siteId),
-                data: { generationStatus: 'completed' },
-            })
+                // Template has blocks for homepage only — sanitize them
+                const templateBlocksClean = sanitizeBlocks(
+                    templatePages?.length
+                        ? (templatePages.flatMap(p => (p.layout as Record<string, unknown>[]) || []))
+                        : blocks
+                )
+
+                // 2. Smart Mapping: replace layout with template blocks, map user content
+                //    PRD F07 US-F07-05: "mapping nội dung hiện tại sang block tương ứng của template mới"
+                for (const page of existingPages.docs) {
+                    const pageData = page as Record<string, unknown>
+                    const currentBlocks = (pageData.layout as Record<string, unknown>[]) || []
+                    if (currentBlocks.length === 0) continue
+
+                    const isHomepage = Boolean(pageData.isHomepage)
+
+                    let newLayout: Record<string, unknown>[]
+
+                    if (isHomepage && templateBlocksClean.length > 0) {
+                        // HOMEPAGE: Smart Mapping — replace layout with template blocks,
+                        // merge user content into matching blockTypes
+                        const { mergedBlocks: merged, unmatchedUserBlocks } = mergeUserContent(
+                            templateBlocksClean, currentBlocks, { returnDetails: true }
+                        )
+
+                        // Track unmatched blocks for notification (FR-05)
+                        if (unmatchedUserBlocks.length > 0) {
+                            allUnmatchedBlocks.push(...unmatchedUserBlocks)
+                        }
+
+                        // Insert unmatched blocks before footer (PRD AC-2: don't lose content)
+                        const footerIdx = merged.findIndex(b => b.blockType === 'footer')
+                        if (footerIdx !== -1 && unmatchedUserBlocks.length > 0) {
+                            merged.splice(footerIdx, 0, ...unmatchedUserBlocks)
+                        } else if (unmatchedUserBlocks.length > 0) {
+                            merged.push(...unmatchedUserBlocks)
+                        }
+
+                        newLayout = merged
+                    } else {
+                        // SUBPAGES: Re-skin only — keep all blocks, overlay template variant
+                        newLayout = currentBlocks.map(block => {
+                            const bt = block.blockType as string
+                            if (!bt) return block
+                            const templateVariant = templateVariantMap[bt]
+                            if (!templateVariant || Object.keys(templateVariant).length === 0) return block
+                            const cleanVariant = stripSystemFields(templateVariant) as Record<string, unknown>
+                            return { ...block, ...cleanVariant }
+                        })
+                    }
+
+                    // Ensure footer is always last
+                    const footerIdx = newLayout.findIndex(b => b.blockType === 'footer')
+                    if (footerIdx !== -1 && footerIdx < newLayout.length - 1) {
+                        const footer = newLayout.splice(footerIdx, 1)[0]
+                        newLayout.push(footer)
+                    }
+
+                    // Strip system fields — Payload rejects 'id' in layout block data
+                    const cleanLayout = stripSystemFields(newLayout) as Record<string, unknown>[]
+
+
+                    await payload.update({
+                        collection: 'pages',
+                        id: page.id,
+                        data: { layout: cleanLayout },
+                    })
+                    _createdPagesCount++
+                }
+
+                // 3. Mark completed
+                await payload.update({
+                    collection: 'sites',
+                    id: Number(siteId),
+                    data: { generationStatus: 'completed' },
+                })
+            } catch (applyError) {
+                // ROLLBACK (BR-06): restore previous theme + page layouts
+                console.error('[Apply Template] Mutation failed, rolling back:', applyError)
+                try {
+                    await payload.update({
+                        collection: 'sites',
+                        id: Number(siteId),
+                        data: { theme: rollbackData.theme, generationStatus: 'completed' } as Record<string, unknown>,
+                    })
+                    for (const page of rollbackData.pages) {
+                        await payload.update({
+                            collection: 'pages',
+                            id: page.id,
+                            data: { layout: page.layout } as Record<string, unknown>,
+                        })
+                    }
+                } catch (rollbackError) {
+                    console.error('[Apply Template] Rollback also failed:', rollbackError)
+                    await payload.update({
+                        collection: 'sites',
+                        id: Number(siteId),
+                        data: { generationStatus: 'failed' },
+                    }).catch(() => {})
+                }
+                return NextResponse.json(
+                    { error: 'Failed to apply template. Your previous content has been restored.' },
+                    { status: 500 }
+                )
+            }
 
             // 5. Increment template usage count
             await payload.update({
@@ -283,8 +415,11 @@ export const POST = withAuth(async (user, req) => {
                 siteId: Number(siteId),
                 siteName: existingSite.name,
                 templateName: template.name,
-                pagesCreated: pagesToCreate.length,
+                pagesUpdated: _createdPagesCount,
                 applied: true,
+                unmatchedBlocks: allUnmatchedBlocks.length > 0
+                    ? [...new Set(allUnmatchedBlocks.map(b => b.blockType as string))]
+                    : undefined,
             })
         }
 
@@ -293,7 +428,12 @@ export const POST = withAuth(async (user, req) => {
         const newSiteRawPages = newSiteTemplatePages?.length
             ? newSiteTemplatePages
             : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
-        const pagesToCreate = newSiteRawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
+        const pagesToCreate = newSiteRawPages.map(p => ({
+            title: p.title,
+            slug: p.slug,
+            isHomepage: p.isHomepage,
+            layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []),
+        }))
         injectNavLinks(pagesToCreate)
 
         const site = await payload.create({
@@ -322,7 +462,7 @@ export const POST = withAuth(async (user, req) => {
                     tenant: tenantId,
                     isHomepage: page.isHomepage ?? idx === 0,
                     _status: 'published',
-                    layout: page.layout,
+                    layout: stripSystemFields(page.layout) as Record<string, unknown>[],
                 },
             })
             _createdPagesCount++

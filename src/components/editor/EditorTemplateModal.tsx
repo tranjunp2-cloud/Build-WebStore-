@@ -22,14 +22,21 @@ const CATEGORY_VALUES: Record<string, string> = {
     blog: 'blog', travel: 'travel',
 }
 
+export interface TemplateApplyResult {
+    templateName: string
+    siteId: string | number
+    unmatchedBlocks?: string[]
+}
+
 interface EditorTemplateModalProps {
     isOpen: boolean
     onClose: () => void
     siteId: string
-    onApplied: () => void
+    onBeforeApply?: () => Promise<void>
+    onApplied: (result: TemplateApplyResult) => void
 }
 
-export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: EditorTemplateModalProps) {
+export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, onApplied }: EditorTemplateModalProps) {
     const { t } = useI18n()
     const tt = t.editor.template
     const categories = CATEGORY_KEYS.map(key => ({ value: CATEGORY_VALUES[key], label: tt[key] }))
@@ -121,6 +128,9 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
         setIsApplying(confirmTemplate.id)
 
         try {
+            // Save unsaved changes before applying template
+            if (onBeforeApply) await onBeforeApply()
+
             const res = await fetch('/api/ai/apply-template', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -139,9 +149,13 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                 throw new Error(errMsg)
             }
 
-            toast.success(tt.appliedSuccess.replace('{name}', confirmTemplate.name))
+            const data = await res.json().catch(() => ({}))
             setConfirmTemplate(null)
-            onApplied()
+            onApplied({
+                templateName: confirmTemplate.name,
+                siteId: data.siteId ?? siteId,
+                unmatchedBlocks: data.unmatchedBlocks,
+            })
         } catch (err) {
             const message = err instanceof Error ? err.message : tt.applyFailed
             toast.error(tt.applyFailed, { description: message })

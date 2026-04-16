@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Upload, ImageIcon, Search, Trash2, Copy, Check, RefreshCw, Film, FileText, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 type MediaDoc = {
     id: string
@@ -35,6 +36,8 @@ function MediaIcon({ mimeType }: { mimeType: string }) {
 }
 
 export default function MediaLibraryPage() {
+    const { t, ti } = useI18n()
+    const ml = t.mediaLibrary
     const [media, setMedia] = useState<MediaDoc[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
@@ -56,7 +59,7 @@ export default function MediaLibraryPage() {
             const data = await res.json()
             setMedia(data.docs || [])
         } catch {
-            toast.error('Failed to load media')
+            toast.error(ml.loadFailed)
         } finally {
             setIsLoading(false)
         }
@@ -84,12 +87,12 @@ export default function MediaLibraryPage() {
                 setMedia(prev => [doc.doc || doc, ...prev])
                 successCount++
             } catch {
-                toast.error(`Failed to upload ${file.name}`)
+                toast.error(ti(ml.uploadFailed, { name: file.name }))
             }
         }
 
         if (successCount > 0) {
-            toast.success(`Uploaded ${successCount} file${successCount > 1 ? 's' : ''}`)
+            toast.success(ti(ml.uploadedCount, { count: successCount }))
         }
         setIsUploading(false)
         if (fileInputRef.current) fileInputRef.current.value = ''
@@ -101,16 +104,16 @@ export default function MediaLibraryPage() {
             if (!res.ok) throw new Error('Delete failed')
             setMedia(prev => prev.filter(m => m.id !== id))
             setSelectedMedia(null)
-            toast.success('File deleted')
+            toast.success(ml.fileDeleted)
         } catch {
-            toast.error('Failed to delete file')
+            toast.error(ml.deleteFailed)
         }
     }
 
     const copyUrl = (url: string, id: string) => {
         navigator.clipboard.writeText(window.location.origin + url)
         setCopiedId(id)
-        toast.success('URL copied')
+        toast.success(ml.urlCopied)
         setTimeout(() => setCopiedId(null), 2000)
     }
 
@@ -129,7 +132,7 @@ export default function MediaLibraryPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Media Library</h1>
+                    <h1 className="text-2xl font-bold text-white">{ml.title}</h1>
                     <p className="mt-1 text-sm text-gray-400">
                         {media.length} file{media.length !== 1 ? 's' : ''} &middot; {formatFileSize(totalSize)} total
                     </p>
@@ -148,7 +151,7 @@ export default function MediaLibraryPage() {
                         className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25 disabled:opacity-50"
                     >
                         <Upload className="h-4 w-4" />
-                        {isUploading ? 'Uploading...' : 'Upload'}
+                        {isUploading ? ml.uploading : ml.upload}
                     </button>
                     <input
                         ref={fileInputRef}
@@ -168,23 +171,26 @@ export default function MediaLibraryPage() {
                     <input
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Search files..."
+                        placeholder={ml.searchPlaceholder}
                         className="w-full rounded-lg border border-white/10 bg-[#1E293B] pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50"
                     />
                 </div>
                 <div className="flex gap-1 rounded-lg border border-white/10 bg-[#1E293B] p-0.5">
-                    {(['all', 'image', 'video', 'pdf'] as const).map(t => (
-                        <button
-                            key={t}
-                            onClick={() => setFilterType(t)}
-                            className={cn(
-                                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors capitalize',
-                                filterType === t ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300',
-                            )}
-                        >
-                            {t === 'all' ? 'All' : t === 'pdf' ? 'PDF' : t.charAt(0).toUpperCase() + t.slice(1) + 's'}
-                        </button>
-                    ))}
+                    {(() => {
+                        const filterLabels: Record<string, string> = { all: ml.filterAll, image: ml.filterImages, video: ml.filterVideos, pdf: ml.filterPdf }
+                        return (['all', 'image', 'video', 'pdf'] as const).map(filterKey => (
+                            <button
+                                key={filterKey}
+                                onClick={() => setFilterType(filterKey)}
+                                className={cn(
+                                    'rounded-md px-3 py-1.5 text-xs font-medium transition-colors capitalize',
+                                    filterType === filterKey ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300',
+                                )}
+                            >
+                                {filterLabels[filterKey]}
+                            </button>
+                        ))
+                    })()}
                 </div>
             </div>
 
@@ -206,13 +212,13 @@ export default function MediaLibraryPage() {
                 <div className="flex h-[50vh] items-center justify-center">
                     <div className="text-center">
                         <ImageIcon className="mx-auto h-12 w-12 text-gray-600" />
-                        <h2 className="mt-4 text-lg font-semibold text-white">No media files</h2>
-                        <p className="mt-1 text-sm text-gray-500">Upload images, videos, or PDFs to get started</p>
+                        <h2 className="mt-4 text-lg font-semibold text-white">{ml.emptyTitle}</h2>
+                        <p className="mt-1 text-sm text-gray-500">{ml.emptyDescription}</p>
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25"
                         >
-                            <Upload className="h-4 w-4" /> Upload Files
+                            <Upload className="h-4 w-4" /> {ml.uploadFiles}
                         </button>
                     </div>
                 </div>
@@ -257,7 +263,7 @@ export default function MediaLibraryPage() {
 
                     {filtered.length === 0 && (
                         <div className="col-span-full py-12 text-center text-sm text-gray-500">
-                            No files match your search
+                            {ml.noMatch}
                         </div>
                     )}
                 </div>
@@ -304,7 +310,7 @@ export default function MediaLibraryPage() {
 
                             {selectedMedia.alt && (
                                 <div>
-                                    <p className="text-[10px] uppercase text-gray-600 mb-1">Alt Text</p>
+                                    <p className="text-[10px] uppercase text-gray-600 mb-1">{ml.altText}</p>
                                     <p className="text-sm text-gray-300">{selectedMedia.alt}</p>
                                 </div>
                             )}
@@ -316,13 +322,13 @@ export default function MediaLibraryPage() {
                                     className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 px-3 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/10 transition-colors"
                                 >
                                     {copiedId === selectedMedia.id ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
-                                    {copiedId === selectedMedia.id ? 'Copied!' : 'Copy URL'}
+                                    {copiedId === selectedMedia.id ? ml.copied : ml.copyUrl}
                                 </button>
                                 <button
                                     onClick={() => handleDelete(selectedMedia.id)}
                                     className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
                                 >
-                                    <Trash2 className="h-3 w-3" /> Delete
+                                    <Trash2 className="h-3 w-3" /> {ml.delete}
                                 </button>
                             </div>
                         </div>

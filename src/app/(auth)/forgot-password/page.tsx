@@ -82,16 +82,16 @@ export default function ForgotPasswordPage() {
             if (success) {
                 setSubmitted(true)
                 setCooldown(RESEND_COOLDOWN_SECONDS)
-                toast.success('Reset link sent!', {
-                    description: 'Check your email inbox.',
+                toast.success(t.auth.forgot.resetLinkSent, {
+                    description: t.auth.forgot.checkInbox,
                 })
             } else {
-                setFormError('root', { message: 'Something went wrong. Please try again.' })
-                toast.error('Something went wrong. Please try again.')
+                setFormError('root', { message: t.auth.forgot.somethingWrong })
+                toast.error(t.auth.forgot.somethingWrong)
             }
         } catch {
-            setFormError('root', { message: 'Connection error. Please try again.' })
-            toast.error('Connection error. Please try again.')
+            setFormError('root', { message: t.auth.forgot.connectionError })
+            toast.error(t.auth.forgot.connectionError)
         }
     }
 
@@ -105,14 +105,14 @@ export default function ForgotPasswordPage() {
             const success = await sendResetLink(email)
             if (success) {
                 setCooldown(RESEND_COOLDOWN_SECONDS)
-                toast.success('Reset link resent!', {
-                    description: 'Check your email inbox again.',
+                toast.success(t.auth.forgot.linkResent, {
+                    description: t.auth.forgot.checkInboxAgain,
                 })
             } else {
-                toast.error('Failed to resend. Please try again later.')
+                toast.error(t.auth.forgot.resendFailed)
             }
         } catch {
-            toast.error('Connection error. Please try again.')
+            toast.error(t.auth.forgot.connectionError)
         } finally {
             setResending(false)
         }

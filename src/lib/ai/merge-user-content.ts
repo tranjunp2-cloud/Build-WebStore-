@@ -17,10 +17,25 @@ export { PAGES_FIELDS, CONTENT_FIELDS }
  * take structural fields (variant/layout) from template,
  * take content fields (headline, body, etc.) from user's existing block.
  */
+export type MergeResult = {
+    mergedBlocks: Record<string, unknown>[]
+    unmatchedUserBlocks: Record<string, unknown>[]
+}
+
 export function mergeUserContent(
     templateBlocks: Record<string, unknown>[],
     existingBlocks: Record<string, unknown>[],
-): Record<string, unknown>[] {
+): Record<string, unknown>[]
+export function mergeUserContent(
+    templateBlocks: Record<string, unknown>[],
+    existingBlocks: Record<string, unknown>[],
+    options: { returnDetails: true },
+): MergeResult
+export function mergeUserContent(
+    templateBlocks: Record<string, unknown>[],
+    existingBlocks: Record<string, unknown>[],
+    options?: { returnDetails: boolean },
+): Record<string, unknown>[] | MergeResult {
     // Group existing blocks by blockType (preserve order for multiple same-type blocks)
     const existingByType: Record<string, Record<string, unknown>[]> = {}
     for (const block of existingBlocks) {
@@ -32,7 +47,7 @@ export function mergeUserContent(
     // Track usage index per blockType to handle multiple blocks of same type
     const usageIndex: Record<string, number> = {}
 
-    return templateBlocks.map(templateBlock => {
+    const mergedBlocks = templateBlocks.map(templateBlock => {
         const bt = templateBlock.blockType as string
         if (!bt) return templateBlock
 
@@ -56,4 +71,26 @@ export function mergeUserContent(
         }
         return merged
     })
+
+    if (!options?.returnDetails) return mergedBlocks
+
+    // Compute unmatched user blocks: blocks with types not in template, or extras beyond template count
+    const templateTypeCounts: Record<string, number> = {}
+    for (const tb of templateBlocks) {
+        const bt = tb.blockType as string
+        if (bt) templateTypeCounts[bt] = (templateTypeCounts[bt] || 0) + 1
+    }
+
+    const unmatchedUserBlocks: Record<string, unknown>[] = []
+    const existingCounts: Record<string, number> = {}
+    for (const eb of existingBlocks) {
+        const bt = eb.blockType as string
+        if (!bt || bt === 'navigation' || bt === 'footer') continue
+        existingCounts[bt] = (existingCounts[bt] || 0) + 1
+        if (!templateTypeCounts[bt] || existingCounts[bt] > templateTypeCounts[bt]) {
+            unmatchedUserBlocks.push(eb)
+        }
+    }
+
+    return { mergedBlocks, unmatchedUserBlocks }
 }
