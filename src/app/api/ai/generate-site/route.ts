@@ -122,15 +122,16 @@ export async function POST(req: NextRequest) {
         // Rate Limit: 5 requests/min (burst) + 20 requests/hour (sustained)
         const rateLimit = await checkTwoTierRateLimit(String(user.id), 5, 20)
         if (!rateLimit.allowed) {
+            const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
             return NextResponse.json(
                 {
                     error: 'Rate limit exceeded. Please wait before trying again.',
-                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                    retryAfter,
                 },
                 {
                     status: 429,
                     headers: {
-                        'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+                        'Retry-After': String(retryAfter),
                         'X-RateLimit-Remaining': '0',
                     },
                 }
