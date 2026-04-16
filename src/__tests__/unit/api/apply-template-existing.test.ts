@@ -629,6 +629,101 @@ describe('POST /api/ai/apply-template', () => {
             })
         })
 
+        // ── TC-F07.044–046: contact formFields sanitization ────────────────────
+
+        it('TC-F07.044: valid contact formFields are preserved during template apply', async () => {
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    {
+                        blockType: 'contact', headline: 'Contact Us',
+                        formFields: [
+                            { fieldName: 'name', fieldType: 'text', label: 'Name', required: true },
+                            { fieldName: 'email', fieldType: 'email', label: 'Email', required: true },
+                        ],
+                    },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            await POST(req)
+
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')
+            expect(contactBlock).toBeDefined()
+            const formFields = contactBlock!.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(2)
+            expect(formFields[0].fieldName).toBe('name')
+        })
+
+        it('TC-F07.045: invalid formFields items are filtered out (missing/wrong type)', async () => {
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    {
+                        blockType: 'contact', headline: 'Contact',
+                        formFields: [
+                            { fieldName: 'name', fieldType: 'text', label: 'Name' },          // valid
+                            { fieldName: '', fieldType: 'text', label: 'Empty name' },          // invalid: empty fieldName
+                            { fieldName: 123, fieldType: 'text', label: 'Number name' },        // invalid: non-string
+                            { fieldName: 'x', fieldType: 'bogus', label: 'Bad type' },          // invalid: unknown fieldType
+                            { fieldName: 'msg', fieldType: 'textarea', label: '' },             // invalid: empty label
+                            { fieldName: '   ', fieldType: 'text', label: 'Whitespace' },       // invalid: whitespace-only
+                        ],
+                    },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            await POST(req)
+
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')!
+            const formFields = contactBlock.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(1) // only 'name' survives
+            expect(formFields[0].fieldName).toBe('name')
+        })
+
+        it('TC-F07.046: all-invalid formFields falls back to default 3 fields', async () => {
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    {
+                        blockType: 'contact', headline: 'Contact',
+                        formFields: [
+                            { fieldName: null, fieldType: null, label: null },
+                            { bad: 'data' },
+                        ],
+                    },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            await POST(req)
+
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')!
+            const formFields = contactBlock.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(3)
+            expect(formFields.map(f => f.fieldName)).toEqual(['name', 'email', 'message'])
+        })
+
         // ── TC-F07.042: siteId as empty string ────────────────────────────────
 
         it('TC-F07.042: siteId as empty string "" is treated as falsy, creates new site', async () => {
