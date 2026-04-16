@@ -38,14 +38,14 @@ export const CATEGORY_REQUIREMENTS: Readonly<Record<string, CategoryRequirement>
     },
     restaurant: {
         minBlocks: 11,
-        mandatoryBlocks: ['navigation', 'hero', 'about', 'gallery', 'testimonials', 'contact', 'footer'],
-        recommendedBlocks: ['stats', 'team', 'cta', 'faq', 'features'],
+        mandatoryBlocks: ['navigation', 'hero', 'about', 'features', 'gallery', 'testimonials', 'contact', 'footer'],
+        recommendedBlocks: ['stats', 'team', 'cta', 'faq'],
         minItems: { testimonials: 4, features: 4, gallery: 8 },
     },
     fnb: {
         minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'about', 'gallery', 'testimonials', 'cta', 'footer'],
-        recommendedBlocks: ['stats', 'features', 'faq', 'team'],
+        mandatoryBlocks: ['navigation', 'hero', 'about', 'features', 'gallery', 'testimonials', 'cta', 'footer'],
+        recommendedBlocks: ['stats', 'faq', 'team'],
         minItems: { testimonials: 4, features: 4, gallery: 6 },
     },
     tech: {
