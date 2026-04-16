@@ -53,6 +53,23 @@ export const BLOCK_IMAGE_SPEC: Record<string, BlockImageSpec> = {
     },
 }
 
+/**
+ * Which block types should fetch images from Unsplash during gen.
+ * Env var `UNSPLASH_BLOCKS` overrides (comma-separated list).
+ * Default: hero-only to stay within Demo rate limit (50 req/hr).
+ * Set to `all` to enable all block types (for Production 5000/hr).
+ *
+ * BLOCK_IMAGE_SPEC above is still used by cleanupNonNumericImageFields
+ * and stripOrphanMediaRefs regardless — those only clean refs, not fetch.
+ */
+function getUnsplashEnabledBlocks(): ReadonlySet<string> {
+    const env = process.env.UNSPLASH_BLOCKS?.trim()
+    if (!env) return UNSPLASH_BLOCKS_DEFAULT
+    if (env === 'all') return new Set(Object.keys(BLOCK_IMAGE_SPEC))
+    return new Set(env.split(',').map((s) => s.trim()).filter(Boolean))
+}
+const UNSPLASH_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
+
 export interface ImageNeed {
     blockType: string
     count: number
@@ -108,11 +125,13 @@ function hashBlockSeed(blockType: string, businessName: string): number {
  */
 export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
     const needs: ImageNeed[] = []
+    const enabledBlocks = getUnsplashEnabledBlocks()
 
     for (const block of blocks) {
         const blockType = typeof block.blockType === 'string' ? block.blockType : ''
         const spec = BLOCK_IMAGE_SPEC[blockType]
         if (!spec) continue
+        if (!enabledBlocks.has(blockType)) continue
 
         // Top-level image fields — one need per block (shared Media ID across all
         // top-level fields). Avoids burning 2 API calls for hero.image + hero.backgroundImage.

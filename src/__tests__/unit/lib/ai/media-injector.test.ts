@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { planImageNeeds, cleanupNonNumericImageFields, stripOrphanMediaRefs } from '@/lib/ai/media-injector'
 
 beforeEach(() => {
     vi.spyOn(console, 'info').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
+    process.env.UNSPLASH_BLOCKS = 'all'
+})
+
+afterEach(() => {
+    delete process.env.UNSPLASH_BLOCKS
 })
 
 describe('media-injector [plan-260414-unsplash]', () => {
@@ -100,6 +105,19 @@ describe('media-injector [plan-260414-unsplash]', () => {
             ]
             const needs = planImageNeeds(blocks)
             expect(needs.length).toBe(3)
+        })
+
+        it('hero-only default: skips non-hero blocks when UNSPLASH_BLOCKS unset', () => {
+            delete process.env.UNSPLASH_BLOCKS
+            const blocks = [
+                { blockType: 'hero', headline: 'H' },
+                { blockType: 'about', headline: 'A' },
+                { blockType: 'gallery', images: [{ caption: 'X' }] },
+                { blockType: 'team', members: [{ name: 'X' }] },
+            ]
+            const needs = planImageNeeds(blocks)
+            expect(needs.length).toBe(1)
+            expect(needs[0]!.blockType).toBe('hero')
         })
     })
 
