@@ -507,7 +507,9 @@ export const POST = withAuth(async (user, req) => {
                 tenant: tenantId,
                 isHomepage: false,
                 _status: 'published',
-                layout: [],
+                layout: [
+                    { blockType: 'hero', variant: 'centered', headline: '404', subheadline: 'Page Not Found — The page you are looking for does not exist or has been moved.' },
+                ],
                 seo: {
                     title: '404 - Page Not Found',
                     description: 'The page you are looking for does not exist.',
