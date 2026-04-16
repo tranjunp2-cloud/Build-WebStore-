@@ -569,13 +569,16 @@ export default function EditorPage() {
                     setIframeKey(key => key + 1)
                 } else {
                     toast.error('Nothing to undo')
+                    return // Nothing changed, skip save
                 }
                 break
             }
         }
 
-        // Single save + preview refresh after any mutation (except undo)
-        // Use setTimeout to let Zustand state settle before reading snapshot
+        // Single save + preview refresh after any mutation (including undo).
+        // Undo must also save to persist the reverted state to DB,
+        // otherwise a page reload would lose the undo.
+        // setTimeout lets Zustand state settle before reading snapshot.
         setTimeout(() => {
             void handleSave({ showToast: false, refreshPreview: true })
         }, 300)
