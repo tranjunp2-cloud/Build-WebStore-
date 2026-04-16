@@ -77,6 +77,7 @@ export async function PATCH(
                 where: { site: { equals: Number(siteId) } },
                 limit: 50,
                 page: pageNum,
+                sort: 'id',
                 draft: true,
             })
 
