@@ -6,7 +6,8 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING } from '@/lib/design-tokens'
+import { CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 function StarRating({ rating, color }: { rating: number; color: string }) {
     return (
@@ -85,8 +86,8 @@ export function SocialProofBlock({ block, theme: _theme }: BlockProps<SocialProo
     const { variant = 'cards', headline, reviews = [] } = block
 
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent">
                 {headline && (
                     <div className="text-center mb-14">
                         <Heading level={2}>
@@ -108,7 +109,7 @@ export function SocialProofBlock({ block, theme: _theme }: BlockProps<SocialProo
                         ))}
                     </div>
                 )}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

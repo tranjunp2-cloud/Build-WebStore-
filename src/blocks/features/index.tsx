@@ -7,21 +7,22 @@ import type { FeaturesConfig } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
 import { IconContainer, SectionLabel, GradientBlob } from '../shared/decorative'
 import { Heading, Body } from '../shared/Typography'
-import { CARD_PADDING, CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+import { CARD_PADDING } from '@/lib/design-tokens'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 // Shared wrapper for all features variants — preserves AnimatedSection
 // (block-internal framer-motion) while delegating padding/container/inner
-// gutter to Phase 01 design tokens. The block keeps its decorative
+// gutter to SectionWrapper tokens. The block keeps its decorative
 // GradientBlob since that is structural, not a Phase 05 concern.
 function FeaturesSection({ children }: { children: React.ReactNode }) {
     return (
-        <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden`}>
+        <AnimatedSection className="relative overflow-hidden">
             <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} relative z-10`}>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                 {children}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

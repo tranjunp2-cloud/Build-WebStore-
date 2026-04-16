@@ -7,7 +7,8 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 void _CSS_VARS
 
@@ -90,8 +91,8 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
     const activeCategory = categories[activeTab]
 
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-12">
                     <Heading level={2} className="mb-5 leading-tight">
@@ -149,7 +150,7 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
                         )}
                     </div>
                 )}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

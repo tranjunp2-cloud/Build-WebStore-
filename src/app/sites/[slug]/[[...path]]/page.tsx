@@ -86,12 +86,15 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     // BUG-F05-01: explicitly fetch published versions for live site.
     // Editor saves with draft:true; publish route promotes to published.
     // Owner previewing unpublished site sees drafts; visitors see published.
+    // BUG-F05-08: hide pages with isVisible=false from visitors (owner can still preview)
+    const visibilityFilter = !isOwner ? [{ isVisible: { not_equals: false } }] : []
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
             and: [
                 { site: { equals: site.id } },
                 { slug: { equals: pageSlug } },
+                ...visibilityFilter,
             ],
         },
         limit: 1,
@@ -109,6 +112,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
                 and: [
                     { site: { equals: site.id } },
                     { isHomepage: { equals: true } },
+                    ...visibilityFilter,
                 ],
             },
             limit: 1,
@@ -121,7 +125,10 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     const navigationPages = await payload.find({
         collection: 'pages',
         where: {
-            site: { equals: site.id },
+            and: [
+                { site: { equals: site.id } },
+                ...visibilityFilter,
+            ],
         },
         limit: 100,
         sort: 'createdAt',

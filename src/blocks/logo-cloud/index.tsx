@@ -4,11 +4,10 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING } from '@/lib/design-tokens'
+import { CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 void _CSS_VARS
-
-const LOGO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
 function LogoHeadline({ text }: { text?: string }) {
     if (!text) return null
@@ -26,8 +25,8 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
     // ── Grid variant ─────────────────────────────────────────────────────
     if (variant === 'grid') {
         return (
-            <AnimatedSection className={SECTION_PADDING.compact}>
-                <div className={LOGO_CONTAINER}>
+            <AnimatedSection>
+                <SectionWrapper as="div" padding="compact" container="default" background="transparent">
                     <LogoHeadline text={headline} />
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
                         {logos.map((item, i) => (
@@ -43,22 +42,22 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                             </div>
                         ))}
                     </div>
-                </div>
+                </SectionWrapper>
             </AnimatedSection>
         )
     }
 
     // ── Default: row variant ─────────────────────────────────────────────
     return (
-        <AnimatedSection className={SECTION_PADDING.compact}>
-            <div className={LOGO_CONTAINER}>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="compact" container="default" background="transparent">
                 <LogoHeadline text={headline} />
                 <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
                     {logos.map((item, i) => (
                         <img key={i} src={item.logo?.url} alt={item.logo?.alt || item.name} className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
                     ))}
                 </div>
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }
