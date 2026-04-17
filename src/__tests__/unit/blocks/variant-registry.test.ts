@@ -15,7 +15,7 @@ import { NavigationConfigSchema, navigationMeta } from '@/blocks/navigation/conf
 const BLOCK_CONFIGS = [
     { name: 'hero', meta: heroMeta, schema: HeroConfigSchema, expectedCount: 12, minFields: { headline: 'Test' } },
     { name: 'features', meta: featuresMeta, schema: FeaturesConfigSchema, expectedCount: 8, minFields: { headline: 'Test' } },
-    { name: 'testimonials', meta: testimonialsMeta, schema: TestimonialsConfigSchema, expectedCount: 8, minFields: {} },
+    { name: 'testimonials', meta: testimonialsMeta, schema: TestimonialsConfigSchema, expectedCount: 10, minFields: {} },
     { name: 'pricing', meta: pricingMeta, schema: PricingConfigSchema, expectedCount: 8, minFields: {} },
     { name: 'gallery', meta: galleryMeta, schema: GalleryConfigSchema, expectedCount: 6, minFields: {} },
     { name: 'footer', meta: footerMeta, schema: FooterConfigSchema, expectedCount: 6, minFields: {} },
@@ -24,9 +24,9 @@ const BLOCK_CONFIGS = [
 ] as const
 
 describe('[TC-S2-015] All Block Variant Counts', () => {
-    it('total variant count across 8 blocks is 60', () => {
+    it('total variant count across 8 blocks is 62', () => {
         const total = BLOCK_CONFIGS.reduce((sum, b) => sum + b.meta.variants.length, 0)
-        expect(total).toBe(60)
+        expect(total).toBe(62)
     })
 
     for (const block of BLOCK_CONFIGS) {

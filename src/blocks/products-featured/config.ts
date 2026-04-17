@@ -3,6 +3,7 @@ import { BaseBlockSchema } from '../types'
 import type { BlockMeta } from '../types'
 
 export const ProductsFeaturedConfigSchema = BaseBlockSchema.extend({
+    variant: z.enum(['hero-product', 'carousel']).default('hero-product'),
     headline: z.string().optional(),
     subheadline: z.string().optional(),
     productIds: z.array(z.string()).optional(),

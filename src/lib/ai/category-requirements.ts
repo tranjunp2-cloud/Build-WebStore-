@@ -194,6 +194,198 @@ export const FOOTER_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
     travel: ['dark-gradient', 'expanded', 'mega-footer'],
 }
 
+/**
+ * Plan 260415 session — variant rotation pools for 11 remaining block types.
+ * Same pattern as NAV/CONTACT/FOOTER pools above. 14 categories × 3 variants.
+ * Variant ids must match Zod enum in each block's config.ts.
+ */
+export const FEATURES_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['icon-left', 'zigzag', 'carousel'],
+    restaurant: ['grid-3', 'icon-left', 'zigzag'],
+    fnb: ['icon-top', 'grid-3', 'carousel'],
+    tech: ['grid-4', 'zigzag', 'icon-left'],
+    health: ['icon-left', 'grid-3', 'list'],
+    education: ['grid-3', 'icon-top', 'zigzag'],
+    realestate: ['grid-3', 'zigzag', 'list'],
+    fitness: ['icon-top', 'grid-3', 'carousel'],
+    creative: ['carousel', 'zigzag', 'icon-left'],
+    business: ['grid-4', 'icon-left', 'list'],
+    ecommerce: ['grid-4', 'icon-top', 'carousel'],
+    events: ['carousel', 'grid-3', 'icon-top'],
+    blog: ['list', 'icon-left', 'grid-2'],
+    travel: ['carousel', 'zigzag', 'grid-3'],
+}
+
+export const TESTIMONIALS_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['spotlight', 'masonry', 'carousel'],
+    restaurant: ['cards', 'minimal-quote', 'carousel'],
+    fnb: ['minimal-quote', 'carousel', 'cards'],
+    tech: ['carousel', 'spotlight', 'avatar-row'],
+    health: ['cards', 'spotlight', 'simple'],
+    education: ['simple', 'cards', 'carousel'],
+    realestate: ['spotlight', 'cards', 'masonry'],
+    fitness: ['avatar-row', 'carousel', 'spotlight'],
+    creative: ['masonry', 'spotlight', 'video-text'],
+    business: ['cards', 'carousel', 'spotlight'],
+    ecommerce: ['carousel', 'avatar-row', 'masonry'],
+    events: ['spotlight', 'masonry', 'cards'],
+    blog: ['simple', 'minimal-quote', 'cards'],
+    travel: ['masonry', 'carousel', 'spotlight'],
+}
+
+export const ABOUT_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['split', 'story', 'simple'],
+    restaurant: ['story', 'split', 'simple'],
+    fnb: ['story', 'simple', 'split'],
+    tech: ['split', 'simple', 'story'],
+    health: ['split', 'story', 'simple'],
+    education: ['story', 'split', 'simple'],
+    realestate: ['split', 'story', 'simple'],
+    fitness: ['split', 'story', 'simple'],
+    creative: ['story', 'split', 'simple'],
+    business: ['split', 'story', 'simple'],
+    ecommerce: ['split', 'simple', 'story'],
+    events: ['story', 'split', 'simple'],
+    blog: ['simple', 'story', 'split'],
+    travel: ['story', 'split', 'simple'],
+}
+
+export const CTA_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['inline', 'card', 'banner'],
+    restaurant: ['banner', 'inline', 'card'],
+    fnb: ['banner', 'card', 'inline'],
+    tech: ['card', 'inline', 'banner'],
+    health: ['inline', 'banner', 'card'],
+    education: ['banner', 'inline', 'card'],
+    realestate: ['card', 'banner', 'inline'],
+    fitness: ['banner', 'card', 'inline'],
+    creative: ['card', 'inline', 'banner'],
+    business: ['inline', 'card', 'banner'],
+    ecommerce: ['banner', 'card', 'inline'],
+    events: ['banner', 'inline', 'card'],
+    blog: ['inline', 'card', 'banner'],
+    travel: ['banner', 'card', 'inline'],
+}
+
+export const STATS_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['highlight', 'grid', 'row'],
+    restaurant: ['row', 'highlight', 'grid'],
+    fnb: ['row', 'grid', 'highlight'],
+    tech: ['grid', 'highlight', 'row'],
+    health: ['highlight', 'row', 'grid'],
+    education: ['grid', 'row', 'highlight'],
+    realestate: ['highlight', 'grid', 'row'],
+    fitness: ['row', 'highlight', 'grid'],
+    creative: ['grid', 'highlight', 'row'],
+    business: ['grid', 'row', 'highlight'],
+    ecommerce: ['row', 'grid', 'highlight'],
+    events: ['highlight', 'row', 'grid'],
+    blog: ['row', 'grid', 'highlight'],
+    travel: ['highlight', 'grid', 'row'],
+}
+
+export const NEWSLETTER_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['popup', 'inline', 'banner'],
+    restaurant: ['inline', 'banner', 'popup'],
+    fnb: ['inline', 'popup', 'banner'],
+    tech: ['banner', 'inline', 'popup'],
+    health: ['inline', 'banner', 'popup'],
+    education: ['inline', 'popup', 'banner'],
+    realestate: ['banner', 'inline', 'popup'],
+    fitness: ['inline', 'banner', 'popup'],
+    creative: ['popup', 'banner', 'inline'],
+    business: ['banner', 'inline', 'popup'],
+    ecommerce: ['popup', 'banner', 'inline'],
+    events: ['inline', 'popup', 'banner'],
+    blog: ['banner', 'inline', 'popup'],
+    travel: ['inline', 'banner', 'popup'],
+}
+
+export const TEAM_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['list', 'grid'],
+    restaurant: ['grid', 'list'],
+    fnb: ['grid', 'list'],
+    tech: ['grid', 'list'],
+    health: ['list', 'grid'],
+    education: ['grid', 'list'],
+    realestate: ['grid', 'list'],
+    fitness: ['grid', 'list'],
+    creative: ['list', 'grid'],
+    business: ['grid', 'list'],
+    ecommerce: ['grid', 'list'],
+    events: ['grid', 'list'],
+    blog: ['list', 'grid'],
+    travel: ['grid', 'list'],
+}
+
+export const FAQ_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['simple', 'accordion', 'grid'],
+    restaurant: ['accordion', 'simple', 'grid'],
+    fnb: ['accordion', 'grid', 'simple'],
+    tech: ['grid', 'accordion', 'simple'],
+    health: ['accordion', 'simple', 'grid'],
+    education: ['accordion', 'grid', 'simple'],
+    realestate: ['simple', 'accordion', 'grid'],
+    fitness: ['accordion', 'simple', 'grid'],
+    creative: ['grid', 'simple', 'accordion'],
+    business: ['accordion', 'grid', 'simple'],
+    ecommerce: ['grid', 'accordion', 'simple'],
+    events: ['accordion', 'grid', 'simple'],
+    blog: ['simple', 'grid', 'accordion'],
+    travel: ['accordion', 'simple', 'grid'],
+}
+
+export const GALLERY_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['masonry', 'lightbox', 'carousel'],
+    restaurant: ['grid', 'masonry', 'carousel'],
+    fnb: ['masonry', 'grid', 'carousel'],
+    tech: ['grid', 'justified', 'carousel'],
+    health: ['lightbox', 'grid', 'masonry'],
+    education: ['grid', 'carousel', 'masonry'],
+    realestate: ['masonry', 'lightbox', 'filmstrip'],
+    fitness: ['carousel', 'masonry', 'grid'],
+    creative: ['masonry', 'justified', 'filmstrip'],
+    business: ['grid', 'carousel', 'masonry'],
+    ecommerce: ['carousel', 'grid', 'masonry'],
+    events: ['masonry', 'carousel', 'lightbox'],
+    blog: ['grid', 'masonry', 'carousel'],
+    travel: ['filmstrip', 'masonry', 'carousel'],
+}
+
+export const PRICING_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['cards', 'horizontal', 'toggle'],
+    restaurant: ['cards', 'table', 'horizontal'],
+    fnb: ['cards', 'horizontal', 'table'],
+    tech: ['toggle', 'comparison', 'cards'],
+    health: ['cards', 'tiered', 'table'],
+    education: ['tiered', 'toggle', 'cards'],
+    realestate: ['cards', 'comparison', 'table'],
+    fitness: ['toggle', 'cards', 'comparison'],
+    creative: ['minimal', 'cards', 'horizontal'],
+    business: ['comparison', 'toggle', 'cards'],
+    ecommerce: ['toggle', 'comparison', 'tiered'],
+    events: ['tiered', 'cards', 'table'],
+    blog: ['minimal', 'cards', 'toggle'],
+    travel: ['cards', 'tiered', 'horizontal'],
+}
+
+export const SERVICE_CARDS_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['featured', 'grid', 'list'],
+    restaurant: ['grid', 'featured', 'list'],
+    fnb: ['grid', 'list', 'featured'],
+    tech: ['grid', 'featured', 'list'],
+    health: ['list', 'grid', 'featured'],
+    education: ['grid', 'list', 'featured'],
+    realestate: ['featured', 'grid', 'list'],
+    fitness: ['featured', 'grid', 'list'],
+    creative: ['featured', 'list', 'grid'],
+    business: ['grid', 'featured', 'list'],
+    ecommerce: ['grid', 'list', 'featured'],
+    events: ['grid', 'featured', 'list'],
+    blog: ['list', 'grid', 'featured'],
+    travel: ['featured', 'grid', 'list'],
+}
+
 /** Maps block type → the array field where items live (for padding). */
 export const ITEM_FIELD_BY_BLOCK: Readonly<Record<string, string>> = {
     features: 'features',

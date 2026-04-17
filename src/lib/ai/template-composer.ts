@@ -1555,6 +1555,17 @@ import {
   NAV_VARIANT_BY_CATEGORY,
   CONTACT_VARIANT_BY_CATEGORY,
   FOOTER_VARIANT_BY_CATEGORY,
+  FEATURES_VARIANT_BY_CATEGORY,
+  TESTIMONIALS_VARIANT_BY_CATEGORY,
+  ABOUT_VARIANT_BY_CATEGORY,
+  CTA_VARIANT_BY_CATEGORY,
+  STATS_VARIANT_BY_CATEGORY,
+  NEWSLETTER_VARIANT_BY_CATEGORY,
+  TEAM_VARIANT_BY_CATEGORY,
+  FAQ_VARIANT_BY_CATEGORY,
+  GALLERY_VARIANT_BY_CATEGORY,
+  PRICING_VARIANT_BY_CATEGORY,
+  SERVICE_CARDS_VARIANT_BY_CATEGORY,
 } from './category-requirements'
 import { seededShufflePick, hashString } from './seeded-random'
 
@@ -1574,6 +1585,17 @@ function rotateStructuralVariants(
     { blockType: 'navigation', pool: NAV_VARIANT_BY_CATEGORY[category], salt: 'navigation' + category },
     { blockType: 'contact', pool: CONTACT_VARIANT_BY_CATEGORY[category], salt: 'contact' + category },
     { blockType: 'footer', pool: FOOTER_VARIANT_BY_CATEGORY[category], salt: 'footer' + category },
+    { blockType: 'features', pool: FEATURES_VARIANT_BY_CATEGORY[category], salt: 'features' + category },
+    { blockType: 'testimonials', pool: TESTIMONIALS_VARIANT_BY_CATEGORY[category], salt: 'testimonials' + category },
+    { blockType: 'about', pool: ABOUT_VARIANT_BY_CATEGORY[category], salt: 'about' + category },
+    { blockType: 'cta', pool: CTA_VARIANT_BY_CATEGORY[category], salt: 'cta' + category },
+    { blockType: 'stats', pool: STATS_VARIANT_BY_CATEGORY[category], salt: 'stats' + category },
+    { blockType: 'newsletter', pool: NEWSLETTER_VARIANT_BY_CATEGORY[category], salt: 'newsletter' + category },
+    { blockType: 'team', pool: TEAM_VARIANT_BY_CATEGORY[category], salt: 'team' + category },
+    { blockType: 'faq', pool: FAQ_VARIANT_BY_CATEGORY[category], salt: 'faq' + category },
+    { blockType: 'gallery', pool: GALLERY_VARIANT_BY_CATEGORY[category], salt: 'gallery' + category },
+    { blockType: 'pricing', pool: PRICING_VARIANT_BY_CATEGORY[category], salt: 'pricing' + category },
+    { blockType: 'service-cards', pool: SERVICE_CARDS_VARIANT_BY_CATEGORY[category], salt: 'service-cards' + category },
   ]
   for (const { blockType, pool, salt } of pools) {
     if (!pool || pool.length === 0) continue

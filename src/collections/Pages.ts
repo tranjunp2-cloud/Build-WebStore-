@@ -491,6 +491,19 @@ const PricingBlock = {
     slug: 'pricing',
     labels: { singular: 'Pricing Section', plural: 'Pricing Sections' },
     fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'cards',
+            options: [
+                { label: 'Cards', value: 'cards' },
+                { label: 'Table', value: 'table' },
+                { label: 'Horizontal', value: 'horizontal' },
+                { label: 'Toggle', value: 'toggle' },
+                { label: 'Tiered', value: 'tiered' },
+                { label: 'Comparison', value: 'comparison' },
+                { label: 'Minimal', value: 'minimal' },
+                { label: 'Slider', value: 'slider' },
+            ],
+        },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
@@ -520,6 +533,14 @@ const FAQBlock = {
     slug: 'faq',
     labels: { singular: 'FAQ Section', plural: 'FAQ Sections' },
     fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'accordion',
+            options: [
+                { label: 'Accordion', value: 'accordion' },
+                { label: 'Grid', value: 'grid' },
+                { label: 'Simple', value: 'simple' },
+            ],
+        },
         { name: 'headline', type: 'text', defaultValue: 'Frequently Asked Questions' },
         {
             name: 'faqs',
@@ -571,7 +592,8 @@ const CTABlock = {
             options: [
                 { label: 'Banner', value: 'banner' },
                 { label: 'Inline', value: 'inline' },
-                { label: 'Floating', value: 'floating' },
+                { label: 'Card', value: 'card' },
+                { label: 'Floating Sticky', value: 'floating-sticky' },
             ],
         },
         { name: 'headline', type: 'text' },
@@ -585,6 +607,8 @@ const CTABlock = {
                 { label: 'Outline', value: 'outline' },
             ],
         },
+        { name: 'secondaryCtaLabel', type: 'text' },
+        { name: 'secondaryCtaUrl', type: 'text' },
     ],
 }
 
