@@ -11,6 +11,9 @@ import {
     DiagonalStripe,
     LayeredShapes,
     TypographicMark,
+    GridLines,
+    MeshGradient,
+    DuotoneOverlay,
 } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
@@ -287,6 +290,161 @@ function TimelineEntry({ item, index }: { item: TimelineItem; index: number }) {
     )
 }
 
+// ── A5 (260417) — 4 new about variants for pool diversity ────────────────────
+
+/**
+ * two-column: editorial newspaper-like CSS columns layout for body. Best when
+ * body is long-form. A4 vocab: GridLines (architectural backdrop).
+ */
+function TwoColumnVariant({ block }: { block: AboutConfig }) {
+    const { headline, sectionLabel, body } = block
+    if (!headline && !body && !sectionLabel) return null
+    return (
+        <AboutSection narrow decorative={<GridLines color={CSS_VARS.primary} spacing={56} opacity={0.04} />}>
+            <div className="text-center mb-8">
+                {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
+                {headline && (
+                    <Heading level={2} className="mb-4" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                )}
+            </div>
+            {body && (
+                <div className="md:columns-2 md:gap-10 max-w-4xl mx-auto" style={{ color: CSS_VARS.muted }}>
+                    <Body size="lg" className="leading-relaxed">
+                        <RichText text={body} as="span" />
+                    </Body>
+                </div>
+            )}
+        </AboutSection>
+    )
+}
+
+/**
+ * founder-quote: body rendered as a pulled quote with large opening "; the
+ * sectionLabel becomes the attribution underneath. Personal/founder voice.
+ * A4 vocab: TypographicMark — giant quotation mark watermark.
+ */
+function FounderQuoteVariant({ block }: { block: AboutConfig }) {
+    const { headline, sectionLabel, body } = block
+    if (!body && !headline) return null
+    return (
+        <AboutSection narrow decorative={<TypographicMark text="“" color={CSS_VARS.primary} opacity={0.06} size="xl" />}>
+            <div className="text-center max-w-3xl mx-auto">
+                {headline && (
+                    <Heading level={2} className="mb-8" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                )}
+                {body && (
+                    <blockquote
+                        className="text-xl md:text-2xl italic leading-relaxed mb-6"
+                        style={{ color: CSS_VARS.text }}
+                    >
+                        <RichText text={body} as="span" />
+                    </blockquote>
+                )}
+                {sectionLabel && (
+                    <Caption className="opacity-70" style={{ color: CSS_VARS.muted }}>
+                        — {sectionLabel}
+                    </Caption>
+                )}
+            </div>
+        </AboutSection>
+    )
+}
+
+/**
+ * centered-large: oversized hero-like simple variant. Bigger sectionLabel,
+ * larger headline, more padding. Use when about is the page focal point.
+ * A4 vocab: MeshGradient (focal effect).
+ */
+function CenteredLargeVariant({ block }: { block: AboutConfig }) {
+    const { headline, sectionLabel, body } = block
+    if (!headline && !body && !sectionLabel) return null
+    return (
+        <AboutSection
+            narrow
+            className="!py-24 md:!py-32"
+            decorative={<MeshGradient color={CSS_VARS.primary} accentColor={CSS_VARS.secondary} opacity={0.25} />}
+        >
+            <div className="text-center max-w-3xl mx-auto">
+                {sectionLabel && (
+                    <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>
+                )}
+                {headline && (
+                    <Heading
+                        level={1}
+                        className="mb-8 text-4xl md:text-6xl font-bold leading-tight"
+                        style={{ fontFamily: CSS_VARS.fontHeading }}
+                    >
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                )}
+                {body && (
+                    <Body size="lg" className="leading-relaxed" style={{ color: CSS_VARS.muted }}>
+                        <RichText text={body} as="span" />
+                    </Body>
+                )}
+            </div>
+        </AboutSection>
+    )
+}
+
+/**
+ * image-overlay: full-bleed image (when provided) with text overlaid + tinted
+ * DuotoneOverlay for legibility. Falls back to centered-large when no image.
+ */
+function ImageOverlayVariant({ block, category }: { block: AboutConfig; category: string }) {
+    const { headline, sectionLabel, body } = block
+    const imageUrl = block.image?.url || getAboutImage(category)
+    if (!imageUrl) return <CenteredLargeVariant block={block} />
+    return (
+        <AnimatedSection
+            className="relative overflow-hidden"
+            style={{ color: '#ffffff', minHeight: 480 }}
+        >
+            <img
+                src={imageUrl}
+                alt={block.image?.alt || `About ${headline || 'us'}`}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading="lazy"
+            />
+            <DuotoneOverlay color1="#0a0a0a" color2={CSS_VARS.primary} opacity={0.65} blendMode="multiply" />
+            <SectionWrapper
+                as="div"
+                padding="relaxed"
+                container="default"
+                background="transparent"
+                innerClassName="relative z-10 text-center max-w-3xl"
+            >
+                {sectionLabel && (
+                    <p
+                        className="inline-block mb-4 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest"
+                        style={{ background: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)' }}
+                    >
+                        {sectionLabel}
+                    </p>
+                )}
+                {headline && (
+                    <Heading
+                        level={2}
+                        className="mb-6 text-3xl md:text-5xl font-bold leading-tight"
+                        style={{ color: '#ffffff', fontFamily: CSS_VARS.fontHeading }}
+                    >
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                )}
+                {body && (
+                    <Body size="lg" className="opacity-90 leading-relaxed" style={{ color: '#ffffff' }}>
+                        <RichText text={body} as="span" />
+                    </Body>
+                )}
+            </SectionWrapper>
+        </AnimatedSection>
+    )
+}
+
 export function AboutBlock({ block, site }: BlockProps<AboutConfig>) {
     const { variant = 'simple' } = block
     // Plan 260415 Lỗi 8A — category fallback chain: siteType → category → business
@@ -297,6 +455,14 @@ export function AboutBlock({ block, site }: BlockProps<AboutConfig>) {
             return <SplitVariant block={block} category={category} />
         case 'story':
             return <StoryVariant block={block} />
+        case 'two-column':
+            return <TwoColumnVariant block={block} />
+        case 'founder-quote':
+            return <FounderQuoteVariant block={block} />
+        case 'centered-large':
+            return <CenteredLargeVariant block={block} />
+        case 'image-overlay':
+            return <ImageOverlayVariant block={block} category={category} />
         case 'simple':
         default:
             return <SimpleVariant block={block} />
