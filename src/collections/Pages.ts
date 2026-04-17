@@ -1067,6 +1067,209 @@ const PortfolioGridBlock = {
     ],
 }
 
+// ── Industry-specific blocks (composer-driven, aiVisible=false) ─────────────
+// These 6 blocks were authored as React components but never registered in
+// Payload, so sanitizeBlocksForPayload was dropping them. Registering here
+// unblocks 5 WEAK categories (health, realestate, fitness, education, tech)
+// whose signature blocks were going to /dev/null.
+// Plan: plans/260417-0837-all-cate-full-and-strong/phase-01-hot-fixes.md (1.1)
+
+const DoctorProfileBlock = {
+    slug: 'doctor-profile',
+    labels: { singular: 'Doctor Profile', plural: 'Doctor Profiles' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'cards',
+            options: [
+                { label: 'Cards', value: 'cards' },
+                { label: 'Detailed', value: 'detailed' },
+                { label: 'List', value: 'list' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        {
+            name: 'doctors', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'specialisation', type: 'text' },
+                { name: 'qualifications', type: 'json' },
+                { name: 'photoUrl', type: 'text' },
+                { name: 'availableDays', type: 'json' },
+                { name: 'languages', type: 'text' },
+                { name: 'consultationFee', type: 'text' },
+                { name: 'bio', type: 'textarea' },
+            ],
+        },
+    ],
+}
+
+const PropertyCardBlock = {
+    slug: 'property-card',
+    labels: { singular: 'Property Card', plural: 'Property Cards' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'List', value: 'list' },
+                { label: 'Featured', value: 'featured' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'showMap', type: 'checkbox', defaultValue: false },
+        { name: 'currency', type: 'text', defaultValue: 'RM' },
+        {
+            name: 'properties', type: 'array',
+            fields: [
+                { name: 'title', type: 'text', required: true },
+                { name: 'price', type: 'number' },
+                { name: 'location', type: 'text' },
+                { name: 'bedrooms', type: 'number' },
+                { name: 'bathrooms', type: 'number' },
+                { name: 'area', type: 'number' },
+                { name: 'imageUrls', type: 'json' },
+                {
+                    name: 'type', type: 'select', defaultValue: 'sale',
+                    options: [
+                        { label: 'For Sale', value: 'sale' },
+                        { label: 'For Rent', value: 'rent' },
+                    ],
+                },
+                { name: 'status', type: 'text' },
+                { name: 'mapUrl', type: 'text' },
+                { name: 'description', type: 'textarea' },
+            ],
+        },
+    ],
+}
+
+const ClassScheduleBlock = {
+    slug: 'class-schedule',
+    labels: { singular: 'Class Schedule', plural: 'Class Schedules' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'List', value: 'list' },
+                { label: 'Cards', value: 'cards' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'showCapacity', type: 'checkbox', defaultValue: true },
+        { name: 'highlightToday', type: 'checkbox', defaultValue: true },
+        {
+            name: 'classes', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'instructor', type: 'text' },
+                { name: 'day', type: 'number', min: 0, max: 6 },
+                { name: 'startTime', type: 'text' },
+                { name: 'endTime', type: 'text' },
+                { name: 'capacity', type: 'number' },
+                { name: 'enrolled', type: 'number' },
+                { name: 'category', type: 'text' },
+                { name: 'level', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const VideoShowcaseBlock = {
+    slug: 'video-showcase',
+    labels: { singular: 'Video Showcase', plural: 'Video Showcases' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'Featured', value: 'featured' },
+                { label: 'Full-width', value: 'fullwidth' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'showCategories', type: 'checkbox', defaultValue: true },
+        { name: 'autoplay', type: 'checkbox', defaultValue: false },
+        {
+            name: 'videos', type: 'array',
+            fields: [
+                { name: 'title', type: 'text', required: true },
+                { name: 'thumbnailUrl', type: 'text' },
+                { name: 'videoUrl', type: 'text', required: true },
+                { name: 'category', type: 'text' },
+                { name: 'duration', type: 'text' },
+                { name: 'description', type: 'textarea' },
+            ],
+        },
+    ],
+}
+
+const ProductQuickViewBlock = {
+    slug: 'product-quick-view',
+    labels: { singular: 'Product Quick View', plural: 'Product Quick Views' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'Carousel', value: 'carousel' },
+                { label: 'Minimal', value: 'minimal' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'columns', type: 'number', defaultValue: 4 },
+        { name: 'showQuickView', type: 'checkbox', defaultValue: true },
+        { name: 'currency', type: 'text', defaultValue: 'RM' },
+        {
+            name: 'products', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'price', type: 'number' },
+                { name: 'originalPrice', type: 'number' },
+                { name: 'imageUrls', type: 'json' },
+                { name: 'description', type: 'textarea' },
+                { name: 'variants', type: 'json' },
+                { name: 'badge', type: 'text' },
+                { name: 'ctaLabel', type: 'text' },
+                { name: 'ctaUrl', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const FeatureComparisonBlock = {
+    slug: 'feature-comparison',
+    labels: { singular: 'Feature Comparison', plural: 'Feature Comparisons' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'table',
+            options: [
+                { label: 'Table', value: 'table' },
+                { label: 'Cards', value: 'cards' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        {
+            name: 'products', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'highlighted', type: 'checkbox', defaultValue: false },
+            ],
+        },
+        {
+            name: 'features', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'values', type: 'json' },
+            ],
+        },
+    ],
+}
+
 export const Pages: CollectionConfig = {
     slug: 'pages',
     hooks: {
@@ -1157,6 +1360,13 @@ export const Pages: CollectionConfig = {
                 ClientLogosBlock,
                 MenuFoodBlock,
                 PortfolioGridBlock,
+                // Industry-specific (composer-driven, aiVisible=false in block meta)
+                DoctorProfileBlock,
+                PropertyCardBlock,
+                ClassScheduleBlock,
+                VideoShowcaseBlock,
+                ProductQuickViewBlock,
+                FeatureComparisonBlock,
             ] as Block[],
         },
         {
