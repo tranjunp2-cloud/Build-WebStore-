@@ -511,11 +511,18 @@ export async function POST(req: NextRequest) {
                 },
             })
 
-            // Delete old pages for this site
+            // Delete old pages for this site. depth:0 keeps relationships as IDs
+            // and skips the massive join across every block table — we only need
+            // ids for the delete loop. (Without this, default depth=2 produced a
+            // ~40-way join that failed loudly when any block table lagged a
+            // migration — cf. faq/pricing "variant" fixes in 355fc7c1/73dc271b.)
             const oldPages = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: site.id } },
                 limit: 100,
+                depth: 0,
+                pagination: false,
+                select: { id: true },
             })
             for (const oldPage of oldPages.docs) {
                 await payload.delete({ collection: 'pages', id: oldPage.id })
@@ -877,6 +884,21 @@ export async function POST(req: NextRequest) {
         const errMsg = error instanceof Error ? error.message : String(error)
         const errStack = error instanceof Error ? error.stack : ''
 
+        // Drizzle wraps the real Postgres error (e.g. `column "variant" does not
+        // exist`) in a wrapper whose .message is just "Failed query: <sql>". The
+        // actionable detail lives on `.cause` (pg DatabaseError) with `code`,
+        // `detail`, `hint`, `table`, `column`, `position`. Without this, a
+        // missing-column migration produces an opaque 500 — see prior fixes for
+        // faq/pricing variant columns (commits 355fc7c1 / 73dc271b).
+        type PgErrLike = { code?: string; detail?: string; hint?: string; table?: string; column?: string; position?: string; message?: string }
+        const cause = (error as { cause?: unknown })?.cause
+        const pgErr: PgErrLike | null = cause && typeof cause === 'object' ? cause as PgErrLike : null
+        const causeMsg = pgErr?.message
+        const pgCode = pgErr?.code
+        const pgDetail = pgErr?.detail
+        const pgTable = pgErr?.table
+        const pgColumn = pgErr?.column
+
         // Plan 260415 fix-500 — structured error log with debugId + stage
         // context so Vercel log search can group failures + PM can cite a
         // support ID when users report "it broke". Stop leaking raw errMsg
@@ -884,7 +906,12 @@ export async function POST(req: NextRequest) {
         const debugId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
         console.error('[AI Generate Site Error]', JSON.stringify({
             debugId,
-            errMsg,
+            errMsg: errMsg.slice(0, 500),
+            causeMsg: causeMsg?.slice(0, 500),
+            pgCode,
+            pgDetail: pgDetail?.slice(0, 300),
+            pgTable,
+            pgColumn,
             pagesCreated: _createdPagesCount,
             siteId: _site?.id ?? null,
         }))

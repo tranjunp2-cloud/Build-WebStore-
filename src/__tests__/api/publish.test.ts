@@ -207,6 +207,60 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(body.error.code).toBe('NOT_FOUND')
     })
 
+    it('TC-F01-pub-09: promotes draft pages with depth:0 and draft:false so new pages go live after Update', async () => {
+        // Regression: new page stayed "draft" after user clicked Update because
+        // populated relationships (default depth=2) + unstripped version fields
+        // (_versionID, _currentVersionId) caused payload.update to silently
+        // drop the promotion for freshly-created draft pages.
+        const { getPayload } = await import('payload')
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: 'page-new', _status: 'draft', _versionID: 'v1', site: 'site-123', layout: [] },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        // find must use depth:0 so relationships come back as IDs, not populated objects
+        expect(findSpy).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'pages',
+            depth: 0,
+            draft: true,
+        }))
+
+        // update for each page must pass draft:false, strip version fields, and
+        // explicitly set _status:'published' (Payload 3.79 bug — update with
+        // draft:false doesn't flip _status on main row on its own)
+        const pageUpdate = updateSpy.mock.calls.find(c => c[0].collection === 'pages' && c[0].id === 'page-new')
+        expect(pageUpdate).toBeTruthy()
+        expect(pageUpdate![0].draft).toBe(false)
+        expect(pageUpdate![0].data._status).toBe('published')
+        expect(pageUpdate![0].data).not.toHaveProperty('_versionID')
+        expect(pageUpdate![0].data).not.toHaveProperty('_currentVersionId')
+    })
+
     it('TC-F01-pub-08: returns 429 when publish rate limit exceeded', async () => {
         // Arrange
         const resetAt = Date.now() + 60000
