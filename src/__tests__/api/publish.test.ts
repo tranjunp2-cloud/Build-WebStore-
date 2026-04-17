@@ -261,6 +261,91 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(pageUpdate![0].data).not.toHaveProperty('_currentVersionId')
     })
 
+    it('TC-F01-pub-12: strips block + nested array id/_uuid before promote so cross-page UUID collisions do not hit pg unique constraint', async () => {
+        // Regression (pages 790 + 793): AI generate-site seeded multiple pages
+        // with colliding block UUIDs. First page publishes OK, second page's
+        // promote hits live pages_blocks_*.id PK collision under a different
+        // _parent_id → PG error 23505 → wrapped into ValidationError
+        // {path:'id', message:'Value must be unique'}. Fix: drop block and
+        // nested-array row id + _uuid so column defaults (gen_random_uuid)
+        // regenerate safe UUIDs. Matches upstream Payload PR #11887.
+        const { getPayload } = await import('payload')
+
+        const draftPage = {
+            id: 'page-793',
+            _status: 'draft',
+            site: 'site-123',
+            title: 'Home',
+            layout: [
+                {
+                    id: 'block-uuid-shared-1', // <-- would collide with page-790's block
+                    _uuid: 'block-uuid-shared-1',
+                    blockType: 'hero',
+                    headline: 'Welcome',
+                    ctaButtons: [
+                        { id: 'cta-uuid-shared', _uuid: 'cta-uuid-shared', label: 'Go', url: '/' },
+                    ],
+                },
+                {
+                    id: 'block-uuid-shared-2',
+                    _uuid: 'block-uuid-shared-2',
+                    blockType: 'features',
+                    features: [
+                        { id: 'feat-uuid-shared', _uuid: 'feat-uuid-shared', title: 'Fast', description: 'Very' },
+                    ],
+                },
+            ],
+        }
+
+        const findSpy = vi.fn().mockResolvedValue({ docs: [draftPage], hasNextPage: false })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        const pageUpdateCall = updateSpy.mock.calls.find(c => c[0].collection === 'pages')
+        expect(pageUpdateCall).toBeTruthy()
+        const sentLayout = pageUpdateCall![0].data.layout as Array<Record<string, unknown>>
+
+        // Block rows stripped
+        expect(sentLayout).toHaveLength(2)
+        for (const block of sentLayout) {
+            expect(block).not.toHaveProperty('id')
+            expect(block).not.toHaveProperty('_uuid')
+            expect(block).toHaveProperty('blockType')
+        }
+
+        // Nested array rows (ctaButtons, features) stripped too
+        const hero = sentLayout.find(b => b.blockType === 'hero') as { ctaButtons: Array<Record<string, unknown>> }
+        expect(hero.ctaButtons[0]).not.toHaveProperty('id')
+        expect(hero.ctaButtons[0]).not.toHaveProperty('_uuid')
+        expect(hero.ctaButtons[0].label).toBe('Go')
+
+        const features = sentLayout.find(b => b.blockType === 'features') as { features: Array<Record<string, unknown>> }
+        expect(features.features[0]).not.toHaveProperty('id')
+        expect(features.features[0]).not.toHaveProperty('_uuid')
+        expect(features.features[0].title).toBe('Fast')
+    })
+
     it('TC-F01-pub-10: surfaces Payload ValidationError in failures[] so user can diagnose missing required fields', async () => {
         // Regression: page with an industry block (doctor-profile, property-card,
         // class-schedule, etc.) whose nested required array row was seeded empty

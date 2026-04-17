@@ -128,6 +128,41 @@ export async function PATCH(
                     // showing the Draft badge even though a published version
                     // exists in _pages_v.
                     data._status = 'published'
+
+                    // Drop block/array row `id` + `_uuid` before promote.
+                    //
+                    // Payload's live block tables (`pages_blocks_*`) use
+                    // varchar PK `id DEFAULT gen_random_uuid()`. When we pass
+                    // `data.layout` back with each block's existing `id`
+                    // baked in, Drizzle `upsertRow` INSERTs that exact value
+                    // into the live PK column (see node_modules/@payloadcms/
+                    // drizzle/dist/transform/write/blocks.js — `_uuid` rename
+                    // only kicks in on versioned tables where disableUnique
+                    // is true). Pre-insert, `blocksToDelete` only clears rows
+                    // under the current `_parent_id`, so a block UUID that
+                    // happens to exist under a different page's _parent_id
+                    // (common when AI generate-site seeds multiple pages
+                    // with colliding block UUIDs) triggers PG error 23505,
+                    // which Payload wraps as ValidationError{path:'id',
+                    // message:'Value must be unique'}. Stripping lets the
+                    // column default regenerate fresh UUIDs. Pattern matches
+                    // upstream Payload PR #11887 (copyToLocale).
+                    const stripArrayItemIds = (items: unknown): unknown => {
+                        if (!Array.isArray(items)) return items
+                        return items.map(item => {
+                            if (!item || typeof item !== 'object') return item
+                            const cleaned: Record<string, unknown> = {}
+                            for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
+                                if (k === 'id' || k === '_uuid') continue
+                                cleaned[k] = Array.isArray(v) ? stripArrayItemIds(v) : v
+                            }
+                            return cleaned
+                        })
+                    }
+                    if (Array.isArray(data.layout)) {
+                        data.layout = stripArrayItemIds(data.layout)
+                    }
+
                     await payload.update({
                         collection: 'pages',
                         id: pg.id,
