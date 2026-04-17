@@ -325,13 +325,16 @@ export async function generateSiteWithAI(
                     swapTelemetry.push(...swapResult.telemetry)
                 }
 
-                // Apply structure enforcer ONLY to homepage (other pages have own content requirements)
-                if (p === 0 && detectedCategory) {
-                    pageBlocks = enforceMinimumStructure(
-                        pageBlocks as Record<string, unknown>[],
-                        detectedCategory,
-                        enforcerCtx,
-                    ) as typeof pageBlocks
+                // Apply structure enforcer — full enforcement for homepage, item padding for sub-pages
+                if (detectedCategory) {
+                    if (p === 0) {
+                        pageBlocks = enforceMinimumStructure(
+                            pageBlocks as Record<string, unknown>[],
+                            detectedCategory,
+                            enforcerCtx,
+                        ) as typeof pageBlocks
+                    }
+                    // B5 fix: enforceMinItems + grid alignment on ALL pages (not just homepage)
                     pageBlocks = enforceMinItems(
                         pageBlocks as Record<string, unknown>[],
                         detectedCategory,

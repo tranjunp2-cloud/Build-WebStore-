@@ -552,9 +552,20 @@ export async function POST(req: NextRequest) {
             result.siteName,
         )
 
+        // B4 fix: detect duplicate hero blocks — take first, log warning
+        const heroBlocks = sanitizedBlocks.filter(b => b.blockType === 'hero')
+        if (heroBlocks.length > 1) {
+            console.warn(`[generate-site] ${heroBlocks.length} hero blocks detected — keeping first, removing ${heroBlocks.length - 1} duplicates`)
+            for (let i = sanitizedBlocks.length - 1; i >= 0; i--) {
+                if (sanitizedBlocks[i]!.blockType === 'hero' && sanitizedBlocks[i] !== heroBlocks[0]) {
+                    sanitizedBlocks.splice(i, 1)
+                }
+            }
+        }
+
         // Inject DALL-E generated Hero Image into the hero block (legacy path, flag-gated)
         if (ENABLE_DALLE_HERO && heroMedia) {
-            const heroBlock = sanitizedBlocks.find(b => b.blockType === 'hero')
+            const heroBlock = heroBlocks[0] ?? null
             if (heroBlock) {
                 // Attach the payload block's backgroundImage field to the uploaded media ID (for DB save)
                 heroBlock.backgroundImage = heroMedia.id
@@ -1037,8 +1048,13 @@ function buildGeneratedPages({
     }
 
     // Fallback: clone-based page generation for single-page AI response
+    // B4 fix: log if duplicate structural blocks found in fallback path
+    const heroCandidates = blocks.filter((block) => block.blockType === 'hero')
+    if (heroCandidates.length > 1) {
+        console.warn(`[buildGeneratedPages] fallback path: ${heroCandidates.length} hero blocks — using first`)
+    }
     const navigation = blocks.find((block) => block.blockType === 'navigation') || null
-    const hero = blocks.find((block) => block.blockType === 'hero') || null
+    const hero = heroCandidates[0] ?? null
     const about = blocks.find((block) => block.blockType === 'about') || null
     const features = blocks.find((block) => block.blockType === 'features') || null
     const testimonials = blocks.find((block) => block.blockType === 'testimonials') || null
