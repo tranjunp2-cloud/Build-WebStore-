@@ -468,7 +468,7 @@ describe('Gen Flow 500 Regression Tests', () => {
             const blocks = [
                 { blockType: 'hero', variant: 'centered', headline: 'Hi' },
                 { blockType: 'before-after', headline: 'Dropped' },
-                { blockType: 'doctor-profile', headline: 'Also dropped' },
+                { blockType: 'nonexistent-widget', headline: 'Also dropped' },
             ]
             const result = sanitizeBlocksForPayload(blocks)
             expect(result).toHaveLength(1)
