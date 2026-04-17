@@ -76,8 +76,8 @@ describe('[TC-S2-006] Testimonials Block Variants', () => {
     })
 
     describe('Meta', () => {
-        it('has exactly 8 variants', () => {
-            expect(testimonialsMeta.variants).toHaveLength(8)
+        it('has exactly 10 variants', () => {
+            expect(testimonialsMeta.variants).toHaveLength(10)
         })
 
         it('variants match schema enum', () => {
