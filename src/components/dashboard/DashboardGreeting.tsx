@@ -1,34 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useI18n } from '@/i18n'
 
-function getGreeting(): string {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 18) return 'Good afternoon'
-    return 'Good evening'
-}
-
-export function DashboardGreeting({ userName }: { userName: string }) {
-    const [greeting, setGreeting] = useState('Good morning')
-
-    useEffect(() => {
-        setGreeting(getGreeting())
-    }, [])
-
+export function DashboardGreeting() {
+    const { t } = useI18n()
     return (
-        <div>
-            <h1 className="text-2xl font-bold text-white">
-                {greeting}, {userName}! 👋
+        <div className="flex flex-col w-full m-0 p-0">
+            <h1 className="m-0 p-0 text-[30px] font-bold leading-[36px] text-[#F8FAFC]">
+                {t.dashboard.overview.welcomeTitle}
             </h1>
-            <p className="mt-1 text-sm text-gray-400">
-                {new Date().toLocaleDateString('vi-VN', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                })}
-            </p>
+            <div className="m-0 p-0 mt-[8px] text-[14px] leading-[1.42em] text-[#F8FAFC]/60 max-w-[330px] sm:max-w-none">
+                {t.dashboard.overview.welcomeSubtitle}
+            </div>
         </div>
     )
 }

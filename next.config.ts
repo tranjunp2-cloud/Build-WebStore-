@@ -9,16 +9,46 @@ if (typeof globalThis.File === 'undefined') {
 }
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
-  serverExternalPackages: ['undici'],
+  // standalone is required for Docker (DO) but breaks multipart form-data on Vercel.
+  // Vercel sets VERCEL=1 at build time — skip standalone for Vercel deployments.
+  ...(process.env.VERCEL ? {} : { output: 'standalone' as const }),
+  // ENABLE_HARNESS=1 includes `*.harness.tsx` files in the route table for the
+  // AI gen test harness (Phase 03). Default build excludes them — production /
+  // staging never sees the harness route. See plans/260414-0837-ai-gen-test-harness/.
+  pageExtensions:
+    process.env.ENABLE_HARNESS === '1'
+      ? ['tsx', 'ts', 'jsx', 'js', 'harness.tsx']
+      : ['tsx', 'ts', 'jsx', 'js'],
+  serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis'],
+  eslint: {
+    // CI runs lint separately — skip during build to save ~1 min
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // CI runs typecheck separately — skip during build to save ~30s
+    ignoreBuildErrors: true,
+  },
   experimental: {
     reactCompiler: false,
+  },
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
   },
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'http',
+        hostname: 'minio',
       },
     ],
   },

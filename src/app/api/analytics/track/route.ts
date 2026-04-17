@@ -3,6 +3,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { createHash } from 'crypto'
 
+import { analyticsTrackSchema } from '@/lib/validations/analytics'
+import { parseRequest } from '@/lib/validations/helpers'
+
 /**
  * POST /api/analytics/track
  * Public lightweight endpoint for tracking page views and events.
@@ -11,12 +14,10 @@ import { createHash } from 'crypto'
  */
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
-        const { siteId, event = 'pageview', pageUrl, referrer, sessionId, metadata } = body
-
-        if (!siteId || !pageUrl) {
-            return NextResponse.json({ success: false }, { status: 422 })
-        }
+        const { data, errorResponse } = await parseRequest(request, analyticsTrackSchema)
+        if (errorResponse) return errorResponse
+        
+        const { siteId, event = 'pageview', pageUrl, referrer, sessionId, metadata } = data!
 
         const payload = await getPayload({ config })
 
@@ -38,8 +39,8 @@ export async function POST(request: NextRequest) {
         await payload.create({
             collection: 'analytics',
             data: {
-                tenant: tenantId,
-                site: siteId,
+                tenant: Number(tenantId),
+                site: Number(siteId),
                 event,
                 pageUrl,
                 referrer: referrer || '',

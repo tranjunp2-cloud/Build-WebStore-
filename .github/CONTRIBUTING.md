@@ -1,59 +1,202 @@
-# Đóng góp & Rule chung — Nguồn sự thật duy nhất
+# Đóng góp & Rule chung
 
-> **Mọi môi trường** (Cursor, Antigravity, CI, dev local, bất kỳ IDE/tool nào) **bắt buộc dùng chung** rule trong thư mục **`.github`**. Không tạo rule riêng theo từng nơi (vd. file guide riêng cho Cursor, rule riêng cho Antigravity). Một chuẩn, mọi nơi tuân theo.
-
----
-
-## 1. Rule nằm ở đâu
-
-| Nội dung | File / vị trí |
-|----------|----------------|
-| **Git, PR, CI/CD, conflict** | [.github/GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) |
-| **Mô tả PR (template)** | [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) — khi tạo/sửa PR **bắt buộc** dùng đúng template này |
-| **Product, BMAD, 9-Point, API, data model** | [SPEC.md](../SPEC.md) (root) |
-| **Cursor:** tuân theo .github + dùng template khi tạo PR | [.cursor/rules/github.mdc](../.cursor/rules/github.mdc) |
-
-Cập nhật rule → chỉ sửa trong `.github` (và SPEC.md cho product). Các file trong `docs/` chỉ tham chiếu hoặc mở rộng chi tiết, **không** là nguồn sự thật cho Git/PR.
+> **Một chuẩn, mọi nơi tuân theo.**
 
 ---
 
-## 2. Ai phải theo
+## 1. Git Rules
 
-- **Dev** (local, bất kỳ editor nào): branch, commit, PR theo [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) và [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
-- **Cursor / Antigravity / AI assistant**: đọc rule từ `.github` và SPEC.md; không tạo thêm file “guide” hoặc “standardization” riêng cho từng môi trường.
-- **CI/CD**: pipeline chạy theo branch/commit/PR đã định nghĩa trong [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md).
+### Branch Naming
+
+Mỗi branch = **1 User Story hoặc 1 task nhỏ**. KHÔNG tạo branch cha cho cả Feature.
+
+```
+feat/F01-01-generate-site     # US-F01-01: 1 story = 1 branch = 1 PR
+feat/F01-02-store-setup       # US-F01-02: story tiếp theo
+feat/F08-03-bulk-create       # US-F08-03: Products bulk create
+fix/F01-builder-crash         # Bug fix cho F01
+chore/deps-upgrade            # Cleanup, CI, docs (bot skip check issue)
+```
+
+### Commit Convention
+```
+feat(F01): add AI template selection
+fix(F01): handle null response in builder
+chore: upgrade Next.js to 15.1
+```
+
+### PR Rules
+- PR **luôn vào `staging`** — KHÔNG vào `main`
+- Title: `type(scope): mô tả` (Conventional Commits)
+- Điền đủ [PR Template](pull_request_template.md)
+- CI phải xanh (lint + typecheck + test + build) mới merge
+- **⚠️ Link issue:** Bot tự thêm `Relates to #<số>`. KHÔNG dùng `Closes #N`.
+
+### Link PR → Issue (bot tự làm!)
+
+Story-sync tự tạo issues từ `docs/stories/`. Bot sẽ **tự động link** PR → Issue:
+
+**Cách nhanh nhất (zero effort):** Đặt PR title có story ID:
+```
+feat(F01): [US-F01-03] AI template selection
+→ Bot tự tìm issue #59 → tự sửa PR body: Relates to #59
+```
+
+**Nếu bot không match được:** Bot comment gợi ý danh sách issues → dev chọn 1 → edit PR.
+
+**Keywords:** Dùng `Relates to #N` (⚠️ KHÔNG dùng `Closes #N`):
+```
+Relates to #123     ← Đúng: issue chờ QC test trước khi close
+Closes #123         ← SAI: issue tự close, skip QA gate
+```
+
+**Tại sao KHÔNG dùng Closes?**
+- Issue phải qua QA Testing trước khi Done
+- QC test xong mới close issue → milestone % chính xác
+- Nếu QC fail → issue trả về dev fix (không cần reopen)
+
+### Issue Status Flow
+
+> **Chi tiết đầy đủ + sơ đồ visual:** xem [GIT_AND_CI_RULES.md §4.4](GIT_AND_CI_RULES.md#44-issue-lifecycle--quy-trình-chi-tiết-từ-tạo-đến-done)
+
+```
+Backlog → Review (UIUX+BA) → In Progress → Code Review → QA Testing → Done
+              ↑                                              │
+              │                  ↑                           │
+              │                  └──── qa:failed ────────────┘
+              └── review:rejected
+```
+
+### Branch Flow — Merge thẳng staging
+```
+feat/F01-01-generate-site ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+feat/F01-02-store-setup   ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+feat/F08-01-product-crud  ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+                                                                              ↓
+                                              Tất cả pass → PR staging → main (release v1.0)
+```
+
+**KHÔNG dùng feature branch cha.** Mỗi US merge thẳng staging → QA test ngay → feedback nhanh.
 
 ---
 
-## 2.1 Áp dụng theo từng môi trường (IDE / tool)
+## 2. Hướng dẫn theo Role
 
-| Môi trường | Cách áp dụng | Ghi chú |
-|------------|--------------|--------|
-| **Cursor** | Tự động qua [.cursor/rules/github.mdc](../.cursor/rules/github.mdc) (alwaysApply). Khi tạo PR, Cursor đọc [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) và điền theo template. | Có cơ chế rule built-in → **chắc chắn** áp dụng nếu rule file tồn tại. |
-| **Antigravity / VS Code / JetBrains / IDE khác** | **Convention + process:** dev (và AI trong IDE đó) phải đọc `.github` và làm theo. Nếu IDE có cơ chế "rule" hoặc "instruction", cần **cấu hình trỏ đến** `.github/CONTRIBUTING.md` và `.github/GIT_AND_CI_RULES.md`. | Không có chuẩn chung như Cursor rules → **không đảm bảo** tự chạy đúng trừ khi team cấu hình tương đương hoặc tuân thủ thủ công. |
-| **CI/CD (GitHub Actions, v.v.)** | Pipeline đọc branch/commit/PR; rule trong [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md). Có thể thêm job check PR description có đủ section (Story, Changes, Checklist, Test Steps) nếu cần. | Chạy đúng nếu workflow được viết theo đúng rule. |
+### PM
+1. Tạo issue từ `docs/stories/` hoặc thủ công
+2. Issue tự vào **Backlog**
+3. Assign UIUX + BA để review spec/design
+4. Theo dõi milestone progress
 
-**Kết luận:** Rule **một nguồn** trong `.github` là chuẩn cho mọi bên. **Cursor** áp dụng tự động nhờ `.cursor/rules/github.mdc`. **Các IDE khác** cần process (đọc .github) hoặc config riêng của IDE đó trỏ về .github thì mới "chạy đúng" tương đương.
+### UIUX Designer
+1. Check issues ở **Backlog** được assign
+2. Làm design → attach figma/wireframe vào issue
+3. Khi xong → thêm label `status:ready`
+4. Nếu spec chưa rõ → thêm label `review:rejected` + comment lý do
+
+### BA
+1. Check issues ở **Backlog** được assign
+2. Verify requirements, acceptance criteria
+3. Khi xong → thêm label `status:ready`
+4. Nếu spec sai → thêm label `review:rejected` + comment lý do
+
+### Dev
+1. Pick issues ở **In Progress** (đã có label `status:ready`)
+2. Tạo branch từ staging: `feat/F01-01-generate-site` (1 US = 1 branch)
+3. Code → commit → push
+4. Tạo PR vào **staging**: title `feat(F01): [US-F01-01] generate site` → bot auto-link
+5. CI pass + reviewer approve → merge → staging auto-deploy
+6. Nếu QC gắn `qa:failed` → check comment QC → tạo branch fix mới → PR mới vào staging
+
+### QC (Quality Control)
+1. Check issues ở **QA Testing** (có label `qa:pending`)
+2. Test trên staging theo acceptance criteria trong issue
+3. **Pass:** Close issue → status tự chuyển Done
+4. **Fail:** Thêm label `qa:failed` + comment chi tiết lỗi
+   - Hoặc tạo bug issue mới từ template "Bug Report (QA)"
+5. Remove label `qa:pending`, thêm `qa:passed` hoặc `qa:failed`
+
+### Reviewer
+1. Check PRs được assign
+2. Review code theo checklist (§2 bên dưới)
+3. Approve → bot tự gắn `approved` + `ready-to-merge` (nếu CI pass)
+4. Changes requested → author fix → re-review
 
 ---
 
-## 3. Quy trình build tính năng (tóm tắt)
+## 3. PR Review Checklist
 
-- **Trước khi code:** Đọc SPEC.md (user stories, API, data model); đảm bảo Readiness Gate 4/4 (SPEC §2.3) nếu có.
-- **Khi implement:** 6-Layer (SPEC §15), soft delete, multi-tenant, 3 states (loading/error/empty), form Zod + RHF.
-- **Trước PR:** 9-Point Done (SPEC §13), lint/typecheck/test pass, PR description điền đủ [template](.github/PULL_REQUEST_TEMPLATE.md).
-- **Deploy / local:** Chỉ dùng Docker (theo rule repo); không hướng dẫn `npm run dev` trực tiếp cho người khác nếu đã quy định Docker.
+### Bắt buộc (không đạt = không merge)
+- [ ] CI pass (Lint, Typecheck, Test, Build)
+- [ ] Branch up-to-date với staging
+- [ ] PR description đầy đủ template
+- [ ] Title theo Conventional Commits
+- [ ] Issue đã linked (`Relates to #N`)
 
-Chi tiết product/UX/security: xem **SPEC.md**.
-
----
-
-## 4. Không tạo file rule trùng / lệch chuẩn
-
-- **Không** tạo file kiểu: `docs/PR_DESCRIPTION_xxx.md` (mô tả PR one-off), `docs/CURSOR_GUIDE_*.md`, `docs/ANTIGRAVITY_RULES.md`, v.v. cho từng môi trường.
-- Mô tả PR: dùng [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) và điền trực tiếp khi tạo/sửa PR trên GitHub.
-- Rule chung: chỉ trong `.github` (và SPEC.md). Mọi bên tham chiếu về đây.
+### Nên kiểm tra
+- [ ] Logic đúng với mô tả PR
+- [ ] API/schema thay đổi có ghi trong PR
+- [ ] Không có secret/credential trong diff
+- [ ] Có test cho code mới
 
 ---
 
-**Tóm tắt:** Rule chung của Git, PR, CI và quy trình đóng góp nằm trong **`.github`**. Cursor, Antigravity và mọi bên đều dùng chung một bộ rule này.
+## 4. Trước khi Push
+
+```bash
+npm run lint          # ESLint
+npm run typecheck     # TypeScript errors
+npm run test          # Unit tests
+npm run build         # Build check
+```
+
+**Tất cả phải pass** trước khi tạo PR.
+
+---
+
+## 5. CI Pipeline
+
+```
+Push/PR → Lint → Typecheck → Test → Build → ✅ Merge allowed
+                                              ❌ Fix trước
+```
+
+Chi tiết: [.github/workflows/ci.yml](workflows/ci.yml)
+
+---
+
+## 6. Deploy Flow
+
+| Branch | Deploy tới | Tự động? |
+|--------|-----------|:---:|
+| `staging` | Staging server | ✅ Auto |
+| `main` | Production | 🔐 Manual approve |
+
+Chi tiết: [DEPLOY.md](DEPLOY.md)
+
+---
+
+## 7. Quy tắc code
+
+- **TypeScript:** Zero `any` — `tsc --noEmit` pass
+- **Mobile First:** UI build ở 375px trước
+- **SEO:** Storefront pages phải có meta title, description, JSON-LD
+- **Bilingual:** AI content BM + EN
+- **9-Point Checklist:** Loading state, Empty state, Error state, Form validation, Button states, Toast feedback, Auth redirect, Mobile 375px, TypeScript clean
+
+Chi tiết: [SPEC.md](../SPEC.md) §13
+
+---
+
+## 8. Labels Reference
+
+| Label | Ý nghĩa | Ai dùng |
+|-------|---------|---------|
+| `status:ready` | UIUX+BA approved → dev pick | UIUX/BA |
+| `review:rejected` | Spec reject → trả về PM | UIUX/BA |
+| `qa:pending` | Chờ QC test (auto khi PR merge) | Bot |
+| `qa:passed` | QC test pass | QC |
+| `qa:failed` | QC test fail → trả về dev | QC |
+| `ready-to-merge` | PR approved + CI pass | Bot |
+| `approved` | PR đã approve | Bot |
+| `wave:X` | Thuộc Wave nào | Bot |

@@ -1,120 +1,109 @@
+import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import { Suspense } from 'react'
-import Link from 'next/link'
-import { Plus, Sparkles } from 'lucide-react'
+import { OverviewSkeleton, AnalyticsSkeleton, SEOSkeleton } from '@/components/dashboard/DashboardSkeleton'
+import { OverviewView } from '@/components/dashboard/views/OverviewView'
+import { AnalyticsView } from '@/components/dashboard/views/AnalyticsView'
+import { SEOView } from '@/components/dashboard/views/SEOView'
+import { DashboardTabs } from '@/components/dashboard/DashboardTabs'
+import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
+import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
+import { DashboardTabContent, TabPanel } from '@/components/dashboard/DashboardTabContent'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getCurrentTenantId } from '@/lib/auth'
 
-import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
-import { formatRelativeTime, formatStorage } from '@/lib/utils'
-import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
-import { DashboardStats } from '@/components/dashboard/DashboardStats'
-import { DashboardSiteGrid } from '@/components/dashboard/DashboardSiteGrid'
-import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
-import { DashboardBanner } from '@/components/dashboard/DashboardBanner'
-import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
+export async function generateMetadata(): Promise<Metadata> {
+    const cookieStore = await cookies()
+    const locale = cookieStore.get('prefer_lang')?.value ?? 'en'
+    const isMs = locale === 'ms'
+    return {
+        title: isMs ? 'Papan Pemuka | PrimeWeb' : 'Dashboard | PrimeWeb',
+        description: isMs
+            ? 'Pantau prestasi kedai anda dan urus perniagaan dalam talian.'
+            : 'Monitor your store performance and manage your online business.',
+    }
+}
 
-// ─── Dashboard Page (Server Component — Real Data) ─────────────────────
-export default async function DashboardPage() {
-    const user = await getCurrentUser()
+export const dynamic = 'force-dynamic'
+interface Props {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export default async function DashboardRoot({ searchParams }: Props) {
+    const resolvedParams = await searchParams
+    const rawTab = typeof resolvedParams.tab === 'string' ? resolvedParams.tab : 'overview'
+
+    // We fetch preferences here so we can pass it down to modal safely
+    let dashboardPreferences: string[] | undefined = undefined
+    let hasUsableSites = false
     const tenantId = await getCurrentTenantId()
-    const payload = await getPayload({ config })
-
-    // Get real user name
-    const userName = (user as any)?.firstName || (user as any)?.email?.split('@')[0] || 'User'
-
-    // Fetch real sites from DB
-    let sites: Array<{ id: string; name: string; slug: string; isPublished: boolean; updatedAt: string }> = []
-    let totalSites = 0
-
     if (tenantId) {
-        const sitesResult = await payload.find({
+        const payload = await getPayload({ config })
+        const tenantResult = await payload.findByID({ collection: 'tenants', id: tenantId })
+        dashboardPreferences = (tenantResult as { settings?: { dashboardPreferences?: string[] } })?.settings?.dashboardPreferences
+
+        const usableSiteCount = await payload.count({
             collection: 'sites',
-            where: { tenant: { equals: tenantId } },
-            sort: '-updatedAt',
-            limit: 20,
+            where: {
+                and: [
+                    { tenant: { equals: tenantId } },
+                    {
+                        or: [
+                            { generationStatus: { equals: 'completed' } },
+                            { generationStatus: { equals: 'none' } },
+                            { generationStatus: { equals: null } },
+                            { generationStatus: { exists: false } },
+                        ],
+                    },
+                ],
+            },
         })
-        totalSites = sitesResult.totalDocs
-        sites = sitesResult.docs.map((doc: any) => ({
-            id: doc.id,
-            name: doc.name || 'Untitled Site',
-            slug: doc.domain || doc.id,
-            isPublished: doc.status === 'published',
-            updatedAt: doc.updatedAt ? formatRelativeTime(doc.updatedAt) : 'Just created',
-        }))
+        hasUsableSites = usableSiteCount.totalDocs > 0
     }
 
-    // Fetch real tenant data for stats
-    let storageUsed = 0
-    let storageLimit = 500 // MB default
-    if (tenantId) {
-        try {
-            const tenant = await payload.findByID({ collection: 'tenants', id: tenantId })
-            storageUsed = (tenant as any)?.settings?.storageUsed || 0
-            storageLimit = ((tenant as any)?.settings?.storageLimitBytes || 524288000) / (1024 * 1024) // bytes → MB
-        } catch {
-            // tenant not found — use defaults
-        }
-    }
-
-    const publishedCount = sites.filter((s) => s.isPublished).length
-
-    const stats = {
-        totalSites,
-        storageUsed: Math.round((storageUsed / (1024 * 1024)) * 10) / 10, // bytes → MB
-        storageLimit: Math.round(storageLimit),
-        publishedCount,
-    }
-
-    const hasSites = sites.length > 0
-    const unpublishedSite = sites.find((s) => !s.isPublished)
+    // Force overview tab when no usable sites — prevents empty analytics/seo views via direct URL
+    const tab = hasUsableSites ? rawTab : 'overview'
 
     return (
-        <Suspense fallback={<DashboardSkeleton />}>
-            <div className="space-y-8">
-                {/* Header: Greeting + Create CTA */}
-                <div className="flex items-center justify-between">
-                    <DashboardGreeting userName={userName} />
-                    <Link
-                        href="/onboarding"
-                        className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 transition-all hover:scale-105"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Create New Website
-                        <Sparkles className="h-3.5 w-3.5" />
-                    </Link>
-                </div>
+        <div className="space-y-6">
+            <DashboardTabContent defaultTab={tab}>
+                {/* Universal Page Header / Toolbar — hidden when no usable sites */}
+                {hasUsableSites && (
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <DashboardTabs />
 
-                {/* Unpublished Banner */}
-                {unpublishedSite && (
-                    <DashboardBanner
-                        siteId={unpublishedSite.id}
-                        siteName={unpublishedSite.name}
-                    />
+                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            <PeriodSelector />
+                            <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                        </div>
+                    </div>
                 )}
 
-                {hasSites ? (
+                {/* Render all tabs — TabPanel hides inactive via CSS for instant switching.
+                   Note: PeriodSelector still uses router.push() which re-renders all tabs.
+                   This is an accepted tradeoff — period changes are rare (1-2x/session)
+                   while tab switches are frequent and must be instant. */}
+                <TabPanel tabId="overview">
+                    <Suspense fallback={<OverviewSkeleton />}>
+                        <OverviewView searchParams={searchParams} />
+                    </Suspense>
+                </TabPanel>
+                {hasUsableSites && (
                     <>
-                        {/* Stats Cards */}
-                        <DashboardStats {...stats} />
-
-                        {/* Site Grid */}
-                        <DashboardSiteGrid sites={sites} />
+                        <TabPanel tabId="analytics">
+                            <Suspense fallback={<AnalyticsSkeleton />}>
+                                <AnalyticsView searchParams={searchParams} />
+                            </Suspense>
+                        </TabPanel>
+                        <TabPanel tabId="seo">
+                            <Suspense fallback={<SEOSkeleton />}>
+                                <SEOView />
+                            </Suspense>
+                        </TabPanel>
                     </>
-                ) : (
-                    /* Empty State */
-                    <DashboardEmptyState />
                 )}
-
-                {/* Mobile Create Button */}
-                <div className="fixed bottom-6 right-6 sm:hidden">
-                    <Link
-                        href="/onboarding"
-                        className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/25 hover:scale-110 transition-all"
-                    >
-                        <Plus className="h-6 w-6 text-white" />
-                    </Link>
-                </div>
-            </div>
-        </Suspense>
+            </DashboardTabContent>
+        </div>
     )
 }

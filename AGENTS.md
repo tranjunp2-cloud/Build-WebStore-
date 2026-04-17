@@ -1,169 +1,151 @@
-# ECH Webstore v2 — Copilot Agent Instructions
+# AGENTS.md — Review Guidelines for AI Code Review (Codex)
 
-> Đây là hướng dẫn cho GitHub Copilot Coding Agent và Code Review.
-> Agent phải đọc và tuân theo toàn bộ instructions này trước khi làm bất kỳ task nào.
+> This file tells AI code review bots (OpenAI Codex, CodeRabbit, etc.)
+> what to check when reviewing PRs in this repo.
 
----
+## Project Context
 
-## 📌 Source of Truth
+- **Stack:** Next.js 15 + Payload CMS 3 + PostgreSQL + TypeScript
+- **Deploy:** Vercel Pro + Neon PostgreSQL (migrated from DO)
+- **Git flow:** Merge thẳng staging. 1 US = 1 branch = 1 PR vào staging.
 
-- `SPEC.md` ở root repo = nguồn sự thật duy nhất
-- Đọc theo thứ tự: **§6 (Story AC) → §8 (API) → §9 (Schema) → §10 (UX Rules)**
-- Nếu SPEC.md chưa có thông tin → comment vào Issue để hỏi BA/SA, KHÔNG tự assume
+## Review Rules (P0 — always flag)
 
----
+### 1. Database Schema Changes
 
-## 🏗️ Tech Stack
+If PR modifies any file in `src/collections/*.ts` (adding/removing fields):
 
-```
-Frontend:  Next.js 14 App Router · Tailwind CSS · shadcn/ui · Zustand · TanStack Query · React Hook Form + Zod
-Backend:   NestJS 10 · PostgreSQL · Prisma ORM · Redis · BullMQ
-AI:        Anthropic Claude claude-sonnet-4-20250514 (SSE streaming) · Ideogram v2 (images)
-Infra:     Vercel (FE) · Railway (BE) · Cloudflare CDN · Sentry · PostHog
-```
+- **MUST** have matching migration in `scripts/db-setup.js`
+- Array fields (`type: 'array'`) need `CREATE TABLE IF NOT EXISTS` with:
+  - `id varchar` (UUID) — NOT serial
+  - `_order integer`, `_parent_id integer`, `_uuid varchar`
+- Group fields (`type: 'group'`) need `ALTER TABLE ADD COLUMN IF NOT EXISTS {group}_{field}`
+- New collections need slug added to `COLLECTION_SLUGS[]` in `db-setup.js`
+- **NEVER** use `DROP TABLE` in migrations
 
----
+### 2. Environment Variables
 
-## ✅ 9-Point Done Checklist — MANDATORY trước mỗi PR
+If PR adds new `process.env.SOMETHING`:
 
-Agent PHẢI verify đủ 9 điểm. Nếu không pass → fix trước khi tạo PR.
+- Must exist in `.env.staging.example` AND `.env.production.example`
+- Must NOT contain real secret values — only placeholders
 
-```
-☐ 1. LOADING STATE    — Skeleton placeholder (không dùng spinner đơn lẻ cho data)
-☐ 2. EMPTY STATE      — Icon + title + description + CTA button (không blank screen)
-☐ 3. ERROR STATE      — Toast đỏ + nút Thử lại / Retry (không silent fail)
-☐ 4. FORM VALIDATION  — Zod inline dưới field (không alert popup)
-☐ 5. BUTTON STATES    — disabled + spinner khi loading (không double submit)
-☐ 6. TOAST FEEDBACK   — Mọi action create/update/delete đều có toast
-☐ 7. AUTH REDIRECT    — 401 response → /login?returnUrl=[current-path]
-☐ 8. MOBILE 375px     — Layout không vỡ trên iPhone SE
-☐ 9. TYPESCRIPT CLEAN — Zero `any`, zero unused imports, `tsc --noEmit` pass
-```
+### 3. Issue Linking
 
----
+- PR description must have `Relates to #N` — NOT `Closes #N`
+- Using `Closes` auto-closes issue on merge, skipping QA gate
 
-## 🔒 Data Rules — KHÔNG được vi phạm
+### 4. Security
 
-```
-SOFT DELETE ONLY:
-  ✅ await prisma.[model].update({ where: { id }, data: { deletedAt: new Date() } })
-  ❌ await prisma.[model].delete({ where: { id } })
+- No hardcoded secrets, API keys, or passwords in code
+- No `console.log` with sensitive data
+- Input validation for all API endpoints
+- Auth/authorization checks on protected routes
 
-MULTI-TENANT — mọi query PHẢI có tenant filter:
-  ✅ prisma.product.findMany({ where: { storeId, deletedAt: null } })
-  ❌ prisma.product.findMany({ where: { id } })   // thiếu storeId
+### 5. TypeScript
 
-API RESPONSE FORMAT — mọi endpoint phải follow:
-  Success: { success: true, data: {...}, meta: { timestamp } }
-  Error:   { success: false, error: { code, message, details, requestId } }
-```
+- No `any` type unless absolutely necessary with comment explaining why
+- Explicit error handling — no empty catch blocks
+- Prefer `async/await` over `.then()` chains
 
----
+### 6. Acceptance Criteria Validation
 
-## 💻 Code Patterns
+If PR links to an issue (`Relates to #N`):
 
-### Frontend
-```typescript
-// ✅ Data fetching — LUÔN dùng TanStack Query
-const { data, isLoading, isError } = useQuery({ queryKey: [...], queryFn: ... })
+- **Read the linked issue** — it contains User Story and Acceptance Criteria (AC)
+- **Verify code changes address ALL AC items** listed in the issue
+- **Flag if any AC item is NOT covered** by the code changes
+- AC format is Gherkin (GIVEN/WHEN/THEN) — check each scenario is implemented
+- If issue has multiple AC sections (AC-1, AC-2, etc.), verify each one
 
-// ❌ KHÔNG fetch() trực tiếp trong component
-const data = await fetch('/api/...')   // WRONG
+### 7. PR Quality
 
-// ✅ Form — LUÔN React Hook Form + Zod
-const form = useForm<T>({ resolver: zodResolver(schema) })
+- PR title must follow Conventional Commits: `type(scope): description`
+- PR should have story ID in title: `feat(F01): [US-F01-01] description`
+- PR should not mix unrelated changes — 1 PR = 1 feature/fix
+- If PR is too large (>500 lines), suggest splitting
 
-// ✅ Image — LUÔN Next.js Image
-import Image from 'next/image'
-<Image src={url} alt={alt} width={400} height={400} />
-// ❌ KHÔNG dùng <img> tag
-```
+## Review Rules (P1 — flag when relevant)
 
-### Backend
-```typescript
-// ✅ NestJS module structure
-src/modules/[feature]/
-  ├── [feature].controller.ts   // HTTP layer only — no business logic
-  ├── [feature].service.ts      // Business logic
-  ├── [feature].repository.ts  // Prisma queries
-  ├── dto/create-[feature].dto.ts
-  └── [feature].module.ts
+### 8. Email
 
-// ✅ Error throwing — luôn có machine-readable code
-throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND', message: '...' })
-throw new HttpException({ code: 'AI_RATE_LIMIT', message: '...' }, 429)
-```
+- `sendEmail()` utility uses Payload SMTP (AWS SES) — do NOT add Resend/other providers
+- Email calls must use `.catch()` pattern (fire-and-forget, non-blocking)
 
----
+### 9. Vercel Deployment
 
-## 🤖 AI Features Rules
+- All pages using `getPayload()` must have `export const dynamic = 'force-dynamic'`
+- Payload `pushDevSchema` does NOT work reliably — always use SQL migrations
+- API routes must have `maxDuration <= 60` (Vercel Pro limit)
+- DB migrations via `scripts/db-setup.js --migrate-only` (runs in Vercel build step)
 
-```
-Rate limits (check bằng Redis TRƯỚC khi call AI):
-  Store generation:    3x / ngày / storeId
-  Product description: 20x / ngày / storeId
-  Image generation:   10x / giờ / storeId
-  Chat messages:     100x / ngày / storeId
+### 10. Performance
 
-AI model: claude-sonnet-4-20250514  (LUÔN dùng model này, không thay đổi)
-Streaming: SSE — không block main thread
-Error handling: Catch Anthropic 429/500 → throw user-friendly error → toast
-```
+- Check for N+1 queries in API routes
+- Check bundle size impact for new frontend dependencies
+- Images should use Next.js `<Image>` component
 
----
+### 11. Testing — E2E Required for New Features
 
-## 🗺️ Navigation Rules
+**P1 — Flag if missing:**
+- PR adds new **page/route** (`src/app/**/page.tsx` or `src/app/api/**/route.ts`) → **MUST** have E2E test in `tests/*.spec.ts`
+- PR fixes **user-reported bug** → **SHOULD** have E2E test reproducing the bug
+- PR only changes **CSS/refactor/docs** → no test needed
 
-```
-Register success    → auto-login → /onboarding         (KHÔNG /login)
-Onboarding done     → /builder/new                     (KHÔNG /dashboard)
-Delete action       → confirm modal → soft delete → undo toast 5s
-401 response        → redirect /login?returnUrl=[path]
-403 response        → toast "Không có quyền" hoặc /403 page
-```
+**What to check:**
+- If `git diff --name-only` has new files in `src/app/` but NO new/modified files in `tests/` → flag: "⚠️ New route/page added without E2E test"
+- E2E tests must test real browser flow (Playwright), NOT mocked unit tests
+- Unit tests (Vitest) only needed for **pure functions** (utils, helpers)
 
----
+**Do NOT flag:**
+- Unit test coverage drops (existing unit tests are smoke tests with mocks)
+- Missing unit tests for API routes (E2E covers this better)
 
-## 🚫 Anti-patterns — KHÔNG được dùng
+**Test file locations:**
+- E2E: `tests/*.spec.ts` (Playwright, browser-based)
+- Unit: `src/__tests__/**` (Vitest, mock-based — existing only, don't require new)
 
-```
-❌ fetch('/api/...')           → ✅ useQuery / useMutation (TanStack Query)
-❌ : any                       → ✅ Explicit type hoặc Prisma generated type
-❌ prisma.[model].delete()     → ✅ update({ data: { deletedAt: new Date() } })
-❌ Query không có storeId      → ✅ Luôn include tenant filter
-❌ Logic trong component       → ✅ Extract ra custom hook
-❌ <img> tag                   → ✅ Next.js <Image>
-❌ Inline style=""             → ✅ Tailwind classes
-❌ Missing loading state       → ✅ <Skeleton> component
-❌ Button không disable khi loading → ✅ disabled={isPending}
-```
+### 13. Test Generation (when generating tests)
 
----
+- Read `docs/TEST_CONVENTION.md` first — follow all patterns
+- Map tests to TC-IDs from `docs/qa/F{XX}.md` — only test `[x] AUTO` flagged cases
+- Import from source code — NEVER re-implement logic in test files
+- Follow AAA pattern (Arrange, Act, Assert)
+- `vi.mock()` at top of file only
+- Copy patterns from gold standard files:
+  - `src/__tests__/unit/otp/otp-generate.test.ts` (pure function)
+  - `src/__tests__/unit/builder/builder-store.test.ts` (store)
+  - `src/__tests__/unit/localization/f21-localization.test.tsx` (component)
 
-## 🧪 Test Requirements
+### 12. Payload CMS Patterns
 
-```
-Unit tests (Jest):     > 70% coverage cho service layer
-E2E tests (Playwright): Critical paths bắt buộc — auth flow, AI generation, checkout
-Load test (k6):        AI endpoints + checkout — 500 concurrent users
+- Collections must use `slug` in snake_case (e.g., `blog_categories`)
+- Hooks (`afterChange`, `beforeChange`) must not throw — use try/catch
+- Access control functions must check tenant isolation
+- Relationship fields need proper `relationTo` pointing to correct collection slug
 
-Trước khi tạo PR:
-  npm run type-check   # phải PASS
-  npm run test         # phải GREEN
-  npm run lint         # phải CLEAN
-```
+## Review Behavior
 
----
+### When to APPROVE
+- Code follows all P0 rules
+- AC items from linked issue are covered
+- No security concerns
 
-## 📋 Khi nhận Issue từ Copilot Coding Agent
+### When to REQUEST CHANGES
+- Any P0 rule violated
+- AC items missing from implementation
+- Security vulnerability found
+- Missing DB migration for schema change
 
-1. Đọc SPEC.md §6 tìm User Story tương ứng — verify AC (Acceptance Criteria)
-2. Check API contract trong §8 — nếu chưa có → comment hỏi trước khi code
-3. Implement đủ 6 layers: UX → API → Data → Security → Ops → Business
-4. Verify 9-Point Done Checklist
-5. Tạo PR với description: Story ID + gì đã làm + gì đã test
-6. Tag BA để demo sign-off trước khi merge
+### Review Format
+- Keep comments concise and actionable
+- Include code suggestions when possible
+- Group related issues together
 
----
+## Do NOT flag
 
-*ECH Malaysia · Webstore v2 · SPEC.md-driven development*
+- Styling preferences (Tailwind class order, etc.)
+- Minor formatting differences
+- Import order (handled by ESLint)
+- Documentation typos in comments
+- Variable naming style (camelCase is project standard)

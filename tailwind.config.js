@@ -3,13 +3,33 @@ module.exports = {
     content: [
         './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
         './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-        './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+        // Exclude (payload) admin to avoid @layer conflicts with Payload CSS
+        './src/app/(auth)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(builder)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(dashboard)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(editor)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(frontend)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(preview)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/sites/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/templates/**/*.{js,ts,jsx,tsx,mdx}',
     ],
     theme: {
         extend: {
             fontFamily: {
-                sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-                heading: ['var(--font-outfit)', 'system-ui', 'sans-serif'],
+                // Theme-aware chain — MUST use nested var() fallbacks, not a
+                // flat comma list. Reason: when --font-body/heading is unset
+                // (dashboard, auth, builder, editor — anywhere generateThemeCSS
+                // does NOT run), a flat `var(--font-body), var(--font-inter)`
+                // substitutes to an empty leading token, making the whole
+                // font-family declaration invalid-at-computed-value-time, so
+                // the browser reverts to the UA default (serif).
+                //   1. --font-body/heading — populated by generateThemeCSS()
+                //      per site, references the chosen pairing's next/font var
+                //   2. --font-inter/outfit — always loaded in AppShell.tsx,
+                //      safe fallback when no theme CSS present (admin routes)
+                //   3. System fallback
+                sans: ['var(--font-body, var(--font-inter))', 'system-ui', 'sans-serif'],
+                heading: ['var(--font-heading, var(--font-outfit))', 'system-ui', 'sans-serif'],
             },
             colors: {
                 brand: {
@@ -46,6 +66,7 @@ module.exports = {
                 'slide-up': 'slideUp 0.4s ease-out',
                 'scale-in': 'scaleIn 0.3s ease-out',
                 'shimmer': 'shimmer 2s linear infinite',
+                'slide-in-right': 'slideInRight 0.3s ease-out',
             },
             keyframes: {
                 fadeIn: {
@@ -64,6 +85,10 @@ module.exports = {
                     '0%': { backgroundPosition: '-200% 0' },
                     '100%': { backgroundPosition: '200% 0' },
                 },
+                slideInRight: {
+                    '0%': { transform: 'translateX(24px)', opacity: '0' },
+                    '100%': { transform: 'translateX(0)', opacity: '1' },
+                },
             },
             backgroundImage: {
                 'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -75,6 +100,11 @@ module.exports = {
                 'glow-accent': '0 0 24px rgba(217, 70, 239, 0.3)',
             },
         },
+    },
+    // Disable Preflight — its CSS reset overrides Payload admin styles
+    // (globals.css has custom resets in @layer base instead)
+    corePlugins: {
+        preflight: false,
     },
     plugins: [
         require('@tailwindcss/typography'),

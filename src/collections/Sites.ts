@@ -13,27 +13,30 @@ export const Sites: CollectionConfig = {
         read: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         // Users can update their own tenant's sites
         update: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         // Users can delete their own tenant's sites
         delete: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
     },
@@ -69,17 +72,48 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'generationStatus',
+            type: 'select',
+            defaultValue: 'none',
+            admin: {
+                position: 'sidebar',
+                readOnly: true,
+                description: 'Tracks AI site generation state (system-managed)',
+            },
+            options: [
+                { label: 'None', value: 'none' },
+                { label: 'Generating', value: 'generating' },
+                { label: 'Completed', value: 'completed' },
+                { label: 'Failed', value: 'failed' },
+            ],
+        },
+        {
             name: 'siteType',
             type: 'select',
             required: true,
             defaultValue: 'business',
             options: [
-                { label: 'Business / Landing Page', value: 'business' },
-                { label: 'Online Store (E-commerce)', value: 'ecommerce' },
-                { label: 'Blog', value: 'blog' },
-                { label: 'Portfolio', value: 'portfolio' },
-                { label: 'Restaurant', value: 'restaurant' },
+                { label: '🏢 Business / Corporate', value: 'business' },
+                { label: '🛍️ Online Store (E-commerce)', value: 'ecommerce' },
+                { label: '🍽️ Restaurant / Cafe / F&B', value: 'restaurant' },
+                { label: '💻 Tech / IT / SaaS', value: 'tech' },
+                { label: '🏥 Health / Dental / Clinic', value: 'health' },
+                { label: '📚 Education / Training', value: 'education' },
+                { label: '🏠 Real Estate / Property', value: 'realestate' },
+                { label: '💪 Gym / Fitness / Yoga', value: 'fitness' },
+                { label: '🎨 Portfolio / Freelancer / Agency', value: 'creative' },
+                { label: '💄 Beauty / Spa / Wellness', value: 'beauty' },
+                { label: '✍️ Blog', value: 'blog' },
             ],
+        },
+        {
+            name: 'locale',
+            type: 'select',
+            options: [
+                { label: 'Bahasa Melayu', value: 'ms' },
+                { label: 'English', value: 'en' },
+            ],
+            defaultValue: 'ms',
         },
         {
             name: 'theme',
@@ -148,6 +182,43 @@ export const Sites: CollectionConfig = {
                         { label: 'Dark', value: 'dark' },
                     ],
                 },
+                {
+                    name: 'accentColor',
+                    type: 'text',
+                },
+                {
+                    name: 'surfaceColor',
+                    type: 'text',
+                },
+                {
+                    name: 'textColor',
+                    type: 'text',
+                },
+                {
+                    name: 'mutedColor',
+                    type: 'text',
+                },
+                {
+                    name: 'spacingPreset',
+                    type: 'select',
+                    defaultValue: 'default',
+                    options: [
+                        { label: 'Compact', value: 'compact' },
+                        { label: 'Default', value: 'default' },
+                        { label: 'Relaxed', value: 'relaxed' },
+                    ],
+                },
+                {
+                    name: 'shadowPreset',
+                    type: 'select',
+                    defaultValue: 'subtle',
+                    options: [
+                        { label: 'None', value: 'none' },
+                        { label: 'Subtle', value: 'subtle' },
+                        { label: 'Medium', value: 'medium' },
+                        { label: 'Dramatic', value: 'dramatic' },
+                    ],
+                },
             ],
         },
         {
@@ -178,6 +249,24 @@ export const Sites: CollectionConfig = {
                     name: 'googleVerificationToken',
                     type: 'text',
                 },
+                {
+                    name: 'autoMetaEnabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Automatically generate SEO meta tags when publishing pages/products' },
+                },
+                {
+                    name: 'trackedKeywords',
+                    type: 'array',
+                    maxRows: 5,
+                    admin: { description: 'Track up to 5 core keywords for SEO ranking' },
+                    fields: [
+                        { name: 'keyword', type: 'text', required: true },
+                        { name: 'currentRank', type: 'number' },
+                        { name: 'previousRank', type: 'number' },
+                        { name: 'lastCheckedAt', type: 'date' },
+                    ],
+                },
             ],
         },
         {
@@ -190,6 +279,23 @@ export const Sites: CollectionConfig = {
                 { name: 'linkedin', type: 'text' },
                 { name: 'youtube', type: 'text' },
                 { name: 'tiktok', type: 'text' },
+            ],
+        },
+        {
+            name: 'branding',
+            type: 'group',
+            fields: [
+                { name: 'logo', type: 'text' },
+                { name: 'favicon', type: 'text' },
+            ],
+        },
+        {
+            name: 'contactInfo',
+            type: 'group',
+            fields: [
+                { name: 'phone', type: 'text' },
+                { name: 'email', type: 'text' },
+                { name: 'address', type: 'textarea' },
             ],
         },
         {
@@ -219,6 +325,41 @@ export const Sites: CollectionConfig = {
             name: 'publishedAt',
             type: 'date',
             admin: { readOnly: true },
+        },
+        {
+            name: 'shippingConfig',
+            type: 'group',
+            label: 'Shipping Configuration',
+            admin: { description: 'Shipping rates for Malaysia regions' },
+            fields: [
+                {
+                    name: 'westRate',
+                    type: 'number',
+                    defaultValue: 800,
+                    admin: { description: 'Semenanjung rate in sen (800 = RM 8)' },
+                },
+                {
+                    name: 'eastRate',
+                    type: 'number',
+                    defaultValue: 1500,
+                    admin: { description: 'Sabah/Sarawak rate in sen (1500 = RM 15)' },
+                },
+                {
+                    name: 'freeAbove',
+                    type: 'number',
+                    admin: { description: 'Free shipping above X sen (null = no free shipping)' },
+                },
+            ],
+        },
+        {
+            name: 'headerBlock',
+            type: 'json',
+            admin: { description: 'Global header/navigation block for all pages' },
+        },
+        {
+            name: 'footerBlock',
+            type: 'json',
+            admin: { description: 'Global footer block for all pages' },
         },
     ],
     timestamps: true,

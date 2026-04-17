@@ -1,0 +1,41 @@
+'use client'
+
+import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
+import { useTabContext } from './DashboardTabContent'
+
+export function DashboardTabs() {
+    const { t } = useI18n()
+    const { activeTab, setActiveTab } = useTabContext()
+
+    const TABS = [
+        { id: 'overview' as const, label: `📊 ${t.dashboard.overview.tabs.overview}` },
+        { id: 'analytics' as const, label: `📈 ${t.dashboard.overview.tabs.analytics}` },
+        { id: 'seo' as const, label: `🔍 ${t.dashboard.overview.tabs.seo}` },
+    ]
+
+    return (
+        <div className="w-full sm:w-auto">
+            <div className="flex w-full sm:inline-flex gap-1 rounded-[8px] bg-[#1F2937] p-1 h-[49px]">
+                {TABS.map((tab) => {
+                    const isActive = activeTab === tab.id
+
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={cn(
+                                "flex flex-1 sm:flex-none items-center justify-center sm:justify-start px-[14px] py-[8px] text-[13px] font-semibold rounded-[6px] transition-all h-full whitespace-nowrap",
+                                isActive
+                                    ? "bg-[#161E2E] text-[#3B82F6] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.5)] ring-1 ring-white/5"
+                                    : "text-[#9CA3AF] hover:text-[#E5E7EB] hover:bg-white/5"
+                            )}
+                        >
+                            <span className="leading-[1.69em]">{tab.label}</span>
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}
