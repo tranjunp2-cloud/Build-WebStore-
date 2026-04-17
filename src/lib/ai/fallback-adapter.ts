@@ -174,7 +174,12 @@ export function adaptTemplateSeedToGenerationResult(
  * phone/email/address/products flow into composer block builders instead of
  * being dropped. Legacy `extractedName` signature preserved via optional param.
  */
-export function composeFallbackResult(
+/**
+ * Plan 260417-0837 item 1.2 — primary template-first gen path. Old name
+ * `composeFallbackResult` stays as deprecated alias for tests + legacy
+ * call sites. New code should import `composeTemplateResult`.
+ */
+export function composeTemplateResult(
     prompt: string,
     seed: number,
     language: Language = 'en',
@@ -219,6 +224,12 @@ export function composeFallbackResult(
     // Phase 06 — the consistency check runs ONE level up in
     // `generateWithFallback` (see openai-generator.ts) so it can push
     // `consistency_warning` SSE events into the gen event stream.
-    // `composeFallbackResult` stays pure / side-effect-free for tests.
+    // `composeTemplateResult` stays pure / side-effect-free for tests.
     return adaptTemplateSeedToGenerationResult(templateSeed, biz, category, language)
 }
+
+/**
+ * @deprecated Renamed to `composeTemplateResult` (Plan 260417-0837 item 1.2).
+ * Kept as alias for test + legacy callers. Remove after all sites migrate.
+ */
+export const composeFallbackResult = composeTemplateResult
