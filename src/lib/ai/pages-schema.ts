@@ -25,6 +25,9 @@ export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
     'social-proof', 'portfolio-grid', 'google-maps', 'accordion',
     'countdown-timer', 'custom-html', 'blog-list',
     'breadcrumb', 'client-logos',
+    // Industry blocks (Plan 260417-0837 Phase 1.1)
+    'doctor-profile', 'property-card', 'class-schedule',
+    'video-showcase', 'product-quick-view', 'feature-comparison',
 ])
 
 /**
@@ -52,6 +55,13 @@ export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fal
     socialWidget: { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
     cartWidget:   { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
     pricing: null, faq: null,
+    // Industry blocks (Plan 260417-0837 Phase 1.1)
+    'doctor-profile': { field: 'variant', values: ['cards', 'detailed', 'list'], fallback: 'cards' },
+    'property-card': { field: 'variant', values: ['grid', 'list', 'featured'], fallback: 'grid' },
+    'class-schedule': { field: 'variant', values: ['grid', 'list', 'cards'], fallback: 'grid' },
+    'video-showcase': { field: 'variant', values: ['grid', 'featured', 'fullwidth'], fallback: 'grid' },
+    'product-quick-view': { field: 'variant', values: ['grid', 'carousel', 'minimal'], fallback: 'grid' },
+    'feature-comparison': { field: 'variant', values: ['table', 'cards'], fallback: 'table' },
 }
 
 /** Map blueprint variant names → Pages.ts valid values. */
@@ -115,6 +125,13 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     'blog-list': ['variant', 'headline', 'subheadline', 'limit'],
     breadcrumb: ['variant', 'items'],
     'client-logos': ['variant', 'headline', 'logos'],
+    // Industry blocks (Plan 260417-0837 Phase 1.1)
+    'doctor-profile': ['variant', 'headline', 'subheadline', 'doctors'],
+    'property-card': ['variant', 'headline', 'subheadline', 'showMap', 'currency', 'properties'],
+    'class-schedule': ['variant', 'headline', 'showCapacity', 'highlightToday', 'classes'],
+    'video-showcase': ['variant', 'headline', 'subheadline', 'showCategories', 'autoplay', 'videos'],
+    'product-quick-view': ['variant', 'headline', 'subheadline', 'columns', 'showQuickView', 'currency', 'products'],
+    'feature-comparison': ['variant', 'headline', 'products', 'features'],
 }
 
 const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
@@ -137,6 +154,8 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
         'features', 'testimonials', 'faqs', 'items', 'images', 'plans',
         'members', 'columns', 'links', 'services', 'stats', 'formFields',
         'ctaButtons', 'logos', 'projects',
+        // Industry blocks (Plan 260417-0837 Phase 1.1)
+        'doctors', 'properties', 'classes', 'videos', 'products',
     ] as const
 
     for (const field of ARRAY_FIELDS) {
