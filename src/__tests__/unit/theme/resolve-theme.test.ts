@@ -78,14 +78,15 @@ describe('[TC-S1-006] resolveTheme() backward compat — v1 site (light mode)', 
 })
 
 // ── TC-S1-007: resolveTheme() with completely empty input ───────────────────
+// Plan 260417 Wave 1 A2 — fallback changed from dark cyan/magenta to light slate.
 describe('[TC-S1-007] resolveTheme() with completely empty input', () => {
-    it('returns complete ThemeConfig with all defaults, no undefined/NaN', () => {
+    it('returns complete ThemeConfig with all light-neutral defaults, no undefined/NaN', () => {
         // Act
         const result = resolveTheme({})
 
-        // Assert — all fields present and valid
-        expect(result.primaryColor).toBe('#0ea5e9')
-        expect(result.secondaryColor).toBe('#d946ef')
+        // Assert — fallback is light slate (A2 fix), not dark cyan/magenta
+        expect(result.primaryColor).toBe('#111827')
+        expect(result.secondaryColor).toBe('#374151')
         expect(result.accentColor).toBeTruthy()
         expect(result.surfaceColor).toBeTruthy()
         expect(result.textColor).toBeTruthy()
@@ -95,7 +96,7 @@ describe('[TC-S1-007] resolveTheme() with completely empty input', () => {
         expect(result.spacingPreset).toBe('default')
         expect(result.borderRadius).toBe('rounded')
         expect(result.shadowPreset).toBe('subtle')
-        expect(result.colorMode).toBe('dark')
+        expect(result.colorMode).toBe('light')
         expect(result.backgroundColor).toBeTruthy()
 
         // No undefined or NaN
