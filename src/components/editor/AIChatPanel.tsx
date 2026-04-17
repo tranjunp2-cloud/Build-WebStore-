@@ -70,26 +70,39 @@ function AIChatPanelInner({
 
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
-    const [messages, setMessages] = useState<ChatMessage[]>(() => {
-        if (typeof window !== 'undefined' && chatStorageKey) {
+    // MIN-5: SSR-safe initial state — deterministic welcome without createdAt.
+    // Cache + timestamp hydrate in the useEffect below after mount.
+    const [messages, setMessages] = useState<ChatMessage[]>([{
+        id: 'welcome',
+        role: 'assistant',
+        content: ac.welcomeMessage,
+    }])
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    // MIN-5: hydrate from sessionStorage after mount to avoid SSR/CSR divergence.
+    useEffect(() => {
+        if (chatStorageKey) {
             const saved = sessionStorage.getItem(chatStorageKey)
             if (saved) {
                 try {
-                    return JSON.parse(saved) as ChatMessage[]
+                    const parsed = JSON.parse(saved) as ChatMessage[]
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setMessages(parsed)
+                        return
+                    }
                 } catch (err) {
                     if (process.env.NODE_ENV === 'development') console.error('[AIChatPanel] invalid cache', err)
                     sessionStorage.removeItem(chatStorageKey)
                 }
             }
         }
-        return [{
-            id: 'welcome',
-            role: 'assistant',
-            content: ac.welcomeMessage,
-            createdAt: formatChatTime(),
-        }]
-    })
-    const messagesEndRef = useRef<HTMLDivElement>(null)
+        setMessages(prev =>
+            prev.length === 1 && prev[0].id === 'welcome' && !prev[0].createdAt
+                ? [{ ...prev[0], createdAt: formatChatTime() }]
+                : prev,
+        )
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chatStorageKey])
 
     // BUG-F05-13: Save messages to sessionStorage on change
     useEffect(() => {

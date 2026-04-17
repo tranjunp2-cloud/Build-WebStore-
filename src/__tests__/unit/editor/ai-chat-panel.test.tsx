@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 
 // ── Mocks ────────────────────────────────────────────────────────────────
@@ -208,6 +209,42 @@ describe('AIChatPanel', () => {
         await waitFor(() => {
             expect(screen.getByText('Translated all sections to Vietnamese.')).toBeInTheDocument()
         })
+    })
+
+    // ── Hydration (MIN-5) ────────────────────────────────────────────────
+
+    it('TC-F05-HYDRATION-01 — server render produces welcome-only HTML (SSR-safe)', () => {
+        // Simulate SSR — renderToString never runs useEffect, so output reflects
+        // only what useState's initializer produced. Cache must not leak in.
+        sessionStorage.setItem('editor-chat-test-site', JSON.stringify([
+            { id: 'old', role: 'user', content: 'cached prompt', createdAt: '08:00 AM' },
+        ]))
+
+        const html = renderToString(<AIChatPanel {...defaultProps} siteId="test-site" />)
+
+        expect(html).toContain('Hello!')
+        expect(html).not.toContain('cached prompt')
+        // Welcome must not carry createdAt in initial render (non-deterministic
+        // time would break hydration). formatChatTime output contains ' AM'/' PM'
+        // on en-US; assert absence.
+        const welcomeSegment = html.split('Hello!')[1]?.slice(0, 200) ?? ''
+        expect(welcomeSegment).not.toMatch(/\b\d{1,2}:\d{2}\s?(AM|PM)\b/i)
+
+        sessionStorage.clear()
+    })
+
+    it('TC-F05-HYDRATION-02 — hydrates from sessionStorage after mount', async () => {
+        sessionStorage.setItem('editor-chat-test-site', JSON.stringify([
+            { id: 'old', role: 'user', content: 'cached prompt', createdAt: '08:00 AM' },
+        ]))
+
+        render(<AIChatPanel {...defaultProps} siteId="test-site" />)
+
+        await waitFor(() => {
+            expect(screen.getByText('cached prompt')).toBeInTheDocument()
+        })
+
+        sessionStorage.clear()
     })
 
     it('prompts chip auto-fills input and submits', async () => {
