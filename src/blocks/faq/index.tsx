@@ -11,6 +11,13 @@ import { Heading, Body } from '../shared/Typography'
 import { CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 
+const FALLBACK_FAQ_ITEMS: FAQConfig['items'] = [
+    { question: 'What services do you offer?', answer: 'We provide a wide range of professional services tailored to your needs.' },
+    { question: 'How can I get started?', answer: 'Simply contact us through our website or give us a call to schedule a consultation.' },
+    { question: 'What are your business hours?', answer: 'We are open Monday to Saturday, 9 AM to 6 PM.' },
+    { question: 'Do you offer free consultations?', answer: 'Yes, we offer a complimentary initial consultation for all new clients.' },
+]
+
 /**
  * Plan 260415 Lỗi G + Decision 4 — FAQ answer accept cả `string` (legacy) và
  * `JSONContent` Lexical (new). Runtime check render đúng type, không cần SQL
@@ -228,7 +235,8 @@ export function FAQBlock({ block }: BlockProps<FAQConfig>) {
     const { headline, subheadline, variant = 'accordion' } = block
     // Payload schema uses 'faqs', frontend config uses 'items' — accept both
     const rawFaqs = (block as Record<string, unknown>).faqs
-    const items = (Array.isArray(rawFaqs) ? rawFaqs as FAQItem[] : null) ?? block.items ?? []
+    const resolvedItems = (Array.isArray(rawFaqs) ? rawFaqs as FAQItem[] : null) ?? block.items ?? []
+    const items = resolvedItems.length > 0 ? resolvedItems : FALLBACK_FAQ_ITEMS
     /* Plan 260415 Lỗi I — allowMultiple từ block config (schema đã add) */
     const allowMultiple = block.allowMultiple || false
     /* Plan 260415 Lỗi K — aria-labelledby cho section */

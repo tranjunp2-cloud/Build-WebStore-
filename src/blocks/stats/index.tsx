@@ -11,6 +11,12 @@ import { Heading, Body, Caption } from '../shared/Typography'
 import { CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 
+const FALLBACK_STATS: StatsConfig['stats'] = [
+    { value: '500+', label: 'Happy Customers' },
+    { value: '10+', label: 'Years Experience' },
+    { value: '4.9', label: 'Average Rating', suffix: '★' },
+]
+
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 
 type StatsSectionProps = {
@@ -230,7 +236,8 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
 }
 
 export function StatsBlock({ block }: BlockProps<StatsConfig>) {
-    const { headline, stats = [], variant = 'row' } = block
+    const { headline, stats: rawStats = [], variant = 'row' } = block
+    const stats = rawStats.length > 0 ? rawStats : FALLBACK_STATS
 
     /* Plan 260415 Lỗi C — empty state dev warn */
     if (!stats.length) {

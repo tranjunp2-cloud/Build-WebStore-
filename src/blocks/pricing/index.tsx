@@ -12,17 +12,18 @@ import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 
+const FALLBACK_PLANS: PricingConfig['plans'] = [
+    { name: 'Starter', price: 'RM 99', period: 'mo', features: [{ text: 'Core features', included: true }, { text: 'Email support', included: true }], ctaLabel: 'Get Started', ctaUrl: '/contact' },
+    { name: 'Pro', price: 'RM 299', period: 'mo', features: [{ text: 'All Starter features', included: true }, { text: 'Priority support', included: true }, { text: 'Advanced tools', included: true }], ctaLabel: 'Choose Pro', ctaUrl: '/contact', highlighted: true },
+    { name: 'Enterprise', price: 'Custom', features: [{ text: 'All Pro features', included: true }, { text: 'Dedicated manager', included: true }], ctaLabel: 'Contact Sales', ctaUrl: '/contact' },
+]
+
 void _StaggerGrid
 void _StaggerItem
 void _HoverCard
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
-// Brand identity vars preserved per Option C additive strategy.
 
-// Plan 260415 Lỗi A (P1 SILENT) — dynamic `md:grid-cols-${n}` không được
-// Tailwind JIT scan → class không sinh ra → cards/toggle/tiered variants kẹt
-// 1 cột desktop. Fix bằng object map với class literal để JIT detect.
-// Clamp max 4 để grid rộng không overflow.
 const GRID_COLS_MD: Record<number, string> = {
     1: 'md:grid-cols-1',
     2: 'md:grid-cols-2',
@@ -40,11 +41,6 @@ type PricingSectionProps = {
     children: ReactNode
 }
 
-/**
- * Outer wrapper used by 7/8 variants. AnimatedSection + GradientBlob +
- * SectionWrapper container. Cards (default) variant skips the blob historically —
- * keep that by passing showBlob={false}.
- */
 function PricingSection({ showBlob = true, children }: PricingSectionProps) {
     return (
         <AnimatedSection className="relative overflow-hidden">
@@ -130,7 +126,8 @@ function FeatureList({ features, className = 'space-y-3' }: FeatureListProps) {
 }
 
 export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
-    const { headline, subheadline, plans = [], variant = 'cards' } = block
+    const { headline, subheadline, plans: rawPlans = [], variant = 'cards' } = block
+    const plans = rawPlans.length > 0 ? rawPlans : FALLBACK_PLANS
 
     // ── horizontal variant ────────────────────────────────────────────────
     if (variant === 'horizontal') {
