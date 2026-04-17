@@ -945,9 +945,14 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
     },
 }
 
-/** Variants confirmed broken (no implementation or renders wrong) — NEVER select these */
+/** Variants confirmed broken (no implementation or renders wrong) — NEVER select these.
+ * Plan 260417 Wave 1 A3 — testimonials 'grid' and 'single' are in Zod enum but
+ * have no switch case in blocks/testimonials/index.tsx, so they fall through to
+ * the 'cards' default variant silently. Filter them out of AI variant picking.
+ */
 const BROKEN_VARIANTS: Record<string, string[]> = {
-    hero: ['animated-gradient'],  // No implementation — falls back to centered silently
+    hero: ['animated-gradient'],
+    testimonials: ['grid', 'single'],
 }
 
 // VARIANT_MIN_CONTENT + enforceMinContent moved to ./variant-validation to break
