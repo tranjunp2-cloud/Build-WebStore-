@@ -1,8 +1,15 @@
 import type { BlockProps } from '../types'
 import type { StatsConfig } from './config'
 
+const FALLBACK_STATS: StatsConfig['stats'] = [
+    { value: '500+', label: 'Happy Customers' },
+    { value: '10+', label: 'Years Experience' },
+    { value: '4.9', label: 'Average Rating', suffix: '★' },
+]
+
 export function StatsBlock({ block, theme }: BlockProps<StatsConfig>) {
-    const { headline, stats = [] } = block
+    const { headline, stats: rawStats = [] } = block
+    const stats = rawStats.length > 0 ? rawStats : FALLBACK_STATS
     return (
         <section className="py-20">
             <div className="container mx-auto px-6">

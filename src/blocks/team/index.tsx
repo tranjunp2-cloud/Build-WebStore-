@@ -1,8 +1,15 @@
 import type { BlockProps } from '../types'
 import type { TeamConfig } from './config'
 
+const FALLBACK_MEMBERS: TeamConfig['members'] = [
+    { name: 'Team Lead', role: 'Founder' },
+    { name: 'Senior Specialist', role: 'Expert' },
+    { name: 'Customer Success', role: 'Support' },
+]
+
 export function TeamBlock({ block, theme }: BlockProps<TeamConfig>) {
-    const { headline, subheadline, members = [] } = block
+    const { headline, subheadline, members: rawMembers = [] } = block
+    const members = rawMembers.length > 0 ? rawMembers : FALLBACK_MEMBERS
     return (
         <section className="py-24">
             <div className="container mx-auto px-6">

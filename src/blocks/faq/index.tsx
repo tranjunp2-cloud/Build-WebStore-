@@ -4,8 +4,16 @@ import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { FAQConfig } from './config'
 
+const FALLBACK_FAQ_ITEMS: FAQConfig['items'] = [
+    { question: 'What services do you offer?', answer: 'We provide a wide range of professional services tailored to your needs.' },
+    { question: 'How can I get started?', answer: 'Simply contact us through our website or give us a call to schedule a consultation.' },
+    { question: 'What are your business hours?', answer: 'We are open Monday to Saturday, 9 AM to 6 PM.' },
+    { question: 'Do you offer free consultations?', answer: 'Yes, we offer a complimentary initial consultation for all new clients.' },
+]
+
 export function FAQBlock({ block, theme }: BlockProps<FAQConfig>) {
-    const { headline, subheadline, items = [], variant = 'accordion' } = block
+    const { headline, subheadline, items: rawItems = [], variant = 'accordion' } = block
+    const items = rawItems.length > 0 ? rawItems : FALLBACK_FAQ_ITEMS
     const [openIndex, setOpenIndex] = useState<number | null>(null)
 
     if (variant === 'grid') {

@@ -1,8 +1,15 @@
 import type { BlockProps } from '../types'
 import type { PricingConfig } from './config'
 
+const FALLBACK_PLANS: PricingConfig['plans'] = [
+    { name: 'Starter', price: 'RM 99', period: 'mo', features: ['Core features', 'Email support'], ctaLabel: 'Get Started', ctaUrl: '/contact' },
+    { name: 'Pro', price: 'RM 299', period: 'mo', features: ['All Starter features', 'Priority support', 'Advanced tools'], ctaLabel: 'Choose Pro', ctaUrl: '/contact', highlighted: true },
+    { name: 'Enterprise', price: 'Custom', features: ['All Pro features', 'Dedicated manager'], ctaLabel: 'Contact Sales', ctaUrl: '/contact' },
+]
+
 export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
-    const { headline, subheadline, plans = [] } = block
+    const { headline, subheadline, plans: rawPlans = [] } = block
+    const plans = rawPlans.length > 0 ? rawPlans : FALLBACK_PLANS
     return (
         <section className="py-24">
             <div className="container mx-auto px-6">
