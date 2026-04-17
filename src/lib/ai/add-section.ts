@@ -1,6 +1,7 @@
 import type { BlockData, ThemeData } from '@/types/editor'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { getGalleryImages, getTeamAvatar } from '@/lib/images/industry-images'
+import { dedupSectionLabel } from './dedup-section-label'
 
 export type SupportedAddSectionType =
     | 'testimonials'
@@ -236,12 +237,13 @@ export function createAddSectionBlock({
                 ),
             }
 
-        case 'features':
+        case 'features': {
+            const headline = `Why customers choose ${brandName}`
             return {
                 blockType: 'features',
                 layout: 'grid-3',
-                sectionLabel: 'Why Choose Us',
-                headline: `Why customers choose ${brandName}`,
+                sectionLabel: dedupSectionLabel('Why Choose Us', headline),
+                headline,
                 subheadline: 'Three strong reasons to trust this offer.',
                 features: [
                     {
@@ -261,6 +263,7 @@ export function createAddSectionBlock({
                     },
                 ],
             }
+        }
 
         case 'team':
             return {

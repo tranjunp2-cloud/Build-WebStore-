@@ -51,6 +51,32 @@ export const BLOCK_IMAGE_SPEC: Record<string, BlockImageSpec> = {
     'logo-cloud': {
         nestedArray: [{ arrayField: 'logos', itemField: 'logo' }],
     },
+    // Plan 260417 Wave 1 C2 — expand coverage 7 → 15 to kill composer
+    // placehold.co grey boxes. `roleForBlock` already maps these types.
+    'products-grid': {
+        nestedArray: [{ arrayField: 'products', itemField: 'image', minCount: 4 }],
+    },
+    'products-featured': {
+        nestedArray: [{ arrayField: 'products', itemField: 'image', minCount: 1 }],
+    },
+    'property-card': {
+        nestedArray: [{ arrayField: 'properties', itemField: 'image', minCount: 3 }],
+    },
+    'doctor-profile': {
+        nestedArray: [{ arrayField: 'doctors', itemField: 'image', minCount: 2 }],
+    },
+    'before-after': {
+        topLevel: ['beforeImage', 'afterImage'],
+    },
+    'case-study': {
+        nestedArray: [{ arrayField: 'caseStudies', itemField: 'image', minCount: 3 }],
+    },
+    'event-card': {
+        nestedArray: [{ arrayField: 'events', itemField: 'image', minCount: 2 }],
+    },
+    'blog-posts': {
+        nestedArray: [{ arrayField: 'posts', itemField: 'image', minCount: 3 }],
+    },
 }
 
 /**
