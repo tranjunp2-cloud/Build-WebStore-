@@ -2777,6 +2777,23 @@ const MIGRATIONS = [
       name varchar, values jsonb
     );`,
   },
+  // ── Fix: faq + pricing missing variant column (staging 500 on 2026-04-17) ──
+  {
+    name: 'pages_blocks_faq.add_variant',
+    sql: `ALTER TABLE "pages_blocks_faq" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: 'pages_blocks_pricing.add_variant',
+    sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_faq.add_variant',
+    sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_pricing.add_variant',
+    sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
 ];
 
 async function runMigrations(pool) {
