@@ -166,8 +166,9 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, on
 
     // Hover preview handlers (desktop)
     const handleCardMouseEnter = useCallback((template: Template, e: React.MouseEvent) => {
+        const target = e.currentTarget as HTMLElement
         hoverTimerRef.current = setTimeout(() => {
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            const rect = target.getBoundingClientRect()
             setHoverPreview({ template, rect })
         }, 500)
     }, [])

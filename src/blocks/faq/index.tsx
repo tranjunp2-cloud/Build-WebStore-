@@ -232,8 +232,11 @@ function SimpleVariant({ headline, subheadline, items, labelledBy }: { headline?
 }
 
 export function FAQBlock({ block }: BlockProps<FAQConfig>) {
-    const { headline, subheadline, items: rawItems = [], variant = 'accordion' } = block
-    const items = rawItems.length > 0 ? rawItems : FALLBACK_FAQ_ITEMS
+    const { headline, subheadline, variant = 'accordion' } = block
+    // Payload schema uses 'faqs', frontend config uses 'items' — accept both
+    const rawFaqs = (block as Record<string, unknown>).faqs
+    const resolvedItems = (Array.isArray(rawFaqs) ? rawFaqs as FAQItem[] : null) ?? block.items ?? []
+    const items = resolvedItems.length > 0 ? resolvedItems : FALLBACK_FAQ_ITEMS
     /* Plan 260415 Lỗi I — allowMultiple từ block config (schema đã add) */
     const allowMultiple = block.allowMultiple || false
     /* Plan 260415 Lỗi K — aria-labelledby cho section */

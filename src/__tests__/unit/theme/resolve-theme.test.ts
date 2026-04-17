@@ -722,6 +722,133 @@ describe('Color utility edge cases', () => {
     })
 })
 
+// ── TC-F01-COLOR-RESET: resolveColor opposite-mode detection ────────────────
+describe('[TC-F01-COLOR-RESET] resolveTheme() opposite-mode color reset', () => {
+    it('TC-F01-COLOR-RESET-01 — resets light bg (#ffffff) to dark default when switching to dark mode', () => {
+        // Arrange — stored backgroundColor is the light-mode default
+        const config = {
+            colorMode: 'dark' as const,
+            backgroundColor: '#ffffff', // light-mode default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert — should reset to dark-mode default, not keep #ffffff
+        expect(result.backgroundColor).toBe('#09090b')
+    })
+
+    it('TC-F01-COLOR-RESET-02 — resets dark bg (#09090b) to light default when switching to light mode', () => {
+        // Arrange
+        const config = {
+            colorMode: 'light' as const,
+            backgroundColor: '#09090b', // dark-mode default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert
+        expect(result.backgroundColor).toBe('#ffffff')
+    })
+
+    it('TC-F01-COLOR-RESET-03 — preserves custom backgroundColor in dark mode', () => {
+        // Arrange — user explicitly set a custom dark bg
+        const config = {
+            colorMode: 'dark' as const,
+            backgroundColor: '#1a1a2e',
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert — custom value preserved
+        expect(result.backgroundColor).toBe('#1a1a2e')
+    })
+
+    it('TC-F01-COLOR-RESET-04 — preserves custom backgroundColor in light mode', () => {
+        // Arrange
+        const config = {
+            colorMode: 'light' as const,
+            backgroundColor: '#f0f0f0',
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert
+        expect(result.backgroundColor).toBe('#f0f0f0')
+    })
+
+    it('TC-F01-COLOR-RESET-05 — resets textColor when it matches opposite mode default', () => {
+        // Arrange — dark text (#09090b) in dark mode = opposite default
+        const config = {
+            colorMode: 'dark' as const,
+            textColor: '#09090b', // this is the light-mode text default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert — reset to dark-mode text default
+        expect(result.textColor).toBe('#fafafa')
+    })
+
+    it('TC-F01-COLOR-RESET-06 — resets surfaceColor when it matches opposite mode default', () => {
+        // Arrange
+        const config = {
+            colorMode: 'light' as const,
+            surfaceColor: '#111111', // dark-mode surface default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert
+        expect(result.surfaceColor).toBe('#f8f8f8')
+    })
+
+    it('TC-F01-COLOR-RESET-07 — resets mutedColor when it matches opposite mode default', () => {
+        // Arrange
+        const config = {
+            colorMode: 'light' as const,
+            mutedColor: '#a1a1aa', // dark-mode muted default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert
+        expect(result.mutedColor).toBe('#71717a')
+    })
+
+    it('TC-F01-COLOR-RESET-08 — undefined colors fall back to mode default', () => {
+        // Arrange — no colors specified
+        const darkResult = resolveTheme({ colorMode: 'dark' })
+        const lightResult = resolveTheme({ colorMode: 'light' })
+
+        // Assert
+        expect(darkResult.backgroundColor).toBe('#09090b')
+        expect(darkResult.textColor).toBe('#fafafa')
+        expect(lightResult.backgroundColor).toBe('#ffffff')
+        expect(lightResult.textColor).toBe('#09090b')
+    })
+
+    it('TC-F01-COLOR-RESET-09 — case-insensitive hex: uppercase #FFFFFF in dark mode resets to #09090b', () => {
+        // Arrange — hex stored with uppercase letters, matches light default modulo case
+        const config = {
+            colorMode: 'dark' as const,
+            backgroundColor: '#FFFFFF', // uppercase light-mode default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert — case-insensitive compare should treat as opposite default and reset
+        expect(result.backgroundColor).toBe('#09090b')
+    })
+})
+
 // ── Pipeline Integration: resolveTheme → generateThemeCSS → Zod valid ───────
 describe('[TC-S1-PIPELINE] Full theme pipeline integration', () => {
     it('resolveTheme output always passes ThemeConfigSchema validation', () => {
