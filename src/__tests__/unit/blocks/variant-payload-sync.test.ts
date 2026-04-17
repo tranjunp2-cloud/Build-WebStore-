@@ -63,7 +63,7 @@ const PAGES_VARIANTS: Record<string, string[]> = {
     stats: ['row', 'grid', 'highlight'],
     pricing: ['cards', 'table', 'horizontal', 'toggle', 'tiered', 'comparison', 'minimal', 'slider'],
     faq: ['accordion', 'grid', 'simple'],
-    team: ['grid', 'list'],
+    team: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'],
     cta: ['banner', 'inline', 'card', 'floating-sticky'],
     newsletter: ['inline', 'popup', 'banner'],
     'logo-cloud': ['row', 'grid'],

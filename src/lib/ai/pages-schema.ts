@@ -51,7 +51,7 @@ export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fal
     contact:      { field: 'variant', values: ['form', 'info-only', 'split', 'card-float', 'map-split', 'minimal-inline'], fallback: 'form' },
     footer:       { field: 'variant', values: ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient'], fallback: 'simple' },
     stats:        { field: 'variant', values: ['row', 'grid', 'highlight'], fallback: 'row' },
-    team:         { field: 'variant', values: ['grid', 'list'], fallback: 'grid' },
+    team:         { field: 'variant', values: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'], fallback: 'grid' },
     socialWidget: { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
     cartWidget:   { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
     pricing: null, faq: null,

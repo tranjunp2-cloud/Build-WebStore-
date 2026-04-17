@@ -1,16 +1,22 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { TeamConfig, TeamMember } from './config'
 import { getSocialIcon, getSocialAriaLabel } from '../shared/social-icons'
-import { SectionLabel } from '../shared/decorative'
+import {
+    SectionLabel,
+    LayeredShapes,
+    GridLines,
+    NoiseTexture,
+} from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { X } from 'lucide-react'
 
 const FALLBACK_MEMBERS: TeamConfig['members'] = [
     { name: 'Team Lead', role: 'Founder' },
@@ -20,7 +26,37 @@ const FALLBACK_MEMBERS: TeamConfig['members'] = [
 
 // ── Local helpers (Plan 260415 team polish) ─────────────────────────────────
 
-function TeamSection({ children, container = 'default' }: { children: ReactNode; container?: 'default' | '4xl' }) {
+function TeamSection({
+    children,
+    container = 'default',
+    decorative,
+}: {
+    children: ReactNode
+    container?: 'default' | '4xl'
+    decorative?: ReactNode
+}) {
+    if (decorative) {
+        // Wrap manually so decorative sits as sibling of SectionWrapper inside
+        // AnimatedSection — absolute children fill the full section, not just
+        // the inner content box.
+        return (
+            <AnimatedSection
+                className="relative overflow-hidden"
+                style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
+            >
+                {decorative}
+                <SectionWrapper
+                    as="div"
+                    padding="default"
+                    container="default"
+                    background="transparent"
+                    innerClassName={`${container === '4xl' ? '!max-w-4xl ' : ''}relative z-10`.trim()}
+                >
+                    {children}
+                </SectionWrapper>
+            </AnimatedSection>
+        )
+    }
     return (
         <SectionWrapper
             as={AnimatedSection}
@@ -267,6 +303,261 @@ function ListVariant({
     )
 }
 
+// ── A5 (260417) — 4 new team variants for pool diversity ─────────────────────
+
+/**
+ * cards-hover-reveal: avatar + name visible by default, hover reveals bio
+ * overlay sliding up. Pure CSS (group-hover Tailwind), no JS state.
+ * A4 vocab: LayeredShapes — organic background.
+ */
+function CardsHoverRevealVariant({
+    sectionLabel,
+    headline,
+    subheadline,
+    members,
+}: {
+    sectionLabel?: string
+    headline?: string
+    subheadline?: string
+    members: TeamMember[]
+}) {
+    return (
+        <TeamSection decorative={<LayeredShapes color={CSS_VARS.primary} opacity={0.08} />}>
+            <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
+            <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {members.map((m, i) => (
+                    <StaggerItem key={`${m.name}-${i}`}>
+                        <article
+                            className="group relative overflow-hidden rounded-2xl aspect-[3/4] cursor-default"
+                            aria-label={`${m.name}, ${m.role}`}
+                            style={{
+                                background: CSS_VARS.surface,
+                                border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
+                            }}
+                        >
+                            <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
+                                <MemberAvatar member={m} />
+                            </div>
+                            <div
+                                className="absolute inset-x-0 bottom-0 p-5 text-center translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"
+                                style={{
+                                    background: `linear-gradient(to top, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.85))`,
+                                    color: '#ffffff',
+                                }}
+                            >
+                                <p className="font-bold text-base">{m.name}</p>
+                                <p className="text-sm opacity-90 mb-1">{m.role}</p>
+                                {m.bio && (
+                                    <p className="text-xs opacity-85 line-clamp-3">{m.bio}</p>
+                                )}
+                                <SocialLinks socials={m.socials} name={m.name} />
+                            </div>
+                            <div className="absolute inset-x-0 bottom-0 py-3 text-center transition-opacity duration-300 group-hover:opacity-0">
+                                <p className="font-semibold text-sm" style={{ color: CSS_VARS.text }}>{m.name}</p>
+                                <p className="text-xs" style={{ color: CSS_VARS.muted }}>{m.role}</p>
+                            </div>
+                        </article>
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+        </TeamSection>
+    )
+}
+
+/**
+ * horizontal-scroll: snap-scroll row of member cards. Touch-friendly on mobile,
+ * unusual horizontal layout on desktop. Pure CSS scroll-snap, no JS.
+ * A4 vocab: GridLines — architectural backdrop.
+ */
+function HorizontalScrollVariant({
+    sectionLabel,
+    headline,
+    subheadline,
+    members,
+}: {
+    sectionLabel?: string
+    headline?: string
+    subheadline?: string
+    members: TeamMember[]
+}) {
+    return (
+        <TeamSection decorative={<GridLines color={CSS_VARS.primary} spacing={48} opacity={0.05} />}>
+            <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
+            <div
+                className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4"
+                style={{ scrollbarWidth: 'thin' }}
+                role="region"
+                aria-label="Team members carousel"
+            >
+                {members.map((m, i) => (
+                    <article
+                        key={`${m.name}-${i}`}
+                        className={`shrink-0 w-72 snap-center text-center ${CARD_PADDING.md}`}
+                        style={{
+                            background: CSS_VARS.surface,
+                            borderRadius: 'var(--radius-lg)',
+                            boxShadow: 'var(--shadow-sm)',
+                            border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
+                        }}
+                        aria-label={`${m.name}, ${m.role}`}
+                    >
+                        <MemberAvatar member={m} />
+                        <MemberMeta member={m} align="center" />
+                        <SocialLinks socials={m.socials} name={m.name} />
+                    </article>
+                ))}
+            </div>
+        </TeamSection>
+    )
+}
+
+/**
+ * bio-modal: compact avatar grid; click opens HTML <dialog> with full bio.
+ * Uses native <dialog> for a11y (Esc to close, focus trap, backdrop).
+ * A4 vocab: NoiseTexture — film texture.
+ */
+function BioModalVariant({
+    sectionLabel,
+    headline,
+    subheadline,
+    members,
+}: {
+    sectionLabel?: string
+    headline?: string
+    subheadline?: string
+    members: TeamMember[]
+}) {
+    const [active, setActive] = useState<TeamMember | null>(null)
+    const dialogRef = useRef<HTMLDialogElement>(null)
+
+    useEffect(() => {
+        const dialog = dialogRef.current
+        if (!dialog) return
+        if (active && !dialog.open) dialog.showModal()
+        if (!active && dialog.open) dialog.close()
+    }, [active])
+
+    return (
+        <TeamSection decorative={<NoiseTexture opacity={0.05} />}>
+            <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
+            <StaggerGrid className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {members.map((m, i) => (
+                    <StaggerItem key={`${m.name}-${i}`}>
+                        <button
+                            type="button"
+                            onClick={() => setActive(m)}
+                            className={`w-full text-center p-4 rounded-xl transition-all hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.5)] ${TOUCH_TARGET.min}`}
+                            style={{
+                                background: CSS_VARS.surface,
+                                border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
+                            }}
+                            aria-label={`Open bio for ${m.name}`}
+                        >
+                            <MemberAvatar member={m} />
+                            <p className="font-semibold text-sm truncate" style={{ color: CSS_VARS.text }}>{m.name}</p>
+                            <p className="text-xs truncate" style={{ color: CSS_VARS.muted }}>{m.role}</p>
+                        </button>
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+            <dialog
+                ref={dialogRef}
+                onClose={() => setActive(null)}
+                onClick={(e) => {
+                    if (e.target === dialogRef.current) setActive(null)
+                }}
+                className="rounded-2xl p-0 max-w-md w-[92vw] backdrop:bg-black/50"
+            >
+                {active && (
+                    <div className="p-6 relative" style={{ background: CSS_VARS.surface, color: CSS_VARS.text }}>
+                        <button
+                            type="button"
+                            onClick={() => setActive(null)}
+                            className={`absolute top-3 right-3 p-2 rounded-full opacity-60 hover:opacity-100 ${TOUCH_TARGET.min} flex items-center justify-center`}
+                            aria-label="Close bio"
+                        >
+                            <X size={18} />
+                        </button>
+                        <div className="text-center">
+                            <MemberAvatar member={active} />
+                            <Heading level={4} className="font-bold mb-1">{active.name}</Heading>
+                            <Body size="small" className="mb-4" style={{ color: CSS_VARS.primary }}>{active.role}</Body>
+                            {active.bio && (
+                                <Body size="small" className="text-left" style={{ color: CSS_VARS.muted }}>
+                                    {active.bio}
+                                </Body>
+                            )}
+                            <SocialLinks socials={active.socials} name={active.name} />
+                        </div>
+                    </div>
+                )}
+            </dialog>
+        </TeamSection>
+    )
+}
+
+/**
+ * compact-row: dense single-row layout per member (small avatar + name + role +
+ * 1-line bio). Like a LinkedIn search result. No decorative — minimal aesthetic.
+ */
+function CompactRowVariant({
+    sectionLabel,
+    headline,
+    subheadline,
+    members,
+}: {
+    sectionLabel?: string
+    headline?: string
+    subheadline?: string
+    members: TeamMember[]
+}) {
+    return (
+        <TeamSection container="4xl">
+            <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
+            <ul className="flex flex-col divide-y" style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.08)' }}>
+                {members.map((m, i) => (
+                    <li
+                        key={`${m.name}-${i}`}
+                        className="flex items-center gap-4 py-4"
+                        style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.08)' }}
+                    >
+                        <div className="flex-shrink-0 w-12 h-12">
+                            {m.avatar?.url ? (
+                                <img
+                                    src={m.avatar.url}
+                                    alt={m.avatar.alt || `${m.name} portrait`}
+                                    className="w-12 h-12 rounded-full object-cover"
+                                    loading="lazy"
+                                />
+                            ) : (
+                                <div
+                                    className="w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                                    style={{ background: `hsl(${hashHue(m.name)}, 55%, 50%)` }}
+                                    aria-hidden="true"
+                                >
+                                    {getInitials(m.name)}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-baseline gap-x-2">
+                                <p className="font-semibold text-sm" style={{ color: CSS_VARS.text }}>{m.name}</p>
+                                <p className="text-xs" style={{ color: CSS_VARS.primary }}>{m.role}</p>
+                            </div>
+                            {m.bio && (
+                                <p className="text-xs truncate mt-0.5" style={{ color: CSS_VARS.muted }}>{m.bio}</p>
+                            )}
+                        </div>
+                        <div className="flex-shrink-0 hidden sm:block">
+                            <SocialLinks socials={m.socials} name={m.name} />
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </TeamSection>
+    )
+}
+
 /**
  * Plan 260415 Lỗi 14T — members.length === 0 trước đây return null silent.
  * Giờ return null nhưng log dev warning để admin biết block đang rỗng.
@@ -289,6 +580,14 @@ export function TeamBlock({ block }: BlockProps<TeamConfig>) {
     switch (variant) {
         case 'list':
             return <ListVariant sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} members={members} />
+        case 'cards-hover-reveal':
+            return <CardsHoverRevealVariant sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} members={members} />
+        case 'horizontal-scroll':
+            return <HorizontalScrollVariant sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} members={members} />
+        case 'bio-modal':
+            return <BioModalVariant sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} members={members} />
+        case 'compact-row':
+            return <CompactRowVariant sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} members={members} />
         case 'grid':
         default:
             return <GridVariant sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} members={members} />

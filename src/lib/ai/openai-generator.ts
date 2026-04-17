@@ -717,7 +717,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'inline'],
         navigation: ['simple', 'transparent', 'centered'],
         newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        team: ['grid', 'list', 'bio-modal', 'cards-hover-reveal'],
     },
     ecommerce: {
         hero: ['slideshow', 'cards-overlay', 'gradient', 'split-right'],
@@ -733,7 +733,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'floating'],
         navigation: ['simple', 'mega-menu', 'pill'],
         newsletter: ['inline', 'popup'],
-        team: ['grid'],
+        team: ['grid', 'compact-row'],
     },
     beauty: {
         hero: ['gradient', 'minimal', 'parallax', 'split-left'],
@@ -749,7 +749,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['floating', 'inline'],
         navigation: ['transparent', 'simple', 'pill'],
         newsletter: ['inline', 'popup'],
-        team: ['grid', 'list'],
+        team: ['cards-hover-reveal', 'grid', 'bio-modal'],
     },
     tech: {
         hero: ['gradient', 'split-video', 'minimal', 'parallax'],
@@ -765,7 +765,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['inline', 'banner'],
         navigation: ['simple', 'transparent', 'pill'],
         newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        team: ['grid', 'list', 'bio-modal', 'compact-row'],
     },
     business: {
         hero: ['centered', 'split-left', 'gradient', 'minimal'],
@@ -781,7 +781,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'inline'],
         navigation: ['simple', 'centered', 'mega-menu'],
         newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        team: ['grid', 'list', 'bio-modal', 'compact-row'],
     },
     portfolio: {
         hero: ['magazine', 'parallax', 'cards-overlay', 'minimal'],
@@ -797,7 +797,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['inline', 'floating'],
         navigation: ['transparent', 'pill', 'simple'],
         newsletter: ['inline'],
-        team: ['list', 'grid'],
+        team: ['cards-hover-reveal', 'bio-modal', 'horizontal-scroll'],
     },
     blog: {
         hero: ['minimal', 'split-left', 'fullscreen', 'centered'],
@@ -813,7 +813,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['inline', 'banner'],
         navigation: ['simple', 'centered'],
         newsletter: ['inline', 'banner', 'popup'],
-        team: ['list'],
+        team: ['list', 'compact-row'],
     },
     health: {
         hero: ['centered', 'split-left', 'minimal', 'gradient'],
@@ -829,7 +829,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'inline'],
         navigation: ['simple', 'centered'],
         newsletter: ['inline'],
-        team: ['grid', 'list'],
+        team: ['grid', 'bio-modal', 'list'],
     },
     education: {
         hero: ['centered', 'split-right', 'gradient', 'magazine'],
@@ -845,7 +845,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'inline'],
         navigation: ['simple', 'centered', 'mega-menu'],
         newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        team: ['grid', 'bio-modal', 'cards-hover-reveal'],
     },
     realestate: {
         hero: ['fullscreen', 'parallax', 'slideshow', 'split-left'],
@@ -861,7 +861,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'floating'],
         navigation: ['simple', 'transparent'],
         newsletter: ['inline'],
-        team: ['grid'],
+        team: ['grid', 'bio-modal', 'compact-row'],
     },
     fitness: {
         hero: ['fullscreen', 'parallax', 'split-video', 'gradient'],
@@ -877,7 +877,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'floating'],
         navigation: ['transparent', 'simple', 'pill'],
         newsletter: ['banner', 'inline'],
-        team: ['grid', 'list'],
+        team: ['cards-hover-reveal', 'horizontal-scroll', 'grid'],
     },
     creative: {
         hero: ['magazine', 'parallax', 'cards-overlay', 'minimal'],
@@ -893,7 +893,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['inline', 'floating'],
         navigation: ['transparent', 'pill', 'sidebar'],
         newsletter: ['popup', 'inline'],
-        team: ['list', 'grid'],
+        team: ['horizontal-scroll', 'cards-hover-reveal', 'bio-modal', 'list'],
     },
     fnb: {
         hero: ['split-left', 'gradient', 'magazine', 'parallax'],
@@ -909,7 +909,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'inline'],
         navigation: ['simple', 'transparent'],
         newsletter: ['inline', 'banner'],
-        team: ['grid'],
+        team: ['grid', 'cards-hover-reveal'],
     },
     events: {
         hero: ['fullscreen', 'gradient', 'split-left', 'centered'],
@@ -925,7 +925,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'floating'],
         navigation: ['simple', 'transparent', 'centered'],
         newsletter: ['banner', 'inline'],
-        team: ['grid', 'list'],
+        team: ['grid', 'cards-hover-reveal', 'horizontal-scroll'],
     },
     travel: {
         hero: ['fullscreen', 'parallax', 'slideshow', 'gradient'],
@@ -941,7 +941,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         cta: ['banner', 'inline'],
         navigation: ['transparent', 'simple'],
         newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        team: ['cards-hover-reveal', 'horizontal-scroll', 'grid'],
     },
 }
 

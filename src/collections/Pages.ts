@@ -559,12 +559,17 @@ const TeamBlock = {
     fields: [
         {
             // Plan 260415 — persist team variant (grid vs list).
+            // Plan 260417 A5 — added 4 new variants for pool diversity.
             name: 'variant',
             type: 'select',
             defaultValue: 'grid',
             options: [
                 { label: 'Grid', value: 'grid' },
                 { label: 'List', value: 'list' },
+                { label: 'Cards (hover reveal)', value: 'cards-hover-reveal' },
+                { label: 'Horizontal Scroll', value: 'horizontal-scroll' },
+                { label: 'Bio Modal', value: 'bio-modal' },
+                { label: 'Compact Row', value: 'compact-row' },
             ],
         },
         { name: 'headline', type: 'text', defaultValue: 'Meet Our Team' },

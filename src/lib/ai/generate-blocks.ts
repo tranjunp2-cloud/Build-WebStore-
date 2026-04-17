@@ -194,7 +194,7 @@ const VARIANT_OPTIONS: Record<string, string[]> = {
     navigation: ['simple', 'centered', 'transparent', 'pill'],
     about: ['simple', 'split', 'story'],
     newsletter: ['inline', 'popup', 'banner'],
-    team: ['grid', 'list'],
+    team: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'],
     pricing: ['cards', 'table', 'horizontal', 'toggle'],
 }
 
