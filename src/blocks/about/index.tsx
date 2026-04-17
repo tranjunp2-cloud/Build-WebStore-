@@ -6,7 +6,12 @@ import type { AboutConfig, TimelineItem } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import { motion } from 'framer-motion'
 import { getAboutImage } from '@/lib/images/industry-images'
-import { SectionLabel } from '../shared/decorative'
+import {
+    SectionLabel,
+    DiagonalStripe,
+    LayeredShapes,
+    TypographicMark,
+} from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
@@ -18,20 +23,31 @@ type AboutSectionProps = {
     children: ReactNode
     narrow?: boolean
     className?: string
+    decorative?: ReactNode
 }
 
-/** Outer wrapper for all variants. AnimatedSection + SectionWrapper container. */
-function AboutSection({ children, narrow = false, className = '' }: AboutSectionProps) {
+/**
+ * Outer wrapper for all variants. AnimatedSection + SectionWrapper container.
+ * Phase A4 (260417) — `decorative` slot adds visual vocabulary per variant.
+ * When decorative is provided, ensures `relative overflow-hidden` is on the
+ * outer tag so absolute-positioned primitives are constrained.
+ */
+function AboutSection({ children, narrow = false, className = '', decorative }: AboutSectionProps) {
+    const wrapperClass = decorative
+        ? `relative overflow-hidden ${className}`.trim()
+        : className
     return (
         <AnimatedSection
-            className={className}
+            className={wrapperClass}
             style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
         >
+            {decorative}
             <SectionWrapper
                 as="div"
                 padding="default"
                 container={narrow ? 'narrow' : 'default'}
                 background="transparent"
+                innerClassName={decorative ? 'relative z-10' : ''}
             >
                 {children}
             </SectionWrapper>
@@ -85,7 +101,7 @@ function SimpleVariant({ block }: { block: AboutConfig }) {
     if (!headline && !body && !sectionLabel) return null
 
     return (
-        <AboutSection narrow>
+        <AboutSection narrow decorative={<DiagonalStripe color={CSS_VARS.primary} opacity={0.06} />}>
             <div className="text-center">
                 {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
                 {headline && (
@@ -115,7 +131,7 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
     const isImageLeft = layout === 'image-left'
 
     return (
-        <AboutSection className="relative overflow-hidden">
+        <AboutSection decorative={<LayeredShapes color={CSS_VARS.primary} opacity={0.1} />}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
                 <AboutImage
                     imageUrl={imageUrl}
@@ -166,7 +182,7 @@ function StoryVariant({ block }: { block: AboutConfig }) {
     }
 
     return (
-        <AboutSection narrow>
+        <AboutSection narrow decorative={<TypographicMark text="STORY" color={CSS_VARS.primary} opacity={0.04} size="lg" />}>
             <div className="text-center mb-12">
                 {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
                 {headline && (

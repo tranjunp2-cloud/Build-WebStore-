@@ -10,6 +10,7 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { GridLines, DuotoneOverlay } from '../shared/decorative'
 
 // ── Local helpers (Plan 260415 newsletter-compliance) ──────────────────────
 // Brand identity vars preserved per Option C additive strategy.
@@ -22,13 +23,21 @@ type NewsletterSectionProps = {
     children: ReactNode
     padding?: 'compact' | 'default'
     style?: React.CSSProperties
+    decorative?: ReactNode
 }
 
 /** Outer wrapper cho inline + banner variants. AnimatedSection + token container. */
-function NewsletterSection({ children, padding = 'default', style }: NewsletterSectionProps) {
+function NewsletterSection({ children, padding = 'default', style, decorative }: NewsletterSectionProps) {
     return (
-        <AnimatedSection style={style}>
-            <SectionWrapper as="div" padding={padding} container="default" background="transparent">
+        <AnimatedSection style={style} className={decorative ? 'relative overflow-hidden' : ''}>
+            {decorative}
+            <SectionWrapper
+                as="div"
+                padding={padding}
+                container="default"
+                background="transparent"
+                innerClassName={decorative ? 'relative z-10' : ''}
+            >
                 {children}
             </SectionWrapper>
         </AnimatedSection>
@@ -203,7 +212,11 @@ function EmailForm({ placeholder, buttonLabel, siteId, layout = 'row', onSuccess
 function InlineVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
     const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
     return (
-        <NewsletterSection padding="compact" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
+        <NewsletterSection
+            padding="compact"
+            style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
+            decorative={<GridLines color={CSS_VARS.primary} spacing={48} opacity={0.05} />}
+        >
             <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
                 <div className="flex-1 text-center lg:text-left">
                     <Heading level={2} className="mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
@@ -367,6 +380,7 @@ function BannerVariant({ block, siteId }: { block: NewsletterConfig; siteId?: st
                 background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
                 color: '#ffffff',
             }}
+            decorative={<DuotoneOverlay color1={CSS_VARS.primary} color2={CSS_VARS.secondary} opacity={0.3} blendMode="overlay" />}
         >
             <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
                 <div className="flex-1 text-center lg:text-left">

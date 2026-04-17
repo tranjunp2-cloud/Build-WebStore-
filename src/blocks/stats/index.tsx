@@ -10,6 +10,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { MeshGradient, DiagonalStripe } from '../shared/decorative'
 
 const FALLBACK_STATS: StatsConfig['stats'] = [
     { value: '500+', label: 'Happy Customers' },
@@ -23,16 +24,19 @@ type StatsSectionProps = {
     children: ReactNode
     narrow?: boolean
     style?: React.CSSProperties
+    decorative?: ReactNode
 }
 
-function StatsSection({ children, narrow = false, style }: StatsSectionProps) {
+function StatsSection({ children, narrow = false, style, decorative }: StatsSectionProps) {
     return (
-        <AnimatedSection style={style}>
+        <AnimatedSection style={style} className={decorative ? 'relative overflow-hidden' : ''}>
+            {decorative}
             <SectionWrapper
                 as="div"
                 padding="compact"
                 container={narrow ? 'narrow' : 'default'}
                 background="transparent"
+                innerClassName={decorative ? 'relative z-10' : ''}
             >
                 {children}
             </SectionWrapper>
@@ -113,7 +117,10 @@ function StatValue({ stat }: { stat: StatItem }) {
    Dùng <div role="group" aria-label> để wrap cả number + label semantic group. */
 function RowVariant({ headline, stats }: { headline?: string; stats: StatItem[] }) {
     return (
-        <StatsSection style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
+        <StatsSection
+            style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
+            decorative={<DiagonalStripe color={CSS_VARS.primary} opacity={0.06} />}
+        >
             <StatsHeadline headline={headline} />
             <StaggerGrid className="flex flex-col sm:flex-row flex-wrap justify-center gap-8 md:gap-12">
                 {stats.map((stat, i) => (
@@ -174,6 +181,7 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
         <StatsSection
             narrow
             style={{ color: CSS_VARS.text, background: 'rgba(var(--brand-primary-rgb), 0.05)' }}
+            decorative={<MeshGradient color={CSS_VARS.primary} accentColor={CSS_VARS.secondary} opacity={0.2} />}
         >
             <StatsHeadline headline={headline} />
             <StaggerGrid className="flex flex-col gap-6">

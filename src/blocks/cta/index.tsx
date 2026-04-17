@@ -7,6 +7,12 @@ import type { CTAConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { motion, useReducedMotion } from 'framer-motion'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import {
+    MeshGradient,
+    DiagonalStripe,
+    NoiseTexture,
+    LayeredShapes,
+} from '../shared/decorative'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
@@ -166,26 +172,30 @@ function BannerVariant({ block, siteId }: { block: CTAConfig; siteId?: string })
             as={AnimatedSection}
             padding="relaxed"
             container="default"
-            className="!py-20 md:!py-28"
+            className="!py-20 md:!py-28 relative overflow-hidden"
             innerClassName="text-center max-w-3xl"
             style={{
                 background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
                 color: '#ffffff',
             }}
         >
-            <Heading level={2} className="mb-4 leading-tight">
-                <RichText text={headline} as="span" />
-            </Heading>
-            {subheadline && (
-                <Body size="lg" className="opacity-85 mb-8 max-w-xl mx-auto">
-                    <RichText text={subheadline} as="span" />
-                </Body>
-            )}
-            <div className="flex flex-wrap items-center justify-center gap-4">
-                <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" siteId={siteId} onInverseBg />
-                {secondaryCtaLabel && secondaryCtaUrl && (
-                    <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} onInverseBg />
+            {/* A4 vocab: mesh — softens the linear gradient with painterly blobs */}
+            <MeshGradient color={CSS_VARS.primary} accentColor={CSS_VARS.secondary} opacity={0.35} />
+            <div className="relative z-10">
+                <Heading level={2} className="mb-4 leading-tight">
+                    <RichText text={headline} as="span" />
+                </Heading>
+                {subheadline && (
+                    <Body size="lg" className="opacity-85 mb-8 max-w-xl mx-auto">
+                        <RichText text={subheadline} as="span" />
+                    </Body>
                 )}
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" siteId={siteId} onInverseBg />
+                    {secondaryCtaLabel && secondaryCtaUrl && (
+                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} onInverseBg />
+                    )}
+                </div>
             </div>
         </SectionWrapper>
     )
@@ -202,9 +212,12 @@ function InlineVariant({ block, siteId }: { block: CTAConfig; siteId?: string })
             as={AnimatedSection}
             padding="compact"
             container="default"
+            className="relative overflow-hidden"
             style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
         >
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 max-w-5xl mx-auto">
+            {/* A4 vocab: diagonal stripe — adds subtle motion across the inline strip */}
+            <DiagonalStripe color={CSS_VARS.primary} opacity={0.06} />
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-5xl mx-auto">
                 <div className="flex-1 max-w-2xl text-center md:text-left">
                     <Heading level={3} className="mb-2">
                         <RichText text={headline} as="span" />
@@ -242,7 +255,7 @@ function CardVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
             style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
         >
             <div
-                className="max-w-xl mx-auto text-center p-10 md:p-12"
+                className="max-w-xl mx-auto text-center p-10 md:p-12 relative overflow-hidden"
                 style={{
                     background: CSS_VARS.surface,
                     borderRadius: CSS_VARS.radiusLg,
@@ -250,19 +263,23 @@ function CardVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
                     border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
                 }}
             >
-                <Heading level={3} className="mb-3">
-                    <RichText text={headline} as="span" />
-                </Heading>
-                {subheadline && (
-                    <Body className="mb-8" style={{ color: CSS_VARS.muted }}>
-                        <RichText text={subheadline} as="span" />
-                    </Body>
-                )}
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="card" siteId={siteId} />
-                    {secondaryCtaLabel && secondaryCtaUrl && (
-                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
+                {/* A4 vocab: noise — film-grain texture that lifts the flat card */}
+                <NoiseTexture opacity={0.06} />
+                <div className="relative z-10">
+                    <Heading level={3} className="mb-3">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body className="mb-8" style={{ color: CSS_VARS.muted }}>
+                            <RichText text={subheadline} as="span" />
+                        </Body>
                     )}
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="card" siteId={siteId} />
+                        {secondaryCtaLabel && secondaryCtaUrl && (
+                            <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
+                        )}
+                    </div>
                 </div>
             </div>
         </SectionWrapper>
@@ -331,7 +348,7 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
 
     const content = (
         <div
-            className="fixed bottom-4 inset-x-4 md:inset-x-auto md:right-6 md:bottom-6 md:max-w-sm z-50 rounded-2xl p-5 pr-12 shadow-2xl"
+            className="fixed bottom-4 inset-x-4 md:inset-x-auto md:right-6 md:bottom-6 md:max-w-sm z-50 rounded-2xl p-5 pr-12 shadow-2xl overflow-hidden"
             style={{
                 background: CSS_VARS.surface,
                 border: '1px solid rgba(var(--brand-primary-rgb), 0.15)',
@@ -341,18 +358,22 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
             role="complementary"
             aria-label="Call to action"
         >
+            {/* A4 vocab: layered shapes — organic blobs peeking inside the toast */}
+            <LayeredShapes color={CSS_VARS.primary} opacity={0.08} />
             <button
                 type="button"
                 onClick={handleDismiss}
-                className={`absolute top-2 right-2 p-2 rounded-full opacity-60 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.4)]`}
+                className={`absolute top-2 right-2 p-2 rounded-full opacity-60 hover:opacity-100 transition-opacity z-20 ${TOUCH_TARGET.min} flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.4)]`}
                 aria-label="Dismiss call to action"
             >
                 <X size={16} />
             </button>
-            <Heading level={4} className="mb-2 pr-2">
-                <RichText text={headline} as="span" />
-            </Heading>
-            <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating-sticky" siteId={siteId} />
+            <div className="relative z-10">
+                <Heading level={4} className="mb-2 pr-2">
+                    <RichText text={headline} as="span" />
+                </Heading>
+                <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating-sticky" siteId={siteId} />
+            </div>
         </div>
     )
 

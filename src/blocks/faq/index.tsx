@@ -10,6 +10,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { NoiseTexture } from '../shared/decorative'
 
 const FALLBACK_FAQ_ITEMS: FAQConfig['items'] = [
     { question: 'What services do you offer?', answer: 'We provide a wide range of professional services tailored to your needs.' },
@@ -32,16 +33,30 @@ function FAQAnswer({ answer }: { answer: FAQItem['answer'] }) {
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 
-function FAQSection({ children, narrow = false, labelledBy }: { children: ReactNode; narrow?: boolean; labelledBy?: string }) {
+function FAQSection({
+    children,
+    narrow = false,
+    labelledBy,
+    decorative,
+}: {
+    children: ReactNode
+    narrow?: boolean
+    labelledBy?: string
+    decorative?: ReactNode
+}) {
     return (
         <SectionWrapper
             as={AnimatedSection}
             padding="default"
             container={narrow ? 'narrow' : 'default'}
+            className={decorative ? 'relative overflow-hidden' : ''}
             style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
             aria-labelledby={labelledBy}
         >
-            {children}
+            {decorative}
+            <div className={decorative ? 'relative z-10' : 'contents'}>
+                {children}
+            </div>
         </SectionWrapper>
     )
 }
@@ -179,7 +194,7 @@ function AccordionVariant({ headline, subheadline, items, allowMultiple = false,
 
 function GridVariant({ headline, subheadline, items, labelledBy }: { headline?: string; subheadline?: string; items: FAQItem[]; labelledBy?: string }) {
     return (
-        <FAQSection labelledBy={labelledBy}>
+        <FAQSection labelledBy={labelledBy} decorative={<NoiseTexture opacity={0.05} />}>
             <SectionHeader headline={headline} subheadline={subheadline} labelledBy={labelledBy} />
             <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                 {items.map((item, i) => (

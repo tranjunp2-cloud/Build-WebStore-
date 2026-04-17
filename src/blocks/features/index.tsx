@@ -5,7 +5,14 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { FeaturesConfig } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
-import { IconContainer, SectionLabel, GradientBlob } from '../shared/decorative'
+import {
+    IconContainer,
+    SectionLabel,
+    GradientBlob,
+    GridLines,
+    AsymmetricGrid,
+    DuotoneOverlay,
+} from '../shared/decorative'
 import { Heading, Body } from '../shared/Typography'
 import { CARD_PADDING } from '@/lib/design-tokens'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -14,12 +21,15 @@ import { SectionWrapper } from '../shared/SectionWrapper'
 
 // Shared wrapper for all features variants — preserves AnimatedSection
 // (block-internal framer-motion) while delegating padding/container/inner
-// gutter to SectionWrapper tokens. The block keeps its decorative
-// GradientBlob since that is structural, not a Phase 05 concern.
-function FeaturesSection({ children }: { children: React.ReactNode }) {
+// gutter to SectionWrapper tokens. Phase A4 (260417) — accepts optional
+// `decorative` slot so each variant can pin its own visual vocabulary.
+// Falls back to the original GradientBlob for variants not in the A4 map.
+function FeaturesSection({ children, decorative }: { children: React.ReactNode; decorative?: React.ReactNode }) {
     return (
         <AnimatedSection className="relative overflow-hidden">
-            <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            {decorative ?? (
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            )}
             <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                 {children}
             </SectionWrapper>
@@ -147,7 +157,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
     // ── zigzag variant ────────────────────────────────────────────────────
     if (variant === 'zigzag') {
         return (
-            <FeaturesSection>
+            <FeaturesSection decorative={<AsymmetricGrid color={CSS_VARS.primary} opacity={0.05} />}>
                 <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
                 <motion.div
                     initial="hidden"
@@ -233,8 +243,12 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
         'grid-4': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
     }[variant] || 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
 
+    // A4 vocab: grid-3 gets architectural grid lines (other grid-N keep blob default)
+    const gridDecorative =
+        variant === 'grid-3' ? <GridLines color={CSS_VARS.primary} spacing={48} opacity={0.05} /> : undefined
+
     return (
-        <FeaturesSection>
+        <FeaturesSection decorative={gridDecorative}>
             <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
 
             {/* Feature Cards */}
@@ -308,7 +322,7 @@ function FeaturesCarousel({
     }, [updateScrollState])
 
     return (
-        <FeaturesSection>
+        <FeaturesSection decorative={<DuotoneOverlay color1={CSS_VARS.primary} color2={CSS_VARS.secondary} opacity={0.04} blendMode="soft-light" />}>
             <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
 
             <div className="relative">
