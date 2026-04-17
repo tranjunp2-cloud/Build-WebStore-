@@ -70,7 +70,6 @@ function AIChatPanelInner({
             id: 'welcome',
             role: 'assistant',
             content: ac.welcomeMessage,
-            createdAt: formatChatTime(),
         },
     ])
     const messagesEndRef = useRef<HTMLDivElement>(null)

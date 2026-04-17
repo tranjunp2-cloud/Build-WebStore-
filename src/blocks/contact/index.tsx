@@ -209,7 +209,7 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
                 const error = errors[fieldName as keyof typeof errors]
                 const errorId = error ? `${fieldName}-error` : undefined
                 return (
-                    <div key={fieldName}>
+                    <div key={`${i}-${fieldName}`}>
                         <label htmlFor={fieldName} className="block text-sm font-medium mb-2 opacity-70">
                             {field.label}
                             {field.required && <span style={{ color: 'var(--brand-primary)' }}> *</span>}

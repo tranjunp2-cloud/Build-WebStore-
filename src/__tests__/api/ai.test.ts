@@ -275,7 +275,7 @@ describe('AI Streaming APIs', () => {
                 body: JSON.stringify({ instruction: 'Make to dark mode', blockIndex: 0 })
             })
             // Temporary mock openai within this test file if necessary, but openai is not globally mocked in this file yet.
-            // Wait, we didn't mock openai in ai.test.ts globally? 
+            // Wait, we didn't mock openai in ai.test.ts globally?
             // Ah, the route uses new OpenAI() inside. Let's mock it.
             vi.mock('openai', () => {
                 const OpenAI = vi.fn()
@@ -291,6 +291,84 @@ describe('AI Streaming APIs', () => {
 
             const res = await EditBlockPOST(req)
             expect(res.status).toBe(200)
+        })
+
+        it('returns update_multiple_blocks for page-wide instruction (TC-F01-MULTI-01)', async () => {
+            process.env.OPENAI_API_KEY = 'test-key'
+
+            // Override the prototype mock so new OpenAI() instances return multi-block response
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as any
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({
+                    action: 'update_multiple_blocks',
+                    updates: [
+                        { blockIndex: 0, changes: { headline: 'Xin chào' } },
+                        { blockIndex: 1, changes: { title: 'Về chúng tôi' } },
+                    ],
+                    message: 'Translated all sections to Vietnamese.',
+                }) } }],
+                model: 'gpt-4o-mini',
+                usage: { prompt_tokens: 100, completion_tokens: 200 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/edit-block', {
+                method: 'POST',
+                body: JSON.stringify({
+                    instruction: 'dịch toàn bộ trang sang tiếng Việt',
+                    allBlocks: [
+                        { blockType: 'hero', headline: 'Hello' },
+                        { blockType: 'about', title: 'About Us' },
+                    ],
+                })
+            })
+
+            const res = await EditBlockPOST(req)
+            expect(res.status).toBe(200)
+            const data = await res.json()
+            expect(data.action).toBe('update_multiple_blocks')
+            expect(data.updates).toHaveLength(2)
+            expect(data.updates[0].blockIndex).toBe(0)
+            expect(data.updates[1].changes.title).toBe('Về chúng tôi')
+        })
+
+        it('filters out-of-bounds blockIndex from AI response (TC-F01-MULTI-02)', async () => {
+            process.env.OPENAI_API_KEY = 'test-key'
+
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as any
+            // AI hallucinates blockIndex=99 on a 2-block page — backend must drop it
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({
+                    action: 'update_multiple_blocks',
+                    updates: [
+                        { blockIndex: 0, changes: { headline: 'Xin chào' } },
+                        { blockIndex: 99, changes: { headline: 'ghost section' } },
+                        { blockIndex: -1, changes: { headline: 'underflow' } },
+                    ],
+                    message: 'Translated all sections.',
+                }) } }],
+                model: 'gpt-4o-mini',
+                usage: { prompt_tokens: 100, completion_tokens: 200 },
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/edit-block', {
+                method: 'POST',
+                body: JSON.stringify({
+                    instruction: 'translate the whole page',
+                    allBlocks: [
+                        { blockType: 'hero', headline: 'Hello' },
+                        { blockType: 'about', title: 'About Us' },
+                    ],
+                })
+            })
+
+            const res = await EditBlockPOST(req)
+            expect(res.status).toBe(200)
+            const data = await res.json()
+            expect(data.action).toBe('update_multiple_blocks')
+            expect(data.updates).toHaveLength(1)
+            expect(data.updates[0].blockIndex).toBe(0)
         })
     })
 

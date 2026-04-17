@@ -90,13 +90,28 @@ export function resolveTheme(
         fontBody = DEFAULT_BODY_FONT
     }
 
+    // Mode-dependent defaults — used when the stored color matches the
+    // *opposite* mode's default, meaning it was never explicitly customized.
+    // Without this check, switching dark→light keeps a dark background.
+    const DARK_DEFAULTS = { bg: '#09090b', surface: '#111111', text: '#fafafa', muted: '#a1a1aa' }
+    const LIGHT_DEFAULTS = { bg: '#ffffff', surface: '#f8f8f8', text: '#09090b', muted: '#71717a' }
+
+    const resolveColor = (value: string | undefined, darkDefault: string, lightDefault: string): string => {
+        if (!value) return isDark ? darkDefault : lightDefault
+        // If the stored value matches the opposite mode's default, reset to current mode's default
+        // Hex is case-insensitive: `#FFFFFF` must match `#ffffff`
+        const opposite = isDark ? lightDefault : darkDefault
+        if (value.toLowerCase() === opposite.toLowerCase()) return isDark ? darkDefault : lightDefault
+        return value
+    }
+
     const resolved: ThemeConfig = {
         primaryColor,
         secondaryColor: partial.secondaryColor || '#d946ef',
         accentColor: partial.accentColor || lightenHex(primaryColor, 15),
-        surfaceColor: partial.surfaceColor || (isDark ? '#111111' : '#f8f8f8'),
-        textColor: partial.textColor || (isDark ? '#fafafa' : '#09090b'),
-        mutedColor: partial.mutedColor || (isDark ? '#a1a1aa' : '#71717a'),
+        surfaceColor: resolveColor(partial.surfaceColor, '#111111', '#f8f8f8'),
+        textColor: resolveColor(partial.textColor, '#fafafa', '#09090b'),
+        mutedColor: resolveColor(partial.mutedColor, '#a1a1aa', '#71717a'),
 
         fontPairingId: partial.fontPairingId ?? null,
         fontHeading,
@@ -107,7 +122,7 @@ export function resolveTheme(
         shadowPreset: partial.shadowPreset || 'subtle',
 
         colorMode,
-        backgroundColor: partial.backgroundColor || (isDark ? '#09090b' : '#ffffff'),
+        backgroundColor: resolveColor(partial.backgroundColor, '#09090b', '#ffffff'),
     }
 
     return resolved

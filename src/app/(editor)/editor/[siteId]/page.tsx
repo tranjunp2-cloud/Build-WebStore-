@@ -581,6 +581,21 @@ export default function EditorPage() {
                 break
             }
 
+            case 'update_multiple_blocks': {
+                if (!action.updates?.length) break
+
+                const { blocks: currentBlocks, theme: currentTheme, pushBatch } = useEditorStore.getState()
+                const newBlocks = [...currentBlocks]
+                for (const update of action.updates) {
+                    const idx = update.blockIndex
+                    if (idx >= 0 && idx < newBlocks.length) {
+                        newBlocks[idx] = { ...newBlocks[idx], ...update.changes }
+                    }
+                }
+                pushBatch(newBlocks, currentTheme, action.message || 'Updated multiple sections')
+                break
+            }
+
             case 'undo': {
                 if (canUndo()) {
                     undo()

@@ -169,6 +169,47 @@ describe('AIChatPanel', () => {
         expect(screen.getByText('External edit detected')).toBeInTheDocument()
     })
     
+    it('calls onAIAction with update_multiple_blocks from API response', async () => {
+        const multiBlockResponse = {
+            action: 'update_multiple_blocks',
+            updates: [
+                { blockIndex: 0, changes: { headline: 'Xin chào' } },
+                { blockIndex: 1, changes: { title: 'Về chúng tôi' } },
+            ],
+            message: 'Translated all sections to Vietnamese.',
+        }
+
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve(multiBlockResponse),
+        })
+
+        render(<AIChatPanel {...defaultProps} />)
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i)
+
+        fireEvent.change(input, { target: { value: 'Translate everything to Vietnamese' } })
+        await act(async () => {
+            fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', charCode: 13 })
+        })
+
+        await waitFor(() => {
+            expect(defaultProps.onAIAction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: 'update_multiple_blocks',
+                    updates: expect.arrayContaining([
+                        expect.objectContaining({ blockIndex: 0 }),
+                        expect.objectContaining({ blockIndex: 1 }),
+                    ]),
+                })
+            )
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText('Translated all sections to Vietnamese.')).toBeInTheDocument()
+        })
+    })
+
     it('prompts chip auto-fills input and submits', async () => {
         const mockFetch = vi.fn().mockResolvedValue({
             ok: true,
