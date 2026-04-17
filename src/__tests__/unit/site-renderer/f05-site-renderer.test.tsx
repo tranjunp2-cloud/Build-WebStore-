@@ -234,14 +234,15 @@ describe('[TC-F04-SR-02] SiteRenderer passes resolved theme config to block comp
             />
         )
 
-        // Assert — defaults from SiteRenderer source code
+        // Assert — defaults from SiteRenderer source code.
+        // Plan 260417 Wave 1 A2 — fallback changed dark cyan/magenta → light slate.
         expect(capturedProps[0]).toMatchObject({
-            primaryColor: '#0ea5e9',
-            secondaryColor: '#d946ef',
-            backgroundColor: '#09090b',
+            primaryColor: '#111827',
+            secondaryColor: '#374151',
+            backgroundColor: '#ffffff',
             fontHeading: 'Outfit',
             fontBody: 'Inter',
-            colorMode: 'dark',
+            colorMode: 'light',
         })
     })
 
@@ -774,10 +775,10 @@ describe('[TC-S1-004] SiteRenderer backward compat — legacy site with 2 colors
         // Act
         const { container } = render(<SiteRenderer site={site} page={{ layout: [] }} />)
 
-        // Assert
+        // Assert — Plan 260417 Wave 1 A2: fallback now light slate.
         const css = container.querySelector('style')?.textContent || ''
-        expect(css).toContain('--brand-primary: #0ea5e9')
-        expect(css).toContain('--brand-secondary: #d946ef')
+        expect(css).toContain('--brand-primary: #111827')
+        expect(css).toContain('--brand-secondary: #374151')
         expect(css).toContain('--font-heading:')
         expect(css).toContain('--font-body:')
         expect(css).toContain('--space-md:')
