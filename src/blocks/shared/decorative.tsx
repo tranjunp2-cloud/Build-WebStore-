@@ -3,7 +3,21 @@
 /**
  * Shared decorative SVG components for block renderers.
  * Adds visual richness without requiring actual images.
+ *
+ * Phase A4 (260417) — 8 new primitives in ./decorative/* unlock per-variant
+ * "decorative vocabulary" so 10 sites in the same category no longer share
+ * the same gradient blob. Each block variant pins to a specific primitive
+ * (see docs/design/decorative-vocabulary.md).
  */
+
+export { MeshGradient } from './decorative/MeshGradient'
+export { NoiseTexture } from './decorative/NoiseTexture'
+export { LayeredShapes } from './decorative/LayeredShapes'
+export { AsymmetricGrid } from './decorative/AsymmetricGrid'
+export { DuotoneOverlay } from './decorative/DuotoneOverlay'
+export { TypographicMark } from './decorative/TypographicMark'
+export { GridLines } from './decorative/GridLines'
+export { DiagonalStripe } from './decorative/DiagonalStripe'
 
 // ── Gradient Blob — soft background accent ──────────────────────────────────
 
