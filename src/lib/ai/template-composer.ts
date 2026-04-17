@@ -6,6 +6,7 @@ import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
 import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
 import { getBlogSeeds } from './content/blog-seeds'
+import { pickLogosByCategory } from './content/client-logos-library'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -1172,18 +1173,19 @@ export function buildServiceCards(biz: BusinessSample, category: string): Record
   }
 }
 
-function buildClientLogos(): Record<string, unknown> {
+function buildClientLogos(category?: string, seed = 0): Record<string, unknown> {
+  // Plan 260417-0837 item 1.4 — real MY brand names instead of Client A..E stubs.
+  // URL omitted until logo asset pipeline ships; renderers fall back to name-only
+  // badge when url missing (safer than broken <img>).
+  const picks = pickLogosByCategory(category, 6, seed)
   return {
     blockType: 'client-logos',
     variant: 'scroll',
     headline: 'Trusted By',
-    logos: [
-      { url: 'https://placehold.co/200x80/e2e8f0/64748b?text=Client+A', alt: 'Client A' },
-      { url: 'https://placehold.co/200x80/e2e8f0/64748b?text=Client+B', alt: 'Client B' },
-      { url: 'https://placehold.co/200x80/e2e8f0/64748b?text=Client+C', alt: 'Client C' },
-      { url: 'https://placehold.co/200x80/e2e8f0/64748b?text=Client+D', alt: 'Client D' },
-      { url: 'https://placehold.co/200x80/e2e8f0/64748b?text=Client+E', alt: 'Client E' },
-    ],
+    logos: picks.map((l) => ({
+      alt: l.name,
+      ...(l.url ? { url: l.url } : {}),
+    })),
   }
 }
 
@@ -1287,7 +1289,7 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
     case 'service-cards':
       return buildServiceCards(biz, category)
     case 'client-logos':
-      return buildClientLogos()
+      return buildClientLogos(category)
     case 'feature-comparison':
       return buildFeatureComparison()
     case 'pricing-table':
@@ -1721,7 +1723,7 @@ function buildBlockFromSpec(
       return { ...buildNewsletter(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'logo-cloud':
     case 'client-logos':
-      return { ...buildClientLogos(), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildClientLogos(category, compositionSeed ?? 0), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     // Industry-specific blocks
     case 'menu-display':
       return buildMenuDisplay(content)

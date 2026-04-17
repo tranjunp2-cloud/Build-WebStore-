@@ -52,6 +52,18 @@ export const travelContent: CategoryContent = {
       heroSubheadline:
         'Heritage walks, Peranakan cuisine, and living history — experience Melaka and Penang like a local.',
     },
+    {
+      name: 'Sabah Diver Escapes',
+      tagline: 'PADI 5-Star Dive Centre — Mabul, Sipadan & Kapalai',
+      description:
+        'Sabah Diver Escapes is a PADI 5-Star IDC dive centre based in Semporna with direct access to Sipadan, Mabul, and Kapalai. 3D2N Mabul Resort dive package (RM 1,980/pax, 8 dives), 4D3N Kapalai Water Villa (RM 2,890/pax), Sipadan permit arranged. PADI Open Water course RM 1,350. Equipment rental + nitrox available.',
+      address: 'Jetty 2, Semporna Seafront, 91300 Semporna, Sabah',
+      phone: '+60 89-781 1200',
+      email: 'dive@sabahdiver.my',
+      heroHeadline: 'Dive Sipadan, Mabul, Kapalai',
+      heroSubheadline:
+        'PADI 5-Star dive centre with Sipadan permits — explore Malaysia\'s world-class reefs from Semporna.',
+    },
   ],
   testimonials: [
     {

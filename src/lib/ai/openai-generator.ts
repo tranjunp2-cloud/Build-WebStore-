@@ -9,7 +9,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { buildSystemPrompt, buildPersonalizePrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
-import { composeFallbackResult } from './fallback-adapter'
+import { composeTemplateResult } from './fallback-adapter'
 import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
@@ -171,12 +171,22 @@ export async function generateSiteWithAI(
             // a clear attribution.
             if (err && typeof err === 'object') {
                 const apiErr = err as { status?: number; message?: string; error?: unknown }
+                // Plan 260417-0837 item 1.7 — structured logging for OpenAI 400
+                // parse failures. Prior logs lacked biz name/desc/reqBytes which
+                // are the three things we need to repro. No root-cause chase
+                // here, just surface enough signal to diagnose next session.
+                const bizName = (businessInfo.businessName ?? '').slice(0, 100)
+                const bizDesc = (businessInfo.shortDescription ?? '').slice(0, 200)
+                const reqBytes = systemPrompt.length + userPromptText.length
                 console.error(
-                    `[AI] OpenAI call FAILED status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} msg=${String(apiErr.message).slice(0, 300)}`,
+                    `[AI-400] OpenAI FAIL status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} reqBytes=${reqBytes} bizName="${bizName}" msg=${String(apiErr.message).slice(0, 300)}`,
                 )
+                if (bizDesc) {
+                    console.error(`[AI-400] bizDesc="${bizDesc}"`)
+                }
                 if (apiErr.error) {
                     try {
-                        console.error(`[AI] OpenAI error body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
+                        console.error(`[AI-400] body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
                     } catch {
                         // ignore serialization failures
                     }
@@ -310,11 +320,13 @@ export async function generateSiteWithAI(
                 const rawPage = rawPages[p] as Record<string, unknown>
                 let pageBlocks = validateBlocks(Array.isArray(rawPage.blocks) ? rawPage.blocks : [])
 
-                // Plan 260415 Phase 04 — post-AI content swap runs on homepage
-                // only. Swaps generic AI-emitted blocks (hero/features/about/
-                // etc.) for curated composer output when content matches the
-                // generic blacklist AND doesn't reference user data.
-                if (p === 0 && postSwapEnabled && detectedCategory) {
+                // Plan 260417-0837 item 1.3 — post-AI content swap (hero/features/
+                // testimonials/faq/about/cta) now runs on ALL pages, not just
+                // homepage. SWAPPABLE_BLOCKS are shape-preserving — only the
+                // copy gets replaced with curated MY content when AI hits the
+                // generic blacklist. Safe on sub-pages because no block is
+                // injected; missing blocks stay missing.
+                if (postSwapEnabled && detectedCategory) {
                     const swapResult = postAISwapStep(
                         pageBlocks as Record<string, unknown>[],
                         enforcerBizOverride,
@@ -325,7 +337,12 @@ export async function generateSiteWithAI(
                     swapTelemetry.push(...swapResult.telemetry)
                 }
 
-                // Apply structure enforcer — full enforcement for homepage, item padding for sub-pages
+                // Structure enforcement — homepage gets full `enforceMinimumStructure`
+                // (injects nav/footer/hero/mandatory blocks + pads to minBlocks).
+                // That logic is unsafe on sub-pages because it'd add nav+footer
+                // twice or inject mandatory blocks that don't belong on /about
+                // etc. Sub-pages still get item padding + grid alignment via the
+                // other enforcers below (plan 1.3 B5 fix).
                 if (detectedCategory) {
                     if (p === 0) {
                         pageBlocks = enforceMinimumStructure(
@@ -334,7 +351,6 @@ export async function generateSiteWithAI(
                             enforcerCtx,
                         ) as typeof pageBlocks
                     }
-                    // B5 fix: enforceMinItems + grid alignment on ALL pages (not just homepage)
                     pageBlocks = enforceMinItems(
                         pageBlocks as Record<string, unknown>[],
                         detectedCategory,
@@ -559,7 +575,7 @@ function generateWithFallback(
     let composerResult: GenerationResult | null = null
     let composerErrMsg: string | null = null
     try {
-        composerResult = composeFallbackResult(prompt, seed, language, businessInfo)
+        composerResult = composeTemplateResult(prompt, seed, language, businessInfo)
     } catch (composerError: unknown) {
         composerErrMsg = composerError instanceof Error ? composerError.message : String(composerError)
     }
@@ -1904,12 +1920,13 @@ async function generateTemplateFirst(
     const { preset: themePreset } = pickCategoryThemeWithMood(presetCategory, themeSeed)
     const resolvedLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
 
-    console.log(`[Template-First] category=${presetCategory} seed=${themeSeed} lang=${resolvedLang}`)
+    // Plan 260417-0837 item 1.2 — confirm template-first is the default path.
+    console.log(`[AI] path=template-first category=${presetCategory} seed=${themeSeed} lang=${resolvedLang}`)
 
     // Run composer + GPT personalize in parallel
     const [composerSettled, personalizeSettled] = await Promise.allSettled([
         // Composer: build full 5-page site from library (~0.5s)
-        Promise.resolve().then(() => composeFallbackResult(promptText, themeSeed, resolvedLang, businessInfo)),
+        Promise.resolve().then(() => composeTemplateResult(promptText, themeSeed, resolvedLang, businessInfo)),
         // GPT: personalize 4 text fields (~3-8s, timeout 10s)
         personalizeWithGPT(openai, businessInfo, presetCategory, resolvedLang),
     ])

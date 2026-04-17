@@ -52,6 +52,18 @@ export const blogContent: CategoryContent = {
       heroSubheadline:
         'Trend reports, designer spotlights, and beauty reviews — celebrating the best of Malaysian fashion.',
     },
+    {
+      name: 'Duit Pintar MY',
+      tagline: 'Personal Finance for Working Malaysians',
+      description:
+        'Duit Pintar MY is a trusted personal finance blog helping Malaysians make smarter money decisions. Weekly articles cover EPF optimisation, Tabung Haji, Amanah Saham, stock picks on Bursa Malaysia, income tax relief strategies, and mortgage comparison. 45,000 subscribers and 1.2M monthly pageviews.',
+      address: 'Suite 8-3, Menara UOA Bangsar, Jalan Bangsar Utama 1, 59000 Kuala Lumpur',
+      phone: '+60 3-2283 5588',
+      email: 'hello@duitpintar.my',
+      heroHeadline: 'Smart Money Moves for Malaysians',
+      heroSubheadline:
+        'EPF tips, tax hacks, and investment guides — practical personal finance for Malaysians who want to build wealth.',
+    },
   ],
   testimonials: [
     {

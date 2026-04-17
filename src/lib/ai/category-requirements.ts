@@ -103,7 +103,7 @@ export const CATEGORY_REQUIREMENTS: Readonly<Record<string, CategoryRequirement>
         minItems: { testimonials: 3, features: 4, gallery: 6, stats: 3 },
     },
     blog: {
-        minBlocks: 9,
+        minBlocks: 10,
         mandatoryBlocks: ['navigation', 'hero', 'features', 'newsletter', 'cta', 'footer'],
         recommendedBlocks: ['about', 'testimonials', 'stats', 'faq'],
         minItems: { features: 4, testimonials: 3, faq: 4 },
