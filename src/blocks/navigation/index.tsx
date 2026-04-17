@@ -9,7 +9,6 @@ import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
-import { normalizeInternalUrl, normalizeNavLinks } from '@/lib/utils/normalize-internal-url'
 
 // Token shortcut: nav containers consume CONTAINER.default + INNER_PADDING.
 // h-16 stays because nav row height is a layout invariant, not section padding.
@@ -346,15 +345,7 @@ function NavMobileMenuDrawer({
 
 export function NavigationBlock({ block, theme, site }: BlockProps<NavigationConfig>) {
     const mergedBlock = mergeNavigationBrandingWithSite(block, site)
-    const { logoText, variant = 'simple' } = mergedBlock
-    // Normalize nav URLs so AI-seeded links like `/Services` (label cased)
-    // resolve to the stored slug `/services`. Applied once here; all variant
-    // sub-components receive the cleaned data. See
-    // `src/lib/utils/normalize-internal-url.ts` for the rule set.
-    const links = normalizeNavLinks(mergedBlock.links)
-    const ctaButton = mergedBlock.ctaButton
-        ? { ...mergedBlock.ctaButton, url: normalizeInternalUrl(mergedBlock.ctaButton.url) }
-        : undefined
+    const { logoText, links = [], ctaButton, variant = 'simple' } = mergedBlock
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const scrolled = useScrollShrink(50)
 

@@ -10,7 +10,6 @@ import { FooterNewsletterForm } from './FooterNewsletterForm'
 import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { normalizeFooterColumns } from '@/lib/utils/normalize-internal-url'
 import {
     SECTION_PADDING,
     CONTAINER,
@@ -226,10 +225,7 @@ const FOOTER_DIVIDER_STYLE = { borderTop: `1px solid rgba(var(--brand-primary-rg
 export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterConfig>) {
     void _theme
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
-    const { logoText, tagline, copyrightText, variant = 'simple' } = mergedBlock
-    // Normalize link URLs in every column — same reason as nav (AI gen uses
-    // label casing like `/Services` which breaks slug lookup).
-    const columns = normalizeFooterColumns(mergedBlock.columns ?? [])
+    const { logoText, tagline, columns = [], copyrightText, variant = 'simple' } = mergedBlock
     // Plan 260415 Lỗi G-pattern — safe String cast cho siteId (dùng trong newsletter form POST)
     const siteId = site?.id != null ? String(site.id) : undefined
 
