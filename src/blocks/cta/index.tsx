@@ -9,11 +9,11 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
-const CTA_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 const FLOATING_STORAGE_PREFIX = 'cta-floating-dismissed-'
 const FLOATING_DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
@@ -162,30 +162,32 @@ function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string
 function BannerVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
     const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary', secondaryCtaLabel, secondaryCtaUrl } = block
     return (
-        <AnimatedSection
-            className="py-20 md:py-28"
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="relaxed"
+            container="default"
+            className="!py-20 md:!py-28"
+            innerClassName="text-center max-w-3xl"
             style={{
                 background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
                 color: '#ffffff',
             }}
         >
-            <div className={`${CTA_CONTAINER} text-center max-w-3xl`}>
-                <Heading level={2} className="mb-4 leading-tight">
-                    <RichText text={headline} as="span" />
-                </Heading>
-                {subheadline && (
-                    <Body size="lg" className="opacity-85 mb-8 max-w-xl mx-auto">
-                        <RichText text={subheadline} as="span" />
-                    </Body>
+            <Heading level={2} className="mb-4 leading-tight">
+                <RichText text={headline} as="span" />
+            </Heading>
+            {subheadline && (
+                <Body size="lg" className="opacity-85 mb-8 max-w-xl mx-auto">
+                    <RichText text={subheadline} as="span" />
+                </Body>
+            )}
+            <div className="flex flex-wrap items-center justify-center gap-4">
+                <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" siteId={siteId} onInverseBg />
+                {secondaryCtaLabel && secondaryCtaUrl && (
+                    <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} onInverseBg />
                 )}
-                <div className="flex flex-wrap items-center justify-center gap-4">
-                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" siteId={siteId} onInverseBg />
-                    {secondaryCtaLabel && secondaryCtaUrl && (
-                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} onInverseBg />
-                    )}
-                </div>
             </div>
-        </AnimatedSection>
+        </SectionWrapper>
     )
 }
 
@@ -196,28 +198,31 @@ function BannerVariant({ block, siteId }: { block: CTAConfig; siteId?: string })
 function InlineVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
     const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary', secondaryCtaLabel, secondaryCtaUrl } = block
     return (
-        <AnimatedSection className="py-12 md:py-16" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
-            <div className={CTA_CONTAINER}>
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6 max-w-5xl mx-auto">
-                    <div className="flex-1 max-w-2xl text-center md:text-left">
-                        <Heading level={3} className="mb-2">
-                            <RichText text={headline} as="span" />
-                        </Heading>
-                        {subheadline && (
-                            <Body style={{ color: CSS_VARS.muted }}>
-                                <RichText text={subheadline} as="span" />
-                            </Body>
-                        )}
-                    </div>
-                    <div className="flex-shrink-0 flex flex-wrap items-center gap-3 justify-center">
-                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="inline" siteId={siteId} />
-                        {secondaryCtaLabel && secondaryCtaUrl && (
-                            <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
-                        )}
-                    </div>
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="compact"
+            container="default"
+            style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
+        >
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 max-w-5xl mx-auto">
+                <div className="flex-1 max-w-2xl text-center md:text-left">
+                    <Heading level={3} className="mb-2">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body style={{ color: CSS_VARS.muted }}>
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
+                </div>
+                <div className="flex-shrink-0 flex flex-wrap items-center gap-3 justify-center">
+                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="inline" siteId={siteId} />
+                    {secondaryCtaLabel && secondaryCtaUrl && (
+                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
+                    )}
                 </div>
             </div>
-        </AnimatedSection>
+        </SectionWrapper>
     )
 }
 
@@ -229,34 +234,38 @@ function InlineVariant({ block, siteId }: { block: CTAConfig; siteId?: string })
 function CardVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
     const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary', secondaryCtaLabel, secondaryCtaUrl } = block
     return (
-        <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
-            <div className={CTA_CONTAINER}>
-                <div
-                    className="max-w-xl mx-auto text-center p-10 md:p-12"
-                    style={{
-                        background: CSS_VARS.surface,
-                        borderRadius: CSS_VARS.radiusLg,
-                        boxShadow: CSS_VARS.shadowLg,
-                        border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
-                    }}
-                >
-                    <Heading level={3} className="mb-3">
-                        <RichText text={headline} as="span" />
-                    </Heading>
-                    {subheadline && (
-                        <Body className="mb-8" style={{ color: CSS_VARS.muted }}>
-                            <RichText text={subheadline} as="span" />
-                        </Body>
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="default"
+            container="default"
+            className="!py-16 md:!py-20"
+            style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
+        >
+            <div
+                className="max-w-xl mx-auto text-center p-10 md:p-12"
+                style={{
+                    background: CSS_VARS.surface,
+                    borderRadius: CSS_VARS.radiusLg,
+                    boxShadow: CSS_VARS.shadowLg,
+                    border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
+                }}
+            >
+                <Heading level={3} className="mb-3">
+                    <RichText text={headline} as="span" />
+                </Heading>
+                {subheadline && (
+                    <Body className="mb-8" style={{ color: CSS_VARS.muted }}>
+                        <RichText text={subheadline} as="span" />
+                    </Body>
+                )}
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="card" siteId={siteId} />
+                    {secondaryCtaLabel && secondaryCtaUrl && (
+                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
                     )}
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="card" siteId={siteId} />
-                        {secondaryCtaLabel && secondaryCtaUrl && (
-                            <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
-                        )}
-                    </div>
                 </div>
             </div>
-        </AnimatedSection>
+        </SectionWrapper>
     )
 }
 

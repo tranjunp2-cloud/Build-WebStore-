@@ -5,6 +5,7 @@ import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
+import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
 
 const updatePageSchema = z.object({
@@ -80,6 +81,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const page = await payload.findByID({
             collection: 'pages',
             id: pageId,
+            draft: true,
         })
         const pageSiteId = typeof page?.site === 'object' ? page.site?.id : page?.site
 
@@ -133,11 +135,56 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             return new NextResponse('No fields to update', { status: 400 })
         }
 
-        const updatedPage = await payload.update({
+        // Split visibility fields from content fields to avoid publishing
+        // draft content when only toggling hide/delete.
+        const visibilityFields: Record<string, unknown> = {}
+        const contentFields: Record<string, unknown> = {}
+        for (const [key, val] of Object.entries(updateData)) {
+            if (key === 'deletedAt' || key === 'isVisible') {
+                visibilityFields[key] = val
+            } else {
+                contentFields[key] = val
+            }
+        }
+
+        // Publish visibility changes immediately so live site reflects them
+        if (Object.keys(visibilityFields).length > 0) {
+            await payload.update({
+                collection: 'pages',
+                id: pageId,
+                data: visibilityFields,
+                draft: false,
+            })
+        }
+
+        // Content changes stay as draft until explicit publish
+        if (Object.keys(contentFields).length > 0) {
+            await payload.update({
+                collection: 'pages',
+                id: pageId,
+                data: contentFields,
+                draft: true,
+            })
+        }
+
+        // Re-read page — use draft:true only when content fields were updated,
+        // otherwise read published version to reflect visibility changes accurately
+        const hasContentChanges = Object.keys(contentFields).length > 0
+        const updatedPage = await payload.findByID({
             collection: 'pages',
             id: pageId,
-            data: updateData,
+            draft: hasContentChanges,
         })
+
+        // BUG-F05-11: revalidate site cache when page is deleted/hidden
+        // so live site reflects the change immediately
+        if (updateData.deletedAt !== undefined || updateData.isVisible !== undefined) {
+            try {
+                revalidateTag(`site-${siteId}`)
+            } catch (err) {
+                console.warn(`[Pages] revalidateTag failed for site-${siteId}:`, err instanceof Error ? err.message : err)
+            }
+        }
 
         return NextResponse.json({
             page: {

@@ -7,16 +7,18 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
+import { getGalleryImages } from '@/lib/images/industry-images'
 
 void _CSS_VARS
 
-const PG_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
-
 function PortfolioGridSection({ children }: { children: ReactNode }) {
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={PG_CONTAINER}>{children}</div>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                {children}
+            </SectionWrapper>
         </AnimatedSection>
     )
 }
@@ -53,8 +55,18 @@ function ProjectCard({ project, className = '' }: ProjectCardProps) {
     )
 }
 
-export function PortfolioGridBlock({ block }: BlockProps<PortfolioGridConfig>) {
-    const { headline, subheadline, projects = [], variant = 'grid' } = block
+export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConfig>) {
+    const { headline, subheadline, projects: rawProjects = [], variant = 'grid' } = block
+    const category = (site?.siteType as string) || 'business'
+
+    // Fallback to industry images when all projects lack image URLs
+    const hasAnyImage = rawProjects.some((p) => p.imageUrl)
+    const projects = hasAnyImage
+        ? rawProjects
+        : rawProjects.map((p, i) => ({
+            ...p,
+            imageUrl: getGalleryImages(category, rawProjects.length)[i] || getGalleryImages(category, 1)[0],
+        }))
 
     const categories = useMemo(() => {
         const cats = Array.from(new Set(projects.map((p) => p.category)))

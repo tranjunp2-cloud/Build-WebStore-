@@ -46,4 +46,5 @@ export const doctorProfileMeta = {
     defaultVariant: 'cards',
     editableFields: ['headline', 'subheadline', 'doctors'],
     quickActions: ['Add doctor', 'Update availability', 'Edit qualifications'],
+    aiVisible: false,
 }

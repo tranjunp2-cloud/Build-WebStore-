@@ -8,7 +8,8 @@ import type { FAQConfig, FAQItem } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 /**
  * Plan 260415 Lỗi G + Decision 4 — FAQ answer accept cả `string` (legacy) và
@@ -24,18 +25,17 @@ function FAQAnswer({ answer }: { answer: FAQItem['answer'] }) {
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 
-const FAQ_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
-const FAQ_CONTAINER_NARROW = `${CONTAINER.narrow} mx-auto ${INNER_PADDING}`
-
 function FAQSection({ children, narrow = false, labelledBy }: { children: ReactNode; narrow?: boolean; labelledBy?: string }) {
     return (
-        <AnimatedSection
-            className={SECTION_PADDING.default}
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="default"
+            container={narrow ? 'narrow' : 'default'}
             style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
             aria-labelledby={labelledBy}
         >
-            <div className={narrow ? FAQ_CONTAINER_NARROW : FAQ_CONTAINER}>{children}</div>
-        </AnimatedSection>
+            {children}
+        </SectionWrapper>
     )
 }
 

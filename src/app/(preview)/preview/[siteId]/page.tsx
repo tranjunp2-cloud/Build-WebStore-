@@ -97,12 +97,13 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         if (!page) return <PreviewNoPage />
 
         // 4b. Ensure nav/footer on EVERY page (including homepage).
-        // BUG-F01-26: Previously only non-homepage pages got injection,
-        // so homepage with missing nav (from auto-save overwrite or AI omit)
-        // would render without menu. Now all pages get the fallback.
-        const pageLayout = (page.layout as Array<{ blockType: string }>) || []
-        const hasNav = pageLayout.some((b: { blockType: string }) => b.blockType === 'navigation')
-        const hasFooter = pageLayout.some((b: { blockType: string }) => b.blockType === 'footer')
+        // BUG-F01-26: Check for WORKING nav (with links), not just block presence.
+        // A nav block with empty links renders as invisible thin bar.
+        const pageLayout = (page.layout as Array<{ blockType: string; links?: unknown[]; columns?: unknown[]; [k: string]: unknown }>) || []
+        const existingNav = pageLayout.find((b) => b.blockType === 'navigation')
+        const hasNav = Boolean(existingNav && Array.isArray(existingNav.links) && existingNav.links.length > 0)
+        const existingFooter = pageLayout.find((b) => b.blockType === 'footer')
+        const hasFooter = Boolean(existingFooter)
 
         if (!hasNav || !hasFooter) {
             // Check site-level headerBlock/footerBlock first
@@ -129,12 +130,12 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 }
             }
 
-            // Last resort: build minimal default nav/footer
+            // Last resort: build default nav/footer
             if (!navBlock && !hasNav) {
                 const siteName = (site.name as string) || 'My Website'
                 navBlock = {
                     blockType: 'navigation',
-                    variant: 'minimal',
+                    variant: 'simple',
                     logoText: siteName,
                     links: [
                         { label: 'Home', url: '/' },
@@ -155,9 +156,15 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 } as Record<string, unknown>
             }
 
+            // Strip broken nav/footer blocks (exist but empty) before injecting working ones
+            const cleanedLayout = pageLayout.filter((b) => {
+                if (b.blockType === 'navigation' && !hasNav) return false
+                return true
+            })
+
             const injectedLayout = [
                 ...(!hasNav && navBlock ? [navBlock] : []),
-                ...pageLayout,
+                ...cleanedLayout,
                 ...(!hasFooter && footerBlock ? [footerBlock] : []),
             ]
             page = { ...page, layout: injectedLayout }

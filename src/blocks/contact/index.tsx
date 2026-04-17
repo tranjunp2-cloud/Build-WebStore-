@@ -12,11 +12,10 @@ import { Mail, Phone, MapPin, Loader2 } from 'lucide-react'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
-
-const CONTACT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
 type ContactSectionProps = {
     showBlob?: boolean
@@ -26,15 +25,20 @@ type ContactSectionProps = {
 
 /** Outer wrapper for 5/6 variants. Minimal-inline uses py-8 custom. */
 function ContactSection({ showBlob = true, compact = false, children }: ContactSectionProps) {
-    const padding = compact ? 'py-8' : SECTION_PADDING.default
     return (
-        <AnimatedSection className={`${padding} relative overflow-hidden`}>
+        <AnimatedSection className="relative overflow-hidden">
             {showBlob && (
                 <GradientBlob color={CSS_VARS.primary} className="top-[20%] left-[-5%]" size={400} opacity={0.06} />
             )}
-            <div className={`${CONTACT_CONTAINER} relative z-10`}>
+            <SectionWrapper
+                as="div"
+                padding={compact ? 'compact' : 'default'}
+                container="default"
+                background="transparent"
+                innerClassName="relative z-10"
+            >
                 {children}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }
@@ -322,12 +326,12 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     // ── Card Float variant ────────────────────────────────────────────────
     if (variant === 'card-float') {
         return (
-            <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden`}>
+            <AnimatedSection className="relative overflow-hidden">
                 <div
                     className="absolute inset-0"
                     style={{ background: `linear-gradient(180deg, rgba(var(--brand-primary-rgb), 0.05), transparent)` }}
                 />
-                <div className={`${CONTACT_CONTAINER} relative z-10`}>
+                <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                     <ContactHeader headline={headline} subtext={subtext} className="text-center max-w-2xl mx-auto mb-10" />
 
                     {/* Plan 260415 contact-bugfix — Floating card dùng theme surface
@@ -380,7 +384,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                             </a>
                         )}
                     </div>
-                </div>
+                </SectionWrapper>
             </AnimatedSection>
         )
     }
@@ -446,8 +450,8 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     // Compact py-8 layout, skip blob. Inline Send button gets TOUCH_TARGET.min.
     if (variant === 'minimal-inline') {
         return (
-            <AnimatedSection className="py-8 relative">
-                <div className={CONTACT_CONTAINER}>
+            <AnimatedSection className="relative">
+                <SectionWrapper as="div" padding="compact" container="default" background="transparent">
                     {headline && (
                         <div className="mb-6">
                             <Heading level={3}>
@@ -466,7 +470,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                         className="flex flex-wrap gap-4 items-start"
                         submitLabel="Send"
                     />
-                </div>
+                </SectionWrapper>
             </AnimatedSection>
         )
     }

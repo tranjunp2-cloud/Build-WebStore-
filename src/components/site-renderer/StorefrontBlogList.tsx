@@ -15,11 +15,12 @@ interface BlogPost {
 
 interface StorefrontBlogListProps {
     tenantId: string
+    tenantSlug?: string
 }
 
 const POSTS_PER_PAGE = 12
 
-export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
+export function StorefrontBlogList({ tenantId, tenantSlug }: StorefrontBlogListProps) {
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [totalDocs, setTotalDocs] = useState(0)
     const [page, setPage] = useState(1)
@@ -28,6 +29,9 @@ export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
     const [loading, setLoading] = useState(true)
     const [searchInput, setSearchInput] = useState('')
     const [search, setSearch] = useState('')
+
+    // BUG-F05-06: build blog links using server-provided tenant slug
+    const blogBasePath = tenantSlug ? `/sites/${tenantSlug}/blogs` : '/blogs'
 
     // Restore scroll position when returning from blog detail
     useEffect(() => {
@@ -176,7 +180,7 @@ export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
                 {posts.map(post => (
                     <a
                         key={post.id}
-                        href={`/blogs/${post.slug}`}
+                        href={`${blogBasePath}/${post.slug}`}
                         onClick={() => sessionStorage.setItem('blog-list-scroll', String(window.scrollY))}
                         className="group rounded-2xl overflow-hidden border border-white/5 hover:border-white/15 transition-all hover:shadow-2xl"
                     >

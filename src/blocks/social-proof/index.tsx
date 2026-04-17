@@ -6,7 +6,9 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING } from '@/lib/design-tokens'
+import { CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
+import { getTeamAvatar } from '@/lib/images/industry-images'
 
 function StarRating({ rating, color }: { rating: number; color: string }) {
     return (
@@ -80,13 +82,20 @@ function ReviewCard({ review, color, variant }: { review: SocialProofReview; col
     )
 }
 
-export function SocialProofBlock({ block, theme: _theme }: BlockProps<SocialProofConfig>) {
+export function SocialProofBlock({ block, theme: _theme, site }: BlockProps<SocialProofConfig>) {
     void _theme
-    const { variant = 'cards', headline, reviews = [] } = block
+    const { variant = 'cards', headline, reviews: rawReviews = [] } = block
+    const category = (site?.siteType as string) || 'business'
+
+    // Fallback: add avatar from industry images for reviews missing avatars (per-item)
+    const reviews = rawReviews.map((review, i) => ({
+        ...review,
+        avatar: review.avatar || getTeamAvatar(category, i),
+    }))
 
     return (
-        <AnimatedSection className={SECTION_PADDING.default}>
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent">
                 {headline && (
                     <div className="text-center mb-14">
                         <Heading level={2}>
@@ -108,7 +117,7 @@ export function SocialProofBlock({ block, theme: _theme }: BlockProps<SocialProo
                         ))}
                     </div>
                 )}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

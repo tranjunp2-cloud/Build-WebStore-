@@ -6,14 +6,14 @@
 
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
-import { buildSystemPrompt, type BusinessInfoInput } from './system-prompt'
+import { buildSystemPrompt, buildPersonalizePrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
 import { composeFallbackResult } from './fallback-adapter'
 import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
-import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
+import { enforceMinimumStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
 import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { pickRecipe } from './category-recipes'
@@ -74,6 +74,30 @@ export async function generateSiteWithAI(
     if (!openai) {
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
         return generateWithFallback(promptText, events, 'en', businessInfo)
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    // Template-first pipeline (default since 260416-1450 plan).
+    //
+    // Composer builds a full 5-page site from 490 curated content entries
+    // (~0.5s). GPT only personalizes 4 text fields (hero headline/sub,
+    // SEO title/desc) via gpt-4.1-nano (~3-8s). Both run in parallel.
+    //
+    // Falls back to AI-first (below) when:
+    //   - GEN_MODE=ai-first env override
+    //   - User provided extraInstructions or referencePrompt (custom input)
+    //   - Composer returns null (unknown category)
+    // ────────────────────────────────────────────────────────────────────
+    const genMode = process.env.GEN_MODE?.trim() || 'template-first'
+    const hasCustomInput = Boolean(extraInstructions?.trim()) || Boolean(referencePrompt?.trim())
+
+    if (genMode === 'template-first' && !hasCustomInput) {
+        const templateResult = await generateTemplateFirst(
+            businessInfo, language, promptText, openai, events,
+        )
+        if (templateResult) return templateResult
+        // templateResult === null → composer failed, fall through to AI-first
+        console.warn('[AI] Template-first returned null — falling back to AI-first path')
     }
 
     try {
@@ -301,18 +325,22 @@ export async function generateSiteWithAI(
                     swapTelemetry.push(...swapResult.telemetry)
                 }
 
-                // Apply structure enforcer ONLY to homepage (other pages have own content requirements)
-                if (p === 0 && detectedCategory) {
-                    pageBlocks = enforceMinimumStructure(
-                        pageBlocks as Record<string, unknown>[],
-                        detectedCategory,
-                        enforcerCtx,
-                    ) as typeof pageBlocks
+                // Apply structure enforcer — full enforcement for homepage, item padding for sub-pages
+                if (detectedCategory) {
+                    if (p === 0) {
+                        pageBlocks = enforceMinimumStructure(
+                            pageBlocks as Record<string, unknown>[],
+                            detectedCategory,
+                            enforcerCtx,
+                        ) as typeof pageBlocks
+                    }
+                    // B5 fix: enforceMinItems + grid alignment on ALL pages (not just homepage)
                     pageBlocks = enforceMinItems(
                         pageBlocks as Record<string, unknown>[],
                         detectedCategory,
                         enforcerCtx,
                     ) as typeof pageBlocks
+                    enforceGridAlignment(pageBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
                 }
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
@@ -426,6 +454,7 @@ export async function generateSiteWithAI(
                     detectedCategory,
                     enforcerCtx,
                 ) as typeof validBlocks
+                enforceGridAlignment(validBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
             }
 
             // Phase 04 — page-level guards for single-page path
@@ -1775,4 +1804,218 @@ export function sanitizeBlockData(
     }
 
     return s
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Template-first pipeline
+// ────────────────────────────────────────────────────────────────────
+
+interface PersonalizeResult {
+    heroHeadline: string
+    heroSubheadline: string
+    seoTitle: string
+    seoDescription: string
+}
+
+/**
+ * GPT-4.1-nano personalizes 4 text fields. Timeout-guarded: if GPT
+ * doesn't respond within 10s, returns null (caller uses template defaults).
+ */
+async function personalizeWithGPT(
+    openai: OpenAI,
+    businessInfo: BusinessInfoInput,
+    category: string,
+    language: 'en' | 'ms' | 'vi',
+): Promise<PersonalizeResult | null> {
+    const { system, user } = buildPersonalizePrompt(businessInfo, category, language)
+    const modelName = selectModel('personalize')
+    const callStart = Date.now()
+
+    try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 10_000)
+
+        const completion = await openai.chat.completions.create(
+            {
+                model: modelName,
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: user },
+                ],
+                temperature: 0.8,
+                max_tokens: 300,
+                response_format: { type: 'json_object' },
+            },
+            { signal: controller.signal },
+        )
+        clearTimeout(timeout)
+
+        logAiUsage({
+            endpoint: 'personalize',
+            model: completion.model,
+            tokensIn: completion.usage?.prompt_tokens ?? 0,
+            tokensOut: completion.usage?.completion_tokens ?? 0,
+            durationMs: Date.now() - callStart,
+            success: true,
+        })
+
+        const content = completion.choices[0]?.message?.content
+        if (!content) return null
+
+        const parsed = JSON.parse(content) as Record<string, unknown>
+        return {
+            heroHeadline: typeof parsed.heroHeadline === 'string' ? parsed.heroHeadline.slice(0, 100) : '',
+            heroSubheadline: typeof parsed.heroSubheadline === 'string' ? parsed.heroSubheadline.slice(0, 200) : '',
+            seoTitle: typeof parsed.seoTitle === 'string' ? parsed.seoTitle.slice(0, 60) : '',
+            seoDescription: typeof parsed.seoDescription === 'string' ? parsed.seoDescription.slice(0, 160) : '',
+        }
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`[AI] personalizeWithGPT failed (${Date.now() - callStart}ms): ${msg}`)
+        logAiUsage({
+            endpoint: 'personalize',
+            model: modelName,
+            tokensIn: 0,
+            tokensOut: 0,
+            durationMs: Date.now() - callStart,
+            success: false,
+            errorCode: err instanceof Error ? err.name : 'unknown',
+        })
+        return null
+    }
+}
+
+/**
+ * Template-first gen: composer builds site from curated library,
+ * GPT only personalizes hero headline + SEO. Both run in parallel.
+ * Returns null if composer fails (caller falls back to AI-first).
+ */
+async function generateTemplateFirst(
+    businessInfo: BusinessInfoInput,
+    language: 'en' | 'ms' | 'vi' | 'auto',
+    promptText: string,
+    openai: OpenAI,
+    events: SSEEvent[],
+): Promise<{ result: GenerationResult; events: SSEEvent[] } | null> {
+    events.push({ event: 'step', data: { step: 'composing', label: 'Building from templates...', progress: 15 } })
+
+    const presetCategory = resolveComposerCategory(promptText)
+    const themeSeed = hashBusinessName(businessInfo.businessName)
+    const { preset: themePreset } = pickCategoryThemeWithMood(presetCategory, themeSeed)
+    const resolvedLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
+
+    console.log(`[Template-First] category=${presetCategory} seed=${themeSeed} lang=${resolvedLang}`)
+
+    // Run composer + GPT personalize in parallel
+    const [composerSettled, personalizeSettled] = await Promise.allSettled([
+        // Composer: build full 5-page site from library (~0.5s)
+        Promise.resolve().then(() => composeFallbackResult(promptText, themeSeed, resolvedLang, businessInfo)),
+        // GPT: personalize 4 text fields (~3-8s, timeout 10s)
+        personalizeWithGPT(openai, businessInfo, presetCategory, resolvedLang),
+    ])
+
+    // Extract composer result
+    const composerResult = composerSettled.status === 'fulfilled' ? composerSettled.value : null
+    if (!composerResult) {
+        const reason = composerSettled.status === 'rejected'
+            ? (composerSettled.reason instanceof Error ? composerSettled.reason.message : String(composerSettled.reason))
+            : 'returned null'
+        console.warn(`[Template-First] composer failed: ${reason}`)
+        return null
+    }
+
+    // Validate composer output has blocks
+    if (!composerResult.blocks || composerResult.blocks.length < 4) {
+        console.warn(`[Template-First] composer returned ${composerResult.blocks?.length ?? 0} blocks (need ≥4)`)
+        return null
+    }
+
+    events.push({ event: 'step', data: { step: 'personalizing', label: 'AI personalizing copy...', progress: 50 } })
+
+    // Merge GPT personalization if available
+    const personalized = personalizeSettled.status === 'fulfilled' ? personalizeSettled.value : null
+    let personalizeApplied = false
+
+    if (personalized) {
+        // Merge hero headline/subheadline
+        const heroBlock = composerResult.blocks.find(
+            (b: Record<string, unknown>) => b.blockType === 'hero',
+        ) as Record<string, unknown> | undefined
+        if (heroBlock && personalized.heroHeadline) {
+            heroBlock.headline = personalized.heroHeadline
+            if (personalized.heroSubheadline) heroBlock.subheadline = personalized.heroSubheadline
+            personalizeApplied = true
+        }
+        // Merge SEO
+        if (personalized.seoTitle) {
+            composerResult.seo = {
+                ...composerResult.seo,
+                title: personalized.seoTitle,
+                description: personalized.seoDescription || composerResult.seo.description,
+            }
+        }
+    }
+
+    // ── Structure enforcement ──
+    // Composer output can be sparse (beauty has only 2 industry blocks).
+    // Run the same enforcer that the AI-first path uses to pad homepage
+    // to minBlocks and fill thin arrays (testimonials, FAQ, features).
+    const enforcerBizOverride = mapBusinessInfo(businessInfo)
+    const { mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
+    const enforcerCtx = {
+        businessName: businessInfo.businessName,
+        industry: businessInfo.industry,
+        seed: themeSeed,
+        userBiz: enforcerBizOverride,
+        mood: themeMood,
+    }
+
+    // Enforce homepage blocks
+    let homepageBlocks = composerResult.blocks as Record<string, unknown>[]
+    homepageBlocks = enforceMinimumStructure(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
+    homepageBlocks = enforceMinItems(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
+    enforceGridAlignment(homepageBlocks, presetCategory, enforcerCtx)
+    composerResult.blocks = homepageBlocks as GeneratedBlock[]
+
+    // Enforce sub-pages too (at least 4 blocks each)
+    if (composerResult.pages) {
+        for (const page of composerResult.pages) {
+            if (page.isHomepage) {
+                page.blocks = homepageBlocks as GeneratedBlock[]
+                continue
+            }
+            let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
+            pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
+            enforceGridAlignment(pageBlocks, presetCategory, enforcerCtx)
+            page.blocks = pageBlocks as GeneratedBlock[]
+        }
+    }
+
+    console.info(
+        `[Template-First] OK blocks=${composerResult.blocks.length} pages=${composerResult.pages?.length ?? 0} personalized=${personalizeApplied} gptFailed=${personalizeSettled.status === 'rejected'}`,
+    )
+
+    // Emit theme
+    events.push({ event: 'theme_set', data: { theme: composerResult.theme } })
+
+    // Emit block events for SSE streaming compat
+    for (let i = 0; i < composerResult.blocks.length; i++) {
+        const progress = 50 + Math.round((i / composerResult.blocks.length) * 40)
+        events.push({ event: 'step', data: { step: `block_${i}`, label: `Assembling block ${i + 1}/${composerResult.blocks.length}`, progress } })
+        events.push({ event: 'block_complete', data: { block: composerResult.blocks[i] as Record<string, unknown>, index: i } })
+    }
+
+    events.push({ event: 'seo_generated', data: composerResult.seo })
+    events.push({ event: 'step', data: { step: 'saving', label: 'Saving to database...', progress: 95 } })
+    events.push({
+        event: 'done',
+        data: {
+            totalBlocks: composerResult.blocks.length,
+            timeMs: 0,
+            warnings: [],
+            genMode: 'template-first',
+        },
+    })
+
+    return { result: composerResult, events }
 }

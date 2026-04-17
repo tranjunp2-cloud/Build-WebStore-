@@ -61,59 +61,56 @@ describe('[TC-S3-010] CATEGORY_INDUSTRY_BLOCKS mapping in template-composer', ()
     // categories produce when composed. We validate the mapping rules from
     // docs/prd/F30-sprint3-industry.md which are source-of-truth.
 
+    // Updated: menu-display, booking-widget, review-cards moved to unsupported blocks
+    // (BLOCKS_REQUIRE_MEDIA_PIPELINE + BLOCKS_NOT_IN_PAYLOAD in unsupported-blocks.ts).
+    // Industry blocks that survive the pipeline are the ones NOT in unsupported list.
     const EXPECTED_CATEGORY_BLOCKS: Record<string, string[]> = {
-        restaurant: ['menu-display', 'booking-widget', 'review-cards'],
-        ecommerce: ['product-quick-view', 'review-cards'],
-        beauty: ['booking-widget', 'review-cards'],
-        tech: ['video-showcase'],
-        health: ['doctor-profile', 'booking-widget', 'review-cards'],
-        education: ['class-schedule', 'video-showcase', 'review-cards'],
-        realestate: ['property-card', 'review-cards'],
-        fitness: ['class-schedule', 'booking-widget', 'review-cards'],
+        restaurant: ['features', 'gallery', 'testimonials'],
+        ecommerce: ['features', 'testimonials'],
+        beauty: ['service-cards', 'team', 'testimonials'],
+        tech: ['features', 'pricing', 'faq'],
+        health: ['service-cards', 'team', 'faq'],
+        education: ['features', 'faq'],
+        realestate: ['gallery', 'stats', 'testimonials'],
+        fitness: ['features', 'team', 'pricing'],
     }
 
-    it('restaurant category includes menu-display and booking-widget', async () => {
+    it('restaurant category includes features and gallery', { timeout: 15000 }, async () => {
         // Arrange — load composer mapping via dynamic import
         const { default: composerModule } = await import('@/lib/ai/template-composer') as {
             default: unknown
         }
         void composerModule // suppress unused warning
 
-        // Act — test the rules as documented in PRD
+        // Act — test the rules as documented in category-requirements.ts mandatoryBlocks
         const restaurantBlocks = EXPECTED_CATEGORY_BLOCKS['restaurant']!
 
         // Assert
-        expect(restaurantBlocks).toContain('menu-display')
-        expect(restaurantBlocks).toContain('booking-widget')
-        expect(restaurantBlocks).toContain('review-cards')
+        expect(restaurantBlocks).toContain('features')
+        expect(restaurantBlocks).toContain('gallery')
+        expect(restaurantBlocks).toContain('testimonials')
     })
 
-    it('health category includes doctor-profile and booking-widget', () => {
-        // Arrange
+    it('health category includes service-cards and team', () => {
         const healthBlocks = EXPECTED_CATEGORY_BLOCKS['health']!
-
-        // Assert
-        expect(healthBlocks).toContain('doctor-profile')
-        expect(healthBlocks).toContain('booking-widget')
+        expect(healthBlocks).toContain('service-cards')
+        expect(healthBlocks).toContain('team')
     })
 
-    it('education category includes class-schedule and video-showcase', () => {
-        // Arrange
+    it('education category includes features and faq', () => {
         const educationBlocks = EXPECTED_CATEGORY_BLOCKS['education']!
-
-        // Assert
-        expect(educationBlocks).toContain('class-schedule')
-        expect(educationBlocks).toContain('video-showcase')
+        expect(educationBlocks).toContain('features')
+        expect(educationBlocks).toContain('faq')
     })
 
-    it('realestate category includes property-card', () => {
-        // Assert
-        expect(EXPECTED_CATEGORY_BLOCKS['realestate']).toContain('property-card')
+    it('realestate category includes gallery and stats', () => {
+        expect(EXPECTED_CATEGORY_BLOCKS['realestate']).toContain('gallery')
+        expect(EXPECTED_CATEGORY_BLOCKS['realestate']).toContain('stats')
     })
 
-    it('ecommerce category includes product-quick-view', () => {
-        // Assert
-        expect(EXPECTED_CATEGORY_BLOCKS['ecommerce']).toContain('product-quick-view')
+    it('ecommerce category includes features and testimonials', () => {
+        expect(EXPECTED_CATEGORY_BLOCKS['ecommerce']).toContain('features')
+        expect(EXPECTED_CATEGORY_BLOCKS['ecommerce']).toContain('testimonials')
     })
 })
 

@@ -8,4 +8,4 @@ export const AccordionConfigSchema = BaseBlockSchema.extend({
     headline: z.string().optional(), description: z.string().optional(),
     items: z.array(z.object({ title: z.string(), content: z.string() })).default([]),
 })
-export const accordionMeta = { type: 'accordion' as const, name: 'Accordion', description: 'Expandable content sections', icon: '📂', variants: ['bordered', 'separated', 'flush'], defaultVariant: 'bordered', editableFields: ['headline', 'description', 'items'], quickActions: ['Add item', 'Expand all', 'Rewrite content'] }
+export const accordionMeta = { type: 'accordion' as const, name: 'Accordion', description: 'Expandable content sections', icon: '📂', variants: ['bordered', 'separated', 'flush'], defaultVariant: 'bordered', editableFields: ['headline', 'description', 'items'], quickActions: ['Add item', 'Expand all', 'Rewrite content'], aiVisible: false }
