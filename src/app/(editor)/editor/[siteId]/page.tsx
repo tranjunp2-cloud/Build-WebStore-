@@ -743,13 +743,33 @@ export default function EditorPage() {
             })
 
             if (!res.ok) {
-                // Try to surface the actual server-side cause (e.g. PG column
-                // missing) instead of a generic "Server returned 500".
-                const body = await res.json().catch(() => null) as { error?: { message?: string; failures?: Array<{ pgColumn?: string; pgTable?: string; causeMsg?: string }> } } | null
+                // Try to surface the actual server-side cause (PG column missing,
+                // Payload ValidationError on a required field, etc.) instead of
+                // a generic "Server returned 500".
+                const body = await res.json().catch(() => null) as {
+                    error?: {
+                        message?: string
+                        failures?: Array<{
+                            errName?: string
+                            errMsg?: string
+                            pgColumn?: string
+                            pgTable?: string
+                            causeMsg?: string
+                            validationErrors?: Array<{ path?: string; message?: string }>
+                        }>
+                    }
+                } | null
                 const firstFailure = body?.error?.failures?.[0]
-                const detail = firstFailure?.pgColumn && firstFailure?.pgTable
-                    ? `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
-                    : firstFailure?.causeMsg || body?.error?.message
+                const firstValidation = firstFailure?.validationErrors?.[0]
+                let detail: string | undefined
+                if (firstValidation?.path) {
+                    // Payload validation error — richest signal for the user.
+                    detail = `${firstValidation.path}: ${firstValidation.message || 'invalid'}`
+                } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
+                    detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
+                } else {
+                    detail = firstFailure?.causeMsg || firstFailure?.errMsg || body?.error?.message
+                }
                 throw new Error(detail || `Server returned ${res.status}`)
             }
 

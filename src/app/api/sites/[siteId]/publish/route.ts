@@ -78,7 +78,16 @@ export async function PATCH(
         // media/relationship fields, which previously made the promotion a no-op
         // for newly-created draft pages (BUG-F05: new page stayed draft after Update).
         const failedPageIds: string[] = []
-        const failureDetails: Array<{ pageId: string; pgCode?: string; pgColumn?: string; pgTable?: string; causeMsg?: string }> = []
+        const failureDetails: Array<{
+            pageId: string
+            errName?: string
+            errMsg?: string
+            pgCode?: string
+            pgColumn?: string
+            pgTable?: string
+            causeMsg?: string
+            validationErrors?: Array<{ path?: string; message?: string }>
+        }> = []
         let hasMore = true
         let pageNum = 1
         while (hasMore) {
@@ -126,30 +135,57 @@ export async function PATCH(
                         draft: false,
                     })
                 } catch (err) {
-                    // Drizzle wraps the Postgres DatabaseError in .cause — the
-                    // wrapper's .message is just "Failed query: <sql>". Real
-                    // details (missing column, relation) live on .cause.code /
-                    // .cause.column / .cause.table. Without extracting them, a
-                    // schema-lag migration shows up as an opaque warning.
+                    // Two distinct failure shapes bubble up here, and the old
+                    // handler only pulled out the first — so the second class
+                    // of failure surfaced to the user as `{pageId}` with zero
+                    // diagnostic detail.
+                    //
+                    //   1. Drizzle/pg errors — real detail on err.cause
+                    //      (.code/.column/.table/.message).
+                    //   2. Payload ValidationError — no .cause; detail lives
+                    //      on err.data.errors[] as {path,message}. Triggers
+                    //      whenever a nested required field on a block is
+                    //      blank (common on industry blocks whose required
+                    //      array rows were seeded empty by AI gen or an
+                    //      older composer).
+                    //
+                    // Always capture name+message so any un-classified error
+                    // type still gives the user something actionable.
                     type PgErrLike = { code?: string; detail?: string; table?: string; column?: string; message?: string }
+                    type ValErrItem = { path?: string; message?: string }
                     const cause = (err as { cause?: unknown })?.cause
                     const pgErr: PgErrLike | null = cause && typeof cause === 'object' ? (cause as PgErrLike) : null
+                    const errName = err instanceof Error ? err.name : 'UnknownError'
                     const errMsg = err instanceof Error ? err.message : String(err)
+                    const data = (err as { data?: unknown })?.data
+                    const rawErrors = data && typeof data === 'object' ? (data as { errors?: unknown }).errors : null
+                    const validationErrors: ValErrItem[] = Array.isArray(rawErrors)
+                        ? (rawErrors as ValErrItem[]).map(e => ({
+                            path: typeof e?.path === 'string' ? e.path : undefined,
+                            message: typeof e?.message === 'string' ? e.message : undefined,
+                        }))
+                        : []
+
                     console.warn('[Publish] Failed to promote page', JSON.stringify({
                         pageId,
+                        errName,
                         errMsg: errMsg.slice(0, 300),
                         pgCode: pgErr?.code,
                         pgColumn: pgErr?.column,
                         pgTable: pgErr?.table,
                         causeMsg: pgErr?.message?.slice(0, 300),
+                        validationErrors,
                     }))
                     failedPageIds.push(pageId)
                     failureDetails.push({
                         pageId,
+                        errName,
+                        errMsg: errMsg.slice(0, 300),
                         pgCode: pgErr?.code,
                         pgColumn: pgErr?.column,
                         pgTable: pgErr?.table,
                         causeMsg: pgErr?.message?.slice(0, 300),
+                        validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
                     })
                 }
             }
