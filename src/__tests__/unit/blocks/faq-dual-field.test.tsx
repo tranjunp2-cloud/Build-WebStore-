@@ -80,21 +80,21 @@ describe('[TC-F01-FAQ-DUAL] FAQ block dual-field fallback', () => {
         expect(screen.getByText('Priority test')).toBeInTheDocument()
     })
 
-    it('TC-F01-FAQ-DUAL-04 — renders empty state when both fields are empty/missing', () => {
-        // Arrange
+    it('TC-F01-FAQ-DUAL-04 — renders FALLBACK_FAQ_ITEMS when both fields are empty/missing', () => {
+        // Arrange — empty input path. Source now substitutes FALLBACK_FAQ_ITEMS
+        // (generic starter FAQs) so admin/editor never sees a blank FAQ block.
+        // See src/blocks/faq/index.tsx:14,239.
         const block = {
             blockType: 'faq' as const,
             items: [],
         }
 
-        // Act — suppress dev console.warn about empty items
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        // Act
         const { container } = render(<FAQBlock block={block} />)
-        warnSpy.mockRestore()
 
-        // Assert — should render but with no FAQ items visible
+        // Assert — fallback renders at least 1 accordion question button.
         const buttons = container.querySelectorAll('button')
-        expect(buttons.length).toBe(0)
+        expect(buttons.length).toBeGreaterThan(0)
     })
 
     it('TC-F01-FAQ-DUAL-05 — non-array "faqs" value falls through to "items" (C2 unsafe-cast guard)', () => {
