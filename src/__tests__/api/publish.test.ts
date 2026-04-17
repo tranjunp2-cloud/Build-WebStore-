@@ -261,6 +261,106 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(pageUpdate![0].data).not.toHaveProperty('_currentVersionId')
     })
 
+    it('TC-F01-pub-10: surfaces Payload ValidationError in failures[] so user can diagnose missing required fields', async () => {
+        // Regression: page with an industry block (doctor-profile, property-card,
+        // class-schedule, etc.) whose nested required array row was seeded empty
+        // used to fail publish with an opaque {pageId:"793"} in failures[] —
+        // no errName, no errMsg, no validationErrors. That's because Payload's
+        // ValidationError has no .cause (unlike Drizzle-wrapped pg errors),
+        // so the old catch-block hit undefined on every extracted field.
+        const { getPayload } = await import('payload')
+
+        class FakeValidationError extends Error {
+            data: { collection?: string; errors: Array<{ path: string; message: string }> }
+            constructor() {
+                super('The following fields are invalid: doctors.0.name')
+                this.name = 'ValidationError'
+                this.data = {
+                    collection: 'pages',
+                    errors: [
+                        { path: 'layout.2.doctors.0.name', message: 'This field is required.' },
+                    ],
+                }
+            }
+        }
+
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: 'page-793', _status: 'draft', site: 'site-123', layout: [{ blockType: 'doctor-profile', doctors: [{}] }] },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id }) => {
+            if (collection === 'pages' && id === 'page-793') {
+                throw new FakeValidationError()
+            }
+            return { id }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(500)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('PARTIAL_PUBLISH_FAILURE')
+        expect(body.error.failedPages).toEqual(['page-793'])
+        expect(body.error.failures).toHaveLength(1)
+
+        const failure = body.error.failures[0]
+        expect(failure.pageId).toBe('page-793')
+        expect(failure.errName).toBe('ValidationError')
+        expect(failure.errMsg).toContain('doctors.0.name')
+        expect(failure.validationErrors).toEqual([
+            { path: 'layout.2.doctors.0.name', message: 'This field is required.' },
+        ])
+    })
+
+    it('TC-F01-pub-11: surfaces generic errors without .cause in failures[] (errName + errMsg always present)', async () => {
+        // Sister-case to TC-F01-pub-10 — a plain TypeError (no .cause, no
+        // .data.errors) still needs to return something actionable, not an
+        // opaque {pageId} blob.
+        const { getPayload } = await import('payload')
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [{ id: 'page-99', _status: 'draft', site: 'site-123', layout: [] }],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection }) => {
+            if (collection === 'pages') {
+                throw new TypeError("Cannot read properties of undefined (reading 'foo')")
+            }
+            return {}
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(500)
+        const failure = body.error.failures[0]
+        expect(failure.errName).toBe('TypeError')
+        expect(failure.errMsg).toContain("Cannot read properties of undefined")
+        expect(failure.validationErrors).toBeUndefined()
+    })
+
     it('TC-F01-pub-08: returns 429 when publish rate limit exceeded', async () => {
         // Arrange
         const resetAt = Date.now() + 60000
