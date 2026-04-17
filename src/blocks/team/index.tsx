@@ -12,6 +12,12 @@ import { Heading, Body } from '../shared/Typography'
 import { CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 
+const FALLBACK_MEMBERS: TeamConfig['members'] = [
+    { name: 'Team Lead', role: 'Founder' },
+    { name: 'Senior Specialist', role: 'Expert' },
+    { name: 'Customer Success', role: 'Support' },
+]
+
 // ── Local helpers (Plan 260415 team polish) ─────────────────────────────────
 
 function TeamSection({ children, container = 'default' }: { children: ReactNode; container?: 'default' | '4xl' }) {
@@ -272,7 +278,8 @@ function useEmptyWarning(count: number) {
 }
 
 export function TeamBlock({ block }: BlockProps<TeamConfig>) {
-    const { headline, subheadline, members = [], variant = 'grid' } = block
+    const { headline, subheadline, members: rawMembers = [], variant = 'grid' } = block
+    const members = rawMembers.length > 0 ? rawMembers : FALLBACK_MEMBERS
     const sectionLabel = getSectionLabel(block)
 
     useEmptyWarning(members.length)

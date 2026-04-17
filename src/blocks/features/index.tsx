@@ -55,8 +55,16 @@ function FeaturesHeader({
     )
 }
 
+const FALLBACK_FEATURES: FeaturesConfig['features'] = [
+    { icon: '⭐', title: 'Quality Service', description: 'Exceptional quality in every interaction.' },
+    { icon: '🚀', title: 'Fast Response', description: 'Quick turnaround on all requests.' },
+    { icon: '💎', title: 'Premium Experience', description: 'Carefully crafted for discerning customers.' },
+    { icon: '🛡️', title: 'Trusted & Reliable', description: 'Years of consistent service excellence.' },
+]
+
 export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
-    const { headline, subheadline, features = [], variant = 'grid-3' } = block
+    const { headline, subheadline, features: rawFeatures = [], variant = 'grid-3' } = block
+    const features = rawFeatures.length > 0 ? rawFeatures : FALLBACK_FEATURES
 
     /* Plan 260415 Lỗi E — empty state dev warn thay vì render header trống */
     if (!features.length) {
