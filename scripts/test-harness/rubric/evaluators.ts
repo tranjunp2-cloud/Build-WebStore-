@@ -8,8 +8,11 @@
 import type { HarnessBlock } from '../types'
 
 export interface EvalContext {
+    /** Homepage blocks (primary scope). */
     blocks: HarnessBlock[]
     theme: Record<string, unknown>
+    /** All pages' blocks flattened — for presence checks on cross-page blocks (contact, faq). */
+    allBlocks?: HarnessBlock[]
 }
 
 export interface EvalResult {
@@ -42,8 +45,11 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
     },
     heroHasCta: ({ blocks }) => {
         const hero = blocks.find((b) => b.blockType === 'hero')
-        const cta = hero?.data?.primaryCta ?? hero?.data?.ctaButton ?? hero?.data?.cta
-        return { pass: Boolean(cta) }
+        const d = hero?.data ?? {}
+        const ctaButtons = (d.ctaButtons ?? d.buttons) as unknown[] | undefined
+        const singleCta = d.primaryCta ?? d.ctaButton ?? d.cta
+        const hasArrayCta = Array.isArray(ctaButtons) && ctaButtons.length > 0
+        return { pass: Boolean(hasArrayCta || singleCta), reason: hasArrayCta ? `${(ctaButtons as unknown[]).length} ctaButtons` : singleCta ? 'cta object' : 'none' }
     },
     heroHeadlineSubstantial: ({ blocks }) => {
         const hero = blocks.find((b) => b.blockType === 'hero')
@@ -107,10 +113,16 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
 }
 
 /** Generic check types handled inline (no custom code). */
-export function evaluatePresence(blocks: HarnessBlock[], blockType: string): EvalResult {
+export function evaluatePresence(blocks: HarnessBlock[], blockType: string, allBlocks?: HarnessBlock[]): EvalResult {
     const targets = blockType.split(',').map((s) => s.trim())
-    const found = blocks.some((b) => targets.includes(b.blockType))
-    return { pass: found, reason: found ? 'present' : `missing (any of ${targets.join('/')})` }
+    // Search homepage first, then fallback to all-pages if provided (e.g. contact often lives on /contact sub-page)
+    const foundHome = blocks.some((b) => targets.includes(b.blockType))
+    if (foundHome) return { pass: true, reason: 'present (home)' }
+    if (allBlocks) {
+        const foundAny = allBlocks.some((b) => targets.includes(b.blockType))
+        if (foundAny) return { pass: true, reason: 'present (sub-page)' }
+    }
+    return { pass: false, reason: `missing (any of ${targets.join('/')})` }
 }
 
 export function evaluateCount(blocks: HarnessBlock[], blockType: string, field: string, min: number): EvalResult {

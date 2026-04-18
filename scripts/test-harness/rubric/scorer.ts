@@ -34,13 +34,13 @@ function loadMatrix(): MatrixReport {
     return JSON.parse(raw) as MatrixReport
 }
 
-function evaluateCriterion(criterion: Criterion, blocks: any[], theme: any): CriterionResult {
-    const ctx = { blocks, theme }
+function evaluateCriterion(criterion: Criterion, blocks: any[], theme: any, allBlocks?: any[]): CriterionResult {
+    const ctx = { blocks, theme, allBlocks }
     let result: { pass: boolean; partial?: boolean; reason?: string } = { pass: false }
 
     switch (criterion.check.type) {
         case 'presence':
-            result = evaluatePresence(blocks, criterion.check.blockType)
+            result = evaluatePresence(blocks, criterion.check.blockType, allBlocks)
             break
         case 'count':
             result = evaluateCount(blocks, criterion.check.blockType, criterion.check.field, criterion.check.min)
@@ -91,9 +91,9 @@ function evaluateCriterion(criterion: Criterion, blocks: any[], theme: any): Cri
     }
 }
 
-function scoreFixture(rubric: Rubric, fixtureId: string, category: string, blocks: any[], theme: any): FixtureScore {
+function scoreFixture(rubric: Rubric, fixtureId: string, category: string, blocks: any[], theme: any, allBlocks?: any[]): FixtureScore {
     const dimensions: DimensionScore[] = rubric.dimensions.map((dim) => {
-        const criteriaResults = dim.criteria.map((c) => evaluateCriterion(c, blocks, theme))
+        const criteriaResults = dim.criteria.map((c) => evaluateCriterion(c, blocks, theme, allBlocks))
         const earnedPoints = criteriaResults.reduce((s, r) => s + r.points, 0)
         const maxPoints = criteriaResults.reduce((s, r) => s + r.maxPoints, 0)
         const score = maxPoints > 0 ? (earnedPoints / maxPoints) * 10 : 0
@@ -122,9 +122,11 @@ export function runScorer(): RubricReport {
     const rubric = loadRubric()
     const matrix = loadMatrix()
 
-    const fixtures: FixtureScore[] = matrix.results.map((r) =>
-        scoreFixture(rubric, r.fixture.id, r.fixture.category, r.blocks, r.theme),
-    )
+    const fixtures: FixtureScore[] = matrix.results.map((r) => {
+        // Flatten all pages' blocks for cross-page presence checks
+        const allBlocks = r.pages ? r.pages.flatMap((p) => p.blocks) : r.blocks
+        return scoreFixture(rubric, r.fixture.id, r.fixture.category, r.blocks, r.theme, allBlocks)
+    })
 
     const total = fixtures.length
     const pass = fixtures.filter((f) => f.status === 'pass').length
