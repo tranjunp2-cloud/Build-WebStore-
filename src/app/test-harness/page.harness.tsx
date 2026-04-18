@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import Link from 'next/link'
 import type { MatrixReport } from '../../../scripts/test-harness/types'
+import { readReport } from '../../../scripts/test-harness/rubric/scorer-lib'
+import type { FixtureScore } from '../../../scripts/test-harness/rubric/rubric.schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +17,21 @@ function loadMatrix(): MatrixReport | null {
     }
 }
 
+function scoreFor(fixtureId: string, scoreMap: Map<string, FixtureScore>): FixtureScore | undefined {
+    return scoreMap.get(fixtureId)
+}
+
+function statusDot(score?: FixtureScore): string {
+    if (!score) return '⚪'
+    return score.status === 'pass' ? '🟢' : score.status === 'warn' ? '🟡' : '🔴'
+}
+
 export default function HarnessIndex() {
     const matrix = loadMatrix()
+    const report = readReport()
+    const scoreMap = new Map<string, FixtureScore>()
+    if (report) report.fixtures.forEach((f) => scoreMap.set(f.fixtureId, f))
+
     if (!matrix) {
         return (
             <div style={{ background: '#fff', color: '#111', minHeight: '100vh' }} className="p-10 font-mono">
@@ -65,14 +80,36 @@ export default function HarnessIndex() {
     return (
         <div style={pageStyle}>
             <div className="max-w-7xl mx-auto px-6 py-10">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold mb-2" style={{ color: '#111' }}>AI Gen Test Harness — Index</h1>
-                    <p style={{ color: '#4b5563' }}>
-                        {totalFixtures} fixtures · {blueprintCount} blueprint · {legacyCount} legacy · {categories.length} categories
-                    </p>
-                    <p className="text-sm mt-2" style={{ color: '#6b7280' }}>
-                        Click any fixture to render. Images are SVG placeholders (media-injector disabled in harness).
-                    </p>
+                <div className="mb-8 flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold mb-2" style={{ color: '#111' }}>AI Gen Test Harness — Index</h1>
+                        <p style={{ color: '#4b5563' }}>
+                            {totalFixtures} fixtures · {blueprintCount} blueprint · {legacyCount} legacy · {categories.length} categories
+                            {report && (
+                                <span> · rubric avg <strong style={{ color: '#7c3aed' }}>{report.summary.avgWeighted.toFixed(2)}/10</strong> (🟢 {report.summary.pass} · 🟡 {report.summary.warn} · 🔴 {report.summary.fail})</span>
+                            )}
+                        </p>
+                        <p className="text-sm mt-2" style={{ color: '#6b7280' }}>
+                            Click fixture to render with score overlay. Images are SVG placeholders (media-injector disabled).
+                            {!report && <span style={{ color: '#d97706' }}> · Run <code style={{ background: '#fef3c7', padding: '0 4px' }}>npm run harness:score</code> để hiện score.</span>}
+                        </p>
+                    </div>
+                    <a
+                        href="/test-harness/admin"
+                        style={{
+                            background: '#7c3aed',
+                            color: '#fff',
+                            padding: '10px 16px',
+                            borderRadius: 8,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            textDecoration: 'none',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 4px 12px rgba(124,58,237,0.3)',
+                        }}
+                    >
+                        📊 Open Admin Dashboard →
+                    </a>
                 </div>
 
                 {/* AI-first section */}
@@ -129,16 +166,27 @@ export default function HarnessIndex() {
                             return true
                         })
 
+                        // Category avg score
+                        const catScores = report ? fixtures.map((f) => scoreMap.get(f.id)?.weighted).filter((v): v is number => typeof v === 'number') : []
+                        const catAvg = catScores.length > 0 ? catScores.reduce((s, n) => s + n, 0) / catScores.length : null
+
                         return (
                             <section key={cat} className="rounded-lg p-5" style={cardStyle}>
-                                <h2 className="text-xl font-semibold mb-3 capitalize" style={{ color: '#111' }}>
-                                    {cat}{' '}
+                                <h2 className="text-xl font-semibold mb-3 capitalize flex items-center gap-3" style={{ color: '#111' }}>
+                                    <span>{cat}</span>
                                     <span className="text-sm font-normal" style={{ color: '#6b7280' }}>
                                         ({uniqueBlueprints.length} presets · {fixtures.length} fixtures)
                                     </span>
+                                    {catAvg !== null && (
+                                        <span style={{ fontSize: 13, fontWeight: 400, color: catAvg >= 7 ? '#059669' : catAvg >= 5 ? '#d97706' : '#dc2626', marginLeft: 'auto', fontFamily: 'ui-monospace, monospace' }}>
+                                            avg {catAvg.toFixed(1)}/10
+                                        </span>
+                                    )}
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-                                    {uniqueBlueprints.map((f) => (
+                                    {uniqueBlueprints.map((f) => {
+                                        const sc = scoreFor(f.id, scoreMap)
+                                        return (
                                         <Link
                                             key={f.id}
                                             href={`/test-harness/${f.id}`}
@@ -146,9 +194,12 @@ export default function HarnessIndex() {
                                             style={tplButtonStyle}
                                             title={f.id}
                                         >
+                                            <span style={{ marginRight: 6 }}>{statusDot(sc)}</span>
                                             {f.id.replace(`${cat}-blueprint-`, '').replace(/-seed\d+$/, '')}
+                                            {sc && <span style={{ float: 'right', color: '#6b7280', fontSize: 11 }}>{sc.weighted.toFixed(1)}</span>}
                                         </Link>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             </section>
                         )

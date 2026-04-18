@@ -163,10 +163,25 @@ Status:
 ## Usage
 
 ```bash
-npm run harness:gen      # regenerate block matrix
-npm run harness:score    # score against rubric
-open .harness-out/rubric-report.html
+# 1. Regenerate block matrix (fixtures + pages data)
+npm run harness:gen
+
+# 2. Score all 390 fixtures (writes rubric-report.json)
+npm run harness:score
+
+# 3. Start dev server + view dashboard
+ENABLE_HARNESS=1 npm run dev
+# Open browser:
+#   http://localhost:3000/test-harness        → index với score column + dashboard link
+#   http://localhost:3000/test-harness/admin  → interactive dashboard với filter/sort/drill
+#   http://localhost:3000/test-harness/<id>   → fixture render + score overlay (bottom-right)
+#   http://localhost:3000/test-harness/ai/<cat> → AI-first gen + score overlay
 ```
+
+Score overlay trên fixture render:
+- Collapsed pill: `● 8.9/10 PASS` (status-colored border)
+- Click expand → 8 dimension bars + drill-down per dim → pass/fail reasons per criterion
+- Rubric info + link admin dashboard ở footer panel
 
 ## Versioning
 
