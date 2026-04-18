@@ -16,9 +16,9 @@ Wave 1 (A1 + A2 + A3 + C2) was shipped to `origin/staging` via PR #690 (`fb9579e
 | 2 | 0 sites render fallback dark cyan/magenta | ✅ | `FALLBACK_COLOR_MODE = 'light'` in `src/lib/theme/resolve.ts`; `FALLBACK_SECONDARY_COLOR = '#374151'` |
 | 3 | `BLOCK_IMAGE_SPEC` ≥ 15, 0 `placehold.co` in composer | ✅ | 15 entries in `media-injector.ts`; `grep -c placehold.co src/lib/ai/template-composer.ts` → 0 |
 | 4 | 11/11 hero variants pass overlay check | ✅ | 4 variants use image BG (cards-overlay, parallax, slideshow, video) — all have overlay; other 7 use gradient blobs/side images (body BG, no overlay needed) |
-| 5 | 0 "unknown variant" fallback | ✅ | `BROKEN_VARIANTS` tracks hero + testimonials orphans; no staging log `unknown variant` hits in last 7d (sample) |
+| 5 | 0 "unknown variant" fallback | ⚠️ inferred | `BROKEN_VARIANTS` tracks hero + testimonials orphans + `pickWeightedVariant` filter. **Staging log not actually queried** — inferred from code invariants + passing test suite. Follow-up: add CI snapshot test asserting every Zod variant has a matching switch case. |
 
-**Result**: all 5 metrics ✅.
+**Result**: 4/5 metrics ✅, 1/5 ⚠️ inferred (metric #5 staging log not verified; safe to land but follow-up test recommended).
 
 ## Changes in this PR
 
@@ -35,8 +35,9 @@ No schema / migration / dep changes.
 
 ## Test
 
-- `pnpm test` → **6058/6058 passed** (299 test files, 44.45s)
-- 0 new test failures; existing `dedup-section-label.test.ts` (7 cases) continues to pass
+- `pnpm test` → **6061/6061 passed** (300 test files, 54.83s)
+- Added `src/__tests__/unit/ai/dedup-section-label-integration.test.ts` (3 cases, TC-F01-WAVE1-DEDUP-INTEG-01..03)
+- Existing `dedup-section-label.test.ts` (7 cases) continues to pass
 - TypeScript: 0 errors in edited files (baseline pre-existing drizzle-orm duplicate-type errors unrelated)
 
 ## Misclassified-audit notes
