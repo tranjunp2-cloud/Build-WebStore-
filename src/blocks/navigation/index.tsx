@@ -371,7 +371,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
     // ── Default: simple ──────────────────────────────────────────────────
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
@@ -443,7 +443,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
 
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
@@ -627,7 +627,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
 
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
@@ -723,7 +723,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
 
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
