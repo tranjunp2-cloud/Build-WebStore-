@@ -1236,7 +1236,7 @@ export function sanitizeBlockData(
             }
 
             // Content-count guard: ensure variant has enough items to render properly
-            const contentArrays = ['testimonials', 'features', 'items', 'images', 'plans', 'members', 'logos']
+            const contentArrays = ['testimonials', 'features', 'items', 'images', 'plans', 'members', 'logos', 'stats']
             for (const field of contentArrays) {
                 if (Array.isArray(s[field])) {
                     s.variant = enforceMinContent(s.blockType, s.variant as string, (s[field] as unknown[]).length)

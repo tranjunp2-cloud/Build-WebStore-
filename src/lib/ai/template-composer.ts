@@ -1618,7 +1618,14 @@ export function rotateStructuralVariants(
     for (const page of pages) {
       for (const block of page.layout as Array<Record<string, unknown>>) {
         if (block.blockType === blockType) {
-          block.variant = picked
+          // Guard: enforce min content for picked variant — prevents grid-4 with 3 items etc.
+          const contentFields = ['features', 'testimonials', 'items', 'plans', 'members', 'images', 'stats', 'logos']
+          let count = 0
+          for (const field of contentFields) {
+            const v = block[field]
+            if (Array.isArray(v) && v.length > count) count = v.length
+          }
+          block.variant = count > 0 ? enforceMinContent(blockType, picked, count) : picked
         }
       }
     }
@@ -1709,8 +1716,12 @@ function buildBlockFromSpec(
         ...(resolvedVariant ? { variant: resolvedVariant } : {}),
         ...(spec.overrides ?? {}),
       }
-    case 'features':
-      return { ...buildFeatures(biz, category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+    case 'features': {
+      const fb = buildFeatures(biz, category) as Record<string, unknown>
+      const fbCount = Array.isArray(fb.features) ? (fb.features as unknown[]).length : 0
+      const finalVariant = resolvedVariant ? enforceMinContent('features', resolvedVariant, fbCount) : undefined
+      return { ...fb, ...(finalVariant ? { variant: finalVariant } : {}) }
+    }
     case 'testimonials':
       return { ...buildTestimonials(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
     case 'contact':
