@@ -414,16 +414,21 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         return { pass: true, reason: 'hero H1 first, no skip' }
     },
     themeColorContrast: ({ theme }) => {
+        // Primary color = UI element / button bg (large text / decorative). WCAG AA
+        // threshold for UI components and large text = 3.0:1 (not 4.5 which is
+        // body text). Body text usually uses theme.textColor (separate check TBD).
         const explicit = theme?.contrastRatio as number | undefined
         if (typeof explicit === 'number') {
-            return { pass: explicit >= 4.5, reason: `explicit ratio ${explicit}` }
+            return { pass: explicit >= 3.0, reason: `explicit ratio ${explicit}` }
         }
         const primary = theme?.primaryColor as string | undefined
         const surface = (theme?.surfaceColor ?? theme?.backgroundColor ?? (theme?.colorMode === 'dark' ? '#0a0a0a' : '#ffffff')) as string
         if (!primary) return { pass: false, reason: 'no primaryColor' }
         const ratio = contrastRatio(primary, surface)
         if (ratio === null) return { pass: false, reason: `invalid hex (primary=${primary}, surface=${surface})` }
-        return { pass: ratio >= 4.5, reason: `computed ${ratio.toFixed(2)}:1 (${primary} vs ${surface})` }
+        if (ratio >= 4.5) return { pass: true, reason: `${ratio.toFixed(2)}:1 (AA normal text)` }
+        if (ratio >= 3.0) return { pass: true, reason: `${ratio.toFixed(2)}:1 (AA UI/large text)` }
+        return { pass: false, reason: `${ratio.toFixed(2)}:1 (<3.0, fails AA)` }
     },
     navAriaLabel: ({ blocks }) => {
         const nav = blocks.find((b) => b.blockType === 'navigation')

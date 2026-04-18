@@ -1,6 +1,7 @@
 import { getCategoryContent } from '@/lib/ai/content'
 import type { CategoryContent, BusinessSample } from '@/lib/ai/content/types'
 import type { ThemePreset } from '@/lib/ai/theme-presets'
+import { DEFAULT_FOCUS_STYLE } from '@/lib/ai/theme-presets'
 import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
@@ -178,6 +179,7 @@ function buildNavigation(
     logoText: biz.name,
     links,
     ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: resolveNavCtaUrl(pages) },
+    ariaLabel: `${biz.name} main navigation`,
   }
 }
 
@@ -2099,7 +2101,11 @@ export function composeFromBlueprint(
     category: preset.category,
     tier: 'premium',
     isPremium: true,
-    theme: preset.themePreset,
+    theme: {
+      ...preset.themePreset,
+      // A11y plan 260418-2357: guarantee focusStyle token present even if preset omits it
+      focusStyle: preset.themePreset.focusStyle ?? DEFAULT_FOCUS_STYLE,
+    },
     pages,
   }
 }
@@ -2161,7 +2167,10 @@ export function composeTemplate(input: ComposerInput): TemplateSeed | null {
     category: input.category,
     tier: input.variant,
     isPremium: input.variant === 'premium',
-    theme: input.themePreset,
+    theme: {
+      ...input.themePreset,
+      focusStyle: input.themePreset.focusStyle ?? DEFAULT_FOCUS_STYLE,
+    },
     pages: validatedPages,
   }
 }

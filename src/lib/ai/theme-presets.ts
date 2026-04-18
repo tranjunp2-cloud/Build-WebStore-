@@ -22,7 +22,12 @@ export type ThemePreset = {
   shadowPreset: 'none' | 'subtle' | 'medium' | 'dramatic'
   /** Plan 260414-2249 phase-02: mood archetype — drives voice, imagery, CTAs. */
   moodId: MoodId
+  /** A11y plan 260418-2357: focus-visible style (Tailwind class). Defaults via default() below. */
+  focusStyle?: string
 }
+
+/** Default focus indicator — applied at composer output when preset omits explicit focusStyle. */
+export const DEFAULT_FOCUS_STYLE = 'ring-2 ring-offset-2 ring-primary'
 
 // ── Restaurant ──────────────────────────────────────────────────────────────
 export const RESTAURANT_PRESETS: ThemePreset[] = [
