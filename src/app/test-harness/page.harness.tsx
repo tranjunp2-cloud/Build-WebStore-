@@ -45,12 +45,49 @@ export default function HarnessIndex() {
                 <h1 className="text-3xl font-bold mb-2">AI Gen Test Harness — Index</h1>
                 <p className="text-gray-600">
                     {totalFixtures} fixtures · {blueprintCount} blueprint · {legacyCount} legacy ·{' '}
-                    {categories.length} categories · Mode:{' '}
-                    <span className="font-semibold text-emerald-600">template-first</span> (no AI calls)
+                    {categories.length} categories
                 </p>
                 <p className="text-sm text-gray-500 mt-2">
                     Click any fixture to render. Images are SVG placeholders (media-injector disabled in harness).
                 </p>
+            </div>
+
+            {/* AI-first section — real OpenAI gen per category */}
+            <section className="border-2 border-purple-300 bg-purple-50 rounded-lg p-5 mb-8">
+                <div className="flex items-start justify-between mb-3">
+                    <div>
+                        <h2 className="text-xl font-semibold text-purple-900">
+                            AI-First · Real OpenAI Gen
+                        </h2>
+                        <p className="text-sm text-purple-700 mt-1">
+                            Calls GPT-4o with <code className="bg-purple-100 px-1">GEN_MODE=ai-first</code>.
+                            First load: ~5-15s (AI call + cache). Refresh with <code className="bg-purple-100 px-1">?refresh=1</code> to regen.
+                        </p>
+                    </div>
+                    <span className="text-xs font-mono bg-purple-600 text-white px-2 py-1 rounded">
+                        COSTS $
+                    </span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                    {categories.map((cat) => (
+                        <Link
+                            key={`ai-${cat}`}
+                            href={`/test-harness/ai/${cat}`}
+                            className="block px-3 py-2 text-sm font-mono bg-white hover:bg-purple-100 border border-purple-200 hover:border-purple-400 rounded transition-colors text-center capitalize"
+                        >
+                            {cat}
+                        </Link>
+                    ))}
+                </div>
+            </section>
+
+            {/* Template-first section — precomposed offline matrix */}
+            <div className="mb-4 flex items-center gap-3">
+                <h2 className="text-2xl font-semibold">Template-First</h2>
+                <span className="text-xs font-mono bg-emerald-600 text-white px-2 py-1 rounded">
+                    FREE · INSTANT
+                </span>
+                <span className="text-sm text-gray-500">— precomposed matrix.json, no AI calls</span>
             </div>
 
             <div className="space-y-8">
