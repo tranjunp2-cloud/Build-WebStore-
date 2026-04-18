@@ -21,7 +21,14 @@ export type ContactFormValues = {
 export type ContactFormErrors = Partial<Record<keyof ContactFormValues | 'form', string>>
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PHONE_REGEX = /^[0-9+\s()-]{9,20}$/
+
+/**
+ * Shared phone pattern (MY-friendly: digits, +, spaces, parens, hyphens).
+ * Bounded quantifier {9,20} prevents ReDoS. Exported as string so the
+ * HTML5 `pattern` attr + client-side regex stay in sync.
+ */
+export const PHONE_PATTERN_MY = '[0-9+\\s()-]{9,20}'
+const PHONE_REGEX = new RegExp(`^${PHONE_PATTERN_MY}$`)
 
 function validate(values: ContactFormValues, requiredFields: Set<string>): ContactFormErrors {
     const errors: ContactFormErrors = {}

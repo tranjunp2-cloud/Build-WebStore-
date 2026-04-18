@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { PricingConfig } from './config'
 import { AnimatedSection, StaggerGrid as _StaggerGrid, StaggerItem as _StaggerItem, HoverCard as _HoverCard, staggerContainer, staggerItem } from '../shared/animations'
-import { GradientBlob } from '../shared/decorative'
+import { GradientBlob, GridLines } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
@@ -39,14 +39,15 @@ function gridColsFor(count: number): string {
 type PricingSectionProps = {
     showBlob?: boolean
     children: ReactNode
+    decorative?: ReactNode
 }
 
-function PricingSection({ showBlob = true, children }: PricingSectionProps) {
+function PricingSection({ showBlob = true, children, decorative }: PricingSectionProps) {
     return (
         <AnimatedSection className="relative overflow-hidden">
-            {showBlob && (
+            {showBlob && (decorative ?? (
                 <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
-            )}
+            ))}
             <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                 {children}
             </SectionWrapper>
@@ -489,7 +490,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
 
     // ── Default: cards variant ────────────────────────────────────────────
     return (
-        <PricingSection showBlob={false}>
+        <PricingSection decorative={<GridLines color={CSS_VARS.primary} spacing={56} opacity={0.04} />}>
             <SectionHeader headline={headline} subheadline={subheadline} />
             <div className={`grid grid-cols-1 ${gridColsFor(Math.min(plans.length, 3))} gap-8 max-w-5xl mx-auto`}>
                 {plans.map((plan, i) => (

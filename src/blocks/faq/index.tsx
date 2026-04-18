@@ -10,6 +10,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { NoiseTexture, GridLines, LayeredShapes, DiagonalStripe } from '../shared/decorative'
 
 const FALLBACK_FAQ_ITEMS: FAQConfig['items'] = [
     { question: 'What services do you offer?', answer: 'We provide a wide range of professional services tailored to your needs.' },
@@ -32,16 +33,30 @@ function FAQAnswer({ answer }: { answer: FAQItem['answer'] }) {
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 
-function FAQSection({ children, narrow = false, labelledBy }: { children: ReactNode; narrow?: boolean; labelledBy?: string }) {
+function FAQSection({
+    children,
+    narrow = false,
+    labelledBy,
+    decorative,
+}: {
+    children: ReactNode
+    narrow?: boolean
+    labelledBy?: string
+    decorative?: ReactNode
+}) {
     return (
         <SectionWrapper
             as={AnimatedSection}
             padding="default"
             container={narrow ? 'narrow' : 'default'}
+            className={decorative ? 'relative overflow-hidden' : ''}
             style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
             aria-labelledby={labelledBy}
         >
-            {children}
+            {decorative}
+            <div className={decorative ? 'relative z-10' : 'contents'}>
+                {children}
+            </div>
         </SectionWrapper>
     )
 }
@@ -179,7 +194,7 @@ function AccordionVariant({ headline, subheadline, items, allowMultiple = false,
 
 function GridVariant({ headline, subheadline, items, labelledBy }: { headline?: string; subheadline?: string; items: FAQItem[]; labelledBy?: string }) {
     return (
-        <FAQSection labelledBy={labelledBy}>
+        <FAQSection labelledBy={labelledBy} decorative={<NoiseTexture opacity={0.05} />}>
             <SectionHeader headline={headline} subheadline={subheadline} labelledBy={labelledBy} />
             <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                 {items.map((item, i) => (
@@ -231,6 +246,156 @@ function SimpleVariant({ headline, subheadline, items, labelledBy }: { headline?
     )
 }
 
+// ── A5 (260417) — 3 new FAQ variants ─────────────────────────────────────────
+
+/**
+ * two-column-accordion: items split across 2 columns (odd left, even right).
+ * Each item renders as collapsible details/summary (native HTML, a11y-safe).
+ * A4 vocab: GridLines.
+ */
+function TwoColumnAccordionVariant({
+    headline,
+    subheadline,
+    items,
+    labelledBy,
+}: {
+    headline?: string
+    subheadline?: string
+    items: FAQItem[]
+    labelledBy?: string
+}) {
+    const leftCol = items.filter((_, i) => i % 2 === 0)
+    const rightCol = items.filter((_, i) => i % 2 === 1)
+    const renderCol = (col: FAQItem[], offset: number) =>
+        col.map((item, i) => (
+            <details
+                key={`${item.question}-${offset + i * 2}`}
+                className="group rounded-xl p-5"
+                style={{
+                    background: CSS_VARS.surface,
+                    border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
+                }}
+            >
+                <summary
+                    className={`flex items-center justify-between cursor-pointer font-semibold ${TOUCH_TARGET.min} list-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.4)] rounded`}
+                    style={{ color: CSS_VARS.text }}
+                >
+                    <span>{item.question}</span>
+                    <span className="ml-2 text-xl transition-transform group-open:rotate-45" aria-hidden="true">+</span>
+                </summary>
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.1)' }}>
+                    <Body size="small" style={{ color: CSS_VARS.muted }}>
+                        <FAQAnswer answer={item.answer} />
+                    </Body>
+                </div>
+            </details>
+        ))
+    return (
+        <FAQSection labelledBy={labelledBy} decorative={<GridLines color={CSS_VARS.primary} spacing={48} opacity={0.04} />}>
+            <SectionHeader headline={headline} subheadline={subheadline} labelledBy={labelledBy} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-5xl mx-auto">
+                <div className="flex flex-col gap-4">{renderCol(leftCol, 0)}</div>
+                <div className="flex flex-col gap-4">{renderCol(rightCol, 1)}</div>
+            </div>
+        </FAQSection>
+    )
+}
+
+/**
+ * chat-bubbles: Q + A as alternating chat-style bubbles (Q on left, A on
+ * right). Casual, conversational feel. A4 vocab: LayeredShapes.
+ */
+function ChatBubblesVariant({
+    headline,
+    subheadline,
+    items,
+    labelledBy,
+}: {
+    headline?: string
+    subheadline?: string
+    items: FAQItem[]
+    labelledBy?: string
+}) {
+    return (
+        <FAQSection narrow labelledBy={labelledBy} decorative={<LayeredShapes color={CSS_VARS.primary} opacity={0.08} />}>
+            <SectionHeader headline={headline} subheadline={subheadline} labelledBy={labelledBy} />
+            <StaggerGrid className="flex flex-col gap-6 max-w-3xl mx-auto">
+                {items.map((item, i) => (
+                    <StaggerItem key={`${item.question}-${i}`} className="flex flex-col gap-3">
+                        <div className="flex justify-start">
+                            <div
+                                className="max-w-[85%] px-5 py-3 rounded-2xl rounded-bl-sm"
+                                style={{
+                                    background: 'rgba(var(--brand-primary-rgb), 0.1)',
+                                    color: CSS_VARS.text,
+                                }}
+                            >
+                                <Body size="small" className="font-semibold">{item.question}</Body>
+                            </div>
+                        </div>
+                        <div className="flex justify-end">
+                            <div
+                                className="max-w-[85%] px-5 py-3 rounded-2xl rounded-br-sm"
+                                style={{
+                                    background: CSS_VARS.primary,
+                                    color: '#ffffff',
+                                }}
+                            >
+                                <Body size="small">
+                                    <FAQAnswer answer={item.answer} />
+                                </Body>
+                            </div>
+                        </div>
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+        </FAQSection>
+    )
+}
+
+/**
+ * numbered: numbered Q&A items with prominent index numerals. Editorial /
+ * magazine feel. A4 vocab: DiagonalStripe.
+ */
+function NumberedVariant({
+    headline,
+    subheadline,
+    items,
+    labelledBy,
+}: {
+    headline?: string
+    subheadline?: string
+    items: FAQItem[]
+    labelledBy?: string
+}) {
+    return (
+        <FAQSection narrow labelledBy={labelledBy} decorative={<DiagonalStripe color={CSS_VARS.primary} opacity={0.06} />}>
+            <SectionHeader headline={headline} subheadline={subheadline} labelledBy={labelledBy} />
+            <StaggerGrid className="flex flex-col gap-8 max-w-3xl mx-auto">
+                {items.map((item, i) => (
+                    <StaggerItem key={`${item.question}-${i}`} className="flex gap-5 items-start">
+                        <span
+                            className="flex-shrink-0 text-4xl md:text-5xl font-black leading-none tabular-nums"
+                            style={{ color: CSS_VARS.primary, fontFamily: CSS_VARS.fontHeading }}
+                            aria-hidden="true"
+                        >
+                            {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <div className="flex-1 min-w-0 pt-1">
+                            <Heading level={4} className="mb-2" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
+                                {item.question}
+                            </Heading>
+                            <Body size="small" style={{ color: CSS_VARS.muted }}>
+                                <FAQAnswer answer={item.answer} />
+                            </Body>
+                        </div>
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+        </FAQSection>
+    )
+}
+
 export function FAQBlock({ block }: BlockProps<FAQConfig>) {
     const { headline, subheadline, variant = 'accordion' } = block
     // Payload schema uses 'faqs', frontend config uses 'items' — accept both
@@ -255,6 +420,12 @@ export function FAQBlock({ block }: BlockProps<FAQConfig>) {
             return <GridVariant headline={headline} subheadline={subheadline} items={items} labelledBy={labelledBy} />
         case 'simple':
             return <SimpleVariant headline={headline} subheadline={subheadline} items={items} labelledBy={labelledBy} />
+        case 'two-column-accordion':
+            return <TwoColumnAccordionVariant headline={headline} subheadline={subheadline} items={items} labelledBy={labelledBy} />
+        case 'chat-bubbles':
+            return <ChatBubblesVariant headline={headline} subheadline={subheadline} items={items} labelledBy={labelledBy} />
+        case 'numbered':
+            return <NumberedVariant headline={headline} subheadline={subheadline} items={items} labelledBy={labelledBy} />
         case 'accordion':
         default:
             return <AccordionVariant headline={headline} subheadline={subheadline} items={items} allowMultiple={allowMultiple} labelledBy={labelledBy} />

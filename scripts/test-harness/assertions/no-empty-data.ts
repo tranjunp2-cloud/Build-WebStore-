@@ -33,6 +33,8 @@ const CONTENT_FIELDS = [
   'classes',
   'plans',
   'tiers',
+  'stats',
+  'logos',
 ]
 
 function countContent(block: HarnessBlock): number {

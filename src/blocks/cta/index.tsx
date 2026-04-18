@@ -7,8 +7,15 @@ import type { CTAConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { motion, useReducedMotion } from 'framer-motion'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import {
+    MeshGradient,
+    DiagonalStripe,
+    NoiseTexture,
+    LayeredShapes,
+    TypographicMark,
+} from '../shared/decorative'
 import { RichText } from '../shared/RichText'
-import { Heading, Body } from '../shared/Typography'
+import { Heading, Body, Caption } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { trackEvent } from '@/lib/analytics/track-event'
@@ -166,26 +173,30 @@ function BannerVariant({ block, siteId }: { block: CTAConfig; siteId?: string })
             as={AnimatedSection}
             padding="relaxed"
             container="default"
-            className="!py-20 md:!py-28"
+            className="!py-20 md:!py-28 relative overflow-hidden"
             innerClassName="text-center max-w-3xl"
             style={{
                 background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
                 color: '#ffffff',
             }}
         >
-            <Heading level={2} className="mb-4 leading-tight">
-                <RichText text={headline} as="span" />
-            </Heading>
-            {subheadline && (
-                <Body size="lg" className="opacity-85 mb-8 max-w-xl mx-auto">
-                    <RichText text={subheadline} as="span" />
-                </Body>
-            )}
-            <div className="flex flex-wrap items-center justify-center gap-4">
-                <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" siteId={siteId} onInverseBg />
-                {secondaryCtaLabel && secondaryCtaUrl && (
-                    <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} onInverseBg />
+            {/* A4 vocab: mesh — softens the linear gradient with painterly blobs */}
+            <MeshGradient color={CSS_VARS.primary} accentColor={CSS_VARS.secondary} opacity={0.35} />
+            <div className="relative z-10">
+                <Heading level={2} className="mb-4 leading-tight">
+                    <RichText text={headline} as="span" />
+                </Heading>
+                {subheadline && (
+                    <Body size="lg" className="opacity-85 mb-8 max-w-xl mx-auto">
+                        <RichText text={subheadline} as="span" />
+                    </Body>
                 )}
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" siteId={siteId} onInverseBg />
+                    {secondaryCtaLabel && secondaryCtaUrl && (
+                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} onInverseBg />
+                    )}
+                </div>
             </div>
         </SectionWrapper>
     )
@@ -202,9 +213,12 @@ function InlineVariant({ block, siteId }: { block: CTAConfig; siteId?: string })
             as={AnimatedSection}
             padding="compact"
             container="default"
+            className="relative overflow-hidden"
             style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
         >
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 max-w-5xl mx-auto">
+            {/* A4 vocab: diagonal stripe — adds subtle motion across the inline strip */}
+            <DiagonalStripe color={CSS_VARS.primary} opacity={0.06} />
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-5xl mx-auto">
                 <div className="flex-1 max-w-2xl text-center md:text-left">
                     <Heading level={3} className="mb-2">
                         <RichText text={headline} as="span" />
@@ -242,7 +256,7 @@ function CardVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
             style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
         >
             <div
-                className="max-w-xl mx-auto text-center p-10 md:p-12"
+                className="max-w-xl mx-auto text-center p-10 md:p-12 relative overflow-hidden"
                 style={{
                     background: CSS_VARS.surface,
                     borderRadius: CSS_VARS.radiusLg,
@@ -250,19 +264,23 @@ function CardVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
                     border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
                 }}
             >
-                <Heading level={3} className="mb-3">
-                    <RichText text={headline} as="span" />
-                </Heading>
-                {subheadline && (
-                    <Body className="mb-8" style={{ color: CSS_VARS.muted }}>
-                        <RichText text={subheadline} as="span" />
-                    </Body>
-                )}
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="card" siteId={siteId} />
-                    {secondaryCtaLabel && secondaryCtaUrl && (
-                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
+                {/* A4 vocab: noise — film-grain texture that lifts the flat card */}
+                <NoiseTexture opacity={0.06} />
+                <div className="relative z-10">
+                    <Heading level={3} className="mb-3">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body className="mb-8" style={{ color: CSS_VARS.muted }}>
+                            <RichText text={subheadline} as="span" />
+                        </Body>
                     )}
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="card" siteId={siteId} />
+                        {secondaryCtaLabel && secondaryCtaUrl && (
+                            <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
+                        )}
+                    </div>
                 </div>
             </div>
         </SectionWrapper>
@@ -331,7 +349,7 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
 
     const content = (
         <div
-            className="fixed bottom-4 inset-x-4 md:inset-x-auto md:right-6 md:bottom-6 md:max-w-sm z-50 rounded-2xl p-5 pr-12 shadow-2xl"
+            className="fixed bottom-4 inset-x-4 md:inset-x-auto md:right-6 md:bottom-6 md:max-w-sm z-50 rounded-2xl p-5 pr-12 shadow-2xl overflow-hidden"
             style={{
                 background: CSS_VARS.surface,
                 border: '1px solid rgba(var(--brand-primary-rgb), 0.15)',
@@ -341,18 +359,22 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
             role="complementary"
             aria-label="Call to action"
         >
+            {/* A4 vocab: layered shapes — organic blobs peeking inside the toast */}
+            <LayeredShapes color={CSS_VARS.primary} opacity={0.08} />
             <button
                 type="button"
                 onClick={handleDismiss}
-                className={`absolute top-2 right-2 p-2 rounded-full opacity-60 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.4)]`}
+                className={`absolute top-2 right-2 p-2 rounded-full opacity-60 hover:opacity-100 transition-opacity z-20 ${TOUCH_TARGET.min} flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.4)]`}
                 aria-label="Dismiss call to action"
             >
                 <X size={16} />
             </button>
-            <Heading level={4} className="mb-2 pr-2">
-                <RichText text={headline} as="span" />
-            </Heading>
-            <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating-sticky" siteId={siteId} />
+            <div className="relative z-10">
+                <Heading level={4} className="mb-2 pr-2">
+                    <RichText text={headline} as="span" />
+                </Heading>
+                <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating-sticky" siteId={siteId} />
+            </div>
         </div>
     )
 
@@ -370,9 +392,183 @@ function FloatingStickyVariant({ block, siteId }: { block: CTAConfig; siteId?: s
     )
 }
 
+// ── A5 (260417) — 4 new CTA variants for pool diversity ─────────────────────
+
+/**
+ * image-bg: full-bleed CTA where stacked decoratives (Mesh + Layered Shapes)
+ * stand in for a hero photo — site config has no image field, so this is the
+ * "decorative-rich banner" variant. Brand gradient remains the base color so
+ * resolved theme drives the mood.
+ */
+function ImageBgVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
+    const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary', secondaryCtaLabel, secondaryCtaUrl } = block
+    return (
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="relaxed"
+            container="default"
+            className="!py-24 md:!py-36 relative overflow-hidden"
+            innerClassName="text-center max-w-3xl"
+            style={{
+                background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
+                color: '#ffffff',
+            }}
+        >
+            <MeshGradient color={CSS_VARS.primary} accentColor={CSS_VARS.secondary} opacity={0.45} />
+            <LayeredShapes color="#ffffff" opacity={0.06} />
+            <div className="relative z-10">
+                <Heading level={2} className="mb-4 leading-tight">
+                    <RichText text={headline} as="span" />
+                </Heading>
+                {subheadline && (
+                    <Body size="lg" className="opacity-85 mb-8 max-w-xl mx-auto">
+                        <RichText text={subheadline} as="span" />
+                    </Body>
+                )}
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="image-bg" siteId={siteId} onInverseBg />
+                    {secondaryCtaLabel && secondaryCtaUrl && (
+                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} onInverseBg />
+                    )}
+                </div>
+            </div>
+        </SectionWrapper>
+    )
+}
+
+/**
+ * split-testimonial: 2-column layout — left side renders subheadline as a
+ * pulled quote (with TypographicMark stamp), right side gets the CTA. Quote
+ * provides social proof framing for the action. Falls back to a generic
+ * line if no subheadline.
+ */
+function SplitTestimonialVariant({ block, siteName, siteId }: { block: CTAConfig; siteName?: string; siteId?: string }) {
+    const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary', secondaryCtaLabel, secondaryCtaUrl } = block
+    const quote = subheadline || 'Trusted by teams who care about every detail.'
+    const attribution = siteName ? `— Customer of ${siteName}` : '— A happy customer'
+    return (
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="default"
+            container="default"
+            className="relative overflow-hidden"
+            style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
+        >
+            <TypographicMark text="“" color={CSS_VARS.primary} opacity={0.06} size="xl" />
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-10 items-center max-w-5xl mx-auto">
+                <blockquote className="text-center md:text-left">
+                    <p className="text-xl md:text-2xl italic leading-relaxed mb-3" style={{ color: CSS_VARS.text }}>
+                        “{quote}”
+                    </p>
+                    <Caption className="opacity-70" style={{ color: CSS_VARS.muted }}>{attribution}</Caption>
+                </blockquote>
+                <div className="text-center md:text-left">
+                    <Heading level={3} className="mb-4">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
+                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="split-testimonial" siteId={siteId} />
+                        {secondaryCtaLabel && secondaryCtaUrl && (
+                            <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </SectionWrapper>
+    )
+}
+
+/**
+ * dark-card: high-contrast dark card variant of `card` — inverted theme for
+ * sections that need visual punch against a light page. Uses NoiseTexture
+ * which reads beautifully on dark backgrounds.
+ */
+function DarkCardVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
+    const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary', secondaryCtaLabel, secondaryCtaUrl } = block
+    return (
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="default"
+            container="default"
+            className="!py-16 md:!py-20"
+            style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
+        >
+            <div
+                className="max-w-2xl mx-auto text-center p-10 md:p-14 relative overflow-hidden"
+                style={{
+                    background: 'linear-gradient(160deg, #0a0a0a, #1a1a1a)',
+                    borderRadius: CSS_VARS.radiusLg,
+                    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
+                    border: '1px solid rgba(var(--brand-primary-rgb), 0.25)',
+                    color: '#ffffff',
+                }}
+            >
+                <NoiseTexture opacity={0.08} />
+                <div className="relative z-10">
+                    <Heading level={3} className="mb-3" style={{ color: '#ffffff' }}>
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body className="mb-8 opacity-80" style={{ color: '#ffffff' }}>
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="dark-card" siteId={siteId} onInverseBg />
+                        {secondaryCtaLabel && secondaryCtaUrl && (
+                            <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} onInverseBg />
+                        )}
+                    </div>
+                </div>
+            </div>
+        </SectionWrapper>
+    )
+}
+
+/**
+ * mesh-gradient-hero: oversized hero-CTA with prominent MeshGradient as the
+ * visual focal point. Bigger padding + larger headline than banner. Use
+ * sparingly — best as page-final CTA where you want maximum impact.
+ */
+function MeshGradientHeroVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
+    const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary', secondaryCtaLabel, secondaryCtaUrl } = block
+    return (
+        <SectionWrapper
+            as={AnimatedSection}
+            padding="relaxed"
+            container="default"
+            className="!py-28 md:!py-40 relative overflow-hidden"
+            innerClassName="text-center max-w-4xl"
+            style={{
+                background: CSS_VARS.background,
+                color: CSS_VARS.text,
+            }}
+        >
+            <MeshGradient color={CSS_VARS.primary} accentColor={CSS_VARS.secondary} opacity={0.55} />
+            <div className="relative z-10">
+                <Heading level={1} className="mb-6 leading-tight text-4xl md:text-6xl font-bold">
+                    <RichText text={headline} as="span" />
+                </Heading>
+                {subheadline && (
+                    <Body size="lg" className="opacity-75 mb-10 max-w-2xl mx-auto">
+                        <RichText text={subheadline} as="span" />
+                    </Body>
+                )}
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="mesh-gradient-hero" siteId={siteId} />
+                    {secondaryCtaLabel && secondaryCtaUrl && (
+                        <SecondaryCTAButton label={secondaryCtaLabel} url={secondaryCtaUrl} siteId={siteId} />
+                    )}
+                </div>
+            </div>
+        </SectionWrapper>
+    )
+}
+
 export function CTABlock({ block, site }: BlockProps<CTAConfig>) {
     // Plan 260415 Lỗi 13C — safer String cast
     const siteId = site?.id != null ? String(site.id) : undefined
+    const siteName = (site as { name?: string } | undefined)?.name
 
     // Plan 260415 Decision 5 — legacy 'floating' (old name) → render card variant
     // để existing sites chưa migrate vẫn render đúng layout card center.
@@ -387,6 +583,14 @@ export function CTABlock({ block, site }: BlockProps<CTAConfig>) {
             return <CardVariant block={block} siteId={siteId} />
         case 'floating-sticky':
             return <FloatingStickyVariant block={block} siteId={siteId} />
+        case 'image-bg':
+            return <ImageBgVariant block={block} siteId={siteId} />
+        case 'split-testimonial':
+            return <SplitTestimonialVariant block={block} siteName={siteName} siteId={siteId} />
+        case 'dark-card':
+            return <DarkCardVariant block={block} siteId={siteId} />
+        case 'mesh-gradient-hero':
+            return <MeshGradientHeroVariant block={block} siteId={siteId} />
         case 'banner':
         default:
             return <BannerVariant block={block} siteId={siteId} />

@@ -205,22 +205,24 @@ function SidebarNavItem({
 }
 
 // ── Shared Nav Helpers (Phase 05 refactor) ──────────────────────────────────
-// Extract repeated CTA / hamburger / mobile drawer blocks. Variants pass
-// `motionWrap=false` to opt out of framer-motion (sidebar/pill have their
-// own motion choreography). Brand identity vars unchanged per Option C.
-// Drawer renders each link via MobileNavItem so nested children work
-// automatically across all variants.
+// Extract repeated CTA / hamburger / mobile drawer blocks. Brand identity vars
+// unchanged per Option C. Drawer renders each link via MobileNavItem so nested
+// children work automatically across all variants.
+
+const NAV_CTA_OVERLAY_OPACITY = 0.8
+const NAV_CTA_SHADOW_OPACITY = 0.188
+
+const CTA_GRADIENT_BACKGROUND = `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), ${NAV_CTA_OVERLAY_OPACITY}))`
 
 const CTA_GRADIENT_STYLE: CSSProperties = {
-    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-    boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), 0.188)`,
+    background: CTA_GRADIENT_BACKGROUND,
+    boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), ${NAV_CTA_SHADOW_OPACITY})`,
 }
 
 type NavCTAButtonProps = {
     href?: string
     label: string
     className?: string
-    motionWrap?: boolean
     onClick?: () => void
 }
 
@@ -229,28 +231,20 @@ function NavCTAButton({
     href = '#',
     label,
     className = 'hidden sm:inline-flex px-5 py-2.5',
-    motionWrap = true,
     onClick,
 }: NavCTAButtonProps) {
     const cls = `${className} rounded-lg text-sm font-semibold text-white transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
-    if (motionWrap) {
-        return (
-            <motion.a
-                href={href}
-                whileHover={{ scale: 1.04, y: -1 }}
-                whileTap={{ scale: 0.97 }}
-                className={cls}
-                style={CTA_GRADIENT_STYLE}
-                onClick={onClick}
-            >
-                {label}
-            </motion.a>
-        )
-    }
     return (
-        <a href={href} className={cls} style={CTA_GRADIENT_STYLE} onClick={onClick}>
+        <motion.a
+            href={href}
+            whileHover={{ scale: 1.04, y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            className={cls}
+            style={CTA_GRADIENT_STYLE}
+            onClick={onClick}
+        >
             {label}
-        </a>
+        </motion.a>
     )
 }
 
@@ -260,7 +254,7 @@ function NavMobileCTAButton({ href = '#', label, onClick }: { href?: string; lab
         <a
             href={href}
             className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
-            style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))` }}
+            style={{ background: CTA_GRADIENT_BACKGROUND }}
             onClick={onClick}
         >
             {label}
@@ -602,10 +596,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                     <a
                                         href={ctaButton.url || '#'}
                                         className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
-                                        style={{
-                                            background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                            boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), 0.188)`,
-                                        }}
+                                        style={CTA_GRADIENT_STYLE}
                                         onClick={() => setIsOpen(false)}
                                     >
                                         {ctaButton.label}
@@ -905,9 +896,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                         <a
                             href={ctaButton.url || '#'}
                             className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
-                            style={{
-                                background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                            }}
+                            style={{ background: CTA_GRADIENT_BACKGROUND }}
                         >
                             {ctaButton.label}
                         </a>
@@ -951,7 +940,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                                 <a
                                     href={ctaButton.url || '#'}
                                     className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
-                                    style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))` }}
+                                    style={{ background: CTA_GRADIENT_BACKGROUND }}
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
                                     {ctaButton.label}
