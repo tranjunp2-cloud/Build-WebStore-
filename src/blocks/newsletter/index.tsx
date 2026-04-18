@@ -8,9 +8,9 @@ import type { BlockProps } from '../types'
 import type { NewsletterConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Heading, Body } from '../shared/Typography'
-import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
-import { GridLines, DuotoneOverlay } from '../shared/decorative'
+import { GridLines, DuotoneOverlay, NoiseTexture, LayeredShapes } from '../shared/decorative'
 
 // ── Local helpers (Plan 260415 newsletter-compliance) ──────────────────────
 // Brand identity vars preserved per Option C additive strategy.
@@ -403,6 +403,106 @@ function BannerVariant({ block, siteId }: { block: NewsletterConfig; siteId?: st
     )
 }
 
+// ── A5 (260417) — 3 new newsletter variants ──────────────────────────────────
+
+/**
+ * stacked-card: centered card with shadow, form stacks vertically inside.
+ * Different from inline (which is horizontal row). Use for emphasized
+ * standalone newsletter section. A4 vocab: NoiseTexture (card texture).
+ */
+function StackedCardVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
+    const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
+    return (
+        <NewsletterSection style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
+            <div
+                className={`max-w-lg mx-auto text-center ${CARD_PADDING.lg} relative overflow-hidden`}
+                style={{
+                    background: CSS_VARS.surface,
+                    borderRadius: 'var(--radius-lg)',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
+                    border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
+                }}
+            >
+                <NoiseTexture opacity={0.05} />
+                <div className="relative z-10">
+                    <Heading level={2} className="mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                        {headline || 'Join our newsletter'}
+                    </Heading>
+                    {subheadline && (
+                        <Body size="small" className="mb-6 opacity-70" style={{ color: CSS_VARS.muted }}>
+                            {subheadline}
+                        </Body>
+                    )}
+                    <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="stack" />
+                </div>
+            </div>
+        </NewsletterSection>
+    )
+}
+
+/**
+ * minimal: very compact — heading + form on single row, no separate section
+ * framing. Blends into page flow. A4 vocab: none (minimal aesthetic).
+ */
+function MinimalVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
+    const { headline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
+    return (
+        <NewsletterSection padding="compact" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
+            <div className="flex flex-col sm:flex-row items-center gap-4 max-w-2xl mx-auto">
+                <Heading level={4} className="flex-shrink-0" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                    {headline || 'Stay in the loop'}
+                </Heading>
+                <div className="flex-1 w-full">
+                    <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="row" />
+                </div>
+            </div>
+        </NewsletterSection>
+    )
+}
+
+/**
+ * incentive-grid: 2-col — subheadline as bullet-list benefits on left, form
+ * on right. Splits `subheadline` on newlines or semicolons as benefit lines;
+ * falls back to 3 generic benefits if none. A4 vocab: LayeredShapes.
+ */
+function IncentiveGridVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
+    const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
+    const benefits = subheadline
+        ? subheadline.split(/[\n;•]/).map((s) => s.trim()).filter(Boolean).slice(0, 4)
+        : ['Weekly tips', 'Early access', 'Exclusive offers']
+    return (
+        <NewsletterSection
+            style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
+            decorative={<LayeredShapes color={CSS_VARS.primary} opacity={0.1} />}
+        >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center max-w-4xl mx-auto">
+                <div>
+                    <Heading level={2} className="mb-4" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                        {headline || 'Get the good stuff'}
+                    </Heading>
+                    <ul className="flex flex-col gap-3">
+                        {benefits.map((b, i) => (
+                            <li key={i} className="flex items-start gap-3">
+                                <span
+                                    className="mt-1 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
+                                    style={{ background: CSS_VARS.primary }}
+                                    aria-hidden="true"
+                                >
+                                    ✓
+                                </span>
+                                <Body size="small" style={{ color: CSS_VARS.text }}>{b}</Body>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+                <div>
+                    <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="stack" />
+                </div>
+            </div>
+        </NewsletterSection>
+    )
+}
+
 export function NewsletterBlock({ block, site }: BlockProps<NewsletterConfig>) {
     const { variant = 'inline' } = block
     // Plan 260415 Lỗi G — safer String() cast instead of `as string`
@@ -413,6 +513,12 @@ export function NewsletterBlock({ block, site }: BlockProps<NewsletterConfig>) {
             return <PopupVariant block={block} siteId={siteId} />
         case 'banner':
             return <BannerVariant block={block} siteId={siteId} />
+        case 'stacked-card':
+            return <StackedCardVariant block={block} siteId={siteId} />
+        case 'minimal':
+            return <MinimalVariant block={block} siteId={siteId} />
+        case 'incentive-grid':
+            return <IncentiveGridVariant block={block} siteId={siteId} />
         case 'inline':
         default:
             return <InlineVariant block={block} siteId={siteId} />

@@ -62,10 +62,10 @@ const PAGES_VARIANTS: Record<string, string[]> = {
     gallery: ['grid', 'masonry', 'carousel', 'lightbox', 'filmstrip', 'justified'],
     stats: ['row', 'grid', 'highlight', 'cards', 'inline-text', 'chart-bars'],
     pricing: ['cards', 'table', 'horizontal', 'toggle', 'tiered', 'comparison', 'minimal', 'slider'],
-    faq: ['accordion', 'grid', 'simple'],
+    faq: ['accordion', 'grid', 'simple', 'two-column-accordion', 'chat-bubbles', 'numbered'],
     team: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'],
     cta: ['banner', 'inline', 'card', 'floating-sticky', 'image-bg', 'split-testimonial', 'dark-card', 'mesh-gradient-hero'],
-    newsletter: ['inline', 'popup', 'banner'],
+    newsletter: ['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid'],
     'logo-cloud': ['row', 'grid'],
     'service-cards': ['grid', 'list', 'featured'],
 }
