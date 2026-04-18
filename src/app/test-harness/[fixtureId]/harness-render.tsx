@@ -3,6 +3,8 @@ import path from 'node:path'
 import { notFound } from 'next/navigation'
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import type { MatrixReport, HarnessResult, HarnessPage, HarnessBlock } from '../../../../scripts/test-harness/types'
+import { scoreFixture } from '../../../../scripts/test-harness/rubric/scorer-lib'
+import { ScoreOverlay } from '../_components/score-overlay'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,6 +92,16 @@ export async function renderHarnessFixture(fixtureId: string, pageSlug?: string)
     const prefix = `/test-harness/${fixtureId}`
     const slugsJson = JSON.stringify(availableSlugs)
 
+    // Score current fixture on-demand — always fresh
+    const allBlocks = result.pages ? result.pages.flatMap((p) => p.blocks) : result.blocks
+    const score = scoreFixture({
+        fixtureId,
+        category: result.fixture.category,
+        blocks: result.blocks,
+        theme: result.theme,
+        allBlocks,
+    })
+
     return (
         <div data-harness-fixture={fixtureId} data-harness-page={normalizeSlug(page.slug)}>
             {/* Rewrite <a href> clicks within harness — map sub-page links to
@@ -140,6 +152,7 @@ export async function renderHarnessFixture(fixtureId: string, pageSlug?: string)
                     )
                 })}
             </div>
+            <ScoreOverlay score={score} />
             <SiteRenderer site={site as never} page={pageData as never} />
         </div>
     )

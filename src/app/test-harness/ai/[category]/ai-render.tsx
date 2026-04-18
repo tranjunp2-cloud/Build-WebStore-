@@ -5,6 +5,9 @@ import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
 import { getCategoryContent } from '@/lib/ai/content'
 import type { GenerationResult, GeneratedPage } from '@/lib/ai/generate-blocks'
+import { scoreFixture } from '../../../../../scripts/test-harness/rubric/scorer-lib'
+import type { HarnessBlock } from '../../../../../scripts/test-harness/types'
+import { ScoreOverlay } from '../../_components/score-overlay'
 
 const CACHE_DIR = path.resolve(process.cwd(), '.harness-out/ai-cache')
 
@@ -118,6 +121,17 @@ export async function renderAIHarness(category: string, slug: string | undefined
     return renderLayout(result, category, normalizeSlug(page.slug), layout, cachedFrom, availableSlugs)
 }
 
+function layoutToHarnessBlocks(layout: Record<string, unknown>[]): HarnessBlock[] {
+    return layout.map((b) => {
+        const { blockType, variant, ...rest } = b
+        return {
+            blockType: (blockType as string) ?? 'unknown',
+            variant: variant as string | undefined,
+            data: rest,
+        }
+    })
+}
+
 function renderLayout(
     result: GenerationResult,
     category: string,
@@ -130,6 +144,19 @@ function renderLayout(
     const pageData = { layout }
     const prefix = `/test-harness/ai/${category}`
     const slugsJson = JSON.stringify(slugs.map((s) => s.slug))
+
+    // Score current AI-gen result on-demand — rubric applies same to AI output
+    const currentBlocks = layoutToHarnessBlocks(layout)
+    const allBlocks = result.pages
+        ? result.pages.flatMap((p) => layoutToHarnessBlocks(p.blocks as unknown as Record<string, unknown>[]))
+        : currentBlocks
+    const score = scoreFixture({
+        fixtureId: `ai-${category}-${currentSlug}`,
+        category,
+        blocks: currentBlocks,
+        theme: result.theme as Record<string, unknown>,
+        allBlocks,
+    })
 
     return (
         <div data-harness-ai-category={category} data-harness-page={currentSlug}>
@@ -196,6 +223,7 @@ function renderLayout(
                     })}
                 </div>
             )}
+            <ScoreOverlay score={score} />
             <SiteRenderer site={site as never} page={pageData as never} />
         </div>
     )
