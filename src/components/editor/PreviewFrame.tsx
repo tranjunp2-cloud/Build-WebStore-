@@ -857,6 +857,37 @@ function PreviewFrameInner({
                                         onBlockSelect?.(selectedLayout.blockIndex)
                                     }}
                                     onDelete={() => setDeleteConfirmIndex(selectedLayout.blockIndex)}
+                                    onDragStart={disableDragDrop ? undefined : (event) => {
+                                        const frameRect = frameElement?.getBoundingClientRect()
+                                        if (!frameRect) return
+
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        event.currentTarget.setPointerCapture(event.pointerId)
+                                        cancelPendingHoverClear()
+                                        dragPointerClientYRef.current = event.clientY
+                                        dragPointerStartYRef.current = event.clientY
+                                        dragPointerOffsetYRef.current = event.clientY - frameRect.top - selectedLayout.top
+                                        setHoverData(null)
+                                        setIsEditing(false)
+                                        setDragState({
+                                            sourceIndex: selectedLayout.blockIndex,
+                                            sourceRect: { ...selectedLayout, blockType: selectedLayout.blockType },
+                                            pointerOffsetY:
+                                                event.clientY - frameRect.top - selectedLayout.top,
+                                            currentY: selectedLayout.top,
+                                        })
+                                        setDropIndex(
+                                            editableLayouts.findIndex(
+                                                layout => layout.blockIndex === selectedLayout.blockIndex,
+                                            ),
+                                        )
+                                        frameElement?.contentWindow?.postMessage(
+                                            { type: 'DRAG_BLOCK_START', blockIndex: selectedLayout.blockIndex },
+                                            window.location.origin,
+                                        )
+                                        syncDragPosition(event.clientY, selectedLayout.blockIndex)
+                                    }}
                                     position={{
                                         top: overlayOffset.top + selectedLayout.top,
                                         left: overlayOffset.left + selectedLayout.left,
@@ -891,68 +922,6 @@ function PreviewFrameInner({
                                     />
                                 )}
                             </>
-                        )
-                    })()}
-                    {(() => {
-                        const activeLayout = blockHover || (selectedBlock !== null
-                            ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
-                            : null)
-                        if (!activeLayout || !overlayOffset || dragState || disableDragDrop || ['navigation', 'footer'].includes(activeLayout.blockType)) {
-                            return null
-                        }
-
-                        return (
-                        <button
-                            type="button"
-                            title={t.editor.toolbar.dragToReorder}
-                            className="group/drag absolute inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-2 text-slate-700 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all duration-150 hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 cursor-grab active:cursor-grabbing animate-in fade-in"
-                            style={{
-                                top: overlayOffset.top + activeLayout.top + 10,
-                                left: overlayOffset.left + activeLayout.left - 24,
-                                zIndex: 45,
-                            }}
-                            onMouseEnter={() => {
-                                isHoveringControlsRef.current = true
-                                cancelPendingHoverClear()
-                            }}
-                            onMouseLeave={() => {
-                                isHoveringControlsRef.current = false
-                            }}
-                            onPointerDown={(event) => {
-                                const frameRect = frameElement?.getBoundingClientRect()
-                                if (!frameRect) return
-
-                                event.preventDefault()
-                                event.stopPropagation()
-                                event.currentTarget.setPointerCapture(event.pointerId)
-                                cancelPendingHoverClear()
-                                dragPointerClientYRef.current = event.clientY
-                                dragPointerStartYRef.current = event.clientY
-                                dragPointerOffsetYRef.current = event.clientY - frameRect.top - activeLayout.top
-                                setHoverData(null)
-                                setIsEditing(false)
-                                setDragState({
-                                    sourceIndex: activeLayout.blockIndex,
-                                    sourceRect: { ...activeLayout, blockType: activeLayout.blockType },
-                                    pointerOffsetY:
-                                        event.clientY - frameRect.top - activeLayout.top,
-                                    currentY: activeLayout.top,
-                                })
-                                setDropIndex(
-                                    editableLayouts.findIndex(
-                                        layout => layout.blockIndex === activeLayout.blockIndex,
-                                    ),
-                                )
-                                frameElement?.contentWindow?.postMessage(
-                                    { type: 'DRAG_BLOCK_START', blockIndex: activeLayout.blockIndex },
-                                    window.location.origin,
-                                )
-                                syncDragPosition(event.clientY, activeLayout.blockIndex)
-                            }}
-                        >
-                            <GripVertical className="h-4 w-4 text-slate-400 group-hover/drag:text-slate-600" />
-                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 group-hover/drag:text-slate-700">{t.editor.toolbar.drag}</span>
-                        </button>
                         )
                     })()}
                 </>

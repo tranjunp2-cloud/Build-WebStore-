@@ -12,6 +12,7 @@
     "generate:types": "payload generate:types",
     "payload": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.ts payload",
     "db:push": "node scripts/db-push-once.js",
+    "db:migrate": "node --require ./scripts/seed-preload.cjs scripts/db-setup.js --migrate-only",
     "db:seed": "tsx --require ./scripts/seed-preload.cjs scripts/seed.ts",
     "db:seed-sso": "tsx --require ./scripts/seed-preload.cjs scripts/seed-sso-account.ts",
     "db:reset": "tsx --require ./scripts/seed-preload.cjs scripts/reset-account.ts",

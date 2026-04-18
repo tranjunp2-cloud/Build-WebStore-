@@ -5,12 +5,14 @@ export type BlockData = { blockType: string } & Record<string, unknown>
 export type ThemeData = Record<string, unknown>
 
 export type AIAction = {
-    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block'
+    action: 'update_block' | 'update_multiple_blocks' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block'
     changes?: Record<string, unknown>
     blockIndex?: number
     afterIndex?: number
     block?: BlockData
     message?: string
+    // Multi-block updates (used with update_multiple_blocks)
+    updates?: { blockIndex: number; changes: Record<string, unknown> }[]
 }
 
 export type CtaButton = { label?: string; url?: string; variant?: string }

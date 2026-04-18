@@ -20,6 +20,8 @@ import { editBlockSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { summarizeNestedField } from '@/lib/ai/summarize'
+import { buildEnumPrompt } from '@/lib/theme/enums'
 
 type AIEditPayload = {
     instruction: string
@@ -34,12 +36,13 @@ type AIEditPayload = {
 }
 
 type AIEditResult = {
-    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block' | 'none'
+    action: 'update_block' | 'update_multiple_blocks' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block' | 'none'
     changes?: Record<string, unknown>
     blockIndex?: number
     afterIndex?: number
     block?: Record<string, unknown>
     message?: string
+    updates?: { blockIndex: number; changes: Record<string, unknown> }[]
 }
 
 function getOpenAI(): OpenAI | null {
@@ -60,6 +63,10 @@ function describeAction(result: AIEditResult): string {
         }
         case 'delete_block':
             return 'Removed the selected section from the page.'
+        case 'update_multiple_blocks': {
+            const count = result.updates?.length || 0
+            return `Updated ${count} sections on the page.`
+        }
         case 'update_block':
         default:
             return 'Updated the content of the selected section.'
@@ -77,17 +84,29 @@ async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
 
     // Build a concise block summary so AI knows the page structure and current content
     // Spec §1.3: "compact summary, NOT full JSON" — limit to key text fields, truncate long values
-    const TEXT_FIELD_ALLOW = new Set(['headline', 'subheadline', 'title', 'subtitle', 'description', 'ctaText', 'buttonText', 'label', 'tagline', 'copyright', 'bodyText', 'sectionLabel', 'name', 'quote'])
+    const TEXT_FIELD_ALLOW = new Set([
+        'headline', 'subheadline', 'title', 'subtitle', 'description',
+        'ctaText', 'buttonText', 'label', 'tagline', 'copyright',
+        'bodyText', 'sectionLabel', 'name', 'quote', 'content',
+        'placeholder', 'html', 'code',
+    ])
     const blockSummary = (allBlocks || []).map((b: Record<string, unknown>, i: number) => {
         const fields: string[] = []
         for (const [k, v] of Object.entries(b)) {
-            if (['blockType', 'variant'].includes(k)) continue
+            if (['blockType', 'variant', 'id', '_order', '_path'].includes(k)) continue
+
+            // Top-level strings (existing behavior)
             if (typeof v === 'string' && v.length > 0 && TEXT_FIELD_ALLOW.has(k)) {
                 fields.push(`${k}: "${v.length > 80 ? v.slice(0, 80) + '…' : v}"`)
+                continue
             }
+
+            // Nested arrays and objects
+            const nested = summarizeNestedField(k, v)
+            if (nested) fields.push(nested)
         }
         const selected = i === blockIndex ? ' ← SELECTED' : ''
-        return `  [${i}] ${(b as Record<string, unknown>).blockType}${selected}\n      ${fields.join(' | ') || '(no text fields)'}`
+        return `  [${i}] ${b.blockType}${selected}\n      ${fields.join('\n      ') || '(no text fields)'}`
     }).join('\n')
 
     const systemPrompt = `You are an AI website editor. The user wants to modify their website.
@@ -98,6 +117,7 @@ async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
 - Current theme: ${JSON.stringify(theme || {})}
 - Total blocks on page: ${allBlocks?.length || 0}
 ${block ? `- Currently editing block #${blockIndex + 1}: type="${block.blockType}"` : '- No specific block selected'}
+${block ? `\n## SELECTED BLOCK FULL DATA\n\`\`\`json\n${JSON.stringify(block, null, 2).slice(0, 3000)}\n\`\`\`` : ''}
 
 ## CURRENT PAGE BLOCKS
 ${blockSummary || '(empty page)'}
@@ -118,12 +138,28 @@ For modifying an existing block:
 }
 ${block ? `The user has selected block #${blockIndex + 1}, so use blockIndex ${blockIndex} unless the instruction clearly refers to a different block.` : 'No block is selected — determine the correct blockIndex from the CURRENT PAGE BLOCKS list based on the user instruction.'}
 
+For modifying MULTIPLE blocks at once (e.g., translate entire page, change tone across all sections):
+{
+  "action": "update_multiple_blocks",
+  "updates": [
+    { "blockIndex": 0, "changes": { "headline": "...", "subheadline": "..." } },
+    { "blockIndex": 1, "changes": { "title": "...", "description": "..." } },
+    ...
+  ],
+  "message": "A short explanation of what was changed."
+}
+IMPORTANT: Use "update_multiple_blocks" when the instruction applies to the ENTIRE PAGE or multiple sections (e.g., "translate all", "change all text to...", "make everything formal"). Use "update_block" when targeting a single specific section.
+Each entry in "updates" follows the same rules as "changes" in "update_block" — include COMPLETE arrays for nested fields, use exact field names from CURRENT PAGE BLOCKS.
+
 For changing the theme:
 {
   "action": "update_theme",
   "changes": { "primaryColor": "#hex", ... },
   "message": "A short explanation of what was changed."
 }
+Theme field constraints (use ONLY these values):
+${buildEnumPrompt()}
+- Colors (primaryColor, secondaryColor, accentColor, etc.): any valid hex color
 
 For adding a new block:
 {
@@ -149,7 +185,7 @@ For undoing the previous action:
 ## RULES
 1. Respond ONLY with the JSON object
 2. Always include a concise "message" explaining the applied change
-3. "changes" should only include fields that are being modified
+3. "changes" should only include fields that are being modified. For array fields, include the COMPLETE array (not just changed items)
 4. For text changes, generate professional, natural content
 5. For theme changes, use tasteful colors that work together
 6. blockType in new blocks MUST be one of the available types
@@ -157,6 +193,44 @@ For undoing the previous action:
 8. Supported add-section types: testimonials, faq, gallery, features, team, newsletter, banner, cta
 9. New sections should be appended to the bottom by default unless the user explicitly asks otherwise
 10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.
+
+## NESTED FIELD FORMAT (CRITICAL)
+When modifying array fields (ctaButtons, features, items, links, testimonials, plans, etc.),
+you MUST return the COMPLETE array in "changes", not individual items.
+
+Example — changing a CTA button label:
+WRONG: {"action":"update_block","blockIndex":0,"changes":{"buttonText":"Buy Now"}}
+RIGHT: {"action":"update_block","blockIndex":0,"changes":{
+  "ctaButtons":[{"label":"Buy Now","url":"#","style":"primary"},{"label":"View Collection","url":"#","style":"secondary"}]
+},"message":"Translated CTA buttons to English."}
+
+Example — updating FAQ items (field name is "faqs", NOT "items"):
+{"action":"update_block","blockIndex":2,"changes":{
+  "faqs":[{"question":"New Q1","answer":"New A1"},{"question":"New Q2","answer":"New A2"}]
+}}
+
+Example — updating navigation links:
+{"action":"update_block","blockIndex":0,"changes":{
+  "links":[{"label":"Home","url":"/"},{"label":"About","url":"/about"},{"label":"Contact","url":"/contact"}]
+}}
+
+Common nested field schemas:
+- ctaButtons: [{label:string, url:string, style:"primary"|"secondary"|"outline"|"ghost"}]
+- features/items: [{title:string, description:string, icon?:string}]
+- faqs (FAQ items — field name is "faqs"): [{question:string, answer:string}]
+- links (navigation): [{label:string, url:string, children?:[{label:string, url:string}]}]
+- testimonials: [{quote:string, name:string, title?:string, company?:string}]
+- plans (pricing): [{name:string, price:string, period?:string, description?:string, features:string[], ctaLabel:string, ctaUrl:string}]
+- stats: [{value:string, label:string, prefix?:string, suffix?:string}]
+- steps: [{title:string, description:string, icon?:string}]
+- columns (footer): [{title:string, links:[{label:string, url:string}]}]
+- images/gallery: [{url:string, alt?:string, caption?:string}]
+
+IMPORTANT RULES for nested fields:
+1. Always use the EXACT field name from CURRENT PAGE BLOCKS or SELECTED BLOCK FULL DATA (e.g., "ctaButtons" not "buttonText" or "cta")
+2. Return the FULL array — partial updates will lose other items
+3. Preserve items you're NOT modifying — copy them as-is from the SELECTED BLOCK FULL DATA
+4. When translating, translate ALL items in the array, not just one
 
 ## SCOPE RESTRICTIONS
 - You are ONLY allowed to edit this website's content, layout, theme, and blocks.
@@ -215,7 +289,7 @@ For undoing the previous action:
             // phase-04: lower temperature 0.7 → 0.3 — edit-block needs fidelity, not variety.
             // User request "change hero headline to X" should return X verbatim, not a creative rephrasing.
             temperature: 0.3,
-            max_tokens: 2000,
+            max_tokens: 4000,
             response_format: { type: 'json_object' },
         })
     } catch (err) {
@@ -250,6 +324,25 @@ For undoing the previous action:
     // Handle scope rejection — AI determined the request is out of scope
     if (result.action === 'none') {
         return result
+    }
+
+    // Filter out-of-bounds blockIndex entries for multi-block updates.
+    // AI occasionally returns indices past the page length — frontend silently
+    // skips them, leaving the user's "Updated N sections" message misleading.
+    if (result.action === 'update_multiple_blocks' && Array.isArray(result.updates) && allBlocks) {
+        const maxIndex = allBlocks.length - 1
+        const original = result.updates.length
+        result.updates = result.updates.filter(u =>
+            typeof u.blockIndex === 'number' && u.blockIndex >= 0 && u.blockIndex <= maxIndex,
+        )
+        if (result.updates.length < original) {
+            console.warn(`[AI edit-block] Filtered ${original - result.updates.length} out-of-bounds updates`)
+        }
+        if (result.updates.length === 0) {
+            result.action = 'none'
+            result.message = 'AI response contained no valid block updates.'
+            return result
+        }
     }
 
     if (result.action === 'add_block') {
