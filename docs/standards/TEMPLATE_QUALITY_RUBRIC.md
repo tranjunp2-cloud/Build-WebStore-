@@ -185,8 +185,24 @@ Score overlay trên fixture render:
 
 ## Versioning
 
-- `v1` (2026-04-18): initial 8 dim × 35 criteria. Baseline for template fix program.
-- Future v1.1: tune weights after baseline run. Future v2: add a11y + perf dimensions.
+- **`v1`** (2026-04-18): initial 8 dim × 35 criteria, weight 66. Baseline avg 8.96/10, 100% pass — ceiling heavy.
+- **`v1.1`** (2026-04-18): stricter — 8 dim × 47 criteria, weight 79. Adds 11 new (image-coverage, features-icons, hero-headline-length, hero-subheadline-length, testimonials-ratings, footer-mega-columns, content-depth-300, nav-links-balanced, hero-cta-pair, cta-text-quality, no-lorem-strict). Tightens 4 (theme font DISTINCT required, section-headlines 70%→85%, block-count sweet-spot 9-14, variety 50%→75%). Baseline avg 8.36/10.
+- Future v2: add a11y + perf dimensions.
+
+### Switch versions
+
+```bash
+npm run harness:score                    # default = v1.1
+npm run harness:score -- --rubric=v1     # run v1 explicitly
+npm run harness:score -- --rubric=both   # run both, compare
+```
+
+Report files:
+- `.harness-out/rubric-report-v1.json`
+- `.harness-out/rubric-report-v1.1.json`
+- `.harness-out/rubric-report.json` (copy of default v1.1 for back-compat)
+
+Admin dashboard + score overlay dùng default (v1.1). Query `?v=v1` để xem v1 dashboard.
 
 ## Related
 

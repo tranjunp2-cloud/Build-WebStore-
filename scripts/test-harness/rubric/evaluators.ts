@@ -23,7 +23,43 @@ export interface EvalResult {
 
 type Evaluator = (ctx: EvalContext) => EvalResult
 
-/** Registry — rubric-v1.json references evaluators by these keys. */
+/** Generic CTA phrases — templates relying only on these reduce conversion.
+ *  "Get Started" NOT in list (common valid SaaS CTA). */
+const GENERIC_CTA_LABELS = new Set([
+    'click here',
+    'learn more',
+    'read more',
+    'view more',
+    'find out more',
+    'more info',
+    'submit',
+])
+
+/** Helper — collect all CTA button labels across hero/nav/cta blocks. */
+function collectCtaLabels(blocks: HarnessBlock[]): string[] {
+    const labels: string[] = []
+    for (const b of blocks) {
+        const data = b.data ?? {}
+        const ctaButtons = (data.ctaButtons ?? data.buttons) as unknown
+        if (Array.isArray(ctaButtons)) {
+            for (const c of ctaButtons) {
+                if (c && typeof c === 'object' && 'label' in c) {
+                    const lbl = (c as { label?: unknown }).label
+                    if (typeof lbl === 'string') labels.push(lbl)
+                }
+            }
+        }
+        for (const field of ['primaryCta', 'secondaryCta', 'ctaButton', 'cta']) {
+            const obj = data[field] as { label?: unknown } | undefined
+            if (obj && typeof obj === 'object' && typeof obj.label === 'string') {
+                labels.push(obj.label)
+            }
+        }
+    }
+    return labels
+}
+
+/** Registry — rubric JSON references evaluators by these keys. */
 export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
     distinctBlockTypes7: ({ blocks }) => {
         const types = new Set(blocks.map((b) => b.blockType))
@@ -109,6 +145,141 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         const types = new Set(blocks.map((b) => b.blockType))
         const pass = types.size >= Math.ceil(blocks.length / 2)
         return { pass, reason: `${types.size}/${blocks.length}` }
+    },
+
+    // ── v1.1 new evaluators ───────────────────────────────────────────────
+
+    heroHeadlineLengthIdeal: ({ blocks }) => {
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const headline = (hero?.data?.headline as string | undefined) ?? ''
+        const len = headline.trim().length
+        if (len >= 15 && len <= 80) return { pass: true, reason: `${len} chars (ideal)` }
+        if ((len >= 10 && len < 15) || (len > 80 && len <= 120)) return { pass: false, partial: true, reason: `${len} chars (partial)` }
+        return { pass: false, reason: `${len} chars (${len < 10 ? 'too short' : 'too long'})` }
+    },
+    heroSubheadlineLength: ({ blocks }) => {
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const sub = ((hero?.data?.subheadline ?? hero?.data?.subHeadline) as string | undefined) ?? ''
+        const len = sub.trim().length
+        if (len >= 30 && len <= 200) return { pass: true, reason: `${len} chars (ideal)` }
+        if ((len >= 20 && len < 30) || (len > 200 && len <= 300)) return { pass: false, partial: true, reason: `${len} chars` }
+        return { pass: false, reason: `${len} chars` }
+    },
+    themeHeadingBodyDistinct: ({ theme }) => {
+        // Strict: require explicit fontHeading + fontBody both defined AND distinct
+        const h = theme?.fontHeading as string | undefined
+        const b = theme?.fontBody as string | undefined
+        if (!h || !b) return { pass: false, reason: `missing explicit fontHeading or fontBody (found pairingId=${theme?.fontPairingId ?? 'none'})` }
+        const pass = h.trim().toLowerCase() !== b.trim().toLowerCase()
+        return { pass, reason: pass ? `${h} / ${b}` : `same font (${h})` }
+    },
+    sectionHeadlinesCoverage85: ({ blocks }) => {
+        const SKIP = new Set(['navigation', 'footer', 'announcement-bar', 'breadcrumb'])
+        const content = blocks.filter((b) => !SKIP.has(b.blockType))
+        if (content.length === 0) return { pass: false, reason: 'no content blocks' }
+        const withHeadline = content.filter((b) => Boolean(b.data?.headline || b.data?.sectionLabel || b.data?.title)).length
+        const ratio = withHeadline / content.length
+        return { pass: ratio >= 0.85, reason: `${withHeadline}/${content.length} (${Math.round(ratio * 100)}%)` }
+    },
+    imageCoverage: ({ blocks }) => {
+        const imgBlock = blocks.find((b) =>
+            ['gallery', 'gallery-masonry', 'portfolio-grid'].includes(b.blockType),
+        )
+        if (imgBlock) return { pass: true, reason: `${imgBlock.blockType}` }
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const bg = (hero?.data?.backgroundImage ?? hero?.data?.image) as { url?: string } | string | undefined
+        const url = typeof bg === 'string' ? bg : (bg?.url as string | undefined)
+        if (url && !url.startsWith('data:image/svg') && url.length > 0) {
+            return { pass: true, reason: 'hero bg image' }
+        }
+        return { pass: false, reason: 'no gallery/portfolio, hero bg missing or SVG placeholder' }
+    },
+    featuresHaveIcons: ({ blocks }) => {
+        const features = blocks.find((b) => b.blockType === 'features')
+        if (!features) return { pass: true, reason: 'no features block (skip)' }
+        const variant = features.variant ?? ''
+        // Only check icon-* variants
+        if (!/icon/i.test(variant)) return { pass: true, reason: `variant=${variant} (skip)` }
+        const items = (features.data?.features ?? features.data?.items) as Array<{ icon?: unknown }> | undefined
+        if (!Array.isArray(items) || items.length === 0) return { pass: false, reason: 'no items' }
+        const withIcon = items.filter((it) => it?.icon).length
+        const ratio = withIcon / items.length
+        return { pass: ratio >= 0.7, reason: `${withIcon}/${items.length} have icon` }
+    },
+    blockCountSweetSpot: ({ blocks }) => {
+        const n = blocks.length
+        if (n >= 9 && n <= 14) return { pass: true, reason: `${n} blocks (sweet spot)` }
+        if ((n >= 7 && n <= 8) || (n >= 15 && n <= 16)) return { pass: false, partial: true, reason: `${n} blocks (near)` }
+        return { pass: false, reason: `${n} blocks (off)` }
+    },
+    themeHasBorderRadius: ({ theme }) => ({ pass: Boolean(theme?.borderRadius), reason: String(theme?.borderRadius ?? 'missing') }),
+    themeHasShadowPreset: ({ theme }) => ({ pass: Boolean(theme?.shadowPreset), reason: String(theme?.shadowPreset ?? 'missing') }),
+    varietyUnique60: ({ blocks }) => {
+        const types = new Set(blocks.map((b) => b.blockType))
+        const ratio = blocks.length > 0 ? types.size / blocks.length : 0
+        return { pass: ratio >= 0.6, reason: `${types.size}/${blocks.length} (${Math.round(ratio * 100)}%)` }
+    },
+    varietyUnique75: ({ blocks }) => {
+        const types = new Set(blocks.map((b) => b.blockType))
+        const ratio = blocks.length > 0 ? types.size / blocks.length : 0
+        return { pass: ratio >= 0.75, reason: `${types.size}/${blocks.length} (${Math.round(ratio * 100)}%)` }
+    },
+    testimonialsHaveRatings: ({ blocks }) => {
+        const block = blocks.find((b) => b.blockType === 'testimonials')
+        if (!block) return { pass: false, reason: 'no testimonials block' }
+        const items = (block.data?.testimonials ?? block.data?.items ?? []) as Array<{ rating?: unknown }>
+        if (items.length === 0) return { pass: false, reason: 'no items' }
+        const withRating = items.filter((t) => typeof t?.rating === 'number' && (t.rating as number) >= 1).length
+        const ratio = withRating / items.length
+        return { pass: ratio >= 0.5, reason: `${withRating}/${items.length} have rating` }
+    },
+    heroCtaPair: ({ blocks }) => {
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const d = hero?.data ?? {}
+        const arr = (d.ctaButtons ?? d.buttons) as unknown[] | undefined
+        if (Array.isArray(arr) && arr.length >= 2) return { pass: true, reason: `${arr.length} CTAs` }
+        if (d.primaryCta && d.secondaryCta) return { pass: true, reason: 'primary + secondary' }
+        return { pass: false, reason: 'single or no CTA' }
+    },
+    ctaTextQualitySpecific: ({ blocks }) => {
+        const labels = collectCtaLabels(blocks)
+        if (labels.length === 0) return { pass: false, reason: 'no CTA labels' }
+        const nonGeneric = labels.filter((l) => !GENERIC_CTA_LABELS.has(l.trim().toLowerCase()))
+        return { pass: nonGeneric.length >= 1, reason: `${nonGeneric.length}/${labels.length} non-generic` }
+    },
+    contentDepth300: ({ blocks }) => {
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const parts: string[] = []
+        if (hero) {
+            parts.push(String(hero.data?.headline ?? ''))
+            parts.push(String(hero.data?.subheadline ?? hero.data?.subHeadline ?? ''))
+        }
+        for (const b of blocks) {
+            if (b.data?.sectionLabel) parts.push(String(b.data.sectionLabel))
+            if (b.data?.headline && b.blockType !== 'hero') parts.push(String(b.data.headline))
+        }
+        const total = parts.join(' ').trim().length
+        return { pass: total >= 300, reason: `${total} chars` }
+    },
+    noLoremStrict: ({ blocks }) => {
+        const raw = JSON.stringify(blocks).toLowerCase()
+        // Word boundaries so "foLOREMn" etc. don't trigger
+        const pattern = /\b(lorem|ipsum|dolor sit|consectetur adipiscing)\b/
+        return { pass: !pattern.test(raw), reason: 'regex scan all string fields' }
+    },
+    navLinksBalanced: ({ blocks }) => {
+        const nav = blocks.find((b) => b.blockType === 'navigation')
+        const links = (nav?.data?.links ?? []) as unknown[]
+        const n = Array.isArray(links) ? links.length : 0
+        return { pass: n >= 3 && n <= 7, reason: `${n} nav links` }
+    },
+    footerMegaColumns: ({ blocks }) => {
+        const footer = blocks.find((b) => b.blockType === 'footer')
+        if (!footer) return { pass: false, reason: 'no footer' }
+        if (footer.variant !== 'mega') return { pass: false, reason: `variant=${footer.variant} (not mega)` }
+        const cols = (footer.data?.columns ?? footer.data?.linkColumns ?? footer.data?.sections) as unknown[] | undefined
+        const n = Array.isArray(cols) ? cols.length : 0
+        return { pass: n >= 4, reason: `${n} columns` }
     },
 }
 

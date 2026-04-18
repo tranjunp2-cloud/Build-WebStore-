@@ -1,34 +1,54 @@
 /**
  * Rubric scorer CLI — thin wrapper around scorer-lib.
  *
- * Usage: tsx scripts/test-harness/rubric/scorer.ts
+ * Usage:
+ *   tsx scripts/test-harness/rubric/scorer.ts               # default v1.1
+ *   tsx scripts/test-harness/rubric/scorer.ts --rubric=v1
+ *   tsx scripts/test-harness/rubric/scorer.ts --rubric=both  # run both versions
  */
 
-import { readMatrix, scoreAll, writeReport } from './scorer-lib'
+import { readMatrix, scoreAll, writeReport, loadRubric, DEFAULT_RUBRIC_VERSION } from './scorer-lib'
+import type { RubricVersion } from './scorer-lib'
 
-function main(): void {
+function parseVersionArg(): RubricVersion | 'both' {
+    const arg = process.argv.find((a) => a.startsWith('--rubric='))
+    if (!arg) return DEFAULT_RUBRIC_VERSION
+    const val = arg.split('=')[1]
+    if (val === 'v1' || val === 'v1.1' || val === 'both') return val
+    console.error(`[rubric] invalid --rubric=${val}. Use v1 | v1.1 | both.`)
+    process.exit(1)
+}
+
+function runOne(version: RubricVersion): void {
     const matrix = readMatrix()
     if (!matrix) {
         console.error('[rubric] matrix.json not found. Run `npm run harness:gen` first.')
         process.exit(1)
     }
 
-    const report = scoreAll(matrix)
-    const outputPath = writeReport(report)
+    const rubric = loadRubric(version)
+    const report = scoreAll(matrix, rubric)
+    const outputPath = writeReport(report, version)
     const r = report.summary
 
-    console.log(`[rubric] ${r.total} fixtures: ${r.pass} pass, ${r.warn} warn, ${r.fail} fail, avg=${r.avgWeighted}/10`)
-    console.log(`[rubric] per-dim avg:`)
+    console.log(`\n[rubric ${version}] ${r.total} fixtures: ${r.pass} pass, ${r.warn} warn, ${r.fail} fail, avg=${r.avgWeighted}/10`)
+    console.log(`[rubric ${version}] per-dim avg:`)
     for (const [id, avg] of Object.entries(r.perDimensionAvg)) {
         console.log(`  - ${id}: ${avg.toFixed(1)}/10`)
     }
-    console.log(`[rubric] wrote ${outputPath}`)
+    console.log(`[rubric ${version}] wrote ${outputPath}`)
 
     const ranked = [...report.fixtures].sort((a, b) => b.weighted - a.weighted)
-    console.log('\n[rubric] top 5:')
+    console.log(`\n[rubric ${version}] top 5:`)
     ranked.slice(0, 5).forEach((f, i) => console.log(`  ${i + 1}. ${f.fixtureId} — ${f.weighted}/10 (${f.status})`))
-    console.log('\n[rubric] bottom 5:')
+    console.log(`\n[rubric ${version}] bottom 5:`)
     ranked.slice(-5).reverse().forEach((f, i) => console.log(`  ${i + 1}. ${f.fixtureId} — ${f.weighted}/10 (${f.status})`))
 }
 
-main()
+const target = parseVersionArg()
+if (target === 'both') {
+    runOne('v1')
+    runOne('v1.1')
+} else {
+    runOne(target)
+}

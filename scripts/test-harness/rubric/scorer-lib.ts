@@ -22,21 +22,41 @@ import type { MatrixReport, HarnessBlock } from '../types'
 // Next.js server components — Next's __dirname points to .next/server bundle,
 // which doesn't contain rubric-v1.json, hence avoid __dirname resolution.
 const REPO_ROOT = process.cwd()
-export const RUBRIC_PATH = path.resolve(REPO_ROOT, 'scripts/test-harness/rubric/rubric-v1.json')
+
+export type RubricVersion = 'v1' | 'v1.1'
+export const DEFAULT_RUBRIC_VERSION: RubricVersion = 'v1.1'
+
+const RUBRIC_FILES: Record<RubricVersion, string> = {
+    v1: 'scripts/test-harness/rubric/rubric-v1.json',
+    'v1.1': 'scripts/test-harness/rubric/rubric-v1.1.json',
+}
+
+export function rubricPath(version: RubricVersion = DEFAULT_RUBRIC_VERSION): string {
+    return path.resolve(REPO_ROOT, RUBRIC_FILES[version])
+}
+
+export function reportPath(version: RubricVersion = DEFAULT_RUBRIC_VERSION): string {
+    return path.resolve(REPO_ROOT, `.harness-out/rubric-report-${version}.json`)
+}
+
 export const MATRIX_PATH = path.resolve(REPO_ROOT, '.harness-out/matrix.json')
-export const REPORT_PATH = path.resolve(REPO_ROOT, '.harness-out/rubric-report.json')
+/** Back-compat path — latest version's report copied here for legacy tooling. */
+export const LATEST_REPORT_PATH = path.resolve(REPO_ROOT, '.harness-out/rubric-report.json')
 
 // Kept for potential future CLI-only usage; unused now but imported by scorer.ts before split.
 void fileURLToPath
 
-let _rubricCache: Rubric | null = null
+const _rubricCache: Partial<Record<RubricVersion, Rubric>> = {}
 
-/** Read rubric-v1.json. Memoized per process. */
-export function loadRubric(): Rubric {
-    if (_rubricCache) return _rubricCache
-    const raw = fs.readFileSync(RUBRIC_PATH, 'utf8')
-    _rubricCache = JSON.parse(raw) as Rubric
-    return _rubricCache
+/** Read rubric JSON. Memoized per version per process. */
+export function loadRubric(version: RubricVersion = DEFAULT_RUBRIC_VERSION): Rubric {
+    const cached = _rubricCache[version]
+    if (cached) return cached
+    const p = rubricPath(version)
+    const raw = fs.readFileSync(p, 'utf8')
+    const parsed = JSON.parse(raw) as Rubric
+    _rubricCache[version] = parsed
+    return parsed
 }
 
 /** Read matrix.json. Returns null if missing. */
@@ -49,20 +69,22 @@ export function readMatrix(): MatrixReport | null {
     }
 }
 
-/** Read pre-computed rubric-report.json. Returns null if missing. */
-export function readReport(): RubricReport | null {
-    if (!fs.existsSync(REPORT_PATH)) return null
+/** Read pre-computed rubric-report-{version}.json. Returns null if missing. */
+export function readReport(version: RubricVersion = DEFAULT_RUBRIC_VERSION): RubricReport | null {
+    const p = reportPath(version)
+    if (!fs.existsSync(p)) return null
     try {
-        return JSON.parse(fs.readFileSync(REPORT_PATH, 'utf8')) as RubricReport
+        return JSON.parse(fs.readFileSync(p, 'utf8')) as RubricReport
     } catch {
         return null
     }
 }
 
 /** Check if report is stale (matrix newer than report). */
-export function isReportStale(): boolean {
-    if (!fs.existsSync(REPORT_PATH) || !fs.existsSync(MATRIX_PATH)) return false
-    const r = fs.statSync(REPORT_PATH)
+export function isReportStale(version: RubricVersion = DEFAULT_RUBRIC_VERSION): boolean {
+    const p = reportPath(version)
+    if (!fs.existsSync(p) || !fs.existsSync(MATRIX_PATH)) return false
+    const r = fs.statSync(p)
     const m = fs.statSync(MATRIX_PATH)
     return m.mtimeMs > r.mtimeMs
 }
@@ -212,7 +234,13 @@ export function scoreAll(matrix: MatrixReport, rubric?: Rubric): RubricReport {
 }
 
 /** Write report JSON to disk. CLI-side helper. */
-export function writeReport(report: RubricReport): string {
-    fs.writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2))
-    return REPORT_PATH
+export function writeReport(report: RubricReport, version: RubricVersion = DEFAULT_RUBRIC_VERSION): string {
+    const p = reportPath(version)
+    const json = JSON.stringify(report, null, 2)
+    fs.writeFileSync(p, json)
+    // Also update legacy rubric-report.json so tools not passing version still see latest default
+    if (version === DEFAULT_RUBRIC_VERSION) {
+        fs.writeFileSync(LATEST_REPORT_PATH, json)
+    }
+    return p
 }
