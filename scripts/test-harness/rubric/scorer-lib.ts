@@ -23,12 +23,13 @@ import type { MatrixReport, HarnessBlock } from '../types'
 // which doesn't contain rubric-v1.json, hence avoid __dirname resolution.
 const REPO_ROOT = process.cwd()
 
-export type RubricVersion = 'v1' | 'v1.1'
-export const DEFAULT_RUBRIC_VERSION: RubricVersion = 'v1.1'
+export type RubricVersion = 'v1' | 'v1.1' | 'v1.2'
+export const DEFAULT_RUBRIC_VERSION: RubricVersion = 'v1.2'
 
 const RUBRIC_FILES: Record<RubricVersion, string> = {
     v1: 'scripts/test-harness/rubric/rubric-v1.json',
     'v1.1': 'scripts/test-harness/rubric/rubric-v1.1.json',
+    'v1.2': 'scripts/test-harness/rubric/rubric-v1.2.json',
 }
 
 export function rubricPath(version: RubricVersion = DEFAULT_RUBRIC_VERSION): string {
@@ -94,8 +95,10 @@ function evaluateCriterion(
     blocks: HarnessBlock[],
     theme: Record<string, unknown>,
     allBlocks?: HarnessBlock[],
+    category?: string,
+    fixtureId?: string,
 ): CriterionResult {
-    const ctx = { blocks, theme, allBlocks }
+    const ctx = { blocks, theme, allBlocks, category, fixtureId }
     let result: { pass: boolean; partial?: boolean; reason?: string } = { pass: false }
 
     switch (criterion.check.type) {
@@ -166,7 +169,7 @@ export function scoreFixture(args: ScoreFixtureArgs): FixtureScore {
     const { fixtureId, category, blocks, theme, allBlocks } = args
 
     const dimensions: DimensionScore[] = rubric.dimensions.map((dim) => {
-        const criteriaResults = dim.criteria.map((c) => evaluateCriterion(c, blocks, theme, allBlocks))
+        const criteriaResults = dim.criteria.map((c) => evaluateCriterion(c, blocks, theme, allBlocks, category, fixtureId))
         const earnedPoints = criteriaResults.reduce((s, r) => s + r.points, 0)
         const maxPoints = criteriaResults.reduce((s, r) => s + r.maxPoints, 0)
         const score = maxPoints > 0 ? (earnedPoints / maxPoints) * 10 : 0

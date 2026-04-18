@@ -13,6 +13,10 @@ export interface EvalContext {
     theme: Record<string, unknown>
     /** All pages' blocks flattened — for presence checks on cross-page blocks (contact, faq). */
     allBlocks?: HarnessBlock[]
+    /** Fixture category — used by categoryDnaCompliance (v1.2+). */
+    category?: string
+    /** Fixture id — for debug + future cross-fixture checks. */
+    fixtureId?: string
 }
 
 export interface EvalResult {
@@ -34,6 +38,47 @@ const GENERIC_CTA_LABELS = new Set([
     'more info',
     'submit',
 ])
+
+/** Category DNA mapping (WEBSITE_TEMPLATE_STANDARDS §4.1).
+ *  Mandatory blocks per category — fixture must include ≥1 from each required group. */
+const CATEGORY_DNA_MAP: Record<string, { mandatory: string[][]; signature: string[] }> = {
+    restaurant: { mandatory: [['menu-display', 'booking-widget'], ['gallery', 'gallery-masonry']], signature: ['menu-display', 'booking-widget', 'review-cards'] },
+    fnb: { mandatory: [['menu-display', 'features'], ['gallery', 'gallery-masonry']], signature: ['menu-display', 'gallery', 'review-cards'] },
+    ecommerce: { mandatory: [['product-quick-view', 'features'], ['pricing', 'pricing-table']], signature: ['product-quick-view', 'pricing'] },
+    beauty: { mandatory: [['service-cards', 'features'], ['gallery', 'gallery-masonry', 'before-after']], signature: ['service-cards', 'booking-widget', 'before-after'] },
+    tech: { mandatory: [['pricing', 'pricing-table'], ['features']], signature: ['pricing', 'features', 'feature-comparison', 'video-showcase'] },
+    health: { mandatory: [['doctor-profile', 'service-cards', 'team'], ['faq']], signature: ['doctor-profile', 'booking-widget'] },
+    education: { mandatory: [['class-schedule', 'features', 'service-cards'], ['faq']], signature: ['class-schedule', 'pricing'] },
+    realestate: { mandatory: [['property-card', 'gallery'], ['stats', 'features']], signature: ['property-card', 'gallery'] },
+    fitness: { mandatory: [['class-schedule', 'features'], ['pricing', 'team']], signature: ['class-schedule', 'team', 'pricing'] },
+    creative: { mandatory: [['gallery', 'gallery-masonry', 'portfolio-grid'], ['testimonials']], signature: ['portfolio-grid', 'gallery-masonry', 'video-showcase'] },
+    business: { mandatory: [['team', 'features'], ['testimonials']], signature: ['team', 'stats', 'features'] },
+    blog: { mandatory: [['features', 'testimonials'], ['newsletter']], signature: ['newsletter', 'features'] },
+    events: { mandatory: [['booking-widget', 'contact'], ['gallery']], signature: ['booking-widget', 'gallery'] },
+    travel: { mandatory: [['gallery', 'gallery-masonry'], ['features', 'service-cards']], signature: ['gallery', 'features'] },
+}
+
+function hasBlockInGroup(blocks: HarnessBlock[], group: string[]): boolean {
+    const types = new Set(blocks.map((b) => b.blockType))
+    return group.some((t) => types.has(t))
+}
+
+/** Compute WCAG relative luminance from hex color. */
+function luminance(hex: string): number | null {
+    const m = hex.replace('#', '').match(/^([0-9a-f]{6})$/i)
+    if (!m) return null
+    const rgb = [0, 2, 4].map((i) => parseInt(m[1]!.slice(i, i + 2), 16) / 255)
+    const lin = rgb.map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)))
+    return 0.2126 * lin[0]! + 0.7152 * lin[1]! + 0.0722 * lin[2]!
+}
+
+function contrastRatio(hex1: string, hex2: string): number | null {
+    const l1 = luminance(hex1)
+    const l2 = luminance(hex2)
+    if (l1 === null || l2 === null) return null
+    const [light, dark] = l1 > l2 ? [l1, l2] : [l2, l1]
+    return (light + 0.05) / (dark + 0.05)
+}
 
 /** Helper — collect all CTA button labels across hero/nav/cta blocks. */
 function collectCtaLabels(blocks: HarnessBlock[]): string[] {
@@ -280,6 +325,196 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         const cols = (footer.data?.columns ?? footer.data?.linkColumns ?? footer.data?.sections) as unknown[] | undefined
         const n = Array.isArray(cols) ? cols.length : 0
         return { pass: n >= 4, reason: `${n} columns` }
+    },
+
+    // ── v1.2 new evaluators ───────────────────────────────────────────────
+
+    heroHeadlineLengthStrict: ({ blocks }) => {
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const headline = (hero?.data?.headline as string | undefined) ?? ''
+        const len = headline.trim().length
+        if (len >= 25 && len <= 70) return { pass: true, reason: `${len} chars (strict ideal)` }
+        if ((len >= 15 && len < 25) || (len > 70 && len <= 90)) return { pass: false, partial: true, reason: `${len} chars (near)` }
+        return { pass: false, reason: `${len} chars (off)` }
+    },
+    contentDepth500: ({ blocks }) => {
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const parts: string[] = []
+        if (hero) {
+            parts.push(String(hero.data?.headline ?? ''))
+            parts.push(String(hero.data?.subheadline ?? hero.data?.subHeadline ?? ''))
+        }
+        for (const b of blocks) {
+            if (b.data?.sectionLabel) parts.push(String(b.data.sectionLabel))
+            if (b.data?.headline && b.blockType !== 'hero') parts.push(String(b.data.headline))
+            if (b.data?.subheadline && b.blockType !== 'hero') parts.push(String(b.data.subheadline))
+        }
+        const total = parts.join(' ').trim().length
+        return { pass: total >= 500, reason: `${total} chars` }
+    },
+    varietyUnique85: ({ blocks }) => {
+        const types = new Set(blocks.map((b) => b.blockType))
+        const ratio = blocks.length > 0 ? types.size / blocks.length : 0
+        return { pass: ratio >= 0.85, reason: `${types.size}/${blocks.length} (${Math.round(ratio * 100)}%)` }
+    },
+    noLoremBroad: ({ blocks }) => {
+        const raw = JSON.stringify(blocks).toLowerCase()
+        const pattern = /\b(lorem|ipsum|dolor sit|adipiscing|consectetur|eiusmod|tempor incididunt)\b/
+        return { pass: !pattern.test(raw), reason: 'regex scan (broad)' }
+    },
+    ctaTextQualitySpecific2x: ({ blocks }) => {
+        const labels = collectCtaLabels(blocks)
+        if (labels.length === 0) return { pass: false, reason: 'no CTA labels' }
+        const nonGeneric = labels.filter((l) => !GENERIC_CTA_LABELS.has(l.trim().toLowerCase()))
+        return { pass: nonGeneric.length >= 2, reason: `${nonGeneric.length} non-generic (need ≥2)` }
+    },
+    altTextCoverage80: ({ blocks }) => {
+        let total = 0
+        let withAlt = 0
+        for (const b of blocks) {
+            // gallery/portfolio images
+            const images = (b.data?.images ?? b.data?.items) as Array<{ image?: { alt?: unknown; url?: unknown }; alt?: unknown; url?: unknown }> | undefined
+            if (Array.isArray(images)) {
+                for (const img of images) {
+                    // Only count real images (with url field), skip non-image array items
+                    const hasUrl = Boolean(img?.image?.url || img?.url)
+                    if (hasUrl) {
+                        total++
+                        const alt = img?.image?.alt ?? img?.alt
+                        if (typeof alt === 'string' && alt.trim().length > 0) withAlt++
+                    }
+                }
+            }
+            // hero bg image alt
+            const bg = b.data?.backgroundImage as { alt?: unknown; url?: unknown } | undefined
+            if (bg?.url) {
+                total++
+                if (typeof bg.alt === 'string' && bg.alt.trim().length > 0) withAlt++
+            }
+        }
+        if (total === 0) return { pass: true, reason: 'no images to check' }
+        const ratio = withAlt / total
+        return { pass: ratio >= 0.8, reason: `${withAlt}/${total} with alt (${Math.round(ratio * 100)}%)` }
+    },
+    headingOrderNoSkip: ({ blocks }) => {
+        // Heuristic: hero=h1, section blocks with headline=h2, cards with title=h3
+        // Verify no section has headline BEFORE hero (implies h2 before h1) & hero appears once
+        const heroIdx = blocks.findIndex((b) => b.blockType === 'hero')
+        if (heroIdx === -1) return { pass: false, reason: 'no hero (missing H1)' }
+        // Check: no non-skip blocks with headline BEFORE hero (would imply H2 before H1)
+        const SKIP = new Set(['navigation', 'announcement-bar', 'breadcrumb'])
+        for (let i = 0; i < heroIdx; i++) {
+            const b = blocks[i]!
+            if (SKIP.has(b.blockType)) continue
+            if (b.data?.headline || b.data?.title) return { pass: false, reason: `${b.blockType} at index ${i} has headline before hero` }
+        }
+        // Multiple heroes = multiple H1s = violates
+        const heroCount = blocks.filter((b) => b.blockType === 'hero').length
+        if (heroCount > 1) return { pass: false, reason: `${heroCount} heroes (multiple H1)` }
+        return { pass: true, reason: 'hero H1 first, no skip' }
+    },
+    themeColorContrast: ({ theme }) => {
+        const explicit = theme?.contrastRatio as number | undefined
+        if (typeof explicit === 'number') {
+            return { pass: explicit >= 4.5, reason: `explicit ratio ${explicit}` }
+        }
+        const primary = theme?.primaryColor as string | undefined
+        const surface = (theme?.surfaceColor ?? theme?.backgroundColor ?? (theme?.colorMode === 'dark' ? '#0a0a0a' : '#ffffff')) as string
+        if (!primary) return { pass: false, reason: 'no primaryColor' }
+        const ratio = contrastRatio(primary, surface)
+        if (ratio === null) return { pass: false, reason: `invalid hex (primary=${primary}, surface=${surface})` }
+        return { pass: ratio >= 4.5, reason: `computed ${ratio.toFixed(2)}:1 (${primary} vs ${surface})` }
+    },
+    navAriaLabel: ({ blocks }) => {
+        const nav = blocks.find((b) => b.blockType === 'navigation')
+        if (!nav) return { pass: false, reason: 'no nav' }
+        if (nav.data?.ariaLabel) return { pass: true, reason: 'has ariaLabel' }
+        const links = nav.data?.links as Array<{ title?: unknown }> | undefined
+        if (Array.isArray(links) && links.some((l) => typeof l?.title === 'string' && l.title.length > 0)) {
+            return { pass: true, reason: 'links have title attrs' }
+        }
+        return { pass: false, reason: 'no ariaLabel + no link title' }
+    },
+    focusIndicatorDefined: ({ theme }) => {
+        const keys = ['focusStyle', 'focusRing', 'focusOutlineColor', 'focusIndicator']
+        for (const k of keys) {
+            if (theme?.[k]) return { pass: true, reason: `theme.${k}=${theme[k]}` }
+        }
+        return { pass: false, reason: 'no focus indicator in theme' }
+    },
+    categoryDnaCompliance: ({ blocks, category, allBlocks }) => {
+        if (!category) return { pass: false, reason: 'no category on fixture' }
+        const dna = CATEGORY_DNA_MAP[category]
+        if (!dna) return { pass: false, reason: `unknown category: ${category}` }
+        // Use allBlocks (cross-page) — category blocks may be on sub-pages
+        const searchPool = allBlocks ?? blocks
+        const groupsPassed = dna.mandatory.filter((grp) => hasBlockInGroup(searchPool, grp)).length
+        const total = dna.mandatory.length
+        if (groupsPassed === total) return { pass: true, reason: `${groupsPassed}/${total} mandatory groups met` }
+        if (groupsPassed >= Math.ceil(total / 2)) return { pass: false, partial: true, reason: `${groupsPassed}/${total} (partial)` }
+        return { pass: false, reason: `${groupsPassed}/${total} groups` }
+    },
+    categorySignatureVariety: ({ blocks, category, allBlocks }) => {
+        if (!category) return { pass: false, reason: 'no category' }
+        const dna = CATEGORY_DNA_MAP[category]
+        if (!dna) return { pass: false, reason: `unknown category: ${category}` }
+        const searchPool = allBlocks ?? blocks
+        const types = new Set(searchPool.map((b) => b.blockType))
+        const present = dna.signature.filter((t) => types.has(t))
+        if (present.length >= 2) return { pass: true, reason: `${present.length} signature blocks: ${present.join(', ')}` }
+        if (present.length === 1) return { pass: false, partial: true, reason: `1 signature block: ${present[0]}` }
+        return { pass: false, reason: `0 signature blocks (expected: ${dna.signature.join(', ')})` }
+    },
+    spacingRhythmTokenOnly: ({ blocks }) => {
+        const TOKEN_SCALE = new Set([4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128])
+        let total = 0
+        let compliant = 0
+        for (const b of blocks) {
+            for (const field of ['padding', 'margin', 'paddingTop', 'paddingBottom', 'marginTop', 'marginBottom', 'gap']) {
+                const v = b.data?.[field]
+                if (typeof v === 'number') {
+                    total++
+                    if (TOKEN_SCALE.has(v)) compliant++
+                } else if (typeof v === 'string') {
+                    const m = v.match(/^(\d+)(px)?$/)
+                    if (m) {
+                        total++
+                        if (TOKEN_SCALE.has(Number(m[1]))) compliant++
+                    }
+                }
+            }
+        }
+        if (total === 0) return { pass: true, reason: 'no explicit spacing values (theme-driven)' }
+        const ratio = compliant / total
+        return { pass: ratio >= 0.9, reason: `${compliant}/${total} compliant (${Math.round(ratio * 100)}%)` }
+    },
+    heroCtaVariety: ({ blocks }) => {
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const arr = (hero?.data?.ctaButtons ?? hero?.data?.buttons) as Array<{ variant?: unknown; style?: unknown; type?: unknown }> | undefined
+        if (!Array.isArray(arr) || arr.length < 2) return { pass: false, reason: 'need ≥2 CTAs' }
+        const styles = arr.map((c) => (c?.variant ?? c?.style ?? c?.type ?? 'default') as string)
+        const unique = new Set(styles)
+        return { pass: unique.size >= 2, reason: `styles: ${styles.join(' | ')}` }
+    },
+    testimonialQuoteLength: ({ blocks }) => {
+        const block = blocks.find((b) => b.blockType === 'testimonials')
+        if (!block) return { pass: false, reason: 'no testimonials' }
+        const items = (block.data?.testimonials ?? block.data?.items ?? []) as Array<{ quote?: unknown }>
+        if (items.length === 0) return { pass: false, reason: 'no items' }
+        const inRange = items.filter((t) => {
+            const q = typeof t?.quote === 'string' ? t.quote : ''
+            return q.length >= 80 && q.length <= 300
+        }).length
+        const ratio = inRange / items.length
+        return { pass: ratio >= 0.8, reason: `${inRange}/${items.length} in 80-300 range` }
+    },
+    navLinksNotRepeat: ({ blocks }) => {
+        const nav = blocks.find((b) => b.blockType === 'navigation')
+        const links = nav?.data?.links as Array<{ label?: unknown }> | undefined
+        if (!Array.isArray(links) || links.length === 0) return { pass: false, reason: 'no nav links' }
+        const labels = links.map((l) => (typeof l?.label === 'string' ? l.label.trim().toLowerCase() : ''))
+        const unique = new Set(labels)
+        return { pass: unique.size === labels.length, reason: `${labels.length} total, ${unique.size} unique` }
     },
 }
 

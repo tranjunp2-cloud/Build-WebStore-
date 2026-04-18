@@ -185,9 +185,29 @@ Score overlay trên fixture render:
 
 ## Versioning
 
-- **`v1`** (2026-04-18): initial 8 dim × 35 criteria, weight 66. Baseline avg 8.96/10, 100% pass — ceiling heavy.
-- **`v1.1`** (2026-04-18): stricter — 8 dim × 47 criteria, weight 79. Adds 11 new (image-coverage, features-icons, hero-headline-length, hero-subheadline-length, testimonials-ratings, footer-mega-columns, content-depth-300, nav-links-balanced, hero-cta-pair, cta-text-quality, no-lorem-strict). Tightens 4 (theme font DISTINCT required, section-headlines 70%→85%, block-count sweet-spot 9-14, variety 50%→75%). Baseline avg 8.36/10.
-- Future v2: add a11y + perf dimensions.
+- **`v1`** (2026-04-18): initial 8 dim × 35 criteria, weight 66. Baseline avg 8.96/10.
+- **`v1.1`** (2026-04-18): stricter — 8 dim × 47 criteria, weight 79. Baseline avg 8.36/10.
+- **`v1.2`** (2026-04-18) — **current default**: 10 dim × 54 criteria, weight 97.
+  - **NEW Dimension 9 — Accessibility (weight 8)**: alt text 80%, heading order, color contrast ≥4.5:1, nav ARIA, focus indicator
+  - **NEW Dimension 10 — Category DNA (weight 10)**: 14 categories × mandatory blocks (Restaurant: menu+booking, Tech: pricing+features ≥4, Beauty: gallery+service-cards, etc. per WEBSITE_TEMPLATE_STANDARDS §4.1)
+  - Tightened: contentDepth 300→500, variety 75→85%, CTA quality ≥1→≥2, headline 15-80→25-70, lorem regex broader
+  - New standalone: spacing-rhythm-token-only, hero-cta-variety, testimonial-quote-length, nav-links-not-repeat
+  - Baseline avg 8.37/10 — **accessibility dim 6.3 surfaces real a11y gaps**
+- Future v2: cross-fixture uniqueness, runtime behavior (Lighthouse-level), category-color enforcement.
+
+### Switch versions
+
+```bash
+npm run harness:score                    # default = v1.2
+npm run harness:score -- --rubric=v1     # run v1 explicitly
+npm run harness:score -- --rubric=v1.1   # run v1.1
+npm run harness:score -- --rubric=v1.2   # run v1.2 explicitly
+npm run harness:score -- --rubric=all    # run all 3, compare
+```
+
+Report files: `.harness-out/rubric-report-{v1|v1.1|v1.2}.json` + `.harness-out/rubric-report.json` (= v1.2 legacy copy).
+
+Admin dashboard + score overlay dùng default v1.2. Đọc `TEMPLATE_QUALITY_RUBRIC_METHODOLOGY.md` để hiểu sources + scoring algorithm chi tiết.
 
 ### Switch versions
 

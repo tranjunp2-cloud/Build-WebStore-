@@ -10,12 +10,14 @@
 import { readMatrix, scoreAll, writeReport, loadRubric, DEFAULT_RUBRIC_VERSION } from './scorer-lib'
 import type { RubricVersion } from './scorer-lib'
 
-function parseVersionArg(): RubricVersion | 'both' {
+function parseVersionArg(): RubricVersion | 'all' {
     const arg = process.argv.find((a) => a.startsWith('--rubric='))
     if (!arg) return DEFAULT_RUBRIC_VERSION
     const val = arg.split('=')[1]
-    if (val === 'v1' || val === 'v1.1' || val === 'both') return val
-    console.error(`[rubric] invalid --rubric=${val}. Use v1 | v1.1 | both.`)
+    if (val === 'v1' || val === 'v1.1' || val === 'v1.2' || val === 'all' || val === 'both') {
+        return val === 'both' ? 'all' : (val as RubricVersion | 'all')
+    }
+    console.error(`[rubric] invalid --rubric=${val}. Use v1 | v1.1 | v1.2 | all.`)
     process.exit(1)
 }
 
@@ -46,9 +48,10 @@ function runOne(version: RubricVersion): void {
 }
 
 const target = parseVersionArg()
-if (target === 'both') {
+if (target === 'all') {
     runOne('v1')
     runOne('v1.1')
+    runOne('v1.2')
 } else {
     runOne(target)
 }
