@@ -12,6 +12,7 @@
 
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation } from './content-rules'
+import { dedupSectionLabel } from './dedup-section-label'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -545,7 +546,7 @@ function buildMiddleBlock(
             return {
                 blockType: 'about',
                 variant,
-                sectionLabel: 'About',
+                sectionLabel: dedupSectionLabel('About', 'Our Story'),
                 headline: 'Our Story',
                 body: content.aboutBody,
             }
@@ -553,7 +554,7 @@ function buildMiddleBlock(
             return {
                 blockType: 'features',
                 variant,
-                sectionLabel: 'Services',
+                sectionLabel: dedupSectionLabel('Services', 'What We Offer'),
                 headline: 'What We Offer',
                 subheadline: 'The core values we deliver to you',
                 features: content.features,
