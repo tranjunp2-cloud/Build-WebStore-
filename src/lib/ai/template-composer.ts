@@ -1192,6 +1192,7 @@ function buildClientLogos(category?: string, seed = 0): Record<string, unknown> 
     variant: 'scroll',
     headline: 'Trusted By',
     logos: picks.map((l) => ({
+      name: l.name,
       alt: l.name,
       ...(l.url ? { url: l.url } : {}),
     })),
