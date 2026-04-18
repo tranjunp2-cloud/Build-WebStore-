@@ -99,6 +99,13 @@ export default async function HarnessFixturePage({
 
   return (
     <div data-harness-fixture={fixtureId}>
+      {/* Intercept sub-page nav clicks — harness only renders homepage, links
+          to /about /contact /services etc. would escape to CMS routes. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(a){var h=a.getAttribute('href');if(h&&!h.startsWith('#')&&!h.startsWith('/test-harness')&&!h.startsWith('http')){e.preventDefault();console.warn('[harness] blocked nav to '+h);}}},true);`,
+        }}
+      />
       <SiteRenderer site={site as never} page={page as never} />
     </div>
   )

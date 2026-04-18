@@ -95,6 +95,12 @@ export default async function AIHarnessPage({
 
     return (
         <div data-harness-ai-category={category}>
+            {/* Intercept sub-page nav clicks — harness only renders homepage. */}
+            <script
+                dangerouslySetInnerHTML={{
+                    __html: `document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(a){var h=a.getAttribute('href');if(h&&!h.startsWith('#')&&!h.startsWith('/test-harness')&&!h.startsWith('http')){e.preventDefault();console.warn('[harness] blocked nav to '+h);}}},true);`,
+                }}
+            />
             <div className="fixed top-2 right-2 z-[100] bg-purple-600 text-white text-xs px-3 py-1.5 rounded-full font-mono shadow-lg">
                 AI-FIRST · {category} · {result.siteName}
             </div>
