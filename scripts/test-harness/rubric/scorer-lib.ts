@@ -7,7 +7,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CUSTOM_EVALUATORS, evaluatePresence, evaluateCount, evaluateEnum } from './evaluators'
+import { CUSTOM_EVALUATORS, evaluatePresence, evaluateCount, evaluateEnum, normalizeForHash } from './evaluators'
+import type { UniquenessContext } from './evaluators'
 import type {
     Rubric,
     Criterion,
@@ -23,13 +24,14 @@ import type { MatrixReport, HarnessBlock } from '../types'
 // which doesn't contain rubric-v1.json, hence avoid __dirname resolution.
 const REPO_ROOT = process.cwd()
 
-export type RubricVersion = 'v1' | 'v1.1' | 'v1.2'
-export const DEFAULT_RUBRIC_VERSION: RubricVersion = 'v1.2'
+export type RubricVersion = 'v1' | 'v1.1' | 'v1.2' | 'v1.3'
+export const DEFAULT_RUBRIC_VERSION: RubricVersion = 'v1.3'
 
 const RUBRIC_FILES: Record<RubricVersion, string> = {
     v1: 'scripts/test-harness/rubric/rubric-v1.json',
     'v1.1': 'scripts/test-harness/rubric/rubric-v1.1.json',
     'v1.2': 'scripts/test-harness/rubric/rubric-v1.2.json',
+    'v1.3': 'scripts/test-harness/rubric/rubric-v1.3.json',
 }
 
 export function rubricPath(version: RubricVersion = DEFAULT_RUBRIC_VERSION): string {
@@ -97,8 +99,9 @@ function evaluateCriterion(
     allBlocks?: HarnessBlock[],
     category?: string,
     fixtureId?: string,
+    uniqueness?: UniquenessContext,
 ): CriterionResult {
-    const ctx = { blocks, theme, allBlocks, category, fixtureId }
+    const ctx = { blocks, theme, allBlocks, category, fixtureId, uniqueness }
     let result: { pass: boolean; partial?: boolean; reason?: string } = { pass: false }
 
     switch (criterion.check.type) {
@@ -161,15 +164,16 @@ export interface ScoreFixtureArgs {
     theme: Record<string, unknown>
     allBlocks?: HarnessBlock[]
     rubric?: Rubric
+    uniqueness?: UniquenessContext
 }
 
 /** Score a single fixture. Pure function — no fs/network. */
 export function scoreFixture(args: ScoreFixtureArgs): FixtureScore {
     const rubric = args.rubric ?? loadRubric()
-    const { fixtureId, category, blocks, theme, allBlocks } = args
+    const { fixtureId, category, blocks, theme, allBlocks, uniqueness } = args
 
     const dimensions: DimensionScore[] = rubric.dimensions.map((dim) => {
-        const criteriaResults = dim.criteria.map((c) => evaluateCriterion(c, blocks, theme, allBlocks, category, fixtureId))
+        const criteriaResults = dim.criteria.map((c) => evaluateCriterion(c, blocks, theme, allBlocks, category, fixtureId, uniqueness))
         const earnedPoints = criteriaResults.reduce((s, r) => s + r.points, 0)
         const maxPoints = criteriaResults.reduce((s, r) => s + r.maxPoints, 0)
         const score = maxPoints > 0 ? (earnedPoints / maxPoints) * 10 : 0
@@ -198,9 +202,38 @@ export function scoreFixture(args: ScoreFixtureArgs): FixtureScore {
     return { fixtureId, category, dimensions, weighted: weightedRounded, status }
 }
 
+/** Build uniqueness context by aggregating hero/CTA fields across all fixtures. */
+export function buildUniquenessContext(matrix: MatrixReport): UniquenessContext {
+    const ctx: UniquenessContext = { headlineCounts: {}, subheadlineCounts: {}, ctaCounts: {} }
+    for (const r of matrix.results) {
+        const hero = r.blocks.find((b) => b.blockType === 'hero')
+        const h = normalizeForHash(hero?.data?.headline)
+        if (h) ctx.headlineCounts[h] = (ctx.headlineCounts[h] ?? 0) + 1
+        const sub = normalizeForHash(hero?.data?.subheadline ?? hero?.data?.subHeadline)
+        if (sub) ctx.subheadlineCounts[sub] = (ctx.subheadlineCounts[sub] ?? 0) + 1
+        // CTAs: collect from hero + nav + cta blocks
+        for (const b of r.blocks) {
+            const arr = (b.data?.ctaButtons ?? b.data?.buttons) as Array<{ label?: unknown }> | undefined
+            if (Array.isArray(arr)) {
+                for (const c of arr) {
+                    const lbl = normalizeForHash(c?.label)
+                    if (lbl) ctx.ctaCounts[lbl] = (ctx.ctaCounts[lbl] ?? 0) + 1
+                }
+            }
+            const cta = b.data?.ctaButton as { label?: unknown } | undefined
+            if (cta) {
+                const lbl = normalizeForHash(cta.label)
+                if (lbl) ctx.ctaCounts[lbl] = (ctx.ctaCounts[lbl] ?? 0) + 1
+            }
+        }
+    }
+    return ctx
+}
+
 /** Score entire matrix. Pure function — does NOT write to disk. */
 export function scoreAll(matrix: MatrixReport, rubric?: Rubric): RubricReport {
     const r = rubric ?? loadRubric()
+    const uniqueness = buildUniquenessContext(matrix)
     const fixtures: FixtureScore[] = matrix.results.map((res) => {
         const allBlocks = res.pages ? res.pages.flatMap((p) => p.blocks) : res.blocks
         return scoreFixture({
@@ -210,6 +243,7 @@ export function scoreAll(matrix: MatrixReport, rubric?: Rubric): RubricReport {
             theme: res.theme,
             allBlocks,
             rubric: r,
+            uniqueness,
         })
     })
 

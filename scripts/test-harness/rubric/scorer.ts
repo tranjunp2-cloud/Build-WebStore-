@@ -14,10 +14,10 @@ function parseVersionArg(): RubricVersion | 'all' {
     const arg = process.argv.find((a) => a.startsWith('--rubric='))
     if (!arg) return DEFAULT_RUBRIC_VERSION
     const val = arg.split('=')[1]
-    if (val === 'v1' || val === 'v1.1' || val === 'v1.2' || val === 'all' || val === 'both') {
+    if (val === 'v1' || val === 'v1.1' || val === 'v1.2' || val === 'v1.3' || val === 'all' || val === 'both') {
         return val === 'both' ? 'all' : (val as RubricVersion | 'all')
     }
-    console.error(`[rubric] invalid --rubric=${val}. Use v1 | v1.1 | v1.2 | all.`)
+    console.error(`[rubric] invalid --rubric=${val}. Use v1 | v1.1 | v1.2 | v1.3 | all.`)
     process.exit(1)
 }
 
@@ -52,6 +52,7 @@ if (target === 'all') {
     runOne('v1')
     runOne('v1.1')
     runOne('v1.2')
+    runOne('v1.3')
 } else {
     runOne(target)
 }

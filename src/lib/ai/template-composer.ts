@@ -2135,6 +2135,8 @@ export function composeFromBlueprint(
       const fonts = resolveFontNames(preset.themePreset.fontPairingId)
       return {
         ...preset.themePreset,
+        // v1.3 plan 260419-0047: textColor default từ colorMode
+        textColor: (preset.themePreset as { textColor?: string }).textColor ?? (preset.themePreset.colorMode === 'dark' ? '#fafafa' : '#111111'),
         // A11y plan 260418-2357: guarantee focusStyle token present
         focusStyle: preset.themePreset.focusStyle ?? DEFAULT_FOCUS_STYLE,
         // Next-wins plan 260419-0034 phase-01: explicit font names for distinct check
@@ -2207,6 +2209,7 @@ export function composeTemplate(input: ComposerInput): TemplateSeed | null {
       const fonts = resolveFontNames(input.themePreset.fontPairingId)
       return {
         ...input.themePreset,
+        textColor: (input.themePreset as { textColor?: string }).textColor ?? (input.themePreset.colorMode === 'dark' ? '#fafafa' : '#111111'),
         focusStyle: input.themePreset.focusStyle ?? DEFAULT_FOCUS_STYLE,
         ...(fonts.heading ? { fontHeading: fonts.heading } : {}),
         ...(fonts.body ? { fontBody: fonts.body } : {}),

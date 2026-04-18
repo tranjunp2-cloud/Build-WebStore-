@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "name": "wix-pro-v1.3",
+  "description": "v1.3 adds cross-fixture Uniqueness dim (weight 6) + textColor contrast criterion. 11 dims, 58 criteria, weight 103.",
+  "thresholds": { "pass": 7, "warn": 5 },
+  "dimensions": [
+    {
+      "id": "visual-richness", "name": "Visual Richness", "weight": 12,
+      "description": "Visual variety — decorative blocks, imagery, variant diversity, icon usage.",
+      "criteria": [
+        { "id": "hero-variant-diverse", "label": "Hero non-default variant", "check": { "type": "enum", "blockType": "hero", "field": "variant", "in": ["split-image", "fullscreen", "video-bg", "overlay", "centered", "split-text-image", "gradient-bg"] }, "passPoints": 3 },
+        { "id": "gallery-present", "label": "Gallery / portfolio present", "check": { "type": "presence", "blockType": "gallery,gallery-masonry,portfolio-grid" }, "passPoints": 2 },
+        { "id": "stats-present", "label": "Stats block present", "check": { "type": "presence", "blockType": "stats" }, "passPoints": 2 },
+        { "id": "logo-cloud-present", "label": "Logo Cloud present", "check": { "type": "presence", "blockType": "client-logos,logo-cloud" }, "passPoints": 2 },
+        { "id": "image-coverage", "label": "Gallery OR hero bg image", "check": { "type": "custom", "evaluator": "imageCoverage" }, "passPoints": 3 },
+        { "id": "features-have-icons", "label": "Icon-variant features ≥70% items có icon", "check": { "type": "custom", "evaluator": "featuresHaveIcons" }, "passPoints": 2 }
+      ]
+    },
+    {
+      "id": "typography-hierarchy", "name": "Typography Hierarchy", "weight": 12,
+      "description": "Distinct fonts, strict headline length, coverage.",
+      "criteria": [
+        { "id": "hero-headline-present", "label": "Hero non-empty headline", "check": { "type": "custom", "evaluator": "heroHasHeadline" }, "passPoints": 2 },
+        { "id": "single-hero", "label": "Exactly 1 hero", "check": { "type": "custom", "evaluator": "singleHero" }, "passPoints": 2 },
+        { "id": "theme-heading-body-distinct", "label": "Distinct heading+body fonts", "check": { "type": "custom", "evaluator": "themeHeadingBodyDistinct" }, "passPoints": 2 },
+        { "id": "hero-subheadline", "label": "Hero subheadline", "check": { "type": "custom", "evaluator": "heroHasSubheadline" }, "passPoints": 1 },
+        { "id": "section-headlines-coverage-85", "label": "≥85% content blocks have headline", "check": { "type": "custom", "evaluator": "sectionHeadlinesCoverage85" }, "passPoints": 2 },
+        { "id": "hero-headline-length-strict", "label": "Hero headline 25-70 chars", "check": { "type": "custom", "evaluator": "heroHeadlineLengthStrict" }, "passPoints": 2 },
+        { "id": "hero-subheadline-length", "label": "Subheadline 30-200 chars", "check": { "type": "custom", "evaluator": "heroSubheadlineLength" }, "passPoints": 1 }
+      ]
+    },
+    {
+      "id": "social-proof", "name": "Social Proof & Trust", "weight": 10,
+      "description": "Testimonials, logos, stats, ratings, avatars.",
+      "criteria": [
+        { "id": "testimonials-present", "label": "Testimonials block", "check": { "type": "presence", "blockType": "testimonials" }, "passPoints": 2 },
+        { "id": "testimonials-count-3plus", "label": "Testimonials ≥3 items", "check": { "type": "count", "blockType": "testimonials", "field": "testimonials", "min": 3 }, "passPoints": 2 },
+        { "id": "logos-count-4plus", "label": "Logo cloud ≥4", "check": { "type": "count", "blockType": "client-logos,logo-cloud", "field": "logos", "min": 4 }, "passPoints": 2 },
+        { "id": "stats-count-3plus", "label": "Stats ≥3", "check": { "type": "count", "blockType": "stats", "field": "stats", "min": 3 }, "passPoints": 2 },
+        { "id": "testimonial-avatar", "label": "≥1 testimonial có avatar", "check": { "type": "custom", "evaluator": "testimonialHasAvatar" }, "passPoints": 2 },
+        { "id": "testimonials-have-ratings", "label": "≥50% testimonials có rating", "check": { "type": "custom", "evaluator": "testimonialsHaveRatings" }, "passPoints": 2 },
+        { "id": "testimonial-quote-length", "label": "≥80% testimonials quote 80-300 chars", "check": { "type": "custom", "evaluator": "testimonialQuoteLength" }, "passPoints": 1 }
+      ]
+    },
+    {
+      "id": "micro-interactions", "name": "Micro-Interactions", "weight": 9,
+      "description": "Nav variant, CTA blocks, forms, diversity.",
+      "criteria": [
+        { "id": "nav-variant-rich", "label": "Nav non-basic variant", "check": { "type": "enum", "blockType": "navigation", "field": "variant", "in": ["centered", "mega-menu", "transparent", "sidebar"] }, "passPoints": 2 },
+        { "id": "cta-block-present", "label": "CTA block present", "check": { "type": "presence", "blockType": "cta" }, "passPoints": 2 },
+        { "id": "interactive-form", "label": "Newsletter or contact form", "check": { "type": "presence", "blockType": "newsletter,contact" }, "passPoints": 2 },
+        { "id": "block-variety-8plus", "label": "≥8 distinct types", "check": { "type": "custom", "evaluator": "distinctBlockTypes8" }, "passPoints": 2 },
+        { "id": "nav-links-balanced", "label": "Nav 3-7 links", "check": { "type": "custom", "evaluator": "navLinksBalanced" }, "passPoints": 1 }
+      ]
+    },
+    {
+      "id": "spacing-rhythm", "name": "Spacing & Rhythm", "weight": 10,
+      "description": "Block count sweet spot, no consecutive dups, tokens.",
+      "criteria": [
+        { "id": "block-count-sweet-spot", "label": "9-14 blocks", "check": { "type": "custom", "evaluator": "blockCountSweetSpot" }, "passPoints": 4, "partialPoints": 2 },
+        { "id": "no-consecutive-duplicates", "label": "No adjacent same-type blocks", "check": { "type": "custom", "evaluator": "noConsecutiveDuplicates" }, "passPoints": 2 },
+        { "id": "theme-has-spacing-preset", "label": "spacingPreset defined", "check": { "type": "custom", "evaluator": "themeHasSpacingPreset" }, "passPoints": 1 },
+        { "id": "spacing-rhythm-token-only", "label": "Padding on preset scale", "check": { "type": "custom", "evaluator": "spacingRhythmTokenOnly" }, "passPoints": 3 }
+      ]
+    },
+    {
+      "id": "conversion-path", "name": "Conversion Path Clarity", "weight": 10,
+      "description": "Multiple CTA placements + copy quality + style variety.",
+      "criteria": [
+        { "id": "hero-has-cta", "label": "Hero has CTA", "check": { "type": "custom", "evaluator": "heroHasCta" }, "passPoints": 2 },
+        { "id": "mid-cta-present", "label": "Mid-page CTA", "check": { "type": "presence", "blockType": "cta" }, "passPoints": 2 },
+        { "id": "newsletter-present", "label": "Newsletter lead capture", "check": { "type": "presence", "blockType": "newsletter" }, "passPoints": 1 },
+        { "id": "cta-text-quality-specific-2x", "label": "≥2 non-generic CTAs", "check": { "type": "custom", "evaluator": "ctaTextQualitySpecific2x" }, "passPoints": 2 },
+        { "id": "hero-cta-variety", "label": "Hero CTAs có style khác nhau", "check": { "type": "custom", "evaluator": "heroCtaVariety" }, "passPoints": 3 }
+      ]
+    },
+    {
+      "id": "content-authenticity", "name": "Content Authenticity", "weight": 8,
+      "description": "No Lorem, depth, category richness.",
+      "criteria": [
+        { "id": "no-lorem-broad", "label": "No Lorem regex", "check": { "type": "custom", "evaluator": "noLoremBroad" }, "passPoints": 2 },
+        { "id": "hero-headline-substantial", "label": "Headline ≥10 chars", "check": { "type": "custom", "evaluator": "heroHeadlineSubstantial" }, "passPoints": 1 },
+        { "id": "features-count-3plus", "label": "Features ≥3", "check": { "type": "count", "blockType": "features", "field": "features", "min": 3 }, "passPoints": 2 },
+        { "id": "faq-count-4plus", "label": "FAQ ≥4", "check": { "type": "count", "blockType": "faq", "field": "items", "min": 4 }, "passPoints": 2 },
+        { "id": "content-depth-500", "label": "Copy total ≥500 chars", "check": { "type": "custom", "evaluator": "contentDepth500" }, "passPoints": 1 }
+      ]
+    },
+    {
+      "id": "information-density", "name": "Information Density", "weight": 8,
+      "description": "Block count, variety, footer structure.",
+      "criteria": [
+        { "id": "block-count-max-16", "label": "≤16 blocks", "check": { "type": "custom", "evaluator": "blockCountMax16" }, "passPoints": 2 },
+        { "id": "variety-unique-85", "label": "≥85% distinct types", "check": { "type": "custom", "evaluator": "varietyUnique85" }, "passPoints": 3 },
+        { "id": "footer-mega-columns", "label": "Footer ≥4 columns", "check": { "type": "custom", "evaluator": "footerMegaColumns" }, "passPoints": 2 },
+        { "id": "nav-links-not-repeat", "label": "Nav links unique", "check": { "type": "custom", "evaluator": "navLinksNotRepeat" }, "passPoints": 1 }
+      ]
+    },
+    {
+      "id": "accessibility", "name": "Accessibility", "weight": 8,
+      "description": "WCAG 2.1 AA measurable checks + v1.3 textColor body contrast.",
+      "criteria": [
+        { "id": "alt-text-coverage-80", "label": "≥80% images có alt", "check": { "type": "custom", "evaluator": "altTextCoverage80" }, "passPoints": 2 },
+        { "id": "heading-order-no-skip", "label": "Heading hierarchy no skip", "check": { "type": "custom", "evaluator": "headingOrderNoSkip" }, "passPoints": 2 },
+        { "id": "theme-color-contrast", "label": "Primary color contrast (UI)", "check": { "type": "custom", "evaluator": "themeColorContrast" }, "passPoints": 1 },
+        { "id": "text-color-body-contrast", "label": "Body textColor contrast ≥4.5:1 (WCAG AA)", "check": { "type": "custom", "evaluator": "textColorBodyContrast" }, "passPoints": 2 },
+        { "id": "nav-aria-label", "label": "Nav ariaLabel", "check": { "type": "custom", "evaluator": "navAriaLabel" }, "passPoints": 1 },
+        { "id": "focus-indicator-defined", "label": "Theme focus indicator", "check": { "type": "custom", "evaluator": "focusIndicatorDefined" }, "passPoints": 1 }
+      ]
+    },
+    {
+      "id": "category-dna", "name": "Category DNA", "weight": 10,
+      "description": "Per-category mandatory blocks compliance (Wix §4.1).",
+      "criteria": [
+        { "id": "category-dna-compliance", "label": "Category mandatory blocks present", "check": { "type": "custom", "evaluator": "categoryDnaCompliance" }, "passPoints": 6, "partialPoints": 3 },
+        { "id": "category-signature-variety", "label": "≥2 signature industry blocks", "check": { "type": "custom", "evaluator": "categorySignatureVariety" }, "passPoints": 4, "partialPoints": 2 }
+      ]
+    },
+    {
+      "id": "content-uniqueness", "name": "Content Uniqueness", "weight": 6,
+      "description": "Cross-fixture duplication detection — unique copy signals real content, not templated filler.",
+      "criteria": [
+        { "id": "hero-headline-unique", "label": "Hero headline ≤2 duplicates across 390 fixtures", "check": { "type": "custom", "evaluator": "heroHeadlineUnique" }, "passPoints": 3, "partialPoints": 1 },
+        { "id": "hero-subheadline-unique", "label": "Subheadline ≤2 duplicates", "check": { "type": "custom", "evaluator": "heroSubheadlineUnique" }, "passPoints": 2, "partialPoints": 1 },
+        { "id": "cta-label-unique", "label": "CTA labels avg ≤10 duplicates", "check": { "type": "custom", "evaluator": "ctaLabelUnique" }, "passPoints": 1 }
+      ]
+    }
+  ]
+}

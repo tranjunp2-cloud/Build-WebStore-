@@ -17,6 +17,21 @@ export interface EvalContext {
     category?: string
     /** Fixture id — for debug + future cross-fixture checks. */
     fixtureId?: string
+    /** Uniqueness context — populated in scoreAll for cross-fixture hash counts (v1.3+). */
+    uniqueness?: UniquenessContext
+}
+
+/** Cross-fixture content duplication map. Built once per scoreAll invocation. */
+export interface UniquenessContext {
+    headlineCounts: Record<string, number>
+    subheadlineCounts: Record<string, number>
+    ctaCounts: Record<string, number>
+}
+
+/** Normalize text for uniqueness hashing — lowercase, trim, collapse whitespace. */
+export function normalizeForHash(s: unknown): string {
+    if (typeof s !== 'string') return ''
+    return s.toLowerCase().trim().replace(/\s+/g, ' ')
 }
 
 export interface EvalResult {
@@ -522,6 +537,53 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         const labels = links.map((l) => (typeof l?.label === 'string' ? l.label.trim().toLowerCase() : ''))
         const unique = new Set(labels)
         return { pass: unique.size === labels.length, reason: `${labels.length} total, ${unique.size} unique` }
+    },
+
+    // ── v1.3 evaluators ───────────────────────────────────────────────────
+
+    heroHeadlineUnique: ({ blocks, uniqueness }) => {
+        // Thresholds calibrated for 390-fixture pool with 5 seeds per preset:
+        //   expected occurrences if headline stable per preset = 5
+        //   healthy signal: ≤8 (allows seed noise + 1-2 preset reuse)
+        //   partial: 9-20
+        //   fail: >20 (means template copy-paste across categories)
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const h = normalizeForHash(hero?.data?.headline)
+        if (!h) return { pass: false, reason: 'no headline' }
+        if (!uniqueness) return { pass: true, reason: 'no uniqueness context (skip)' }
+        const count = uniqueness.headlineCounts[h] ?? 0
+        if (count <= 8) return { pass: true, reason: `${count} occurrences` }
+        if (count <= 20) return { pass: false, partial: true, reason: `${count} duplicates` }
+        return { pass: false, reason: `${count} duplicates (high)` }
+    },
+    heroSubheadlineUnique: ({ blocks, uniqueness }) => {
+        const hero = blocks.find((b) => b.blockType === 'hero')
+        const h = normalizeForHash(hero?.data?.subheadline ?? hero?.data?.subHeadline)
+        if (!h) return { pass: false, reason: 'no subheadline' }
+        if (!uniqueness) return { pass: true, reason: 'no context' }
+        const count = uniqueness.subheadlineCounts[h] ?? 0
+        if (count <= 8) return { pass: true, reason: `${count}` }
+        if (count <= 20) return { pass: false, partial: true, reason: `${count}` }
+        return { pass: false, reason: `${count}` }
+    },
+    ctaLabelUnique: ({ blocks, uniqueness }) => {
+        const labels = collectCtaLabels(blocks).map(normalizeForHash).filter(Boolean)
+        if (labels.length === 0) return { pass: false, reason: 'no CTAs' }
+        if (!uniqueness) return { pass: true, reason: 'no context' }
+        const avgCount = labels.reduce((s, l) => s + (uniqueness.ctaCounts[l] ?? 0), 0) / labels.length
+        // CTAs reused across many templates by design (Get Started, Book Now) — looser threshold
+        if (avgCount <= 40) return { pass: true, reason: `avg ${avgCount.toFixed(1)} occurrences` }
+        if (avgCount <= 100) return { pass: false, partial: true, reason: `avg ${avgCount.toFixed(1)}` }
+        return { pass: false, reason: `avg ${avgCount.toFixed(1)} (too generic)` }
+    },
+
+    textColorBodyContrast: ({ theme }) => {
+        const text = theme?.textColor as string | undefined
+        const surface = (theme?.surfaceColor ?? theme?.backgroundColor ?? (theme?.colorMode === 'dark' ? '#0a0a0a' : '#ffffff')) as string
+        if (!text) return { pass: false, reason: 'no textColor' }
+        const ratio = contrastRatio(text, surface)
+        if (ratio === null) return { pass: false, reason: `invalid hex (text=${text})` }
+        return { pass: ratio >= 4.5, reason: `${ratio.toFixed(2)}:1 (body text WCAG AA)` }
     },
 }
 
