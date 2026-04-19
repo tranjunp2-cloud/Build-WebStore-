@@ -11,7 +11,7 @@ import type { CollectionConfig, CollectionBeforeChangeHook } from 'payload'
 const appendTimelineHook: CollectionBeforeChangeHook = ({ data, originalDoc }) => {
     const timeline: Array<{
         event: string
-        actorId: number | null
+        actor: number | null
         data: Record<string, unknown>
         at: string
     }> = Array.isArray(data.timeline) ? [...data.timeline] : []
@@ -22,7 +22,7 @@ const appendTimelineHook: CollectionBeforeChangeHook = ({ data, originalDoc }) =
         if (data.status && data.status !== originalDoc.status) {
             timeline.push({
                 event: 'status_change',
-                actorId: null,
+                actor: null,
                 data: { from: originalDoc.status, to: data.status },
                 at: now,
             })
@@ -33,7 +33,7 @@ const appendTimelineHook: CollectionBeforeChangeHook = ({ data, originalDoc }) =
         if (data.assignedTo !== undefined && data.assignedTo !== originalDoc.assignedTo) {
             timeline.push({
                 event: 'assignment_change',
-                actorId: null,
+                actor: null,
                 data: { from: originalDoc.assignedTo ?? null, to: data.assignedTo ?? null },
                 at: now,
             })
@@ -41,7 +41,7 @@ const appendTimelineHook: CollectionBeforeChangeHook = ({ data, originalDoc }) =
         if (data.severity && data.severity !== originalDoc.severity) {
             timeline.push({
                 event: 'severity_change',
-                actorId: null,
+                actor: null,
                 data: { from: originalDoc.severity, to: data.severity },
                 at: now,
             })
@@ -155,7 +155,7 @@ export const TemplateIssues: CollectionConfig = {
             admin: { description: 'Append-only comment thread.' },
             fields: [
                 {
-                    name: 'authorId',
+                    name: 'author',
                     type: 'relationship',
                     relationTo: 'users',
                 },
@@ -178,7 +178,7 @@ export const TemplateIssues: CollectionConfig = {
             admin: { description: 'Auto-populated audit trail. Do not edit manually.' },
             fields: [
                 { name: 'event', type: 'text', required: true },
-                { name: 'actorId', type: 'relationship', relationTo: 'users' },
+                { name: 'actor', type: 'relationship', relationTo: 'users' },
                 { name: 'data', type: 'json' },
                 {
                     name: 'at',

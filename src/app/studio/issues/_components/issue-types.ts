@@ -10,7 +10,7 @@ export type IssueRelatedType = 'template' | 'generation' | 'block'
 
 export interface IssueComment {
     id: string
-    authorId: { id: number; email?: string } | number | null
+    author: { id: number; email?: string } | number | null
     body: string
     createdAt: string
 }
@@ -18,7 +18,7 @@ export interface IssueComment {
 export interface IssueTimelineEntry {
     id: string
     event: string
-    actorId: { id: number; email?: string } | number | null
+    actor: { id: number; email?: string } | number | null
     data: Record<string, unknown> | null
     at: string
 }

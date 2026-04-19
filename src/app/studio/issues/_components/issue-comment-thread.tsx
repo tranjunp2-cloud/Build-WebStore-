@@ -8,10 +8,10 @@ import { useState } from 'react'
 import type { IssueComment } from './issue-types'
 import { IssueMarkdown } from './issue-markdown'
 
-function authorLabel(authorId: IssueComment['authorId']): string {
-    if (!authorId) return 'Unknown'
-    if (typeof authorId === 'number') return `User #${authorId}`
-    return authorId.email ?? `User #${authorId.id}`
+function authorLabel(author: IssueComment['author']): string {
+    if (!author) return 'Unknown'
+    if (typeof author === 'number') return `User #${author}`
+    return author.email ?? `User #${author.id}`
 }
 
 function relativeTime(iso: string): string {
@@ -43,7 +43,7 @@ export function IssueCommentThread({ issueId, comments, onCommentAdded }: Props)
         // Optimistic insert
         const optimistic: IssueComment = {
             id: `opt-${Date.now()}`,
-            authorId: null,
+            author: null,
             body: body.trim(),
             createdAt: new Date().toISOString(),
         }
@@ -96,7 +96,7 @@ export function IssueCommentThread({ issueId, comments, onCommentAdded }: Props)
                 >
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                         <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: 12 }}>
-                            {authorLabel(c.authorId)}
+                            {authorLabel(c.author)}
                         </span>
                         <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
                             {relativeTime(c.createdAt)}

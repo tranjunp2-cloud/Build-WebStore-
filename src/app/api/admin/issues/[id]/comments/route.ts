@@ -42,7 +42,7 @@ export const POST = withSuperAdmin(async (req: NextRequest, ctx) => {
 
     const existingComments = Array.isArray(existing.comments) ? existing.comments : []
     const newComment = {
-        authorId: Number(userId),
+        author: Number(userId),
         body: parsed.data.body,
         createdAt: new Date().toISOString(),
     }

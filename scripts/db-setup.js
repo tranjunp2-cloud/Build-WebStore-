@@ -3250,6 +3250,23 @@ const MIGRATIONS = [
     name: 'content_packs_tags.parent_idx',
     sql: `CREATE INDEX IF NOT EXISTS content_packs_tags_parent_idx ON content_packs_tags (_parent_id);`,
   },
+  // Phase 08 fix: Payload creates {collection}_rels table for relationship hasMany fields
+  // (includedTemplates). Without this table, list queries fail with:
+  //   error: relation "content_packs_rels" does not exist
+  {
+    name: 'content_packs_rels.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs_rels (
+      id serial PRIMARY KEY,
+      "order" integer,
+      parent_id integer NOT NULL,
+      path varchar NOT NULL,
+      templates_id integer
+    );`,
+  },
+  {
+    name: 'content_packs_rels.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS content_packs_rels_parent_idx ON content_packs_rels (parent_id);`,
+  },
 
   // Phase 08 data seed: backfill 6 category DNA records (guard: only if dna IS NULL)
   // Wrapped as a DO block so it runs atomically and is idempotent.

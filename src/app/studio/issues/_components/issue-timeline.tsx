@@ -6,10 +6,10 @@
  */
 import type { IssueTimelineEntry } from './issue-types'
 
-function actorLabel(actorId: IssueTimelineEntry['actorId']): string {
-    if (!actorId) return 'System'
-    if (typeof actorId === 'number') return `User #${actorId}`
-    return actorId.email ?? `User #${actorId.id}`
+function actorLabel(actor: IssueTimelineEntry['actor']): string {
+    if (!actor) return 'System'
+    if (typeof actor === 'number') return `User #${actor}`
+    return actor.email ?? `User #${actor.id}`
 }
 
 function relativeTime(iso: string): string {
@@ -94,7 +94,7 @@ export function IssueTimeline({ timeline }: Props) {
                             {eventLabel(entry)}
                         </p>
                         <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '2px 0 0' }}>
-                            {actorLabel(entry.actorId)} · {relativeTime(entry.at)}
+                            {actorLabel(entry.actor)} · {relativeTime(entry.at)}
                         </p>
                     </div>
                 </li>
