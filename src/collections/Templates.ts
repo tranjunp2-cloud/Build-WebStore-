@@ -1,4 +1,5 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
+import { checkCompliance } from '@/lib/admin/dna-compliance'
 
 export const TEMPLATE_CATEGORY_OPTIONS = [
     { label: '🍽️ Restaurant / Cafe / F&B', value: 'restaurant' },
@@ -17,6 +18,45 @@ export const TEMPLATE_CATEGORY_OPTIONS = [
     { label: '✈️ Travel / Tourism', value: 'travel' },
 ]
 
+/**
+ * afterChange hook: recompute DNA compliance cache when template is saved.
+ * Guard: skip when context.skipComplianceHook to prevent infinite loop.
+ */
+const recomputeComplianceHook: CollectionAfterChangeHook = async ({ doc, req, context }) => {
+    if (context?.skipComplianceHook) return doc
+
+    const categories = Array.isArray(doc.category) ? doc.category : [doc.category].filter(Boolean)
+    if (categories.length === 0) return doc
+
+    try {
+        // Fetch first matching category's DNA
+        const categorySlug = categories[0]
+        const catResult = await req.payload.find({
+            collection: 'categories',
+            where: { slug: { equals: categorySlug } },
+            limit: 1,
+            depth: 0,
+        })
+
+        const dna = catResult.docs[0]?.dna ?? null
+        if (!dna) return doc
+
+        const compliance = checkCompliance(doc, dna as Record<string, unknown>)
+
+        await req.payload.update({
+            collection: 'templates',
+            id: doc.id,
+            data: { dnaComplianceCache: compliance },
+            context: { skipComplianceHook: true },
+        })
+    } catch (err) {
+        // Non-fatal: compliance cache is best-effort
+        console.warn('[Templates] compliance recompute failed:', err)
+    }
+
+    return doc
+}
+
 export const Templates: CollectionConfig = {
     slug: 'templates',
     admin: {
@@ -28,6 +68,9 @@ export const Templates: CollectionConfig = {
         create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
         update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
         delete: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+    },
+    hooks: {
+        afterChange: [recomputeComplianceHook],
     },
     fields: [
         { name: 'name', type: 'text', required: true },
@@ -142,6 +185,14 @@ export const Templates: CollectionConfig = {
             type: 'number',
             defaultValue: 0,
             admin: { readOnly: true },
+        },
+        {
+            name: 'dnaComplianceCache',
+            type: 'json',
+            admin: {
+                readOnly: true,
+                description: 'Auto-populated compliance result from Category DNA check. Do not edit manually.',
+            },
         },
     ],
     timestamps: true,

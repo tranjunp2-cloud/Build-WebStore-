@@ -1,12 +1,12 @@
 'use client'
 /**
  * Dropdown row actions menu for a single template.
- * Actions: Edit (stub), Clone, Publish, Schedule, Archive.
+ * Actions: Edit (stub), Clone, Publish, Schedule, Archive, Add to Pack.
  */
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
-    MoreHorizontal, Pencil, Copy, Rocket, Clock, Archive,
+    MoreHorizontal, Pencil, Copy, Rocket, Clock, Archive, Layers,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -20,6 +20,7 @@ import { CloneTemplateModal } from '../../_components/modals/clone-template-moda
 import { PublishTemplateModal } from '../../_components/modals/publish-template-modal'
 import { ArchiveTemplateModal } from '../../_components/modals/archive-template-modal'
 import { ScheduleTemplateModal } from '../../_components/modals/schedule-template-modal'
+import { AddToPackModal } from '../../_components/modals/add-to-pack-modal'
 import type { AdminTemplate } from '@/lib/admin/templates-query'
 
 type Props = {
@@ -27,7 +28,7 @@ type Props = {
     onRefresh: () => void
 }
 
-type ActiveModal = 'clone' | 'publish' | 'archive' | 'schedule' | null
+type ActiveModal = 'clone' | 'publish' | 'archive' | 'schedule' | 'add-to-pack' | null
 
 export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
     const [activeModal, setActiveModal] = useState<ActiveModal>(null)
@@ -74,6 +75,10 @@ export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
                             <Archive size={13} className="mr-2" /> Archive
                         </DropdownMenuItem>
                     )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => setActiveModal('add-to-pack')}>
+                        <Layers size={13} className="mr-2" /> Add to pack
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
 
@@ -103,6 +108,14 @@ export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
                     template={template}
                     onClose={() => setActiveModal(null)}
                     onScheduled={() => handleDone('Template scheduled')}
+                />
+            )}
+            {activeModal === 'add-to-pack' && (
+                <AddToPackModal
+                    templateId={String(template.id)}
+                    templateName={template.name}
+                    onClose={() => setActiveModal(null)}
+                    onAdded={() => handleDone(`Added "${template.name}" to pack`)}
                 />
             )}
         </>

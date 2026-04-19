@@ -3205,6 +3205,78 @@ const MIGRATIONS = [
     name: 'ai_generation_records.idx_agr_created_status',
     sql: `CREATE INDEX IF NOT EXISTS idx_agr_created_status ON ai_generation_records(created_at DESC, status);`,
   },
+
+  // ── Phase 08: Category DNA + Content Packs + Review ──────────────────────
+
+  // Categories: add dna jsonb column
+  {
+    name: 'categories.alter_dna',
+    sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS dna jsonb;`,
+  },
+
+  // Templates: add dna_compliance_cache jsonb column
+  {
+    name: 'templates.alter_dna_compliance_cache',
+    sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS dna_compliance_cache jsonb;`,
+  },
+
+  // ContentPacks parent table
+  {
+    name: 'content_packs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs (
+      id serial PRIMARY KEY,
+      name varchar NOT NULL,
+      description text,
+      cover_image_id integer REFERENCES media(id) ON DELETE SET NULL,
+      category varchar,
+      personality varchar,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now()
+    );`,
+  },
+
+  // ContentPacks tags array sub-table (Payload array convention: varchar id, _order, _parent_id, _uuid)
+  {
+    name: 'content_packs_tags.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs_tags (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES content_packs(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tag varchar
+    );`,
+  },
+  {
+    name: 'content_packs_tags.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS content_packs_tags_parent_idx ON content_packs_tags (_parent_id);`,
+  },
+
+  // Phase 08 data seed: backfill 6 category DNA records (guard: only if dna IS NULL)
+  // Wrapped as a DO block so it runs atomically and is idempotent.
+  {
+    name: 'categories.seed_dna_fnb',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","menu-food","gallery","booking-widget","footer"],"recommendedBlocks":["testimonials","gallery-masonry","cta","google-maps"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["class-schedule","doctor-profile","property-card"],"typicalPersonalities":["warm-traditional","warm-homestyle","bold-dark"],"minSections":5,"aiPromptHint":"Warm, inviting tone focused on food experiences. Emphasize ambiance, freshness, and hospitality."}'::jsonb WHERE slug = 'fnb' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_retail',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","products-grid","cart-widget","testimonials","footer"],"recommendedBlocks":["products-featured","cta","newsletter","pricing"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","class-schedule","doctor-profile"],"typicalPersonalities":["modern-vibrant","soft-feminine","editorial-clean"],"minSections":5,"aiPromptHint":"Confident, product-forward tone. Highlight deals, quality, and social proof. Drive conversion."}'::jsonb WHERE slug = 'retail' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_portfolio',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","portfolio-grid","about","contact","footer"],"recommendedBlocks":["testimonials","stats","team","cta"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","products-grid","cart-widget","class-schedule"],"typicalPersonalities":["editorial-clean","bold-dark","luxury-travel"],"minSections":5,"aiPromptHint":"Sophisticated, minimal tone. Let the work speak. Emphasize craft, process, and results."}'::jsonb WHERE slug = 'portfolio' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_news',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","blog-list","newsletter","footer"],"recommendedBlocks":["stats","testimonials","cta","social-widget"],"mandatoryOrder":["navigation","hero","blog-list","footer"],"forbiddenBlocks":["menu-food","products-grid","booking-widget","class-schedule"],"typicalPersonalities":["editorial-clean","modern-vibrant"],"minSections":5,"aiPromptHint":"Clear, authoritative tone. Prioritize readability and information hierarchy. Build trust through consistency."}'::jsonb WHERE slug = 'news' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_beauty',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","service-cards","booking-widget","gallery","testimonials","footer"],"recommendedBlocks":["gallery-masonry","before-after","team","newsletter","cta"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["products-grid","cart-widget","class-schedule","blog-list"],"typicalPersonalities":["soft-feminine","calm-wellness","luxury-travel"],"minSections":6,"aiPromptHint":"Elegant, nurturing tone. Evoke transformation, self-care, and indulgence. Subtle luxury feel."}'::jsonb WHERE slug = 'beauty' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_education',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","class-schedule","features","contact","footer"],"recommendedBlocks":["testimonials","faq","team","stats","cta","pricing"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","cart-widget","booking-widget","gallery-masonry"],"typicalPersonalities":["modern-vibrant","calm-wellness","editorial-clean"],"minSections":6,"aiPromptHint":"Encouraging, clear, and structured tone. Highlight outcomes, expertise, and learning journey."}'::jsonb WHERE slug = 'education' AND dna IS NULL;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -3237,6 +3309,7 @@ const COLLECTION_SLUGS = [
   'block_variants',
   'ai_generation_records',
   'template_issues',
+  'content_packs',
 ];
 
 /**
