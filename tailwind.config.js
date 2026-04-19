@@ -10,7 +10,7 @@ module.exports = {
         './src/app/(editor)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/(frontend)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/(preview)/**/*.{js,ts,jsx,tsx,mdx}',
-        './src/app/(studio)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/studio/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/sites/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/templates/**/*.{js,ts,jsx,tsx,mdx}',
         './src/lib/admin/**/*.{js,ts,jsx,tsx}',
