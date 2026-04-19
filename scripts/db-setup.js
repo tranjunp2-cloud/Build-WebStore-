@@ -28,6 +28,16 @@ function createPool() {
   if (!connStr) return null;
 
   const pg = require('pg');
+  // Honour sslmode=disable (or localhost, which Postgres typically doesn't run
+  // with SSL) so dev DBs work without forcing TLS. Hosted DBs (DO/Vercel/etc.)
+  // still get ssl:{rejectUnauthorized:false} which accepts their self-signed certs.
+  const sslmodeMatch = connStr.match(/[?&]sslmode=([^&]+)/);
+  const sslmode = sslmodeMatch ? sslmodeMatch[1].toLowerCase() : null;
+  const hostMatch = connStr.match(/@([^:/?]+)/);
+  const host = hostMatch ? hostMatch[1].toLowerCase() : '';
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal';
+  const useSsl = sslmode === 'disable' ? false : (isLocal ? false : { rejectUnauthorized: false });
+
   const cleanStr = connStr
     .replace(/[?&]sslmode=[^&]+/g, '')
     .replace(/\?&/, '?')
@@ -35,7 +45,7 @@ function createPool() {
 
   return new pg.Pool({
     connectionString: cleanStr,
-    ssl: { rejectUnauthorized: false },
+    ssl: useSsl,
     connectionTimeoutMillis: 10000,
   });
 }
@@ -2795,6 +2805,37 @@ const MIGRATIONS = [
     name: '_pages_v_blocks_pricing.add_variant',
     sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
   },
+
+  // ── Fix (2026-04-17, BUG-F05 new-page-stays-draft): `variant` was defined
+  // in every block's Payload schema (Pages.ts) but the original CREATE TABLE
+  // blocks here only listed it for a handful. Draft-save writes to the
+  // versioned `_pages_v_blocks_*` rows, which picked up the column via
+  // Payload's schema sync; the main `pages_blocks_*` rows never did.
+  // Promoting draft→published (PATCH /publish) then hit INSERT/UPDATE on the
+  // main table and silently failed the row — user saw "Update success" toast
+  // but status stayed Draft, hasUnpublishedChanges stayed true. Single bulk
+  // ALTER IF NOT EXISTS covers every block that has `variant` in Pages.ts.
+  ...[
+    'hero', 'navigation', 'about', 'contact', 'footer',
+    'social_widget', 'cart_widget', 'features', 'testimonials', 'gallery',
+    'stats', 'team', 'cta', 'newsletter', 'video',
+    'logo_cloud', 'blog_list', 'products_grid', 'products_featured',
+    'service_cards', 'carousel', 'step_process', 'divider',
+    'announcement_bar', 'whatsapp_button', 'google_maps', 'accordion',
+    'countdown_timer', 'social_proof', 'breadcrumb', 'client_logos',
+    'menu_food', 'portfolio_grid', 'doctor_profile', 'property_card',
+    'class_schedule', 'video_showcase', 'product_quick_view',
+    'feature_comparison',
+  ].flatMap(slug => [
+    {
+      name: `pages_blocks_${slug}.add_variant`,
+      sql: `ALTER TABLE "pages_blocks_${slug}" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+    },
+    {
+      name: `_pages_v_blocks_${slug}.add_variant`,
+      sql: `ALTER TABLE "_pages_v_blocks_${slug}" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+    },
+  ]),
 ];
 
 async function runMigrations(pool) {

@@ -10,6 +10,7 @@ import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
+import { MeshGradient, DiagonalStripe, NoiseTexture, TypographicMark, GridLines } from '../shared/decorative'
 
 const FALLBACK_STATS: StatsConfig['stats'] = [
     { value: '500+', label: 'Happy Customers' },
@@ -23,16 +24,19 @@ type StatsSectionProps = {
     children: ReactNode
     narrow?: boolean
     style?: React.CSSProperties
+    decorative?: ReactNode
 }
 
-function StatsSection({ children, narrow = false, style }: StatsSectionProps) {
+function StatsSection({ children, narrow = false, style, decorative }: StatsSectionProps) {
     return (
-        <AnimatedSection style={style}>
+        <AnimatedSection style={style} className={decorative ? 'relative overflow-hidden' : ''}>
+            {decorative}
             <SectionWrapper
                 as="div"
                 padding="compact"
                 container={narrow ? 'narrow' : 'default'}
                 background="transparent"
+                innerClassName={decorative ? 'relative z-10' : ''}
             >
                 {children}
             </SectionWrapper>
@@ -113,7 +117,10 @@ function StatValue({ stat }: { stat: StatItem }) {
    Dùng <div role="group" aria-label> để wrap cả number + label semantic group. */
 function RowVariant({ headline, stats }: { headline?: string; stats: StatItem[] }) {
     return (
-        <StatsSection style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
+        <StatsSection
+            style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
+            decorative={<DiagonalStripe color={CSS_VARS.primary} opacity={0.06} />}
+        >
             <StatsHeadline headline={headline} />
             <StaggerGrid className="flex flex-col sm:flex-row flex-wrap justify-center gap-8 md:gap-12">
                 {stats.map((stat, i) => (
@@ -174,6 +181,7 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
         <StatsSection
             narrow
             style={{ color: CSS_VARS.text, background: 'rgba(var(--brand-primary-rgb), 0.05)' }}
+            decorative={<MeshGradient color={CSS_VARS.primary} accentColor={CSS_VARS.secondary} opacity={0.2} />}
         >
             <StatsHeadline headline={headline} />
             <StaggerGrid className="flex flex-col gap-6">
@@ -235,6 +243,147 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
     )
 }
 
+// ── A5 (260417) — 3 new stats variants for pool diversity ───────────────────
+
+/**
+ * cards: each stat as an individual elevated card (vs grid which is flat).
+ * A4 vocab: NoiseTexture — film grain on the section.
+ */
+function CardsVariant({ headline, stats }: { headline?: string; stats: StatItem[] }) {
+    return (
+        <StatsSection
+            style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
+            decorative={<NoiseTexture opacity={0.05} />}
+        >
+            <StatsHeadline headline={headline} />
+            <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {stats.map((stat, i) => (
+                    <StaggerItem
+                        key={`${stat.label}-${i}`}
+                        className={`text-center ${CARD_PADDING.lg} transition-shadow hover:shadow-xl`}
+                        style={{
+                            background: CSS_VARS.surface,
+                            borderRadius: 'var(--radius-lg)',
+                            border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+                        }}
+                    >
+                        <div role="group" aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}>
+                            <p
+                                className="text-5xl font-bold mb-3"
+                                style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary, fontVariantNumeric: 'tabular-nums' }}
+                            >
+                                <StatValue stat={stat} />
+                            </p>
+                            <Body size="small" className="opacity-70" style={{ color: CSS_VARS.muted }}>{stat.label}</Body>
+                        </div>
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+        </StatsSection>
+    )
+}
+
+/**
+ * inline-text: stats embedded inline as a narrative sentence — values pop in
+ * brand color, labels read as flowing text. Compact, story-like.
+ * A4 vocab: TypographicMark — large background number watermark from first stat.
+ */
+function InlineTextVariant({ headline, stats }: { headline?: string; stats: StatItem[] }) {
+    const watermarkText = stats[0]?.value || '#'
+    return (
+        <StatsSection
+            narrow
+            style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}
+            decorative={<TypographicMark text={watermarkText} color={CSS_VARS.primary} opacity={0.05} size="xl" />}
+        >
+            <StatsHeadline headline={headline} />
+            <p
+                className="text-center text-2xl md:text-3xl leading-relaxed max-w-3xl mx-auto"
+                style={{ color: CSS_VARS.text }}
+            >
+                {stats.map((stat, i) => (
+                    <span key={`${stat.label}-${i}`}>
+                        {i > 0 && (i === stats.length - 1 ? ' and ' : ', ')}
+                        <span
+                            className="font-bold"
+                            style={{ color: CSS_VARS.primary, fontVariantNumeric: 'tabular-nums' }}
+                            aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''}`}
+                        >
+                            <StatValue stat={stat} />
+                        </span>
+                        <span className="opacity-70" style={{ color: CSS_VARS.muted }}> {stat.label}</span>
+                    </span>
+                ))}
+                <span className="opacity-70" style={{ color: CSS_VARS.muted }}>.</span>
+            </p>
+        </StatsSection>
+    )
+}
+
+/**
+ * chart-bars: stats rendered as horizontal decorative bars. Bar width scales
+ * with parsed numeric value (capped 0-100). Labels left, value right, bar
+ * underneath. A4 vocab: GridLines — chart graph paper feel.
+ */
+function ChartBarsVariant({ headline, stats }: { headline?: string; stats: StatItem[] }) {
+    return (
+        <StatsSection
+            narrow
+            style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
+            decorative={<GridLines color={CSS_VARS.primary} spacing={32} opacity={0.04} direction="horizontal" />}
+        >
+            <StatsHeadline headline={headline} />
+            <StaggerGrid className="flex flex-col gap-6 max-w-2xl mx-auto">
+                {stats.map((stat, i) => {
+                    const stripped = stat.value.replace(/[,_]/g, '').match(/-?\d+\.?\d*/)?.[0] || ''
+                    const numeric = parseFloat(stripped)
+                    const widthPct = !isNaN(numeric)
+                        ? Math.max(8, Math.min(100, numeric > 100 ? 100 : numeric))
+                        : 50
+                    return (
+                        <StaggerItem
+                            key={`${stat.label}-${i}`}
+                            role="group"
+                            aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}
+                        >
+                            <div className="flex items-baseline justify-between mb-2">
+                                <Caption className="font-medium" style={{ color: CSS_VARS.text }}>
+                                    {stat.label}
+                                </Caption>
+                                <span
+                                    className="text-xl font-bold"
+                                    style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary, fontVariantNumeric: 'tabular-nums' }}
+                                >
+                                    <StatValue stat={stat} />
+                                </span>
+                            </div>
+                            <div
+                                className="w-full h-3 overflow-hidden"
+                                style={{ background: 'rgba(var(--brand-primary-rgb), 0.1)', borderRadius: 'var(--radius-full)' }}
+                                role="progressbar"
+                                aria-valuenow={!isNaN(numeric) ? numeric : 0}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                            >
+                                <div
+                                    className="h-full"
+                                    style={{
+                                        width: `${widthPct}%`,
+                                        background: `linear-gradient(90deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.7))`,
+                                        borderRadius: 'var(--radius-full)',
+                                        transition: 'width 1s cubic-bezier(0.22, 1, 0.36, 1)',
+                                    }}
+                                />
+                            </div>
+                        </StaggerItem>
+                    )
+                })}
+            </StaggerGrid>
+        </StatsSection>
+    )
+}
+
 export function StatsBlock({ block }: BlockProps<StatsConfig>) {
     const { headline, stats: rawStats = [], variant = 'row' } = block
     const stats = rawStats.length > 0 ? rawStats : FALLBACK_STATS
@@ -252,6 +401,12 @@ export function StatsBlock({ block }: BlockProps<StatsConfig>) {
             return <GridVariant headline={headline} stats={stats} />
         case 'highlight':
             return <HighlightVariant headline={headline} stats={stats} />
+        case 'cards':
+            return <CardsVariant headline={headline} stats={stats} />
+        case 'inline-text':
+            return <InlineTextVariant headline={headline} stats={stats} />
+        case 'chart-bars':
+            return <ChartBarsVariant headline={headline} stats={stats} />
         case 'row':
         default:
             return <RowVariant headline={headline} stats={stats} />

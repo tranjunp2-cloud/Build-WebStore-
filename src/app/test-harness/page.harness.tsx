@@ -2,7 +2,9 @@
  * AI Gen Test Harness — index route (Phase 01 of plan 260419-2231).
  *
  * Lists all blueprint fixtures (deduped to seed=0) in a grid so PM can eyeball
- * 56 blueprints in one sitting + tag triage verdicts.
+ * 56 blueprints in one sitting + tag triage verdicts. If a rubric score report
+ * exists (`.harness-out/report.json` from staging scorer), per-card status dot
+ * surfaces pass/warn/fail to help PM prioritize attention.
  *
  * Gated same way as `/test-harness/[fixtureId]`: only loaded when
  * `ENABLE_HARNESS=1` (see next.config.ts pageExtensions).
@@ -20,6 +22,8 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { TriagePanel } from './_components/triage-panel.harness-client'
 import type { MatrixReport, HarnessResult } from '../../../scripts/test-harness/types'
+import { readReport } from '../../../scripts/test-harness/rubric/scorer-lib'
+import type { FixtureScore } from '../../../scripts/test-harness/rubric/rubric.schema'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +34,7 @@ type BlueprintCard = {
   blockCount: number
   blockTypes: string[]
   firstSeedResult: HarnessResult
+  score?: FixtureScore
 }
 
 function loadMatrix(): MatrixReport | null {
@@ -43,7 +48,7 @@ function loadMatrix(): MatrixReport | null {
   }
 }
 
-function pickUniqueBlueprints(matrix: MatrixReport): BlueprintCard[] {
+function pickUniqueBlueprints(matrix: MatrixReport, scoreMap: Map<string, FixtureScore>): BlueprintCard[] {
   const byPreset = new Map<string, HarnessResult>()
   for (const r of matrix.results) {
     if (r.fixture.source !== 'blueprint') continue
@@ -63,8 +68,14 @@ function pickUniqueBlueprints(matrix: MatrixReport): BlueprintCard[] {
       blockCount: r.blocks.length,
       blockTypes: r.blocks.map((b) => b.blockType),
       firstSeedResult: r,
+      score: scoreMap.get(r.fixture.id),
     }))
     .sort((a, b) => a.category.localeCompare(b.category) || a.presetName.localeCompare(b.presetName))
+}
+
+function scoreDot(score?: FixtureScore): string {
+  if (!score) return '⚪'
+  return score.status === 'pass' ? '🟢' : score.status === 'warn' ? '🟡' : '🔴'
 }
 
 export default function HarnessIndexPage() {
@@ -82,7 +93,11 @@ export default function HarnessIndexPage() {
     )
   }
 
-  const blueprints = pickUniqueBlueprints(matrix)
+  const report = readReport()
+  const scoreMap = new Map<string, FixtureScore>()
+  if (report) report.fixtures.forEach((f) => scoreMap.set(f.fixtureId, f))
+
+  const blueprints = pickUniqueBlueprints(matrix, scoreMap)
   const categories = Array.from(new Set(blueprints.map((b) => b.category))).sort()
 
   return (
@@ -91,7 +106,7 @@ export default function HarnessIndexPage() {
         <div>
           <h1 className="text-2xl font-semibold">Template Quality Triage — {blueprints.length} blueprints</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Plan: <code>plans/260419-2231-GH-1-per-template-quality-fix</code>. Click any card to open full render in a new tab; return here to tag verdict.
+            Plan: <code>plans/260419-2231-GH-1-per-template-quality-fix</code>. Click any card to open full render in a new tab; return here to tag verdict. Rubric dot: 🟢 pass, 🟡 warn, 🔴 fail, ⚪ no score.
           </p>
         </div>
         <TriagePanel totalCount={blueprints.length} fixtureIds={blueprints.map((b) => b.fixtureId)} />
@@ -110,7 +125,10 @@ export default function HarnessIndexPage() {
           <Card key={bp.fixtureId} className="p-4">
             <div className="mb-2 flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{bp.presetName}</div>
+                <div className="flex items-center gap-1.5 truncate font-medium">
+                  <span title={bp.score ? `rubric: ${bp.score.status}` : 'no rubric score'}>{scoreDot(bp.score)}</span>
+                  <span className="truncate">{bp.presetName}</span>
+                </div>
                 <div className="text-xs text-muted-foreground">{bp.category}</div>
               </div>
               <Badge variant="outline" className="shrink-0 text-xs">

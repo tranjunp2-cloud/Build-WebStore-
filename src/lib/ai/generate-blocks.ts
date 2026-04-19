@@ -12,6 +12,7 @@
 
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation } from './content-rules'
+import { dedupSectionLabel } from './dedup-section-label'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -187,14 +188,14 @@ const VARIANT_OPTIONS: Record<string, string[]> = {
     testimonials: ['cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote'],
     contact: ['form', 'split', 'card-float', 'minimal-inline'],
     footer: ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient'],
-    faq: ['accordion', 'grid', 'simple'],
-    cta: ['banner', 'inline', 'floating'],
-    stats: ['row', 'grid', 'highlight'],
+    faq: ['accordion', 'grid', 'simple', 'two-column-accordion', 'chat-bubbles', 'numbered'],
+    cta: ['banner', 'inline', 'card', 'floating-sticky', 'image-bg', 'split-testimonial', 'dark-card', 'mesh-gradient-hero'],
+    stats: ['row', 'grid', 'highlight', 'cards', 'inline-text', 'chart-bars'],
     gallery: ['grid', 'masonry', 'carousel', 'lightbox'],
     navigation: ['simple', 'centered', 'transparent', 'pill'],
-    about: ['simple', 'split', 'story'],
-    newsletter: ['inline', 'popup', 'banner'],
-    team: ['grid', 'list'],
+    about: ['simple', 'split', 'story', 'two-column', 'founder-quote', 'centered-large', 'image-overlay'],
+    newsletter: ['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid'],
+    team: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'],
     pricing: ['cards', 'table', 'horizontal', 'toggle'],
 }
 
@@ -545,7 +546,7 @@ function buildMiddleBlock(
             return {
                 blockType: 'about',
                 variant,
-                sectionLabel: 'About',
+                sectionLabel: dedupSectionLabel('About', 'Our Story'),
                 headline: 'Our Story',
                 body: content.aboutBody,
             }
@@ -553,7 +554,7 @@ function buildMiddleBlock(
             return {
                 blockType: 'features',
                 variant,
-                sectionLabel: 'Services',
+                sectionLabel: dedupSectionLabel('Services', 'What We Offer'),
                 headline: 'What We Offer',
                 subheadline: 'The core values we deliver to you',
                 features: content.features,

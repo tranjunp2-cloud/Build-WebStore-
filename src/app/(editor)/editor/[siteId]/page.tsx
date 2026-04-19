@@ -677,6 +677,17 @@ export default function EditorPage() {
             // Clear unpublished changes flag after successful publish
             if (!currentlyPublished) {
                 markPublished()
+
+                // Refetch pages so draft→live status is reflected in the sidebar.
+                try {
+                    const pagesRes = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' })
+                    if (pagesRes.ok) {
+                        const pagesData = await pagesRes.json()
+                        if (Array.isArray(pagesData?.pages)) setPages(pagesData.pages)
+                    }
+                } catch {
+                    // Non-fatal.
+                }
             }
 
             if (!currentlyPublished) {
@@ -710,7 +721,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, site?.status, siteId, siteName])
+    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, setPages, site?.status, siteId, siteName])
 
     // Re-publish: always PATCH (never DELETE). Used by "Update" button on published sites.
     const handleRepublish = useCallback(async () => {
@@ -731,10 +742,52 @@ export default function EditorPage() {
                 credentials: 'include',
             })
 
-            if (!res.ok) throw new Error(`Server returned ${res.status}`)
+            if (!res.ok) {
+                // Try to surface the actual server-side cause (PG column missing,
+                // Payload ValidationError on a required field, etc.) instead of
+                // a generic "Server returned 500".
+                const body = await res.json().catch(() => null) as {
+                    error?: {
+                        message?: string
+                        failures?: Array<{
+                            errName?: string
+                            errMsg?: string
+                            pgColumn?: string
+                            pgTable?: string
+                            causeMsg?: string
+                            validationErrors?: Array<{ path?: string; message?: string }>
+                        }>
+                    }
+                } | null
+                const firstFailure = body?.error?.failures?.[0]
+                const firstValidation = firstFailure?.validationErrors?.[0]
+                let detail: string | undefined
+                if (firstValidation?.path) {
+                    // Payload validation error — richest signal for the user.
+                    detail = `${firstValidation.path}: ${firstValidation.message || 'invalid'}`
+                } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
+                    detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
+                } else {
+                    detail = firstFailure?.causeMsg || firstFailure?.errMsg || body?.error?.message
+                }
+                throw new Error(detail || `Server returned ${res.status}`)
+            }
 
             markPublished()
             setPublishSuccess(true)
+
+            // Refetch pages so freshly-promoted pages show "Live" instead of stale
+            // "Draft". markPublished() only clears hasUnpublishedChanges; individual
+            // page.status still holds the pre-publish value until we resync.
+            try {
+                const pagesRes = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' })
+                if (pagesRes.ok) {
+                    const pagesData = await pagesRes.json()
+                    if (Array.isArray(pagesData?.pages)) setPages(pagesData.pages)
+                }
+            } catch {
+                // Non-fatal — next page reload will resync.
+            }
 
             const data = await res.json()
             const url = data?.data?.url || data?.data?.domain
@@ -753,7 +806,9 @@ export default function EditorPage() {
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
             if (process.env.NODE_ENV === 'development') console.error('[Editor] Re-publish failed:', err)
+            const detail = err instanceof Error ? err.message : undefined
             toast.error(t.editor.toast.publishFailed, {
+                description: detail,
                 duration: 10000,
                 action: {
                     label: 'Retry',
@@ -763,7 +818,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, siteId])
+    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, setPages, siteId])
 
     const handlePageSelected = useCallback(async (pageId: string) => {
         const store = useEditorStore.getState()

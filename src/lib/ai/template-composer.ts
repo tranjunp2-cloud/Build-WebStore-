@@ -1,12 +1,26 @@
 import { getCategoryContent } from '@/lib/ai/content'
 import type { CategoryContent, BusinessSample } from '@/lib/ai/content/types'
 import type { ThemePreset } from '@/lib/ai/theme-presets'
+import { DEFAULT_FOCUS_STYLE } from '@/lib/ai/theme-presets'
+import { FONT_PAIRINGS } from '@/lib/fonts/pairings'
+
+/** Resolve explicit heading + body font names from a pairing id. Returns nulls if id unknown. */
+function resolveFontNames(pairingId: string | undefined): { heading?: string; body?: string } {
+    if (!pairingId) return {}
+    const pairing = FONT_PAIRINGS.find((p) => p.id === pairingId)
+    return pairing ? { heading: pairing.headingFont, body: pairing.bodyFont } : {}
+}
 import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
 import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
 import { getBlogSeeds } from './content/blog-seeds'
 import { pickLogosByCategory } from './content/client-logos-library'
+import {
+  NEUTRAL_FALLBACK_SVG,
+  PORTRAIT_FALLBACK_SVG,
+  AVATAR_FALLBACK_SVG,
+} from './fallback-svg'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,8 +53,12 @@ function shuffleArray<T>(arr: T[], rand: () => number): T[] {
 
 // ── Seed-Based Variant Selection ──────────────────────────────────────────
 
+// Plan 260417 Wave 1 A3 — variants declared in Zod enum but NOT implemented
+// in the block's render switch. AI gen would silently fall through to the
+// block's default variant, hiding the mismatch from QA.
 const BROKEN_VARIANTS: Record<string, string[]> = {
   hero: ['animated-gradient'],
+  testimonials: ['grid', 'single'],
 }
 
 function simpleHash(str: string): number {
@@ -169,6 +187,7 @@ function buildNavigation(
     logoText: biz.name,
     links,
     ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: resolveNavCtaUrl(pages) },
+    ariaLabel: `${biz.name} main navigation`,
   }
 }
 
@@ -442,6 +461,9 @@ export function buildTestimonials(content: CategoryContent): Record<string, unkn
       title: t.title,
       company: t.company,
       rating: t.rating,
+      // Next-wins plan 260419-0034 phase-02: static avatar fallback for all.
+      // Real photo URLs come from media-injector trong production gen.
+      avatarUrl: AVATAR_FALLBACK_SVG,
     })),
   }
 }
@@ -465,29 +487,48 @@ function buildContact(biz: BusinessSample): Record<string, unknown> {
 }
 
 function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unknown> {
+  // Next-wins plan 260419-0034 phase-03: upgrade default to mega variant với 4 columns
+  // (Explore / Company / Support / Legal) to meet Wix-pro footer expectations.
+  const exploreLinks = pages.map((p) => ({
+    label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
+    url: p === '/' ? '/' : `/${p}`,
+  }))
   const linkColumns = [
+    { title: 'Explore', links: exploreLinks },
     {
-      title: 'Pages',
-      links: pages.map((p) => ({
-        label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
-        url: p === '/' ? '/' : `/${p}`,
-      })),
+      title: 'Company',
+      links: [
+        { label: 'About Us', url: '/about' },
+        { label: 'Contact', url: '/contact' },
+        { label: 'Careers', url: '/careers' },
+      ],
     },
     {
-      title: 'Contact',
+      title: 'Support',
       links: [
-        { label: biz.email, url: `mailto:${biz.email}` },
-        { label: biz.phone, url: `tel:${biz.phone.replace(/[\s-]/g, '')}` },
+        { label: 'Help Center', url: '/help' },
+        { label: 'FAQ', url: '/faq' },
+        { label: 'Get in Touch', url: `mailto:${biz.email}` },
+      ],
+    },
+    {
+      title: 'Legal',
+      links: [
+        { label: 'Privacy Policy', url: '/privacy' },
+        { label: 'Terms of Service', url: '/terms' },
+        { label: 'Cookie Policy', url: '/cookies' },
       ],
     },
   ]
   return {
     blockType: 'footer',
-    variant: 'expanded',
+    variant: 'mega',
     logoText: biz.name,
     tagline: biz.tagline,
     columns: linkColumns,
     copyrightText: `© 2026 ${biz.name}. All rights reserved.`,
+    contactEmail: biz.email,
+    contactPhone: biz.phone,
     socials: [
       { platform: 'facebook', url: '#' },
       { platform: 'instagram', url: '#' },
@@ -579,12 +620,12 @@ function buildGallery(biz: BusinessSample): Record<string, unknown> {
     variant: 'grid',
     headline: `Gallery — ${biz.name}`,
     images: [
-      { image: { url: 'https://placehold.co/600x400/e2e8f0/64748b?text=Gallery+1', alt: `${biz.name} photo 1` } },
-      { image: { url: 'https://placehold.co/600x400/e2e8f0/64748b?text=Gallery+2', alt: `${biz.name} photo 2` } },
-      { image: { url: 'https://placehold.co/600x400/e2e8f0/64748b?text=Gallery+3', alt: `${biz.name} photo 3` } },
-      { image: { url: 'https://placehold.co/600x400/e2e8f0/64748b?text=Gallery+4', alt: `${biz.name} photo 4` } },
-      { image: { url: 'https://placehold.co/600x400/e2e8f0/64748b?text=Gallery+5', alt: `${biz.name} photo 5` } },
-      { image: { url: 'https://placehold.co/600x400/e2e8f0/64748b?text=Gallery+6', alt: `${biz.name} photo 6` } },
+      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 1` } },
+      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 2` } },
+      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 3` } },
+      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 4` } },
+      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 5` } },
+      { image: { url: NEUTRAL_FALLBACK_SVG, alt: `${biz.name} photo 6` } },
     ],
   }
 }
@@ -993,9 +1034,9 @@ function buildPropertyCard(): Record<string, unknown> {
     showMap: false,
     currency: 'RM',
     properties: [
-      { title: 'Luxury Condo in KLCC', price: 1200000, location: 'KLCC, Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, imageUrls: ['https://placehold.co/600x400/e2e8f0/64748b?text=KLCC+Condo'], type: 'sale' as const, description: 'Modern luxury condo with stunning twin tower views.' },
-      { title: 'Semi-D in Shah Alam', price: 850000, location: 'Seksyen 7, Shah Alam', bedrooms: 4, bathrooms: 3, area: 2200, imageUrls: ['https://placehold.co/600x400/e2e8f0/64748b?text=Shah+Alam'], type: 'sale' as const, description: 'Spacious family home in quiet neighbourhood.' },
-      { title: 'Studio in Mont Kiara', price: 2500, location: 'Mont Kiara, Kuala Lumpur', bedrooms: 1, bathrooms: 1, area: 550, imageUrls: ['https://placehold.co/600x400/e2e8f0/64748b?text=Mont+Kiara'], type: 'rent' as const, description: 'Fully furnished studio, walking distance to MRT.' },
+      { title: 'Luxury Condo in KLCC', price: 1200000, location: 'KLCC, Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, imageUrls: [NEUTRAL_FALLBACK_SVG], type: 'sale' as const, description: 'Modern luxury condo with stunning twin tower views.' },
+      { title: 'Semi-D in Shah Alam', price: 850000, location: 'Seksyen 7, Shah Alam', bedrooms: 4, bathrooms: 3, area: 2200, imageUrls: [NEUTRAL_FALLBACK_SVG], type: 'sale' as const, description: 'Spacious family home in quiet neighbourhood.' },
+      { title: 'Studio in Mont Kiara', price: 2500, location: 'Mont Kiara, Kuala Lumpur', bedrooms: 1, bathrooms: 1, area: 550, imageUrls: [NEUTRAL_FALLBACK_SVG], type: 'rent' as const, description: 'Fully furnished studio, walking distance to MRT.' },
     ],
   }
 }
@@ -1003,10 +1044,10 @@ function buildPropertyCard(): Record<string, unknown> {
 // Canned product-quick-view items. Used as fallback + padded when user supplies
 // fewer than 3 products (extracted so buildProductQuickView can reuse them).
 const CANNED_QUICK_VIEW_PRODUCTS = [
-  { name: 'Baju Kurung Moden', price: 89, originalPrice: 120, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Kurung'], description: 'Elegant modern baju kurung in premium cotton.', variants: ['S', 'M', 'L', 'XL'], badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-  { name: 'Wireless Earbuds Pro', price: 199, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Earbuds'], description: 'Active noise cancellation with 30-hour battery life.', variants: ['Black', 'White'], badge: 'New', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-  { name: 'Organic Honey (500g)', price: 45, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Honey'], description: 'Pure Malaysian kelulut honey from Cameron Highlands.', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-  { name: 'Batik Silk Scarf', price: 65, originalPrice: 85, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Batik'], description: 'Handmade batik silk scarf in traditional Malaysian motifs.', badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
+  { name: 'Baju Kurung Moden', price: 89, originalPrice: 120, imageUrls: [PORTRAIT_FALLBACK_SVG], description: 'Elegant modern baju kurung in premium cotton.', variants: ['S', 'M', 'L', 'XL'], badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
+  { name: 'Wireless Earbuds Pro', price: 199, imageUrls: [PORTRAIT_FALLBACK_SVG], description: 'Active noise cancellation with 30-hour battery life.', variants: ['Black', 'White'], badge: 'New', ctaLabel: 'Add to Cart', ctaUrl: '#' },
+  { name: 'Organic Honey (500g)', price: 45, imageUrls: [PORTRAIT_FALLBACK_SVG], description: 'Pure Malaysian kelulut honey from Cameron Highlands.', ctaLabel: 'Add to Cart', ctaUrl: '#' },
+  { name: 'Batik Silk Scarf', price: 65, originalPrice: 85, imageUrls: [PORTRAIT_FALLBACK_SVG], description: 'Handmade batik silk scarf in traditional Malaysian motifs.', badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
 ] as const
 
 /**
@@ -1021,7 +1062,7 @@ function quickViewItemsFromProducts(
   const userItems: Record<string, unknown>[] = products.map((product) => ({
     name: capitalizeFirst(product),
     price: 0, // unknown — storefront can edit later
-    imageUrls: [`https://placehold.co/400x500/e2e8f0/64748b?text=${encodeURIComponent(product)}`],
+    imageUrls: [PORTRAIT_FALLBACK_SVG],
     description: (FEATURE_BODY_TEMPLATES[category] ?? FEATURE_BODY_TEMPLATES['business']!).replace('{product}', product),
     ctaLabel: 'Shop Now',
     ctaUrl: '#',
@@ -1060,12 +1101,12 @@ function buildPortfolioGrid(): Record<string, unknown> {
     headline: 'Our Work',
     subheadline: 'A selection of projects we are proud of.',
     projects: [
-      { title: 'Brand Identity — Nasi Kandar Chain', description: 'Complete brand redesign for a national F&B chain.', imageUrl: 'https://placehold.co/600x400/e2e8f0/64748b?text=Branding', category: 'Branding' },
-      { title: 'E-commerce Website', description: 'Full e-commerce platform for a fashion brand.', imageUrl: 'https://placehold.co/600x400/e2e8f0/64748b?text=Web+Design', category: 'Web Design' },
-      { title: 'Product Packaging', description: 'Packaging design for artisan coffee brand.', imageUrl: 'https://placehold.co/600x400/e2e8f0/64748b?text=Packaging', category: 'Packaging' },
-      { title: 'Corporate Video', description: 'Brand story video for a tech startup.', imageUrl: 'https://placehold.co/600x400/e2e8f0/64748b?text=Video', category: 'Video' },
-      { title: 'Social Media Campaign', description: 'Instagram campaign that reached 500K impressions.', imageUrl: 'https://placehold.co/600x400/e2e8f0/64748b?text=Social', category: 'Digital' },
-      { title: 'Annual Report Design', description: 'Clean, modern annual report for a public company.', imageUrl: 'https://placehold.co/600x400/e2e8f0/64748b?text=Print', category: 'Print' },
+      { title: 'Brand Identity — Nasi Kandar Chain', description: 'Complete brand redesign for a national F&B chain.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Branding' },
+      { title: 'E-commerce Website', description: 'Full e-commerce platform for a fashion brand.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Web Design' },
+      { title: 'Product Packaging', description: 'Packaging design for artisan coffee brand.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Packaging' },
+      { title: 'Corporate Video', description: 'Brand story video for a tech startup.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Video' },
+      { title: 'Social Media Campaign', description: 'Instagram campaign that reached 500K impressions.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Digital' },
+      { title: 'Annual Report Design', description: 'Clean, modern annual report for a public company.', imageUrl: NEUTRAL_FALLBACK_SVG, category: 'Print' },
     ],
   }
 }
@@ -1183,6 +1224,7 @@ function buildClientLogos(category?: string, seed = 0): Record<string, unknown> 
     variant: 'scroll',
     headline: 'Trusted By',
     logos: picks.map((l) => ({
+      name: l.name,
       alt: l.name,
       ...(l.url ? { url: l.url } : {}),
     })),
@@ -1255,7 +1297,7 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
         name: `Dr. ${['Aisha', 'Rahman', 'Mei Ling', 'Kumar', 'Siti', 'Jonathan'][i % 6]} ${['Tan', 'Lee', 'Wong', 'Patel', 'Ismail', 'Lim'][i % 6]}`,
         title: ['Consultant Physician', 'Senior Specialist', 'Chief Medical Officer', 'Head of Department'][i % 4],
         specialty: ['Cardiology', 'Pediatrics', 'General Practice', 'Dermatology'][i % 4],
-        image: `https://placehold.co/400x400/0ea5e9/ffffff?text=Dr.+${i + 1}`,
+        image: AVATAR_FALLBACK_SVG,
         bio: `Experienced medical professional at ${biz.name}.`,
         experience: `${10 + i} years`,
       }))
@@ -1275,7 +1317,7 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
       const items = Array.from({ length: 6 }, (_, i) => ({
         title: `${biz.name} Project ${i + 1}`,
         category: ['Branding', 'Web Design', 'Photography', 'Illustration'][i % 4],
-        image: `https://placehold.co/600x800/1e293b/ffffff?text=Portfolio+${i + 1}`,
+        image: NEUTRAL_FALLBACK_SVG,
         description: `Creative project showcasing ${biz.tagline ?? 'our craft'}.`,
       }))
       return {
@@ -1299,8 +1341,8 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
         blockType: 'before-after',
         variant: 'slider',
         headline: 'See the Transformation',
-        beforeImage: { url: 'https://placehold.co/600x400/e2e8f0/64748b?text=Before', alt: 'Before treatment', label: 'Before' },
-        afterImage: { url: 'https://placehold.co/600x400/e2e8f0/64748b?text=After', alt: 'After treatment', label: 'After' },
+        beforeImage: { url: NEUTRAL_FALLBACK_SVG, alt: 'Before treatment', label: 'Before' },
+        afterImage: { url: NEUTRAL_FALLBACK_SVG, alt: 'After treatment', label: 'After' },
       }
     default:
       return null
@@ -1578,7 +1620,7 @@ import { seededShufflePick, hashString } from './seeded-random'
  * so same-category businesses spread across different shapes instead of
  * locking to the composer's hardcoded default.
  */
-function rotateStructuralVariants(
+export function rotateStructuralVariants(
   pages: TemplatePage[],
   category: string,
   seed: number,
@@ -1599,13 +1641,24 @@ function rotateStructuralVariants(
     { blockType: 'pricing', pool: PRICING_VARIANT_BY_CATEGORY[category], salt: 'pricing' + category },
     { blockType: 'service-cards', pool: SERVICE_CARDS_VARIANT_BY_CATEGORY[category], salt: 'service-cards' + category },
   ]
+  const debug = process.env.AI_GEN_DEBUG === '1'
   for (const { blockType, pool, salt } of pools) {
     if (!pool || pool.length === 0) continue
     const picked = seededShufflePick(pool, seed ^ hashString(salt)) ?? pool[0]
+    if (debug) {
+      console.debug(`[composer] rotate block=${blockType} category=${category} variant=${picked} seed=${seed}`)
+    }
     for (const page of pages) {
       for (const block of page.layout as Array<Record<string, unknown>>) {
         if (block.blockType === blockType) {
-          block.variant = picked
+          // Guard: enforce min content for picked variant — prevents grid-4 with 3 items etc.
+          const contentFields = ['features', 'testimonials', 'items', 'plans', 'members', 'images', 'stats', 'logos']
+          let count = 0
+          for (const field of contentFields) {
+            const v = block[field]
+            if (Array.isArray(v) && v.length > count) count = v.length
+          }
+          block.variant = count > 0 ? enforceMinContent(blockType, picked, count) : picked
         }
       }
     }
@@ -1696,8 +1749,12 @@ function buildBlockFromSpec(
         ...(resolvedVariant ? { variant: resolvedVariant } : {}),
         ...(spec.overrides ?? {}),
       }
-    case 'features':
-      return { ...buildFeatures(biz, category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+    case 'features': {
+      const fb = buildFeatures(biz, category) as Record<string, unknown>
+      const fbCount = Array.isArray(fb.features) ? (fb.features as unknown[]).length : 0
+      const finalVariant = resolvedVariant ? enforceMinContent('features', resolvedVariant, fbCount) : undefined
+      return { ...fb, ...(finalVariant ? { variant: finalVariant } : {}) }
+    }
     case 'testimonials':
       return { ...buildTestimonials(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
     case 'contact':
@@ -1745,7 +1802,7 @@ function buildBlockFromSpec(
       const items = Array.from({ length: count }, (_, i) => ({
         title: `${biz.name} Project ${i + 1}`,
         category: ['Branding', 'Web Design', 'Photography', 'Illustration'][i % 4],
-        image: `https://placehold.co/600x800/1e293b/ffffff?text=Portfolio+${i + 1}`,
+        image: NEUTRAL_FALLBACK_SVG,
         description: `Creative project showcasing ${biz.tagline ?? 'our craft'}.`,
       }))
       return {
@@ -1768,7 +1825,7 @@ function buildBlockFromSpec(
         name: `Dr. ${['Aisha', 'Rahman', 'Mei Ling', 'Kumar', 'Siti', 'Jonathan'][i % 6]} ${['Tan', 'Lee', 'Wong', 'Patel', 'Ismail', 'Lim'][i % 6]}`,
         title: ['Consultant Physician', 'Senior Specialist', 'Chief Medical Officer', 'Head of Department'][i % 4],
         specialty: ['Cardiology', 'Pediatrics', 'General Practice', 'Dermatology'][i % 4],
-        image: `https://placehold.co/400x400/0ea5e9/ffffff?text=Dr.+${i + 1}`,
+        image: AVATAR_FALLBACK_SVG,
         bio: `Experienced medical professional at ${biz.name}.`,
         experience: `${10 + i} years`,
       }))
@@ -1787,11 +1844,11 @@ function buildBlockFromSpec(
       const items = Array.from({ length: count }, (_, i) => ({
         label: `Transformation ${i + 1}`,
         beforeImage: {
-          url: `https://placehold.co/600x400/e2e8f0/64748b?text=Before+${i + 1}`,
+          url: NEUTRAL_FALLBACK_SVG,
           alt: `Before ${i + 1}`,
         },
         afterImage: {
-          url: `https://placehold.co/600x400/10b981/ffffff?text=After+${i + 1}`,
+          url: NEUTRAL_FALLBACK_SVG,
           alt: `After ${i + 1}`,
         },
       }))
@@ -1811,7 +1868,7 @@ function buildBlockFromSpec(
       const items = Array.from({ length: count }, (_, i) => ({
         title: [`Inside ${biz.name}`, 'Tips & Insights', 'Latest News', 'Case Study', 'Industry Update', 'Best Practices'][i % 6]!,
         excerpt: `Stay up to date with the latest from ${biz.name}. Read our take on ${biz.tagline ?? 'the industry'}.`,
-        image: `https://placehold.co/800x500/6366f1/ffffff?text=Post+${i + 1}`,
+        image: NEUTRAL_FALLBACK_SVG,
         author: ['Editorial Team', 'Lead Writer', 'Guest Contributor'][i % 3],
         date: '2026-04-14',
         category: ['News', 'Guides', 'Stories'][i % 3],
@@ -1835,7 +1892,7 @@ function buildBlockFromSpec(
       const items = Array.from({ length: count }, (_, i) => ({
         name: `${biz.name} Item ${i + 1}`,
         price: `RM ${(25 + i * 15).toFixed(2)}`,
-        image: `https://placehold.co/400x400/e2e8f0/64748b?text=Product+${i + 1}`,
+        image: PORTRAIT_FALLBACK_SVG,
         description: `Curated product from ${biz.name}`,
         category: biz.tagline ?? 'Featured',
       }))
@@ -2074,7 +2131,19 @@ export function composeFromBlueprint(
     category: preset.category,
     tier: 'premium',
     isPremium: true,
-    theme: preset.themePreset,
+    theme: (() => {
+      const fonts = resolveFontNames(preset.themePreset.fontPairingId)
+      return {
+        ...preset.themePreset,
+        // v1.3 plan 260419-0047: textColor default từ colorMode
+        textColor: (preset.themePreset as { textColor?: string }).textColor ?? (preset.themePreset.colorMode === 'dark' ? '#fafafa' : '#111111'),
+        // A11y plan 260418-2357: guarantee focusStyle token present
+        focusStyle: preset.themePreset.focusStyle ?? DEFAULT_FOCUS_STYLE,
+        // Next-wins plan 260419-0034 phase-01: explicit font names for distinct check
+        ...(fonts.heading ? { fontHeading: fonts.heading } : {}),
+        ...(fonts.body ? { fontBody: fonts.body } : {}),
+      }
+    })(),
     pages,
   }
 }
@@ -2136,7 +2205,16 @@ export function composeTemplate(input: ComposerInput): TemplateSeed | null {
     category: input.category,
     tier: input.variant,
     isPremium: input.variant === 'premium',
-    theme: input.themePreset,
+    theme: (() => {
+      const fonts = resolveFontNames(input.themePreset.fontPairingId)
+      return {
+        ...input.themePreset,
+        textColor: (input.themePreset as { textColor?: string }).textColor ?? (input.themePreset.colorMode === 'dark' ? '#fafafa' : '#111111'),
+        focusStyle: input.themePreset.focusStyle ?? DEFAULT_FOCUS_STYLE,
+        ...(fonts.heading ? { fontHeading: fonts.heading } : {}),
+        ...(fonts.body ? { fontBody: fonts.body } : {}),
+      }
+    })(),
     pages: validatedPages,
   }
 }
