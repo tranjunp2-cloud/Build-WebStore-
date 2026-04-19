@@ -33,6 +33,7 @@ import { BlockVariants } from './collections/BlockVariants'
 import { AiGenerationRecords } from './collections/AiGenerationRecords'
 import { TemplateIssues } from './collections/TemplateIssues'
 import { ContentPacks } from './collections/ContentPacks'
+import { TemplateVersions } from './collections/TemplateVersions'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -138,6 +139,7 @@ export default buildConfig({
     AiGenerationRecords,
     TemplateIssues,
     ContentPacks,
+    TemplateVersions,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

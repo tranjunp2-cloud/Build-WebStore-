@@ -3294,6 +3294,54 @@ const MIGRATIONS = [
     name: 'categories.seed_dna_education',
     sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","class-schedule","features","contact","footer"],"recommendedBlocks":["testimonials","faq","team","stats","cta","pricing"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","cart-widget","booking-widget","gallery-masonry"],"typicalPersonalities":["modern-vibrant","calm-wellness","editorial-clean"],"minSections":6,"aiPromptHint":"Encouraging, clear, and structured tone. Highlight outcomes, expertise, and learning journey."}'::jsonb WHERE slug = 'education' AND dna IS NULL;`,
   },
+  // ── Phase 09: TemplateVersions ───────────────────────────────────────────
+  {
+    name: 'template_versions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_versions (
+      id serial PRIMARY KEY,
+      template_id integer REFERENCES templates(id) ON DELETE CASCADE,
+      version_number integer NOT NULL,
+      sections_snapshot jsonb NOT NULL DEFAULT '[]'::jsonb,
+      changelog text,
+      created_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now()
+    );`,
+  },
+  {
+    name: 'template_versions.create_index',
+    sql: `CREATE INDEX IF NOT EXISTS template_versions_template_version_idx
+      ON template_versions (template_id, version_number DESC);`,
+  },
+  // ALTER TABLE fallbacks (idempotent — in case table pre-existed without all cols)
+  {
+    name: 'template_versions.add_col_template_id',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS template_id integer REFERENCES templates(id) ON DELETE CASCADE;`,
+  },
+  {
+    name: 'template_versions.add_col_version_number',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS version_number integer;`,
+  },
+  {
+    name: 'template_versions.add_col_sections_snapshot',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS sections_snapshot jsonb NOT NULL DEFAULT '[]'::jsonb;`,
+  },
+  {
+    name: 'template_versions.add_col_changelog',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS changelog text;`,
+  },
+  {
+    name: 'template_versions.add_col_created_by_id',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS created_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_versions.add_col_updated_at',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now();`,
+  },
+  {
+    name: 'template_versions.add_col_created_at',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now();`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -3327,6 +3375,7 @@ const COLLECTION_SLUGS = [
   'ai_generation_records',
   'template_issues',
   'content_packs',
+  'template_versions',
 ];
 
 /**

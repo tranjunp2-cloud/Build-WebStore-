@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
-    MoreHorizontal, Pencil, Copy, Rocket, Clock, Archive, Layers,
+    MoreHorizontal, Pencil, Copy, Rocket, Clock, Archive, Layers, Wrench,
 } from 'lucide-react'
 import {
     DropdownMenu,
@@ -49,7 +49,12 @@ export function TemplateRowActionsMenu({ template, onRefresh }: Props) {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                    {/* Edit — stub link; full editor in Phase 09 */}
+                    {/* Edit in builder — Phase 09 */}
+                    <DropdownMenuItem asChild>
+                        <a href={`/studio/templates/${template.id}/edit`}>
+                            <Wrench size={13} className="mr-2" /> Edit in builder
+                        </a>
+                    </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                         <a href={`/admin/collections/templates/${template.id}`} target="_blank" rel="noopener noreferrer">
                             <Pencil size={13} className="mr-2" /> Edit (Payload)

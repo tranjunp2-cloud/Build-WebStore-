@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TemplateStatusPill } from './template-status-pill'
 import { QualityTab } from './quality-tab'
 import { IssuesTabEmbed } from '@/app/studio/_components/issues-tab-embed'
+import { VersionsTabEmbed } from './versions-tab-embed'
 import type { AdminTemplate } from '@/lib/admin/templates-query'
 
 type Props = {
@@ -161,7 +162,7 @@ export function TemplateDrawer({ template, onClose }: Props) {
                 </TabsContent>
 
                 <TabsContent value="versions" className="flex-1 overflow-auto mt-0">
-                    <PlaceholderTab phase={9} feature="Version history & rollback" />
+                    <VersionsTabEmbed templateId={Number(template.id)} />
                 </TabsContent>
             </Tabs>
         </div>
