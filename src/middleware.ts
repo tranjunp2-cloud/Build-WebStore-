@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { buildMaintenanceHtml } from '@/lib/maintenance'
 
 const ADMIN_PATHS = ['/admin', '/api']
+// Studio internal admin — requires super-admin role (checked below)
+const STUDIO_PATH = '/studio'
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
 
 /**
@@ -64,6 +66,34 @@ export async function middleware(req: NextRequest) {
         ) {
             return NextResponse.next()
         }
+    }
+
+    // ── Studio admin guard (/studio/*) ────────────────────────────────
+    // Edge-runtime: cannot call Payload local API. Decode JWT directly via jose.
+    // Defense-in-depth: layout.tsx also calls requireSuperAdmin() on the server.
+    if (pathname.startsWith(STUDIO_PATH)) {
+        const tokenCookie = req.cookies.get('payload-token')?.value
+        if (!tokenCookie) {
+            // Not authenticated — redirect to Payload login
+            url.pathname = '/admin'
+            return NextResponse.redirect(url)
+        }
+        try {
+            const { jwtVerify } = await import('jose')
+            const secret = new TextEncoder().encode(process.env.PAYLOAD_SECRET || '')
+            const { payload: decoded } = await jwtVerify(tokenCookie, secret)
+            // roles is an array in our Users collection
+            const roles = (decoded.roles as string[] | undefined) ?? []
+            if (!roles.includes('super-admin')) {
+                url.pathname = '/admin'
+                return NextResponse.redirect(url)
+            }
+        } catch {
+            // Invalid / expired token
+            url.pathname = '/admin'
+            return NextResponse.redirect(url)
+        }
+        return NextResponse.next()
     }
 
     // ── API and admin routes: pass through ─────────────────────────────

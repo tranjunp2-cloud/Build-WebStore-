@@ -10,8 +10,10 @@ module.exports = {
         './src/app/(editor)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/(frontend)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/(preview)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(studio)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/sites/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/templates/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/lib/admin/**/*.{js,ts,jsx,tsx}',
     ],
     theme: {
         extend: {
@@ -32,6 +34,24 @@ module.exports = {
                 heading: ['var(--font-heading, var(--font-outfit))', 'system-ui', 'sans-serif'],
             },
             colors: {
+                // Studio admin CSS-var bridge tokens (scoped via .studio-shell)
+                // These allow using Tailwind classes like bg-studio-bg, text-studio-text etc.
+                // Actual values are set in studio.css; Tailwind just wires the var() references.
+                studio: {
+                    bg: 'var(--bg)',
+                    'bg-elev': 'var(--bg-elev)',
+                    'bg-sunk': 'var(--bg-sunk)',
+                    border: 'var(--border)',
+                    'border-strong': 'var(--border-strong)',
+                    text: 'var(--text)',
+                    'text-2': 'var(--text-2)',
+                    'text-3': 'var(--text-3)',
+                    accent: 'var(--accent)',
+                    'accent-hover': 'var(--accent-hover)',
+                    success: 'var(--success)',
+                    danger: 'var(--danger)',
+                    warn: 'var(--warn)',
+                },
                 brand: {
                     50: '#f0f9ff',
                     100: '#e0f2fe',
@@ -60,6 +80,15 @@ module.exports = {
             },
             borderRadius: {
                 '4xl': '2rem',
+            },
+            spacing: {
+                // Studio density-aware spacing tokens
+                'row-h': 'var(--row-h)',
+                'studio-pad': 'var(--pad)',
+                'studio-gap': 'var(--gap)',
+                'sidebar-w': 'var(--sidebar-w)',
+                'sidebar-collapsed': 'var(--sidebar-w-collapsed)',
+                'topbar-h': 'var(--topbar-h)',
             },
             animation: {
                 'fade-in': 'fadeIn 0.5s ease-in-out',

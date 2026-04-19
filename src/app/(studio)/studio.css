@@ -1,0 +1,130 @@
+/**
+ * Studio Admin — Design Token CSS Variables
+ * Scoped to .studio-shell to avoid overriding shadcn :root globals.
+ * Density and accent are toggled via data-attributes on document.documentElement,
+ * but applied within .studio-shell scope only.
+ */
+
+/* ── Light mode defaults ──────────────────────────────────────────────── */
+.studio-shell {
+    --bg: #F8FAFC;
+    --bg-elev: #FFFFFF;
+    --bg-sunk: #F1F5F9;
+    --border: #E2E8F0;
+    --border-strong: #CBD5E1;
+    --text: #0F172A;
+    --text-2: #475569;
+    --text-3: #94A3B8;
+
+    /* Accent: blue (default) */
+    --accent: #2563EB;
+    --accent-hover: #1D4ED8;
+
+    --success: #059669;
+    --danger: #DC2626;
+    --warn: #D97706;
+
+    /* Radius */
+    --radius-sm: 4px;
+    --radius: 8px;
+    --radius-lg: 12px;
+
+    /* Spacing — default density */
+    --row-h: 48px;
+    --pad: 16px;
+    --gap: 16px;
+
+    /* Layout */
+    --sidebar-w: 232px;
+    --sidebar-w-collapsed: 64px;
+    --topbar-h: 56px;
+}
+
+/* ── Dark mode override ───────────────────────────────────────────────── */
+.dark .studio-shell {
+    --bg: #0F172A;
+    --bg-elev: #1E293B;
+    --bg-sunk: #0D1829;
+    --border: #1E293B;
+    --border-strong: #334155;
+    --text: #F1F5F9;
+    --text-2: #94A3B8;
+    --text-3: #475569;
+}
+
+/* ── Density variants ─────────────────────────────────────────────────── */
+[data-density="compact"] .studio-shell {
+    --row-h: 40px;
+    --pad: 12px;
+    --gap: 12px;
+}
+
+[data-density="spacious"] .studio-shell {
+    --row-h: 56px;
+    --pad: 20px;
+    --gap: 20px;
+}
+
+/* ── Accent variants ──────────────────────────────────────────────────── */
+[data-accent="teal"] .studio-shell {
+    --accent: #0D9488;
+    --accent-hover: #0F766E;
+}
+
+[data-accent="violet"] .studio-shell {
+    --accent: #7C3AED;
+    --accent-hover: #6D28D9;
+}
+
+[data-accent="slate"] .studio-shell {
+    --accent: #475569;
+    --accent-hover: #334155;
+}
+
+/* ── Utility classes using tokens ─────────────────────────────────────── */
+.studio-shell {
+    background-color: var(--bg);
+    color: var(--text);
+}
+
+.studio-sidebar {
+    width: var(--sidebar-w);
+    min-height: 100vh;
+    background-color: var(--bg-elev);
+    border-right: 1px solid var(--border);
+    transition: width 200ms ease;
+    flex-shrink: 0;
+}
+
+.studio-sidebar.collapsed {
+    width: var(--sidebar-w-collapsed);
+}
+
+.studio-topbar {
+    height: var(--topbar-h);
+    background-color: var(--bg-elev);
+    border-bottom: 1px solid var(--border);
+}
+
+.studio-nav-item {
+    height: var(--row-h);
+    padding: 0 var(--pad);
+    border-radius: var(--radius);
+    transition: background-color 120ms ease, color 120ms ease;
+    outline: none;
+}
+
+.studio-nav-item:hover {
+    background-color: var(--bg-sunk);
+    color: var(--text);
+}
+
+.studio-nav-item.active {
+    background-color: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.studio-nav-item:focus-visible {
+    box-shadow: 0 0 0 2px var(--accent);
+}
