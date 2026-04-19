@@ -1,14 +1,17 @@
 'use client'
 /**
  * Floating bulk action toolbar — appears bottom-right when ≥1 template selected.
- * Actions: Publish, Schedule, Archive, Delete (soft = archive).
+ * Actions: Publish, Schedule, Archive, Delete (soft = archive), Re-score.
+ * Re-score warns if >20 selected (Vercel timeout constraint).
  */
 import { useState } from 'react'
-import { Rocket, Clock, Archive, Trash2, X } from 'lucide-react'
+import { Rocket, Clock, Archive, Trash2, X, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScheduleTemplateModal } from '../../_components/modals/schedule-template-modal'
 
-type BulkActionType = 'publish' | 'archive' | 'schedule' | 'delete'
+const BULK_RESCORE_MAX = 20
+
+type BulkActionType = 'publish' | 'archive' | 'schedule' | 'delete' | 're-score'
 
 type Props = {
     count: number
@@ -23,6 +26,11 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
     const handle = async (action: BulkActionType) => {
         if (action === 'schedule') {
             setShowSchedule(true)
+            return
+        }
+        if (action === 're-score' && count > BULK_RESCORE_MAX) {
+            // Warn rather than silently cap
+            alert(`Re-score is limited to ${BULK_RESCORE_MAX} templates at a time to stay within Vercel's 60s timeout. Please deselect some templates and try again.`)
             return
         }
         setLoading(action)
@@ -98,6 +106,18 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
                 >
                     <Trash2 size={13} />
                     {loading === 'delete' ? 'Removing…' : 'Delete'}
+                </Button>
+
+                <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={loading !== null}
+                    onClick={() => handle('re-score')}
+                    className="gap-1.5"
+                    title={count > BULK_RESCORE_MAX ? `Max ${BULK_RESCORE_MAX} at a time` : 'Score selected templates'}
+                >
+                    <Star size={13} />
+                    {loading === 're-score' ? 'Scoring…' : 'Re-score'}
                 </Button>
 
                 <div className="w-px h-5 bg-border mx-1" />

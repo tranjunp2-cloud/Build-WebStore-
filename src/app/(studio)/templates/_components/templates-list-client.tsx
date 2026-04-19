@@ -126,13 +126,14 @@ export function TemplatesListClient({
 
     const handleBulkAction = useCallback(
         async (
-            action: 'publish' | 'archive' | 'schedule' | 'delete',
+            action: 'publish' | 'archive' | 'schedule' | 'delete' | 're-score',
             scheduledFor?: string,
         ) => {
             const ids = Array.from(selected)
             try {
                 const result = await bulkAction(ids, action, scheduledFor)
-                toast.success(`${result.succeeded} template(s) updated`)
+                const verb = action === 're-score' ? 'scored' : 'updated'
+                toast.success(`${result.succeeded} template(s) ${verb}`)
                 if (result.failed > 0) toast.warning(`${result.failed} failed`)
                 setSelected(new Set())
                 doFetch(filter)

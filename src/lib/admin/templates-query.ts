@@ -52,6 +52,10 @@ export type TemplatesFilter = {
     limit?: number
     /** Preset status filter applied by sub-routes (drafts/scheduled/archived/review) */
     presetStatus?: TemplateStatus
+    /** Quality filter: minimum avgScore (0–10). Client-side applied after fetch. */
+    minScore?: number
+    /** Quality filter: only show templates that pass the rubric. Client-side applied. */
+    passRubricOnly?: boolean
 }
 
 // ── Category options (reuse from collection) ──────────────────────────────────
@@ -150,15 +154,60 @@ export async function createTemplate(
     return json.data
 }
 
+// ── Quality helpers ───────────────────────────────────────────────────────────
+
+export type QualityScore = {
+    id: string | number
+    rubricVersion: string
+    avgScore: number
+    passRubric: boolean
+    scorer?: string
+    scoredAt: string
+    dimensions?: Array<{
+        name: string
+        score: number
+        weight: number
+        criteriaMet: number
+        criteriaTotal: number
+    }>
+}
+
+export async function fetchTemplateQuality(
+    id: string | number,
+): Promise<{ latest: QualityScore | null; history: QualityScore[] }> {
+    const res = await fetch(`/api/admin/templates/${id}/quality`, { cache: 'no-store' })
+    if (!res.ok) throw new Error(`Quality fetch failed: ${res.status}`)
+    const json = await res.json()
+    return json.data
+}
+
+export async function scoreTemplate(
+    id: string | number,
+    rubricVersion = 'v1.3',
+): Promise<QualityScore> {
+    const res = await fetch(`/api/admin/templates/${id}/score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rubricVersion, scorer: 'manual' }),
+    })
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(err.error ?? 'Score failed')
+    }
+    const json = await res.json()
+    return json.data
+}
+
 export async function bulkAction(
     ids: Array<string | number>,
-    action: 'publish' | 'archive' | 'schedule' | 'delete',
+    action: 'publish' | 'archive' | 'schedule' | 'delete' | 're-score',
     scheduledFor?: string,
+    rubricVersion?: string,
 ): Promise<{ succeeded: number; failed: number }> {
     const res = await fetch('/api/admin/templates/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids, action, scheduledFor }),
+        body: JSON.stringify({ ids, action, scheduledFor, rubricVersion }),
     })
     if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }))

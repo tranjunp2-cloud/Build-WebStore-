@@ -69,9 +69,11 @@ export const UpdateTemplateSchema = CreateTemplateSchema.partial()
 
 export const BulkActionSchema = z.object({
     ids: z.array(z.union([z.string(), z.number()])).min(1),
-    action: z.enum(['publish', 'archive', 'schedule', 'delete']),
+    action: z.enum(['publish', 'archive', 'schedule', 'delete', 're-score']),
     /** ISO string — only required when action=schedule */
     scheduledFor: z.string().datetime().optional(),
+    /** Rubric version — only used when action=re-score */
+    rubricVersion: z.enum(['v1', 'v1.1', 'v1.2', 'v1.3']).optional(),
 })
 
 // Simple in-memory rate limiter (MVP; per IP, per minute)
@@ -79,7 +81,7 @@ const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
 const RATE_LIMIT = 10
 const WINDOW_MS = 60_000
 
-export function checkRateLimit(key: string): boolean {
+export function checkRateLimit(key: string, limit: number = RATE_LIMIT): boolean {
     const now = Date.now()
     const entry = rateLimitStore.get(key)
 
@@ -88,7 +90,7 @@ export function checkRateLimit(key: string): boolean {
         return true
     }
 
-    if (entry.count >= RATE_LIMIT) return false
+    if (entry.count >= limit) return false
 
     entry.count++
     return true

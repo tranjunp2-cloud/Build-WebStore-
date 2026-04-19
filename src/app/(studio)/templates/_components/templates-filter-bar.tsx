@@ -129,10 +129,42 @@ export function TemplatesFilterBar({ filter, presetStatus, onFilterChange, total
                     <option value="sortOrder">Sort order</option>
                 </select>
 
+                {/* Min score */}
+                <div className="flex items-center gap-1.5">
+                    <label htmlFor="min-score-filter" className="text-xs text-muted-foreground whitespace-nowrap">
+                        Min score
+                    </label>
+                    <input
+                        id="min-score-filter"
+                        type="number"
+                        min={0}
+                        max={10}
+                        step={0.5}
+                        value={filter.minScore ?? ''}
+                        onChange={e => {
+                            const v = e.target.value
+                            onFilterChange({ minScore: v === '' ? undefined : Number(v) })
+                        }}
+                        placeholder="0–10"
+                        className="w-16 rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring"
+                    />
+                </div>
+
+                {/* Pass rubric only */}
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        checked={filter.passRubricOnly ?? false}
+                        onChange={e => onFilterChange({ passRubricOnly: e.target.checked || undefined })}
+                        className="rounded border-input"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">Pass rubric only</span>
+                </label>
+
                 {/* Active filter chips */}
-                {(filter.search || (filter.category && filter.category !== 'all') || (filter.personality && filter.personality !== 'all')) && (
+                {(filter.search || (filter.category && filter.category !== 'all') || (filter.personality && filter.personality !== 'all') || filter.minScore !== undefined || filter.passRubricOnly) && (
                     <button
-                        onClick={() => onFilterChange({ search: undefined, category: undefined, personality: undefined })}
+                        onClick={() => onFilterChange({ search: undefined, category: undefined, personality: undefined, minScore: undefined, passRubricOnly: undefined })}
                         className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                     >
                         <X size={11} /> Clear filters

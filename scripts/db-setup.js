@@ -2817,6 +2817,79 @@ const MIGRATIONS = [
   // main table and silently failed the row — user saw "Update success" toast
   // but status stayed Draft, hasUnpublishedChanges stayed true. Single bulk
   // ALTER IF NOT EXISTS covers every block that has `variant` in Pages.ts.
+  // ── Template Quality Scores (Phase 03 — Quality Integration) ────────────────
+  // Persists per-template rubric score snapshots. Each row = one scoring run.
+  // Array sub-table uses varchar id + _parent_id + _order + _uuid per convention.
+  {
+    name: 'template_quality_scores.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_quality_scores (
+      id serial PRIMARY KEY,
+      template_id integer REFERENCES templates(id) ON DELETE CASCADE,
+      rubric_version varchar NOT NULL,
+      avg_score numeric NOT NULL,
+      pass_rubric boolean DEFAULT false,
+      scorer varchar DEFAULT 'manual',
+      scored_at timestamp DEFAULT now(),
+      updated_at timestamp DEFAULT now() NOT NULL,
+      created_at timestamp DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'template_quality_scores.template_scored_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_quality_scores_template_scored_idx
+      ON template_quality_scores (template_id, scored_at DESC);`,
+  },
+  {
+    name: 'template_quality_scores_dimensions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_quality_scores_dimensions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES template_quality_scores(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar NOT NULL,
+      score numeric NOT NULL,
+      weight numeric NOT NULL,
+      criteria_met integer DEFAULT 0,
+      criteria_total integer DEFAULT 0
+    );`,
+  },
+  {
+    name: 'template_quality_scores_dimensions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_quality_scores_dimensions_parent_idx
+      ON template_quality_scores_dimensions (_parent_id);`,
+  },
+  // Idempotent ALTER TABLE fallbacks — safe if tables already created above
+  {
+    name: 'template_quality_scores.alter_template_id',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS template_id integer;`,
+  },
+  {
+    name: 'template_quality_scores.alter_rubric_version',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS rubric_version varchar;`,
+  },
+  {
+    name: 'template_quality_scores.alter_avg_score',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS avg_score numeric;`,
+  },
+  {
+    name: 'template_quality_scores.alter_pass_rubric',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS pass_rubric boolean DEFAULT false;`,
+  },
+  {
+    name: 'template_quality_scores.alter_scorer',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS scorer varchar DEFAULT 'manual';`,
+  },
+  {
+    name: 'template_quality_scores.alter_scored_at',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS scored_at timestamp DEFAULT now();`,
+  },
+
   ...[
     'hero', 'navigation', 'about', 'contact', 'footer',
     'social_widget', 'cart_widget', 'features', 'testimonials', 'gallery',
@@ -2865,6 +2938,7 @@ const COLLECTION_SLUGS = [
   'seo_meta_jobs', 'notifications', 'subscribers',
   'contact_submissions',
   'ai_usage_logs',
+  'template_quality_scores',
 ];
 
 /**

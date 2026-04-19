@@ -1,14 +1,17 @@
 'use client'
 /**
  * Table view: sortable columns, checkbox selection, row actions.
- * Columns: checkbox | name | category | status | personality | updated | usageCount | actions
+ * Columns: checkbox | name | category | status | personality | updated | usageCount | score | actions
  */
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ChevronUp, ChevronDown, ImageOff } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { TemplateStatusPill } from './template-status-pill'
 import { TemplateRowActionsMenu } from './template-row-actions-menu'
+import { ScoreBadge } from './score-badge'
 import type { AdminTemplate, TemplatesFilter } from '@/lib/admin/templates-query'
+
+type QualitySummary = { avgScore: number; passRubric: boolean }
 
 type Props = {
     templates: AdminTemplate[]
@@ -42,6 +45,35 @@ function SortIcon({ col, currentSort }: { col: SortKey; currentSort: string }) {
 
 export function TemplatesTableView({ templates, selected, onSelect, onFilterChange, loading, filter }: Props) {
     const currentSort = filter.sort ?? '-updatedAt'
+    const [qualityMap, setQualityMap] = useState<Map<string | number, QualitySummary>>(new Map())
+
+    // Fetch latest quality scores for visible templates on mount / when list changes
+    useEffect(() => {
+        if (templates.length === 0) return
+        let cancelled = false
+        const fetchAll = async () => {
+            const entries = await Promise.allSettled(
+                templates.map(async (t) => {
+                    const res = await fetch(`/api/admin/templates/${t.id}/quality`, { cache: 'no-store' })
+                    if (!res.ok) return null
+                    const json = await res.json()
+                    const latest = json?.data?.latest
+                    if (!latest) return null
+                    return { id: t.id, avgScore: latest.avgScore as number, passRubric: latest.passRubric as boolean }
+                })
+            )
+            if (cancelled) return
+            const next = new Map<string | number, QualitySummary>()
+            for (const r of entries) {
+                if (r.status === 'fulfilled' && r.value) {
+                    next.set(r.value.id, { avgScore: r.value.avgScore, passRubric: r.value.passRubric })
+                }
+            }
+            setQualityMap(next)
+        }
+        void fetchAll()
+        return () => { cancelled = true }
+    }, [templates])
     const allIds = templates.map(t => t.id)
     const allSelected = templates.length > 0 && allIds.every(id => selected.has(id))
 
@@ -102,13 +134,14 @@ export function TemplatesTableView({ templates, selected, onSelect, onFilterChan
                                 Uses <SortIcon col="usageCount" currentSort={currentSort} />
                             </button>
                         </th>
+                        <th className="px-3 py-2.5 text-right font-medium hidden lg:table-cell">Score</th>
                         <th className="w-10 px-3 py-2.5" />
                     </tr>
                 </thead>
                 <tbody className="divide-y">
                     {templates.length === 0 && !loading && (
                         <tr>
-                            <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground text-sm">
+                            <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground text-sm">
                                 No templates found.
                             </td>
                         </tr>
@@ -151,6 +184,17 @@ export function TemplatesTableView({ templates, selected, onSelect, onFilterChan
                             </td>
                             <td className="px-3 py-2.5 hidden sm:table-cell text-right text-xs text-muted-foreground">
                                 {t.usageCount ?? 0}
+                            </td>
+                            <td className="px-3 py-2.5 hidden lg:table-cell text-right">
+                                {qualityMap.has(t.id) ? (
+                                    <ScoreBadge
+                                        avgScore={qualityMap.get(t.id)!.avgScore}
+                                        pass={qualityMap.get(t.id)!.passRubric}
+                                        size="sm"
+                                    />
+                                ) : (
+                                    <span className="text-[10px] text-muted-foreground">—</span>
+                                )}
                             </td>
                             <td className="px-3 py-2.5 text-right">
                                 <TemplateRowActionsMenu template={t} onRefresh={handleRefresh} />

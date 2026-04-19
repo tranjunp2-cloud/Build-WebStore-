@@ -6,6 +6,7 @@
 import { X, ExternalLink, ImageOff } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TemplateStatusPill } from './template-status-pill'
+import { QualityTab } from './quality-tab'
 import type { AdminTemplate } from '@/lib/admin/templates-query'
 
 type Props = {
@@ -151,7 +152,7 @@ export function TemplateDrawer({ template, onClose }: Props) {
                 </TabsContent>
 
                 <TabsContent value="quality" className="flex-1 overflow-auto mt-0">
-                    <PlaceholderTab phase={3} feature="Quality scorer integration" />
+                    <QualityTab templateId={template.id} />
                 </TabsContent>
 
                 <TabsContent value="issues" className="flex-1 overflow-auto mt-0">
