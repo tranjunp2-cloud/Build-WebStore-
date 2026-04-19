@@ -1,7 +1,7 @@
 ---
 title: "BUG-F05-09: 404 page hiển thị sai — render như page bình thường"
 description: "Fix 404 page rendering: empty layout shows as blank page, missing draft:true query, no 404 content block"
-status: pending
+status: done
 priority: P1
 effort: 1.5h
 branch: fix/F05-09-404-page-rendering
