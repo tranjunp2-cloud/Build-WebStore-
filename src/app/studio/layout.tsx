@@ -1,8 +1,11 @@
 /**
  * Studio route group layout — server component.
  * Enforces super-admin RBAC via requireSuperAdmin() (defense-in-depth on top of middleware).
- * Imports studio.css for scoped design tokens.
+ * Imports globals.css for Tailwind base/utilities, then studio.css for scoped design tokens.
+ * Root layout intentionally omits globals.css (see comment in src/app/layout.tsx) so each
+ * feature route group imports it directly, avoiding the heavy font bundle in AppShell.
  */
+import '../globals.css'
 import './studio.css'
 import { requireSuperAdmin } from '@/lib/admin/auth-guard'
 import { AdminShell } from './_components/admin-shell'
