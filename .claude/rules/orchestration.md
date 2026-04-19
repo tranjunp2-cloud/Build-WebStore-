@@ -5,7 +5,7 @@ description: Subagent orchestration — context isolation, file ownership, paral
 
 # Orchestration
 
-Extends `~/.claude/rules/orchestration-protocol.md` with project-specific file-ownership patterns for Next.js + Payload + Vercel CI.
+Extends `.claude/rules/orchestration-protocol.md` (vendored from ClaudeKit engineer kit) with project-specific file-ownership patterns for Next.js + Payload + Vercel CI.
 
 ## Context isolation (mandatory)
 

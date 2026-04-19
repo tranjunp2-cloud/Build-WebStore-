@@ -5,7 +5,7 @@ description: Primary AI workflow for ech-prime-web-v2 — feature/bug/investigat
 
 # Workflow
 
-Extends `~/.claude/rules/primary-workflow.md` with project-specific flows for Next.js + Payload CMS + Vercel CI context. When this file conflicts with the global rule, this wins for ech-prime-web-v2 work.
+Extends `.claude/rules/primary-workflow.md` (vendored from ClaudeKit engineer kit) with project-specific flows for Next.js + Payload CMS + Vercel CI context. When this file conflicts with the kit rule, this wins for ech-prime-web-v2 work.
 
 ## Flows
 

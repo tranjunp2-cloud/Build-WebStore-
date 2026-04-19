@@ -22,6 +22,9 @@ Next.js 15 (App Router) + Payload CMS 3 + PostgreSQL (Neon) + Tailwind + shadcn/
 
 ## Canonical docs (`docs/`)
 
+> **Project overrides:** The table below is the authoritative doc map for ech-prime-web-v2. It **supersedes** the generic ClaudeKit defaults in `.claude/rules/documentation-management.md` (kit file — references `development-roadmap.md`, `project-changelog.md`, etc. which we consolidated). When kit and project disagree, this table wins.
+
+
 | Doc | Owner | Purpose |
 |-----|-------|---------|
 | `docs/README.md` | PM | Team hub — read first; links to everything |
