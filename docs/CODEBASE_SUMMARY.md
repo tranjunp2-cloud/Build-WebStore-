@@ -73,6 +73,8 @@ Adding a new collection requires: Payload config + migration in `scripts/db-setu
 - **Images / S3** (`src/lib/images/`, Payload plugin-cloud-storage) — upload via AWS SDK v3 to DO Spaces-compatible S3.
 - **Email** (`src/lib/email/send.ts`) — Custom utility over `payload.sendEmail()`. See `.claude/rules/email-smtp.md`.
 - **Test harness** (`scripts/test-harness/`) — E2E page-gen regression harness with Playwright visual diff.
+- **Template drift validator** (`src/lib/ai/template-drift-validator.ts`) — scans TS presets + DB templates against live block registry; CI gate + post-deploy preflight. Paired with `block-schema-version.ts` hash stamped on seed.
+- **Templates health dashboard** (`src/app/(dashboard)/templates-health/`) — super-admin page surfacing per-template drift badges + re-seed/re-harness buttons.
 
 ## Notable patterns
 

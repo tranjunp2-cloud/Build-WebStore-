@@ -16,6 +16,9 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ## [Unreleased] — Staging
 
 ### Added
+- feat(ci): auto re-seed templates + drift/harness gate on CI (plan 260419-2022)
+- feat(admin): `/dashboard/templates-health` drift dashboard (super-admin) — re-seed + harness buttons, per-template drift badges (plan 260419-2022 phase 04)
+- feat(templates): stamp `blockSchemaVersion` sha256 on seed — enables per-row staleness detection via `scanDbTemplates` (plan 260419-2022 phase 05)
 - ClaudeKit rules + docs refactor (2026-04-19): split `CLAUDE.md` 296→113 lines, created 8 `.claude/rules/*.md` (database-schema, vercel-deploy, env-vars, git-flow, testing, email-smtp, workflow, orchestration), seeded 6 canonical `docs/*.md`
 
 ### Pending

@@ -67,3 +67,29 @@ Upgrade existing v1 rule-based builder to Phase 2 with **real OpenAI GPT-4o** in
 3. **Zustand over context**: Better performance, simpler persistence for drafts, and easy to mutate array order for drag-and-drop.
 4. **Drag & Drop Reorder**: Modifies the `sortOrder` array in frontend state. Persists via PATCH to Payload CMS only when user clicks "Publish" or "Tinh chỉnh" to avoid excessive DB writes.
 5. **No CMS Config in F01**: Builder only redirects to `/admin`, leveraging Payload's existing React-based admin panel.
+
+## 5. Template Drift Detection (added 2026-04-19, plan 260419-2022)
+
+Closes the drift gap between the live `src/blocks/registry.ts` and seeded templates (`Templates` collection + TS presets in `template-definitions.ts` / `template-presets-batch*.ts`).
+
+**Flow:**
+
+```
+Block config change
+  ├─ PR CI: npm run drift:check (Vitest) — blocks PR if drift count > baseline
+  ├─ PR CI: npm run harness:gen --mode=quick — composer smoke
+  ├─ Merge staging → deploy → POST /api/templates/seed?v3=true&force=true (Bearer SEED_TOKEN)
+  │     └─ stamps row.blockSchemaVersion = sha256(registry shape) on every row
+  └─ /dashboard/templates-health — super-admin sees per-template drift badge
+```
+
+**Key components:**
+
+- `src/lib/ai/template-drift-validator.ts` — `scanTsTemplates()` + `scanDbTemplates(payload)` + `validateBlockRef()` (registry + Zod structural check; skips content constraints).
+- `src/lib/ai/block-schema-version.ts` — deterministic sha256/16-char hash of registry variants + schema keys.
+- `src/app/api/templates/seed/route.ts` — tri-auth ordering (internal key → Bearer SEED_TOKEN → admin JWT), constant-time compare, stamps schema version on seed.
+- `.github/scripts/seed-templates-post-deploy.sh` — health-gate + retry + Bearer POST, called from `ci.yml` deploy-staging + deploy-production jobs.
+
+**Seed strategy:** force replace-all (idempotent delete+insert). Rationale: no admin template editing today → zero data loss risk. Revisit when admin editing ships (PD-017 in `docs/decisions/decisions-log.md`).
+
+**Known drift baseline:** 800 pre-existing findings on main (footer@mega variant + unknown-block + hero/features drift). CI ratchets the count — blocks any PR that raises it, never blocks on baseline. Separate cleanup plan TBD.

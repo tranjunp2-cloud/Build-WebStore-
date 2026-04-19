@@ -1,13 +1,15 @@
 /**
  * Matrix builder — enumerates the cartesian product (category × variant × seed)
- * and pulls expected invariants from CATEGORY_DNA (single source of truth).
+ * and pulls expected invariants from CATEGORY_REQUIREMENTS (post Plan 2253
+ * cleanup that removed the CATEGORY_DNA constant; requirements now carries
+ * the mandatoryBlocks + minBlocks data harness needs for its guards).
  */
 
 import {
-  CATEGORY_DNA,
   TEMPLATE_PRESETS,
   TEMPLATE_DEFINITIONS,
 } from '@/lib/ai/template-definitions'
+import { CATEGORY_REQUIREMENTS } from '@/lib/ai/category-requirements'
 import type { Fixture, HarnessMode } from './types'
 
 export type BuildMatrixOpts = {
@@ -17,7 +19,7 @@ export type BuildMatrixOpts = {
   seedsPerCell?: number
 }
 
-const ALL_CATEGORIES = Object.keys(CATEGORY_DNA)
+const ALL_CATEGORIES = Object.keys(CATEGORY_REQUIREMENTS)
 const ALL_VARIANTS: Array<'starter' | 'professional' | 'premium'> = [
   'starter',
   'professional',
@@ -59,15 +61,15 @@ export function buildMatrix(opts: BuildMatrixOpts): Fixture[] {
   const fixtures: Fixture[] = []
 
   for (const category of categories) {
-    const dna = CATEGORY_DNA[category]
-    if (!dna) {
+    const req = CATEGORY_REQUIREMENTS[category]
+    if (!req) {
       console.warn(`[harness] skipping unknown category: ${category}`)
       continue
     }
 
-    const expectedSignatureBlocks = dna.signatureBlocks
-    const expectedMinBlocks = Math.max(6, dna.mandatoryHomepageOrder.length - 3)
-    const expectedMaxBlocks = Math.max(16, dna.mandatoryHomepageOrder.length + 4)
+    const expectedSignatureBlocks = req.mandatoryBlocks
+    const expectedMinBlocks = Math.max(6, req.minBlocks - 3)
+    const expectedMaxBlocks = Math.max(16, req.minBlocks + 4)
 
     // --- Blueprint path: pick all presets matching this category ---
     const presetsInCat = TEMPLATE_PRESETS

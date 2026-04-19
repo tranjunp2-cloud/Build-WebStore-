@@ -521,6 +521,7 @@ const MIGRATIONS = [
   // templates
   { name: 'templates.sort_order', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order numeric DEFAULT 0;` },
   { name: 'templates.usage_count', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS usage_count numeric DEFAULT 0;` },
+  { name: 'templates.block_schema_version', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS block_schema_version varchar(64);` },
   // templates_tags
   { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
   // ── Templates: Tags array table ──
