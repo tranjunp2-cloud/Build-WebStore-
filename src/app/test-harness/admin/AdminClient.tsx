@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import type { RubricReport, FixtureScore } from '../../../../scripts/test-harness/rubric/rubric.schema'
 
@@ -164,9 +165,9 @@ export function AdminClient({ report }: Props) {
                         Rubric {report.rubric.name} · scored {new Date(report.generatedAt).toLocaleString()}
                     </div>
                 </div>
-                <a href="/test-harness" style={{ color: '#60a5fa', fontSize: 13, textDecoration: 'none' }}>
+                <Link href="/test-harness" style={{ color: '#60a5fa', fontSize: 13, textDecoration: 'none' }}>
                     ← Back to Index
-                </a>
+                </Link>
             </header>
 
             <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>

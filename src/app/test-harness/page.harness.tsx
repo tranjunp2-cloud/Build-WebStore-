@@ -94,7 +94,7 @@ export default function HarnessIndex() {
                             {!report && <span style={{ color: '#d97706' }}> · Run <code style={{ background: '#fef3c7', padding: '0 4px' }}>npm run harness:score</code> để hiện score.</span>}
                         </p>
                     </div>
-                    <a
+                    <Link
                         href="/test-harness/admin"
                         style={{
                             background: '#7c3aed',
@@ -109,7 +109,7 @@ export default function HarnessIndex() {
                         }}
                     >
                         📊 Open Admin Dashboard →
-                    </a>
+                    </Link>
                 </div>
 
                 {/* AI-first section */}
