@@ -1,34 +1,47 @@
 'use client'
 /**
- * Filter bar: status tabs, category dropdown, personality dropdown, search input.
- * Search debounced 300ms. Status tabs show counts from totalDocs.
+ * Filter bar — bundle-matched design.
+ * Status tabs (.tabs) above, then search + selects + seg control in one row (.filters).
+ * Search debounced 300ms. Preset status locks the tab row.
  */
 import { useEffect, useRef, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, Filter, RefreshCw, LayoutList, Grid2X2, PanelRight } from 'lucide-react'
 import { CATEGORY_OPTIONS, PERSONALITY_OPTIONS } from '@/lib/admin/templates-query'
 import type { TemplatesFilter, TemplateStatus } from '@/lib/admin/templates-query'
 
 const STATUS_TABS: Array<{ id: string; label: string }> = [
-    { id: 'all', label: 'All' },
-    { id: 'live', label: 'Live' },
-    { id: 'draft', label: 'Draft' },
-    { id: 'review', label: 'In Review' },
+    { id: 'all',       label: 'All' },
+    { id: 'live',      label: 'Live' },
+    { id: 'draft',     label: 'Draft' },
+    { id: 'review',    label: 'In Review' },
     { id: 'scheduled', label: 'Scheduled' },
-    { id: 'archived', label: 'Archived' },
+    { id: 'archived',  label: 'Archived' },
 ]
+
+type ViewMode = 'table' | 'grid' | 'split'
 
 type Props = {
     filter: TemplatesFilter
     presetStatus?: TemplateStatus
     onFilterChange: (updated: Partial<TemplatesFilter>) => void
     totalDocs: number
+    view: ViewMode
+    onViewChange: (v: ViewMode) => void
+    onRefresh: () => void
 }
 
-export function TemplatesFilterBar({ filter, presetStatus, onFilterChange, totalDocs }: Props) {
+export function TemplatesFilterBar({
+    filter,
+    presetStatus,
+    onFilterChange,
+    totalDocs,
+    view,
+    onViewChange,
+    onRefresh,
+}: Props) {
     const [localSearch, setLocalSearch] = useState(filter.search ?? '')
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    // Sync external search reset
     useEffect(() => {
         setLocalSearch(filter.search ?? '')
     }, [filter.search])
@@ -44,45 +57,46 @@ export function TemplatesFilterBar({ filter, presetStatus, onFilterChange, total
     const currentStatus = filter.status ?? 'all'
 
     return (
-        <div className="flex flex-col gap-2">
-            {/* Status tabs — hidden if page has a presetStatus (sub-routes) */}
+        <div>
+            {/* Status tabs */}
             {!presetStatus && (
-                <div className="flex items-center gap-1 border-b pb-2">
+                <div className="tabs">
                     {STATUS_TABS.map(tab => (
                         <button
                             key={tab.id}
-                            onClick={() => onFilterChange({ status: tab.id === 'all' ? undefined : tab.id })}
-                            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                                currentStatus === tab.id
-                                    ? 'bg-foreground text-background'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                            }`}
+                            className={currentStatus === tab.id ? 'active' : ''}
+                            onClick={() =>
+                                onFilterChange({ status: tab.id === 'all' ? undefined : (tab.id as TemplateStatus) })
+                            }
                         >
                             {tab.label}
                             {tab.id === currentStatus && (
-                                <span className="ml-1.5 text-xs opacity-70">{totalDocs}</span>
+                                <span style={{ color: 'var(--text-3)', fontWeight: 400, marginLeft: 4 }}>
+                                    {totalDocs}
+                                </span>
                             )}
                         </button>
                     ))}
                 </div>
             )}
 
-            {/* Secondary filters row */}
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Filters row */}
+            <div className="filters">
                 {/* Search */}
-                <div className="relative flex-1 min-w-[180px] max-w-xs">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <div className="search-wrap">
+                    <Search size={14} />
                     <input
                         type="text"
-                        placeholder="Search templates…"
+                        placeholder="Search by name or tag…"
                         value={localSearch}
                         onChange={e => handleSearch(e.target.value)}
-                        className="w-full rounded-md border bg-background pl-8 pr-8 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
                     />
                     {localSearch && (
                         <button
+                            className="icon-btn"
+                            style={{ width: 18, height: 18 }}
                             onClick={() => handleSearch('')}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            aria-label="Clear search"
                         >
                             <X size={12} />
                         </button>
@@ -91,9 +105,9 @@ export function TemplatesFilterBar({ filter, presetStatus, onFilterChange, total
 
                 {/* Category */}
                 <select
+                    className="select"
                     value={filter.category ?? 'all'}
                     onChange={e => onFilterChange({ category: e.target.value })}
-                    className="rounded-md border bg-background px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
                 >
                     <option value="all">All categories</option>
                     {CATEGORY_OPTIONS.map(c => (
@@ -103,9 +117,10 @@ export function TemplatesFilterBar({ filter, presetStatus, onFilterChange, total
 
                 {/* Personality */}
                 <select
+                    className="select"
                     value={filter.personality ?? 'all'}
                     onChange={e => onFilterChange({ personality: e.target.value })}
-                    className="rounded-md border bg-background px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                    title="Personality — vibe / tone"
                 >
                     <option value="all">All personalities</option>
                     {PERSONALITY_OPTIONS.map(p => (
@@ -115,9 +130,9 @@ export function TemplatesFilterBar({ filter, presetStatus, onFilterChange, total
 
                 {/* Sort */}
                 <select
+                    className="select"
                     value={filter.sort ?? '-updatedAt'}
                     onChange={e => onFilterChange({ sort: e.target.value })}
-                    className="rounded-md border bg-background px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
                 >
                     <option value="-updatedAt">Updated (newest)</option>
                     <option value="updatedAt">Updated (oldest)</option>
@@ -129,47 +144,61 @@ export function TemplatesFilterBar({ filter, presetStatus, onFilterChange, total
                     <option value="sortOrder">Sort order</option>
                 </select>
 
-                {/* Min score */}
-                <div className="flex items-center gap-1.5">
-                    <label htmlFor="min-score-filter" className="text-xs text-muted-foreground whitespace-nowrap">
-                        Min score
-                    </label>
-                    <input
-                        id="min-score-filter"
-                        type="number"
-                        min={0}
-                        max={10}
-                        step={0.5}
-                        value={filter.minScore ?? ''}
-                        onChange={e => {
-                            const v = e.target.value
-                            onFilterChange({ minScore: v === '' ? undefined : Number(v) })
-                        }}
-                        placeholder="0–10"
-                        className="w-16 rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring"
-                    />
-                </div>
+                {/* More filters stub */}
+                <button className="btn btn-sm">
+                    <Filter size={13} /> More filters
+                </button>
 
-                {/* Pass rubric only */}
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input
-                        type="checkbox"
-                        checked={filter.passRubricOnly ?? false}
-                        onChange={e => onFilterChange({ passRubricOnly: e.target.checked || undefined })}
-                        className="rounded border-input"
-                    />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">Pass rubric only</span>
-                </label>
+                {/* Spacer */}
+                <div style={{ flex: 1 }} />
 
-                {/* Active filter chips */}
-                {(filter.search || (filter.category && filter.category !== 'all') || (filter.personality && filter.personality !== 'all') || filter.minScore !== undefined || filter.passRubricOnly) && (
+                {/* Clear active filters */}
+                {(filter.search ||
+                    (filter.category && filter.category !== 'all') ||
+                    (filter.personality && filter.personality !== 'all')) && (
                     <button
-                        onClick={() => onFilterChange({ search: undefined, category: undefined, personality: undefined, minScore: undefined, passRubricOnly: undefined })}
-                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                        className="btn btn-sm btn-ghost"
+                        onClick={() =>
+                            onFilterChange({
+                                search: undefined,
+                                category: undefined,
+                                personality: undefined,
+                            })
+                        }
                     >
-                        <X size={11} /> Clear filters
+                        <X size={12} /> Clear
                     </button>
                 )}
+
+                {/* Refresh */}
+                <button className="btn btn-sm btn-ghost" onClick={onRefresh} title="Refresh">
+                    <RefreshCw size={13} />
+                </button>
+
+                {/* View toggle — segmented control */}
+                <div className="seg">
+                    <button
+                        className={view === 'table' ? 'active' : ''}
+                        onClick={() => onViewChange('table')}
+                        title="Table view"
+                    >
+                        <LayoutList size={13} /> Table
+                    </button>
+                    <button
+                        className={view === 'grid' ? 'active' : ''}
+                        onClick={() => onViewChange('grid')}
+                        title="Grid view"
+                    >
+                        <Grid2X2 size={13} /> Grid
+                    </button>
+                    <button
+                        className={view === 'split' ? 'active' : ''}
+                        onClick={() => onViewChange('split')}
+                        title="Split view"
+                    >
+                        <PanelRight size={13} /> Split
+                    </button>
+                </div>
             </div>
         </div>
     )

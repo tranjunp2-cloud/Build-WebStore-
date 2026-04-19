@@ -2,17 +2,17 @@
 /**
  * Main client orchestrator for the Templates list page.
  * Manages: filter state ↔ URL sync, view toggle, selection, data re-fetch.
- * ≤200 LOC: sub-components handle rendering details.
+ * Visual layer matches design bundle (page-head, page-title, page-sub, btn-primary).
  */
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { LayoutList, Grid2X2, PanelRight, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Upload, Plus } from 'lucide-react'
 import { TemplatesFilterBar } from './templates-filter-bar'
 import { TemplatesTableView } from './templates-table-view'
 import { TemplatesGridView } from './templates-grid-view'
 import { TemplatesSplitView } from './templates-split-view'
+import { TemplateDrawer } from './template-drawer'
 import { BulkActionToolbar } from './bulk-action-toolbar'
 import { CreateTemplateModal } from '../../_components/modals/create-template-modal'
 import { fetchTemplates, bulkAction } from '@/lib/admin/templates-query'
@@ -58,6 +58,7 @@ export function TemplatesListClient({
     const [selected, setSelected] = useState<Set<string | number>>(new Set())
     const [loading, setLoading] = useState(false)
     const [showCreate, setShowCreate] = useState(false)
+    const [drawerId, setDrawerId] = useState<string | number | null>(null)
     const [, startTransition] = useTransition()
 
     // Persist view preference
@@ -87,7 +88,6 @@ export function TemplatesListClient({
         [pathname, router, searchParams, view],
     )
 
-    // Re-fetch when filter changes (skip initial render — initialData already loaded)
     const doFetch = useCallback(
         async (f: TemplatesFilter) => {
             setLoading(true)
@@ -150,6 +150,10 @@ export function TemplatesListClient({
         toast.success('Template created')
     }, [filter, doFetch])
 
+    const handleRefresh = useCallback(() => {
+        doFetch(filter)
+    }, [filter, doFetch])
+
     const viewProps = {
         templates: data.data,
         selected,
@@ -159,90 +163,91 @@ export function TemplatesListClient({
         filter,
     }
 
+    const liveCount = data.data.filter(t => t.status === 'live').length
+
     return (
-        <div className="flex flex-col gap-4 h-full">
+        <div className="page" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {/* Page header */}
-            <div className="flex items-center justify-between">
+            <div className="page-head">
                 <div>
-                    <h1 className="text-xl font-semibold text-foreground">{pageTitle}</h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
+                    <h1 className="page-title">{pageTitle}</h1>
+                    <p className="page-sub">
                         {data.meta.totalDocs} templates
+                        {liveCount > 0 && ` · ${liveCount} live`}
                         {presetStatus && ` · filtered by ${presetStatus}`}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    {/* View toggle */}
-                    <div className="flex items-center rounded-md border bg-background p-0.5 gap-0.5">
-                        {(
-                            [
-                                { mode: 'table' as ViewMode, Icon: LayoutList, label: 'Table' },
-                                { mode: 'grid' as ViewMode, Icon: Grid2X2, label: 'Grid' },
-                                { mode: 'split' as ViewMode, Icon: PanelRight, label: 'Split' },
-                            ] as const
-                        ).map(({ mode, Icon, label }) => (
-                            <button
-                                key={mode}
-                                title={label}
-                                onClick={() => setView(mode)}
-                                className={`p-1.5 rounded transition-colors ${
-                                    view === mode
-                                        ? 'bg-accent text-accent-foreground'
-                                        : 'text-muted-foreground hover:text-foreground'
-                                }`}
-                            >
-                                <Icon size={15} />
-                            </button>
-                        ))}
-                    </div>
-                    <Button size="sm" onClick={() => setShowCreate(true)}>
-                        <Plus size={15} className="mr-1" />
-                        New template
-                    </Button>
+                <div className="page-actions">
+                    <button className="btn btn-ghost" style={{ fontSize: 13 }}>
+                        <Upload size={14} /> Import ZIP
+                    </button>
+                    <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                        <Plus size={14} /> New template
+                    </button>
                 </div>
             </div>
 
-            {/* Filter bar */}
+            {/* Filter bar (includes status tabs + search row + view toggle) */}
             <TemplatesFilterBar
                 filter={filter}
                 presetStatus={presetStatus}
                 onFilterChange={handleFilterChange}
                 totalDocs={data.meta.totalDocs}
+                view={view}
+                onViewChange={setView}
+                onRefresh={handleRefresh}
             />
 
-            {/* Content */}
-            <div className="flex-1 min-h-0 relative">
-                {view === 'table' && <TemplatesTableView {...viewProps} />}
-                {view === 'grid' && <TemplatesGridView {...viewProps} />}
+            {/* Content area */}
+            <div style={{ flex: 1, minHeight: 0 }}>
+                {view === 'table' && (
+                    <TemplatesTableView
+                        {...viewProps}
+                        onRowClick={id => setDrawerId(prev => prev === id ? null : id)}
+                        activeId={drawerId}
+                    />
+                )}
+                {view === 'grid'  && <TemplatesGridView  {...viewProps} />}
                 {view === 'split' && <TemplatesSplitView {...viewProps} />}
             </div>
 
             {/* Pagination */}
             {data.meta.totalPages > 1 && (
-                <div className="flex items-center justify-between border-t pt-3 text-sm text-muted-foreground">
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderTop: '1px solid var(--border)',
+                        paddingTop: 12,
+                        marginTop: 12,
+                        fontSize: 13,
+                        color: 'var(--text-2)',
+                    }}
+                >
                     <span>
                         Page {data.meta.page} of {data.meta.totalPages}
                         {' · '}{data.meta.totalDocs} total
                     </span>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                            className="btn btn-sm"
                             disabled={!data.meta.hasPrevPage}
                             onClick={() => handlePageChange(data.meta.page - 1)}
                         >
                             Previous
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
+                        </button>
+                        <button
+                            className="btn btn-sm"
                             disabled={!data.meta.hasNextPage}
                             onClick={() => handlePageChange(data.meta.page + 1)}
                         >
                             Next
-                        </Button>
+                        </button>
                     </div>
                     <select
-                        className="rounded border bg-background px-2 py-1 text-sm"
+                        className="select"
+                        style={{ height: 28, fontSize: 12 }}
                         value={filter.limit ?? 50}
                         onChange={e => handleFilterChange({ limit: Number(e.target.value) })}
                     >
@@ -253,7 +258,18 @@ export function TemplatesListClient({
                 </div>
             )}
 
-            {/* Bulk toolbar */}
+            {/* Template detail drawer — overlay (table/grid views only; split handles inline) */}
+            {drawerId !== null && view !== 'split' && (() => {
+                const t = data.data.find(x => x.id === drawerId)
+                return t ? (
+                    <TemplateDrawer
+                        template={t}
+                        onClose={() => setDrawerId(null)}
+                    />
+                ) : null
+            })()}
+
+            {/* Bulk floating toolbar */}
             {selected.size > 0 && (
                 <BulkActionToolbar
                     count={selected.size}

@@ -1,22 +1,37 @@
 'use client'
 /**
- * Reusable status pill for template status values.
- * Uses STATUS_META for consistent colour/label across views.
+ * Status pill — matches bundle .badge + .b-{status} classes.
+ * Five states: live | draft | review | scheduled | archived
  */
-import { getStatusMeta } from '@/lib/admin/template-status-meta'
 
 type Props = {
     status: string | null | undefined
     className?: string
 }
 
+const STATUS_CLASS: Record<string, string> = {
+    live:      'b-live',
+    draft:     'b-draft',
+    review:    'b-review',
+    scheduled: 'b-scheduled',
+    archived:  'b-archived',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+    live:      'Live',
+    draft:     'Draft',
+    review:    'In Review',
+    scheduled: 'Scheduled',
+    archived:  'Archived',
+}
+
 export function TemplateStatusPill({ status, className = '' }: Props) {
-    const meta = getStatusMeta(status)
+    const key = status ?? 'draft'
+    const cls = STATUS_CLASS[key] ?? 'b-draft'
+    const label = STATUS_LABEL[key] ?? key
     return (
-        <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${meta.className} ${className}`}
-        >
-            {meta.label}
+        <span className={`badge ${cls} ${className}`}>
+            {label}
         </span>
     )
 }

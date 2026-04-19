@@ -1,12 +1,10 @@
 'use client'
 /**
- * Archive template confirm modal — warns this removes it from the gallery.
+ * Archive template confirm modal — bundle style confirm dialog.
+ * Warn message + confirm button (destructive).
  */
 import { useState } from 'react'
-import {
-    Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { X, Archive } from 'lucide-react'
 import { patchTemplate } from '@/lib/admin/templates-query'
 import type { AdminTemplate } from '@/lib/admin/templates-query'
 
@@ -18,7 +16,7 @@ type Props = {
 
 export function ArchiveTemplateModal({ template, onClose, onArchived }: Props) {
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const [error,   setError]   = useState<string | null>(null)
 
     const handleConfirm = async () => {
         setLoading(true)
@@ -34,29 +32,46 @@ export function ArchiveTemplateModal({ template, onClose, onArchived }: Props) {
     }
 
     return (
-        <Dialog open onOpenChange={open => !open && onClose()}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Archive template</DialogTitle>
-                    <DialogDescription>
-                        <span className="font-medium text-foreground">{template.name}</span> will be removed from
-                        the Template Gallery and hidden from users. You can restore it later.
-                    </DialogDescription>
-                </DialogHeader>
-                {error && <p className="text-sm text-destructive py-1">{error}</p>}
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose} disabled={loading}>
+        <>
+            <div className="modal-scrim" onClick={onClose} />
+            <div className="modal">
+                <div className="modal-head">
+                    <span className="modal-title">Archive template</span>
+                    <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label="Close">
+                        <X size={15} />
+                    </button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="warn-banner" style={{
+                        background: 'rgba(220,38,38,0.06)',
+                        border: '1px solid rgba(220,38,38,0.2)',
+                        color: 'var(--danger)',
+                    }}>
+                        ⚠ <strong>{template.name}</strong> will be removed from the Template Gallery
+                        and hidden from all users. You can restore it later by changing status back to draft.
+                    </div>
+
+                    {error && (
+                        <p style={{ color: 'var(--danger)', fontSize: 13, margin: '8px 0 0' }}>{error}</p>
+                    )}
+                </div>
+
+                <div className="modal-foot">
+                    <button className="btn btn-ghost" onClick={onClose} disabled={loading}>
                         Cancel
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        onClick={handleConfirm}
+                    </button>
+                    <button
+                        className="btn"
+                        style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}
+                        onClick={() => void handleConfirm()}
                         disabled={loading}
                     >
+                        <Archive size={13} />
                         {loading ? 'Archiving…' : 'Archive template'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    </button>
+                </div>
+            </div>
+        </>
     )
 }

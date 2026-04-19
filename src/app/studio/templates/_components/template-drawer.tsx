@@ -1,10 +1,14 @@
 'use client'
 /**
- * Template detail drawer — tabs: Overview | Quality (Phase 03) | Issues (Phase 06) | Versions (Phase 09)
- * Opens on right side in split view. Lightweight: data already fetched in list row.
+ * Template detail drawer — matches bundle .drawer design.
+ * Tabs: Overview | Quality | Issues | Versions | History
+ *
+ * Two modes:
+ *   - overlay (default): fixed right panel + scrim, triggered from table/grid view
+ *   - inline: rendered as .card inside split view, no scrim/fixed positioning
  */
-import { X, ExternalLink, ImageOff } from 'lucide-react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useState } from 'react'
+import { X, ExternalLink, Rocket, Copy } from 'lucide-react'
 import { TemplateStatusPill } from './template-status-pill'
 import { QualityTab } from './quality-tab'
 import { IssuesTabEmbed } from '@/app/studio/_components/issues-tab-embed'
@@ -14,157 +18,212 @@ import type { AdminTemplate } from '@/lib/admin/templates-query'
 type Props = {
     template: AdminTemplate
     onClose: () => void
+    /** When true: renders as card (no fixed overlay, no scrim) */
+    inline?: boolean
+    onPublish?: () => void
 }
 
-function PlaceholderTab({ phase, feature }: { phase: number; feature: string }) {
-    return (
-        <div className="flex flex-col items-center justify-center h-48 text-center gap-2">
-            <p className="text-sm font-medium text-muted-foreground">{feature}</p>
-            <p className="text-xs text-muted-foreground">Available in Phase {phase}</p>
-        </div>
-    )
-}
+const TABS = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'quality',  label: 'Quality' },
+    { id: 'issues',   label: 'Issues' },
+    { id: 'versions', label: 'Versions' },
+    { id: 'history',  label: 'History' },
+] as const
 
-export function TemplateDrawer({ template, onClose }: Props) {
+type TabId = (typeof TABS)[number]['id']
+
+export function TemplateDrawer({ template, onClose, inline = false, onPublish }: Props) {
+    const [tab, setTab] = useState<TabId>('overview')
+
     const categoryList = Array.isArray(template.category)
         ? template.category.join(', ')
         : (template.category ?? '—')
 
     const tagList = template.tags?.map(t => t.tag).filter(Boolean) ?? []
 
-    return (
-        <div className="flex flex-col h-full bg-background border-l overflow-hidden">
-            {/* Header */}
-            <div className="flex items-start justify-between gap-2 p-4 border-b">
-                <div className="min-w-0">
-                    <h2 className="font-semibold text-sm truncate">{template.name}</h2>
-                    <div className="flex items-center gap-2 mt-1">
-                        <TemplateStatusPill status={template.status} />
-                        {template.isPremium && (
-                            <span className="text-xs text-amber-600 font-medium">Premium</span>
-                        )}
-                    </div>
+    const head = (
+        <div className="drawer-head">
+            <div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                    TEMPLATE
                 </div>
-                <button
-                    onClick={onClose}
-                    className="p-1 rounded hover:bg-muted text-muted-foreground flex-shrink-0"
-                    aria-label="Close drawer"
-                >
-                    <X size={16} />
+                <div className="drawer-title">
+                    {template.name}
+                </div>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <TemplateStatusPill status={template.status} />
+                <button className="icon-btn" onClick={onClose} aria-label="Close drawer">
+                    <X size={15} />
                 </button>
             </div>
+        </div>
+    )
 
-            {/* Thumbnail */}
-            <div className="aspect-[16/10] bg-muted border-b flex-shrink-0">
-                {template.thumbnail?.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                        src={template.thumbnail.url}
-                        alt={template.name}
-                        className="w-full h-full object-cover"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                        <ImageOff size={24} className="text-muted-foreground" />
+    const tabNav = (
+        <div className="drawer-tabs">
+            {TABS.map(t => (
+                <button
+                    key={t.id}
+                    className={`drawer-tab${tab === t.id ? ' active' : ''}`}
+                    onClick={() => setTab(t.id)}
+                >
+                    {t.label}
+                </button>
+            ))}
+        </div>
+    )
+
+    const body = (
+        <div className="drawer-body scroll-thin">
+            {/* Overview */}
+            {tab === 'overview' && (
+                <>
+                    {/* Thumbnail */}
+                    {template.thumbnail?.url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={template.thumbnail.url}
+                            alt={template.name}
+                            style={{ width: '100%', aspectRatio: '16/10', objectFit: 'cover', borderRadius: 'var(--radius)', marginBottom: 16 }}
+                        />
+                    ) : (
+                        <div className="ph ph-thumb" style={{ marginBottom: 16 }}>
+                            <span>
+                                {template.name}
+                                <small>live preview · view-only</small>
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Meta grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, fontSize: 12 }}>
+                        {[
+                            { label: 'Status',   value: <TemplateStatusPill status={template.status} /> },
+                            { label: 'Category', value: categoryList },
+                            { label: 'Uses',     value: (template.usageCount ?? 0).toLocaleString() },
+                            { label: 'Created',  value: new Date(template.createdAt).toLocaleDateString() },
+                            { label: 'Updated',  value: new Date(template.updatedAt).toLocaleDateString() },
+                            { label: 'Featured', value: template.isFeatured ? 'Yes' : 'No' },
+                        ].map(({ label, value }) => (
+                            <div key={label}>
+                                <div className="muted" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>
+                                    {label}
+                                </div>
+                                <div>{value}</div>
+                            </div>
+                        ))}
                     </div>
-                )}
-            </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0">
-                <TabsList className="mx-4 mt-3 h-8 justify-start gap-1 bg-transparent p-0 border-b rounded-none w-auto">
-                    {['overview', 'quality', 'issues', 'versions'].map(t => (
-                        <TabsTrigger
-                            key={t}
-                            value={t}
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent px-2 pb-2 text-xs capitalize"
-                        >
-                            {t}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
+                    {/* Description */}
+                    {template.description && (
+                        <div className="field">
+                            <label>Description</label>
+                            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: 'var(--text)' }}>
+                                {template.description}
+                            </p>
+                        </div>
+                    )}
 
-                {/* Overview */}
-                <TabsContent value="overview" className="flex-1 overflow-auto p-4 mt-0">
-                    <dl className="space-y-3 text-sm">
-                        {template.description && (
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Description</dt>
-                                <dd className="text-sm leading-relaxed">{template.description}</dd>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Category</dt>
-                                <dd>{categoryList}</dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Personality</dt>
-                                <dd>{template.personality ?? '—'}</dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Usage count</dt>
-                                <dd>{template.usageCount ?? 0}</dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Featured</dt>
-                                <dd>{template.isFeatured ? 'Yes' : 'No'}</dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Created</dt>
-                                <dd>{new Date(template.createdAt).toLocaleDateString()}</dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Updated</dt>
-                                <dd>{new Date(template.updatedAt).toLocaleDateString()}</dd>
+                    {/* Scheduled for */}
+                    {template.scheduledFor && (
+                        <div className="field">
+                            <label>Scheduled for</label>
+                            <p style={{ margin: 0, fontSize: 13 }}>
+                                {new Date(template.scheduledFor).toLocaleString()}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Tags */}
+                    {tagList.length > 0 && (
+                        <div className="field">
+                            <label>Tags</label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                {tagList.map(tag => (
+                                    <span key={tag} className="chip">#{tag}</span>
+                                ))}
                             </div>
                         </div>
-                        {template.scheduledFor && (
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Scheduled for</dt>
-                                <dd>{new Date(template.scheduledFor).toLocaleString()}</dd>
-                            </div>
-                        )}
-                        {tagList.length > 0 && (
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-1">Tags</dt>
-                                <dd className="flex flex-wrap gap-1">
-                                    {tagList.map(tag => (
-                                        <span key={tag} className="px-2 py-0.5 bg-muted rounded-full text-xs">{tag}</span>
-                                    ))}
-                                </dd>
-                            </div>
-                        )}
-                        {template.previewUrl && (
-                            <div>
-                                <dt className="text-xs text-muted-foreground font-medium mb-0.5">Preview URL</dt>
-                                <dd>
-                                    <a
-                                        href={template.previewUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-primary text-xs flex items-center gap-1 hover:underline"
-                                    >
-                                        Open preview <ExternalLink size={11} />
-                                    </a>
-                                </dd>
-                            </div>
-                        )}
-                    </dl>
-                </TabsContent>
+                    )}
 
-                <TabsContent value="quality" className="flex-1 overflow-auto mt-0">
-                    <QualityTab templateId={template.id} />
-                </TabsContent>
+                    {/* Preview URL */}
+                    {template.previewUrl && (
+                        <div className="field">
+                            <label>Preview URL</label>
+                            <a
+                                href={template.previewUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--accent)', fontSize: 12 }}
+                            >
+                                Open preview <ExternalLink size={11} />
+                            </a>
+                        </div>
+                    )}
+                </>
+            )}
 
-                <TabsContent value="issues" className="flex-1 overflow-auto mt-0">
-                    <IssuesTabEmbed relatedType="template" relatedId={String(template.id)} />
-                </TabsContent>
+            {tab === 'quality' && (
+                <QualityTab templateId={template.id} />
+            )}
 
-                <TabsContent value="versions" className="flex-1 overflow-auto mt-0">
-                    <VersionsTabEmbed templateId={Number(template.id)} />
-                </TabsContent>
-            </Tabs>
+            {tab === 'issues' && (
+                <IssuesTabEmbed relatedType="template" relatedId={String(template.id)} />
+            )}
+
+            {tab === 'versions' && (
+                <VersionsTabEmbed templateId={Number(template.id)} />
+            )}
+
+            {tab === 'history' && (
+                <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '24px 0', textAlign: 'center' }}>
+                    Version history coming soon.
+                </div>
+            )}
         </div>
+    )
+
+    const foot = (
+        <div className="drawer-foot">
+            <button className="btn btn-ghost" style={{ marginRight: 'auto' }}>
+                <X size={13} /> Delete
+            </button>
+            <button className="btn" onClick={onClose}>Close</button>
+            <button className="btn">
+                <Copy size={13} /> Clone
+            </button>
+            {template.status !== 'live' && (
+                <button className="btn btn-primary" onClick={onPublish}>
+                    <Rocket size={13} /> Publish
+                </button>
+            )}
+        </div>
+    )
+
+    /* ── Inline mode (split view card) ─────────────────────── */
+    if (inline) {
+        return (
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {head}
+                {tabNav}
+                {body}
+                {foot}
+            </div>
+        )
+    }
+
+    /* ── Overlay mode (fixed right drawer + scrim) ──────────── */
+    return (
+        <>
+            <div className="drawer-scrim" onClick={onClose} />
+            <div className="drawer">
+                {head}
+                {tabNav}
+                {body}
+                {foot}
+            </div>
+        </>
     )
 }

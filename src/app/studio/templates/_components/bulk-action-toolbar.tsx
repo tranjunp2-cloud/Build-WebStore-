@@ -1,12 +1,12 @@
 'use client'
 /**
- * Floating bulk action toolbar — appears bottom-right when ≥1 template selected.
- * Actions: Publish, Schedule, Archive, Delete (soft = archive), Re-score.
- * Re-score warns if >20 selected (Vercel timeout constraint).
+ * Bulk action toolbar — bundle Variant B: floating bottom pill.
+ * Appears (slides up) when ≥1 template selected.
+ * Actions: Publish | Schedule | Archive | Delete | Re-score | Clear
+ * Re-score warns if >20 selected (Vercel 60s timeout constraint).
  */
 import { useState } from 'react'
 import { Rocket, Clock, Archive, Trash2, X, Star } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { ScheduleTemplateModal } from '../../_components/modals/schedule-template-modal'
 
 const BULK_RESCORE_MAX = 20
@@ -24,110 +24,84 @@ export function BulkActionToolbar({ count, onAction, onClear }: Props) {
     const [showSchedule, setShowSchedule] = useState(false)
 
     const handle = async (action: BulkActionType) => {
-        if (action === 'schedule') {
-            setShowSchedule(true)
-            return
-        }
+        if (action === 'schedule') { setShowSchedule(true); return }
         if (action === 're-score' && count > BULK_RESCORE_MAX) {
-            // Warn rather than silently cap
-            alert(`Re-score is limited to ${BULK_RESCORE_MAX} templates at a time to stay within Vercel's 60s timeout. Please deselect some templates and try again.`)
+            alert(`Re-score is limited to ${BULK_RESCORE_MAX} templates at a time to stay within Vercel's 60s timeout. Deselect some and try again.`)
             return
         }
         setLoading(action)
-        try {
-            await onAction(action)
-        } finally {
-            setLoading(null)
-        }
+        try { await onAction(action) } finally { setLoading(null) }
     }
 
     const handleScheduleConfirm = async (scheduledFor: string) => {
         setShowSchedule(false)
         setLoading('schedule')
-        try {
-            await onAction('schedule', scheduledFor)
-        } finally {
-            setLoading(null)
-        }
+        try { await onAction('schedule', scheduledFor) } finally { setLoading(null) }
     }
+
+    const busy = loading !== null
 
     return (
         <>
-            <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl border bg-background shadow-xl px-4 py-3 animate-in slide-in-from-bottom-4">
-                {/* Count pill */}
-                <span className="text-sm font-medium text-foreground mr-1">
-                    <span className="inline-flex items-center justify-center bg-primary text-primary-foreground rounded-full w-5 h-5 text-xs font-bold mr-1.5">
-                        {count}
-                    </span>
-                    selected
-                </span>
+            {/* Floating pill — always rendered, slide controlled by .active class */}
+            <div className={`bulk-floating${count > 0 ? ' active' : ''}`}>
+                <span className="count">{count}</span>
+                <span style={{ color: 'var(--text-3)' }}>selected</span>
 
-                <div className="w-px h-5 bg-border mx-1" />
+                <div className="divider" />
 
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={loading !== null}
+                <button
+                    className="btn-float"
+                    disabled={busy}
                     onClick={() => handle('publish')}
-                    className="gap-1.5"
                 >
                     <Rocket size={13} />
                     {loading === 'publish' ? 'Publishing…' : 'Publish'}
-                </Button>
+                </button>
 
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={loading !== null}
+                <button
+                    className="btn-float"
+                    disabled={busy}
                     onClick={() => handle('schedule')}
-                    className="gap-1.5"
                 >
-                    <Clock size={13} />
-                    Schedule
-                </Button>
+                    <Clock size={13} /> Schedule
+                </button>
 
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={loading !== null}
+                <button
+                    className="btn-float"
+                    disabled={busy}
                     onClick={() => handle('archive')}
-                    className="gap-1.5"
                 >
                     <Archive size={13} />
                     {loading === 'archive' ? 'Archiving…' : 'Archive'}
-                </Button>
+                </button>
 
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={loading !== null}
-                    onClick={() => handle('delete')}
-                    className="gap-1.5 text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5"
-                >
-                    <Trash2 size={13} />
-                    {loading === 'delete' ? 'Removing…' : 'Delete'}
-                </Button>
-
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={loading !== null}
+                <button
+                    className="btn-float"
+                    disabled={busy}
                     onClick={() => handle('re-score')}
-                    className="gap-1.5"
-                    title={count > BULK_RESCORE_MAX ? `Max ${BULK_RESCORE_MAX} at a time` : 'Score selected templates'}
+                    title={count > BULK_RESCORE_MAX ? `Max ${BULK_RESCORE_MAX} at a time` : 'Score selected'}
                 >
                     <Star size={13} />
                     {loading === 're-score' ? 'Scoring…' : 'Re-score'}
-                </Button>
+                </button>
 
-                <div className="w-px h-5 bg-border mx-1" />
+                <div className="divider" />
 
                 <button
+                    className="btn-float btn-danger"
+                    disabled={busy}
+                    onClick={() => handle('delete')}
+                >
+                    <Trash2 size={13} />
+                </button>
+
+                <button
+                    className="btn-float"
                     onClick={onClear}
-                    className="p-1 rounded hover:bg-muted text-muted-foreground"
                     aria-label="Clear selection"
                 >
-                    <X size={14} />
+                    <X size={13} />
                 </button>
             </div>
 
