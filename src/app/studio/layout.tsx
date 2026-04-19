@@ -1,13 +1,13 @@
 /**
  * Studio route group layout — server component.
  * Enforces super-admin RBAC via requireSuperAdmin() (defense-in-depth on top of middleware).
+ * Fetches sidebar badge counts in parallel with auth check.
  * Imports globals.css for Tailwind base/utilities, then studio.css for scoped design tokens.
- * Root layout intentionally omits globals.css (see comment in src/app/layout.tsx) so each
- * feature route group imports it directly, avoiding the heavy font bundle in AppShell.
  */
 import '../globals.css'
 import './studio.css'
 import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { fetchSidebarCounts } from './_components/sidebar-counts'
 import { AdminShell } from './_components/admin-shell'
 
 export const metadata = {
@@ -23,7 +23,10 @@ export default async function StudioLayout({
 }: {
     children: React.ReactNode
 }) {
-    const { user } = await requireSuperAdmin()
+    const [{ user }, counts] = await Promise.all([
+        requireSuperAdmin(),
+        fetchSidebarCounts(),
+    ])
 
-    return <AdminShell user={user}>{children}</AdminShell>
+    return <AdminShell user={user} counts={counts}>{children}</AdminShell>
 }

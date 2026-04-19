@@ -2,30 +2,39 @@
 
 /**
  * AdminShell — client-side wrapper combining Sidebar + Topbar + Toaster.
- * Receives server-fetched user from the layout server component.
- * CSS tokens are scoped via .studio-shell to avoid shadcn :root conflicts.
+ * Receives server-fetched user + counts from the layout server component.
+ *
+ * .studio-shell applies CSS grid: sidebar-w | 1fr, with sidebar-collapsed variant.
+ * The sidebar-collapsed class is driven by sidebarCollapsed state from useStudioPreferences.
  */
 import { Toaster } from 'sonner'
 import { AdminSidebar } from './admin-sidebar'
 import { AdminTopbar } from './admin-topbar'
+import { useStudioPreferences } from './theme-density-accent-switcher'
 import type { AdminUser } from '@/lib/admin/auth-guard'
+import type { SidebarCounts } from './sidebar-counts'
 
 export function AdminShell({
     user,
+    counts,
     children,
 }: {
     user: AdminUser
+    counts: SidebarCounts
     children: React.ReactNode
 }) {
-    return (
-        <div className="studio-shell flex min-h-screen">
-            <AdminSidebar />
+    const { sidebarCollapsed } = useStudioPreferences()
 
-            <div className="flex flex-col flex-1 min-w-0">
+    return (
+        <div className={`studio-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+            <AdminSidebar user={user} counts={counts} />
+
+            <div className="studio-main-col">
                 <AdminTopbar user={user} />
 
                 <main
-                    className="flex-1 overflow-auto p-[var(--pad)]"
+                    className="flex-1 overflow-auto"
+                    style={{ padding: 'var(--pad)' }}
                     id="studio-main"
                     tabIndex={-1}
                 >

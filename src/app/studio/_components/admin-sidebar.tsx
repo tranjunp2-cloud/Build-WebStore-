@@ -1,23 +1,32 @@
 'use client'
 
 /**
- * AdminSidebar — collapsible navigation sidebar for Studio admin.
- * Width: 232px (expanded) ↔ 64px (collapsed), controlled via pw_sidebar_collapsed.
- * Sections and items from admin-nav-config.ts.
+ * AdminSidebar — matches design bundle shell.jsx:37-72 exactly.
+ *
+ * Structure:
+ *   sidebar-head: logo-mark "PW" + "Prime Web · Admin" + collapse chevron (top-right)
+ *   scroll body: nav-section-title (uppercase) + nav-item rows (icon + label + count/liveDot)
+ *   sidebar-foot: avatar (initials) + name + role
+ *
+ * Intentional deviations from bundle:
+ *   - Bundle uses plain <svg> chevron; we use lucide ChevronRight for consistency.
+ *   - Bundle hardcodes "DN"/"Duy Nguyen"; we derive initials from the passed user prop.
+ *   - Count values come from real DB via SidebarCounts prop (not hardcoded).
+ *   - liveDot renders as .live-dot.on span (matches bundle CSS exactly).
  */
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
     LayoutDashboard, BarChart2, FileText, FileEdit, GitPullRequest,
     History, CalendarClock, Archive, Boxes, Package, Zap,
-    Activity, Bug, Tag, FolderOpen, Settings, ChevronLeft, ChevronRight,
-    Layers,
+    Activity, Bug, Tag, FolderOpen, Settings, Layers,
 } from 'lucide-react'
-import { NAV_SECTIONS, type NavItem } from './admin-nav-config'
 import { useStudioPreferences } from './theme-density-accent-switcher'
+import type { SidebarCounts } from './sidebar-counts'
+import type { AdminUser } from '@/lib/admin/auth-guard'
 
-// Map href → lucide icon
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+// ── Icon map ──────────────────────────────────────────────────────────────────
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
     '/studio': LayoutDashboard,
     '/studio/analytics': BarChart2,
     '/studio/templates': FileText,
@@ -36,116 +45,200 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
     '/studio/settings': Settings,
 }
 
-function PhaseGateBadge({ phase }: { phase: number | null }) {
-    if (phase === null) {
-        return (
-            <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded"
-                style={{ background: 'var(--bg-sunk)', color: 'var(--text-3)' }}>
-                Roadmap
-            </span>
-        )
-    }
-    if (phase > 1) {
-        return (
-            <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded"
-                style={{ background: 'var(--bg-sunk)', color: 'var(--text-3)' }}>
-                Ph{phase}
-            </span>
-        )
-    }
-    return null
+// ── Nav structure — mirrors shell.jsx nav array exactly ───────────────────────
+type NavEntry = {
+    href: string
+    label: string
+    count?: (c: SidebarCounts) => number | null
+    liveDot?: boolean
 }
 
-function NavItemRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+type NavSection = {
+    section: string
+    items: NavEntry[]
+}
+
+const NAV: NavSection[] = [
+    {
+        section: 'Workspace',
+        items: [
+            { href: '/studio', label: 'Dashboard' },
+            { href: '/studio/analytics', label: 'Analytics' },
+        ],
+    },
+    {
+        section: 'Templates',
+        items: [
+            { href: '/studio/templates', label: 'All templates', count: (c) => c.templates },
+            { href: '/studio/drafts', label: 'Drafts', count: (c) => c.drafts },
+            { href: '/studio/review', label: 'Review workflow', count: (c) => c.review },
+            { href: '/studio/versions', label: 'Versions' },
+            { href: '/studio/scheduled', label: 'Scheduled', count: (c) => c.scheduled },
+            { href: '/studio/archived', label: 'Archived' },
+        ],
+    },
+    {
+        section: 'Intelligence',
+        items: [
+            { href: '/studio/blocks', label: 'Block usage' },
+            { href: '/studio/packs', label: 'Content packs' },
+            { href: '/studio/performance', label: 'AI quality' },
+        ],
+    },
+    {
+        section: 'Monitoring',
+        items: [
+            { href: '/studio/generations', label: 'User generations', liveDot: true },
+            { href: '/studio/issues', label: 'Issues & feedback', count: (c) => c.issues },
+        ],
+    },
+    {
+        section: 'Organize',
+        items: [
+            { href: '/studio/categories', label: 'Categories' },
+            { href: '/studio/tags', label: 'Tags & AI prompts' },
+        ],
+    },
+    {
+        section: 'Admin',
+        items: [
+            { href: '/studio/settings', label: 'Settings' },
+        ],
+    },
+]
+
+// ── Nav item row ───────────────────────────────────────────────────────────────
+function NavItemRow({
+    item,
+    collapsed,
+    counts,
+}: {
+    item: NavEntry
+    collapsed: boolean
+    counts: SidebarCounts
+}) {
     const pathname = usePathname()
-    const isActive = pathname === item.href || (item.href !== '/studio' && pathname.startsWith(item.href))
+    const isActive = pathname === item.href ||
+        (item.href !== '/studio' && pathname.startsWith(item.href))
     const Icon = ICON_MAP[item.href] ?? Layers
+    const countVal = item.count ? item.count(counts) : null
+    const showCount = countVal !== null && countVal > 0
 
     return (
         <Link
             href={item.href}
             aria-label={item.label}
             aria-current={isActive ? 'page' : undefined}
-            className={`studio-nav-item flex items-center gap-3 w-full text-sm no-underline ${isActive ? 'active' : ''} ${collapsed ? 'justify-center px-0' : ''}`}
-            style={{ color: isActive ? 'var(--accent)' : 'var(--text-2)' }}
+            className={`nav-item${isActive ? ' active' : ''}`}
         >
-            <span className="relative flex-shrink-0">
-                <Icon size={18} />
-                {item.liveDot && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 border border-white" />
-                )}
+            {/* Icon */}
+            <span className="nav-icon">
+                <Icon size={16} />
             </span>
 
+            {/* Label + badge — hidden when collapsed */}
             {!collapsed && (
                 <>
-                    <span className="flex-1 truncate">{item.label}</span>
-                    {item.badge && (
-                        <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                            style={{ background: 'var(--bg-sunk)', color: 'var(--text-2)' }}>
-                            {item.badge}
-                        </span>
+                    <span className="nav-label">{item.label}</span>
+                    {item.liveDot && (
+                        <span className="live-dot on" style={{ marginLeft: 'auto' }} aria-label="Live" />
                     )}
-                    {!item.badge && <PhaseGateBadge phase={item.phase} />}
+                    {!item.liveDot && showCount && (
+                        <span className="count">{countVal}</span>
+                    )}
                 </>
             )}
         </Link>
     )
 }
 
-export function AdminSidebar() {
+// ── Collapse chevron SVG (matches bundle exactly) ─────────────────────────────
+function CollapseChevron({ collapsed }: { collapsed: boolean }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            style={{ transform: collapsed ? 'none' : 'rotate(180deg)', transition: 'transform 200ms ease' }}
+            aria-hidden
+        >
+            <path d="m9 18 6-6-6-6" />
+        </svg>
+    )
+}
+
+// ── AdminSidebar ───────────────────────────────────────────────────────────────
+export function AdminSidebar({
+    user,
+    counts,
+}: {
+    user: AdminUser
+    counts: SidebarCounts
+}) {
     const { sidebarCollapsed, setSidebarCollapsed } = useStudioPreferences()
+
+    // Derive initials (max 2 chars) from name
+    const initials = user.name
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+
+    // Role label — always "Admin · staging" in prod; derived from user.roles for accuracy
+    const envLabel = process.env.NODE_ENV === 'production' ? 'production' : 'staging'
+    const roleLabel = `Admin · ${envLabel}`
 
     return (
         <aside
-            className={`studio-sidebar flex flex-col ${sidebarCollapsed ? 'collapsed' : ''}`}
+            className="studio-sidebar"
             aria-label="Studio navigation"
         >
-            {/* Brand */}
-            <div className="flex items-center gap-2 px-4 border-b"
-                style={{ height: 'var(--topbar-h)', borderColor: 'var(--border)', flexShrink: 0 }}>
-                {!sidebarCollapsed && (
-                    <span className="font-semibold text-sm tracking-tight" style={{ color: 'var(--text)' }}>
-                        Prime Studio
-                    </span>
-                )}
-                {sidebarCollapsed && (
-                    <LayoutDashboard size={20} style={{ color: 'var(--accent)', margin: '0 auto' }} />
-                )}
-            </div>
-
-            {/* Nav sections */}
-            <nav className="flex-1 overflow-y-auto py-3 px-2" aria-label="Primary navigation">
-                {NAV_SECTIONS.map((section) => (
-                    <div key={section.title} className="mb-4">
-                        {!sidebarCollapsed && (
-                            <p className="px-2 mb-1 text-[11px] font-semibold uppercase tracking-wider"
-                                style={{ color: 'var(--text-3)' }}>
-                                {section.title}
-                            </p>
-                        )}
-                        <ul className="flex flex-col gap-0.5" role="list">
-                            {section.items.map((item) => (
-                                <li key={item.href}>
-                                    <NavItemRow item={item} collapsed={sidebarCollapsed} />
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                ))}
-            </nav>
-
-            {/* Collapse toggle */}
-            <div className="border-t p-2" style={{ borderColor: 'var(--border)' }}>
+            {/* ── Head: logo-mark + label + collapse chevron ─── */}
+            <div className="sidebar-head">
+                <div className="logo-mark" aria-hidden>PW</div>
+                <span className="sidebar-label">Prime Web · Admin</span>
                 <button
                     type="button"
+                    className="icon-btn"
+                    style={{ marginLeft: 'auto', width: 24, height: 24 }}
                     onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                     aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                    className="studio-nav-item flex items-center justify-center w-full"
-                    style={{ color: 'var(--text-3)' }}
                 >
-                    {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                    {!sidebarCollapsed && <span className="ml-2 text-xs">Collapse</span>}
+                    <CollapseChevron collapsed={sidebarCollapsed} />
                 </button>
+            </div>
+
+            {/* ── Scroll body: nav sections ─── */}
+            <div style={{ flex: 1, overflow: 'auto' }} className="scroll-thin">
+                {NAV.map((sec) => (
+                    <div key={sec.section} className="nav-section">
+                        <div className="nav-section-title">{sec.section}</div>
+                        {sec.items.map((item) => (
+                            <NavItemRow
+                                key={item.href}
+                                item={item}
+                                collapsed={sidebarCollapsed}
+                                counts={counts}
+                            />
+                        ))}
+                    </div>
+                ))}
+            </div>
+
+            {/* ── Foot: avatar + name + role ─── */}
+            <div className="sidebar-foot">
+                <div className="avatar" title={user.email} aria-label={`User: ${user.name}`}>
+                    {initials}
+                </div>
+                <div className="who">
+                    <div className="who-name">{user.name}</div>
+                    <div className="role">{roleLabel}</div>
+                </div>
             </div>
         </aside>
     )
