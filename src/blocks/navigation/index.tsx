@@ -371,9 +371,10 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
     // ── Default: simple ──────────────────────────────────────────────────
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            aria-label={mergedBlock.ariaLabel || 'Main navigation'}
             className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
             style={{
                 borderBottom: NAV_SURFACE_BORDER,
@@ -443,9 +444,10 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
 
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            aria-label={mergedBlock.ariaLabel || 'Main navigation'}
             className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
             style={{
                 // Plan 260415 — TransparentNav giờ LUÔN có nền mờ nhẹ (25%
@@ -627,9 +629,10 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
 
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            aria-label={mergedBlock.ariaLabel || 'Main navigation'}
             className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
             style={{
                 borderBottom: NAV_SURFACE_BORDER,
@@ -723,9 +726,10 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
 
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -10 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            aria-label={mergedBlock.ariaLabel || 'Main navigation'}
             className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
             style={{
                 borderBottom: NAV_SURFACE_BORDER,

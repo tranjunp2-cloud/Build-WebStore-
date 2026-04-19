@@ -29,6 +29,8 @@ export type HarnessResult = {
   fixture: Fixture
   /** Homepage blocks (layout) — the primary thing we assert on */
   blocks: HarnessBlock[]
+  /** All pages from composer output — enables sub-page navigation in harness route. */
+  pages?: HarnessPage[]
   /** Theme config from the composer output */
   theme: Record<string, unknown>
   /** Page count (full TemplateSeed.pages.length) */
@@ -36,6 +38,13 @@ export type HarnessResult = {
   /** Error message if composer threw (still written to matrix, Phase 02 counts as FAIL) */
   composerError?: string
   durationMs: number
+}
+
+/** Harness page — full structure for sub-page routing. */
+export type HarnessPage = {
+  title: string
+  slug: string
+  blocks: HarnessBlock[]
 }
 
 /** Minimal block shape — captures everything the composer emits for inspection */

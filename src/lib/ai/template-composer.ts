@@ -1,6 +1,15 @@
 import { getCategoryContent } from '@/lib/ai/content'
 import type { CategoryContent, BusinessSample } from '@/lib/ai/content/types'
 import type { ThemePreset } from '@/lib/ai/theme-presets'
+import { DEFAULT_FOCUS_STYLE } from '@/lib/ai/theme-presets'
+import { FONT_PAIRINGS } from '@/lib/fonts/pairings'
+
+/** Resolve explicit heading + body font names from a pairing id. Returns nulls if id unknown. */
+function resolveFontNames(pairingId: string | undefined): { heading?: string; body?: string } {
+    if (!pairingId) return {}
+    const pairing = FONT_PAIRINGS.find((p) => p.id === pairingId)
+    return pairing ? { heading: pairing.headingFont, body: pairing.bodyFont } : {}
+}
 import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
@@ -178,6 +187,7 @@ function buildNavigation(
     logoText: biz.name,
     links,
     ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: resolveNavCtaUrl(pages) },
+    ariaLabel: `${biz.name} main navigation`,
   }
 }
 
@@ -451,6 +461,9 @@ export function buildTestimonials(content: CategoryContent): Record<string, unkn
       title: t.title,
       company: t.company,
       rating: t.rating,
+      // Next-wins plan 260419-0034 phase-02: static avatar fallback for all.
+      // Real photo URLs come from media-injector trong production gen.
+      avatarUrl: AVATAR_FALLBACK_SVG,
     })),
   }
 }
@@ -474,29 +487,48 @@ function buildContact(biz: BusinessSample): Record<string, unknown> {
 }
 
 function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unknown> {
+  // Next-wins plan 260419-0034 phase-03: upgrade default to mega variant với 4 columns
+  // (Explore / Company / Support / Legal) to meet Wix-pro footer expectations.
+  const exploreLinks = pages.map((p) => ({
+    label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
+    url: p === '/' ? '/' : `/${p}`,
+  }))
   const linkColumns = [
+    { title: 'Explore', links: exploreLinks },
     {
-      title: 'Pages',
-      links: pages.map((p) => ({
-        label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
-        url: p === '/' ? '/' : `/${p}`,
-      })),
+      title: 'Company',
+      links: [
+        { label: 'About Us', url: '/about' },
+        { label: 'Contact', url: '/contact' },
+        { label: 'Careers', url: '/careers' },
+      ],
     },
     {
-      title: 'Contact',
+      title: 'Support',
       links: [
-        { label: biz.email, url: `mailto:${biz.email}` },
-        { label: biz.phone, url: `tel:${biz.phone.replace(/[\s-]/g, '')}` },
+        { label: 'Help Center', url: '/help' },
+        { label: 'FAQ', url: '/faq' },
+        { label: 'Get in Touch', url: `mailto:${biz.email}` },
+      ],
+    },
+    {
+      title: 'Legal',
+      links: [
+        { label: 'Privacy Policy', url: '/privacy' },
+        { label: 'Terms of Service', url: '/terms' },
+        { label: 'Cookie Policy', url: '/cookies' },
       ],
     },
   ]
   return {
     blockType: 'footer',
-    variant: 'expanded',
+    variant: 'mega',
     logoText: biz.name,
     tagline: biz.tagline,
     columns: linkColumns,
     copyrightText: `© 2026 ${biz.name}. All rights reserved.`,
+    contactEmail: biz.email,
+    contactPhone: biz.phone,
     socials: [
       { platform: 'facebook', url: '#' },
       { platform: 'instagram', url: '#' },
@@ -1192,6 +1224,7 @@ function buildClientLogos(category?: string, seed = 0): Record<string, unknown> 
     variant: 'scroll',
     headline: 'Trusted By',
     logos: picks.map((l) => ({
+      name: l.name,
       alt: l.name,
       ...(l.url ? { url: l.url } : {}),
     })),
@@ -2098,7 +2131,19 @@ export function composeFromBlueprint(
     category: preset.category,
     tier: 'premium',
     isPremium: true,
-    theme: preset.themePreset,
+    theme: (() => {
+      const fonts = resolveFontNames(preset.themePreset.fontPairingId)
+      return {
+        ...preset.themePreset,
+        // v1.3 plan 260419-0047: textColor default từ colorMode
+        textColor: (preset.themePreset as { textColor?: string }).textColor ?? (preset.themePreset.colorMode === 'dark' ? '#fafafa' : '#111111'),
+        // A11y plan 260418-2357: guarantee focusStyle token present
+        focusStyle: preset.themePreset.focusStyle ?? DEFAULT_FOCUS_STYLE,
+        // Next-wins plan 260419-0034 phase-01: explicit font names for distinct check
+        ...(fonts.heading ? { fontHeading: fonts.heading } : {}),
+        ...(fonts.body ? { fontBody: fonts.body } : {}),
+      }
+    })(),
     pages,
   }
 }
@@ -2160,7 +2205,16 @@ export function composeTemplate(input: ComposerInput): TemplateSeed | null {
     category: input.category,
     tier: input.variant,
     isPremium: input.variant === 'premium',
-    theme: input.themePreset,
+    theme: (() => {
+      const fonts = resolveFontNames(input.themePreset.fontPairingId)
+      return {
+        ...input.themePreset,
+        textColor: (input.themePreset as { textColor?: string }).textColor ?? (input.themePreset.colorMode === 'dark' ? '#fafafa' : '#111111'),
+        focusStyle: input.themePreset.focusStyle ?? DEFAULT_FOCUS_STYLE,
+        ...(fonts.heading ? { fontHeading: fonts.heading } : {}),
+        ...(fonts.body ? { fontBody: fonts.body } : {}),
+      }
+    })(),
     pages: validatedPages,
   }
 }

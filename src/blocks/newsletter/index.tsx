@@ -273,6 +273,9 @@ function PopupVariant({ block, siteId }: { block: NewsletterConfig; siteId?: str
     useEffect(() => {
         if (typeof window === 'undefined') return
 
+        // Skip auto-open trong test-harness route — screenshots overlap với layout review
+        if (window.location.pathname.startsWith('/test-harness/')) return
+
         const prefersReducedMotion =
             typeof window.matchMedia === 'function' &&
             window.matchMedia('(prefers-reduced-motion: reduce)').matches

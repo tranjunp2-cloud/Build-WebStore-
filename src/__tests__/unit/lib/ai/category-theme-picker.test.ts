@@ -176,3 +176,22 @@ describe('hashBusinessName', () => {
         }
     })
 })
+
+// Plan 260419 wix-residual — phase-02 font rotation guarantee.
+// Locks in success metric: font pairing rotates ≥ 3 distinct pairs across 10
+// seeded sites for same category. Closes gap flagged in wave2 audit — no
+// separate FONT_PAIRING_POOL needed; theme presets already carry varied
+// fontPairingIds (8 presets × distinct IDs per category).
+describe('pickCategoryTheme — font pairing rotation', () => {
+    it('TC-F01-V.51 — same category × 10 seeded names produces ≥3 distinct fontPairingIds', () => {
+        for (const category of KNOWN_CATEGORIES) {
+            const seen = new Set<string>()
+            for (let i = 0; i < 10; i++) {
+                const seed = hashBusinessName(`${category}-sample-${i}`)
+                seen.add(pickCategoryTheme(category, seed).fontPairingId)
+            }
+            expect(seen.size, `category=${category} font rotation`).toBeGreaterThanOrEqual(3)
+        }
+    })
+})
+
