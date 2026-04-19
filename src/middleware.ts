@@ -74,22 +74,29 @@ export async function middleware(req: NextRequest) {
     if (pathname.startsWith(STUDIO_PATH)) {
         const tokenCookie = req.cookies.get('payload-token')?.value
         if (!tokenCookie) {
-            // Not authenticated — redirect to Payload login
             url.pathname = '/admin'
             return NextResponse.redirect(url)
         }
         try {
-            const { jwtVerify } = await import('jose')
-            const secret = new TextEncoder().encode(process.env.PAYLOAD_SECRET || '')
-            const { payload: decoded } = await jwtVerify(tokenCookie, secret)
-            // roles is an array in our Users collection
+            // Payload v3 signs JWT with a derived key (not raw PAYLOAD_SECRET),
+            // so jose's jwtVerify fails in edge runtime. We decode unverified
+            // and defer real verification to the Next.js server layer:
+            // layout.tsx calls requireSuperAdmin() which hits Payload local API.
+            // Cookie is httpOnly and set by Payload server — middleware decoding
+            // it here is only a routing hint, not the security boundary.
+            const { decodeJwt } = await import('jose')
+            const decoded = decodeJwt(tokenCookie)
             const roles = (decoded.roles as string[] | undefined) ?? []
+            const exp = decoded.exp as number | undefined
+            if (exp && exp * 1000 < Date.now()) {
+                url.pathname = '/admin'
+                return NextResponse.redirect(url)
+            }
             if (!roles.includes('super-admin')) {
                 url.pathname = '/admin'
                 return NextResponse.redirect(url)
             }
         } catch {
-            // Invalid / expired token
             url.pathname = '/admin'
             return NextResponse.redirect(url)
         }
