@@ -900,6 +900,7 @@ export const Users: CollectionConfig = {
             type: 'select',
             hasMany: true,
             defaultValue: ['tenant-owner'],
+            saveToJWT: true, // edge middleware checks role via decoded JWT (no DB call in edge runtime)
             options: [
                 { label: 'Super Admin', value: 'super-admin' },
                 { label: 'Tenant Owner', value: 'tenant-owner' },
