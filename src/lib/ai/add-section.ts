@@ -552,14 +552,16 @@ export function createAddSectionBlock({
                 ],
             }
 
-        case 'about':
+        case 'about': {
+            const aboutHeadline = 'Our Story'
             return {
                 blockType: 'about',
                 variant: 'simple',
-                sectionLabel: 'About Us',
-                headline: `Our Story`,
+                sectionLabel: dedupSectionLabel('About Us', aboutHeadline),
+                headline: aboutHeadline,
                 body: `${brandName} was founded with a simple mission: to deliver quality and value to every customer. With years of experience and a passionate team, we continue to grow and innovate.`,
             }
+        }
 
         case 'contact':
             return {
