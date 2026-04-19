@@ -15,6 +15,7 @@ import { StatusDot } from './status-dot'
 import { GenerationTimeline } from './generation-timeline'
 import { GenerationBlocksTab } from './generation-blocks-tab'
 import { GenerationRawJson } from './generation-raw-json'
+import { IssuesTabEmbed } from '@/app/studio/_components/issues-tab-embed'
 import type { GenerationRecord } from './generation-types'
 
 type Props = {
@@ -124,9 +125,7 @@ export function GenerationDetailDrawer({ record, onClose }: Props) {
                                 </TabsContent>
 
                                 <TabsContent value="issues">
-                                    <p style={{ fontSize: 13, color: 'var(--text-3)', padding: '16px 0' }}>
-                                        Issue linking will be available in Phase 06.
-                                    </p>
+                                    <IssuesTabEmbed relatedType="generation" relatedId={String(displayed.id)} />
                                 </TabsContent>
 
                                 <TabsContent value="raw">

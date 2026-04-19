@@ -7,6 +7,7 @@ import { X, ExternalLink, ImageOff } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { TemplateStatusPill } from './template-status-pill'
 import { QualityTab } from './quality-tab'
+import { IssuesTabEmbed } from '@/app/studio/_components/issues-tab-embed'
 import type { AdminTemplate } from '@/lib/admin/templates-query'
 
 type Props = {
@@ -156,7 +157,7 @@ export function TemplateDrawer({ template, onClose }: Props) {
                 </TabsContent>
 
                 <TabsContent value="issues" className="flex-1 overflow-auto mt-0">
-                    <PlaceholderTab phase={6} feature="Issues & feedback thread" />
+                    <IssuesTabEmbed relatedType="template" relatedId={String(template.id)} />
                 </TabsContent>
 
                 <TabsContent value="versions" className="flex-1 overflow-auto mt-0">

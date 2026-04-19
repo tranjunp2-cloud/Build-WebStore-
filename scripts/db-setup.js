@@ -3085,6 +3085,112 @@ const MIGRATIONS = [
     name: 'ai_generation_records.alter_completed_at',
     sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS completed_at timestamp;`,
   },
+
+  // ── Phase 06: TemplateIssues ──────────────────────────────────────────────
+  {
+    name: 'template_issues.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues (
+  id serial PRIMARY KEY,
+  title varchar NOT NULL,
+  description text,
+  severity varchar NOT NULL DEFAULT 'medium',
+  category varchar NOT NULL DEFAULT 'other',
+  status varchar NOT NULL DEFAULT 'open',
+  related_type varchar NOT NULL,
+  related_id varchar NOT NULL,
+  reported_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+  assigned_to_id integer REFERENCES users(id) ON DELETE SET NULL,
+  resolved_at timestamp,
+  updated_at timestamp DEFAULT now(),
+  created_at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues.create_status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_status_idx ON template_issues (status);`,
+  },
+  {
+    name: 'template_issues.create_severity_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_severity_idx ON template_issues (severity);`,
+  },
+  {
+    name: 'template_issues.create_related_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_related_idx ON template_issues (related_type, related_id);`,
+  },
+  {
+    name: 'template_issues_comments.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues_comments (
+  id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  _order integer NOT NULL DEFAULT 0,
+  _parent_id integer NOT NULL REFERENCES template_issues(id) ON DELETE CASCADE,
+  _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+  author_id integer REFERENCES users(id) ON DELETE SET NULL,
+  body text NOT NULL,
+  created_at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues_comments.create_parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_comments_parent_idx ON template_issues_comments (_parent_id);`,
+  },
+  {
+    name: 'template_issues_timeline.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues_timeline (
+  id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  _order integer NOT NULL DEFAULT 0,
+  _parent_id integer NOT NULL REFERENCES template_issues(id) ON DELETE CASCADE,
+  _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+  event varchar NOT NULL,
+  actor_id integer REFERENCES users(id) ON DELETE SET NULL,
+  data jsonb,
+  at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues_timeline.create_parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_timeline_parent_idx ON template_issues_timeline (_parent_id);`,
+  },
+  // ALTER TABLE fallbacks for all template_issues columns
+  {
+    name: 'template_issues.alter_title',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS title varchar NOT NULL DEFAULT '';`,
+  },
+  {
+    name: 'template_issues.alter_description',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS description text;`,
+  },
+  {
+    name: 'template_issues.alter_severity',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS severity varchar NOT NULL DEFAULT 'medium';`,
+  },
+  {
+    name: 'template_issues.alter_category',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS category varchar NOT NULL DEFAULT 'other';`,
+  },
+  {
+    name: 'template_issues.alter_status',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'open';`,
+  },
+  {
+    name: 'template_issues.alter_related_type',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_type varchar;`,
+  },
+  {
+    name: 'template_issues.alter_related_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_id varchar;`,
+  },
+  {
+    name: 'template_issues.alter_reported_by_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS reported_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_issues.alter_assigned_to_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS assigned_to_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_issues.alter_resolved_at',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -3116,6 +3222,7 @@ const COLLECTION_SLUGS = [
   'block_catalog_entries',
   'block_variants',
   'ai_generation_records',
+  'template_issues',
 ];
 
 /**

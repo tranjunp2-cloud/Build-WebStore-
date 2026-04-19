@@ -31,6 +31,7 @@ import { TemplateQualityScores } from './collections/TemplateQualityScores'
 import { BlockCatalogEntries } from './collections/BlockCatalogEntries'
 import { BlockVariants } from './collections/BlockVariants'
 import { AiGenerationRecords } from './collections/AiGenerationRecords'
+import { TemplateIssues } from './collections/TemplateIssues'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -134,6 +135,7 @@ export default buildConfig({
     BlockCatalogEntries,
     BlockVariants,
     AiGenerationRecords,
+    TemplateIssues,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

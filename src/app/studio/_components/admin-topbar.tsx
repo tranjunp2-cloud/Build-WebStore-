@@ -2,10 +2,12 @@
 
 /**
  * AdminTopbar — page title, global search stub, theme/density/accent switchers,
- * and user avatar dropdown menu.
+ * user avatar dropdown menu, and "Report issue" quick-action.
  */
 import { usePathname } from 'next/navigation'
-import { Search, Sun, Moon, Monitor, LogOut } from 'lucide-react'
+import { Search, Sun, Moon, LogOut, Flag } from 'lucide-react'
+import { useState } from 'react'
+import { CreateIssueModal } from './modals/create-issue-modal'
 import {
     useStudioPreferences,
     type Theme,
@@ -44,6 +46,7 @@ export function AdminTopbar({ user }: { user: AdminUser }) {
     const pathname = usePathname()
     const pageTitle = usePageTitle(pathname)
     const { theme, setTheme, density, setDensity, accent, setAccent } = useStudioPreferences()
+    const [showReportIssue, setShowReportIssue] = useState(false)
 
     function cycleTheme() {
         const next: Theme = theme === 'light' ? 'dark' : 'light'
@@ -76,6 +79,23 @@ export function AdminTopbar({ user }: { user: AdminUser }) {
                 <Search size={13} />
                 <span>Search…</span>
                 <kbd className="ml-2 text-[10px] opacity-60">⌘K</kbd>
+            </button>
+
+            {/* Report issue quick-action */}
+            <button
+                type="button"
+                onClick={() => setShowReportIssue(true)}
+                aria-label="Report issue"
+                title="Report issue"
+                className="studio-nav-item flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs border"
+                style={{
+                    background: 'var(--bg-sunk)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-2)',
+                }}
+            >
+                <Flag size={12} />
+                <span>Report issue</span>
             </button>
 
             {/* Theme toggle */}
@@ -165,6 +185,13 @@ export function AdminTopbar({ user }: { user: AdminUser }) {
                     </div>
                 </div>
             </div>
+            {/* Report issue modal — rendered inside topbar to stay within client boundary */}
+            {showReportIssue && (
+                <CreateIssueModal
+                    onClose={() => setShowReportIssue(false)}
+                    onCreated={() => setShowReportIssue(false)}
+                />
+            )}
         </header>
     )
 }
