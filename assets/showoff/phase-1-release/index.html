@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="system">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ECH Prime Web v2 — Phase 1 Release</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --bg-2: #11151b;
+    --bg-3: #161b22;
+    --fg: #e6edf3;
+    --fg-muted: #8b949e;
+    --fg-dim: #6e7681;
+    --accent: #8b5cf6;
+    --accent-2: #ec4899;
+    --accent-3: #06b6d4;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --border: #21262d;
+    --glass: rgba(255,255,255,0.04);
+    --glass-border: rgba(255,255,255,0.08);
+    --shadow-glow: 0 0 80px rgba(139,92,246,0.25);
+  }
+  [data-theme="light"] {
+    --bg: #fafbff;
+    --bg-2: #ffffff;
+    --bg-3: #f1f3f9;
+    --fg: #0b0d10;
+    --fg-muted: #4b5563;
+    --fg-dim: #6b7280;
+    --accent: #7c3aed;
+    --accent-2: #db2777;
+    --accent-3: #0891b2;
+    --border: #e5e7eb;
+    --glass: rgba(0,0,0,0.02);
+    --glass-border: rgba(0,0,0,0.06);
+    --shadow-glow: 0 0 80px rgba(124,58,237,0.15);
+  }
+  @media (prefers-color-scheme: light) {
+    [data-theme="system"] {
+      --bg: #fafbff;
+      --bg-2: #ffffff;
+      --bg-3: #f1f3f9;
+      --fg: #0b0d10;
+      --fg-muted: #4b5563;
+      --fg-dim: #6b7280;
+      --accent: #7c3aed;
+      --accent-2: #db2777;
+      --accent-3: #0891b2;
+      --border: #e5e7eb;
+      --glass: rgba(0,0,0,0.02);
+      --glass-border: rgba(0,0,0,0.06);
+      --shadow-glow: 0 0 80px rgba(124,58,237,0.15);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Be Vietnam Pro', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    overflow-x: hidden;
+    transition: background 0.4s, color 0.4s;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-family: 'Space Grotesk', 'Be Vietnam Pro', sans-serif; letter-spacing: -0.02em; line-height: 1.1; }
+  code, .mono { font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace; }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+
+  /* ===== HEADER / NAV ===== */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: 14px 24px;
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border-bottom: 1px solid var(--glass-border);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+  .logo-mark {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 900; font-size: 13px;
+    box-shadow: 0 4px 14px rgba(139,92,246,0.4);
+  }
+  .nav-controls { display: flex; gap: 8px; align-items: center; }
+  .btn-ghost {
+    background: var(--glass); border: 1px solid var(--glass-border);
+    color: var(--fg); padding: 7px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .btn-ghost:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); transform: translateY(-1px); }
+  .lang-toggle, .theme-toggle { min-width: 56px; }
+
+  /* ===== HERO ===== */
+  #hero {
+    min-height: 100vh;
+    position: relative;
+    display: flex; align-items: center;
+    padding: 120px 24px 80px;
+    overflow: hidden;
+  }
+  .hero-bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 30%, rgba(139,92,246,0.3), transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(236,72,153,0.25), transparent 50%),
+      radial-gradient(ellipse at 50% 100%, rgba(6,182,212,0.2), transparent 60%);
+    z-index: 0;
+    animation: heroGlow 12s ease-in-out infinite alternate;
+  }
+  @keyframes heroGlow {
+    0% { transform: scale(1) rotate(0deg); opacity: 0.85; }
+    100% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+  }
+  .hero-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--glass-border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--glass-border) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    z-index: 0;
+  }
+  .hero-content { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; width: 100%; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    padding: 8px 16px; border-radius: 999px;
+    font-size: 13px; font-weight: 600;
+    margin-bottom: 32px;
+    backdrop-filter: blur(10px);
+  }
+  .hero-badge .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 0 0 rgba(34,197,94,0.7);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(34,197,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  }
+  .hero-title {
+    font-size: clamp(44px, 7vw, 96px);
+    font-weight: 900;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    margin-bottom: 24px;
+  }
+  .hero-title .gradient {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 50%, var(--accent-3) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+    animation: shimmer 6s ease-in-out infinite;
+    background-size: 200% 200%;
+  }
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .hero-sub {
+    font-size: clamp(17px, 1.8vw, 22px);
+    color: var(--fg-muted);
+    max-width: 720px;
+    margin-bottom: 48px;
+    line-height: 1.55;
+  }
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    max-width: 900px;
+  }
+  .stat-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    padding: 24px;
+    border-radius: 16px;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s;
+  }
+  .stat-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+  .stat-val {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 40px; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .stat-label { font-size: 13px; color: var(--fg-muted); margin-top: 6px; font-weight: 500; }
+
+  /* ===== SECTIONS ===== */
+  section.panel {
+    padding: 100px 24px;
+    position: relative;
+  }
+  .section-header { max-width: 800px; margin: 0 auto 60px; text-align: center; }
+  .section-eyebrow {
+    display: inline-block; padding: 6px 14px;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: clamp(32px, 4.5vw, 56px);
+    font-weight: 800;
+    margin-bottom: 16px;
+  }
+  .section-sub {
+    font-size: clamp(15px, 1.3vw, 18px);
+    color: var(--fg-muted);
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  /* ===== FEATURES GRID ===== */
+  #features { background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%); }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .feature-card {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 0;
+  }
+  .feature-card:hover { transform: translateY(-6px); border-color: transparent; box-shadow: 0 20px 40px -12px rgba(139,92,246,0.35); }
+  .feature-card:hover::before { opacity: 1; }
+  .feature-card:hover .feature-code, .feature-card:hover .feature-title, .feature-card:hover .feature-desc { color: white; }
+  .feature-card:hover .feature-icon { background: rgba(255,255,255,0.2); color: white; }
+  .feature-card > * { position: relative; z-index: 1; }
+  .feature-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: white;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px;
+    margin-bottom: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.3s;
+  }
+  .feature-code { font-size: 11px; color: var(--fg-dim); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; transition: color 0.3s; }
+  .feature-title { font-size: 19px; font-weight: 700; margin: 6px 0 10px; transition: color 0.3s; }
+  .feature-desc { font-size: 14px; color: var(--fg-muted); line-height: 1.55; transition: color 0.3s; }
+
+  /* ===== ENGINEERING WINS ===== */
+  #engineering { background: var(--bg); }
+  .wins-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .win-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+  .win-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+  .win-card .accent-bar {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+  }
+  .win-icon {
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+    font-size: 26px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+  }
+  .win-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
+  .win-desc { font-size: 14px; color: var(--fg-muted); line-height: 1.6; }
+  .win-tag {
+    display: inline-block;
+    margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    padding: 4px 10px; border-radius: 6px;
+  }
+
+  /* ===== NUMBERS ===== */
+  #numbers {
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-3) 50%, var(--bg) 100%);
+    position: relative; overflow: hidden;
+  }
+  #numbers::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 15%, transparent), transparent 60%);
+    z-index: 0;
+  }
+  .numbers-wrap { position: relative; z-index: 1; }
+  .numbers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .num-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(10px);
+    padding: 40px 28px;
+    border-radius: 20px;
+    text-align: center;
+    transition: all 0.3s;
+  }
+  .num-card:hover { transform: scale(1.03); }
+  .num-val {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(48px, 5vw, 72px); font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .num-unit { font-size: 22px; color: var(--fg-muted); font-weight: 600; }
+  .num-label { font-size: 13px; color: var(--fg-muted); margin-top: 10px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; }
+
+  /* ===== STACK ===== */
+  #stack { background: var(--bg-2); }
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .stack-group {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .stack-group h4 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .stack-items { display: flex; flex-wrap: wrap; gap: 8px; }
+  .stack-chip {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ===== ROADMAP ===== */
+  #roadmap {
+    background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 100%);
+  }
+  .roadmap-wrap {
+    max-width: 1000px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .roadmap-card {
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .roadmap-card.done {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--success) 10%, transparent), transparent);
+    border-color: color-mix(in srgb, var(--success) 40%, var(--border));
+  }
+  .roadmap-card.next {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+  .roadmap-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 4px 10px; border-radius: 6px;
+    margin-bottom: 16px;
+  }
+  .roadmap-card.done .roadmap-status { background: color-mix(in srgb, var(--success) 20%, transparent); color: var(--success); }
+  .roadmap-card.next .roadmap-status { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+  .roadmap-title { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+  .roadmap-meta { font-size: 13px; color: var(--fg-muted); margin-bottom: 24px; font-family: 'JetBrains Mono', monospace; }
+  .roadmap-list { list-style: none; }
+  .roadmap-list li {
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--glass-border);
+    font-size: 14px;
+    display: flex; gap: 10px;
+  }
+  .roadmap-list li::before {
+    content: '→';
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .roadmap-card.done .roadmap-list li::before { content: '✓'; color: var(--success); }
+
+  /* ===== FOOTER ===== */
+  footer {
+    padding: 60px 24px 40px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--fg-muted);
+    font-size: 13px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .refs { max-width: 900px; margin: 20px auto; font-size: 12px; line-height: 1.8; }
+
+  /* ===== LANGUAGE VISIBILITY ===== */
+  [data-lang="vi"] [lang="en"], [data-lang="en"] [lang="vi"] { display: none; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    .roadmap-wrap { grid-template-columns: 1fr; }
+    .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    .stat-val { font-size: 32px; }
+    section.panel { padding: 70px 20px; }
+  }
+
+  /* reveal animation */
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.8s, transform 0.8s; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body data-lang="vi">
+
+<!-- ===== NAV ===== -->
+<nav class="nav">
+  <div class="logo">
+    <div class="logo-mark">E</div>
+    <span>ECH Prime Web v2</span>
+  </div>
+  <div class="nav-controls">
+    <button class="btn-ghost lang-toggle" onclick="toggleLang()">
+      <span data-lang-label="vi">🇻🇳 VI</span>
+      <span data-lang-label="en" style="display:none">🇬🇧 EN</span>
+    </button>
+    <button class="btn-ghost theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+      <span data-theme-label="system">🖥️</span>
+      <span data-theme-label="dark" style="display:none">🌙</span>
+      <span data-theme-label="light" style="display:none">☀️</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      <span lang="vi">Phase 1 — Đã landed 2026-04-19</span>
+      <span lang="en">Phase 1 — Landed 2026-04-19</span>
+    </div>
+    <h1 class="hero-title">
+      <span lang="vi">
+        Từ ý tưởng đến<br />
+        <span class="gradient">storefront live</span><br />
+        trong &lt; 60 giây.
+      </span>
+      <span lang="en">
+        From idea to<br />
+        <span class="gradient">live storefront</span><br />
+        in under 60 seconds.
+      </span>
+    </h1>
+    <p class="hero-sub">
+      <span lang="vi">ECH Prime Web v2 — nền tảng AI builder cho SMB Đông Nam Á. Phase 1 ship <strong>17 feature modules</strong>, <strong>110 issues</strong>, và một pipeline gen site từ prompt văn bản đến website sản xuất thực tế.</span>
+      <span lang="en">ECH Prime Web v2 — the AI builder for SEA SMBs. Phase 1 ships <strong>17 feature modules</strong>, <strong>110 issues</strong>, and a pipeline that turns a text prompt into a production storefront.</span>
+    </p>
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-val">110</div>
+        <div class="stat-label" lang="vi">Issues đã đóng</div>
+        <div class="stat-label" lang="en">Issues closed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">97</div>
+        <div class="stat-label" lang="vi">PRs đã merge</div>
+        <div class="stat-label" lang="en">PRs merged</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">739</div>
+        <div class="stat-label" lang="vi">Commits (Feb–Apr)</div>
+        <div class="stat-label" lang="en">Commits (Feb–Apr)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val">12</div>
+        <div class="stat-label" lang="vi">Thành viên đóng góp</div>
+        <div class="stat-label" lang="en">Contributors</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FEATURES ===== -->
+<section id="features" class="panel">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow" lang="vi">Đã ship</span>
+      <span class="section-eyebrow" lang="en">Shipped</span>
+      <h2 class="section-title">
+        <span lang="vi">17 feature modules</span>
+        <span lang="en">17 feature modules</span>
+      </h2>
+      <p class="section-sub">
+        <span lang="vi">Từ AI site generator đến order management — Phase 1 phủ toàn bộ lõi e-commerce cho SMB.</span>
+        <span lang="en">From AI site generator to order management — Phase 1 covers the full e-commerce core for SMBs.</span>
+      </p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">F01</div>
+        <div class="feature-code">AI Site Generator</div>
+        <div class="feature-title" lang="vi">AI Site Generator</div>
+        <div class="feature-title" lang="en">AI Site Generator</div>
+        <div class="feature-desc" lang="vi">Chat builder, one-click publish, multilingual, AI image gen, template-first pipeline.</div>
+        <div class="feature-desc" lang="en">Chat builder, one-click publish, multilingual, AI image gen, template-first pipeline.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F02</div>
+        <div class="feature-code">Authentication</div>
+        <div class="feature-title">Authentication</div>
+        <div class="feature-desc" lang="vi">OAuth, MFA, forgot password flow, SSO welcome email.</div>
+        <div class="feature-desc" lang="en">OAuth, MFA, forgot password flow, SSO welcome email.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F03</div>
+        <div class="feature-code">Dashboard</div>
+        <div class="feature-title">Dashboard</div>
+        <div class="feature-desc" lang="vi">SSR analytics, owner tracking, storefront tracking, SEO widget.</div>
+        <div class="feature-desc" lang="en">SSR analytics, owner tracking, storefront tracking, SEO widget.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F05</div>
+        <div class="feature-code">AI Editor</div>
+        <div class="feature-title">AI Editor</div>
+        <div class="feature-desc" lang="vi">Inline edit, multi-block, nested fields, draft/publish separation.</div>
+        <div class="feature-desc" lang="en">Inline edit, multi-block, nested fields, draft/publish separation.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F06</div>
+        <div class="feature-code">Onboarding</div>
+        <div class="feature-title" lang="vi">Onboarding Wizard</div>
+        <div class="feature-title" lang="en">Onboarding Wizard</div>
+        <div class="feature-desc" lang="vi">AI Discovery, welcome redirect, mobile UX edge-to-edge.</div>
+        <div class="feature-desc" lang="en">AI Discovery, welcome redirect, mobile UX edge-to-edge.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F07</div>
+        <div class="feature-code">Template Gallery</div>
+        <div class="feature-title" lang="vi">Template Gallery</div>
+        <div class="feature-title" lang="en">Template Gallery</div>
+        <div class="feature-desc" lang="vi">30+ premium templates, category DNA, variant rotation.</div>
+        <div class="feature-desc" lang="en">30+ premium templates, category DNA, variant rotation.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F08</div>
+        <div class="feature-code">Products</div>
+        <div class="feature-title" lang="vi">Product Management</div>
+        <div class="feature-title" lang="en">Product Management</div>
+        <div class="feature-desc" lang="vi">CRUD, categories, AI bulk create, dynamic attributes, mobile UX.</div>
+        <div class="feature-desc" lang="en">CRUD, categories, AI bulk create, dynamic attributes, mobile UX.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F10</div>
+        <div class="feature-code">Orders</div>
+        <div class="feature-title" lang="vi">Orders Management</div>
+        <div class="feature-title" lang="en">Orders Management</div>
+        <div class="feature-desc" lang="vi">Dashboard, cancel+restock, filters, mobile drawers.</div>
+        <div class="feature-desc" lang="en">Dashboard, cancel+restock, filters, mobile drawers.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F11</div>
+        <div class="feature-code">Undo/Redo</div>
+        <div class="feature-title">Undo / Redo</div>
+        <div class="feature-desc" lang="vi">Full history incl. AI edits, mobile floating toolbar.</div>
+        <div class="feature-desc" lang="en">Full history incl. AI edits, mobile floating toolbar.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F12</div>
+        <div class="feature-code">Auto-save</div>
+        <div class="feature-title" lang="vi">Auto-save Draft</div>
+        <div class="feature-title" lang="en">Auto-save Draft</div>
+        <div class="feature-desc" lang="vi">Retry logic, conflict resolution.</div>
+        <div class="feature-desc" lang="en">Retry logic, conflict resolution.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F16</div>
+        <div class="feature-code">Notifications</div>
+        <div class="feature-title" lang="vi">Notification Center</div>
+        <div class="feature-title" lang="en">Notification Center</div>
+        <div class="feature-desc" lang="vi">SSE live toast, browser push, badge, admin broadcast.</div>
+        <div class="feature-desc" lang="en">SSE live toast, browser push, badge, admin broadcast.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F17</div>
+        <div class="feature-code">Blog</div>
+        <div class="feature-title" lang="vi">Blog Management</div>
+        <div class="feature-title" lang="en">Blog Management</div>
+        <div class="feature-desc" lang="vi">CRUD, AI improve, pagination, 47 QC bugs squashed.</div>
+        <div class="feature-desc" lang="en">CRUD, AI improve, pagination, 47 QC bugs squashed.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F19</div>
+        <div class="feature-code">Store Config</div>
+        <div class="feature-title" lang="vi">Store Configuration</div>
+        <div class="feature-title" lang="en">Store Configuration</div>
+        <div class="feature-desc" lang="vi">Custom domain (DO API), QR payment, staff RBAC.</div>
+        <div class="feature-desc" lang="en">Custom domain (DO API), QR payment, staff RBAC.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F20</div>
+        <div class="feature-code">Help Center</div>
+        <div class="feature-title" lang="vi">Help Center</div>
+        <div class="feature-title" lang="en">Help Center</div>
+        <div class="feature-desc" lang="vi">Q&amp;A accordion, instructions, full i18n.</div>
+        <div class="feature-desc" lang="en">Q&amp;A accordion, instructions, full i18n.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F21</div>
+        <div class="feature-code">Localization</div>
+        <div class="feature-title">Localization</div>
+        <div class="feature-desc" lang="vi">EN / MS / VI — full i18n toàn app.</div>
+        <div class="feature-desc" lang="en">EN / MS / VI — full app i18n.</div>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">F23</div>
+        <div class="feature-code">Subdomain</div>
+        <div class="feature-title" lang="vi">Custom Subdomain</div>
+        <div class="feature-title" lang="en">Custom Subdomain</div>
+        <div class="feature-desc" lang="vi">Tenant slug sync với builder.</div>
+        <div class="feature-desc" lang="en">Tenant slug sync with builder.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ENGINEERING WINS ===== -->
+<section id="engineering" class="panel">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Engineering</span>
+      <h2 class="section-title">
+        <span lang="vi">Những chiến thắng kỹ thuật</span>
+        <span lang="en">Engineering wins</span>
+      </h2>
+      <p class="section-sub">
+        <span lang="vi">Những thay đổi nền tảng khiến Phase 1 scale được: migration, CI pipeline, test convention, AI code review.</span>
+        <span lang="en">Foundational changes that made Phase 1 scale: migration, CI pipeline, test convention, AI code review.</span>
+      </p>
+    </div>
+
+    <div class="wins-grid">
+      <div class="win-card reveal">
+        <div class="accent-bar"></div>
+        <div class="win-icon">▲</div>
+        <div class="win-title" lang="vi">Vercel Migration</div>
+        <div class="win-title" lang="en">Vercel Migration</div>
+        <div class="win-desc" lang="vi">Chuyển từ DigitalOcean App Platform sang Vercel CI-driven deploys, bypass Pro-plan commit-author check qua <code>VERCEL_TOKEN</code>.</div>
+        <div class="win-desc" lang="en">Moved from DO App Platform to Vercel CI-driven deploys, bypassing Pro-plan commit-author checks via <code>VERCEL_TOKEN</code>.</div>
+        <div class="win-tag">2026-04-12</div>
+      </div>
+
+      <div class="win-card reveal">
+        <div class="accent-bar"></div>
+        <div class="win-icon">🤖</div>
+        <div class="win-title" lang="vi">AI Gen Pipeline v2</div>
+        <div class="win-title" lang="en">AI Gen Pipeline v2</div>
+        <div class="win-desc" lang="vi">Template-first composer với GPT personalization, structure enforcer, variant pools, Unsplash image pipeline.</div>
+        <div class="win-desc" lang="en">Template-first composer with GPT personalization, structure enforcer, variant pools, Unsplash image pipeline.</div>
+        <div class="win-tag">&lt; 60s time-to-site</div>
+      </div>
+
+      <div class="win-card reveal">
+        <div class="accent-bar"></div>
+        <div class="win-icon">⚡</div>
+        <div class="win-title" lang="vi">CI Pipeline — 11 min</div>
+        <div class="win-title" lang="en">CI Pipeline — 11 min</div>
+        <div class="win-desc" lang="vi">Quality → test → deploy-staging/production, bot-driven Lark notifications, alias rollover verification.</div>
+        <div class="win-desc" lang="en">Quality → test → deploy-staging/production, bot-driven Lark notifications, alias rollover verification.</div>
+        <div class="win-tag">1.5m + 4.5m + 6m</div>
+      </div>
+
+      <div class="win-card reveal">
+        <div class="accent-bar"></div>
+        <div class="win-icon">🔥</div>
+        <div class="win-title" lang="vi">500 Fix Campaign</div>
+        <div class="win-title" lang="en">500 Fix Campaign</div>
+        <div class="win-desc" lang="vi">Production errors rớt từ <strong>450/day → &lt;10/day</strong> qua 8 bugs, 6 PRs. Modules: pages-schema, site-type, payload-retry, post-ai-swap.</div>
+        <div class="win-desc" lang="en">Production errors down from <strong>450/day → &lt;10/day</strong> via 8 bugs, 6 PRs. Modules: pages-schema, site-type, payload-retry, post-ai-swap.</div>
+        <div class="win-tag">-97.8% error rate</div>
+      </div>
+
+      <div class="win-card reveal">
+        <div class="accent-bar"></div>
+        <div class="win-icon">🧪</div>
+        <div class="win-title" lang="vi">Test Convention</div>
+        <div class="win-title" lang="en">Test Convention</div>
+        <div class="win-desc" lang="vi">TC-ID naming, AAA pattern, <code>vi.mock</code> top-of-file, coverage 60% lines / 50% branches.</div>
+        <div class="win-desc" lang="en">TC-ID naming, AAA pattern, top-of-file <code>vi.mock</code>, coverage 60% lines / 50% branches.</div>
+        <div class="win-tag">Vitest + RTL + Playwright</div>
+      </div>
+
+      <div class="win-card reveal">
+        <div class="accent-bar"></div>
+        <div class="win-icon">👁️</div>
+        <div class="win-title" lang="vi">AI Code Review</div>
+        <div class="win-title" lang="en">AI Code Review</div>
+        <div class="win-desc" lang="vi">OpenAI Codex auto-review mọi PR với 13 rules trong <code>AGENTS.md</code>. 👍 = no issues, P1/P2 = need fix.</div>
+        <div class="win-desc" lang="en">OpenAI Codex auto-reviews every PR with 13 rules in <code>AGENTS.md</code>. 👍 = no issues, P1/P2 = need fix.</div>
+        <div class="win-tag">Codex + AGENTS.md</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== NUMBERS ===== -->
+<section id="numbers" class="panel">
+  <div class="numbers-wrap container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow" lang="vi">Con số</span>
+      <span class="section-eyebrow" lang="en">By the numbers</span>
+      <h2 class="section-title">
+        <span lang="vi">Sprint 1-3 đã làm được gì?</span>
+        <span lang="en">What Sprint 1-3 achieved</span>
+      </h2>
+    </div>
+
+    <div class="numbers-grid">
+      <div class="num-card reveal">
+        <div class="num-val">110<span class="num-unit"></span></div>
+        <div class="num-label" lang="vi">Issues closed</div>
+        <div class="num-label" lang="en">Issues closed</div>
+      </div>
+      <div class="num-card reveal">
+        <div class="num-val">97<span class="num-unit"></span></div>
+        <div class="num-label" lang="vi">PRs merged</div>
+        <div class="num-label" lang="en">PRs merged</div>
+      </div>
+      <div class="num-card reveal">
+        <div class="num-val">739<span class="num-unit"></span></div>
+        <div class="num-label" lang="vi">Commits</div>
+        <div class="num-label" lang="en">Commits</div>
+      </div>
+      <div class="num-card reveal">
+        <div class="num-val">17<span class="num-unit"></span></div>
+        <div class="num-label" lang="vi">Feature modules</div>
+        <div class="num-label" lang="en">Feature modules</div>
+      </div>
+      <div class="num-card reveal">
+        <div class="num-val">&lt;60<span class="num-unit">s</span></div>
+        <div class="num-label" lang="vi">Time-to-site</div>
+        <div class="num-label" lang="en">Time-to-site</div>
+      </div>
+      <div class="num-card reveal">
+        <div class="num-val">3<span class="num-unit"></span></div>
+        <div class="num-label" lang="vi">Ngôn ngữ (VI/EN/MS)</div>
+        <div class="num-label" lang="en">Locales (VI/EN/MS)</div>
+      </div>
+      <div class="num-card reveal">
+        <div class="num-val">-97<span class="num-unit">%</span></div>
+        <div class="num-label" lang="vi">Prod error rate</div>
+        <div class="num-label" lang="en">Prod error rate</div>
+      </div>
+      <div class="num-card reveal">
+        <div class="num-val">12<span class="num-unit"></span></div>
+        <div class="num-label" lang="vi">Contributors</div>
+        <div class="num-label" lang="en">Contributors</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== STACK ===== -->
+<section id="stack" class="panel">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Tech Stack</span>
+      <h2 class="section-title">
+        <span lang="vi">Xây trên nền tảng hiện đại</span>
+        <span lang="en">Built on a modern foundation</span>
+      </h2>
+      <p class="section-sub">
+        <span lang="vi">Next.js 15 + Payload CMS 3 + Neon Postgres — serverless từ đầu, fluid compute, zero cold starts đáng kể.</span>
+        <span lang="en">Next.js 15 + Payload CMS 3 + Neon Postgres — serverless from day one, fluid compute, negligible cold starts.</span>
+      </p>
+    </div>
+
+    <div class="stack-grid">
+      <div class="stack-group reveal">
+        <h4>Frontend</h4>
+        <div class="stack-items">
+          <span class="stack-chip">Next.js 15</span>
+          <span class="stack-chip">TypeScript</span>
+          <span class="stack-chip">Tailwind</span>
+          <span class="stack-chip">shadcn/ui</span>
+          <span class="stack-chip">Zustand</span>
+          <span class="stack-chip">TanStack Query</span>
+        </div>
+      </div>
+      <div class="stack-group reveal">
+        <h4>Backend / CMS</h4>
+        <div class="stack-items">
+          <span class="stack-chip">Payload CMS 3</span>
+          <span class="stack-chip">Route Handlers</span>
+          <span class="stack-chip">Drizzle</span>
+          <span class="stack-chip">JWT + Refresh</span>
+        </div>
+      </div>
+      <div class="stack-group reveal">
+        <h4>AI</h4>
+        <div class="stack-items">
+          <span class="stack-chip">OpenAI GPT-4o</span>
+          <span class="stack-chip">Vercel AI SDK</span>
+          <span class="stack-chip">Unsplash</span>
+          <span class="stack-chip">Codex Review</span>
+        </div>
+      </div>
+      <div class="stack-group reveal">
+        <h4>Database</h4>
+        <div class="stack-items">
+          <span class="stack-chip">Neon Postgres</span>
+          <span class="stack-chip">ap-southeast-1</span>
+          <span class="stack-chip">Serverless</span>
+        </div>
+      </div>
+      <div class="stack-group reveal">
+        <h4>Storage &amp; Pay</h4>
+        <div class="stack-items">
+          <span class="stack-chip">DO Spaces (S3)</span>
+          <span class="stack-chip">Stripe</span>
+          <span class="stack-chip">SePay (roadmap)</span>
+        </div>
+      </div>
+      <div class="stack-group reveal">
+        <h4>DevOps</h4>
+        <div class="stack-items">
+          <span class="stack-chip">Vercel</span>
+          <span class="stack-chip">Fluid Compute</span>
+          <span class="stack-chip">GitHub Actions</span>
+          <span class="stack-chip">Lark Bot</span>
+        </div>
+      </div>
+      <div class="stack-group reveal">
+        <h4>Testing</h4>
+        <div class="stack-items">
+          <span class="stack-chip">Vitest</span>
+          <span class="stack-chip">React Testing Lib</span>
+          <span class="stack-chip">Playwright</span>
+        </div>
+      </div>
+      <div class="stack-group reveal">
+        <h4>Analytics</h4>
+        <div class="stack-items">
+          <span class="stack-chip">Vercel Analytics</span>
+          <span class="stack-chip">PostHog (preview)</span>
+          <span class="stack-chip">Storefront tracking</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ROADMAP ===== -->
+<section id="roadmap" class="panel">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Roadmap</span>
+      <h2 class="section-title">
+        <span lang="vi">Phase 1 đóng gói. Phase 2 đang tới.</span>
+        <span lang="en">Phase 1 closed. Phase 2 incoming.</span>
+      </h2>
+    </div>
+
+    <div class="roadmap-wrap">
+      <div class="roadmap-card done reveal">
+        <div class="roadmap-status">
+          <span lang="vi">✓ Hoàn thành</span>
+          <span lang="en">✓ Done</span>
+        </div>
+        <div class="roadmap-title">Phase 1 — v1.0</div>
+        <div class="roadmap-meta">Sprint 1-3 · Due 2026-04-14</div>
+        <ul class="roadmap-list">
+          <li lang="vi">F01 AI Site Generator</li>
+          <li lang="en">F01 AI Site Generator</li>
+          <li lang="vi">F02-F12 E-commerce core</li>
+          <li lang="en">F02-F12 E-commerce core</li>
+          <li lang="vi">F16 Notification Center</li>
+          <li lang="en">F16 Notification Center</li>
+          <li lang="vi">F17-F23 Blog, CMS, Help, i18n</li>
+          <li lang="en">F17-F23 Blog, CMS, Help, i18n</li>
+          <li lang="vi">Vercel migration + CI pipeline</li>
+          <li lang="en">Vercel migration + CI pipeline</li>
+        </ul>
+      </div>
+
+      <div class="roadmap-card next reveal">
+        <div class="roadmap-status">
+          <span lang="vi">↗ Đang tới</span>
+          <span lang="en">↗ Next</span>
+        </div>
+        <div class="roadmap-title">Phase 2 — v1.1</div>
+        <div class="roadmap-meta">Sprint 4 · Due 2026-04-29</div>
+        <ul class="roadmap-list">
+          <li lang="vi">F13 Payment Gateway (Stripe + SePay)</li>
+          <li lang="en">F13 Payment Gateway (Stripe + SePay)</li>
+          <li lang="vi">F14 Shipping (carriers, rates, labels)</li>
+          <li lang="en">F14 Shipping (carriers, rates, labels)</li>
+          <li lang="vi">F15 Admin Management (super-admin)</li>
+          <li lang="en">F15 Admin Management (super-admin)</li>
+          <li lang="vi">OpenAI cost-per-user dashboard</li>
+          <li lang="en">OpenAI cost-per-user dashboard</li>
+          <li lang="vi">Template v3 — 30 templates × CRO/SEO DNA</li>
+          <li lang="en">Template v3 — 30 templates × CRO/SEO DNA</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div>
+    <strong>ECH Prime Web v2</strong> —
+    <span lang="vi">Nền tảng AI builder cho SMB Đông Nam Á</span>
+    <span lang="en">AI builder for SEA SMBs</span>
+    · © 2026
+  </div>
+  <div class="refs">
+    <span lang="vi"><strong>Tham khảo:</strong></span>
+    <span lang="en"><strong>References:</strong></span>
+    <a href="https://github.com/primeproduction/ech-prime-web-v2/milestone/8">Milestone v1.0</a> ·
+    <a href="https://github.com/primeproduction/ech-prime-web-v2/milestone/9">Milestone v1.1</a> ·
+    <a href="https://payloadcms.com">Payload CMS 3</a> ·
+    <a href="https://nextjs.org">Next.js 15</a> ·
+    <a href="https://neon.tech">Neon Postgres</a> ·
+    <a href="https://vercel.com">Vercel Fluid Compute</a>
+  </div>
+</footer>
+
+<script>
+  /* === LANG === */
+  function toggleLang() {
+    const cur = document.body.dataset.lang;
+    const next = cur === 'vi' ? 'en' : 'vi';
+    document.body.dataset.lang = next;
+    document.documentElement.lang = next;
+    document.querySelectorAll('[data-lang-label]').forEach(el => {
+      el.style.display = el.dataset.langLabel === next ? '' : 'none';
+    });
+  }
+  /* === THEME === */
+  const themes = ['system', 'dark', 'light'];
+  function toggleTheme() {
+    const cur = document.documentElement.dataset.theme || 'system';
+    const idx = themes.indexOf(cur);
+    const next = themes[(idx + 1) % themes.length];
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('theme', next);
+    document.querySelectorAll('[data-theme-label]').forEach(el => {
+      el.style.display = el.dataset.themeLabel === next ? '' : 'none';
+    });
+  }
+  (function initTheme() {
+    const saved = localStorage.getItem('theme') || 'system';
+    document.documentElement.dataset.theme = saved;
+    document.querySelectorAll('[data-theme-label]').forEach(el => {
+      el.style.display = el.dataset.themeLabel === saved ? '' : 'none';
+    });
+  })();
+
+  /* === REVEAL ON SCROLL === */
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
