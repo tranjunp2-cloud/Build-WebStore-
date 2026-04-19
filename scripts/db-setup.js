@@ -3191,6 +3191,20 @@ const MIGRATIONS = [
     name: 'template_issues.alter_resolved_at',
     sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
   },
+
+  // ── Phase 07: AI Quality Dashboard indexes ─────────────────────────────────
+  // Composite index on template_quality_scores(template_id, scored_at DESC)
+  // Note: template_quality_scores_template_scored_idx covers (template_id, scored_at DESC)
+  // so idx_tqs_template_scored is a safe alias — CREATE INDEX IF NOT EXISTS skips if identical.
+  {
+    name: 'template_quality_scores.idx_tqs_template_scored',
+    sql: `CREATE INDEX IF NOT EXISTS idx_tqs_template_scored ON template_quality_scores(template_id, scored_at DESC);`,
+  },
+  // Composite index on ai_generation_records(created_at DESC, status)
+  {
+    name: 'ai_generation_records.idx_agr_created_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_agr_created_status ON ai_generation_records(created_at DESC, status);`,
+  },
 ];
 
 async function runMigrations(pool) {
