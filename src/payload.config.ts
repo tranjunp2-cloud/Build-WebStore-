@@ -28,6 +28,8 @@ import { Notifications } from './collections/Notifications'
 import { PushSubscriptions } from './collections/PushSubscriptions'
 import { AiUsageLogs } from './collections/AiUsageLogs'
 import { TemplateQualityScores } from './collections/TemplateQualityScores'
+import { BlockCatalogEntries } from './collections/BlockCatalogEntries'
+import { BlockVariants } from './collections/BlockVariants'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -128,6 +130,8 @@ export default buildConfig({
     PushSubscriptions,
     AiUsageLogs,
     TemplateQualityScores,
+    BlockCatalogEntries,
+    BlockVariants,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

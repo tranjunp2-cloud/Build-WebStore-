@@ -2890,6 +2890,80 @@ const MIGRATIONS = [
       ADD COLUMN IF NOT EXISTS scored_at timestamp DEFAULT now();`,
   },
 
+  // ── Phase 04: Block Catalog ──
+  {
+    name: 'block_catalog_entries.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS block_catalog_entries (
+      id serial PRIMARY KEY,
+      slug varchar NOT NULL UNIQUE,
+      description_override text,
+      description_override_vi text,
+      display_order integer DEFAULT 0,
+      curated_preview_url varchar,
+      hidden_from_catalog boolean DEFAULT false,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'block_catalog_entries.slug_idx',
+    sql: `CREATE INDEX IF NOT EXISTS block_catalog_entries_slug_idx ON block_catalog_entries (slug);`,
+  },
+  {
+    name: 'block_catalog_entries.alter_slug',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS slug varchar;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_description_override',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS description_override text;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_description_override_vi',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS description_override_vi text;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_display_order',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS display_order integer DEFAULT 0;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_curated_preview_url',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS curated_preview_url varchar;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_hidden_from_catalog',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS hidden_from_catalog boolean DEFAULT false;`,
+  },
+  {
+    name: 'block_variants.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS block_variants (
+      id serial PRIMARY KEY,
+      block_slug varchar NOT NULL,
+      variant_name varchar NOT NULL,
+      preview_url_override varchar,
+      notes text,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'block_variants.block_slug_idx',
+    sql: `CREATE INDEX IF NOT EXISTS block_variants_block_slug_idx ON block_variants (block_slug);`,
+  },
+  {
+    name: 'block_variants.alter_block_slug',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS block_slug varchar;`,
+  },
+  {
+    name: 'block_variants.alter_variant_name',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS variant_name varchar;`,
+  },
+  {
+    name: 'block_variants.alter_preview_url_override',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS preview_url_override varchar;`,
+  },
+  {
+    name: 'block_variants.alter_notes',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS notes text;`,
+  },
+
   ...[
     'hero', 'navigation', 'about', 'contact', 'footer',
     'social_widget', 'cart_widget', 'features', 'testimonials', 'gallery',
@@ -2939,6 +3013,8 @@ const COLLECTION_SLUGS = [
   'contact_submissions',
   'ai_usage_logs',
   'template_quality_scores',
+  'block_catalog_entries',
+  'block_variants',
 ];
 
 /**
