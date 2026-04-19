@@ -1,0 +1,121 @@
+---
+owner: Dev
+last_updated: 2026-04-19
+---
+
+# Project Changelog
+
+Curated per-release notes. Seeded 2026-04-19 from v1.0 kickoff (commit `6c06d015`, 2026-03-13) through 2026-04-19. Maintained per-release going forward — see `docs/PROJECT_ALIGNMENT.md` for priorities.
+
+Source: `git log main --since=2026-03-13 --merges --first-parent` (~370 merges, filtered to `feat:` + `fix:` only).
+
+For full architectural decisions + incident post-mortems: see `docs/journals/`.
+
+---
+
+## [Unreleased] — Staging
+
+### Added
+- ClaudeKit rules + docs refactor (2026-04-19): split `CLAUDE.md` 296→113 lines, created 8 `.claude/rules/*.md` (database-schema, vercel-deploy, env-vars, git-flow, testing, email-smtp, workflow, orchestration), seeded 6 canonical `docs/*.md`
+
+### Pending
+- v1.0 stabilization (staging /admin 404, SSO JWT mismatch, AI gen JSON parse intermittent)
+- Key rotation (DO Spaces + Unsplash — leaked 2026-04-15)
+- Production S3 bucket + prod credentials
+
+---
+
+## 2026-04-17 → 2026-04-19 — Wave 1 / Wave 2 Wix-parity polish
+
+**Focus:** F01 AI Builder robustness + F05 AI Editor publish correctness.
+
+- **F01:** Wave 1 completion (#698), wave 2 Wix-detailed (#697), template-first-gen (#680, #682), variant wiring demo (#683, #685), register industry blocks (#686), subpage polish (#687), pipeline + block-quality fixes (#684), old templates fix (#688)
+- **F05:** Publish block-id collision fix (#694), publish validation error surface (#693), update-page-draft bug fix (#692), merge drag buttons bug (#691), AI editor improvements (#689), 404 page rendering fix (#677), unhide-page 500 (#678), inline AI chat lost fix (#673), hidden page still live (#676), empty block data (#669), publish new pages (#670)
+
+Journal: `plans/260418-1740-wave2-continuation-harness-cleanup/`, `plans/260418-2358-wave1-completion/`.
+
+---
+
+## 2026-04-15 — 500 Fix Campaign
+
+**Outcome:** 450 → < 10 errors/day. 8 bugs, 6 PRs.
+
+Key modules patched:
+- `pages-schema` — draft/published collision
+- `site-type` detection — missing industry fallback
+- `payload-retry` — transient DB timeout handling
+- `post-ai-swap` — block reference integrity
+- `stripOrphanMediaRefs` — hanging media pointers after block deletion
+
+Full post-mortem: `docs/journals/260415-500-fix-campaign-and-ai-gen-v2.md`.
+
+---
+
+## 2026-04-13 → 2026-04-14 — Vercel CI-driven deploy
+
+**Problem:** Vercel Pro blocked commits from non-team-members ("The Deployment was blocked because the commit author does not have contributing access"). Team has 1 member (phuongltweb) — inviting more = $20/seat/mo.
+
+**Fix:** Switch from Vercel git webhook → GitHub Actions CI using `VERCEL_TOKEN` (token owner = team member). All deploys now attributed to phuongltweb, bypassing author check.
+
+PRs: #559 (disable webhook), #560 (CI deploy scaffold), #562 (staging target fix), #565 (env pull scoping), #567 (alias rollover verification), #569 (smart-notify integration).
+
+Plan: `plans/260413-1126-vercel-deploy-blocked/`.
+Journal: `docs/journals/260414-ai-gen-flow-overview.md`, `docs/journals/260414-session-ai-gen-deep-dive.md`.
+
+---
+
+## 2026-04-12 — DigitalOcean → Vercel migration
+
+Retired DigitalOcean App Platform (ech-prime-web v1). All runtime + bot moved to Vercel. Legacy files (`Dockerfile`, `.github/scripts/sync-do-envs.py`) retained for reference; `Dockerfile` still used for local `docker-compose` dev.
+
+---
+
+## 2026-03-29 (PR #364 – #374) — Test infra + DB stability sprint
+
+### Added
+- Fix missing FK columns + auto-sync rels tables (#364)
+- SMTP migration: Resend → Payload SMTP via AWS SES (#365)
+- Smoke tests + Quality Metrics + Env sync fix (#366)
+- 12 missing DB tables + CI table check (#367)
+- Git flow docs + AGENTS.md + Security scan + Codex setup (#368)
+- `products_rels` table (#369)
+- Locale validation (AI Builder) (#370)
+- Unit test count parsing fix (#371)
+- `docs/TEST_CONVENTION.md` (#372)
+- 26 Pages block tables + block columns (#373)
+- ALTER TABLE fallbacks for all array tables (#374)
+
+---
+
+## 2026-03-26 → 2026-03-31 — Sprint 1 (Crash Launch)
+
+**Outcome:** Core USP + CMS + Auth + Commerce shipped; Phase 1 launch 2026-03-31 → extended to 2026-04-14 for stabilization.
+
+Feature waves:
+- **2026-03-26 → 28:** F01 (AI Builder), F05 (AI Editor), F11 (SEO), F12 (Undo/Redo), F18 (CMS Layout), F02 (Auth), F06 (Onboarding)
+- **2026-03-29 → 30:** F19 (Store Config), F08 (Products), F09 (Storefront), F10 (Orders), F21 (Localization), F20 (Analytics)
+- **2026-03-31:** F17 (Blog), F03 (Dashboard), F07 (Templates), F16 (Notifications) — best-effort
+
+---
+
+## 2026-03-13 → 2026-03-25 — Sprint 0 (Foundation)
+
+**Outcome:** Backend APIs, CI/CD green, test infrastructure, Figma design alignment.
+
+- GitHub Actions pipeline (`ci.yml`): quality → test → deploy
+- Vitest + React Testing Library + Playwright E2E
+- Payload CMS 3 + Drizzle + Neon Postgres schema
+- Lark bot integration (`prime-bot-assistant`) for CI notifications
+- DigitalOcean App Platform initial deploy (retired 2026-04-12)
+
+v1.0 kickoff: commit `6c06d015` (2026-03-13 15:58).
+
+---
+
+## Related docs
+
+- Full merged PR list: `git log main --since=2026-03-13 --merges --oneline`
+- Per-feature architecture changes: `docs/architecture/F*.md`
+- Strategic decisions + post-mortems: `docs/journals/`
+- Timeline + priority: `docs/PROJECT_ALIGNMENT.md`
+- Open blockers: `docs/tracking/OPEN_BLOCKERS.md`
