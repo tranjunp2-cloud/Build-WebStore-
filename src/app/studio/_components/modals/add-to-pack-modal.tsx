@@ -4,6 +4,7 @@
  * GET /api/admin/packs → list packs, then PATCH /api/admin/packs/[id] with merged includedTemplates.
  */
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -91,7 +92,7 @@ export function AddToPackModal({ templateId, templateName, onClose, onAdded }: P
                     ) : packs.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             No packs found. Create one in{' '}
-                            <a href="/studio/packs" className="underline text-primary">Content Packs</a>.
+                            <Link href="/studio/packs" className="underline text-primary">Content Packs</Link>.
                         </p>
                     ) : (
                         <select
