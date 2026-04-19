@@ -1,13 +1,60 @@
-import { PlaceholderCard } from '../_components/placeholder-card'
+/**
+ * /studio/review — Templates filtered to status=review.
+ */
+export const dynamic = 'force-dynamic'
 
-export const metadata = { title: 'Review Workflow' }
+import type { Metadata } from 'next'
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { requireSuperAdmin } from '@/lib/admin/auth-guard'
+import { TemplatesListClient } from '../templates/_components/templates-list-client'
 
-export default function ReviewPage() {
+export const metadata: Metadata = { title: 'Review Workflow' }
+
+type PageProps = {
+    searchParams: Promise<Record<string, string | string[] | undefined>>
+}
+
+function first(v: string | string[] | undefined): string {
+    return Array.isArray(v) ? (v[0] ?? '') : (v ?? '')
+}
+
+export default async function ReviewPage({ searchParams }: PageProps) {
+    await requireSuperAdmin()
+
+    const sp = await searchParams
+    const sort = first(sp.sort) || '-updatedAt'
+    const page = Math.max(1, Number(first(sp.page) || 1))
+    const limit = Math.min(100, Math.max(10, Number(first(sp.limit) || 50)))
+    const view = (first(sp.view) || 'table') as 'table' | 'grid' | 'split'
+
+    const payload = await getPayload({ config })
+    const result = await payload.find({
+        collection: 'templates',
+        where: { status: { equals: 'review' } },
+        sort,
+        page,
+        limit,
+        depth: 1,
+    })
+
     return (
-        <PlaceholderCard
-            title="Review Workflow"
-            phase={8}
-            description="2-stage approval board for templates submitted for review."
+        <TemplatesListClient
+            initialData={{
+                data: result.docs as never,
+                meta: {
+                    totalDocs: result.totalDocs,
+                    totalPages: result.totalPages,
+                    page: result.page ?? 1,
+                    limit: result.limit,
+                    hasNextPage: result.hasNextPage,
+                    hasPrevPage: result.hasPrevPage,
+                },
+            }}
+            initialFilter={{ sort, page, limit }}
+            initialView={view}
+            pageTitle="Review Workflow"
+            presetStatus="review"
         />
     )
 }

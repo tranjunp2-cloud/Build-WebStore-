@@ -531,6 +531,9 @@ const MIGRATIONS = [
   // templates
   { name: 'templates.sort_order', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order numeric DEFAULT 0;` },
   { name: 'templates.usage_count', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS usage_count numeric DEFAULT 0;` },
+  { name: 'templates.status', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS status varchar DEFAULT 'live';` },
+  { name: 'templates.scheduled_for', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS scheduled_for timestamp;` },
+  { name: 'templates.personality', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS personality varchar;` },
   // templates_tags
   { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
   // ── Templates: Tags array table ──
