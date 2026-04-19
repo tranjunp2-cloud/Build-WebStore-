@@ -30,6 +30,7 @@ import { AiUsageLogs } from './collections/AiUsageLogs'
 import { TemplateQualityScores } from './collections/TemplateQualityScores'
 import { BlockCatalogEntries } from './collections/BlockCatalogEntries'
 import { BlockVariants } from './collections/BlockVariants'
+import { AiGenerationRecords } from './collections/AiGenerationRecords'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -132,6 +133,7 @@ export default buildConfig({
     TemplateQualityScores,
     BlockCatalogEntries,
     BlockVariants,
+    AiGenerationRecords,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

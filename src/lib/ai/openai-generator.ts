@@ -19,6 +19,7 @@ import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
+import { startCapture, finishCapture } from './capture-generation'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
 import { mapBusinessInfo } from './business-info-mapper'
 import type { BusinessSample } from './content/types'
@@ -77,10 +78,24 @@ export async function generateSiteWithAI(
         businessInfo.products,
     ].join(' | ')
 
+    // Phase 05 monitoring — capture generation record (best-effort, never blocks)
+    const cap = await startCapture({
+        endpoint: 'site-generator',
+        prompt: promptText,
+        category: businessInfo.industry ?? undefined,
+    })
+
     const openai = getOpenAI()
     if (!openai) {
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
-        return generateWithFallback(promptText, events, 'en', businessInfo)
+        const fallbackResult = await generateWithFallback(promptText, events, 'en', businessInfo)
+        const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
+        await finishCapture(cap, {
+            status: 'success',
+            selectedBlocks: fallbackBlocks,
+            outputSnapshot: { path: 'fallback-no-key', siteName: fallbackResult.result.siteName },
+        })
+        return fallbackResult
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -102,7 +117,15 @@ export async function generateSiteWithAI(
         const templateResult = await generateTemplateFirst(
             businessInfo, language, promptText, openai, events,
         )
-        if (templateResult) return templateResult
+        if (templateResult) {
+            const tfBlocks = templateResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
+            await finishCapture(cap, {
+                status: 'success',
+                selectedBlocks: tfBlocks,
+                outputSnapshot: { path: 'template-first', siteName: templateResult.result.siteName },
+            })
+            return templateResult
+        }
         // templateResult === null → composer failed, fall through to AI-first
         console.warn('[AI] Template-first returned null — falling back to AI-first path')
     }
@@ -547,13 +570,27 @@ export async function generateSiteWithAI(
             },
         })
 
+        const aiBlocks = validBlocks.map((b) => String((b as Record<string, unknown>).blockType ?? ''))
+        await finishCapture(cap, {
+            status: 'success',
+            selectedBlocks: aiBlocks,
+            outputSnapshot: { path: 'ai-first', siteName: result.siteName, totalBlocks: validBlocks.length },
+        })
+
         return { result, events }
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
         events.push({ event: 'error', data: { code: 'ai_fallback', message: 'Using smart templates', retryable: false } })
         const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
-        return generateWithFallback(promptText, events, fallbackLang, businessInfo)
+        const fallbackResult = await generateWithFallback(promptText, events, fallbackLang, businessInfo)
+        const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
+        await finishCapture(cap, {
+            status: 'success',
+            selectedBlocks: fallbackBlocks,
+            outputSnapshot: { path: 'ai-first-fallback', siteName: fallbackResult.result.siteName, error: errMessage.slice(0, 200) },
+        })
+        return fallbackResult
     }
 }
 

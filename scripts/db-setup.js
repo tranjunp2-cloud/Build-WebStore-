@@ -2985,6 +2985,106 @@ const MIGRATIONS = [
       sql: `ALTER TABLE "_pages_v_blocks_${slug}" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
     },
   ]),
+
+  // ── AiGenerationRecords: Phase 05 Monitoring ──────────────────────────────
+  {
+    name: 'ai_generation_records.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_generation_records (
+      id serial PRIMARY KEY,
+      site_id integer REFERENCES sites(id) ON DELETE SET NULL,
+      user_id integer REFERENCES users(id) ON DELETE SET NULL,
+      endpoint varchar NOT NULL,
+      category varchar,
+      prompt_mode varchar NOT NULL DEFAULT 'full',
+      prompt_text text,
+      prompt_hash varchar,
+      output_snapshot jsonb,
+      status varchar NOT NULL DEFAULT 'running',
+      error_log text,
+      duration_ms integer,
+      cost_usd numeric,
+      completed_at timestamp,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'ai_generation_records.created_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_created_at_idx ON ai_generation_records (created_at DESC);`,
+  },
+  {
+    name: 'ai_generation_records.status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_status_idx ON ai_generation_records (status);`,
+  },
+  {
+    name: 'ai_generation_records.user_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_user_id_idx ON ai_generation_records (user_id);`,
+  },
+  {
+    name: 'ai_generation_records_selected_blocks.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_selected_blocks (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      value varchar);`,
+  },
+  {
+    name: 'ai_generation_records_selected_blocks.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_selected_blocks_parent_idx ON ai_generation_records_selected_blocks (_parent_id);`,
+  },
+  // ALTER TABLE safety clones — idempotent if table was created by pushDevSchema
+  {
+    name: 'ai_generation_records.alter_site_id',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS site_id integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_user_id',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS user_id integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_endpoint',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS endpoint varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_category',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS category varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_mode',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_mode varchar NOT NULL DEFAULT 'full';`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_text',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_text text;`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_hash',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_hash varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_output_snapshot',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS output_snapshot jsonb;`,
+  },
+  {
+    name: 'ai_generation_records.alter_status',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'running';`,
+  },
+  {
+    name: 'ai_generation_records.alter_error_log',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS error_log text;`,
+  },
+  {
+    name: 'ai_generation_records.alter_duration_ms',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS duration_ms integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_cost_usd',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS cost_usd numeric;`,
+  },
+  {
+    name: 'ai_generation_records.alter_completed_at',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS completed_at timestamp;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -3015,6 +3115,7 @@ const COLLECTION_SLUGS = [
   'template_quality_scores',
   'block_catalog_entries',
   'block_variants',
+  'ai_generation_records',
 ];
 
 /**
