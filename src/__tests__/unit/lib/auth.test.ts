@@ -142,8 +142,72 @@ describe('getCurrentUser [TC-F02.33]', () => {
         const user = await getCurrentUser()
         expect(user).toBeNull()
         expect(mockFindByID).not.toHaveBeenCalled()
-        
+
         process.env.PAYLOAD_SECRET = oldSecret // restore
+    })
+
+    // Plan 260419 staging-bugs-batch — SSO_SHARED_SECRET fallback for cross-service
+    // JWT verification. Fixes "signature verification failed at /api/v1/sso/provision"
+    // when a peer Payload service (e.g. web-cms-v2) signs with a different secret.
+    it('TC-F02-SSO.01 — accepts JWT signed by SSO_SHARED_SECRET when PAYLOAD_SECRET fails', async () => {
+        mockGet.mockReturnValue({ value: 'cross-service-jwt' })
+        mockAuth.mockResolvedValue({ user: null })
+        const oldSecret = process.env.PAYLOAD_SECRET
+        const oldShared = process.env.SSO_SHARED_SECRET
+        process.env.PAYLOAD_SECRET = 'primary-secret'
+        process.env.SSO_SHARED_SECRET = 'peer-secret'
+        // First verify (PAYLOAD_SECRET) fails → second verify (SSO_SHARED_SECRET) succeeds.
+        mockJwtVerify
+            .mockRejectedValueOnce(new Error('signature verification failed'))
+            .mockResolvedValueOnce({
+                payload: { id: 'user-42', collection: 'users', mfa_verified: true },
+            })
+        mockFindByID.mockResolvedValue({ id: 'user-42', email: 'cms@example.com' })
+
+        const user = await getCurrentUser()
+        expect(user).toEqual({ id: 'user-42', email: 'cms@example.com' })
+        expect(mockJwtVerify).toHaveBeenCalledTimes(2)
+        expect(mockFindByID).toHaveBeenCalledWith({ collection: 'users', id: 'user-42' })
+
+        process.env.PAYLOAD_SECRET = oldSecret
+        process.env.SSO_SHARED_SECRET = oldShared
+    })
+
+    it('TC-F02-SSO.02 — returns null when both PAYLOAD_SECRET and SSO_SHARED_SECRET reject', async () => {
+        mockGet.mockReturnValue({ value: 'bad-jwt' })
+        mockAuth.mockResolvedValue({ user: null })
+        const oldSecret = process.env.PAYLOAD_SECRET
+        const oldShared = process.env.SSO_SHARED_SECRET
+        process.env.PAYLOAD_SECRET = 'primary-secret'
+        process.env.SSO_SHARED_SECRET = 'peer-secret'
+        mockJwtVerify
+            .mockRejectedValueOnce(new Error('signature verification failed'))
+            .mockRejectedValueOnce(new Error('signature verification failed'))
+
+        const user = await getCurrentUser()
+        expect(user).toBeNull()
+        expect(mockJwtVerify).toHaveBeenCalledTimes(2)
+        expect(mockFindByID).not.toHaveBeenCalled()
+
+        process.env.PAYLOAD_SECRET = oldSecret
+        process.env.SSO_SHARED_SECRET = oldShared
+    })
+
+    it('TC-F02-SSO.03 — does NOT call jwtVerify twice when SSO_SHARED_SECRET is unset', async () => {
+        mockGet.mockReturnValue({ value: 'bad-jwt' })
+        mockAuth.mockResolvedValue({ user: null })
+        const oldSecret = process.env.PAYLOAD_SECRET
+        const oldShared = process.env.SSO_SHARED_SECRET
+        process.env.PAYLOAD_SECRET = 'primary-secret'
+        delete process.env.SSO_SHARED_SECRET
+        mockJwtVerify.mockRejectedValueOnce(new Error('signature verification failed'))
+
+        const user = await getCurrentUser()
+        expect(user).toBeNull()
+        expect(mockJwtVerify).toHaveBeenCalledTimes(1)
+
+        process.env.PAYLOAD_SECRET = oldSecret
+        if (oldShared !== undefined) process.env.SSO_SHARED_SECRET = oldShared
     })
 })
 

@@ -6,6 +6,7 @@
 
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import { sanitizeBusinessInfo } from './sanitize-user-input'
 import { buildSystemPrompt, buildPersonalizePrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
@@ -57,11 +58,17 @@ export type SSEEvent = {
  * Falls back to rule-based generation if API key missing or AI fails.
  */
 export async function generateSiteWithAI(
-    businessInfo: BusinessInfoInput,
+    rawBusinessInfo: BusinessInfoInput,
     extraInstructions?: string,
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
     referencePrompt?: string,
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
+    // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
+    // intermittent "400 could not parse JSON body" from OpenAI when clipboard
+    // carries broken Unicode (common from mobile emoji paste + Windows clip).
+    const businessInfo = sanitizeBusinessInfo(rawBusinessInfo)
+    const sanitizedExtra = extraInstructions ? (sanitizeBusinessInfo({ extraInstructions }).extraInstructions as string) : extraInstructions
+    const sanitizedRef = referencePrompt ? (sanitizeBusinessInfo({ referencePrompt }).referencePrompt as string) : referencePrompt
     const events: SSEEvent[] = []
     const promptText = [
         businessInfo.businessName,
@@ -126,9 +133,9 @@ export async function generateSiteWithAI(
 
         const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
         const userPromptText = buildUserPrompt(businessInfo, {
-            extraInstructions,
+            extraInstructions: sanitizedExtra,
             language,
-            referencePrompt,
+            referencePrompt: sanitizedRef,
             mood: themeMood,
             recipe: layoutRecipe,
         })
