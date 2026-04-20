@@ -4,9 +4,14 @@ import React, { useState, useEffect } from 'react'
 import {
     Bold, Italic, Underline, Strikethrough,
     AlignLeft, AlignCenter, AlignRight, AlignJustify,
-    Link2, Palette, List, ListOrdered, Sparkles
+    Link2, Palette, List, ListOrdered, Sparkles, ChevronDown
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
+
+const FONT_FAMILIES = [
+    'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat',
+    'Poppins', 'Nunito', 'Raleway', 'Georgia', 'Times New Roman',
+]
 
 interface RichTextToolbarProps {
     onCommand: (command: string, value?: string) => void
@@ -22,22 +27,27 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
     const { t } = useI18n()
     const rt = t.editor.richText
     const isActive = (cmd: string) => Boolean(activeState[cmd])
-    const currentTag = String(activeState.formatBlock || 'P').toUpperCase()
-    const currentValue = ['H1', 'H2', 'H3', 'H4'].includes(currentTag) ? currentTag : 'P'
     const currentAlign = String(activeState.textAlign || 'left')
     const isAlign = (align: string) => currentAlign === align
 
+    const [fontFamily, setFontFamily] = useState('Inter')
+    const [showFontMenu, setShowFontMenu] = useState(false)
     const [showLinkInput, setShowLinkInput] = useState(false)
     const [linkUrl, setLinkUrl] = useState('')
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [showListMenu, setShowListMenu] = useState(false)
     const [fontSize, setFontSize] = useState(16)
 
-    // Sync font size from active element when toolbar first opens or element changes
+    // Sync font size + family from active element when toolbar opens or element changes
     useEffect(() => {
         const fs = Number(activeState.fontSize)
         if (fs > 0) setFontSize(fs)
     }, [activeState.fontSize])
+
+    useEffect(() => {
+        const ff = String(activeState.fontFamily || '')
+        if (ff) setFontFamily(ff)
+    }, [activeState.fontFamily])
 
     const handleFontSize = (delta: number) => {
         const next = Math.max(8, Math.min(96, fontSize + delta))
@@ -54,18 +64,37 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
             className="relative flex items-center gap-1 bg-white border border-gray-200 shadow-xl rounded-lg p-1.5 pointer-events-auto"
             onMouseDown={(e) => e.preventDefault()}
         >
-            <select
-                value={currentValue}
-                onMouseDown={(e) => e.stopPropagation()}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onCommand('formatBlock', e.target.value)}
-                className="w-[110px] h-8 text-xs border-0 bg-transparent hover:bg-gray-100 focus:ring-0 cursor-pointer outline-none"
-            >
-                <option value="H1">{rt.heading1}</option>
-                <option value="H2">{rt.heading2}</option>
-                <option value="H3">{rt.heading3}</option>
-                <option value="H4">{rt.heading4}</option>
-                <option value="P">{rt.paragraph}</option>
-            </select>
+            {/* Font family */}
+            <div className="relative">
+                <button
+                    type="button"
+                    className="flex items-center gap-1 h-8 rounded px-2 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+                    style={{ fontFamily, minWidth: 100 }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.preventDefault(); setShowFontMenu(v => !v); setShowColorPicker(false); setShowLinkInput(false); setShowListMenu(false) }}
+                >
+                    <span className="flex-1 text-left truncate">{fontFamily}</span>
+                    <ChevronDown className="w-3 h-3 text-gray-400 shrink-0" />
+                </button>
+                {showFontMenu && (
+                    <div
+                        className="absolute left-0 top-full mt-1 z-20 min-w-[140px] rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        {FONT_FAMILIES.map((f) => (
+                            <button
+                                key={f}
+                                type="button"
+                                className={`flex w-full items-center px-3 py-1.5 text-xs transition-colors hover:bg-gray-100 ${fontFamily === f ? 'text-blue-600 font-medium' : 'text-gray-700'}`}
+                                style={{ fontFamily: f }}
+                                onClick={(e) => { e.preventDefault(); setFontFamily(f); onCommand('fontName', f); setShowFontMenu(false) }}
+                            >
+                                {f}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
 
             {/* Font size */}
             <div className="flex items-center rounded border border-gray-200 overflow-hidden">

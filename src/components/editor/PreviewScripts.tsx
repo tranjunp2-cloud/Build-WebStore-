@@ -445,6 +445,9 @@ export function PreviewScripts() {
                     fontSize = parseFloat(window.getComputedStyle(currentEditingEl).fontSize) || 16
                 }
             }
+            // Read font family: inline style first, then computed
+            const fontFamily = currentEditingEl?.style.fontFamily ||
+                window.getComputedStyle(currentEditingEl!).fontFamily.split(',')[0].trim().replace(/['"]/g, '') || 'Inter'
             window.parent.postMessage({
                 type: 'SELECTION_STATE',
                 state: {
@@ -454,6 +457,7 @@ export function PreviewScripts() {
                     formatBlock: currentEditingEl?.tagName || 'P',
                     textAlign: align,
                     fontSize: Math.round(fontSize),
+                    fontFamily,
                 }
             }, parentOrigin)
         }
@@ -565,6 +569,10 @@ export function PreviewScripts() {
                     if (!isNaN(px) && px > 0) {
                         currentEditingEl.style.fontSize = `${px}px`
                     }
+
+                // ── fontName: set style.fontFamily directly ──
+                } else if (cmd === 'fontName' && val) {
+                    currentEditingEl.style.fontFamily = val
 
                 // ── other commands: fallback to execCommand ──
                 } else {
