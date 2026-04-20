@@ -20,6 +20,18 @@ const nextConfig: NextConfig = {
       ? ['tsx', 'ts', 'jsx', 'js', 'harness.tsx']
       : ['tsx', 'ts', 'jsx', 'js'],
   serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis'],
+  // Bundle .harness-out/{matrix,report}.json into the serverless function for
+  // /test-harness routes — files are generated at build time when ENABLE_HARNESS=1
+  // (see vercel.json buildCommand) but Next.js auto-trace can't see fs.readFileSync
+  // dynamic paths, so we have to include explicitly.
+  outputFileTracingIncludes: {
+    '/test-harness': ['./.harness-out/**/*.json'],
+    '/test-harness/admin': ['./.harness-out/**/*.json'],
+    '/test-harness/[fixtureId]': ['./.harness-out/**/*.json'],
+    '/test-harness/[fixtureId]/[slug]': ['./.harness-out/**/*.json'],
+    '/test-harness/ai/[category]': ['./.harness-out/**/*.json'],
+    '/test-harness/ai/[category]/[slug]': ['./.harness-out/**/*.json'],
+  },
   eslint: {
     // CI runs lint separately — skip during build to save ~1 min
     ignoreDuringBuilds: true,
