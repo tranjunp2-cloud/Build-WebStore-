@@ -1,7 +1,8 @@
 'use client'
 /**
  * AddToPackModal — pick a content pack and append this template to it.
- * GET /api/admin/packs → list packs, then PATCH /api/admin/packs/[id] with merged includedTemplates.
+ * Restyled to match bundle design tokens (modal pattern).
+ * GET /api/admin/packs → list packs, PATCH /api/admin/packs/[id] with merged includedTemplates.
  */
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -9,7 +10,6 @@ import { toast } from 'sonner'
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
 type PackOption = {
@@ -34,8 +34,8 @@ export function AddToPackModal({ templateId, templateName, onClose, onAdded }: P
 
     useEffect(() => {
         fetch('/api/admin/packs?limit=100')
-            .then(r => r.json())
-            .then(d => setPacks(d.data ?? []))
+            .then((r) => r.json())
+            .then((d) => setPacks(d.data ?? []))
             .catch(() => setPacks([]))
             .finally(() => setLoading(false))
     }, [])
@@ -45,7 +45,7 @@ export function AddToPackModal({ templateId, templateName, onClose, onAdded }: P
         setSaving(true)
         setError(null)
 
-        const pack = packs.find(p => p.id === selectedPack)
+        const pack = packs.find((p) => p.id === selectedPack)
         if (!pack) {
             setError('Pack not found')
             setSaving(false)
@@ -53,7 +53,7 @@ export function AddToPackModal({ templateId, templateName, onClose, onAdded }: P
         }
 
         // Merge existing templates with the new one (deduplicate)
-        const existing = (pack.includedTemplates ?? []).map(t => String(t.id))
+        const existing = (pack.includedTemplates ?? []).map((t) => String(t.id))
         const merged = Array.from(new Set([...existing, templateId]))
 
         try {
@@ -66,6 +66,7 @@ export function AddToPackModal({ templateId, templateName, onClose, onAdded }: P
                 const d = await res.json().catch(() => ({}))
                 throw new Error(d.error ?? 'Add failed')
             }
+            toast.success(`Added to pack`)
             onAdded()
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Add failed')
@@ -74,46 +75,50 @@ export function AddToPackModal({ templateId, templateName, onClose, onAdded }: P
     }
 
     return (
-        <Dialog open onOpenChange={open => !open && onClose()}>
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Add to Pack</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4 py-2">
-                    <p className="text-sm text-muted-foreground">
-                        Add <span className="font-medium text-foreground">{templateName}</span> to a content pack.
+                <div className="modal-body">
+                    <p className="modal-hint">
+                        Add <span className="modal-hint-em">{templateName}</span> to a content pack.
                     </p>
 
                     {loading ? (
-                        <div className="space-y-2">
-                            <Skeleton className="h-9 w-full" />
-                        </div>
+                        <Skeleton className="h-9 w-full" />
                     ) : packs.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="modal-hint">
                             No packs found. Create one in{' '}
-                            <Link href="/studio/packs" className="underline text-primary">Content Packs</Link>.
+                            <Link href="/studio/packs" className="modal-link">Content Packs</Link>.
                         </p>
                     ) : (
                         <select
                             value={selectedPack}
-                            onChange={e => setSelectedPack(e.target.value)}
-                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            onChange={(e) => setSelectedPack(e.target.value)}
+                            className="select"
                         >
                             <option value="">— Select a pack —</option>
-                            {packs.map(p => (
+                            {packs.map((p) => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
                         </select>
                     )}
 
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && <p className="modal-error">{error}</p>}
 
-                    <div className="flex justify-end gap-2 pt-1">
-                        <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-                        <Button onClick={handleAdd} disabled={saving || !selectedPack || loading}>
+                    <div className="modal-actions">
+                        <button className="btn btn-ghost" onClick={onClose} disabled={saving}>
+                            Cancel
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleAdd}
+                            disabled={saving || !selectedPack || loading}
+                        >
                             {saving ? 'Adding…' : 'Add to Pack'}
-                        </Button>
+                        </button>
                     </div>
                 </div>
             </DialogContent>

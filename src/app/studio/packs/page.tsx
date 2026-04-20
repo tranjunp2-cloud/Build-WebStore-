@@ -1,5 +1,6 @@
 /**
- * /studio/packs — Content Packs grid view.
+ * /studio/packs — Content Packs master-detail layout.
+ * Bundle: page-packs.jsx — 2-column grid: pack list (left) + detail panel (right).
  */
 export const dynamic = 'force-dynamic'
 
@@ -48,17 +49,5 @@ export default async function PacksPage() {
         updatedAt: String(p.updatedAt),
     }))
 
-    return (
-        <div className="flex flex-col h-full">
-            <div className="px-6 py-4 border-b flex-shrink-0">
-                <h1 className="text-lg font-semibold">Content Packs</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                    Curated template bundles — campaigns, industry kits, seasonal collections.
-                </p>
-            </div>
-            <div className="flex-1 overflow-auto">
-                <PacksGrid initialPacks={packs} />
-            </div>
-        </div>
-    )
+    return <PacksGrid initialPacks={packs} />
 }

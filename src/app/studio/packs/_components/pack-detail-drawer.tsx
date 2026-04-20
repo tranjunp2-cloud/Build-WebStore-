@@ -1,11 +1,11 @@
 'use client'
 /**
  * PackDetailDrawer — slide-over with tabs: Overview / Templates / Edit.
+ * Restyled to match bundle page-packs.jsx design tokens.
  */
 import { useState } from 'react'
 import { X, Trash2, Layers, ImageOff } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -61,69 +61,67 @@ export function PackDetailDrawer({ pack, onClose, onUpdated, onDeleted }: Props)
     const templates = pack.includedTemplates ?? []
 
     return (
-        <div className="fixed inset-y-0 right-0 w-96 bg-background border-l shadow-xl flex flex-col z-50">
+        <div className="pk-drawer">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-                <h2 className="font-semibold text-sm truncate">{pack.name}</h2>
-                <button onClick={onClose} className="p-1 rounded hover:bg-muted" aria-label="Close">
-                    <X size={16} />
+            <div className="pk-drawer-hd">
+                <h2 className="pk-drawer-title">{pack.name}</h2>
+                <button onClick={onClose} className="pk-drawer-close" aria-label="Close">
+                    <X size={15} />
                 </button>
             </div>
 
-            <Tabs defaultValue="overview" className="flex flex-col flex-1 min-h-0">
-                <TabsList className="mx-4 mt-3 h-8 justify-start gap-1 bg-transparent p-0 border-b rounded-none">
-                    {['overview', 'templates', 'edit'].map(t => (
-                        <TabsTrigger
-                            key={t}
-                            value={t}
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent px-2 pb-2 text-xs capitalize"
-                        >
-                            {t}
+            <Tabs defaultValue="overview" className="pk-drawer-tabs">
+                <TabsList className="pk-drawer-tablist">
+                    {['overview', 'templates', 'edit'].map((t) => (
+                        <TabsTrigger key={t} value={t} className="pk-drawer-tab">
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
                         </TabsTrigger>
                     ))}
                 </TabsList>
 
                 {/* Overview tab */}
-                <TabsContent value="overview" className="flex-1 overflow-auto p-4 mt-0 space-y-3">
-                    <div className="aspect-[4/3] bg-muted rounded flex items-center justify-center">
+                <TabsContent value="overview" className="pk-drawer-body">
+                    <div className="pk-drawer-thumb">
                         {pack.coverImage?.url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={pack.coverImage.url} alt={pack.name} className="w-full h-full object-cover rounded" />
+                            <img src={pack.coverImage.url} alt={pack.name} className="pk-drawer-thumb-img" />
                         ) : (
-                            <ImageOff size={24} className="text-muted-foreground opacity-40" />
+                            <ImageOff size={24} className="pk-drawer-thumb-icon" />
                         )}
                     </div>
-                    {pack.description && <p className="text-sm">{pack.description}</p>}
-                    <dl className="grid grid-cols-2 gap-2 text-sm">
+                    {pack.description && <p className="pk-drawer-desc">{pack.description}</p>}
+                    <dl className="pk-drawer-dl">
                         <div>
-                            <dt className="text-xs text-muted-foreground">Category</dt>
-                            <dd>{pack.category ?? '—'}</dd>
+                            <dt className="pk-drawer-dt">Category</dt>
+                            <dd className="pk-drawer-dd">{pack.category ?? '—'}</dd>
                         </div>
                         <div>
-                            <dt className="text-xs text-muted-foreground">Personality</dt>
-                            <dd>{pack.personality ?? '—'}</dd>
+                            <dt className="pk-drawer-dt">Personality</dt>
+                            <dd className="pk-drawer-dd">{pack.personality ?? '—'}</dd>
                         </div>
                         <div>
-                            <dt className="text-xs text-muted-foreground">Templates</dt>
-                            <dd className="flex items-center gap-1"><Layers size={12} /> {templates.length}</dd>
+                            <dt className="pk-drawer-dt">Templates</dt>
+                            <dd className="pk-drawer-dd pk-drawer-dd-row">
+                                <Layers size={12} /> {templates.length}
+                            </dd>
                         </div>
                         <div>
-                            <dt className="text-xs text-muted-foreground">Created</dt>
-                            <dd>{new Date(pack.createdAt).toLocaleDateString()}</dd>
+                            <dt className="pk-drawer-dt">Created</dt>
+                            <dd className="pk-drawer-dd">{new Date(pack.createdAt).toLocaleDateString('vi-VN')}</dd>
                         </div>
                     </dl>
                 </TabsContent>
 
                 {/* Templates tab */}
-                <TabsContent value="templates" className="flex-1 overflow-auto p-4 mt-0">
+                <TabsContent value="templates" className="pk-drawer-body">
                     {templates.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No templates in this pack.</p>
+                        <p className="pk-drawer-empty">No templates in this pack.</p>
                     ) : (
-                        <ul className="space-y-1">
-                            {templates.map(t => (
-                                <li key={t.id} className="flex items-center gap-2 text-sm py-1.5 border-b last:border-0">
-                                    <Layers size={12} className="text-muted-foreground flex-shrink-0" />
-                                    <span className="truncate">{t.name}</span>
+                        <ul className="pk-drawer-tmpl-list">
+                            {templates.map((t) => (
+                                <li key={t.id} className="pk-drawer-tmpl-row">
+                                    <Layers size={12} className="pk-drawer-tmpl-icon" />
+                                    <span className="pk-drawer-tmpl-name">{t.name}</span>
                                 </li>
                             ))}
                         </ul>
@@ -131,23 +129,23 @@ export function PackDetailDrawer({ pack, onClose, onUpdated, onDeleted }: Props)
                 </TabsContent>
 
                 {/* Edit tab */}
-                <TabsContent value="edit" className="flex-1 overflow-auto p-4 mt-0 space-y-4">
-                    <div className="space-y-1.5">
+                <TabsContent value="edit" className="pk-drawer-body pk-drawer-body-edit">
+                    <div className="pk-drawer-field">
                         <Label htmlFor="edit-name">Name</Label>
-                        <Input id="edit-name" value={editName} onChange={e => setEditName(e.target.value)} />
+                        <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="pk-drawer-field">
                         <Label htmlFor="edit-desc">Description</Label>
-                        <Textarea id="edit-desc" value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={4} />
+                        <Textarea id="edit-desc" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={4} />
                     </div>
-                    <div className="flex gap-2">
-                        <Button size="sm" onClick={handleSave} disabled={saving || !editName.trim()}>
+                    <div className="pk-drawer-edit-actions">
+                        <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving || !editName.trim()}>
                             {saving ? 'Saving…' : 'Save'}
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={handleDelete} disabled={deleting}>
-                            <Trash2 size={13} className="mr-1" />
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={handleDelete} disabled={deleting}>
+                            <Trash2 size={13} />
                             {deleting ? 'Deleting…' : 'Delete'}
-                        </Button>
+                        </button>
                     </div>
                 </TabsContent>
             </Tabs>
