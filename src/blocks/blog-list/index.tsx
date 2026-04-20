@@ -33,9 +33,14 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
 
-    // BUG-F05-06: build blog links using tenant slug from server-injected site prop
-    const tenantSlug = (site as Record<string, unknown>)?.tenantSlug as string | undefined
-    const blogBasePath = tenantSlug ? `/sites/${tenantSlug}/blogs` : '/blogs'
+    // BUG-F05-06: build blog links using site base path injected server-side.
+    // `siteBasePath` is '' on subdomain/custom-domain, '/sites/<slug>' on local
+    // direct access. Fallback to tenantSlug if siteBasePath not provided.
+    const siteRec = site as Record<string, unknown>
+    const siteBasePath = typeof siteRec?.siteBasePath === 'string'
+        ? (siteRec.siteBasePath as string)
+        : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
+    const blogBasePath = `${siteBasePath}/blogs`
 
     useEffect(() => {
         const tenantId = site?.tenant
