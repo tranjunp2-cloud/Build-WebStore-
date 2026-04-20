@@ -1,117 +1,163 @@
 'use client'
 /**
  * builder-library-pane.tsx
- * Left pane: filterable block list from registry.
- * Click "Add" appends to end of canvas. All 29+ blocks shown;
- * inspector-edit only for the 10 with SECTION_FIELD_SCHEMA.
+ * Left pane: filterable block list with category rail.
+ * Ported DOM from builder-library.jsx. Zustand wiring unchanged.
  */
 import { useState } from 'react'
-import { Search, Plus } from 'lucide-react'
 import { listAllBlocks } from '@/lib/admin/block-registry-reader'
-import { SCHEMA_SUPPORTED_TYPES } from '@/lib/admin/section-field-schema'
 import { useBuilderStore } from '@/lib/admin/builder-store'
 
 const ALL_BLOCKS = listAllBlocks()
 
-const CATEGORY_LABELS: Record<string, string> = {
-    hero: 'Hero', nav: 'Nav', content: 'Content', social: 'Social',
-    media: 'Media', conversion: 'Conversion', commerce: 'Commerce',
-    blog: 'Blog', utility: 'Utility', industry: 'Industry', other: 'Other',
-}
+// Category metadata for the sidebar rail
+const BLOCK_CATEGORIES = [
+    { id: 'all',        name: 'All',        icon: '▦' },
+    { id: 'hero',       name: 'Hero',       icon: '🦸' },
+    { id: 'nav',        name: 'Nav',        icon: '🧭' },
+    { id: 'content',    name: 'Content',    icon: '📝' },
+    { id: 'social',     name: 'Social',     icon: '💬' },
+    { id: 'media',      name: 'Media',      icon: '🖼️' },
+    { id: 'conversion', name: 'Conversion', icon: '📣' },
+    { id: 'commerce',   name: 'Commerce',   icon: '💰' },
+    { id: 'blog',       name: 'Blog',       icon: '📰' },
+    { id: 'utility',    name: 'Utility',    icon: '🔧' },
+    { id: 'industry',   name: 'Industry',   icon: '🏭' },
+    { id: 'other',      name: 'Other',      icon: '📦' },
+]
 
 export function BuilderLibraryPane() {
-    const [query, setQuery] = useState('')
-    const [activeCategory, setActiveCategory] = useState<string | null>(null)
-    const { addBlock } = useBuilderStore()
+    const [query, setQuery]     = useState('')
+    const [cat, setCat]         = useState('all')
+    const [collapsed, setCollapsed] = useState(false)
+    const { addBlock }          = useBuilderStore()
+
+    const countByCat = (id: string) =>
+        id === 'all' ? ALL_BLOCKS.length : ALL_BLOCKS.filter((b) => b.category === id).length
 
     const filtered = ALL_BLOCKS.filter((b) => {
-        const matchQ = query === '' ||
+        const matchCat = cat === 'all' || b.category === cat
+        const matchQ   = query === '' ||
             b.name.toLowerCase().includes(query.toLowerCase()) ||
-            b.slug.toLowerCase().includes(query.toLowerCase())
-        const matchC = activeCategory === null || b.category === activeCategory
-        return matchQ && matchC
+            b.slug.toLowerCase().includes(query.toLowerCase()) ||
+            b.description.toLowerCase().includes(query.toLowerCase())
+        return matchCat && matchQ
     })
 
-    const categories = Array.from(new Set(ALL_BLOCKS.map((b) => b.category)))
-
-    return (
-        <div className="flex flex-col h-full overflow-hidden">
-            <div className="p-2 border-b flex-shrink-0 space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground px-1">Blocks</p>
-                {/* Search */}
-                <div className="relative">
-                    <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                        type="text"
-                        placeholder="Search..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="w-full pl-6 pr-2 py-1 text-xs rounded border border-input bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                </div>
-                {/* Category filter chips */}
-                <div className="flex flex-wrap gap-1">
+    /* ── Collapsed rail ── */
+    if (collapsed) {
+        return (
+            <aside className="b-library">
+                <div className="b-pane-head" style={{ padding: '0 6px', justifyContent: 'center' }}>
                     <button
                         type="button"
-                        onClick={() => setActiveCategory(null)}
-                        className={[
-                            'px-2 py-0.5 text-[10px] rounded-full border transition-colors',
-                            activeCategory === null
-                                ? 'bg-primary text-primary-foreground border-primary'
-                                : 'border-border hover:bg-muted',
-                        ].join(' ')}
+                        className="b-pane-collapse-btn"
+                        onClick={() => setCollapsed(false)}
+                        title="Expand library"
                     >
-                        All
+                        ›
                     </button>
-                    {categories.map((cat) => (
+                </div>
+                <div className="b-lib-collapsed">
+                    {BLOCK_CATEGORIES.map((c) => (
                         <button
-                            key={cat}
+                            key={c.id}
                             type="button"
-                            onClick={() => setActiveCategory(cat === activeCategory ? null : cat)}
-                            className={[
-                                'px-2 py-0.5 text-[10px] rounded-full border transition-colors',
-                                activeCategory === cat
-                                    ? 'bg-primary text-primary-foreground border-primary'
-                                    : 'border-border hover:bg-muted',
-                            ].join(' ')}
+                            className={cat === c.id ? 'active' : ''}
+                            title={c.name}
+                            onClick={() => { setCat(c.id); setCollapsed(false) }}
                         >
-                            {CATEGORY_LABELS[cat] ?? cat}
+                            {c.icon}
                         </button>
                     ))}
                 </div>
+            </aside>
+        )
+    }
+
+    /* ── Expanded ── */
+    return (
+        <aside className="b-library">
+            {/* Pane header */}
+            <div className="b-pane-head">
+                Block Library
+                <span className="sub">{ALL_BLOCKS.length} blocks</span>
+                <button
+                    type="button"
+                    className="b-pane-collapse-btn"
+                    onClick={() => setCollapsed(true)}
+                    title="Collapse library"
+                    style={{ transform: 'rotate(180deg)' }}
+                >
+                    ›
+                </button>
+            </div>
+
+            {/* Search */}
+            <div className="b-search">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                    type="text"
+                    placeholder="Search blocks, types…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                />
+            </div>
+
+            {/* Category list */}
+            <div className="b-cat-list scroll-thin">
+                {BLOCK_CATEGORIES.map((c) => (
+                    <div
+                        key={c.id}
+                        role="button"
+                        tabIndex={0}
+                        className={'b-cat-row' + (cat === c.id ? ' active' : '')}
+                        onClick={() => setCat(c.id)}
+                        onKeyDown={(e) => e.key === 'Enter' && setCat(c.id)}
+                    >
+                        <span className="cat-icon">{c.icon}</span>
+                        <span>{c.name}</span>
+                        <span className="count">{countByCat(c.id)}</span>
+                    </div>
+                ))}
             </div>
 
             {/* Block list */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            <div className="b-block-list scroll-thin">
                 {filtered.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-4">No blocks match.</p>
+                    <div style={{ padding: '20px 12px', fontSize: 12, color: 'var(--text-3)', textAlign: 'center' }}>
+                        No blocks found
+                    </div>
                 )}
-                {filtered.map((block) => {
-                    const hasSchema = SCHEMA_SUPPORTED_TYPES.includes(block.slug)
-                    return (
-                        <div
-                            key={block.slug}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted group"
-                        >
-                            <span className="text-sm flex-shrink-0" aria-hidden>{block.icon}</span>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium truncate">{block.name}</p>
-                                {!hasSchema && (
-                                    <p className="text-[10px] text-muted-foreground">Inspector: soon</p>
-                                )}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => addBlock(block.slug)}
-                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-primary/10 hover:text-primary text-muted-foreground transition-opacity flex-shrink-0"
-                                aria-label={`Add ${block.name}`}
-                            >
-                                <Plus size={13} />
-                            </button>
+                {filtered.map((block) => (
+                    <div
+                        key={block.slug}
+                        role="button"
+                        tabIndex={0}
+                        className="b-block-card"
+                        onClick={() => addBlock(block.slug)}
+                        onKeyDown={(e) => e.key === 'Enter' && addBlock(block.slug)}
+                        title="Click to add to canvas"
+                    >
+                        <div className="b-bc-head">
+                            <div className="b-bc-icon">{block.icon}</div>
+                            <div className="b-bc-name">{block.name}</div>
+                            <div className="b-bc-meta">{block.variants.length}v</div>
                         </div>
-                    )
-                })}
+                        <div className="b-bc-desc">{block.description}</div>
+                        <div className="b-bc-variants">
+                            {block.variants.slice(0, 3).map((v) => (
+                                <span key={v} className="b-bc-variant">{v}</span>
+                            ))}
+                            {block.variants.length > 3 && (
+                                <span className="b-bc-variant more">+{block.variants.length - 3}</span>
+                            )}
+                        </div>
+                    </div>
+                ))}
             </div>
-        </div>
+        </aside>
     )
 }

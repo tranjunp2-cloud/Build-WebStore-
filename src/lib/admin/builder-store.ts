@@ -24,6 +24,7 @@ interface BuilderState {
     addBlock: (type: string, atIdx?: number) => void
     reorder: (fromIdx: number, toIdx: number) => void
     updateSelected: (patch: Record<string, unknown>) => void
+    patchSection: (id: string, patch: Record<string, unknown>) => void
     deleteSection: (id: string) => void
     duplicateSection: (id: string) => void
     select: (id: string | null) => void
@@ -73,6 +74,15 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
                 s.id === selectedId
                     ? { ...s, config: { ...s.config, ...patch } }
                     : s,
+            ),
+            dirty: true,
+        }))
+    },
+
+    patchSection(id, patch) {
+        set((state) => ({
+            sections: state.sections.map((s) =>
+                s.id === id ? { ...s, config: { ...s.config, ...patch } } : s,
             ),
             dirty: true,
         }))
