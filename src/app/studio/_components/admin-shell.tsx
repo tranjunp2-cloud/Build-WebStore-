@@ -18,15 +18,17 @@ export function AdminShell({
     user,
     counts,
     children,
+    fontVariable,
 }: {
     user: AdminUser
     counts: SidebarCounts
     children: React.ReactNode
+    fontVariable?: string
 }) {
     const { sidebarCollapsed } = useStudioPreferences()
 
     return (
-        <div className={`studio-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+        <div className={`studio-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}${fontVariable ? ` ${fontVariable}` : ''}`}>
             <AdminSidebar user={user} counts={counts} />
 
             <div className="studio-main-col">

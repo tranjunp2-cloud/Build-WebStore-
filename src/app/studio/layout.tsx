@@ -3,9 +3,11 @@
  * Enforces super-admin RBAC via requireSuperAdmin() (defense-in-depth on top of middleware).
  * Fetches sidebar badge counts in parallel with auth check.
  * Imports globals.css for Tailwind base/utilities, then studio.css for scoped design tokens.
+ * Font: Geist Sans (Vercel-native, next/font) — scoped to /studio/* only.
  */
 import '../globals.css'
 import './studio.css'
+import { GeistSans } from 'geist/font/sans'
 import { requireSuperAdmin } from '@/lib/admin/auth-guard'
 import { fetchSidebarCounts } from './_components/sidebar-counts'
 import { AdminShell } from './_components/admin-shell'
@@ -28,5 +30,5 @@ export default async function StudioLayout({
         fetchSidebarCounts(),
     ])
 
-    return <AdminShell user={user} counts={counts}>{children}</AdminShell>
+    return <AdminShell user={user} counts={counts} fontVariable={GeistSans.variable}>{children}</AdminShell>
 }

@@ -80,6 +80,7 @@
     "dompurify": "^3.4.0",
     "framer-motion": "^11.12.0",
     "franc-min": "^6.2.0",
+    "geist": "^1.7.0",
     "graphql": "^16.13.1",
     "isomorphic-dompurify": "~2.26.0",
     "lucide-react": "^0.454.0",

@@ -2,6 +2,7 @@
  * /studio/generations — User Generations live feed.
  * Server component: fetches first 50 records, passes to client feed.
  * Client feed polls every 10s for updates.
+ * Layout handled entirely by GenerationsLiveFeed (gen-page class).
  */
 export const dynamic = 'force-dynamic'
 
@@ -38,18 +39,5 @@ export default async function GenerationsPage() {
         },
     }
 
-    return (
-        <div style={{ padding: '24px 28px', maxWidth: 1200 }}>
-            <div style={{ marginBottom: 20 }}>
-                <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)', margin: 0 }}>
-                    User Generations
-                </h1>
-                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-2)' }}>
-                    Live feed of AI generation requests — auto-refreshes every 10 seconds.
-                </p>
-            </div>
-
-            <GenerationsLiveFeed initialData={initialData} />
-        </div>
-    )
+    return <GenerationsLiveFeed initialData={initialData} />
 }
