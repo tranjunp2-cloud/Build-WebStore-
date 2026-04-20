@@ -1,7 +1,7 @@
 /**
  * /studio/versions
  * Server component: timeline of latest 50 versions across all templates.
- * Replaces Phase 09 placeholder.
+ * VersionsTimeline owns the split layout (bundle design Batch 2).
  */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Versions' }
@@ -44,12 +44,30 @@ export default async function VersionsPage() {
     })
 
     return (
-        <div className="p-6 max-w-2xl">
-            <div className="mb-6">
-                <h1 className="text-lg font-semibold">Version History</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                    Latest 50 saves across all templates. Rollback available in F07.
-                </p>
+        <div className="page">
+            <div className="page-head" style={{ marginBottom: 20 }}>
+                <div>
+                    <h1 className="page-title">Versioning &amp; Rollback</h1>
+                    <p className="page-sub">
+                        View version history, compare diffs, rollback to a safe checkpoint.
+                        Rollback available in F07.
+                    </p>
+                </div>
+                <div className="page-actions">
+                    <button className="btn btn-sm">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 12s1-1 4-1 5 2 8 2 4-1 4-1V2s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="1" y1="7" x2="17" y2="7"/>
+                        </svg>
+                        Preview
+                    </button>
+                    <button className="btn btn-sm btn-primary">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h1v3l3-3h3a2 2 0 0 0 2-2V8"/>
+                            <path d="M15 2h-6a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h2l2 2V7h2a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/>
+                        </svg>
+                        Open builder
+                    </button>
+                </div>
             </div>
 
             <VersionsTimeline versions={versions} showTemplateName />

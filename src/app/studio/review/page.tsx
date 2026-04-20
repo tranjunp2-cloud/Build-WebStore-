@@ -1,5 +1,6 @@
 /**
  * /studio/review — Slim review workflow: approve or reject templates in status=review.
+ * ReviewQueue owns the full page layout (bundle design).
  */
 export const dynamic = 'force-dynamic'
 
@@ -48,17 +49,5 @@ export default async function ReviewPage({ searchParams }: PageProps) {
         updatedAt: String(t.updatedAt),
     }))
 
-    return (
-        <div className="flex flex-col h-full">
-            <div className="px-6 py-4 border-b flex-shrink-0">
-                <h1 className="text-lg font-semibold">Review Workflow</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                    {result.totalDocs} template{result.totalDocs !== 1 ? 's' : ''} pending review
-                </p>
-            </div>
-            <div className="flex-1 overflow-auto">
-                <ReviewQueue initialTemplates={templates} />
-            </div>
-        </div>
-    )
+    return <ReviewQueue initialTemplates={templates} />
 }

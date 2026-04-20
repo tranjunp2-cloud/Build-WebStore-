@@ -2374,3 +2374,248 @@
 
 /* ── bulk-inline (reuse from template list, already defined)      */
 /* Already defined above as .studio-shell .bulk-inline */
+
+/* ============================================================
+   REVIEW WORKFLOW — Batch 2
+   ============================================================ */
+
+/* Split layout: 340px queue | detail panel */
+.studio-shell .rw-split {
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .studio-shell .rw-split {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Queue scroll area */
+.studio-shell .rw-queue-scroll {
+    max-height: calc(100vh - 260px);
+    overflow: auto;
+}
+
+/* Individual queue row — button reset + custom layout */
+.studio-shell .rw-queue-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    border-left: 3px solid transparent;
+    border-bottom: 1px dashed var(--border);
+    cursor: pointer;
+    background: transparent;
+    font-family: inherit;
+    transition: background 120ms ease;
+}
+
+.studio-shell .rw-queue-item:hover {
+    background: var(--bg-hover);
+}
+
+.studio-shell .rw-queue-item--active {
+    border-left-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+/* Item name row */
+.studio-shell .rw-queue-item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.studio-shell .rw-queue-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+}
+
+.studio-shell .rw-queue-item-meta {
+    font-size: 11px;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Inline status badge (review) */
+.studio-shell .rw-status-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+/* Check progress bar (queue item) */
+.studio-shell .rw-check-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-sunk);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.studio-shell .rw-check-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+}
+
+/* Detail grid: checks left | decision right (340px) */
+.studio-shell .rw-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 14px;
+    align-items: start;
+}
+
+@media (max-width: 1100px) {
+    .studio-shell .rw-detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Pre-publish check row */
+.studio-shell .rw-check-row {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+    align-items: flex-start;
+}
+
+.studio-shell .rw-check-row:last-child {
+    border-bottom: none;
+}
+
+.studio-shell .rw-check-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* ============================================================
+   VERSIONS TIMELINE — Batch 2
+   ============================================================ */
+
+/* Timeline item wrapper (vertical line on left) */
+.studio-shell .vt-timeline-item {
+    position: relative;
+    padding-left: 40px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    margin-left: 8px;
+    cursor: pointer;
+}
+
+/* Branch dot */
+.studio-shell .vt-dot {
+    position: absolute;
+    left: -9px;
+    top: 14px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+}
+
+/* Version entry card */
+.studio-shell .vt-version-card {
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-elev);
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.studio-shell .vt-version-card:hover {
+    border-color: var(--border-strong);
+}
+
+.studio-shell .vt-version-card--selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+/* Rollback disabled tooltip wrapper */
+.studio-shell .vt-rollback-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.studio-shell .vt-rollback-tooltip {
+    pointer-events: none;
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    border-radius: 4px;
+    background: var(--text);
+    color: var(--bg-elev);
+    padding: 2px 8px;
+    font-size: 10px;
+    opacity: 0;
+    transition: opacity 150ms ease;
+    z-index: 10;
+}
+
+.studio-shell .vt-rollback-wrap:hover .vt-rollback-tooltip {
+    opacity: 1;
+}
+
+/* Version detail panel label */
+.studio-shell .vt-detail-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+/* Diff viewer row */
+.studio-shell .vt-diff-row {
+    padding: 10px 16px;
+    display: grid;
+    grid-template-columns: 100px 120px 1fr 1fr 72px;
+    gap: 12px;
+    align-items: center;
+    font-size: 12px;
+}
+
+@media (max-width: 900px) {
+    .studio-shell .vt-diff-row {
+        grid-template-columns: 80px 1fr;
+        grid-template-rows: auto auto;
+    }
+}
+
+/* Diff kind pill */
+.studio-shell .vt-diff-kind {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
