@@ -147,13 +147,24 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             }
         }
 
-        // Publish visibility changes immediately so live site reflects them
+        // Apply visibility changes. `draft: false` tells Payload to publish
+        // the update, which forces full-doc validation on every required
+        // block field in the layout — AI-seeded or partially-edited pages
+        // sometimes fail that and throw 500, blocking a simple hide/unhide.
+        //
+        // Respect `page._status` so we only go through the publish path when
+        // the current version IS the published snapshot (no pending edits to
+        // leak). Otherwise save to draft; live site picks it up at next
+        // publish. Trade-off: toggling visibility on a page with pending
+        // content edits defers the live change until republish, which is
+        // semantically correct (visibility is part of the pending edit set).
         if (Object.keys(visibilityFields).length > 0) {
+            const isPublishedClean = page._status === 'published'
             await payload.update({
                 collection: 'pages',
                 id: pageId,
                 data: visibilityFields,
-                draft: false,
+                draft: !isPublishedClean,
             })
         }
 
@@ -199,7 +210,45 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             }
         })
     } catch (error) {
-        console.error('Error updating page:', error)
-        return new NextResponse('Internal Error', { status: 500 })
+        console.error('[PATCH /sites/:siteId/pages/:pageId] error:', error)
+
+        // Surface structured detail (errName, errMsg, Payload validationErrors)
+        // so the client + future debugging UI can tell the real cause. Until
+        // this change the catch returned a bare "Internal Error" string and
+        // the toggle-visibility bug was invisible past the 500.
+        //
+        // Shape intentionally mirrors `/api/sites/[siteId]/publish`'s
+        // `error.failures[]` envelope so one client parser handles both
+        // endpoints (see `handleRepublish` in editor page.tsx).
+        const err = error as {
+            name?: string
+            message?: string
+            data?: { errors?: Array<{ field?: string; path?: string; message?: string }> }
+        }
+        const rawErrors = err?.data?.errors
+        const validationErrors = Array.isArray(rawErrors)
+            ? rawErrors.map((e) => ({
+                path: e.path ?? e.field ?? '',
+                message: e.message ?? '',
+            }))
+            : undefined
+
+        const resolvedPageId = await ctx.params.then((p) => p.pageId).catch(() => undefined)
+
+        return NextResponse.json(
+            {
+                error: {
+                    message: 'Failed to update page',
+                    failures: [{
+                        pageId: resolvedPageId,
+                        errName: err?.name,
+                        errMsg: err?.message?.slice(0, 300),
+                        causeMsg: err?.message?.slice(0, 300),
+                        validationErrors: validationErrors && validationErrors.length > 0 ? validationErrors : undefined,
+                    }],
+                },
+            },
+            { status: 500 },
+        )
     }
 })
