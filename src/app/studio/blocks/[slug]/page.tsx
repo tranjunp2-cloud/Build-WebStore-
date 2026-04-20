@@ -2,6 +2,7 @@
  * /studio/blocks/[slug] — Block detail page (server component).
  * Fetches single block registry entry + admin overrides + variant overrides
  * + used-by templates, then renders BlockDetailTabs client component.
+ * Header: icon + name + ai-pill + 4 stat cards (matches bundle builder-block-detail.jsx).
  */
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
@@ -84,6 +85,8 @@ export default async function BlockDetailPage({ params }: Props) {
             category: Array.isArray(doc.category) ? doc.category : [],
         }))
 
+    const usageCount = usageCounts[slug] ?? 0
+
     const blockData: BlockDetailData = {
         slug: block.slug,
         name: block.name,
@@ -95,7 +98,7 @@ export default async function BlockDetailPage({ params }: Props) {
         defaultVariant: block.defaultVariant,
         editableFields: block.editableFields,
         aiVisible: block.aiVisible,
-        usageCount: usageCounts[slug] ?? 0,
+        usageCount,
         descriptionOverride: (override?.descriptionOverride as string) ?? null,
         descriptionOverrideVi: (override?.descriptionOverrideVi as string) ?? null,
         curatedPreviewUrl: (override?.curatedPreviewUrl as string) ?? null,
@@ -109,26 +112,82 @@ export default async function BlockDetailPage({ params }: Props) {
     }
 
     return (
-        <div className="flex flex-col gap-6 p-6 max-w-5xl">
+        <div className="page" style={{ maxWidth: 1200 }}>
             {/* Breadcrumb */}
-            <nav className="flex items-center gap-2 text-xs text-white/40">
-                <Link href="/studio/blocks" className="hover:text-white/70 transition-colors">
-                    Block Catalog
+            <nav style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, fontSize: 12 }}>
+                <Link
+                    href="/studio/blocks"
+                    className="b-btn ghost"
+                    style={{ height: 26, padding: '0 8px', fontSize: 12 }}
+                >
+                    ← Block Catalog
                 </Link>
-                <span>/</span>
-                <span className="text-white/70">{block.name}</span>
+                <span className="b-crumb-sep">/</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    {block.category}
+                </span>
+                <span className="b-crumb-sep">/</span>
+                <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>
+                    {block.name}
+                </span>
             </nav>
 
-            {/* Page header */}
-            <div className="flex items-center gap-4">
-                <span className="text-4xl leading-none" aria-hidden>{block.icon}</span>
-                <div>
-                    <h1 className="text-xl font-bold text-white">{block.nameVi}</h1>
-                    <p className="text-sm text-white/50">{block.name} &middot; <code className="font-mono text-xs text-white/40">{slug}</code></p>
+            {/* Detail header — icon + name + ai-pill + 4 stat cards */}
+            <div className="b-detail-head">
+                {/* Left: icon + name info */}
+                <div className="left">
+                    <div className="bd-icon">{block.icon}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <h1 className="bd-name">
+                            {block.name}
+                            <span className="bd-type-code">{slug}</span>
+                            {block.aiVisible ? (
+                                <span className="bd-ai-pill">✓ AI-visible</span>
+                            ) : (
+                                <span className="bd-manual-pill">Manual only</span>
+                            )}
+                        </h1>
+                        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
+                            {blockData.descriptionOverride ?? block.description}
+                        </p>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                            <span className="b-chip" style={{ cursor: 'default' }}>
+                                Category: {block.category}
+                            </span>
+                            {block.defaultVariant && (
+                                <span className="b-chip" style={{ cursor: 'default' }}>
+                                    Default:{' '}
+                                    <span style={{ fontFamily: 'var(--mono)', marginLeft: 4 }}>
+                                        {block.defaultVariant}
+                                    </span>
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right: 4 stat cards */}
+                <div className="right">
+                    <div className="bd-stat">
+                        <div className="bd-stat-val">{block.variants.length}</div>
+                        <div className="bd-stat-label">Variants</div>
+                    </div>
+                    <div className="bd-stat">
+                        <div className="bd-stat-val">{block.variants.length}</div>
+                        <div className="bd-stat-label">Enabled</div>
+                    </div>
+                    <div className="bd-stat">
+                        <div className="bd-stat-val">{block.editableFields.length}</div>
+                        <div className="bd-stat-label">Fields</div>
+                    </div>
+                    <div className="bd-stat">
+                        <div className="bd-stat-val">{usageCount}</div>
+                        <div className="bd-stat-label">Templates</div>
+                    </div>
                 </div>
             </div>
 
-            {/* Detail tabs */}
+            {/* 6-tab detail component */}
             <BlockDetailTabs block={blockData} />
         </div>
     )

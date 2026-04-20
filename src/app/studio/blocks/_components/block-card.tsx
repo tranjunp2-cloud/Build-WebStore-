@@ -3,10 +3,10 @@
 /**
  * block-card.tsx
  * Single block card in the catalog grid.
- * Shows icon, EN/VI name, variant count, usage stat, hidden badge.
+ * Styled to match design bundle .b-card pattern.
+ * Shows icon, EN/VI name, variant count, usage stat, AI pill, hidden badge.
  */
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 
 export type BlockCardData = {
     slug: string
@@ -19,6 +19,7 @@ export type BlockCardData = {
     usageCount: number
     hiddenFromCatalog: boolean
     curatedPreviewUrl: string | null
+    aiVisible: boolean
 }
 
 type Props = {
@@ -27,43 +28,40 @@ type Props = {
 
 export function BlockCard({ block }: Props) {
     return (
-        <Link
-            href={`/studio/blocks/${block.slug}`}
-            className="group relative flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4 transition-colors hover:bg-white/10 hover:border-white/20"
-        >
-            {/* Hidden badge */}
-            {block.hiddenFromCatalog && (
-                <Badge
-                    variant="secondary"
-                    className="absolute right-3 top-3 text-xs bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-                >
-                    Hidden
-                </Badge>
-            )}
-
-            {/* Icon */}
-            <span className="text-3xl leading-none" aria-hidden>
-                {block.icon}
-            </span>
-
-            {/* Names */}
-            <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-semibold text-white leading-tight">
-                    {block.nameVi}
-                </span>
-                <span className="text-xs text-white/50">{block.name}</span>
+        <Link href={`/studio/blocks/${block.slug}`} className="b-card" style={{ padding: 14 }}>
+            {/* Icon + name row */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                <div className="b-card-icon">{block.icon}</div>
+                <div className="b-card-meta">
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>
+                        {block.nameVi}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{block.name}</div>
+                </div>
             </div>
 
             {/* Stats row */}
-            <div className="flex items-center gap-3 mt-auto pt-2 border-t border-white/10">
-                <span className="text-xs text-white/50">
+            <div className="b-card-stats">
+                <span>
                     {block.variants.length} variant{block.variants.length !== 1 ? 's' : ''}
                 </span>
                 {block.usageCount > 0 && (
-                    <span className="text-xs text-emerald-400 ml-auto">
-                        {block.usageCount} template{block.usageCount !== 1 ? 's' : ''}
+                    <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+                        {block.usageCount} tpl
                     </span>
                 )}
+                <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+                    {block.aiVisible ? (
+                        <span className="b-type-pill ai">AI</span>
+                    ) : (
+                        <span className="b-type-pill">manual</span>
+                    )}
+                    {block.hiddenFromCatalog && (
+                        <span className="b-type-pill" style={{ color: 'var(--warn)', borderColor: 'rgba(217,119,6,0.3)', background: 'rgba(217,119,6,0.08)' }}>
+                            hidden
+                        </span>
+                    )}
+                </span>
             </div>
         </Link>
     )

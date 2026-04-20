@@ -3123,3 +3123,1100 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
+
+/* ============================================================
+   BLOCK CATALOG PAGE — Batch 4 styles
+   Ported 1-to-1 from design bundle page-blocks.jsx
+   ============================================================ */
+
+/* ── Mode toggle (matrix / blocks / impact) ────────────────── */
+.studio-shell .b-modes {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 2px;
+    background: var(--bg-elev);
+    gap: 0;
+}
+
+.studio-shell .b-mode-tab {
+    height: 28px;
+    padding: 0 14px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-2);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 120ms ease, color 120ms ease;
+    white-space: nowrap;
+}
+
+.studio-shell .b-mode-tab.active {
+    background: var(--bg-sunk);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.dark .studio-shell .b-mode-tab.active {
+    background: var(--bg);
+}
+
+/* ── 5-stat strip ──────────────────────────────────────────── */
+.studio-shell .b-stats {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+    .studio-shell .b-stats {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.studio-shell .b-stat {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.studio-shell .b-stat-label {
+    font-size: 10px;
+    color: var(--text-3);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.studio-shell .b-stat-val {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.studio-shell .b-stat-sub {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 1px;
+}
+
+/* ── Matrix view ───────────────────────────────────────────── */
+.studio-shell .b-matrix {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+}
+
+.studio-shell .b-matrix thead {
+    position: sticky;
+    top: 0;
+    background: var(--bg-elev);
+    z-index: 1;
+}
+
+.studio-shell .b-matrix-head {
+    text-align: center;
+    padding: 10px 6px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    min-width: 54px;
+}
+
+.studio-shell .b-matrix-head-template {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    min-width: 180px;
+    position: sticky;
+    left: 0;
+    background: var(--bg-elev);
+    z-index: 2;
+}
+
+.studio-shell .b-matrix-sticky {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+}
+
+.studio-shell .b-matrix-row:hover .b-matrix-sticky {
+    background: var(--bg-hover) !important;
+}
+
+.studio-shell .b-matrix-cell {
+    padding: 6px 4px;
+    border-bottom: 1px dashed var(--border);
+    text-align: center;
+}
+
+.studio-shell .b-matrix-cell-filled {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 22px;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.studio-shell .b-matrix-cell-empty {
+    width: 32px;
+    height: 22px;
+    margin: 0 auto;
+    border-radius: 4px;
+    background: var(--bg-sunk);
+    border: 1px dashed var(--border);
+}
+
+/* ── Block catalog list (blocks mode) ─────────────────────── */
+.studio-shell .b-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    text-decoration: none;
+    color: inherit;
+}
+
+.studio-shell .b-card:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.studio-shell .b-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.studio-shell .b-card-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.studio-shell .b-card-stats {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--text-3);
+    padding-top: 8px;
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.studio-shell .b-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 120ms ease;
+    text-decoration: none;
+    color: inherit;
+}
+
+.studio-shell .b-row:last-child {
+    border-bottom: none;
+}
+
+.studio-shell .b-row:hover {
+    background: var(--bg-hover);
+}
+
+/* type pills in table rows */
+.studio-shell .b-type-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--bg-sunk);
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    white-space: nowrap;
+}
+
+.studio-shell .b-type-pill.ai {
+    background: var(--accent-soft);
+    border-color: var(--accent-border);
+    color: var(--accent);
+}
+
+/* ── Impact simulator (stub) ───────────────────────────────── */
+.studio-shell .impact-sim-stub {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 64px 32px;
+    text-align: center;
+    border: 1px dashed var(--border-dashed);
+    border-radius: var(--radius-lg);
+    background: var(--bg-elev);
+}
+
+.studio-shell .impact-sim-stub .i-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+}
+
+.studio-shell .impact-sim-stub .i-sub {
+    font-size: 13px;
+    color: var(--text-3);
+    margin: 0;
+}
+
+/* ============================================================
+   BLOCK DETAIL PAGE — Batch 4 styles
+   Ported 1-to-1 from design bundle builder-block-detail.jsx
+   ============================================================ */
+
+/* ── Block detail header ───────────────────────────────────── */
+.studio-shell .b-detail-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.studio-shell .b-detail-head .left {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    flex: 1;
+    min-width: 0;
+}
+
+.studio-shell .b-detail-head .right {
+    display: flex;
+    gap: 12px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.studio-shell .bd-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.studio-shell .bd-name {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.015em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.studio-shell .bd-type-code {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-3);
+    background: var(--bg-sunk);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.studio-shell .bd-ai-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+}
+
+.studio-shell .bd-manual-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg-sunk);
+    border: 1px solid var(--border);
+    color: var(--text-3);
+}
+
+.studio-shell .bd-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 10px 16px;
+    background: var(--bg-sunk);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    min-width: 72px;
+    text-align: center;
+}
+
+.studio-shell .bd-stat-val {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.studio-shell .bd-stat-label {
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+/* ── Block detail tabs (underline style) ───────────────────── */
+.studio-shell .b-detail-tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.studio-shell .b-detail-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 120ms ease;
+    white-space: nowrap;
+}
+
+.studio-shell .b-detail-tab:hover {
+    color: var(--text);
+}
+
+.studio-shell .b-detail-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+
+.studio-shell .b-detail-tab .b-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--bg-sunk);
+    color: var(--text-3);
+}
+
+.studio-shell .b-detail-tab.active .b-tab-count {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+/* ── Variant gallery ───────────────────────────────────────── */
+.studio-shell .b-variant-gallery {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 1fr;
+}
+
+.studio-shell .b-variant-gallery.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.studio-shell .b-variant-gallery.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+    .studio-shell .b-variant-gallery.cols-2,
+    .studio-shell .b-variant-gallery.cols-3 {
+        grid-template-columns: 1fr;
+    }
+}
+
+.studio-shell .b-var-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.15s;
+}
+
+.studio-shell .b-var-card.is-default {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.studio-shell .b-var-card.is-disabled {
+    opacity: 0.5;
+}
+
+.studio-shell .b-var-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-sunk);
+}
+
+.studio-shell .b-var-card-head .name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    font-family: var(--mono);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.studio-shell .b-var-card-head .default-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--accent);
+    color: #fff;
+}
+
+.studio-shell .b-var-card-head .actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.studio-shell .b-var-card-head .actions button {
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    border: none;
+    background: none;
+    color: var(--text-3);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.studio-shell .b-var-card-head .actions button:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+}
+
+/* variant preview placeholder (stripe pattern) */
+.studio-shell .b-var-preview {
+    aspect-ratio: 16 / 9;
+    background:
+        repeating-linear-gradient(135deg, var(--stripe) 0 8px, transparent 8px 16px),
+        var(--bg-sunk);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-in;
+    position: relative;
+    overflow: hidden;
+}
+
+.studio-shell .b-var-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.studio-shell .b-var-preview .prev-label {
+    font-size: 11px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    text-align: center;
+    padding: 8px;
+}
+
+.studio-shell .b-var-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-sunk);
+    font-size: 11px;
+    color: var(--text-3);
+}
+
+.studio-shell .b-var-foot .sp {
+    flex: 1;
+}
+
+/* add variant placeholder card */
+.studio-shell .b-var-add {
+    background: var(--bg-elev);
+    border: 1px dashed var(--border-dashed);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 180px;
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+.studio-shell .b-var-add:hover {
+    background: var(--bg-sunk);
+    border-color: var(--accent);
+}
+
+.studio-shell .b-var-add .plus {
+    font-size: 28px;
+    color: var(--text-3);
+    margin-bottom: 6px;
+}
+
+.studio-shell .b-var-add .t {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+}
+
+.studio-shell .b-var-add .s {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 2px;
+}
+
+/* Toggle switch */
+.studio-shell .b-switch {
+    width: 32px;
+    height: 18px;
+    border-radius: 999px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-strong);
+    position: relative;
+    cursor: pointer;
+    transition: background 200ms ease, border-color 200ms ease;
+    flex-shrink: 0;
+}
+
+.studio-shell .b-switch.on {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.studio-shell .b-switch::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    top: 2px;
+    left: 2px;
+    transition: transform 200ms ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.studio-shell .b-switch.on::after {
+    transform: translateX(14px);
+}
+
+/* ── Variant zoom modal device switcher ────────────────────── */
+.studio-shell .b-zoom-vp-seg {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 2px;
+    background: var(--bg-elev);
+    gap: 0;
+}
+
+.studio-shell .b-zoom-vp-btn {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-2);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 120ms ease, color 120ms ease;
+    white-space: nowrap;
+}
+
+.studio-shell .b-zoom-vp-btn.active {
+    background: var(--bg-sunk);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.dark .studio-shell .b-zoom-vp-btn.active {
+    background: var(--bg);
+}
+
+/* ── Schema table ──────────────────────────────────────────── */
+.studio-shell .b-schema-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.studio-shell .b-schema-table th {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--bg-sunk);
+}
+
+.studio-shell .b-schema-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.studio-shell .b-schema-table tr:last-child td {
+    border-bottom: none;
+}
+
+.studio-shell .b-schema-table tr:hover td {
+    background: var(--bg-hover);
+}
+
+.studio-shell .b-schema-table .key {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+
+.studio-shell .b-schema-table .ztype {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--success);
+    background: rgba(5,150,105,0.08);
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+
+.studio-shell .b-schema-table .hint {
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 2px;
+}
+
+/* type pills in schema table */
+.studio-shell .b-pill-ai {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+}
+
+.studio-shell .b-pill-manual {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--bg-sunk);
+    border: 1px solid var(--border);
+    color: var(--text-3);
+}
+
+/* ── Tabs shared label button ──────────────────────────────── */
+.studio-shell .b-group-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--text-3);
+    margin-bottom: 10px;
+}
+
+/* ── Usage list (detail usage tab) ────────────────────────── */
+.studio-shell .b-usage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.studio-shell .b-usage-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    transition: background 120ms ease;
+}
+
+.studio-shell .b-usage-row:last-child {
+    border-bottom: none;
+}
+
+.studio-shell .b-usage-row:hover {
+    background: var(--bg-hover);
+}
+
+.studio-shell .b-usage-row .thumb {
+    width: 40px;
+    aspect-ratio: 16/10;
+    border-radius: 4px;
+    background:
+        repeating-linear-gradient(135deg, var(--stripe) 0 6px, transparent 6px 12px),
+        var(--bg-sunk);
+    border: 1px dashed var(--border-dashed);
+    flex-shrink: 0;
+}
+
+.studio-shell .b-usage-row .n {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.studio-shell .b-usage-row .s {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 1px;
+}
+
+.studio-shell .b-usage-row .sp {
+    flex: 1;
+}
+
+.studio-shell .b-usage-row .var-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+    font-family: var(--mono);
+}
+
+/* ── History list (detail history tab) ─────────────────────── */
+.studio-shell .b-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.studio-shell .b-history-row {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: background 120ms ease;
+}
+
+.studio-shell .b-history-row:last-child {
+    border-bottom: none;
+}
+
+.studio-shell .b-history-row.latest {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+}
+
+.studio-shell .b-history-row .head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.studio-shell .b-history-row .v {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.studio-shell .b-history-row .when {
+    font-size: 11px;
+    color: var(--text-3);
+}
+
+.studio-shell .b-history-row .msg {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.studio-shell .b-history-row .who {
+    font-size: 11px;
+    color: var(--text-3);
+}
+
+/* ── Preset grid (detail presets tab) ─────────────────────── */
+.studio-shell .b-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.studio-shell .b-preset-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.15s;
+}
+
+.studio-shell .b-preset-card:hover {
+    border-color: var(--border-strong);
+}
+
+.studio-shell .b-preset-preview {
+    aspect-ratio: 16 / 9;
+    background:
+        repeating-linear-gradient(135deg, var(--stripe) 0 8px, transparent 8px 16px),
+        var(--bg-sunk);
+    border-bottom: 1px solid var(--border);
+}
+
+.studio-shell .b-preset-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+}
+
+.studio-shell .b-preset-foot .n {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.studio-shell .b-preset-foot .u {
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 1px;
+    font-family: var(--mono);
+}
+
+/* ── AI visibility toggle section ─────────────────────────── */
+.studio-shell .b-ai-card {
+    padding: 18px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.studio-shell .b-ai-card .b-group-title {
+    margin-bottom: 12px;
+}
+
+/* Breadcrumb separator for detail page */
+.studio-shell .b-crumb-sep {
+    color: var(--text-4);
+    font-size: 13px;
+    user-select: none;
+}
+
+/* Generic btn alias for block detail actions */
+.studio-shell .b-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: var(--bg-elev);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    font-family: inherit;
+    text-decoration: none;
+    transition: background 120ms ease;
+}
+
+.studio-shell .b-btn:hover {
+    background: var(--bg-hover);
+}
+
+.studio-shell .b-btn.ghost {
+    border-color: transparent;
+    background: transparent;
+}
+
+.studio-shell .b-btn.ghost:hover {
+    background: var(--bg-hover);
+}
+
+.studio-shell .b-btn.primary {
+    background: var(--text);
+    color: var(--bg-elev);
+    border-color: var(--text);
+}
+
+.studio-shell .b-btn.primary:hover {
+    background: var(--text-2);
+}
+
+/* Segment control alias for block detail col-toggle */
+.studio-shell .b-seg {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 2px;
+    background: var(--bg-sunk);
+    gap: 0;
+}
+
+.studio-shell .b-seg button {
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.studio-shell .b-seg button.active {
+    background: var(--bg-elev);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* chip used inside variant gallery header area */
+.studio-shell .b-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--text-2);
+    background: var(--bg-elev);
+    white-space: nowrap;
+}
+

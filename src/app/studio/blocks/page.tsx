@@ -1,6 +1,7 @@
 /**
  * /studio/blocks — Block Catalog page (server component).
  * Fetches registry + overrides + usage counts, passes to client grid.
+ * Layout: 3-mode toggle (matrix / blocks / impact) + 5-stat strip.
  */
 import type { Metadata } from 'next'
 import { getPayload } from 'payload'
@@ -43,21 +44,59 @@ export default async function BlocksPage() {
             usageCount: usageCounts[block.slug] ?? 0,
             hiddenFromCatalog: (override?.hiddenFromCatalog as boolean) ?? false,
             curatedPreviewUrl: (override?.curatedPreviewUrl as string | undefined) ?? null,
+            aiVisible: block.aiVisible,
         }
     })
 
+    // Stats for strip
+    const totalBlocks = cardData.length
+    const activeInTemplates = cardData.filter((b) => b.usageCount > 0).length
+    const aiVisible = cardData.filter((b) => b.aiVisible).length
+    const categories = new Set(cardData.map((b) => b.category)).size
+    const totalVariants = cardData.reduce((sum, b) => sum + b.variants.length, 0)
+
     return (
-        <div className="flex flex-col gap-6 p-6">
+        <div className="page">
             {/* Header */}
-            <div className="flex items-start justify-between">
+            <div className="page-head">
                 <div>
-                    <h1 className="text-xl font-bold text-white">Block Catalog</h1>
-                    <p className="text-sm text-white/50 mt-1">
-                        {blocks.length} blocks registered &middot; {cardData.filter((b) => b.usageCount > 0).length} in use
+                    <h1 className="page-title">Block Catalog</h1>
+                    <p className="page-sub">
+                        Blocks nào dùng ở templates nào · Impact analysis khi update block
                     </p>
                 </div>
             </div>
 
+            {/* 5-stat strip */}
+            <div className="b-stats">
+                <div className="b-stat">
+                    <div className="b-stat-label">Total blocks</div>
+                    <div className="b-stat-val">{totalBlocks}</div>
+                    <div className="b-stat-sub">types</div>
+                </div>
+                <div className="b-stat">
+                    <div className="b-stat-label">Active in templates</div>
+                    <div className="b-stat-val">{activeInTemplates}</div>
+                    <div className="b-stat-sub">/ {totalBlocks} used</div>
+                </div>
+                <div className="b-stat">
+                    <div className="b-stat-label">AI-visible</div>
+                    <div className="b-stat-val">{aiVisible}</div>
+                    <div className="b-stat-sub">/ {totalBlocks}</div>
+                </div>
+                <div className="b-stat">
+                    <div className="b-stat-label">Categories</div>
+                    <div className="b-stat-val">{categories}</div>
+                    <div className="b-stat-sub">groups</div>
+                </div>
+                <div className="b-stat">
+                    <div className="b-stat-label">Total variants</div>
+                    <div className="b-stat-val">{totalVariants}</div>
+                    <div className="b-stat-sub">across all blocks</div>
+                </div>
+            </div>
+
+            {/* Block catalog grid (handles mode toggle internally) */}
             <BlockCatalogGrid blocks={cardData} />
         </div>
     )

@@ -2,14 +2,13 @@
 
 /**
  * block-detail-tabs.tsx
- * 4-tab client component for block detail page:
- * Overview / Variants / Schema / Used By
+ * 6-tab client component for block detail page (matches bundle builder-block-detail.jsx):
+ * Variants / Schema / Content Presets / AI & Prompts / Usage / History
+ * Presets + History = stubs ("Coming in F07")
  */
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
+import { useState } from 'react'
 import { VariantGallery } from './variant-gallery'
 import { BlockSchemaInspector } from './block-schema-inspector'
-import { DnaHeatmapStub } from './dna-heatmap-stub'
 
 type VariantOverride = {
     variantName: string
@@ -44,133 +43,228 @@ export type BlockDetailData = {
     usedByTemplates: UsedByTemplate[]
 }
 
+type Tab = 'variants' | 'schema' | 'presets' | 'ai' | 'usage' | 'history'
+
 type Props = {
     block: BlockDetailData
 }
 
 export function BlockDetailTabs({ block }: Props) {
-    const displayDescription = block.descriptionOverride ?? block.description
-    const displayDescriptionVi = block.descriptionOverrideVi ?? null
+    const [tab, setTab] = useState<Tab>('variants')
+
+    const tabDefs: { id: Tab; label: string; count?: number }[] = [
+        { id: 'variants', label: 'Variants', count: block.variants.length },
+        { id: 'schema', label: 'Schema & fields', count: block.editableFields.length },
+        { id: 'presets', label: 'Content presets' },
+        { id: 'ai', label: 'AI & prompts' },
+        { id: 'usage', label: 'Usage', count: block.usageCount },
+        { id: 'history', label: 'History' },
+    ]
 
     return (
-        <Tabs defaultValue="overview" className="flex flex-col gap-0">
-            <TabsList className="bg-white/5 border border-white/10 rounded-xl h-auto p-1 mb-6 self-start">
-                <TabsTrigger value="overview" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-lg text-sm">
-                    Overview
-                </TabsTrigger>
-                <TabsTrigger value="variants" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-lg text-sm">
-                    Variants
-                    <Badge className="ml-1.5 text-[10px] py-0 px-1.5 bg-white/10 text-white/60 border-0">
-                        {block.variants.length}
-                    </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="schema" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-lg text-sm">
-                    Schema
-                </TabsTrigger>
-                <TabsTrigger value="used-by" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-lg text-sm">
-                    Used By
-                    {block.usageCount > 0 && (
-                        <Badge className="ml-1.5 text-[10px] py-0 px-1.5 bg-emerald-500/20 text-emerald-400 border-0">
-                            {block.usageCount}
-                        </Badge>
-                    )}
-                </TabsTrigger>
-            </TabsList>
+        <div>
+            {/* Tab bar */}
+            <div className="b-detail-tabs">
+                {tabDefs.map(({ id, label, count }) => (
+                    <button
+                        key={id}
+                        className={`b-detail-tab${tab === id ? ' active' : ''}`}
+                        onClick={() => setTab(id)}
+                    >
+                        {label}
+                        {count !== undefined && (
+                            <span className="b-tab-count">{count}</span>
+                        )}
+                    </button>
+                ))}
+            </div>
 
-            {/* ── Overview ─────────────────────────────────────────────────── */}
-            <TabsContent value="overview" className="mt-0 flex flex-col gap-6">
-                {/* Description */}
-                <div className="flex flex-col gap-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-white/40">Description</h3>
-                    <p className="text-sm text-white/80 leading-relaxed">{displayDescription}</p>
-                    {displayDescriptionVi && (
-                        <p className="text-sm text-white/50 leading-relaxed italic">{displayDescriptionVi}</p>
-                    )}
-                </div>
-
-                {/* Meta grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <MetaStat label="Category" value={block.category} />
-                    <MetaStat label="Variants" value={String(block.variants.length)} />
-                    <MetaStat label="Used In" value={`${block.usageCount} template${block.usageCount !== 1 ? 's' : ''}`} />
-                    <MetaStat label="AI Visible" value={block.aiVisible ? 'Yes' : 'No'} />
-                </div>
-
-                {/* Flags */}
-                <div className="flex flex-wrap gap-2">
-                    {block.hiddenFromCatalog && (
-                        <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30 text-xs">
-                            Hidden from catalog
-                        </Badge>
-                    )}
-                    {!block.aiVisible && (
-                        <Badge className="bg-orange-500/20 text-orange-300 border-orange-500/30 text-xs">
-                            AI hidden
-                        </Badge>
-                    )}
-                </div>
-
-                {/* DNA Heatmap stub */}
-                <DnaHeatmapStub blockSlug={block.slug} />
-            </TabsContent>
-
-            {/* ── Variants ─────────────────────────────────────────────────── */}
-            <TabsContent value="variants" className="mt-0">
+            {/* ── Variants ─────────────────────────────────────────────── */}
+            {tab === 'variants' && (
                 <VariantGallery
                     blockSlug={block.slug}
                     blockName={block.name}
                     variants={block.variants}
+                    defaultVariant={block.defaultVariant}
                     editableFields={block.editableFields}
                     curatedPreviewUrl={block.curatedPreviewUrl}
                     variantOverrides={block.variantOverrides}
                 />
-            </TabsContent>
+            )}
 
-            {/* ── Schema ───────────────────────────────────────────────────── */}
-            <TabsContent value="schema" className="mt-0">
+            {/* ── Schema ───────────────────────────────────────────────── */}
+            {tab === 'schema' && (
                 <BlockSchemaInspector
                     blockSlug={block.slug}
                     editableFields={block.editableFields}
                     defaultVariant={block.defaultVariant}
                     variants={block.variants}
                 />
-            </TabsContent>
+            )}
 
-            {/* ── Used By ──────────────────────────────────────────────────── */}
-            <TabsContent value="used-by" className="mt-0">
-                {block.usedByTemplates.length === 0 ? (
-                    <p className="text-sm text-white/40 py-8 text-center">
-                        This block is not used in any templates yet.
-                    </p>
-                ) : (
-                    <div className="flex flex-col gap-2">
-                        {block.usedByTemplates.map((t) => (
-                            <div
-                                key={t.id}
-                                className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3"
-                            >
-                                <span className="text-sm text-white/80 font-medium">{t.name}</span>
-                                {t.category && t.category.length > 0 && (
-                                    <span className="ml-auto text-xs text-white/40">
-                                        {t.category.join(', ')}
-                                    </span>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </TabsContent>
-        </Tabs>
+            {/* ── Content Presets — stub ────────────────────────────────── */}
+            {tab === 'presets' && (
+                <ComingSoonStub
+                    title="Content Presets"
+                    description="Cấu hình content mẫu mà admin & AI có thể áp dụng nhanh cho block này."
+                    tag="Coming in F07"
+                />
+            )}
+
+            {/* ── AI & Prompts ──────────────────────────────────────────── */}
+            {tab === 'ai' && (
+                <AiTab block={block} />
+            )}
+
+            {/* ── Usage ────────────────────────────────────────────────── */}
+            {tab === 'usage' && (
+                <UsageTab block={block} />
+            )}
+
+            {/* ── History — stub ────────────────────────────────────────── */}
+            {tab === 'history' && (
+                <ComingSoonStub
+                    title="Change History"
+                    description="Commit history của block schema & variants — sẽ tích hợp với git log khi F07 ship."
+                    tag="Coming in F07"
+                />
+            )}
+        </div>
     )
 }
 
-// ── Internal ─────────────────────────────────────────────────────────────────
+// ── AI & Prompts tab ──────────────────────────────────────────────────────────
 
-function MetaStat({ label, value }: { label: string; value: string }) {
+function AiTab({ block }: { block: BlockDetailData }) {
+    const estimatedTokens = block.editableFields.length * 18 + block.variants.length * 12
+    const tokenPct = Math.min(100, (estimatedTokens / 400) * 100)
+
+    const promptTemplate = `Block: ${block.slug}
+Description: ${block.description}
+Variants: ${block.variants.join(', ')}
+Fields: ${block.editableFields.join(', ')}
+
+Usage guideline:
+- Use this block when the user wants to display ${block.name.toLowerCase()}.
+- Default variant is "${block.defaultVariant}".
+- Be concise in headline (under 60 chars).`
+
     return (
-        <div className="flex flex-col gap-1 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
-            <span className="text-xs text-white/40">{label}</span>
-            <span className="text-sm font-semibold text-white">{value}</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {/* AI visibility toggle */}
+            <div className="b-ai-card">
+                <div className="b-group-title">Visibility cho AI generator</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
+                    <div className={`b-switch${block.aiVisible ? ' on' : ''}`} title="Read-only — set via registry" />
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+                            {block.aiVisible ? 'AI có thể tạo block này' : 'Chỉ dùng manual'}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>
+                            {block.aiVisible
+                                ? 'AI generator nhìn thấy block trong system prompt và có thể tự thêm vào layout'
+                                : 'Block này không xuất hiện trong AI prompt — chỉ admin mới thêm được'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Context window cost */}
+            <div className="b-ai-card">
+                <div className="b-group-title">Context window cost</div>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                    <div>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
+                            ~{estimatedTokens} tk
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>token ước tính trong prompt</div>
+                    </div>
+                    <div style={{ flex: 1, height: 6, background: 'var(--bg-sunk)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${tokenPct}%`, height: '100%', background: 'var(--accent)', borderRadius: 3 }} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Prompt template */}
+            <div className="b-ai-card" style={{ gridColumn: '1 / -1' }}>
+                <div className="b-group-title">Prompt template (system message context)</div>
+                <textarea
+                    readOnly
+                    defaultValue={promptTemplate}
+                    style={{
+                        width: '100%',
+                        minHeight: 140,
+                        padding: 10,
+                        fontFamily: 'var(--mono)',
+                        fontSize: 11.5,
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-sunk)',
+                        color: 'var(--text)',
+                        resize: 'vertical',
+                        lineHeight: 1.5,
+                        boxSizing: 'border-box',
+                    }}
+                />
+                <p style={{ marginTop: 8, fontSize: 11, color: 'var(--text-3)' }}>
+                    Prompt editor và quick actions sẽ live-editable trong F07.
+                </p>
+            </div>
+        </div>
+    )
+}
+
+// ── Usage tab ─────────────────────────────────────────────────────────────────
+
+function UsageTab({ block }: { block: BlockDetailData }) {
+    if (block.usedByTemplates.length === 0) {
+        return (
+            <div className="empty-state">
+                <p style={{ margin: 0 }}>Block này chưa được dùng trong template nào.</p>
+            </div>
+        )
+    }
+
+    return (
+        <>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14 }}>
+                Block <strong style={{ color: 'var(--text)' }}>{block.slug}</strong> đang được dùng trong{' '}
+                <strong style={{ color: 'var(--text)' }}>{block.usedByTemplates.length} templates</strong>
+            </p>
+            <div className="b-usage-list">
+                {block.usedByTemplates.map((t) => (
+                    <div key={t.id} className="b-usage-row">
+                        <div className="thumb" />
+                        <div>
+                            <div className="n">{t.name}</div>
+                            {t.category && t.category.length > 0 && (
+                                <div className="s">{t.category.join(', ')}</div>
+                            )}
+                        </div>
+                        <span className="sp" />
+                        <span className="var-pill">{block.defaultVariant || 'default'}</span>
+                    </div>
+                ))}
+            </div>
+        </>
+    )
+}
+
+// ── Coming-soon stub ──────────────────────────────────────────────────────────
+
+function ComingSoonStub({ title, description, tag }: { title: string; description: string; tag: string }) {
+    return (
+        <div className="impact-sim-stub">
+            <span style={{ fontSize: 36 }}>🚧</span>
+            <p className="i-title">{title}</p>
+            <p className="i-sub">{description}</p>
+            <span
+                className="chip chip-accent"
+                style={{ fontSize: 11, cursor: 'default', marginTop: 4 }}
+                title={tag}
+            >
+                {tag}
+            </span>
         </div>
     )
 }
