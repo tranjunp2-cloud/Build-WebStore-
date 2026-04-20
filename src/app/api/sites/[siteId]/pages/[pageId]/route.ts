@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
+import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { parseRequest } from '@/lib/validations/helpers'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
@@ -78,10 +79,17 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             if (seoDescription !== undefined) updateData.seo.description = seoDescription.trim()
         }
 
+        // depth: 0 keeps `layout` relationship fields (e.g. seo.ogImage, site)
+        // as scalar IDs. We re-send this layout back through payload.update in
+        // the visibility block below; passing populated relationship objects
+        // to update on Payload 3.79 causes silent validation drops on nested
+        // media/relationship fields — same gotcha the /publish route
+        // documents (see commit df2a03d4).
         const page = await payload.findByID({
             collection: 'pages',
             id: pageId,
             draft: true,
+            depth: 0,
         })
         const pageSiteId = typeof page?.site === 'object' ? page.site?.id : page?.site
 
@@ -147,23 +155,41 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             }
         }
 
-        // Apply visibility changes. `draft: false` tells Payload to publish
-        // the update, which forces full-doc validation on every required
-        // block field in the layout — AI-seeded or partially-edited pages
-        // sometimes fail that and throw 500, blocking a simple hide/unhide.
+        // Apply visibility changes. Two failure modes we have to sidestep:
         //
-        // Respect `page._status` so we only go through the publish path when
-        // the current version IS the published snapshot (no pending edits to
-        // leak). Otherwise save to draft; live site picks it up at next
-        // publish. Trade-off: toggling visibility on a page with pending
+        // 1) `draft: false` → Payload publishes, re-validating every required
+        //    block field in `layout`. AI-seeded or partially-edited pages
+        //    sometimes fail that (throw 500). Gate on `page._status ===
+        //    'published'` so we only take the publish path when the current
+        //    version IS the published snapshot (nothing pending to leak).
+        //
+        // 2) Even `draft: true` passes the current layout back through
+        //    Drizzle's `upsertRow` on live `pages_blocks_*` tables. Those
+        //    tables have varchar PK `id DEFAULT gen_random_uuid()` and the
+        //    `id → _uuid` rename only fires on versioned tables — so AI-
+        //    seeded block UUIDs that collide across pages trigger PG 23505
+        //    (`ValidationError{ path: 'id', message: 'Value must be unique' }`).
+        //    Strip `id` / `_uuid` from the layout so column defaults
+        //    regenerate fresh UUIDs. Pattern matches `/publish` route's fix
+        //    (commit df2a03d4).
+        //
+        // Trade-off for (1): toggling visibility on a page with pending
         // content edits defers the live change until republish, which is
         // semantically correct (visibility is part of the pending edit set).
+        // Trade-off for (2): block UUIDs regenerate on every toggle so
+        // block-level version-diff linkage is lost. Version diff UI isn't
+        // wired up, so acceptable.
         if (Object.keys(visibilityFields).length > 0) {
             const isPublishedClean = page._status === 'published'
+            const layout = (page as unknown as { layout?: unknown[] }).layout
+            const data: Record<string, unknown> = { ...visibilityFields }
+            if (Array.isArray(layout)) {
+                data.layout = stripArrayItemIds(layout)
+            }
             await payload.update({
                 collection: 'pages',
                 id: pageId,
-                data: visibilityFields,
+                data,
                 draft: !isPublishedClean,
             })
         }
