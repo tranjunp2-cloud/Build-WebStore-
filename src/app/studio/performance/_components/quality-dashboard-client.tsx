@@ -19,6 +19,7 @@ import type {
   CostPerGenResult,
   WorstBlockEntry,
   HeatmapResult,
+  HighestOverrideCategoryEntry,
 } from '@/lib/admin/quality-metrics'
 import type { FailCategory } from '@/lib/admin/fail-reason-categorizer'
 
@@ -32,6 +33,8 @@ type Props = {
   from: string
   to: string
   exportUrl: string
+  /** Phase 03: real override-rate per category from Phase 04 fields. Empty when no data. */
+  overrideCategories: HighestOverrideCategoryEntry[]
 }
 
 const FAIL_CATEGORY_LABELS: Record<string, string> = {
@@ -55,20 +58,28 @@ export function QualityDashboardClient({
   from,
   to,
   exportUrl,
+  overrideCategories,
 }: Props) {
   // Total failures for alert
   const totalFails = Object.values(failBreakdown).reduce((s, v) => s + v, 0)
   const criticalThreshold = 5
 
-  // Derive worst-blocks override rate from existing WorstBlockEntry (avgScore inverted as proxy)
-  const worstByOverride = worstBlocks
-    .map((b) => ({
-      block: b.slug,
-      overrideRate: Math.max(0, Math.round(100 - b.avgScore)),
-      gens: b.usageCount,
-    }))
-    .sort((a, b) => b.overrideRate - a.overrideRate)
-    .slice(0, 8)
+  // Phase 03: use real override-rate data if available; fall back to proxy when empty.
+  // Proxy: derive from WorstBlockEntry avgScore (inverted) — remove once data accumulates.
+  const worstByOverride = overrideCategories.length > 0
+    ? overrideCategories.map((c) => ({
+        block: c.category,
+        overrideRate: Math.round(c.overrideRate * 100),
+        gens: c.genCount,
+      })).slice(0, 8)
+    : worstBlocks
+        .map((b) => ({
+          block: b.slug,
+          overrideRate: Math.max(0, Math.round(100 - b.avgScore)),
+          gens: b.usageCount,
+        }))
+        .sort((a, b) => b.overrideRate - a.overrideRate)
+        .slice(0, 8)
 
   // Category success from heatmap (row averages)
   const byCategory = heatmap.categories.map((cat, ri) => {
@@ -171,8 +182,14 @@ export function QualityDashboardClient({
         <div className="aiq-card">
           <div className="aiq-card-head">
             <div>
-              <div className="aiq-card-title">Blocks AI làm tệ nhất</div>
-              <div className="aiq-card-sub">Theo override rate — user phải sửa sau khi gen</div>
+              <div className="aiq-card-title">
+                {overrideCategories.length > 0 ? 'Override rate theo ngành' : 'Blocks AI làm tệ nhất'}
+              </div>
+              <div className="aiq-card-sub">
+                {overrideCategories.length > 0
+                  ? 'Category có tỉ lệ user sửa cao nhất sau gen (real data)'
+                  : 'Proxy score — override rate thật chưa có data'}
+              </div>
             </div>
           </div>
           {worstByOverride.length === 0 ? (

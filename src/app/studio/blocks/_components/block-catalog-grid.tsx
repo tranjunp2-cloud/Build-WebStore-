@@ -5,8 +5,9 @@
  * Client component: 3-mode toggle (matrix / blocks / impact) + catalog grid.
  * Receives all block data from server component (no client fetch needed).
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { BlockCard, type BlockCardData } from './block-card'
+import type { BlockImpactResult } from '@/app/api/admin/blocks/[slug]/impact/route'
 
 // Category display labels
 const CATEGORY_LABELS: Record<string, string> = {
@@ -42,6 +43,29 @@ export function BlockCatalogGrid({ blocks, showHidden = false }: Props) {
     const [search, setSearch] = useState('')
     const [activeCategory, setActiveCategory] = useState<string>('all')
     const [sortBy, setSortBy] = useState<SortBy>('usage')
+
+    // Impact simulator state
+    const [impactSlug, setImpactSlug] = useState<string>('')
+    const [impactResult, setImpactResult] = useState<BlockImpactResult | null>(null)
+    const [impactLoading, setImpactLoading] = useState(false)
+    const [impactError, setImpactError] = useState<string | null>(null)
+
+    const runImpactSim = useCallback(async (slug: string) => {
+        if (!slug) return
+        setImpactLoading(true)
+        setImpactError(null)
+        setImpactResult(null)
+        try {
+            const res = await fetch(`/api/admin/blocks/${encodeURIComponent(slug)}/impact`)
+            const d = await res.json()
+            if (d.error) throw new Error(d.error)
+            setImpactResult(d.data as BlockImpactResult)
+        } catch (err) {
+            setImpactError(err instanceof Error ? err.message : 'Failed to compute impact')
+        } finally {
+            setImpactLoading(false)
+        }
+    }, [])
 
     // Visible blocks (respect hiddenFromCatalog flag unless showHidden)
     const visibleBlocks = useMemo(
@@ -322,21 +346,95 @@ export function BlockCatalogGrid({ blocks, showHidden = false }: Props) {
                 </>
             )}
 
-            {/* ── Impact mode — stub ──────────────────────────────────── */}
+            {/* ── Impact mode ─────────────────────────────────────────── */}
             {mode === 'impact' && (
-                <div className="impact-sim-stub">
-                    <span style={{ fontSize: 36 }}>⚡</span>
-                    <p className="i-title">Impact Simulator</p>
-                    <p className="i-sub">
-                        Xem templates nào bị ảnh hưởng khi thay đổi variant của 1 block.
-                    </p>
-                    <span
-                        className="chip chip-accent"
-                        style={{ fontSize: 11, cursor: 'default', marginTop: 4 }}
-                        title="Impact Simulator ships in F07"
-                    >
-                        Coming in F07
-                    </span>
+                <div style={{ maxWidth: 560, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div>
+                        <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 6px' }}>Impact Simulator</h2>
+                        <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                            Chọn block slug để xem templates nào bị ảnh hưởng và số lần AI gen block này trong 30 ngày qua.
+                        </p>
+                    </div>
+
+                    {/* Block selector */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <select
+                            className="select"
+                            style={{ flex: 1 }}
+                            value={impactSlug}
+                            onChange={(e) => setImpactSlug(e.target.value)}
+                        >
+                            <option value="">— Chọn block —</option>
+                            {blocks
+                                .filter((b) => !b.hiddenFromCatalog || showHidden)
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .map((b) => (
+                                    <option key={b.slug} value={b.slug}>
+                                        {b.name} ({b.slug})
+                                    </option>
+                                ))}
+                        </select>
+                        <button
+                            className="btn btn-primary"
+                            disabled={!impactSlug || impactLoading}
+                            onClick={() => runImpactSim(impactSlug)}
+                        >
+                            {impactLoading ? 'Computing...' : 'Simulate'}
+                        </button>
+                    </div>
+
+                    {/* Error state */}
+                    {impactError && (
+                        <div style={{ padding: '10px 14px', background: 'rgba(220,38,38,0.08)', borderRadius: 6, color: 'var(--danger)', fontSize: 13 }}>
+                            {impactError}
+                        </div>
+                    )}
+
+                    {/* Result panel */}
+                    {impactResult && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {/* Warning banner */}
+                            {impactResult.warningHighImpact && (
+                                <div style={{
+                                    display: 'flex', alignItems: 'flex-start', gap: 10,
+                                    padding: '10px 14px', borderRadius: 6,
+                                    background: 'rgba(217,119,6,0.10)', border: '1px solid rgba(217,119,6,0.25)',
+                                    color: 'var(--warn)', fontSize: 13,
+                                }}>
+                                    <span style={{ fontWeight: 700 }}>⚠</span>
+                                    <span>
+                                        High impact: <strong>{impactResult.templatesAffected} templates</strong> use this block.
+                                        Test changes carefully before publishing.
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Stats row */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <div className="card" style={{ padding: '16px 20px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--text)' }}>
+                                        {impactResult.templatesAffected}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>
+                                        Templates using this block
+                                    </div>
+                                </div>
+                                <div className="card" style={{ padding: '16px 20px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--text)' }}>
+                                        {impactResult.generationsLast30d}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>
+                                        AI generations (last 30d)
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="muted" style={{ fontSize: 11 }}>
+                                Block: <code style={{ fontFamily: 'var(--mono)' }}>{impactResult.blockSlug}</code>
+                                {' · '}computed {new Date().toLocaleTimeString('vi-VN')}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

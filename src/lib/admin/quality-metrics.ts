@@ -43,6 +43,13 @@ export type WorstBlockEntry = {
   usageCount: number
 }
 
+// Phase 03: real override-rate per category using Phase 04 fields
+export type HighestOverrideCategoryEntry = {
+  category: string
+  overrideRate: number   // 0–1 float, e.g. 0.42 = 42%
+  genCount: number
+}
+
 export type HeatmapResult = {
   categories: string[]
   blocks: string[]
@@ -59,6 +66,12 @@ type CostRow = { avg_usd: string | null; total_usd: string | null }
 type CostSeriesRow = { day: string; total_usd: string | null }
 type BlockScoreRow = { block_name: string; avg_score: string | null }
 type HeatmapRow = { category: string; block_name: string; avg_score: string | null }
+// Phase 03: real override-rate row shape
+type OverrideRateCategoryRow = {
+  category: string | null
+  override_rate: string | null
+  gen_count: string
+}
 
 function toFloat(val: string | null | undefined): number {
   if (val === null || val === undefined) return 0
@@ -309,7 +322,44 @@ export async function getWorstBlocks(
   }))
 }
 
-// ── 5. Category × block heatmap ───────────────────────────────────────────────
+// ── 5. Highest override-rate categories (Phase 03 — real formula) ─────────────
+
+/**
+ * Returns top `limit` categories sorted by real override rate.
+ * Override rate = AVG(fields_edited / NULLIF(fields_filled, 0)) per category.
+ * Uses Phase 04 schema columns: fields_edited, fields_filled on ai_generation_records.
+ * NULL-safe: rows where fields_filled = 0 are excluded via NULLIF.
+ * Source: ai_generation_records.
+ */
+export async function getHighestOverrideCategories(
+  range: DateRange,
+  limit = 10,
+): Promise<HighestOverrideCategoryEntry[]> {
+  const payload = await getPayload({ config })
+  const db = payload.db.drizzle
+
+  const rows = await db.execute(sql`
+    SELECT
+      COALESCE(category, 'uncategorized') AS category,
+      AVG(fields_edited::float / NULLIF(fields_filled, 0)) AS override_rate,
+      COUNT(*) AS gen_count
+    FROM ai_generation_records
+    WHERE created_at >= ${range.from.toISOString()}
+      AND created_at <= ${range.to.toISOString()}
+      AND fields_filled > 0
+    GROUP BY category
+    ORDER BY AVG(fields_edited::float / NULLIF(fields_filled, 0)) DESC NULLS LAST
+    LIMIT ${limit}
+  `) as { rows: OverrideRateCategoryRow[] }
+
+  return rows.rows.map((r) => ({
+    category: r.category ?? 'uncategorized',
+    overrideRate: Math.round(toFloat(r.override_rate) * 1000) / 1000,
+    genCount: toInt(r.gen_count),
+  }))
+}
+
+// ── 7. Category × block heatmap ───────────────────────────────────────────────
 
 /**
  * Returns 2D matrix of avg quality score per (category, block) pair.

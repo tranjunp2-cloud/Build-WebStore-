@@ -13,6 +13,7 @@ import {
   getCostPerGen,
   getWorstBlocks,
   getCategoryBlockHeatmap,
+  getHighestOverrideCategories,
 } from '@/lib/admin/quality-metrics'
 import { categorizeFailures } from '@/lib/admin/fail-reason-categorizer'
 import { QualityDashboardClient } from './_components/quality-dashboard-client'
@@ -65,13 +66,14 @@ export default async function PerformancePage({
     }
   })()
 
-  const [quality, genRate, cost, worstBlocks, heatmap, failLogs] = await Promise.all([
+  const [quality, genRate, cost, worstBlocks, heatmap, failLogs, overrideCategories] = await Promise.all([
     getAvgQualityScore(range).catch(() => null),
     getGenSuccessRate(range).catch(() => null),
     getCostPerGen(range).catch(() => null),
     getWorstBlocks(range, 10).catch(() => []),
     getCategoryBlockHeatmap(range).catch(() => ({ categories: [], blocks: [], matrix: [] })),
     failLogsPromise,
+    getHighestOverrideCategories(range, 8).catch(() => []),
   ])
 
   const failBreakdown = categorizeFailures(failLogs)
@@ -91,6 +93,7 @@ export default async function PerformancePage({
       from={fromStr}
       to={toStr}
       exportUrl={exportUrl}
+      overrideCategories={overrideCategories}
     />
   )
 }

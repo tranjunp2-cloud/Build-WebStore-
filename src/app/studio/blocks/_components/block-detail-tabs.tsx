@@ -4,11 +4,13 @@
  * block-detail-tabs.tsx
  * 6-tab client component for block detail page (matches bundle builder-block-detail.jsx):
  * Variants / Schema / Content Presets / AI & Prompts / Usage / History
- * Presets + History = stubs ("Coming in F07")
+ * Phase 03: Presets + History tabs wired to real endpoints (no more F07 stubs).
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { VariantGallery } from './variant-gallery'
 import { BlockSchemaInspector } from './block-schema-inspector'
+import type { BlockPresetStub } from '@/app/api/admin/blocks/[slug]/presets/route'
+import type { BlockHistoryEvent } from '@/app/api/admin/blocks/[slug]/history/route'
 
 type VariantOverride = {
     variantName: string
@@ -102,13 +104,9 @@ export function BlockDetailTabs({ block }: Props) {
                 />
             )}
 
-            {/* ── Content Presets — stub ────────────────────────────────── */}
+            {/* ── Content Presets ───────────────────────────────────────── */}
             {tab === 'presets' && (
-                <ComingSoonStub
-                    title="Content Presets"
-                    description="Cấu hình content mẫu mà admin & AI có thể áp dụng nhanh cho block này."
-                    tag="Coming in F07"
-                />
+                <ContentPresetsTab blockSlug={block.slug} />
             )}
 
             {/* ── AI & Prompts ──────────────────────────────────────────── */}
@@ -121,13 +119,9 @@ export function BlockDetailTabs({ block }: Props) {
                 <UsageTab block={block} />
             )}
 
-            {/* ── History — stub ────────────────────────────────────────── */}
+            {/* ── History ───────────────────────────────────────────────── */}
             {tab === 'history' && (
-                <ComingSoonStub
-                    title="Change History"
-                    description="Commit history của block schema & variants — sẽ tích hợp với git log khi F07 ship."
-                    tag="Coming in F07"
-                />
+                <HistoryTab blockSlug={block.slug} />
             )}
         </div>
     )
@@ -250,21 +244,145 @@ function UsageTab({ block }: { block: BlockDetailData }) {
     )
 }
 
-// ── Coming-soon stub ──────────────────────────────────────────────────────────
+// ── Content Presets tab ───────────────────────────────────────────────────────
 
-function ComingSoonStub({ title, description, tag }: { title: string; description: string; tag: string }) {
+function ContentPresetsTab({ blockSlug }: { blockSlug: string }) {
+    const [presets, setPresets] = useState<BlockPresetStub[] | null>(null)
+    const [note, setNote] = useState<string | null>(null)
+    const [error, setError] = useState<string | null>(null)
+
+    useEffect(() => {
+        let cancelled = false
+        fetch(`/api/admin/blocks/${encodeURIComponent(blockSlug)}/presets`)
+            .then((r) => r.json())
+            .then((d) => {
+                if (cancelled) return
+                if (d.error) { setError(d.error); return }
+                setPresets(d.data ?? [])
+                setNote(d.meta?.note ?? null)
+            })
+            .catch(() => { if (!cancelled) setError('Failed to load presets') })
+        return () => { cancelled = true }
+    }, [blockSlug])
+
+    if (error) {
+        return <div className="empty-state"><p style={{ margin: 0, color: 'var(--danger)' }}>{error}</p></div>
+    }
+
+    if (!presets) {
+        return <div className="empty-state"><p style={{ margin: 0 }}>Loading presets...</p></div>
+    }
+
+    if (presets.length === 0) {
+        return (
+            <div className="empty-state">
+                <p style={{ margin: 0 }}>{note ?? 'No presets configured for this block type yet.'}</p>
+                <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-3)' }}>
+                    Full preset editor available in F07.
+                </p>
+            </div>
+        )
+    }
+
     return (
-        <div className="impact-sim-stub">
-            <span style={{ fontSize: 36 }}>🚧</span>
-            <p className="i-title">{title}</p>
-            <p className="i-sub">{description}</p>
-            <span
-                className="chip chip-accent"
-                style={{ fontSize: 11, cursor: 'default', marginTop: 4 }}
-                title={tag}
-            >
-                {tag}
-            </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {presets.map((p) => (
+                <div
+                    key={p.id}
+                    style={{
+                        padding: '10px 14px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 6,
+                        background: 'var(--bg-sunk)',
+                    }}
+                >
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{p.label}</div>
+                    {p.description && (
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>{p.description}</div>
+                    )}
+                    <span className="chip" style={{ fontSize: 10, marginTop: 6, cursor: 'default' }}>{p.source}</span>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+// ── History tab ───────────────────────────────────────────────────────────────
+
+function HistoryTab({ blockSlug }: { blockSlug: string }) {
+    const [events, setEvents] = useState<BlockHistoryEvent[] | null>(null)
+    const [note, setNote] = useState<string | null>(null)
+    const [error, setError] = useState<string | null>(null)
+
+    useEffect(() => {
+        let cancelled = false
+        fetch(`/api/admin/blocks/${encodeURIComponent(blockSlug)}/history`)
+            .then((r) => r.json())
+            .then((d) => {
+                if (cancelled) return
+                if (d.error) { setError(d.error); return }
+                setEvents(d.data ?? [])
+                setNote(d.meta?.note ?? null)
+            })
+            .catch(() => { if (!cancelled) setError('Failed to load history') })
+        return () => { cancelled = true }
+    }, [blockSlug])
+
+    if (error) {
+        return <div className="empty-state"><p style={{ margin: 0, color: 'var(--danger)' }}>{error}</p></div>
+    }
+
+    if (!events) {
+        return <div className="empty-state"><p style={{ margin: 0 }}>Loading history...</p></div>
+    }
+
+    if (events.length === 0) {
+        return (
+            <div className="empty-state">
+                <p style={{ margin: 0 }}>{note ?? 'No version history found for this block yet.'}</p>
+                <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-3)' }}>
+                    History appears once the block is used in a saved template version. Diff viewer: F07.
+                </p>
+            </div>
+        )
+    }
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {events.map((ev, i) => {
+                const date = new Date(ev.occurredAt)
+                const dateStr = isNaN(date.getTime())
+                    ? ev.occurredAt
+                    : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                const isLast = i === events.length - 1
+                return (
+                    <div
+                        key={ev.id}
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: '80px 1fr',
+                            gap: '0 12px',
+                            paddingBottom: isLast ? 0 : 12,
+                            marginBottom: isLast ? 0 : 12,
+                            borderBottom: isLast ? 'none' : '1px dashed var(--border)',
+                        }}
+                    >
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', paddingTop: 2 }}>{dateStr}</div>
+                        <div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+                                Version {ev.versionNumber} saved
+                                {' — '}
+                                <span style={{ color: 'var(--text-2)' }}>{ev.templateName}</span>
+                            </div>
+                            {ev.changelog && (
+                                <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 3 }}>
+                                    {ev.changelog}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )
+            })}
         </div>
     )
 }

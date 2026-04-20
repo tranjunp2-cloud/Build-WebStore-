@@ -3,9 +3,11 @@
  * PacksGrid — master-detail layout matching bundle page-packs.jsx.
  * Left: scrollable pack list cards. Right: detail panel (coverage, stats, sample content,
  * used-by templates, validation warnings). Inline search + category filter.
+ * Phase 03: stats (strings/images/products) fetched from /api/admin/packs/[id]/stats.
  */
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Upload, Plus, Search, Eye, Copy, Edit, Link } from 'lucide-react'
+import type { PackContentStats } from '@/app/api/admin/packs/[id]/stats/route'
 import { PackDetailDrawer } from './pack-detail-drawer'
 import { CreatePackModal } from '../../_components/modals/create-pack-modal'
 import type { PackDoc } from '../page'
@@ -185,9 +187,7 @@ export function PacksGrid({ initialPacks }: Props) {
                                         <p className="pk-card-desc">{p.description}</p>
                                     )}
                                     <div className="pk-card-stats">
-                                        <span>—</span>
-                                        <span>·</span>
-                                        <span>— images</span>
+                                        <span>{p.includedTemplates?.length ?? 0} templates</span>
                                     </div>
                                     <div className="pk-card-foot">
                                         {p.category && (
@@ -248,6 +248,22 @@ function PackDetailPanel({
     const tmplCount = pack.includedTemplates?.length ?? 0
     // Derive a rough coverage from template count (placeholder — real data from DB)
     const coverage = Math.min(95, 60 + tmplCount * 5)
+
+    // Fetch real content stats for this pack
+    const [stats, setStats] = useState<PackContentStats | null>(null)
+    const [statsLoading, setStatsLoading] = useState(true)
+
+    useEffect(() => {
+        let cancelled = false
+        setStatsLoading(true)
+        setStats(null)
+        fetch(`/api/admin/packs/${encodeURIComponent(pack.id)}/stats`)
+            .then((r) => r.json())
+            .then((d) => { if (!cancelled && d.data) setStats(d.data as PackContentStats) })
+            .catch(() => { /* non-fatal — fall back to '—' */ })
+            .finally(() => { if (!cancelled) setStatsLoading(false) })
+        return () => { cancelled = true }
+    }, [pack.id])
 
     const SAMPLE_PREVIEW = [
         { field: 'hero.headline',      value: `Welcome to ${pack.name}` },
@@ -325,11 +341,23 @@ function PackDetailPanel({
                 </div>
             </div>
 
-            {/* Stats row */}
+            {/* Stats row — real data from /api/admin/packs/[id]/stats */}
             <div className="pk-stats-row">
-                <CoverStat label="Strings" value="—" sub="copy fields" />
-                <CoverStat label="Images" value="—" sub="placeholder + real" />
-                <CoverStat label="Products" value="0" sub="SKU items" />
+                <CoverStat
+                    label="Strings"
+                    value={statsLoading ? '…' : stats ? String(stats.strings) : '—'}
+                    sub="copy fields"
+                />
+                <CoverStat
+                    label="Images"
+                    value={statsLoading ? '…' : stats ? String(stats.images) : '—'}
+                    sub="image fields"
+                />
+                <CoverStat
+                    label="Products"
+                    value={statsLoading ? '…' : stats ? String(stats.products) : '—'}
+                    sub="product blocks"
+                />
                 <CoverStat label="Templates" value={tmplCount} sub="đang dùng" />
             </div>
 
