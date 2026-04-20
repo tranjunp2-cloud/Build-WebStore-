@@ -3342,6 +3342,16 @@ const MIGRATIONS = [
     name: 'template_versions.add_col_created_at',
     sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now();`,
   },
+
+  // ── Phase 04: AiGenerationRecord override-rate fields ────────────────────
+  // Pre-migration rows return NULL override rate; acceptable per product (rolling 30d window).
+  {
+    name: 'ai_generation_records.add_field_count_columns',
+    sql: `ALTER TABLE ai_generation_records
+      ADD COLUMN IF NOT EXISTS fields_total integer,
+      ADD COLUMN IF NOT EXISTS fields_filled integer,
+      ADD COLUMN IF NOT EXISTS fields_edited integer DEFAULT 0;`,
+  },
 ];
 
 async function runMigrations(pool) {

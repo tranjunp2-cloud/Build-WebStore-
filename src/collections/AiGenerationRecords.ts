@@ -128,6 +128,23 @@ export const AiGenerationRecords: CollectionConfig = {
             type: 'date',
             admin: { description: 'When status transitioned to success or failed' },
         },
+        // Phase 04 — override-rate fields (populated at gen time + on edit)
+        {
+            name: 'fieldsTotal',
+            type: 'number',
+            admin: { description: 'Total template fields at generation time (used for override-rate denominator)' },
+        },
+        {
+            name: 'fieldsFilled',
+            type: 'number',
+            admin: { description: 'Fields auto-filled by AI (non-empty values in output snapshot)' },
+        },
+        {
+            name: 'fieldsEdited',
+            type: 'number',
+            defaultValue: 0,
+            admin: { description: 'Fields user edited post-generation (incremented via save-sections)' },
+        },
     ],
     timestamps: true,
 }

@@ -23,6 +23,8 @@
  */
 
 import { createHash } from 'crypto'
+// Phase 04 — snapshot field counting extracted to keep this file under 200 lines
+export { countSnapshotFields } from './snapshot-field-counter'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,10 @@ export type FinishCaptureInput = {
     outputSnapshot?: Record<string, unknown>
     error?: string
     costUsd?: number
+    /** Phase 04 — override-rate: total editable fields across all generated blocks */
+    fieldsTotal?: number
+    /** Phase 04 — override-rate: fields where AI wrote a non-empty value */
+    fieldsFilled?: number
 }
 
 // ── SHA256 helper ────────────────────────────────────────────────────────────
@@ -186,6 +192,9 @@ export async function finishCapture(
                 ...(snapshotData !== undefined ? { outputSnapshot: snapshotData } : {}),
                 ...(errorLogData !== undefined ? { errorLog: errorLogData } : {}),
                 ...(input.costUsd !== undefined ? { costUsd: input.costUsd } : {}),
+                // Phase 04 — override-rate fields (optional, only written when caller provides them)
+                ...(input.fieldsTotal !== undefined ? { fieldsTotal: input.fieldsTotal } : {}),
+                ...(input.fieldsFilled !== undefined ? { fieldsFilled: input.fieldsFilled } : {}),
             },
         })
     } catch (err) {

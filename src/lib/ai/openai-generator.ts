@@ -20,6 +20,7 @@ import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-pi
 import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { startCapture, finishCapture } from './capture-generation'
+import { countSnapshotFields } from './snapshot-field-counter'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
 import { mapBusinessInfo } from './business-info-mapper'
 import type { BusinessSample } from './content/types'
@@ -119,10 +120,14 @@ export async function generateSiteWithAI(
         )
         if (templateResult) {
             const tfBlocks = templateResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
+            // Phase 04: count fields from actual blocks for override-rate tracking
+            const tfFieldCounts = countSnapshotFields({ blocks: templateResult.result.blocks as Record<string, unknown>[] })
             await finishCapture(cap, {
                 status: 'success',
                 selectedBlocks: tfBlocks,
                 outputSnapshot: { path: 'template-first', siteName: templateResult.result.siteName },
+                fieldsTotal: tfFieldCounts.fieldsTotal,
+                fieldsFilled: tfFieldCounts.fieldsFilled,
             })
             return templateResult
         }
@@ -571,10 +576,14 @@ export async function generateSiteWithAI(
         })
 
         const aiBlocks = validBlocks.map((b) => String((b as Record<string, unknown>).blockType ?? ''))
+        // Phase 04: count fields for override-rate tracking
+        const aiFieldCounts = countSnapshotFields({ blocks: validBlocks as Record<string, unknown>[] })
         await finishCapture(cap, {
             status: 'success',
             selectedBlocks: aiBlocks,
             outputSnapshot: { path: 'ai-first', siteName: result.siteName, totalBlocks: validBlocks.length },
+            fieldsTotal: aiFieldCounts.fieldsTotal,
+            fieldsFilled: aiFieldCounts.fieldsFilled,
         })
 
         return { result, events }

@@ -2,6 +2,9 @@
  * POST /api/admin/templates/[id]/save-sections
  * Updates templatePages[0].layout + creates a TemplateVersion row.
  * Super-admin only. Rate-limited to 30/min/user.
+ *
+ * Phase 04: After saving, increments fields_edited on any ai_generation_records
+ * row linked to a site derived from this template. Best-effort — errors swallowed.
  */
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +13,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { z } from 'zod'
 import { withSuperAdmin, checkRateLimit } from '@/lib/admin/api-utils'
+import { countChangedFields } from '@/lib/admin/section-field-diff'
 import type { PlatformUser } from '@/types/user'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -24,6 +28,50 @@ const BodySchema = z.object({
     sections: z.array(SectionSchema).max(200),
     changelog: z.string().max(500).optional(),
 })
+
+// ── fieldsEdited increment (Phase 04 — override-rate) ────────────────────────
+
+/**
+ * Increment fields_edited on ai_generation_records rows linked to the template's site.
+ * Best-effort — never throws or blocks the save response.
+ *
+ * Join path: templates(id) ← sites(origin_template_id) ← ai_generation_records(site_id)
+ * If origin_template_id column is absent the SQL silently returns 0 rows (no-op).
+ */
+async function incrementFieldsEdited(
+    payload: import('payload').Payload,
+    templateId: number,
+    delta: number,
+): Promise<void> {
+    if (delta <= 0) return
+
+    try {
+        const db = payload.db as unknown as {
+            drizzle: { execute: (sql: unknown) => Promise<unknown> }
+        }
+        if (!db?.drizzle?.execute) return
+
+        const { sql } = await import('drizzle-orm')
+
+        // COALESCE guarantees idempotent increment even on concurrent saves.
+        await db.drizzle.execute(
+            sql`UPDATE ai_generation_records
+                SET fields_edited = COALESCE(fields_edited, 0) + ${delta}
+                WHERE site_id IN (
+                    SELECT id FROM sites
+                    WHERE origin_template_id = ${templateId}
+                )`,
+        )
+    } catch (err) {
+        // Swallow silently — monitoring must not block the save
+        console.debug(
+            '[save-sections] fieldsEdited increment skipped:',
+            err instanceof Error ? err.message : String(err),
+        )
+    }
+}
+
+// ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
     return withSuperAdmin(async (_req, adminCtx) => {
@@ -73,15 +121,22 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             ? template.templatePages
             : []
 
-        const updatedPages = existingPages.length > 0
-            ? existingPages.map((page: unknown, idx: number) => {
-                if (idx === 0) {
-                    const p = page as Record<string, unknown>
-                    return { ...p, layout: sections }
-                }
-                return page
-            })
-            : [{ title: 'Home', slug: 'home', isHomepage: true, layout: sections }]
+        // Phase 04: capture old layout before overwrite for field-diff
+        const oldLayout: Array<Record<string, unknown>> =
+            existingPages.length > 0
+                ? ((existingPages[0] as Record<string, unknown>)?.layout as Array<Record<string, unknown>> ?? [])
+                : []
+
+        const updatedPages =
+            existingPages.length > 0
+                ? existingPages.map((page: unknown, idx: number) => {
+                      if (idx === 0) {
+                          const p = page as Record<string, unknown>
+                          return { ...p, layout: sections }
+                      }
+                      return page
+                  })
+                : [{ title: 'Home', slug: 'home', isHomepage: true, layout: sections }]
 
         await payload.update({
             collection: 'templates',
@@ -89,6 +144,10 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
             data: { templatePages: updatedPages as never[] },
             context: { skipComplianceHook: true },
         })
+
+        // Phase 04: count changed fields + increment fieldsEdited (fire-and-forget)
+        const editedDelta = countChangedFields(oldLayout, sections)
+        void incrementFieldsEdited(payload, templateId, editedDelta)
 
         // Determine next version number
         const latestVersions = await payload.find({
