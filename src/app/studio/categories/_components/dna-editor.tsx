@@ -2,28 +2,24 @@
 /**
  * DnaEditor — form to edit Category DNA fields.
  * Sends PATCH /api/admin/categories/[id]/dna on save.
- * Split responsibility: this file handles form state + save logic.
- * Block picker chips and drag-list are inlined (< 200 LOC total).
+ * Restyled to bundle .dna-* classes.
  */
 import { useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { DnaBlockListField } from './dna-block-list-field'
 import type { CategoryDNA } from '@/lib/admin/dna-compliance'
 
+// Personality options with swatch colors matching bundle
 const PERSONALITY_OPTIONS = [
-    { value: 'warm-traditional', label: 'Warm Traditional' },
-    { value: 'warm-homestyle', label: 'Warm Homestyle' },
-    { value: 'bold-dark', label: 'Bold Dark' },
-    { value: 'soft-feminine', label: 'Soft Feminine' },
-    { value: 'calm-wellness', label: 'Calm Wellness' },
-    { value: 'modern-vibrant', label: 'Modern Vibrant' },
-    { value: 'editorial-clean', label: 'Editorial Clean' },
-    { value: 'luxury-travel', label: 'Luxury Travel' },
-    { value: 'playful-kids', label: 'Playful Kids' },
+    { value: 'warm-traditional',  label: 'Warm Traditional',  hex: '#D97706', desc: 'Classic, trustworthy, heritage feel' },
+    { value: 'warm-homestyle',    label: 'Warm Homestyle',    hex: '#F59E0B', desc: 'Cozy, approachable, family-friendly' },
+    { value: 'bold-dark',         label: 'Bold Dark',         hex: '#1E293B', desc: 'Strong, premium, dramatic contrast' },
+    { value: 'soft-feminine',     label: 'Soft Feminine',     hex: '#F9A8D4', desc: 'Gentle, elegant, pastel tones' },
+    { value: 'calm-wellness',     label: 'Calm Wellness',     hex: '#6EE7B7', desc: 'Clean, serene, health-focused' },
+    { value: 'modern-vibrant',    label: 'Modern Vibrant',    hex: '#60A5FA', desc: 'Bold colors, energetic, digital-native' },
+    { value: 'editorial-clean',   label: 'Editorial Clean',   hex: '#94A3B8', desc: 'Minimal, typographic, editorial' },
+    { value: 'luxury-travel',     label: 'Luxury Travel',     hex: '#A78BFA', desc: 'Aspirational, refined, escapism' },
+    { value: 'playful-kids',      label: 'Playful Kids',      hex: '#FCD34D', desc: 'Fun, bright, child-friendly' },
 ] as const
 
 type Props = {
@@ -38,32 +34,32 @@ function tagsToText(arr: string[] | undefined): string {
 }
 
 function textToTags(text: string): string[] {
-    return text.split(',').map(s => s.trim()).filter(Boolean)
+    return text.split(',').map((s) => s.trim()).filter(Boolean)
 }
 
 export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Props) {
     const [form, setForm] = useState({
-        signatureBlocks: tagsToText(initialDna?.signatureBlocks),
-        recommendedBlocks: tagsToText(initialDna?.recommendedBlocks),
-        mandatoryOrder: tagsToText(initialDna?.mandatoryOrder),
-        forbiddenBlocks: tagsToText(initialDna?.forbiddenBlocks),
-        typicalPersonalities: initialDna?.typicalPersonalities ?? [] as string[],
+        signatureBlocks:    tagsToText(initialDna?.signatureBlocks),
+        recommendedBlocks:  tagsToText(initialDna?.recommendedBlocks),
+        mandatoryOrder:     tagsToText(initialDna?.mandatoryOrder),
+        forbiddenBlocks:    tagsToText(initialDna?.forbiddenBlocks),
+        typicalPersonalities: initialDna?.typicalPersonalities ?? ([] as string[]),
         minSections: initialDna?.minSections ?? 5,
         aiPromptHint: initialDna?.aiPromptHint ?? '',
     })
     const [saving, setSaving] = useState(false)
 
-    const set = useCallback(<K extends keyof typeof form>(key: K, val: typeof form[K]) => {
-        setForm(prev => ({ ...prev, [key]: val }))
+    const set = useCallback(<K extends keyof typeof form>(key: K, val: (typeof form)[K]) => {
+        setForm((prev) => ({ ...prev, [key]: val }))
     }, [])
 
     const togglePersonality = (value: string) => {
-        setForm(prev => {
+        setForm((prev) => {
             const has = prev.typicalPersonalities.includes(value)
             return {
                 ...prev,
                 typicalPersonalities: has
-                    ? prev.typicalPersonalities.filter(p => p !== value)
+                    ? prev.typicalPersonalities.filter((p) => p !== value)
                     : [...prev.typicalPersonalities, value],
             }
         })
@@ -73,13 +69,13 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
         setSaving(true)
         try {
             const dna: CategoryDNA = {
-                signatureBlocks: textToTags(form.signatureBlocks),
-                recommendedBlocks: textToTags(form.recommendedBlocks),
-                mandatoryOrder: textToTags(form.mandatoryOrder),
-                forbiddenBlocks: textToTags(form.forbiddenBlocks),
+                signatureBlocks:      textToTags(form.signatureBlocks),
+                recommendedBlocks:    textToTags(form.recommendedBlocks),
+                mandatoryOrder:       textToTags(form.mandatoryOrder),
+                forbiddenBlocks:      textToTags(form.forbiddenBlocks),
                 typicalPersonalities: form.typicalPersonalities as CategoryDNA['typicalPersonalities'],
-                minSections: Number(form.minSections),
-                aiPromptHint: form.aiPromptHint.trim() || undefined,
+                minSections:          Number(form.minSections),
+                aiPromptHint:         form.aiPromptHint.trim() || undefined,
             }
 
             const res = await fetch(`/api/admin/categories/${categoryId}/dna`, {
@@ -90,7 +86,7 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
 
             if (!res.ok) {
                 const err = await res.json().catch(() => ({ error: res.statusText }))
-                throw new Error(err.error ?? 'Save failed')
+                throw new Error((err as { error?: string }).error ?? 'Save failed')
             }
 
             toast.success(`DNA saved for "${categoryName}"`)
@@ -102,90 +98,141 @@ export function DnaEditor({ categoryId, categoryName, initialDna, onSaved }: Pro
         }
     }
 
+    const mandatoryChips = form.mandatoryOrder.split(',').map((s) => s.trim()).filter(Boolean)
+
     return (
-        <div className="p-6 space-y-6 max-w-2xl">
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* AI prompt hint */}
+            {(form.aiPromptHint || true) && (
+                <div className="dna-field-group">
+                    <div className="dna-prompt-label">AI prompt hint</div>
+                    <textarea
+                        className="dna-textarea"
+                        value={form.aiPromptHint}
+                        onChange={(e) => set('aiPromptHint', e.target.value)}
+                        placeholder="Tone guidance for AI generation (1-2 sentences)…"
+                        rows={3}
+                        maxLength={500}
+                    />
+                    <span className="dna-char-count">{form.aiPromptHint.length}/500</span>
+                </div>
+            )}
+
+            {/* Signature blocks */}
             <DnaBlockListField
-                label="Signature Blocks"
-                hint="Required blocks for templates in this category."
+                label="Signature blocks"
+                labelPrefix="★"
+                hint="bắt buộc — AI sẽ tự điền nếu user quên"
                 value={form.signatureBlocks}
-                onChange={v => set('signatureBlocks', v)}
-            />
-            <DnaBlockListField
-                label="Recommended Blocks"
-                hint="Encouraged but not required."
-                value={form.recommendedBlocks}
-                onChange={v => set('recommendedBlocks', v)}
-            />
-            <DnaBlockListField
-                label="Mandatory Order"
-                hint="Blocks that must appear in this sequence (left to right = top to bottom)."
-                value={form.mandatoryOrder}
-                onChange={v => set('mandatoryOrder', v)}
-            />
-            <DnaBlockListField
-                label="Forbidden Blocks"
-                hint="Blocks that must NOT appear in this category."
-                value={form.forbiddenBlocks}
-                onChange={v => set('forbiddenBlocks', v)}
+                onChange={(v) => set('signatureBlocks', v)}
             />
 
-            {/* Personality multi-select */}
-            <div className="space-y-1.5">
-                <Label>Typical Personalities</Label>
-                <div className="flex flex-wrap gap-2">
-                    {PERSONALITY_OPTIONS.map(p => {
+            {/* Mandatory order */}
+            <div className="dna-field-group">
+                <div className="dna-section-label">
+                    <span>→</span>
+                    <span>Mandatory order</span>
+                    <span className="dna-section-hint">blocks must appear in this sequence</span>
+                </div>
+                <input
+                    type="text"
+                    className="dna-field-input"
+                    value={form.mandatoryOrder}
+                    onChange={(e) => set('mandatoryOrder', e.target.value)}
+                    placeholder="navigation, hero, cta (comma-separated, ordered)"
+                />
+                {/* Render as sequence with arrows */}
+                {mandatoryChips.length > 0 && (
+                    <div className="dna-order-row">
+                        {mandatoryChips.map((b, i) => (
+                            <span key={b + i} style={{ display: 'contents' }}>
+                                <div className="dna-order-item">
+                                    <span className="dna-order-idx">{i + 1}</span>
+                                    {b}
+                                </div>
+                                {i < mandatoryChips.length - 1 && (
+                                    <span className="dna-order-arrow">›</span>
+                                )}
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Recommended blocks */}
+            <DnaBlockListField
+                label="Recommended"
+                labelPrefix="+"
+                hint="Encouraged but not required"
+                value={form.recommendedBlocks}
+                onChange={(v) => set('recommendedBlocks', v)}
+            />
+
+            {/* Forbidden blocks */}
+            <DnaBlockListField
+                label="Forbidden"
+                labelPrefix="⊘"
+                hint="Must NOT appear in this category"
+                value={form.forbiddenBlocks}
+                chipVariant="forbidden"
+                onChange={(v) => set('forbiddenBlocks', v)}
+            />
+
+            {/* Min sections */}
+            <div className="dna-field-group">
+                <div className="dna-form-label">Minimum sections</div>
+                <input
+                    type="number"
+                    className="dna-number-input"
+                    min={1}
+                    max={20}
+                    value={form.minSections}
+                    onChange={(e) => set('minSections', Number(e.target.value))}
+                />
+            </div>
+
+            {/* Typical personalities */}
+            <div className="dna-field-group">
+                <div className="dna-section-label">
+                    <span>Typical personalities</span>
+                    <span className="dna-section-hint">Vibes thường gặp trong ngành này</span>
+                </div>
+                <div className="dna-personality-grid" style={{ padding: 0 }}>
+                    {PERSONALITY_OPTIONS.map((p) => {
                         const active = form.typicalPersonalities.includes(p.value)
                         return (
                             <button
                                 key={p.value}
                                 type="button"
                                 onClick={() => togglePersonality(p.value)}
-                                className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-                                    active
-                                        ? 'bg-primary text-primary-foreground border-primary'
-                                        : 'border-border hover:border-foreground/40'
-                                }`}
+                                className={`dna-personality-card${active ? ' selected' : ''}`}
                             >
-                                {p.label}
+                                <div className="dna-personality-head">
+                                    <span
+                                        className="dna-personality-swatch"
+                                        style={{ background: p.hex }}
+                                    />
+                                    <span className="dna-personality-name">{p.label}</span>
+                                </div>
+                                <div className="dna-personality-desc">{p.desc}</div>
                             </button>
                         )
                     })}
                 </div>
             </div>
 
-            {/* Min sections */}
-            <div className="space-y-1.5">
-                <Label htmlFor="min-sections">Minimum Sections</Label>
-                <Input
-                    id="min-sections"
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={form.minSections}
-                    onChange={e => set('minSections', Number(e.target.value))}
-                    className="w-24"
-                />
+            {/* Save */}
+            <div className="dna-save-row">
+                <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleSave}
+                    disabled={saving}
+                >
+                    {saving ? 'Saving…' : 'Save DNA'}
+                </button>
             </div>
-
-            {/* AI prompt hint */}
-            <div className="space-y-1.5">
-                <Label htmlFor="ai-hint">AI Prompt Hint</Label>
-                <Textarea
-                    id="ai-hint"
-                    value={form.aiPromptHint}
-                    onChange={e => set('aiPromptHint', e.target.value)}
-                    placeholder="Tone guidance for AI generation (1-2 sentences)…"
-                    rows={3}
-                    maxLength={500}
-                />
-                <p className="text-xs text-muted-foreground">
-                    {form.aiPromptHint.length}/500 chars
-                </p>
-            </div>
-
-            <Button onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save DNA'}
-            </Button>
         </div>
     )
 }

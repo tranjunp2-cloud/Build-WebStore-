@@ -1,5 +1,6 @@
 /**
  * /studio/categories — Category DNA editor (split-pane).
+ * Bundle: CategoriesPage pattern from pages.jsx.
  */
 export const dynamic = 'force-dynamic'
 
@@ -32,16 +33,16 @@ export default async function CategoriesPage() {
     }))
 
     return (
-        <div className="flex flex-col h-full">
-            <div className="px-6 py-4 border-b flex-shrink-0">
-                <h1 className="text-lg font-semibold">Category DNA</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                    Define signature blocks, personality, and AI hints per category.
-                </p>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div className="cat-page-head">
+                <div>
+                    <h1 className="cat-page-title">Categories &amp; Category DNA</h1>
+                    <p className="cat-page-sub">
+                        Mỗi ngành có &quot;DNA&quot; riêng: signature blocks, mandatory order, personalities — AI dùng DNA này để gen template đúng chuẩn ngành.
+                    </p>
+                </div>
             </div>
-            <div className="flex-1 min-h-0">
-                <CategorySplitPane categories={categories} />
-            </div>
+            <CategorySplitPane categories={categories} />
         </div>
     )
 }

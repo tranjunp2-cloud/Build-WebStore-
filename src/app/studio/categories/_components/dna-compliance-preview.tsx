@@ -2,11 +2,10 @@
 /**
  * DnaCompliancePreview — pick a template and see DNA compliance results.
  * Fetches templates for the category, runs client-side compliance check.
+ * Restyled to bundle .comp-* classes.
  */
 import { useState, useEffect } from 'react'
 import { checkCompliance, type CategoryDNA, type ComplianceResult } from '@/lib/admin/dna-compliance'
-import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
 
 type TemplateSummary = {
     id: string
@@ -22,25 +21,10 @@ type Props = {
     dna: CategoryDNA | null
 }
 
-function ViolationRow({ type, message, severity }: { type: string; message: string; severity: string }) {
-    return (
-        <li className="flex items-start gap-2 text-sm py-1.5 border-b last:border-0">
-            <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${severity === 'error' ? 'bg-destructive' : 'bg-amber-400'}`} />
-            <div>
-                <span className="text-xs font-mono text-muted-foreground mr-2">{type}</span>
-                {message}
-            </div>
-        </li>
-    )
-}
-
-function ScoreBadge({ score, pass }: { score: number; pass: boolean }) {
-    const color = pass ? 'bg-green-100 text-green-800' : score >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
-    return (
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${color}`}>
-            {pass ? '✓ Pass' : '✗ Fail'} — {score}/100
-        </span>
-    )
+function scoreBadgeClass(score: number, pass: boolean): string {
+    if (pass) return 'comp-score-badge comp-score-pass'
+    if (score >= 60) return 'comp-score-badge comp-score-warn'
+    return 'comp-score-badge comp-score-fail'
 }
 
 export function DnaCompliancePreview({ categoryId, dna }: Props) {
@@ -49,19 +33,24 @@ export function DnaCompliancePreview({ categoryId, dna }: Props) {
     const [selected, setSelected] = useState<TemplateSummary | null>(null)
     const [result, setResult] = useState<ComplianceResult | null>(null)
 
+    // categoryId unused in fetch (fetches all, filters client-side if needed)
+    void categoryId
+
     useEffect(() => {
         setLoading(true)
-        fetch(`/api/admin/templates?limit=100&status=all`)
-            .then(r => r.json())
-            .then(d => {
-                const docs: TemplateSummary[] = (d.data ?? d.docs ?? []).map((t: Record<string, unknown>) => ({
-                    id: String(t.id),
-                    name: String(t.name ?? ''),
-                    status: String(t.status ?? ''),
-                    personality: (t.personality as string) ?? null,
-                    templatePages: (t.templatePages as TemplateSummary['templatePages']) ?? null,
-                    defaultBlocks: t.defaultBlocks ?? null,
-                }))
+        fetch('/api/admin/templates?limit=100&status=all')
+            .then((r) => r.json())
+            .then((d) => {
+                const docs: TemplateSummary[] = (d.data ?? d.docs ?? []).map(
+                    (t: Record<string, unknown>) => ({
+                        id: String(t.id),
+                        name: String(t.name ?? ''),
+                        status: String(t.status ?? ''),
+                        personality: (t.personality as string) ?? null,
+                        templatePages: (t.templatePages as TemplateSummary['templatePages']) ?? null,
+                        defaultBlocks: t.defaultBlocks ?? null,
+                    })
+                )
                 setTemplates(docs)
             })
             .catch(() => setTemplates([]))
@@ -77,33 +66,30 @@ export function DnaCompliancePreview({ categoryId, dna }: Props) {
 
     if (!dna) {
         return (
-            <div className="p-6 text-sm text-muted-foreground">
+            <div className="comp-empty">
                 Save the DNA configuration first, then preview compliance here.
             </div>
         )
     }
 
     return (
-        <div className="p-6 space-y-4 max-w-2xl">
-            <div className="space-y-1.5">
-                <label className="text-sm font-medium">Select a template to check</label>
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {/* Template selector */}
+            <div className="comp-select-wrap">
+                <label className="dna-form-label">Select a template to check</label>
                 {loading ? (
-                    <div className="space-y-1">
-                        {Array.from({ length: 3 }).map((_, i) => (
-                            <Skeleton key={i} className="h-8 w-full" />
-                        ))}
-                    </div>
+                    <div style={{ height: 36, background: 'var(--bg-sunk)', borderRadius: 8, animation: 'pulse 1.5s infinite' }} />
                 ) : (
                     <select
-                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        className="comp-select"
                         value={selected?.id ?? ''}
-                        onChange={e => {
-                            const tpl = templates.find(t => t.id === e.target.value)
+                        onChange={(e) => {
+                            const tpl = templates.find((t) => t.id === e.target.value)
                             if (tpl) handleSelect(tpl)
                         }}
                     >
                         <option value="">— Select a template —</option>
-                        {templates.map(t => (
+                        {templates.map((t) => (
                             <option key={t.id} value={t.id}>
                                 {t.name} ({t.status})
                             </option>
@@ -112,31 +98,42 @@ export function DnaCompliancePreview({ categoryId, dna }: Props) {
                 )}
             </div>
 
+            {/* Result card */}
             {result && selected && (
-                <div className="border rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{selected.name}</span>
-                        <ScoreBadge score={result.score} pass={result.pass} />
+                <div className="comp-result-card">
+                    <div className="comp-result-head">
+                        <span className="comp-result-name">{selected.name}</span>
+                        <span className={scoreBadgeClass(result.score, result.pass)}>
+                            {result.pass ? '✓ Pass' : '✗ Fail'} — {result.score}/100
+                        </span>
                     </div>
 
                     {result.violations.length === 0 ? (
-                        <p className="text-sm text-green-700">No violations — template fully complies with DNA.</p>
+                        <div className="comp-pass-msg">
+                            No violations — template fully complies with DNA.
+                        </div>
                     ) : (
-                        <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-2">
+                        <>
+                            <div className="comp-violations-label">
                                 {result.violations.length} violation{result.violations.length !== 1 ? 's' : ''}
-                            </p>
-                            <ul className="divide-y rounded border px-3">
+                            </div>
+                            <ul className="comp-violations-list">
                                 {result.violations.map((v, i) => (
-                                    <ViolationRow key={i} {...v} />
+                                    <li key={i} className="comp-violation-row">
+                                        <span className={`comp-violation-dot ${v.severity}`} />
+                                        <div>
+                                            <span className="comp-violation-type">{v.type}</span>
+                                            {v.message}
+                                        </div>
+                                    </li>
                                 ))}
                             </ul>
-                        </div>
+                        </>
                     )}
 
-                    <p className="text-xs text-muted-foreground">
+                    <div className="comp-checked-at">
                         Checked at {new Date(result.checkedAt).toLocaleTimeString()}
-                    </p>
+                    </div>
                 </div>
             )}
         </div>
