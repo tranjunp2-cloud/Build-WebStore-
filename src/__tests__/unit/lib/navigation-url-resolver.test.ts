@@ -48,10 +48,37 @@ describe('[TC-F05-nav-resolver] buildSlugCanonicalMap', () => {
             { id: 3, slug: null },
             { id: 4, slug: '/ok' },
         ])
-        // Only `/ok` + its lowercased + bare forms should be present.
+        // `/ok` + bare `ok` → 2 entries.
+        // Homepage aliases always added when pages.length > 0:
+        // `/`, `/home`, `home`, `/index`, `index` → 5 entries.
         expect(map.get('/ok')).toBe('/ok')
         expect(map.get('ok')).toBe('/ok')
-        expect(map.size).toBe(3)
+        expect(map.size).toBe(7)
+    })
+
+    it('TC-F05-nav-resolver-14: aliases /home, /index, home, index to canonical homepage /', () => {
+        // AI-seeded nav often hardcodes /Home as the first link label.
+        // Homepage's stored slug is `/`, so without aliasing /home would
+        // 404. These aliases let the resolver collapse them to canonical /.
+        const map = buildSlugCanonicalMap(samplePages)
+        expect(map.get('/home')).toBe('/')
+        expect(map.get('home')).toBe('/')
+        expect(map.get('/index')).toBe('/')
+        expect(map.get('index')).toBe('/')
+    })
+
+    it('TC-F05-nav-resolver-15: an explicit /home page wins over the homepage alias', () => {
+        // If a site actually owns a slug `/home`, that page's canonical
+        // entry is written first (first-write-wins) so the alias block
+        // does not clobber it.
+        const map = buildSlugCanonicalMap([
+            { id: 1, slug: '/', isHomepage: true },
+            { id: 2, slug: '/home' },
+        ])
+        expect(map.get('/home')).toBe('/home')
+        expect(map.get('home')).toBe('/home')
+        // Root homepage is still addressable.
+        expect(map.get('/')).toBe('/')
     })
 })
 
@@ -95,10 +122,14 @@ describe('[TC-F05-nav-resolver] rewriteLiveUrl', () => {
         expect(rewriteLiveUrl('#section', map)).toBe('#section')
     })
 
-    it('TC-F05-nav-resolver-10: leaves unmatched internal paths untouched so forward-declared pages are respected', () => {
-        // `/coming-soon` is not in samplePages — user may have plans. Don't guess.
+    it('TC-F05-nav-resolver-10: unmatched internal paths fall back to lowercase so URL bar stays clean', () => {
+        // `/coming-soon` is not in samplePages but already lowercase — unchanged.
         expect(rewriteLiveUrl('/coming-soon', map)).toBe('/coming-soon')
-        expect(rewriteLiveUrl('/Nonexistent-Page', map)).toBe('/Nonexistent-Page')
+        // Label-cased path for a page that no longer exists (user-reported
+        // `/Contact` after deletion) or forward-declared — lowercase the path
+        // so the URL bar never shows mixed-case.
+        expect(rewriteLiveUrl('/Nonexistent-Page', map)).toBe('/nonexistent-page')
+        expect(rewriteLiveUrl('/Coming-Soon?ref=A', map)).toBe('/coming-soon?ref=A')
     })
 
     it('TC-F05-nav-resolver-11: homepage always resolves to /', () => {
@@ -107,16 +138,43 @@ describe('[TC-F05-nav-resolver] rewriteLiveUrl', () => {
         expect(rewriteLiveUrl('/#features', map)).toBe('/#features')
     })
 
+    it('TC-F05-nav-resolver-16: /Home, /Index (any casing) resolve to canonical /', () => {
+        // User-reported symptom: AI-seeded nav label "Home" emits `/Home`;
+        // homepage's stored slug is `/`, so without aliasing the live URL
+        // lands on `/Home` (404). Aliases collapse it to `/`.
+        expect(rewriteLiveUrl('/Home', map)).toBe('/')
+        expect(rewriteLiveUrl('/HOME', map)).toBe('/')
+        expect(rewriteLiveUrl('/home', map)).toBe('/')
+        expect(rewriteLiveUrl('/Index', map)).toBe('/')
+        expect(rewriteLiveUrl('/Home#team', map)).toBe('/#team')
+    })
+
+    it('TC-F05-nav-resolver-17: link to a deleted page is lowercased so URL bar stays clean', () => {
+        // User deleted `/contact`, so it is not in the pages list; nav still
+        // has an AI-seeded `/Contact` link that would otherwise stay
+        // mixed-case in the URL bar. Lowercase fallback normalizes it.
+        const mapWithoutContact = buildSlugCanonicalMap([
+            { id: 1, slug: '/', isHomepage: true },
+            { id: 2, slug: '/about' },
+            { id: 3, slug: '/services' },
+        ])
+        expect(rewriteLiveUrl('/Contact', mapWithoutContact)).toBe('/contact')
+        expect(rewriteLiveUrl('/Contact?utm=x', mapWithoutContact)).toBe('/contact?utm=x')
+    })
+
     it('TC-F05-nav-resolver-12: handles empty / null / undefined safely', () => {
         expect(rewriteLiveUrl('', map)).toBe('')
         expect(rewriteLiveUrl(null, map)).toBe('')
         expect(rewriteLiveUrl(undefined, map)).toBe('')
     })
 
-    it('TC-F05-nav-resolver-13: with an empty slug map, every internal URL is returned untouched', () => {
-        // Defensive behavior — if pages list hasn't loaded yet, don't mangle URLs.
+    it('TC-F05-nav-resolver-13: with an empty slug map, internal URLs are lowercased (no hits possible)', () => {
+        // Defensive behavior — if pages list hasn't loaded yet, we still
+        // lowercase the path so the URL bar never leaks label casing.
+        // External URLs / anchors still pass through untouched.
         const emptyMap = buildSlugCanonicalMap([])
-        expect(rewriteLiveUrl('/Services', emptyMap)).toBe('/Services')
+        expect(rewriteLiveUrl('/Services', emptyMap)).toBe('/services')
         expect(rewriteLiveUrl('/', emptyMap)).toBe('/')
+        expect(rewriteLiveUrl('https://Google.com', emptyMap)).toBe('https://Google.com')
     })
 })
