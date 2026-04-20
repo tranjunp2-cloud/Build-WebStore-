@@ -63,14 +63,30 @@ export type NavPageLike = {
 }
 
 /**
+ * Homepage aliases appended to the canonical slug map so AI-seeded nav
+ * labels like "Home" / "Index" (which emit `/Home`, `/Index`) resolve to
+ * the real `/` homepage instead of 404-ing on a nonexistent page. Kept
+ * as an exported const so SiteRenderer's preview map can mirror the
+ * exact same alias set without drifting.
+ */
+export const HOMEPAGE_ALIASES = ['/home', 'home', '/index', 'index'] as const
+
+/**
  * Build a `{ anyFormOfSlug → canonical /slug }` map from the pages list.
  * Three forms are indexed per page so the rewriter tolerates casing +
  * leading-slash drift:
  *   - exact               (`/services` → `/services`)
  *   - lowercased          (`/Services` → `/services`; fixes AI-gen case leak)
  *   - bare (no leading /) (`services`  → `/services`)
- * Homepage always resolves `'/'` → `'/'`.
+ *
+ * After per-page entries, a homepage block is appended:
+ *   - `/` always resolves to `/` when any page exists.
+ *   - `HOMEPAGE_ALIASES` entries (`/home`, `/index`, etc.) resolve to
+ *     `/` unless the site explicitly owns that slug — page entries are
+ *     written first and the alias block checks `!map.has(alias)` before
+ *     setting, so first-write-wins.
  */
+
 export function buildSlugCanonicalMap(
     pages: NavPageLike[] | null | undefined,
 ): Map<string, string> {
@@ -88,8 +104,12 @@ export function buildSlugCanonicalMap(
             map.set(bare, withSlash)
         }
     }
-    const homepage = pages.find((p) => p?.isHomepage) ?? pages[0]
-    if (homepage) map.set('/', '/')
+    if (pages.length > 0) {
+        map.set('/', '/')
+        for (const alias of HOMEPAGE_ALIASES) {
+            if (!map.has(alias)) map.set(alias, '/')
+        }
+    }
     return map
 }
 
@@ -108,7 +128,10 @@ export function splitPathAndTail(url: string): [string, string] {
 /**
  * Resolve a URL against the canonical slug map. Returns canonical `/slug`
  * (with query+hash reattached) when the path resolves to a known page.
- * Otherwise returns the URL unchanged.
+ * Otherwise returns `path.toLowerCase()` + tail — unmatched internal paths
+ * (e.g. links to pages that were deleted from the site, or AI-seeded
+ * label-cased URLs like `/Contact` where no stored slug exists) are
+ * lowercased so the URL bar never shows mixed-case junk.
  *
  * Lookup: exact → lowercased → bare. First hit wins.
  */
@@ -129,5 +152,5 @@ export function rewriteLiveUrl(
         slugCanonical.get(path) ??
         slugCanonical.get(path.toLowerCase()) ??
         slugCanonical.get(path.replace(/^\//, ''))
-    return (hit ?? path) + tail
+    return (hit ?? path.toLowerCase()) + tail
 }

@@ -3,6 +3,7 @@ import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 import {
+    HOMEPAGE_ALIASES,
     buildSlugCanonicalMap,
     rewriteLiveUrl,
     splitPathAndTail,
@@ -137,7 +138,16 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
         }
     }
     const homepage = pages.find((p) => (p as NavPage & { isHomepage?: boolean }).isHomepage) ?? pages[0]
-    if (homepage) slugToPageId.set('/', String(homepage.id))
+    if (homepage) {
+        const homepageId = String(homepage.id)
+        slugToPageId.set('/', homepageId)
+        // Mirror buildSlugCanonicalMap's HOMEPAGE_ALIASES so preview clicks on
+        // `/Home`, `/Index`, etc. resolve the iframe to the homepage pageId
+        // instead of dead-ending at `#`. Sharing the const prevents drift.
+        for (const alias of HOMEPAGE_ALIASES) {
+            if (!slugToPageId.has(alias)) slugToPageId.set(alias, homepageId)
+        }
+    }
 
     const slugCanonical = buildSlugCanonicalMap(pages as unknown as { id: string | number; slug?: string | null; isHomepage?: boolean | null }[])
 
