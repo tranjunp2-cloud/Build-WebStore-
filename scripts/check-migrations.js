@@ -22,17 +22,29 @@
  *   - pages.deletedAt → _pages_v.version_deleted_at
  * Forgetting this causes Payload draft queries to crash with 42703 (column does not exist).
  *
- * Usage: node scripts/check-migrations.js [base-branch]
- * Default base branch: staging
+ * BASELINE DRIFT (opt-in: --baseline flag):
+ * The default check only catches fields ADDED in the current PR diff. Fields that
+ * existed in the baseline commit WITHOUT a matching migration slip through forever.
+ * Pass `--baseline` to scan every field in TRACKED_COLLECTIONS and WARN when no
+ * ALTER TABLE / CREATE TABLE column covers it. Warnings only — never fails CI —
+ * because Payload's historical pushDevSchema may have seeded columns that have
+ * no corresponding migration. Dev uses this mode to audit; real missing columns
+ * surface as INSERT 500s on staging. See plans/reports/drift-audit-*.md.
+ *
+ * Usage:
+ *   node scripts/check-migrations.js [base-branch]     # diff check (CI default)
+ *   node scripts/check-migrations.js --baseline        # additionally warn on baseline drift
  *
  * Exit 0 = ok (no new fields, or all have migrations)
- * Exit 1 = new fields found without migrations
+ * Exit 1 = new fields found without migrations (diff check only; baseline never fails)
  */
 const { execSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
-const BASE_BRANCH = process.argv[2] || 'origin/staging'
+const rawArgs = process.argv.slice(2)
+const BASELINE_MODE = rawArgs.includes('--baseline')
+const BASE_BRANCH = rawArgs.find((a) => !a.startsWith('--')) || 'origin/staging'
 const DB_SETUP_PATH = path.join(__dirname, 'db-setup.js')
 
 // Tables we track migrations for — ALL collections with DB tables
@@ -408,6 +420,151 @@ function checkNewBlocks() {
   return missing
 }
 
+/**
+ * Baseline drift check — scan every field in every tracked collection,
+ * classify by Payload Drizzle convention, then warn if no column is covered
+ * by an ALTER TABLE migration OR a CREATE TABLE body.
+ *
+ * Heuristics (because regex, not a TS AST):
+ * - Fields are detected by `name: 'xxx'` lines. The following `type:` at the
+ *   same indentation is the field's type.
+ * - Groups push a prefix onto a stack keyed by indent; sub-fields deeper than
+ *   that indent inherit `{group}_` in their expected column name.
+ * - Skipped: array / blocks / select hasMany (separate tables — other checks
+ *   handle those), richText / json / code / point / ui / tabs / row / collapsible
+ *   (either Drizzle-special or presentational).
+ * - Relationships and uploads: expected column is `{field}_id`.
+ *
+ * Known false-positive sources:
+ * - Columns that Payload's historical `pushDevSchema` created on staging but
+ *   never got a matching ALTER TABLE in db-setup.js. These appear as warnings
+ *   even though the live DB has the column. Dev confirms via psql when in doubt.
+ */
+const SCALAR_FIELD_TYPES = new Set([
+  'text', 'textarea', 'email', 'code', 'number', 'date', 'checkbox',
+  'select', 'richText', 'json',
+])
+const SKIP_TYPES = new Set([
+  'array', 'blocks', 'ui', 'tabs', 'row', 'collapsible', 'group', 'point',
+])
+const PAYLOAD_AUTO_FIELDS = new Set([
+  'id', 'createdAt', 'updatedAt', '_status', '_verified', '_verificationToken',
+])
+
+function extractCollectionFields(source) {
+  const out = []
+  const lines = source.split('\n')
+  // Stack of active groups: [{ name, indent }]. We pop when we see a field at
+  // indent <= the group's indent (i.e. back at group's own level or above).
+  const groupStack = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const nameMatch = line.match(/^(\s*)name:\s*['"]([\w]+)['"]/)
+    if (!nameMatch) continue
+    const indent = nameMatch[1].length
+    const fieldName = nameMatch[2]
+
+    // Skip `name:` that sits inside an admin block, options array, validate fn,
+    // etc. by requiring a sibling `type:` at the same indent within a few lines.
+    let type = null
+    for (let j = i - 2; j <= i + 8; j++) {
+      if (j < 0 || j >= lines.length || j === i) continue
+      const tMatch = lines[j].match(/^(\s*)type:\s*['"]([\w]+)['"]/)
+      if (tMatch && tMatch[1].length === indent) {
+        type = tMatch[2]
+        break
+      }
+    }
+    if (!type) continue
+
+    // Close groups whose indent is >= this field's indent (we've exited them).
+    while (groupStack.length && groupStack[groupStack.length - 1].indent >= indent) {
+      groupStack.pop()
+    }
+
+    const prefix = groupStack.map((g) => toSnakeCase(g.name)).join('_')
+    out.push({ name: fieldName, type, prefix })
+
+    if (type === 'group') {
+      groupStack.push({ name: fieldName, indent })
+    }
+  }
+
+  return out
+}
+
+function isColumnCovered(fullDbSetupText, migrationColumns, table, column) {
+  if (migrationColumns.has(`${table}.${column}`)) return true
+  // Heuristic: grep the column name inside a `CREATE TABLE IF NOT EXISTS <table>`
+  // body. Uses [\s\S]*? to search across lines up to the matching `;`.
+  const re = new RegExp(
+    `CREATE TABLE IF NOT EXISTS\\s+"?${table}"?\\s*\\([\\s\\S]*?\\b${column}\\b[\\s\\S]*?\\);`,
+    'i',
+  )
+  return re.test(fullDbSetupText)
+}
+
+function checkBaselineDrift() {
+  const warnings = []
+  const fullText = fs.readFileSync(DB_SETUP_PATH, 'utf8')
+  const migrationColumns = getMigrationColumns()
+  const migrationTables = getMigrationTables()
+
+  for (const [filename, tableName] of Object.entries(TRACKED_COLLECTIONS)) {
+    if (filename === 'Pages.ts') continue // complex, handled by checkNewPagesBlockFields
+    const filePath = path.join(__dirname, '..', 'src', 'collections', filename)
+    if (!fs.existsSync(filePath)) continue
+
+    const source = fs.readFileSync(filePath, 'utf8')
+    const fields = extractCollectionFields(source)
+
+    for (const field of fields) {
+      if (PAYLOAD_AUTO_FIELDS.has(field.name)) continue
+      if (SKIP_TYPES.has(field.type) && field.type !== 'group') continue
+
+      // Arrays / select hasMany → expect separate table (not column). We only
+      // flag when the expected table is missing. For KISS, defer array table
+      // auditing — existing checkNewBlocks handles block tables; array tables
+      // rarely drift. Skip for now.
+      if (field.type === 'array') continue
+
+      // Groups themselves don't have a column; their sub-fields do.
+      if (field.type === 'group') continue
+
+      const snake = toSnakeCase(field.name)
+      const prefixedSnake = field.prefix ? `${field.prefix}_${snake}` : snake
+
+      // Build candidate column names by type.
+      const candidates = []
+      if (['relationship', 'upload'].includes(field.type)) {
+        candidates.push(`${prefixedSnake}_id`)
+      } else if (SCALAR_FIELD_TYPES.has(field.type)) {
+        candidates.push(prefixedSnake)
+      } else {
+        // Unknown/unsupported type — skip silently.
+        continue
+      }
+
+      const covered = candidates.some((c) =>
+        isColumnCovered(fullText, migrationColumns, tableName, c),
+      )
+      if (covered) continue
+
+      warnings.push({
+        collection: filename,
+        table: tableName,
+        field: field.name,
+        group: field.prefix || null,
+        type: field.type,
+        expectedColumn: `${tableName}.${candidates[0]}`,
+      })
+    }
+  }
+
+  return warnings
+}
+
 function main() {
   console.log(`[migration-check] Comparing against ${BASE_BRANCH}...`)
 
@@ -490,6 +647,38 @@ function main() {
     }
   } else if (missingBlockTables.length === 0 && missingVersionCols.length === 0) {
     console.log('[migration-check] ✅ No new collection fields or block types detected')
+  }
+
+  // ── Check 4 (opt-in): Baseline drift audit ───────────────────────────
+  // Finds fields that have existed in collections for a long time but were
+  // NEVER given a migration. These slip past the diff-only checks because
+  // they are not "new in the PR". Always WARN, never fail — many warnings
+  // are false positives from Payload's historical pushDevSchema seeding.
+  if (BASELINE_MODE) {
+    console.log('\n[migration-check] Running baseline drift audit (opt-in)...')
+    const drifts = checkBaselineDrift()
+    if (drifts.length === 0) {
+      console.log('[migration-check] ✅ No baseline drift detected')
+    } else {
+      console.warn(`\n⚠️  ${drifts.length} baseline drift warning(s) — fields declared in collections but no ALTER TABLE or CREATE TABLE column found:\n`)
+      // Group by collection for readability.
+      const byCollection = drifts.reduce((acc, d) => {
+        ;(acc[d.collection] = acc[d.collection] || []).push(d)
+        return acc
+      }, {})
+      for (const [collection, items] of Object.entries(byCollection)) {
+        console.warn(`   ${collection} (${items.length}):`)
+        for (const d of items) {
+          const groupStr = d.group ? ` [group: ${d.group}]` : ''
+          console.warn(`     - ${d.expectedColumn}  (field "${d.field}", type "${d.type}"${groupStr})`)
+        }
+      }
+      console.warn('\n💡 Review each warning manually:')
+      console.warn('   1. Query staging DB: psql $DATABASE_URI -c "\\d <table>" to check if column exists')
+      console.warn('   2. If column EXISTS on staging (Payload pushDevSchema legacy) → false positive, safe to ignore')
+      console.warn('   3. If column MISSING → add ALTER TABLE ADD COLUMN IF NOT EXISTS migration to db-setup.js')
+      console.warn('   (Never fails CI — this is an audit tool, not a gate.)\n')
+    }
   }
 
   process.exit(hasErrors ? 1 : 0)
