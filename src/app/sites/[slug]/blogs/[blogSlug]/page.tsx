@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import DOMPurify from 'isomorphic-dompurify'
 import { getServerI18n } from '@/i18n/server'
+import { getSiteBasePath } from '@/lib/site-base-path'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,6 +80,7 @@ export default async function BlogDetailPage({ params }: Props) {
     if (!data) notFound()
 
     const { t } = await getServerI18n()
+    const base = await getSiteBasePath(slug)
     const { site, post } = data
     const primaryColor = site.theme_primary_color || '#3B82F6'
     const thumbnail = typeof post.thumbnail === 'object' && post.thumbnail
@@ -101,11 +103,11 @@ export default async function BlogDetailPage({ params }: Props) {
             <article className="max-w-3xl mx-auto px-4 py-8">
                 {/* Breadcrumb */}
                 <nav className="flex items-center gap-2 text-sm text-gray-500 mb-8">
-                    <Link href={`/sites/${slug}`} className="hover:text-gray-300 transition-colors">
+                    <Link href={base || '/'} className="hover:text-gray-300 transition-colors">
                         {t.storefront.products.home}
                     </Link>
                     <span>/</span>
-                    <Link href={`/sites/${slug}/blogs`} className="hover:text-gray-300 transition-colors">
+                    <Link href={`${base}/blogs`} className="hover:text-gray-300 transition-colors">
                         {t.storefront.blog.title}
                     </Link>
                     <span>/</span>
@@ -162,7 +164,7 @@ export default async function BlogDetailPage({ params }: Props) {
                 {/* Back to Blog */}
                 <div className="mt-12 pt-8 border-t border-white/10">
                     <Link
-                        href={`/sites/${slug}/blogs`}
+                        href={`${base}/blogs`}
                         className="text-sm font-medium hover:opacity-80 transition-opacity"
                         style={{ color: primaryColor }}
                     >

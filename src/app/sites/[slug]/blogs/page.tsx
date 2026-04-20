@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getServerI18n } from '@/i18n/server'
+import { getSiteBasePath } from '@/lib/site-base-path'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,6 +71,7 @@ export default async function BlogListingPage({ params }: Props) {
     if (!data) notFound()
 
     const { t } = await getServerI18n()
+    const base = await getSiteBasePath(slug)
     const { site, blogs } = data
     const primaryColor = site.theme_primary_color || '#3B82F6'
 
@@ -107,7 +109,7 @@ export default async function BlogListingPage({ params }: Props) {
                             return (
                                 <Link
                                     key={post.id as string}
-                                    href={`/sites/${slug}/blogs/${post.slug}`}
+                                    href={`${base}/blogs/${post.slug}`}
                                     className="group flex flex-col rounded-xl border border-white/10 bg-[#111827] overflow-hidden hover:border-white/20 transition-colors"
                                 >
                                     {/* Thumbnail */}
