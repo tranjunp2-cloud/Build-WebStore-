@@ -9,6 +9,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next/headers', () => ({
     headers: vi.fn().mockResolvedValue(new Map()),
+    cookies: vi.fn().mockResolvedValue({ get: () => undefined }),
 }))
 
 // Mock Payload CMS
