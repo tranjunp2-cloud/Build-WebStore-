@@ -35,6 +35,19 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
     const [showLinkInput, setShowLinkInput] = useState(false)
     const [linkUrl, setLinkUrl] = useState('')
     const [showColorPicker, setShowColorPicker] = useState(false)
+    const [hexInput, setHexInput] = useState('#000000')
+    const [activeColor, setActiveColor] = useState('#000000')
+
+    const applyColor = (hex: string) => {
+        setActiveColor(hex)
+        setHexInput(hex)
+        onCommand('foreColor', hex)
+    }
+
+    const handleHexInput = (val: string) => {
+        setHexInput(val)
+        if (/^#[0-9a-fA-F]{6}$/.test(val)) applyColor(val)
+    }
     const [showListMenu, setShowListMenu] = useState(false)
     const [fontSize, setFontSize] = useState(16)
 
@@ -203,22 +216,68 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
             <div className="relative">
                 <button
                     className={btnCls(showColorPicker)}
-                    onClick={(e) => { e.preventDefault(); setShowColorPicker(!showColorPicker); setShowLinkInput(false); setShowListMenu(false) }}
+                    onClick={(e) => { e.preventDefault(); setShowColorPicker(!showColorPicker); setShowFontMenu(false); setShowLinkInput(false); setShowListMenu(false) }}
                     title="Text color"
                 >
-                    <Palette className="w-4 h-4" />
+                    <span className="relative inline-flex items-center justify-center w-4 h-4">
+                        <Palette className="w-4 h-4" />
+                        <span
+                            className="absolute -bottom-0.5 left-0 right-0 h-[3px] rounded-full"
+                            style={{ backgroundColor: activeColor }}
+                        />
+                    </span>
                 </button>
                 {showColorPicker && (
-                    <div className="absolute left-0 top-full mt-2 z-10 grid grid-cols-5 gap-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg" onMouseDown={(e) => e.stopPropagation()}>
-                        {PRESET_COLORS.map((color) => (
-                            <button
-                                key={color}
-                                className="h-6 w-6 rounded-md border border-gray-200 transition-transform hover:scale-110"
-                                style={{ backgroundColor: color }}
-                                onClick={(e) => { e.preventDefault(); onCommand('foreColor', color); setShowColorPicker(false) }}
-                                title={color}
+                    <div
+                        className="absolute left-0 top-full mt-2 z-20 rounded-lg border border-gray-200 bg-white p-2.5 shadow-xl"
+                        style={{ width: 168 }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        {/* Preset swatches — inline grid to avoid Tailwind purge */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 8 }}>
+                            {PRESET_COLORS.map((color) => (
+                                <button
+                                    key={color}
+                                    type="button"
+                                    className="rounded transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    style={{
+                                        width: 24, height: 24,
+                                        backgroundColor: color,
+                                        border: activeColor === color ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                                    }}
+                                    onClick={(e) => { e.preventDefault(); applyColor(color) }}
+                                    title={color}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Hex input + color preview */}
+                        <div className="flex items-center gap-1.5">
+                            <label
+                                className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded border border-gray-200 overflow-hidden"
+                                title="Pick custom color"
+                            >
+                                <span className="block w-full h-full" style={{ backgroundColor: activeColor }} />
+                                <input
+                                    type="color"
+                                    className="sr-only"
+                                    value={activeColor}
+                                    onChange={(e) => applyColor(e.target.value)}
+                                />
+                            </label>
+                            <input
+                                type="text"
+                                value={hexInput}
+                                maxLength={7}
+                                placeholder="#000000"
+                                className="h-7 flex-1 rounded border border-gray-200 px-1.5 text-xs text-gray-700 outline-none focus:border-blue-400 font-mono"
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onChange={(e) => handleHexInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') { e.preventDefault(); if (/^#[0-9a-fA-F]{6}$/.test(hexInput)) { applyColor(hexInput); setShowColorPicker(false) } }
+                                }}
                             />
-                        ))}
+                        </div>
                     </div>
                 )}
             </div>
