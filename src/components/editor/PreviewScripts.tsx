@@ -435,6 +435,16 @@ export function PreviewScripts() {
                 (currentEditingEl?.classList.contains('text-center') ? 'center' :
                  currentEditingEl?.classList.contains('text-right') ? 'right' :
                  currentEditingEl?.classList.contains('text-justify') ? 'justify' : 'left')
+            // Read font size: inline style first, then computed
+            let fontSize = 0
+            if (currentEditingEl) {
+                const inlineFs = parseFloat(currentEditingEl.style.fontSize)
+                if (inlineFs > 0) {
+                    fontSize = inlineFs
+                } else {
+                    fontSize = parseFloat(window.getComputedStyle(currentEditingEl).fontSize) || 16
+                }
+            }
             window.parent.postMessage({
                 type: 'SELECTION_STATE',
                 state: {
@@ -443,6 +453,7 @@ export function PreviewScripts() {
                     underline: /<u\b/i.test(html),
                     formatBlock: currentEditingEl?.tagName || 'P',
                     textAlign: align,
+                    fontSize: Math.round(fontSize),
                 }
             }, parentOrigin)
         }

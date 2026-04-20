@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
     Bold, Italic, Underline, Strikethrough,
     AlignLeft, AlignCenter, AlignRight, AlignJustify,
@@ -32,6 +32,12 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [showListMenu, setShowListMenu] = useState(false)
     const [fontSize, setFontSize] = useState(16)
+
+    // Sync font size from active element when toolbar first opens or element changes
+    useEffect(() => {
+        const fs = Number(activeState.fontSize)
+        if (fs > 0) setFontSize(fs)
+    }, [activeState.fontSize])
 
     const handleFontSize = (delta: number) => {
         const next = Math.max(8, Math.min(96, fontSize + delta))
