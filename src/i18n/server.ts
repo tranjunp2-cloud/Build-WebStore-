@@ -8,7 +8,7 @@ const locales = { en, ms } as const
 
 export async function getServerI18n() {
     const cookieStore = await cookies()
-    const saved = cookieStore.get(LOCALE_KEY)?.value as Locale | undefined
-    const locale: Locale = saved && locales[saved] ? saved : 'en'
+    const saved = cookieStore.get(LOCALE_KEY)?.value
+    const locale: Locale = saved === 'en' || saved === 'ms' ? saved : 'en'
     return { t: locales[locale], locale }
 }
