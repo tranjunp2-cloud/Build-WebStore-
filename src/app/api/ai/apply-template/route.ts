@@ -297,11 +297,18 @@ export const POST = withAuth(async (user, req) => {
                     data: { theme: templateTheme },
                 })
 
-                // Template has blocks for homepage only — sanitize them
+                // Template has blocks for homepage only — sanitize them.
+                // Pick the template's homepage layout (NOT flatMap across all pages,
+                // which would duplicate navigation/footer that appear on every page
+                // for multi-page templates — Professional=3 pages, Premium=5 pages).
+                const templateHomepagePage =
+                    templatePages?.find((p) =>
+                        Boolean((p as { isHomepage?: boolean }).isHomepage),
+                    ) ?? templatePages?.[0]
+                const templateHomepageLayout =
+                    (templateHomepagePage?.layout as Record<string, unknown>[] | undefined) ?? []
                 const templateBlocksClean = sanitizeBlocks(
-                    templatePages?.length
-                        ? (templatePages.flatMap(p => (p.layout as Record<string, unknown>[]) || []))
-                        : blocks
+                    templateHomepageLayout.length ? templateHomepageLayout : blocks,
                 )
 
                 // 2. Smart Mapping: replace layout with template blocks, map user content
