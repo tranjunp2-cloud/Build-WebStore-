@@ -3,7 +3,7 @@
 import type { ReactNode, ComponentType } from 'react'
 import type { BlockProps } from '../types'
 import type { ContactConfig, FormField } from './config'
-import { useContactForm } from './useContactForm'
+import { useContactForm, PHONE_PATTERN_MY } from './useContactForm'
 import { AnimatedSection } from '../shared/animations'
 import { GradientBlob, SectionLabel, GlassCard } from '../shared/decorative'
 import { motion } from 'framer-motion'
@@ -292,7 +292,7 @@ function FormFieldInput({ field, error, errorId }: { field: FormField; error?: b
             {...commonProps}
             type={type}
             autoComplete={autoComplete}
-            pattern={field.fieldType === 'phone' ? '[0-9+\\s()-]{9,20}' : undefined}
+            pattern={field.fieldType === 'phone' ? PHONE_PATTERN_MY : undefined}
         />
     )
 }

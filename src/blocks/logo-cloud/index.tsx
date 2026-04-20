@@ -19,8 +19,8 @@ function LogoHeadline({ text }: { text?: string }) {
 }
 
 /** Text placeholder for logos without valid image URL — shows initials in a styled div */
-function LogoPlaceholder({ name }: { name: string }) {
-    const initials = name
+function LogoPlaceholder({ name }: { name?: string }) {
+    const initials = (name ?? '')
         .split(/\s+/)
         .map((w) => w[0])
         .join('')

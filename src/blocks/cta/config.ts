@@ -7,7 +7,26 @@ import { BaseBlockSchema } from '../types'
 // sticky CTA. Migration SQL `UPDATE cta SET variant='card' WHERE variant='floating'`
 // lives in scripts/db-setup.js.
 
-export type CTAVariant = 'banner' | 'inline' | 'card' | 'floating-sticky'
+export type CTAVariant =
+    | 'banner'
+    | 'inline'
+    | 'card'
+    | 'floating-sticky'
+    | 'image-bg'
+    | 'split-testimonial'
+    | 'dark-card'
+    | 'mesh-gradient-hero'
+
+export const CTA_VARIANTS: CTAVariant[] = [
+    'banner',
+    'inline',
+    'card',
+    'floating-sticky',
+    'image-bg',
+    'split-testimonial',
+    'dark-card',
+    'mesh-gradient-hero',
+]
 
 export type CTAButton = {
     label: string
@@ -30,7 +49,7 @@ export type CTAConfig = {
 
 export const CTAConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('cta'),
-    variant: z.enum(['banner', 'inline', 'card', 'floating-sticky']).default('banner'),
+    variant: z.enum(['banner', 'inline', 'card', 'floating-sticky', 'image-bg', 'split-testimonial', 'dark-card', 'mesh-gradient-hero']).default('banner'),
     headline: z.string(),
     subheadline: z.string().optional(),
     ctaLabel: z.string(),
@@ -45,7 +64,7 @@ export const ctaMeta = {
     name: 'CTA',
     description: 'Call to action banner',
     icon: '📣',
-    variants: ['banner', 'inline', 'card', 'floating-sticky'],
+    variants: CTA_VARIANTS,
     defaultVariant: 'banner',
     editableFields: ['headline', 'subheadline', 'ctaLabel', 'ctaUrl', 'secondaryCtaLabel', 'secondaryCtaUrl'],
     quickActions: ['Rewrite CTA', 'Make urgent'],
