@@ -67,9 +67,51 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'pages',
             id: '10',
-            data: { isVisible: false },
+            data: expect.objectContaining({ isVisible: false }),
             draft: true,
         }))
+    })
+
+    // BUG-F05-visibility-pk: toggling visibility on a page whose layout
+    // contains AI-seeded block UUIDs that collide with other pages' live
+    // block rows caused PG 23505 → ValidationError{path:'id'}. Fix strips
+    // block-row `id` + `_uuid` so Drizzle regenerates fresh UUIDs.
+    it('strips block ids from layout before passing to payload.update', async () => {
+        mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] })
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: '10', site: 1, slug: '/about', title: 'About', _status: 'draft',
+                layout: [
+                    { id: 'collide-uuid', _uuid: 'collide-uuid', blockType: 'hero', headline: 'Hi' },
+                    {
+                        id: 'another-uuid', blockType: 'features',
+                        features: [
+                            { id: 'nested-uuid', name: 'F1' },
+                        ],
+                    },
+                ],
+            })
+            .mockResolvedValueOnce({
+                id: '10', title: 'About', slug: '/about',
+                _status: 'draft', isVisible: false, seo: {}, updatedAt: '2026-04-01',
+            })
+        mockUpdate.mockResolvedValue({})
+
+        const req = { json: () => Promise.resolve({ isVisible: false }) } as unknown as Request
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
+
+        expect(res.status).toBe(200)
+        const callArg = mockUpdate.mock.calls[0][0] as { data: { layout: unknown[] } }
+        const sentLayout = callArg.data.layout as Array<Record<string, unknown>>
+        expect(sentLayout).toHaveLength(2)
+        // block-level ids gone
+        expect(sentLayout[0]).not.toHaveProperty('id')
+        expect(sentLayout[0]).not.toHaveProperty('_uuid')
+        expect(sentLayout[0]).toMatchObject({ blockType: 'hero', headline: 'Hi' })
+        // nested array ids also gone
+        const nestedFeatures = (sentLayout[1].features as Array<Record<string, unknown>>)
+        expect(nestedFeatures[0]).not.toHaveProperty('id')
+        expect(nestedFeatures[0]).toMatchObject({ name: 'F1' })
     })
 
     it('publishes visibility immediately when page is already published clean', async () => {
@@ -89,7 +131,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'pages',
             id: '10',
-            data: { isVisible: true },
+            data: expect.objectContaining({ isVisible: true }),
             draft: false,
         }))
     })
@@ -115,7 +157,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'pages',
             id: '10',
-            data: { deletedAt: '2026-04-20T10:00:00Z' },
+            data: expect.objectContaining({ deletedAt: '2026-04-20T10:00:00Z' }),
             draft: true,
         }))
     })
@@ -137,7 +179,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'pages',
             id: '10',
-            data: { deletedAt: '2026-04-20T10:00:00Z' },
+            data: expect.objectContaining({ deletedAt: '2026-04-20T10:00:00Z' }),
             draft: false,
         }))
     })
