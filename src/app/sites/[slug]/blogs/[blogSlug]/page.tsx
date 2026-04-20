@@ -5,7 +5,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import DOMPurify from 'isomorphic-dompurify'
-import { I18nText } from '@/components/storefront/I18nText'
+import { getServerI18n } from '@/i18n/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,6 +78,7 @@ export default async function BlogDetailPage({ params }: Props) {
     const data = await getSiteAndPost(slug, blogSlug)
     if (!data) notFound()
 
+    const { t } = await getServerI18n()
     const { site, post } = data
     const primaryColor = site.theme_primary_color || '#3B82F6'
     const thumbnail = typeof post.thumbnail === 'object' && post.thumbnail
@@ -101,11 +102,11 @@ export default async function BlogDetailPage({ params }: Props) {
                 {/* Breadcrumb */}
                 <nav className="flex items-center gap-2 text-sm text-gray-500 mb-8">
                     <Link href={`/sites/${slug}`} className="hover:text-gray-300 transition-colors">
-                        <I18nText render={t => t.storefront.products.home} />
+                        {t.storefront.products.home}
                     </Link>
                     <span>/</span>
                     <Link href={`/sites/${slug}/blogs`} className="hover:text-gray-300 transition-colors">
-                        <I18nText render={t => t.storefront.blog.title} />
+                        {t.storefront.blog.title}
                     </Link>
                     <span>/</span>
                     <span className="text-gray-400 truncate">{post.title as string}</span>
@@ -165,7 +166,7 @@ export default async function BlogDetailPage({ params }: Props) {
                         className="text-sm font-medium hover:opacity-80 transition-opacity"
                         style={{ color: primaryColor }}
                     >
-                        <I18nText render={t => t.storefront.blog.backToBlog} />
+                        {t.storefront.blog.backToBlog}
                     </Link>
                 </div>
             </article>
