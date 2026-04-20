@@ -2496,6 +2496,27 @@ const MIGRATIONS = [
     name: 'sites.generation_status_backfill',
     sql: `UPDATE sites SET generation_status = 'completed' WHERE generation_status IS NULL;`,
   },
+  // ── Sites: siteType + aiGenerationMetadata (required by /api/ai/generate-site) ──
+  // Root cause 2026-04-20: Sites.ts declares siteType (select, required) and
+  // aiGenerationMetadata (group) but DB staging was seeded before these existed.
+  // CREATE TABLE IF NOT EXISTS skipped column adds → INSERT fails with
+  // "Failed query: insert into sites" on POST /api/ai/generate-site.
+  {
+    name: 'sites.site_type',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS site_type varchar DEFAULT 'business';`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_generated_at',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_generated_at timestamp(3) with time zone;`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_original_prompt',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_original_prompt varchar;`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_business_type',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_business_type varchar;`,
+  },
   // ── F16-04: Add metadata column for notification i18n ──
   {
     name: 'notifications.metadata',
