@@ -12,16 +12,20 @@
  *   TC-F05-save-08  → normalizeUploadField: image is null → kept as null
  *   TC-F05-save-09  → normalizeBlocksForPersistence: footer column links null → no crash
  *   TC-F05-save-10  → normalizeBlocksForPersistence: socialWidget block → normalizeSocialWidgetConfig called
+ *   TC-F05-save-11  → sanitizeBlockVariant: invalid variant for known block → coerced to defaultVariant
+ *   TC-F05-save-12  → sanitizeBlockVariant: valid variant / missing block / empty variant → unchanged
+ *   TC-F05-save-13  → normalizeBlocksForPersistence: blog-list with legacy "editorial" variant → coerced to "cards"
  *
  * Source:
  *   src/lib/block-normalization.ts
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
     normalizeUploadField,
     stripNestedIds,
     normalizeBlocksForPersistence,
+    sanitizeBlockVariant,
 } from '@/lib/block-normalization'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -375,6 +379,26 @@ describe('normalizeBlocksForPersistence', () => {
         expect(firstLink).toHaveProperty('enabled')
     })
 
+    // TC-F05-save-13
+    it('TC-F05-save-13: blog-list with legacy "editorial" variant → coerced to "cards" (defaultVariant)', () => {
+        // Arrange — preset layer produced variants not in the Payload enum.
+        // Real staging 500 payloads: blog-list=grid|editorial|featured-hero,
+        // hero=overlay, social-proof=masonry (all invalid).
+        const blocks = [
+            { blockType: 'blog-list', variant: 'editorial', headline: 'Latest' },
+            { blockType: 'hero', variant: 'overlay', headline: 'Welcome' },
+            { blockType: 'social-proof', variant: 'masonry', headline: 'Love' },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — every invalid variant collapsed to block's defaultVariant
+        expect(result[0]!.variant).toBe('cards')     // blog-list default
+        expect(result[1]!.variant).toBe('centered')  // hero default
+        expect(result[2]!.variant).toBe('cards')     // social-proof default
+    })
+
     it('TC-F05-save-10b: socialWidget block with invalid platform → coerced to "facebook"', () => {
         // Arrange — unknown platform from old data
         const blocks = [
@@ -396,5 +420,86 @@ describe('normalizeBlocksForPersistence', () => {
         expect(links[0].platform).toBe('facebook')
         // valid 'facebook' platform kept as-is
         expect(links[1].platform).toBe('facebook')
+    })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 4 — sanitizeBlockVariant (direct unit tests)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('sanitizeBlockVariant', () => {
+    beforeEach(() => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    // TC-F05-save-11
+    it('TC-F05-save-11: invalid variant for known block → coerced to defaultVariant', () => {
+        // Arrange — "editorial" is not in blog-list's enum [cards, list]
+        const block = { blockType: 'blog-list', variant: 'editorial', headline: 'News' }
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert
+        expect(result.variant).toBe('cards')
+        expect(result.headline).toBe('News')
+    })
+
+    it('TC-F05-save-11b: invalid hero variant → coerced to centered', () => {
+        // Arrange
+        const block = { blockType: 'hero', variant: 'overlay' }
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert
+        expect(result.variant).toBe('centered')
+    })
+
+    // TC-F05-save-12
+    it('TC-F05-save-12: valid variant → unchanged (same reference)', () => {
+        // Arrange
+        const block = { blockType: 'hero', variant: 'minimal', headline: 'Hi' }
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert — short-circuit returns input
+        expect(result).toBe(block)
+        expect(result.variant).toBe('minimal')
+    })
+
+    it('TC-F05-save-12b: unknown block type → unchanged', () => {
+        // Arrange
+        const block = { blockType: 'not-a-real-block', variant: 'whatever' }
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert — no meta, leave alone
+        expect(result).toBe(block)
+    })
+
+    it('TC-F05-save-12c: missing/empty variant → unchanged (Zod default applies downstream)', () => {
+        // Arrange
+        const a = { blockType: 'hero', headline: 'Hi' }
+        const b = { blockType: 'hero', variant: '', headline: 'Hi' }
+        const c = { blockType: 'hero', variant: undefined, headline: 'Hi' }
+
+        // Act + Assert
+        expect(sanitizeBlockVariant(a)).toBe(a)
+        expect(sanitizeBlockVariant(b)).toBe(b)
+        expect(sanitizeBlockVariant(c)).toBe(c)
+    })
+
+    it('TC-F05-save-12d: non-string blockType → unchanged', () => {
+        // Arrange
+        const block = { blockType: 42, variant: 'anything' } as unknown as Record<string, unknown>
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert
+        expect(result).toBe(block)
     })
 })
