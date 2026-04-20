@@ -31,6 +31,13 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
     const [linkUrl, setLinkUrl] = useState('')
     const [showColorPicker, setShowColorPicker] = useState(false)
     const [showListMenu, setShowListMenu] = useState(false)
+    const [fontSize, setFontSize] = useState(16)
+
+    const handleFontSize = (delta: number) => {
+        const next = Math.max(8, Math.min(96, fontSize + delta))
+        setFontSize(next)
+        onCommand('fontSize', String(next))
+    }
 
     const btnCls = (active: boolean) =>
         `p-1.5 rounded transition-colors ${active ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`
@@ -53,6 +60,35 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
                 <option value="H4">{rt.heading4}</option>
                 <option value="P">{rt.paragraph}</option>
             </select>
+
+            {/* Font size */}
+            <div className="flex items-center rounded border border-gray-200 overflow-hidden">
+                <button
+                    className="flex h-7 w-6 items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors text-sm leading-none"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.preventDefault(); handleFontSize(-1) }}
+                    title="Decrease font size"
+                >−</button>
+                <input
+                    type="number"
+                    value={fontSize}
+                    min={8}
+                    max={96}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                        const v = Math.max(8, Math.min(96, Number(e.target.value) || 16))
+                        setFontSize(v)
+                        onCommand('fontSize', String(v))
+                    }}
+                    className="h-7 w-9 border-x border-gray-200 bg-gray-50 text-center text-xs text-gray-700 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button
+                    className="flex h-7 w-6 items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors text-sm leading-none"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.preventDefault(); handleFontSize(1) }}
+                    title="Increase font size"
+                >+</button>
+            </div>
 
             <div className="w-px h-6 bg-gray-200 mx-1" />
 
