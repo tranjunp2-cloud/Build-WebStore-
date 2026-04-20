@@ -548,6 +548,13 @@ export function PreviewScripts() {
                     // Also remove Tailwind text-align classes that might conflict
                     currentEditingEl.classList.remove('text-left', 'text-center', 'text-right', 'text-justify')
 
+                // ── fontSize: set style.fontSize directly (execCommand only accepts 1-7) ──
+                } else if (cmd === 'fontSize' && val) {
+                    const px = parseFloat(val)
+                    if (!isNaN(px) && px > 0) {
+                        currentEditingEl.style.fontSize = `${px}px`
+                    }
+
                 // ── other commands: fallback to execCommand ──
                 } else {
                     document.execCommand(cmd, false, val)
