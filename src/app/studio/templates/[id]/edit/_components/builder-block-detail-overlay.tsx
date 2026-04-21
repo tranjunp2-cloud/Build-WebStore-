@@ -72,6 +72,8 @@ function toBlockDetailData(api: BlockApiResponse): BlockDetailData {
         })),
         // usedByTemplates not returned by this route — pass empty for MVP
         usedByTemplates: [],
+        // fields not available in overlay context — schema tab falls back to legacy heuristic
+        fields: [],
     }
 }
 
@@ -115,6 +117,7 @@ export function BuilderBlockDetailOverlay({ slug, onAddToTemplate, onBack }: Pro
         hiddenFromCatalog: false,
         variantOverrides: [],
         usedByTemplates: [],
+        fields: [],
     } satisfies BlockDetailData : null)
 
     if (!displayBlock) {

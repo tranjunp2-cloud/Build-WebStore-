@@ -12,6 +12,7 @@ import config from '@payload-config'
 import { getBlockBySlug } from '@/lib/admin/block-registry-reader'
 import { getBlockUsageCounts } from '@/lib/admin/block-usage-counter'
 import { BlockDetailTabs, type BlockDetailData } from '../_components/block-detail-tabs'
+import { getSchemaForBlock, introspectSchema } from '@/lib/admin/block-schema-registry'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,13 +80,33 @@ export default async function BlockDetailPage({ params }: Props) {
                 )
             })
         })
-        .map((doc) => ({
-            id: doc.id,
-            name: doc.name ?? String(doc.id),
-            category: Array.isArray(doc.category) ? doc.category : [],
-        }))
+        .map((doc) => {
+            // Collect all variant values this template uses for this block slug across all pages
+            const variantsInUse: string[] = []
+            if (Array.isArray(doc.templatePages)) {
+                for (const page of doc.templatePages) {
+                    if (!Array.isArray(page.layout)) continue
+                    for (const b of page.layout as Array<Record<string, unknown>>) {
+                        if (b.blockType === slug) {
+                            const v = typeof b.variant === 'string' ? b.variant : null
+                            if (v && !variantsInUse.includes(v)) variantsInUse.push(v)
+                        }
+                    }
+                }
+            }
+            return {
+                id: doc.id,
+                name: doc.name ?? String(doc.id),
+                category: Array.isArray(doc.category) ? doc.category : [],
+                variantsInUse,
+            }
+        })
 
     const usageCount = usageCounts[slug] ?? 0
+
+    // Phase P2: Introspect real Zod schema fields for the Schema tab
+    const blockSchema = getSchemaForBlock(slug)
+    const fields = blockSchema ? introspectSchema(blockSchema) : []
 
     const blockData: BlockDetailData = {
         slug: block.slug,
@@ -111,6 +132,7 @@ export default async function BlockDetailPage({ params }: Props) {
             displayName: (v.displayName as string) ?? null,
         })),
         usedByTemplates,
+        fields,
     }
 
     return (

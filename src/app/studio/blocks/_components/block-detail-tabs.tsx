@@ -5,12 +5,17 @@
  * 6-tab client component for block detail page (matches bundle builder-block-detail.jsx):
  * Variants / Schema / Content Presets / AI & Prompts / Usage / History
  * Phase 03: Presets + History tabs wired to real endpoints (no more F07 stubs).
+ * Phase P1: Usage tab click-through + variantsInUse badge per row.
+ * Phase P2: Schema tab uses real Zod fields (FieldMeta[]) from registry.
+ * Phase P3: AI tab reads prompt-overrides list; AiTab read-only preview.
  */
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { VariantGallery } from './variant-gallery'
 import { BlockSchemaInspector } from './block-schema-inspector'
 import type { BlockPresetStub } from '@/app/api/admin/blocks/[slug]/presets/route'
 import type { BlockHistoryEvent } from '@/app/api/admin/blocks/[slug]/history/route'
+import type { FieldMeta } from '@/lib/admin/block-schema-registry'
 
 type VariantOverride = {
     variantName: string
@@ -25,6 +30,8 @@ type UsedByTemplate = {
     name: string
     slug?: string
     category?: string[]
+    /** Which variants of this block this template uses */
+    variantsInUse?: string[]
 }
 
 export type BlockDetailData = {
@@ -45,6 +52,8 @@ export type BlockDetailData = {
     hiddenFromCatalog: boolean
     variantOverrides: VariantOverride[]
     usedByTemplates: UsedByTemplate[]
+    /** Real Zod-introspected fields (Phase P2). Falls back to [] if schema missing. */
+    fields: FieldMeta[]
 }
 
 type Tab = 'variants' | 'schema' | 'presets' | 'ai' | 'usage' | 'history'
@@ -103,6 +112,7 @@ export function BlockDetailTabs({ block }: Props) {
                     editableFields={block.editableFields}
                     defaultVariant={block.defaultVariant}
                     variants={block.variants}
+                    fields={block.fields}
                 />
             )}
 
@@ -229,17 +239,30 @@ function UsageTab({ block }: { block: BlockDetailData }) {
             </p>
             <div className="b-usage-list">
                 {block.usedByTemplates.map((t) => (
-                    <div key={t.id} className="b-usage-row">
+                    <Link
+                        key={t.id}
+                        href={`/studio/templates/${t.id}/edit`}
+                        className="b-usage-row"
+                        style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', textDecoration: 'none' }}
+                    >
                         <div className="thumb" />
-                        <div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                             <div className="n">{t.name}</div>
                             {t.category && t.category.length > 0 && (
                                 <div className="s">{t.category.join(', ')}</div>
                             )}
                         </div>
                         <span className="sp" />
-                        <span className="var-pill">{block.defaultVariant || 'default'}</span>
-                    </div>
+                        {/* Variant badges — show all variants this template uses for this block */}
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                            {(t.variantsInUse && t.variantsInUse.length > 0)
+                                ? t.variantsInUse.map((v) => (
+                                    <span key={v} className="var-pill">{v}</span>
+                                ))
+                                : <span className="var-pill">{block.defaultVariant || 'default'}</span>
+                            }
+                        </div>
+                    </Link>
                 ))}
             </div>
         </>
