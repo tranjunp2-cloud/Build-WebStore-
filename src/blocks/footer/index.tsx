@@ -50,6 +50,7 @@ const FOOTER_RESPONSIVE_GAP = 'gap-6 sm:gap-8 md:gap-10'
 type FooterSectionProps = {
     paddingClass: string
     showGradientLine?: boolean
+    style?: React.CSSProperties
     children: ReactNode
 }
 
@@ -75,7 +76,7 @@ const FOOTER_VARIANTS = {
     },
 }
 
-function FooterSection({ paddingClass, showGradientLine = true, children }: FooterSectionProps) {
+function FooterSection({ paddingClass, showGradientLine = true, style, children }: FooterSectionProps) {
     const shouldReduce = useReducedMotion()
 
     const innerContent = (
@@ -95,7 +96,7 @@ function FooterSection({ paddingClass, showGradientLine = true, children }: Foot
     )
 
     if (shouldReduce) {
-        return <footer className={`${paddingClass} relative`}>{innerContent}</footer>
+        return <footer className={`${paddingClass} relative`} style={style}>{innerContent}</footer>
     }
 
     return (
@@ -105,6 +106,7 @@ function FooterSection({ paddingClass, showGradientLine = true, children }: Foot
             viewport={{ once: true, margin: '-80px' }}
             variants={FOOTER_VARIANTS}
             className={`${paddingClass} relative`}
+            style={style}
         >
             {innerContent}
         </motion.footer>
@@ -251,7 +253,8 @@ const FOOTER_DIVIDER_STYLE = { borderTop: `1px solid rgba(var(--brand-primary-rg
 export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterConfig>) {
     void _theme
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
-    const { logoText, tagline, columns = [], copyrightText, variant = 'simple' } = mergedBlock
+    const { logoText, tagline, columns = [], copyrightText, backgroundColor, variant = 'simple' } = mergedBlock
+    const footerStyle: React.CSSProperties = backgroundColor ? { backgroundColor } : {}
     // Plan 260415 Lỗi G-pattern — safe String cast cho siteId (dùng trong newsletter form POST)
     const siteId = site?.id != null ? String(site.id) : undefined
 
@@ -274,7 +277,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // ── Centered Stack variant ────────────────────────────────────────────
     if (variant === 'centered-stack') {
         return (
-            <FooterSection paddingClass={SECTION_PADDING.compact}>
+            <FooterSection paddingClass={SECTION_PADDING.compact} style={footerStyle}>
                 <div className="text-center">
                     <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4 mx-auto" />
                     {tagline && (
@@ -322,7 +325,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // FooterSection helper because of the dual-band structure.
     if (variant === 'mega-footer') {
         return (
-            <footer className="relative">
+            <footer className="relative" style={footerStyle}>
                 {/* Top band */}
                 <div className="py-10" style={{ background: `var(--brand-primary)` }}>
                     <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} text-center`}>
@@ -392,7 +395,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                 style={{
                     /* Plan 260415 Lỗi 16F — theme-adaptive gradient thay vì hardcode đen.
                        color-mix var(--background) với 94% độ đục → hiện cả light + dark themes. */
-                    background: `linear-gradient(to bottom, transparent, color-mix(in srgb, var(--background, #000000) 92%, black))`,
+                    background: backgroundColor || `linear-gradient(to bottom, transparent, color-mix(in srgb, var(--background, #000000) 92%, black))`,
                 }}
             >
                 <GradientLine
@@ -438,7 +441,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // tokens which only cover symmetric py-* values. Kept inline.
     if (variant === 'expanded') {
         return (
-            <FooterSection paddingClass="pt-16 md:pt-20 pb-8">
+            <FooterSection paddingClass="pt-16 md:pt-20 pb-8" style={footerStyle}>
                 {/* 4-column links section */}
                 <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${FOOTER_RESPONSIVE_GAP} mb-12`}>
                     {/* Brand column as first of 4 */}
@@ -492,7 +495,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
         const allLinks = columns.flatMap(col => col.links || [])
 
         return (
-            <FooterSection paddingClass="py-6" showGradientLine={false}>
+            <FooterSection paddingClass="py-6" showGradientLine={false} style={footerStyle}>
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                     {/* Logo / brand text — left */}
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -525,7 +528,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // Plan 260415 Lỗi D — grid responsive sm:grid-cols-2 md:grid-cols-4 (bỏ
     // md 2-col trung gian vì 4 cột đều hơn với 1 brand + 3 link cols).
     return (
-        <FooterSection paddingClass="pt-16 md:pt-20 pb-8">
+        <FooterSection paddingClass="pt-16 md:pt-20 pb-8" style={footerStyle}>
             <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 ${FOOTER_RESPONSIVE_GAP} mb-16`}>
                 {/* Brand Column */}
                 <div className="sm:col-span-2 md:col-span-1">
