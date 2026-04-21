@@ -3,6 +3,7 @@
  * builder-shell.tsx
  * 3-pane layout orchestrator. Initialises Zustand store from server-fetched
  * sections, wires auto-save, and composes Library | Canvas | Inspector.
+ * Mode state machine: 'builder' | 'catalog' | 'block-detail' (Phase A).
  * Visual re-skin: uses builder-shell CSS grid from bundle (builder.css).
  */
 import { useEffect, useState } from 'react'
@@ -13,6 +14,10 @@ import { BuilderHeader } from './builder-header'
 import { BuilderLibraryPane } from './builder-library-pane'
 import { BuilderCanvasPane } from './builder-canvas-pane'
 import { BuilderInspectorPane } from './builder-inspector-pane'
+import { BuilderCatalogOverlay } from './builder-catalog-overlay'
+import { BuilderBlockDetailOverlay } from './builder-block-detail-overlay'
+
+type BuilderMode = 'builder' | 'catalog' | 'block-detail'
 
 interface Props {
     templateId: number
@@ -22,9 +27,11 @@ interface Props {
 }
 
 export function BuilderShell({ templateId, initialName, initialStatus, initialSections }: Props) {
-    const { load } = useBuilderStore()
+    const { load, addBlock } = useBuilderStore()
     const [name, setName] = useState(initialName)
     const [status, setStatus] = useState(initialStatus)
+    const [mode, setMode] = useState<BuilderMode>('builder')
+    const [detailBlockSlug, setDetailBlockSlug] = useState<string | null>(null)
 
     // Initialise store: prefer localStorage auto-save, fall back to DB sections
     useEffect(() => {
@@ -59,6 +66,33 @@ export function BuilderShell({ templateId, initialName, initialStatus, initialSe
         }).catch(() => {/* non-fatal */})
     }
 
+    // Catalog overlay (replaces full shell subtree, preserves Zustand state)
+    if (mode === 'catalog') {
+        return (
+            <BuilderCatalogOverlay
+                onOpenBlockDetail={(slug: string) => {
+                    setDetailBlockSlug(slug)
+                    setMode('block-detail')
+                }}
+                onBack={() => setMode('builder')}
+            />
+        )
+    }
+
+    // Block detail overlay
+    if (mode === 'block-detail' && detailBlockSlug) {
+        return (
+            <BuilderBlockDetailOverlay
+                slug={detailBlockSlug}
+                onAddToTemplate={(blockType: string) => {
+                    addBlock(blockType)
+                    setMode('builder')
+                }}
+                onBack={() => setMode('catalog')}
+            />
+        )
+    }
+
     return (
         /*
          * builder-shell: 3-pane CSS grid.
@@ -73,10 +107,17 @@ export function BuilderShell({ templateId, initialName, initialStatus, initialSe
                 templateStatus={status as 'draft' | 'review' | 'live' | 'scheduled' | 'archived'}
                 onNameChange={handleNameChange}
                 onStatusChange={handleStatusChange}
+                mode={mode}
+                onModeChange={(m) => setMode(m)}
             />
             <BuilderLibraryPane />
             <BuilderCanvasPane />
-            <BuilderInspectorPane />
+            <BuilderInspectorPane
+                onOpenBlockDetail={(slug) => {
+                    setDetailBlockSlug(slug)
+                    setMode('block-detail')
+                }}
+            />
         </div>
     )
 }

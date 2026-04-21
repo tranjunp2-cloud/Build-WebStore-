@@ -14,6 +14,7 @@ import { clearAutoSave } from '@/lib/admin/builder-auto-save'
 
 const STATUS_OPTIONS = ['draft', 'review', 'live', 'scheduled', 'archived'] as const
 type TemplateStatus = typeof STATUS_OPTIONS[number]
+type BuilderMode = 'builder' | 'catalog' | 'block-detail'
 
 interface Props {
     templateName: string
@@ -21,6 +22,8 @@ interface Props {
     templateId: number
     onNameChange: (name: string) => void
     onStatusChange: (status: TemplateStatus) => void
+    mode: BuilderMode
+    onModeChange: (mode: 'builder' | 'catalog') => void
 }
 
 export function BuilderHeader({
@@ -29,6 +32,8 @@ export function BuilderHeader({
     templateId,
     onNameChange,
     onStatusChange,
+    mode,
+    onModeChange,
 }: Props) {
     const [saving, setSaving] = useState(false)
     const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
@@ -134,10 +139,27 @@ export function BuilderHeader({
                 <span className="b-unsaved-badge">Unsaved</span>
             )}
 
-            {/* Block Catalog link */}
-            <Link href="/studio/blocks" className="b-btn ghost">
-                ⚙ Block Catalog
-            </Link>
+            {/* Mode tabs: Builder / Block Catalog */}
+            <div className="b-mode-tabs" role="tablist">
+                <button
+                    type="button"
+                    role="tab"
+                    className={`b-mode-tab${mode === 'builder' ? ' active' : ''}`}
+                    onClick={() => onModeChange('builder')}
+                    aria-selected={mode === 'builder'}
+                >
+                    ▦ Builder
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    className={`b-mode-tab${mode === 'catalog' || mode === 'block-detail' ? ' active' : ''}`}
+                    onClick={() => onModeChange('catalog')}
+                    aria-selected={mode === 'catalog' || mode === 'block-detail'}
+                >
+                    ⚙ Block Catalog
+                </button>
+            </div>
 
             {/* Save */}
             <button
