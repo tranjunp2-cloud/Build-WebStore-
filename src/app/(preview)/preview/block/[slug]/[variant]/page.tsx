@@ -9,6 +9,7 @@
  *
  * Caching: NONE — force-dynamic so block code edits reflect immediately.
  */
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getBlockBySlug } from '@/lib/admin/block-registry-reader'
 import { buildDemoContent, requiresLiveData } from '@/lib/admin/block-preview-demo-content'
@@ -18,6 +19,10 @@ import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+export const metadata: Metadata = {
+    robots: { index: false, follow: false },
+}
 
 type Params = { params: Promise<{ slug: string; variant: string }> }
 
@@ -81,12 +86,7 @@ export default async function BlockPreviewPage({ params }: Params) {
 
       {/* Block render — wrapped in error boundary to surface SSR crashes gracefully */}
       <BlockErrorBoundary blockType={slug}>
-        <Component
-          block={content}
-          theme={theme}
-          isEditor={false}
-          isPreview={true}
-        />
+        <Component block={content} theme={theme} />
       </BlockErrorBoundary>
     </>
   )

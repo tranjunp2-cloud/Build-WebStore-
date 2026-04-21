@@ -1,23 +1,14 @@
 /**
- * Block preview layout — minimal shell for iframe embedding.
- * Bypasses app nav/footer chrome. Imports globals.css for Tailwind + CSS vars.
- * noindex/nofollow prevents search indexing of preview routes.
+ * Block preview layout — minimal wrapper for iframe embedding.
+ * Route groups nest inside root `src/app/layout.tsx`, so use <div> (not <html>/<body>).
+ * Robots noindex is set on the page via `metadata` export.
  */
 import '@/app/globals.css'
 
 export default function BlockPreviewLayout({
-  children,
+    children,
 }: {
-  children: React.ReactNode
+    children: React.ReactNode
 }) {
-  return (
-    <html lang="en">
-      <head>
-        <meta name="robots" content="noindex, nofollow" />
-      </head>
-      <body className="preview-body">
-        {children}
-      </body>
-    </html>
-  )
+    return <div className="preview-body">{children}</div>
 }

@@ -3,17 +3,7 @@
  * Demo content for commerce, industry, utility, and media blocks.
  * Imported by block-preview-demo-content.ts — do not import directly.
  */
-import type { DemoContent } from './block-preview-demo-content'
-
-const IMG = {
-  office: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&auto=format&fit=crop',
-  hero:   'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&auto=format&fit=crop',
-  nature: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&auto=format&fit=crop',
-  person1:'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop',
-  person2:'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop',
-  product:'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&auto=format&fit=crop',
-  real:   'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800&auto=format&fit=crop',
-} as const
+import { IMG, type DemoContent } from './block-preview-demo-content'
 
 const PART2_MAP: Record<string, (variant: string) => DemoContent> = {
   // ── Pricing ──────────────────────────────────────────────────────────────

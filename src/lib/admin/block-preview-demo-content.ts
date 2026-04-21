@@ -26,8 +26,8 @@ export const LIVE_DATA_BLOCKS = new Set([
   'menu-display',
 ])
 
-/** Shared Unsplash image URLs — stable CDN, no expiry */
-const IMG = {
+/** Shared Unsplash image URLs — stable CDN, no expiry. Exported for part2. */
+export const IMG = {
   office: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&auto=format&fit=crop',
   team:   'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&auto=format&fit=crop',
   hero:   'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1200&auto=format&fit=crop',
@@ -37,6 +37,7 @@ const IMG = {
   person2:'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop',
   person3:'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop',
   product:'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&auto=format&fit=crop',
+  real:   'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800&auto=format&fit=crop',
   food:   'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&auto=format&fit=crop',
 } as const
 
