@@ -140,14 +140,19 @@ export function VariantGallery({
                                 onClick={() => setActiveVariant(variant)}
                             >
                                 {previewUrl ? (
+                                    /* Curated screenshot override — kept for backward compat */
                                     /* eslint-disable-next-line @next/next/no-img-element */
                                     <img src={previewUrl} alt={`${variant} preview`} />
                                 ) : (
-                                    <span className="prev-label">
-                                        {blockSlug}
-                                        <br />
-                                        <span style={{ opacity: 0.6 }}>{variant}</span>
-                                    </span>
+                                    /* SSR iframe — renders block at desktop width, scaled to fit card */
+                                    <iframe
+                                        src={`/preview/block/${blockSlug}/${encodeURIComponent(variant)}`}
+                                        title={`${blockSlug}/${variant} preview`}
+                                        className="b-var-iframe"
+                                        loading="lazy"
+                                        sandbox="allow-same-origin allow-scripts"
+                                        aria-hidden="true"
+                                    />
                                 )}
                             </div>
 

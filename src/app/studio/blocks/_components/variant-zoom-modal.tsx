@@ -44,6 +44,7 @@ const VIEWPORT_TABS: { id: Viewport; label: string; Icon: React.FC<{ size?: numb
 export function VariantZoomModal({
     open,
     onClose,
+    blockSlug,
     blockName,
     variantName,
     previewUrl,
@@ -118,6 +119,7 @@ export function VariantZoomModal({
                         }}
                     >
                         {effectivePreviewUrl ? (
+                            /* Curated screenshot override — kept for backward compat */
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img
                                 src={effectivePreviewUrl}
@@ -132,25 +134,22 @@ export function VariantZoomModal({
                                 loading="lazy"
                             />
                         ) : (
-                            <div
-                                className="ph"
+                            /* SSR iframe — renders at actual device width, no scale transform */
+                            <iframe
+                                key={`${blockSlug}-${variantName}-${vp}`}
+                                src={`/preview/block/${blockSlug}/${encodeURIComponent(variantName)}`}
+                                title={`${blockName} / ${variantName} — ${vp} preview`}
                                 style={{
-                                    aspectRatio: '16/9',
+                                    width: maxW,
+                                    height: '100%',
+                                    minHeight: 480,
+                                    border: 0,
                                     borderRadius: 8,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 6,
+                                    background: '#ffffff',
+                                    display: 'block',
                                 }}
-                            >
-                                <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'var(--mono)' }}>
-                                    {blockName} · {variantName}
-                                </span>
-                                <span style={{ fontSize: 10, color: 'var(--text-4)' }}>
-                                    {vp} — {maxW}px
-                                </span>
-                            </div>
+                                sandbox="allow-same-origin allow-scripts"
+                            />
                         )}
                     </div>
                 </div>

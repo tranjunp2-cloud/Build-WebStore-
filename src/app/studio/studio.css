@@ -3722,6 +3722,26 @@
     padding: 8px;
 }
 
+/* SSR iframe — rendered at 1280px desktop width, scaled down to fit card.
+   transform: scale avoids zoom (unsupported in Firefox).
+   pointer-events: none lets click pass through to parent .b-var-preview. */
+.studio-shell .b-var-iframe {
+    width: 1280px;
+    height: 800px;
+    border: 0;
+    pointer-events: none;
+    transform-origin: top left;
+    transform: scale(var(--preview-scale, 0.25));
+    background: #ffffff;
+    display: block;
+    flex-shrink: 0;
+}
+
+/* Scale per column layout — parent card width stays fixed, iframe scales */
+.studio-shell .b-variant-gallery.cols-1 { --preview-scale: 0.5; }
+.studio-shell .b-variant-gallery.cols-2 { --preview-scale: 0.3; }
+.studio-shell .b-variant-gallery.cols-3 { --preview-scale: 0.22; }
+
 .studio-shell .b-var-foot {
     display: flex;
     align-items: center;
