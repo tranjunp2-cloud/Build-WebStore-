@@ -67,7 +67,8 @@ export function BlockDetailTabs({ block }: Props) {
 
     const tabDefs: { id: Tab; label: string; count?: number }[] = [
         { id: 'variants', label: 'Variants', count: block.variants.length },
-        { id: 'schema', label: 'Schema & fields', count: block.editableFields.length },
+        // Use real Zod-introspected fields.length when available; fall back to editableFields
+        { id: 'schema', label: 'Schema & fields', count: block.fields.length > 0 ? block.fields.length : block.editableFields.length },
         { id: 'presets', label: 'Content presets' },
         { id: 'ai', label: 'AI & prompts' },
         { id: 'usage', label: 'Usage', count: block.usageCount },

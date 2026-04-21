@@ -77,7 +77,13 @@ function resolveType(z: ZodTypeAny): { type: string; enumValues?: string[]; item
         case 'ZodNumber': return { type: 'number' }
         case 'ZodBoolean': return { type: 'boolean' }
         case 'ZodEnum': {
-            const vals = def.options ?? Object.values(def.values ?? {})
+            // `def.options` is an array in Zod v3 native enums; `def.values` is a
+            // Record<string, string> in some edge-case shapes. Handle both defensively.
+            const vals: string[] = Array.isArray(def.options)
+                ? def.options
+                : Array.isArray(def.values)
+                    ? def.values
+                    : Object.values(def.values ?? {})
             return { type: 'enum', enumValues: vals }
         }
         case 'ZodArray': {
