@@ -58,6 +58,7 @@ export default async function NotFound() {
     if (!site) return <Fallback404 />
 
     // Find 404 page — only published version for public visitors (BUG-F05-09)
+    // draft: false ensures we query the main pages table (published) not _pages_v (drafts)
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
@@ -73,6 +74,7 @@ export default async function NotFound() {
         },
         limit: 1,
         depth: 3,
+        draft: false,
     })
     const page404 = pagesResult.docs[0]
 
@@ -81,6 +83,7 @@ export default async function NotFound() {
         where: { site: { equals: site.id } },
         limit: 100,
         sort: 'createdAt',
+        draft: false,
     })
 
     // If 404 page exists WITH actual layout content, render it via SiteRenderer
