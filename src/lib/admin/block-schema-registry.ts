@@ -46,8 +46,7 @@ type ZodDef = {
 }
 
 function getDef(z: ZodTypeAny): ZodDef {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (z as any)._def as ZodDef
+    return (z as unknown as { _def: ZodDef })._def
 }
 
 /** Recursively unwrap ZodOptional / ZodNullable / ZodDefault to get the core type */
@@ -122,8 +121,8 @@ function extractConstraints(z: ZodTypeAny): Pick<FieldMeta, 'minLength' | 'maxLe
  * Depth limit: 1 (only top-level fields). Nested objects/arrays described by type only.
  */
 export function introspectSchema(schema: ZodObject<ZodRawShape>): FieldMeta[] {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const shape: Record<string, ZodTypeAny> = (schema as any).shape ?? {}
+    const shape: Record<string, ZodTypeAny> =
+        (schema as unknown as { shape?: Record<string, ZodTypeAny> }).shape ?? {}
     return Object.entries(shape).map(([name, raw]) => {
         const { z: inner, optional, nullable } = unwrap(raw)
         const { type, enumValues, itemType } = resolveType(inner)
@@ -200,8 +199,7 @@ import { configSchema as videoBackgroundSchema } from '@/blocks/video-background
 import { configSchema as videoShowcaseSchema } from '@/blocks/video-showcase/config'
 import { configSchema as whatsappButtonSchema } from '@/blocks/whatsapp-button/config'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyZodObject = ZodObject<any>
+type AnyZodObject = ZodObject<ZodRawShape>
 
 // Null entries = block config.ts doesn't export configSchema yet (legacy fallback)
 const SCHEMA_MAP: Record<string, AnyZodObject | null> = {
