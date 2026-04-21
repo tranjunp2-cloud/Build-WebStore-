@@ -233,8 +233,8 @@ describe('AIChatPanel', () => {
         sessionStorage.clear()
     })
 
-    it('TC-F05-HYDRATION-02 — hydrates from sessionStorage after mount', async () => {
-        sessionStorage.setItem('editor-chat-test-site', JSON.stringify([
+    it('TC-F05-HYDRATION-02 — hydrates from localStorage after mount', async () => {
+        localStorage.setItem('editor-chat-test-site', JSON.stringify([
             { id: 'old', role: 'user', content: 'cached prompt', createdAt: '08:00 AM' },
         ]))
 
@@ -244,7 +244,7 @@ describe('AIChatPanel', () => {
             expect(screen.getByText('cached prompt')).toBeInTheDocument()
         })
 
-        sessionStorage.clear()
+        localStorage.clear()
     })
 
     it('prompts chip auto-fills input and submits', async () => {

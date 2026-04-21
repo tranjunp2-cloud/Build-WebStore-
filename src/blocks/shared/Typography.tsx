@@ -10,6 +10,8 @@
  * Reference: plans/260412-2300-design-quality-rules/phase-02-typography.md
  */
 
+import { hasInlineFormatting } from "@/lib/utils/rich-text-render"
+import { RichText } from "./RichText"
 import type { ElementType, HTMLAttributes, ReactNode } from 'react'
 import {
     TYPE_SCALE,
@@ -44,8 +46,14 @@ export function Heading({
 }: HeadingProps) {
     const Tag: ElementType = as ?? (`h${level}` as const)
     const classes = HEADING_CLASSES[level]
+    const finalClassName = `${classes} font-heading ${className}`.trim()
+
+    if (typeof children === 'string' && hasInlineFormatting(children)) {
+        return <RichText text={children} as={Tag} className={finalClassName} {...rest} />
+    }
+
     return (
-        <Tag className={`${classes} font-heading ${className}`.trim()} {...rest}>
+        <Tag className={finalClassName} {...rest}>
             {children}
         </Tag>
     )
@@ -61,8 +69,14 @@ type DisplayProps = {
 
 export function Display({ className = '', children, ...rest }: DisplayProps) {
     const classes = `${TYPE_SCALE.display} ${LINE_HEIGHT.display} ${FONT_WEIGHT.heading} font-heading`
+    const finalClassName = `${classes} ${className}`.trim()
+
+    if (typeof children === 'string' && hasInlineFormatting(children)) {
+        return <RichText text={children} as="h1" className={finalClassName} {...rest} />
+    }
+
     return (
-        <h1 className={`${classes} ${className}`.trim()} {...rest}>
+        <h1 className={finalClassName} {...rest}>
             {children}
         </h1>
     )
@@ -93,8 +107,14 @@ export function Body({
     ...rest
 }: BodyProps) {
     const classes = BODY_CLASSES[size]
+    const finalClassName = `${classes} font-body ${className}`.trim()
+
+    if (typeof children === 'string' && hasInlineFormatting(children)) {
+        return <RichText text={children} as={Tag} className={finalClassName} {...rest} />
+    }
+
     return (
-        <Tag className={`${classes} font-body ${className}`.trim()} {...rest}>
+        <Tag className={finalClassName} {...rest}>
             {children}
         </Tag>
     )
@@ -110,8 +130,14 @@ type CaptionProps = {
 
 export function Caption({ className = '', children, ...rest }: CaptionProps) {
     const classes = `${TYPE_SCALE.small} ${LINE_HEIGHT.small} ${FONT_WEIGHT.body}`
+    const finalClassName = `${classes} font-body ${className}`.trim()
+
+    if (typeof children === 'string' && hasInlineFormatting(children)) {
+        return <RichText text={children} as="span" className={finalClassName} {...rest} />
+    }
+
     return (
-        <span className={`${classes} font-body ${className}`.trim()} {...rest}>
+        <span className={finalClassName} {...rest}>
             {children}
         </span>
     )

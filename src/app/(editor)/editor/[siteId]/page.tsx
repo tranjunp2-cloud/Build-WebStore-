@@ -95,6 +95,7 @@ export default function EditorPage() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [userData, setUserData] = useState<{ name: string; initial: string; role: string } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
+    const [chatBlockContext, setChatBlockContext] = useState<{ blockIndex: number; blockType: string } | null>(null)
     const [isCompactLayout, setIsCompactLayout] = useState(false)
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
@@ -919,6 +920,8 @@ export default function EditorPage() {
                     currentPageSlug={page?.slug || 'home'}
                     currentPageTitle={currentPageTitle}
                     externalActivity={chatActivity}
+                    blockContext={chatBlockContext}
+                    onBlockContextDismiss={() => setChatBlockContext(null)}
                     compact={isCompactLayout}
                 />
             ) : null}
@@ -1059,8 +1062,6 @@ export default function EditorPage() {
                                     pages={pages}
                                     currentPageId={currentPageId}
                                     onThemeChange={handleThemeChange}
-                                    onDeleteBlock={handleDeleteBlock}
-                                    onDuplicateBlock={handleDuplicateBlock}
                                     onBlockFieldChange={handleBlockFieldChange}
                                     onBlockUpdate={handleBlockUpdate}
                                     onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
@@ -1092,6 +1093,10 @@ export default function EditorPage() {
                             viewport={viewport}
                             selectedBlock={selectedBlock}
                             onBlockSelect={handleBlockSelectWithContext}
+                            onBlockAIEdit={(blockIndex, blockType) => {
+                                setActiveSidebarTab('chat')
+                                setChatBlockContext({ blockIndex, blockType })
+                            }}
                             onDeleteBlock={handleDeleteBlock}
                             onDuplicateBlock={handleDuplicateBlock}
                             onInlineEditApplied={async (content, blockIndex, detail) => {
@@ -1137,8 +1142,6 @@ export default function EditorPage() {
                         pages={pages}
                         currentPageId={currentPageId}
                         onThemeChange={handleThemeChange}
-                        onDeleteBlock={handleDeleteBlock}
-                        onDuplicateBlock={handleDuplicateBlock}
                         onBlockFieldChange={handleBlockFieldChange}
                         onBlockUpdate={handleBlockUpdate}
                         onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
