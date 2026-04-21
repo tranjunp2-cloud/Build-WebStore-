@@ -516,6 +516,18 @@ function PreviewFrameInner({
                 onBlockDrop?.(index, blockData)
             } else if (e.data?.type === 'PAGE_NAVIGATE') {
                 onPageNavigate?.(String(e.data.pageId))
+            } else if (e.data?.type === 'BLOCK_FIELD_CHANGED') {
+                const { blockIndex, field, value } = e.data as { blockIndex: number; field: string; value: unknown }
+                const currentBlocks = blocksRef.current
+                if (currentBlocks[blockIndex]) {
+                    const path = (field as string).split('.').map((seg: string) =>
+                        /^\d+$/.test(seg) ? Number(seg) : seg
+                    ) as Array<string | number>
+                    const clone = JSON.parse(JSON.stringify(currentBlocks))
+                    const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value as string)
+                    updateBlock(blockIndex, nextBlock)
+                    performSave(true)
+                }
             }
         }
         window.addEventListener('message', handleMessage)

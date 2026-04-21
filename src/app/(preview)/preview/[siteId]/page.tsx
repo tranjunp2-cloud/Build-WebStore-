@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import type { Viewport } from 'next'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
-import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
+import { PreviewSiteRenderer } from './PreviewSiteRenderer'
 import { PreviewScripts } from '@/components/editor/PreviewScripts'
 import { AppShell } from '@/components/AppShell'
 import { getCurrentUser } from '@/lib/auth'
@@ -181,11 +181,10 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             <AppShell>
                 <div className="overflow-x-hidden min-height-screen">
                     {/* Render with true SiteRenderer in Editor Mode */}
-                    <SiteRenderer
+                    <PreviewSiteRenderer
                         site={site}
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
-                        isEditor={true}
                     />
 
                     {/* Editor specific listeners */}
