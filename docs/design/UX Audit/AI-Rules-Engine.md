@@ -41,105 +41,368 @@ Output: Validated Design Tokens / Blocks / Content
 
 > **Trigger:** Người dùng chọn ngành nghề qua dropdown `Industry Context` hoặc nhập mô tả doanh nghiệp.
 
-### A.1 Industry Mapping — Palette ưu tiên
+### A.1 Industry Registry — 8 ngành chuẩn
 
-| Ngành | Primary Colors | Avoided Colors | Lý do tâm lý màu sắc |
-|-------|---------------|----------------|----------------------|
-| **Công nghệ / SaaS** | `Blue`, `Indigo` | `Red` (trừ Warning) | Tạo cảm giác tin cậy, hiện đại, chuyên nghiệp |
-| **F&B / Thực phẩm** | `Red`, `Orange`, `Yellow`, `Green (Organic)` | Màu lạnh trung tính | Kích thích thị giác, tạo cảm giác ngon miệng |
-| **Y tế / Chăm sóc sức khỏe** | `Teal`, `Light Blue`, `White` | `Red đậm` | Tránh liên tưởng máu/nguy hiểm, tạo cảm giác sạch sẽ |
-| **Tài chính / Ngân hàng** | `Dark Blue`, `Gold`, `Green` | Gradient phức tạp | Thể hiện sự thịnh vượng, ổn định, đáng tin |
-| **Thời trang / Làm đẹp** | `Black`, `Pink`, `Pastel tones` | — | Cho phép high-contrast để tăng tính nghệ thuật |
-| **Giáo dục** | `Blue`, `Green`, `Purple nhạt` | High-contrast mạnh | Hỗ trợ tập trung, hài hòa thị giác |
+| ID | Ngành | Sub-categories |
+|----|-------|---------------|
+| `fnb` | 🍕 F&B | Nhà hàng / Cafe / Ẩm thực |
+| `ecommerce` | 🛍️ Ecommerce | Bán lẻ / Thời trang / Shop online |
+| `tech` | 💻 Tech | Công nghệ / IT / SaaS |
+| `healthcare` | 🏥 Healthcare | Y tế / Nha khoa / Phòng khám |
+| `realestate` | 🏠 Real Estate | Bất động sản |
+| `service` | 💼 Service | Freelancer / Agency / Portfolio cá nhân |
+| `education` | 🎓 Education | Giáo dục / Đào tạo |
+| `fitness` | 🏋️ Fitness | Gym / Thể hình / Yoga |
 
-### A.2 Mood & Vibration Rules
+---
+
+### A.2 Industry Mapping — Palette chi tiết theo ngành
+
+---
+
+#### 🍕 F&B — Nhà hàng / Cafe / Ẩm thực
+
+> **Tâm lý màu sắc:** Kích thích vị giác, tạo cảm giác ấm áp và mời gọi. Màu ấm (Red, Orange, Yellow) được chứng minh kích thích sự thèm ăn.
+
+| Token | Light Mode | Dark Mode | Ghi chú |
+|-------|-----------|-----------|---------|
+| Primary | `#E53935` Red 600 | `#EF5350` Red 400 | Nhà hàng / Ẩm thực đặc sắc |
+| Primary Alt | `#FF6D00` Deep Orange | `#FF8A50` | Cafe / Fast food |
+| Primary Alt | `#388E3C` Green 700 | `#66BB6A` | Organic / Healthy food |
+| Secondary | `#FFC107` Amber 500 | `#FFD54F` | Điểm nhấn ấm, kích thích |
+| CTA / Button | `#FF6D00` Deep Orange | `#FF8A50` | Urgency + Appetite |
+| Background | `#FFFDE7` Cream | `#1A1208` Dark warm | Ấm áp, không gây mỏi mắt |
+| Neutral text | `#3E2723` Brown 900 | `#EFEBE9` | Gần với màu gỗ/đất |
+
+**Avoided:** `#B0BEC5` (Cold Grey), `#78909C` (Blue Grey) — màu lạnh làm giảm cảm giác ngon miệng.
+
+**Sub-type rules:**
+```
+IF sub_type == 'cafe':    primary = #FF6D00 (Warm Orange) + #795548 (Coffee Brown)
+IF sub_type == 'organic': primary = #388E3C (Forest Green) + #8D6E63 (Earth Brown)
+IF sub_type == 'fine_dining': primary = #212121 (Black) + #B8860B (Dark Gold)
+```
+
+---
+
+#### 🛍️ Ecommerce — Bán lẻ / Thời trang / Shop online
+
+> **Tâm lý màu sắc:** Tạo cảm giác muốn mua, kết hợp tin cậy (Blue) với urgency (Orange/Red). Thời trang thiên về aesthetic và identity thương hiệu.
+
+| Token | Light Mode | Dark Mode | Ghi chú |
+|-------|-----------|-----------|---------|
+| Primary | `#1565C0` Blue 800 | `#42A5F5` Blue 400 | Trust — bán lẻ tổng hợp |
+| Primary Alt | `#212121` Near Black | `#EEEEEE` | Fashion / Luxury |
+| Secondary | `#F8BBD0` Pink 100 | `#F48FB1` Pink 300 | Fashion feminine |
+| CTA / Button | `#FF6D00` Deep Orange | `#FF8A50` | Sale / Urgency |
+| CTA Alt | `#D32F2F` Red 700 | `#EF5350` | Flash sale, countdown |
+| Badge/Sale | `#C62828` Red 800 | `#EF9A9A` | Discount tag |
+| Background | `#FFFFFF` hoặc `#F5F5F5` | `#121212` | Clean, product-focused |
+| Neutral | `#757575` Grey 600 | `#9E9E9E` | |
+
+**Sub-type rules:**
+```
+IF sub_type == 'fashion_luxury': primary = #212121 + #B8860B (Gold), no bright Orange CTA
+IF sub_type == 'fashion_casual': primary = #E91E63 (Pink) + #FF6D00, high-energy
+IF sub_type == 'retail_general': primary = #1565C0, CTA = #FF6D00
+```
+
+---
+
+#### 💻 Tech — Công nghệ / IT / SaaS
+
+> **Tâm lý màu sắc:** Tin cậy, chuyên nghiệp, đổi mới. Blue và Indigo truyền đạt sự ổn định và công nghệ. Purple gợi sự sáng tạo và AI/innovation.
+
+| Token | Light Mode | Dark Mode | Ghi chú |
+|-------|-----------|-----------|---------|
+| Primary | `#1565C0` Blue 800 | `#42A5F5` Blue 400 | Classic SaaS trust |
+| Primary Alt | `#3949AB` Indigo 600 | `#7986CB` Indigo 300 | Modern / Developer tool |
+| Primary Alt | `#6A1B9A` Purple 900 | `#CE93D8` Purple 200 | AI / Creative Tech |
+| Secondary | `#00897B` Teal 600 | `#4DB6AC` Teal 300 | Success states, highlights |
+| CTA / Button | `#1E88E5` Blue 600 | `#64B5F6` | Primary action |
+| Accent | `#7C4DFF` Deep Purple A200 | `#B388FF` | Feature badges, tags |
+| Background | `#FAFAFA` | `#0D1117` GitHub-style | |
+| Code/Mono bg | `#F5F5F5` | `#161B22` | |
+
+**Avoided:** `#E53935` Red làm primary (dùng cho Error state only), màu quá ấm làm mất cảm giác tech.
+
+**Saturation rule:** Giữ saturation ≤ 85% để tránh gây mỏi mắt khi dùng nhiều giờ.
+
+---
+
+#### 🏥 Healthcare — Y tế / Nha khoa / Phòng khám
+
+> **Tâm lý màu sắc:** Sạch sẽ, an toàn, đáng tin. Teal và Light Blue tạo cảm giác vô trùng và chuyên nghiệp y tế. Tránh Red đậm (liên tưởng nguy hiểm/máu).
+
+| Token | Light Mode | Dark Mode | Ghi chú |
+|-------|-----------|-----------|---------|
+| Primary | `#00897B` Teal 600 | `#4DB6AC` Teal 300 | Y tế tổng quát |
+| Primary Alt | `#039BE5` Light Blue 600 | `#4FC3F7` | Nha khoa, phòng khám |
+| Secondary | `#A5D6A7` Light Green | `#66BB6A` | Recovery, wellness |
+| CTA / Button | `#00796B` Teal 700 | `#26A69A` | Đặt lịch, tư vấn |
+| Alert/Error | `#FF8A65` Deep Orange 300 | `#FF7043` | Thay thế Red cho cảnh báo |
+| Background | `#FFFFFF` hoặc `#E0F7FA` | `#0A1929` | Trắng tinh / xanh lạnh nhạt |
+| Neutral | `#546E7A` Blue Grey | `#90A4AE` | |
+
+**Avoided:** `#B71C1C` (Dark Red), `#D32F2F` (Red) — gây liên tưởng đến máu, nguy hiểm.
+
+**Saturation rule:** `saturation <= 70%` — màu quá saturate gây cảm giác kém chuyên nghiệp trong y tế.
+
+---
+
+#### 🏠 Real Estate — Bất động sản
+
+> **Tâm lý màu sắc:** Sang trọng, ổn định, giá trị lâu dài. Navy và Gold truyền đạt đẳng cấp và sự thịnh vượng. Earth tones gợi sự gắn bó với đất đai, tổ ấm.
+
+| Token | Light Mode | Dark Mode | Ghi chú |
+|-------|-----------|-----------|---------|
+| Primary | `#1A237E` Indigo 900 (Navy) | `#5C6BC0` Indigo 400 | Sang trọng, tin cậy |
+| Primary Alt | `#F9A825` Amber 800 (Gold) | `#FFD54F` | Premium / Luxury RE |
+| Secondary | `#37474F` Blue Grey 700 | `#78909C` | Neutral authority |
+| CTA / Button | `#F9A825` Gold | `#FFD54F` | Premium feel |
+| CTA Alt | `#2E7D32` Green 800 | `#66BB6A` | Eco / Green building |
+| Accent | `#5D4037` Brown 700 | `#8D6E63` | Earth / Land feel |
+| Background | `#FAFAFA` hoặc `#EFEBE9` | `#0A0E1A` Dark Navy | |
+| Neutral | `#455A64` Blue Grey | `#90A4AE` | |
+
+**Avoided:** Màu neon, gradient phức tạp, màu quá playful — gây mất cảm giác đáng tin về tài sản giá trị lớn.
+
+**Saturation rule:** `saturation <= 80%` — palette phải mang tính ổn định, không flashy.
+
+---
+
+#### 💼 Service — Freelancer / Agency / Portfolio
+
+> **Tâm lý màu sắc:** Chuyên nghiệp nhưng có cá tính. Agency thường dùng Dark + 1 bold accent để thể hiện sự sáng tạo. Freelancer có thể dùng personal brand color.
+
+| Token | Light Mode | Dark Mode | Ghi chú |
+|-------|-----------|-----------|---------|
+| Primary | `#37474F` Blue Grey 700 | `#ECEFF1` | Professional neutral |
+| Primary Alt | `#4527A0` Deep Purple 900 | `#9575CD` | Creative Agency |
+| Primary Alt | `#1A237E` Navy | `#5C6BC0` | Corporate Service |
+| Secondary | `#ECEFF1` Blue Grey 50 | `#263238` | |
+| CTA / Button | `#FF6F00` Amber 900 | `#FFB300` | Stand out, confident |
+| CTA Alt | `#00BFA5` Teal A700 | `#64FFDA` | Modern Agency |
+| Accent (Pop) | Brand-specific bright | | 1 bold pop color |
+| Background | `#FFFFFF` hoặc `#FAFAFA` | `#1C1C1E` | |
+| Neutral | `#616161` Grey | `#9E9E9E` | |
+
+**Rule:** Agency portfolio được phép dùng 1 unexpected accent color (ví dụ: Electric Yellow `#FFEA00`, Hot Pink `#E91E63`) để tạo impression. Tuy nhiên phải đảm bảo WCAG AA.
+
+---
+
+#### 🎓 Education — Giáo dục / Đào tạo
+
+> **Tâm lý màu sắc:** Hài hòa, tập trung, truyền cảm hứng học tập. Blue và Green hỗ trợ nhận thức và ghi nhớ. Yellow tạo sự lạc quan và năng lượng.
+
+| Token | Light Mode | Dark Mode | Ghi chú |
+|-------|-----------|-----------|---------|
+| Primary | `#1565C0` Blue 800 | `#42A5F5` Blue 400 | Tin cậy, học thuật |
+| Primary Alt | `#6A1B9A` Purple 900 | `#CE93D8` | Creative Education |
+| Secondary | `#FBC02D` Yellow 700 | `#FFD54F` | Optimism, energy |
+| CTA / Button | `#1976D2` Blue 700 | `#64B5F6` | Enroll, Start Learning |
+| Accent | `#43A047` Green 600 | `#81C784` | Growth, progress |
+| Background | `#FAFAFA` hoặc `#E3F2FD` | `#0D1321` | Light, không gây mỏi mắt |
+| Neutral | `#546E7A` | `#90A4AE` | |
+
+**Contrast rule:** Luôn dùng analogous hoặc triadic palette — tránh complementary pairs có delta_hue < 30° gây căng thẳng thị giác khi học dài giờ.
+
+**Saturation rule:** `saturation <= 80%` — màu hài hòa, không gây phân tâm.
+
+---
+
+#### 🏋️ Fitness — Gym / Thể hình / Yoga
+
+> **Tâm lý màu sắc:** Năng lượng, sức mạnh, thúc đẩy hành động (Gym). Hoặc cân bằng, thư thái, kết nối cơ thể-tâm trí (Yoga). Hai sub-type có palette hoàn toàn khác nhau.
+
+| Token | Gym (Light) | Gym (Dark) | Yoga (Light) | Yoga (Dark) |
+|-------|------------|------------|-------------|------------|
+| Primary | `#D32F2F` Red 700 | `#EF5350` | `#00695C` Teal 800 | `#4DB6AC` |
+| Secondary | `#212121` Black | `#424242` | `#558B2F` Lt Green 800 | `#AED581` |
+| CTA | `#FF6D00` Orange | `#FF8A50` | `#00796B` Teal 700 | `#26A69A` |
+| Accent | `#FFD600` Yellow | `#FFFF00` | `#EDE7F6` Lavender | `#7E57C2` |
+| Background | `#FAFAFA` / `#FFEBEE` | `#0D0D0D` | `#F9FBE7` | `#0A1A15` |
+| Neutral | `#424242` | `#9E9E9E` | `#5D4037` | `#A1887F` |
+
+**Sub-type rules:**
+```
+IF sub_type == 'gym':
+    primary = #D32F2F + #212121
+    ALLOW high_contrast = true (energy, bold)
+    PREFER high saturation (85-100%)
+
+IF sub_type == 'yoga' OR sub_type == 'wellness':
+    primary = #00695C + #558B2F
+    REQUIRE harmony_score >= 0.75 (calming)
+    AVOID high-contrast harsh pairs
+    saturation <= 75%
+
+IF sub_type == 'sport_general':
+    primary = #FF6D00 + #212121 (energetic but versatile)
+```
+
+---
+
+### A.3 Mood & Vibration Rules (toàn bộ 8 ngành)
 
 #### Saturation Guardrail
 ```
-IF industry IN [Healthcare, Finance]:
-    VALIDATE saturation(color) <= 90%
-    IF saturation > 90%:
-        FLAG: "Màu quá bão hòa — gây nhức mắt và thiếu chuyên nghiệp cho ngành {industry}"
-        SUGGEST: auto_desaturate(color, target=75%)
+Ngưỡng saturation tối đa theo ngành:
+
+  healthcare:  <= 70%   (sterile, professional)
+  realestate:  <= 80%   (stable, trustworthy)
+  education:   <= 80%   (calm, focused)
+  tech:        <= 85%   (modern but not eye-straining)
+  service:     <= 90%   (flexible, brand-dependent)
+  fnb:         <= 100%  (appetite-stimulating)
+  ecommerce:   <= 100%  (brand-dependent, CTA can be full saturation)
+  fitness_gym: <= 100%  (high-energy intentional)
+  fitness_yoga:<= 75%   (calm, grounding)
+
+IF saturation > threshold[industry]:
+    FLAG: "⚠️ Saturation {value}% vượt ngưỡng {threshold}% cho ngành {industry}"
+    SUGGEST: auto_desaturate(color, target=threshold - 10%)
 ```
 
 #### Contrast by Industry
 ```
-IF industry == Fashion:
+fitness_gym, ecommerce:
     ALLOW high_contrast_pairs = true
-    PREFER contrast_ratio >= 7:1 (AAA) for artistic impact
+    PREFER contrast_ratio >= 7:1 (AAA) khi muốn bold impact
 
-IF industry == Education:
+education, healthcare, fitness_yoga:
     REQUIRE color_harmony_score >= 0.7
-    AVOID complementary_pairs with delta_hue < 30°
-    PREFER analogous or triadic palettes
+    AVOID complementary_pairs with delta_hue in [150°, 210°] (too harsh)
+    PREFER analogous (±30°) or triadic palettes
+
+realestate, service:
+    AVOID overly complex gradients (> 3 color stops)
+    PREFER flat color or subtle 2-stop gradients
+
+fnb:
+    REQUIRE warm_bias = true (hue in [0°, 60°] or [300°, 360°])
+    AVOID cool neutrals (hue [180°, 240°]) làm primary
 ```
 
-### A.3 AI Industry Smart Suggest
+#### CTA Color Logic
+```
+Mọi ngành: CTA button phải đạt contrast >= 4.5:1 với label text
+
+Recommended CTA hex theo ngành:
+  fnb:        #FF6D00  (Deep Orange — appetite + urgency)
+  ecommerce:  #FF6D00  (urgency) hoặc brand primary
+  tech:       #1E88E5  (Blue — trusted action)
+  healthcare: #00796B  (Teal — safe, proceed)
+  realestate: #F9A825  (Gold — premium value)
+  service:    #FF6F00  (Amber — confident, stand out)
+  education:  #1976D2  (Blue — enroll, start)
+  fitness_gym:#FF6D00  (Orange — energy, now)
+  fitness_yoga:#00796B (Teal — begin, flow)
+```
+
+---
+
+### A.4 AI Industry Smart Suggest
 
 **Trigger:** Người dùng nhập mô tả doanh nghiệp dạng tự do.
 
-**Ví dụ input:** `"Spa cho mẹ và bé tại Malaysia"`
-
 **Quy trình xử lý:**
 ```
-1. NLP classify → industry = [Healthcare + Beauty/Wellness]
-2. Map palette rules:
-   - Base: Teal, Light Blue (Healthcare)
-   - Accent: Soft Pink, Pastel Lavender (Beauty)
-   - Neutral: White, Off-white (#FAFAFA)
-3. Generate Color Pair (Light + Dark Mode)
-4. Validate WCAG AA (contrast ≥ 4.5:1) cho mọi cặp text/bg
-5. Output với giải thích
+1. NLP classify → map to industry ID + sub_type
+2. Load palette rules cho industry đó
+3. Generate 5 Color Tokens: primary, secondary, cta, background, neutral
+4. Generate Color Pair: Light Mode + Dark Mode cho mỗi token
+5. Validate WCAG AA (contrast ≥ 4.5:1) cho mọi cặp text/bg
+6. Output với giải thích lý do chọn màu
 ```
 
-**Output format:**
+**Ví dụ — "Spa cho mẹ và bé tại Malaysia":**
 ```
 📦 Suggested Palette — "Spa cho mẹ và bé"
-─────────────────────────────────────────
-Primary:    #4DB6AC  →  Dark: #80CBC4   [Teal — sức khỏe & tin cậy]
-Secondary:  #F8BBD0  →  Dark: #F48FB1   [Soft Pink — nhẹ nhàng, nữ tính]
-Neutral:    #FAFAFA  →  Dark: #1E1E1E   [Trung tính]
-CTA:        #00897B  →  Dark: #26A69A   [Teal đậm — hành động rõ ràng]
+  → Classified: Healthcare (Wellness) + Ecommerce (Beauty)
+─────────────────────────────────────────────────────────
+Token        Light Mode    Dark Mode     Lý do
+─────────────────────────────────────────────────────────
+Primary      #00897B       #4DB6AC       Teal: sức khỏe, sạch sẽ, an toàn
+Secondary    #F8BBD0       #F48FB1       Soft Pink: nhẹ nhàng, dịu dàng cho mẹ & bé
+CTA          #00796B       #26A69A       Teal đậm: hành động rõ ràng, không aggressive
+Background   #FAFAFA       #0A1929       Trắng tinh / Navy tối
+Neutral      #546E7A       #90A4AE       Blue Grey: chuyên nghiệp, không lạnh
 
-✅ Contrast Check:
-   Primary text on White bg: 4.7:1 (AA Pass)
-   CTA text on CTA bg:        5.2:1 (AA Pass)
+✅ Contrast Check (WCAG AA ≥ 4.5:1):
+   Body text (#37474F) on #FAFAFA:    8.6:1  ✅ AA Pass
+   CTA label (#FFFFFF) on #00796B:    5.3:1  ✅ AA Pass
+   Dark: text (#E0F7FA) on #0A1929:   7.1:1  ✅ AA Pass
 
 💡 Lý do chọn màu:
-   Teal → ngành chăm sóc sức khỏe: sạch sẽ, an toàn
-   Soft Pink → spa/làm đẹp: nhẹ nhàng, thư giãn, phù hợp mẹ & bé
-   Palette phù hợp thị trường Malaysia: màu sắc không quá mạnh,
-   tránh red/orange là màu nhạy cảm văn hóa trong bối cảnh y tế
+   • Teal (Healthcare) → sạch sẽ, an toàn, đặc trưng spa y tế
+   • Soft Pink (Wellness/Beauty) → nhẹ nhàng, phù hợp đối tượng mẹ & bé
+   • Không dùng Red/Orange → tránh liên tưởng mạnh/kích thích không phù hợp spa
+   • Palette phù hợp thị trường Malaysia: trung tính về văn hóa,
+     không thiên lệch tone màu nhạy cảm
+   • Saturation: 65% (trong ngưỡng Healthcare ≤ 70%)
 ```
 
-### A.4 Dashboard — Industry Context Dropdown
+**Ví dụ — "Gym cho dân văn phòng tại KL":**
+```
+📦 Suggested Palette — "Gym văn phòng"
+  → Classified: Fitness (Gym) + Service (Urban Professional)
+────────────────────────────────────────────────────────────
+Token        Light Mode    Dark Mode     Lý do
+────────────────────────────────────────────────────────────
+Primary      #D32F2F       #EF5350       Red: năng lượng, thúc đẩy hành động
+Secondary    #212121       #424242       Black: mạnh mẽ, premium gym
+CTA          #FF6D00       #FF8A50       Orange: urgency, join now
+Accent       #FFD600       #FFFF00       Yellow: highlight, achievement
+Background   #FAFAFA       #0D0D0D       Sáng / Tối tuyệt đối
+
+✅ Saturation Check: Red #D32F2F = 73% (Gym cho phép 100%, ✅ OK)
+```
+
+---
+
+### A.5 Dashboard — Industry Context Dropdown
 
 ```
 UI Component: <IndustryContextDropdown />
-─────────────────────────────────────────
+──────────────────────────────────────────
 Options:
-  [ ] Công nghệ / SaaS
-  [ ] F&B / Thực phẩm
-  [ ] Y tế / Chăm sóc sức khỏe
-  [ ] Tài chính / Ngân hàng
-  [ ] Thời trang / Làm đẹp
-  [ ] Giáo dục
-  [ ] Khác
+  [ ] 🍕 F&B — Nhà hàng / Cafe / Ẩm thực
+  [ ] 🛍️ Ecommerce — Bán lẻ / Thời trang / Shop online
+  [ ] 💻 Tech — Công nghệ / IT / SaaS
+  [ ] 🏥 Healthcare — Y tế / Nha khoa / Phòng khám
+  [ ] 🏠 Real Estate — Bất động sản
+  [ ] 💼 Service — Freelancer / Agency / Portfolio
+  [ ] 🎓 Education — Giáo dục / Đào tạo
+  [ ] 🏋️ Fitness — Gym / Thể hình / Yoga
+  [ ] ❓ Khác
 
 Khi chọn ngành:
   → Scan toàn bộ Design Tokens hiện tại
-  → Flag mọi màu "Off-brand" với ngành đó
-  → Hiển thị badge: 🔴 Off-brand | 🟡 Cần xem xét | 🟢 Phù hợp
+  → So sánh với palette rules của ngành đó
+  → Flag từng token với badge:
+     🔴 Off-brand      — vi phạm rõ ràng (VD: Red primary trong Healthcare)
+     🟡 Cần xem xét   — vượt ngưỡng saturation, hoặc ngoài palette khuyến nghị
+     🟢 Phù hợp       — nằm trong palette rules
 ```
 
-**Ví dụ output khi chọn "Y tế":**
+**Ví dụ output khi chọn "🏥 Healthcare":**
 
-| Token | Giá trị | Trạng thái |
-|-------|---------|------------|
-| `--color-primary` | `#E53935` (Red 700) | 🔴 Off-brand — màu đỏ đậm không phù hợp ngành Y tế |
-| `--color-accent` | `#FF6D00` (Orange) | 🟡 Cần xem xét — saturation 100% vượt ngưỡng |
-| `--color-secondary` | `#4DB6AC` (Teal) | 🟢 Phù hợp |
+| Token | Hex hiện tại | Trạng thái | Lý do |
+|-------|-------------|------------|-------|
+| `--color-primary` | `#E53935` Red 600 | 🔴 Off-brand | Red đậm — liên tưởng nguy hiểm/máu |
+| `--color-accent` | `#FF6D00` Deep Orange | 🟡 Cần xem xét | Saturation 100% > ngưỡng 70% |
+| `--color-cta` | `#FF6D00` Deep Orange | 🟡 Cần xem xét | Nên dùng Teal (#00796B) cho Healthcare |
+| `--color-secondary` | `#4DB6AC` Teal 300 | 🟢 Phù hợp | Nằm trong palette Healthcare |
+| `--color-background` | `#FAFAFA` | 🟢 Phù hợp | Clean white — chuẩn y tế |
+
+**Ví dụ output khi chọn "🍕 F&B":**
+
+| Token | Hex hiện tại | Trạng thái | Lý do |
+|-------|-------------|------------|-------|
+| `--color-primary` | `#1565C0` Blue 800 | 🔴 Off-brand | Cold Blue — giảm cảm giác ngon miệng |
+| `--color-secondary` | `#78909C` Blue Grey | 🔴 Off-brand | Màu lạnh trung tính — không phù hợp F&B |
+| `--color-cta` | `#FF6D00` Deep Orange | 🟢 Phù hợp | Warm Orange — kích thích, urgency |
 
 ---
 
