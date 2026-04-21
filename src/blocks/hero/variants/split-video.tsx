@@ -1,21 +1,36 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
-import { CTAButtons, HERO_CONTAINER, VideoControlButton } from '../shared'
+import { CTAButtons, HERO_CONTAINER, VideoControlButton, safeAltText } from '../shared'
+import { HeroMediaOverlay } from '../hero-media-overlay'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 
 export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
-    const { headline, subheadline, ctaButtons = [], badge, videoUrl } = block
+    const { headline, subheadline, ctaButtons = [], badge, videoUrl, image } = block
     const primaryColor = CSS_VARS.primary
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const [isPlaying, setIsPlaying] = useState(true)
+
+    // Respect prefers-reduced-motion
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+        const handler = (e: MediaQueryListEvent | MediaQueryList) => {
+            if (e.matches && videoRef.current) {
+                videoRef.current.pause()
+                setIsPlaying(false)
+            }
+        }
+        handler(mq)
+        mq.addEventListener('change', handler)
+        return () => mq.removeEventListener('change', handler)
+    }, [])
 
     const togglePlayback = () => {
         if (!videoRef.current) return
@@ -53,47 +68,56 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
                     </motion.div>
 
                     {/* Right — Video */}
-                    <motion.div
-                        initial={{ opacity: 0, x: 40 }}
-                        whileInView={{ opacity: 1, x: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                        className="relative"
+                    <HeroMediaOverlay
+                        field="image.url"
+                        altText={safeAltText(image?.alt, headline)}
+                        showVideoButton={true}
+                        videoField="videoUrl"
+                        currentVideoUrl={videoUrl}
                     >
-                        {videoUrl ? (
-                            <div className="relative rounded-2xl overflow-hidden"
-                                style={{
-                                    boxShadow: `0 25px 50px rgba(var(--brand-primary-rgb), 0.082), 0 10px 20px rgba(0,0,0,0.2)`,
-                                }}
-                            >
-                                <video
-                                    ref={videoRef}
-                                    src={videoUrl}
-                                    autoPlay
-                                    muted
-                                    loop
-                                    playsInline
-                                    className="w-full h-auto aspect-video object-cover"
-                                />
-                                {/* Play/Pause toggle */}
-                                <VideoControlButton
-                                    isPlaying={isPlaying}
-                                    onClick={togglePlayback}
-                                    className="absolute bottom-4 right-4"
-                                />
-                            </div>
-                        ) : (
-                            <div
-                                className="w-full aspect-video rounded-2xl flex items-center justify-center"
-                                style={{
-                                    background: `rgba(var(--brand-primary-rgb), 0.05)`,
-                                    border: `2px dashed rgba(var(--brand-primary-rgb), 0.2)`,
-                                }}
-                            >
-                                <p className="opacity-40 text-sm">No video URL provided</p>
-                            </div>
-                        )}
-                    </motion.div>
+                        <motion.div
+                            initial={{ opacity: 0, x: 40 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                            className="relative"
+                        >
+                            {videoUrl ? (
+                                <div className="relative rounded-2xl overflow-hidden"
+                                    style={{
+                                        boxShadow: `0 25px 50px rgba(var(--brand-primary-rgb), 0.082), 0 10px 20px rgba(0,0,0,0.2)`,
+                                    }}
+                                >
+                                    <video
+                                        ref={videoRef}
+                                        src={videoUrl}
+                                        autoPlay
+                                        muted
+                                        loop
+                                        playsInline
+                                        poster={image?.url}
+                                        className="w-full h-auto aspect-video object-cover"
+                                    />
+                                    {/* Play/Pause toggle */}
+                                    <VideoControlButton
+                                        isPlaying={isPlaying}
+                                        onClick={togglePlayback}
+                                        className="absolute bottom-4 right-4"
+                                    />
+                                </div>
+                            ) : (
+                                <div
+                                    className="w-full aspect-video rounded-2xl flex items-center justify-center"
+                                    style={{
+                                        background: `rgba(var(--brand-primary-rgb), 0.05)`,
+                                        border: `2px dashed rgba(var(--brand-primary-rgb), 0.2)`,
+                                    }}
+                                >
+                                    <p className="opacity-40 text-sm">No video URL provided</p>
+                                </div>
+                            )}
+                        </motion.div>
+                    </HeroMediaOverlay>
                 </div>
             </div>
         </AnimatedSection>

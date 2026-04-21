@@ -14,6 +14,7 @@ import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
 import { OwnerProvider } from './OwnerContext'
+import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -53,6 +54,7 @@ export type SiteRendererProps = {
     isEditor?: boolean
     siteId?: string
     isOwner?: boolean
+    onBlockFieldChange?: (blockIndex: number, field: string, value: unknown) => void
 }
 
 function applyGlobalSystemBlocks(
@@ -83,7 +85,7 @@ function applyGlobalSystemBlocks(
     return nextBlocks
 }
 
-export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -310,12 +312,18 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                         paddingBottom: blockStyle?.paddingBottom !== undefined ? `${blockStyle.paddingBottom}px` : 'var(--block-spacing-default)',
                     }
 
+                const callbackValue = onBlockFieldChange
+                    ? { blockIndex: index, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(index, field, value) }
+                    : null
+
                 const blockContent = (
-                    <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <HeadingProvider level={headingLevel}>
-                            <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
-                        </HeadingProvider>
-                    </BlockErrorBoundary>
+                    <BlockEditCallbackProvider value={callbackValue}>
+                        <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
+                            <HeadingProvider level={headingLevel}>
+                                <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
+                            </HeadingProvider>
+                        </BlockErrorBoundary>
+                    </BlockEditCallbackProvider>
                 )
 
                 if (isEditor) {
