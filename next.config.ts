@@ -20,17 +20,21 @@ const nextConfig: NextConfig = {
       ? ['tsx', 'ts', 'jsx', 'js', 'harness.tsx']
       : ['tsx', 'ts', 'jsx', 'js'],
   serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis'],
-  // Bundle .harness-out/{matrix,report}.json into the serverless function for
-  // /test-harness routes — files are generated at build time when ENABLE_HARNESS=1
-  // (see vercel.json buildCommand) but Next.js auto-trace can't see fs.readFileSync
-  // dynamic paths, so we have to include explicitly.
+  // Bundle runtime JSON files into serverless for /test-harness routes:
+  //   1. .harness-out/*.json — matrix + rubric reports (built via vercel.json
+  //      buildCommand when ENABLE_HARNESS=1)
+  //   2. scripts/test-harness/rubric/*.json — rubric definition files loaded by
+  //      scoreFixture() on every fixture render (loadRubric via fs.readFileSync)
+  // Next.js auto-trace can't see fs.readFileSync dynamic paths → include explicitly.
+  // Without #2, fixture routes throw ENOENT → 500 (admin page only uses the
+  // pre-computed report, so it wasn't affected before).
   outputFileTracingIncludes: {
-    '/test-harness': ['./.harness-out/**/*.json'],
-    '/test-harness/admin': ['./.harness-out/**/*.json'],
-    '/test-harness/[fixtureId]': ['./.harness-out/**/*.json'],
-    '/test-harness/[fixtureId]/[slug]': ['./.harness-out/**/*.json'],
-    '/test-harness/ai/[category]': ['./.harness-out/**/*.json'],
-    '/test-harness/ai/[category]/[slug]': ['./.harness-out/**/*.json'],
+    '/test-harness': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
+    '/test-harness/admin': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
+    '/test-harness/[fixtureId]': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
+    '/test-harness/[fixtureId]/[slug]': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
+    '/test-harness/ai/[category]': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
+    '/test-harness/ai/[category]/[slug]': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
   },
   eslint: {
     // CI runs lint separately — skip during build to save ~1 min
