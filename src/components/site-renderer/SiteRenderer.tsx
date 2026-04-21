@@ -1,7 +1,6 @@
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
-import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 import {
     HOMEPAGE_ALIASES,
     buildSlugCanonicalMap,
@@ -291,12 +290,13 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                     return null
                 }
 
-                const normalizedBlock = block.blockType === 'navigation'
-                    ? {
-                        ...block,
-                        links: filterNavigationLinksByVisibility(block.links, pages),
-                    }
-                    : block
+                // Nav always renders every link the user authored, even when
+                // a target page is `isVisible=false`. Hiding only affects
+                // direct routing (public route query already returns 404 for
+                // hidden pages); the nav menu itself stays stable so users
+                // never see menu items disappear mid-session as they click
+                // around.
+                const normalizedBlock = block
 
                 const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
 
