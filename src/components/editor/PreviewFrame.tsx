@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useEffect, useState, useCallback, useRef } from 'react'
+import React, { memo, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { GripVertical, Loader2 } from 'lucide-react'
 import { InlineEditPopover } from './InlineEditPopover'
 import { RichTextToolbar } from './RichTextToolbar'
@@ -28,6 +28,7 @@ interface PreviewFrameProps {
     onDuplicateBlock?: (index: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
     onPageNavigate?: (pageId: string) => void
+    onBlockAIEdit?: (blockIndex: number, blockType: string) => void
     disableDragDrop?: boolean
 }
 
@@ -103,7 +104,12 @@ function findStringFieldPath(
         if (value === oldHtml) return currentPath
         if (value === decodedOldHtml) return currentPath
         if (value === searchKey) return currentPath
-        
+        // Strip HTML tags from stored value, then exact-compare with plain-text searchKey.
+        // Handles case where field stores "<b>Hello</b>" but searchKey is "Hello" (innerText).
+        const strippedValue = value.replace(/<[^>]+>/g, '').trim()
+        if (strippedValue === searchKey) return currentPath
+        if (strippedValue === oldHtml) return currentPath
+
         // Partial matches
         if (!exactOnly) {
             if (value.includes(oldHtml)) return currentPath
@@ -196,6 +202,7 @@ function PreviewFrameInner({
     onDuplicateBlock,
     onBlockDrop,
     onPageNavigate,
+    onBlockAIEdit,
     disableDragDrop = false,
 }: PreviewFrameProps) {
     const { t } = useI18n()
@@ -204,6 +211,7 @@ function PreviewFrameInner({
     useEffect(() => { blocksRef.current = blocks }, [blocks])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
+
     const [blockLayouts, setBlockLayouts] = useState<BlockLayoutRect[]>([])
     const [dragState, setDragStateRaw] = useState<DragState | null>(null)
     const [dropIndex, setDropIndex] = useState<number | null>(null)
@@ -219,11 +227,16 @@ function PreviewFrameInner({
         })
     }, [])
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number } | null>(null)
+    const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number; blockType: string; originalText: string; scrollYAtStart: number } | null>(null)
+    const [iframeScrollY, setIframeScrollY] = useState(0)
     const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string } | null>(null)
+    // Scroll position to restore after iframe reload
+    const savedScrollYRef = useRef<number>(0)
+    const scrollToBlockIndexRef = useRef<number | null>(null)
     const [isImageProcessing, setIsImageProcessing] = useState(false)
     const [wysiwygState, setWysiwygState] = useState<Record<string, unknown>>({})
     const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
+    const frameElementRef = useRef<HTMLIFrameElement | null>(null)
     const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null)
 
     // Live theme update — send CSS variables to iframe without reload
@@ -236,6 +249,15 @@ function PreviewFrameInner({
             window.location.origin,
         )
     }, [frameElement, storeTheme])
+
+    // Sync selected block highlight into iframe via outline CSS
+    useEffect(() => {
+        if (!frameElement) return
+        frameElement.contentWindow?.postMessage(
+            { type: 'SET_BLOCK_SELECTED', blockIndex: selectedBlock ?? null },
+            window.location.origin,
+        )
+    }, [frameElement, selectedBlock])
 
     // Send translated drop hint text to iframe for CSS pseudo-element
     useEffect(() => {
@@ -260,6 +282,7 @@ function PreviewFrameInner({
     const dragPointerOffsetYRef = useRef<number | null>(null)
     const isHoveringControlsRef = useRef<boolean>(false)
     const textEditStopTimerRef = useRef<number | null>(null)
+    const currentLiveTextRef = useRef<string | null>(null)
     const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
     useEffect(() => {
         latestBlockLayoutsRef.current = blockLayouts
@@ -344,6 +367,7 @@ function PreviewFrameInner({
                     rawTargetIndex > sourceIndex ? rawTargetIndex - 1 : rawTargetIndex
 
                 if (targetIndex !== sourceIndex) {
+                    scrollToBlockIndexRef.current = targetIndex
                     onReorderBlocks?.(sourceIndex, targetIndex)
                 }
             }
@@ -379,7 +403,9 @@ function PreviewFrameInner({
                 if (isEditingRef.current || dragStateRef.current) return
                 setBlockHover(e.data.layout as BlockLayoutRect)
             } else if (e.data?.type === 'BLOCK_LAYOUT') {
-                setBlockLayouts((e.data.layouts || []) as BlockLayoutRect[])
+                const layouts = (e.data.layouts || []) as BlockLayoutRect[]
+                setBlockLayouts(layouts)
+
             } else if (e.data?.type === 'BLOCK_MOUSEOUT') {
                 if (!isEditingRef.current && !dragStateRef.current && !isHoveringControlsRef.current) {
                     cancelPendingHoverClear()
@@ -410,7 +436,10 @@ function PreviewFrameInner({
                     clearTimeout(textEditStopTimerRef.current)
                     textEditStopTimerRef.current = null
                 }
-                setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex })
+                const startScrollY = e.data.scrollY ?? 0
+                setIframeScrollY(startScrollY)
+                setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex, blockType: e.data.blockType ?? '', originalText: e.data.originalText ?? '', scrollYAtStart: startScrollY })
+                currentLiveTextRef.current = e.data.originalText ?? null
                 setImageClickData(null)
             } else if (e.data?.type === 'TEXT_EDITING_STOPPED') {
                 textEditStopTimerRef.current = window.setTimeout(() => {
@@ -419,6 +448,7 @@ function PreviewFrameInner({
                         return
                     }
                     setTextEditingData(null)
+                    currentLiveTextRef.current = null
                     performSave(true)
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
@@ -426,16 +456,40 @@ function PreviewFrameInner({
                 if (newHtml !== undefined) {
                     const currentBlocks = blocksRef.current
                     const block = currentBlocks[blockIndex]
-                    // Find the field using plain text searchKey
                     const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, searchKey) : null
                     if (fieldPath && block) {
-                        // Direct set — always replace entire field value with clean HTML
-                        // This prevents nesting accumulation from partial find-and-replace
+                        const originalValue = String(getValueAtPath(block, fieldPath) ?? '')
+                        // Only keep a heading wrapper if the original field already stored one (RichText
+                        // pattern like "<h2>Title</h2>"). For all other fields — plain text, bold/italic
+                        // inline HTML, etc. — the block component provides the heading tag itself, so
+                        // storing <hX> causes it to render as literal text.
+                        const originalHasHeadingWrapper = /^<h[1-6][\s>]/i.test(originalValue.trim())
+
+                        // Secondary check: if the original value stores a heading wrapper around
+                        // plain text (e.g. template data `<h4 style="...">Jennifer Ooi</h4>` in a
+                        // plain-text field like `member.name`), treat it as a plain-text field and
+                        // strip the wrapper on save. Without this, each edit re-adds a heading
+                        // wrapper, producing accumulating nesting: `<h4><h4>...</h4></h4>`.
+                        // A "wrapper around plain text" = the inner content contains no child tags.
+                        const originalWrapsPlainText = originalHasHeadingWrapper &&
+                            /^<h[1-6](?:\s[^>]*)?>([^<]*)<\/h[1-6]>$/i.test(originalValue.trim())
+
+                        currentLiveTextRef.current = newHtml
+                        let valueToSave = newHtml
+                        if (!originalHasHeadingWrapper || originalWrapsPlainText) {
+                            const headingMatch = newHtml.match(/^<(h[1-6])(?:\s[^>]*)?>([\s\S]+?)<\/\1>$/i)
+                            if (headingMatch) valueToSave = headingMatch[2]
+                        }
+
                         const clone = JSON.parse(JSON.stringify(currentBlocks))
-                        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, newHtml)
+                        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, valueToSave)
                         updateBlock(blockIndex, nextBlock)
                     }
                 }
+            } else if (e.data?.type === 'IFRAME_SCROLL') {
+                const scrollY = e.data.scrollY ?? 0
+                setIframeScrollY(scrollY)
+                savedScrollYRef.current = scrollY
             } else if (e.data?.type === 'REQUEST_STOP_EDITING') {
                 setTimeout(() => {
                     const activeEl = document.activeElement
@@ -456,6 +510,7 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'IMAGE_HOVERED') {
             } else if (e.data?.type === 'EDITOR_BLOCK_DROP') {
                 const { index, blockData } = e.data.payload
+                scrollToBlockIndexRef.current = index
                 onBlockDrop?.(index, blockData)
             } else if (e.data?.type === 'PAGE_NAVIGATE') {
                 onPageNavigate?.(String(e.data.pageId))
@@ -486,7 +541,7 @@ function PreviewFrameInner({
             setIsEditing(false)
             setTextEditingData(null) // Clean up WYSIWYG if clicking outside
             // Tell iframe to stop editing too
-            frameElement?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, window.location.origin)
+            frameElementRef.current?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, window.location.origin)
         }
 
         document.addEventListener('keydown', handleKeyDown)
@@ -517,12 +572,18 @@ function PreviewFrameInner({
             return
         }
 
+        // AI Edit from toolbar: open the inline AI popover instead of posting to iframe
+        if (command === 'aiEdit') {
+            setIsEditing(true)
+            return
+        }
+
         frameElement.contentWindow?.postMessage({
             type: 'EXEC_COMMAND',
             command,
             value
         }, window.location.origin)
-    }, [frameElement])
+    }, [frameElement, setIsEditing])
 
     const handleImageReplace = useCallback(async (file: File) => {
         if (!imageClickData) return
@@ -691,9 +752,18 @@ function PreviewFrameInner({
     }, [isDragging, dragSourceIndex, frameElement, syncDragPosition])
 
     const handleInlineRewrite = useCallback(async (instruction: string) => {
-        if (!hoverData) return
+        // Use hoverData if available, otherwise fall back to textEditingData context
+        const blockIndex = hoverData?.blockIndex ?? textEditingData?.blockIndex ?? -1
+        const blockType = hoverData?.blockType ?? textEditingData?.blockType ?? ''
+        const text = hoverData?.text ?? currentLiveTextRef.current ?? textEditingData?.originalText ?? ''
+        // When falling back to textEditingData (no hoverData), use exact-match only —
+        // the fuzzy pass risks matching a different field with the same short substring.
+        const fieldPath = hoverData?.fieldPath ??
+            (textEditingData && blocks[textEditingData.blockIndex]
+                ? findStringFieldPath(blocks[textEditingData.blockIndex], text, text, [], true)
+                : null)
 
-        const { blockIndex, blockType, text, fieldPath } = hoverData
+        if (blockIndex < 0) return
         const block = blocks[blockIndex]
         if (!block || !fieldPath) {
             return
@@ -749,7 +819,38 @@ function PreviewFrameInner({
         } finally {
             setIsSubmitting(false)
         }
-    }, [blocks, hoverData, onInlineEditApplied, updateBlock])
+    }, [blocks, hoverData, textEditingData, onInlineEditApplied, updateBlock])
+
+    // BUG-FIX: Prevent iframe reloading in the middle of typing due to background auto-saves.
+    // If the user is actively editing text, freeze the iframeKey so it doesn't navigate.
+    // Once they blur/stop editing, it safely syncs up and reloads the preview.
+    const previousIframeKey = useRef(iframeKey)
+    const effectiveIframeKey = (textEditingData || isEditing) ? previousIframeKey.current : iframeKey
+    useEffect(() => {
+        if (!textEditingData && !isEditing) {
+            previousIframeKey.current = iframeKey
+        }
+    }, [iframeKey, textEditingData, isEditing])
+
+    const iframeSrc = useMemo(() => {
+        const url = new URL(`/preview/${siteId}`, 'http://localhost')
+        url.searchParams.set('v', String(effectiveIframeKey))
+        if (pageId) {
+            url.searchParams.set('pageId', pageId)
+        }
+        
+        // Add scroll parameters to avoid relying on native iframe onLoad which can be flaky.
+        // NOTE: This runs only when iframeKey/pageId changes (when we INTEND to reload).
+        url.searchParams.set('scroll', String(savedScrollYRef.current || 0))
+        if (scrollToBlockIndexRef.current !== null) {
+            url.searchParams.set('scrollToBlock', String(scrollToBlockIndexRef.current))
+            scrollToBlockIndexRef.current = null // Clear it so it only runs once
+        }
+        
+        return url.pathname + url.search
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [siteId, effectiveIframeKey, pageId]) // DO NOT depend on savedScrollYRef to prevent constant reloads
+
 
     if (isLoading) {
         return (
@@ -760,12 +861,6 @@ function PreviewFrameInner({
                 </div>
             </div>
         )
-    }
-
-    const previewUrl = new URL(`/preview/${siteId}`, 'http://localhost')
-    previewUrl.searchParams.set('v', String(iframeKey))
-    if (pageId) {
-        previewUrl.searchParams.set('pageId', pageId)
     }
 
     const canInlineEdit = Boolean(hoverData?.fieldPath)
@@ -785,7 +880,12 @@ function PreviewFrameInner({
         }
     }
 
+    // How much the iframe has scrolled since text editing started — used to keep
+    // toolbar/popover anchored to the element as the user scrolls.
+    const scrollOffset = textEditingData ? iframeScrollY - textEditingData.scrollYAtStart : 0
+
     return (
+        <>
         <div
             ref={setContainerElement}
             className="relative flex-1 overflow-hidden bg-[#111827] p-6"
@@ -802,9 +902,9 @@ function PreviewFrameInner({
                     }}
                 >
                     <iframe
-                        ref={setFrameElement}
-                        key={iframeKey}
-                        src={previewUrl.pathname + previewUrl.search}
+                        ref={(el) => { setFrameElement(el); frameElementRef.current = el }}
+                        key={effectiveIframeKey}
+                        src={iframeSrc}
                         className="h-full w-full border-0"
                         title={t.editor.toolbar.sitePreview}
                         sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
@@ -814,24 +914,49 @@ function PreviewFrameInner({
 
             {((blockHover && !dragState) || (selectedBlock !== null && overlayOffset)) ? (
                 <>
+                    {/* Hover overlay — dashed border + block name label */}
                     {(() => {
-                        const selectedLayout = selectedBlock !== null
-                            ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
-                            : null
-                        const activeLayout = blockHover || selectedLayout
-                        if (!activeLayout || !overlayOffset || dragState) return null
-
+                        if (!blockHover || dragState || !overlayOffset) return null
+                        if (blockHover.blockIndex === selectedBlock) return null
+                        const label = blockHover.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
                         return (
                             <div
-                                className="pointer-events-none absolute rounded-xl border border-cyan-400/40 bg-cyan-400/5 transition-opacity duration-150"
+                                className="pointer-events-none absolute border-2 border-dashed border-blue-400 transition-all duration-100"
                                 style={{
-                                    top: overlayOffset.top + activeLayout.top - 6,
-                                    left: overlayOffset.left + activeLayout.left - 6,
-                                    width: activeLayout.width + 12,
-                                    height: activeLayout.height + 12,
+                                    top: overlayOffset.top + blockHover.top,
+                                    left: overlayOffset.left + blockHover.left,
+                                    width: blockHover.width,
+                                    height: blockHover.height,
                                     zIndex: 30,
                                 }}
-                            />
+                            >
+                                <span className="absolute left-0 top-0 -translate-y-full max-w-[160px] truncate rounded-t-sm bg-blue-400 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
+                                    {label}
+                                </span>
+                            </div>
+                        )
+                    })()}
+                    {/* Selected border injected via CSS into iframe; label rendered here */}
+                    {(() => {
+                        if (selectedBlock === null || !overlayOffset || dragState) return null
+                        const layout = editableLayouts.find(l => l.blockIndex === selectedBlock) ?? null
+                        if (!layout) return null
+                        const label = layout.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+                        return (
+                            <div
+                                className="pointer-events-none absolute transition-all duration-100"
+                                style={{
+                                    top: overlayOffset.top + layout.top,
+                                    left: overlayOffset.left + layout.left,
+                                    width: layout.width,
+                                    height: layout.height,
+                                    zIndex: 31,
+                                }}
+                            >
+                                <span className="absolute left-0 top-0 -translate-y-full rounded-t-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
+                                    {label}
+                                </span>
+                            </div>
                         )
                     })()}
                     {/* Block Action Bar — shows on selected block */}
@@ -848,6 +973,7 @@ function PreviewFrameInner({
                                     blockType={selectedLayout.blockType}
                                     blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
                                     totalBlocks={editableLayouts.length}
+                                    isMobile={viewport === 'mobile'}
                                     onMoveUp={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex - 1)}
                                     onMoveDown={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex + 1)}
                                     onDuplicate={() => {
@@ -855,6 +981,7 @@ function PreviewFrameInner({
                                     }}
                                     onAIEdit={() => {
                                         onBlockSelect?.(selectedLayout.blockIndex)
+                                        onBlockAIEdit?.(selectedLayout.blockIndex, selectedLayout.blockType)
                                     }}
                                     onDelete={() => setDeleteConfirmIndex(selectedLayout.blockIndex)}
                                     onDragStart={disableDragDrop ? undefined : (event) => {
@@ -894,33 +1021,6 @@ function PreviewFrameInner({
                                         width: selectedLayout.width,
                                     }}
                                 />
-                                {deleteConfirmIndex === selectedLayout.blockIndex && (
-                                    <DeleteBlockConfirm
-                                        blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
-                                        onConfirm={() => {
-                                            const blockName = blocks[selectedLayout.blockIndex]?.blockType || 'block'
-                                            onDeleteBlock?.(selectedLayout.blockIndex)
-                                            onBlockSelect?.(null)
-                                            setDeleteConfirmIndex(null)
-                                            toast.success(`Deleted ${blockName.replace(/-/g, ' ')}`, {
-                                                duration: 5000,
-                                                action: {
-                                                    label: 'Undo',
-                                                    onClick: () => {
-                                                        const { undo: storeUndo } = useEditorStore.getState()
-                                                        storeUndo()
-                                                    },
-                                                },
-                                            })
-                                        }}
-                                        onCancel={() => setDeleteConfirmIndex(null)}
-                                        anchorRect={{
-                                            top: overlayOffset.top + selectedLayout.top,
-                                            left: overlayOffset.left + selectedLayout.left,
-                                            width: selectedLayout.width,
-                                        }}
-                                    />
-                                )}
                             </>
                         )
                     })()}
@@ -976,7 +1076,7 @@ function PreviewFrameInner({
             </AnimatePresence>
 
             {hoverData && hoverData.rect && overlayOffset && !dragState ? (
-                <div 
+                <div
                     className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 rounded transition-opacity duration-200"
                     onMouseEnter={() => {
                         isHoveringControlsRef.current = true
@@ -984,7 +1084,8 @@ function PreviewFrameInner({
                     }}
                     onMouseLeave={() => {
                         isHoveringControlsRef.current = false
-                        if (!isEditing) {
+                        // Keep hoverData while text-editing so AI sparkles can still use it
+                        if (!isEditing && !textEditingData) {
                             setHoverData(null)
                         }
                     }}
@@ -996,33 +1097,11 @@ function PreviewFrameInner({
                         zIndex: 100,
                     }}
                 >
-                    {!isEditing && canInlineEdit && (
-                        <div
-                            data-inline-edit-trigger
-                            className="absolute -top-8 right-0 flex cursor-pointer items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 text-[10px] font-bold uppercase text-white shadow-lg transition-colors hover:bg-blue-500 pointer-events-auto"
-                            onMouseEnter={() => {
-                                isHoveringControlsRef.current = true
-                                cancelPendingHoverClear()
-                            }}
-                            onMouseLeave={() => {
-                                isHoveringControlsRef.current = false
-                            }}
-                            onClick={() => setIsEditing(true)}
-                        >
-                            ✨ {t.editor.preview.editWithAI}
-                        </div>
-                    )}
-                    {isEditing && canInlineEdit && (
+                    {isEditing && (
                         <div
                             data-inline-edit-popover
                             className="absolute left-0 top-0 z-50 pointer-events-auto -translate-y-[calc(100%+12px)]"
-                            onMouseEnter={() => {
-                                isHoveringControlsRef.current = true
-                                cancelPendingHoverClear()
-                            }}
-                            onMouseLeave={() => {
-                                isHoveringControlsRef.current = false
-                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
                         >
                             <InlineEditPopover
                                 blockType={hoverData.blockType}
@@ -1037,24 +1116,71 @@ function PreviewFrameInner({
                 </div>
             ) : null}
 
-            {/* US-F05-06 AC-1: Rich Text Toolbar */}
-            {textEditingData && overlayOffset && (() => {
-                const TOOLBAR_WIDTH = 340;
-                let topPos = overlayOffset.top + textEditingData.rect.top - 48;
-                let leftPos = overlayOffset.left + textEditingData.rect.left + (textEditingData.rect.width / 2) - (TOOLBAR_WIDTH / 2);
-                
-                const maxLeft = (containerElement?.clientWidth || typeof window !== 'undefined' ? window.innerWidth : 1000) - TOOLBAR_WIDTH - 16;
-                leftPos = Math.max(16, Math.min(leftPos, maxLeft));
+            {/* AI popover triggered from toolbar sparkles — position:fixed to escape overflow-hidden */}
+            {isEditing && !hoverData && textEditingData && overlayOffset && (() => {
+                const POPOVER_EST_HEIGHT = 200
+                const adjustedTop = textEditingData.rect.top - scrollOffset
+                const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
+                const absTop = cRect.top + overlayOffset.top + adjustedTop
+                const absLeft = cRect.left + overlayOffset.left + textEditingData.rect.left
+                const showBelow = absTop - 12 < POPOVER_EST_HEIGHT
+                const popoverLeft = Math.max(cRect.left + 8, Math.min(absLeft, (cRect.right ?? window.innerWidth) - 320 - 8))
+                return (
+                <div
+                    data-inline-edit-popover
+                    className="z-[210] pointer-events-auto"
+                    style={showBelow ? {
+                        position: 'fixed',
+                        top: absTop + textEditingData.rect.height + 8,
+                        left: popoverLeft,
+                    } : {
+                        position: 'fixed',
+                        top: absTop - 12,
+                        left: popoverLeft,
+                        transform: 'translateY(-100%)',
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    <InlineEditPopover
+                        blockType={textEditingData.blockType}
+                        currentText={textEditingData.originalText}
+                        isSubmitting={isSubmitting}
+                        isMobile={viewport === 'mobile'}
+                        onClose={() => setIsEditing(false)}
+                        onSubmit={handleInlineRewrite}
+                    />
+                </div>
+                )
+            })()}
 
-                if (topPos < 16) {
-                    topPos = overlayOffset.top + textEditingData.rect.top + textEditingData.rect.height + 8;
+            {/* US-F05-06 AC-1: Rich Text Toolbar — position:fixed to escape overflow-hidden parents */}
+            {textEditingData && overlayOffset && (() => {
+                const TOOLBAR_HEIGHT = 48;
+                const adjustedRectTop = textEditingData.rect.top - scrollOffset
+                // getBoundingClientRect gives viewport-relative coords → use with position:fixed
+                const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
+                const canvasWidth = (cRect.right ?? window.innerWidth) - cRect.left
+                // Clamp toolbar width to canvas width so it never spills into the sidebar on mobile
+                const TOOLBAR_WIDTH = Math.min(560, canvasWidth - 16)
+                let topPos = cRect.top + overlayOffset.top + adjustedRectTop - TOOLBAR_HEIGHT;
+                let leftPos = cRect.left + overlayOffset.left + textEditingData.rect.left + (textEditingData.rect.width / 2) - (TOOLBAR_WIDTH / 2);
+
+                // Clamp within canvas bounds (cRect), not full window — prevents spilling into sidebar
+                const minLeft = cRect.left + 8
+                const maxLeft = cRect.left + canvasWidth - TOOLBAR_WIDTH - 8
+                leftPos = Math.max(minLeft, Math.min(leftPos, maxLeft));
+
+                // If no room above, flip below the element
+                if (topPos < 8) {
+                    topPos = cRect.top + overlayOffset.top + adjustedRectTop + textEditingData.rect.height + 8;
                 }
 
                 return (
                     <div
-                        className="absolute z-[100]"
+                        className="z-[200]"
                         data-wysiwyg-toolbar
                         style={{
+                            position: 'fixed',
                             top: topPos,
                             left: leftPos,
                         }}
@@ -1090,6 +1216,31 @@ function PreviewFrameInner({
                 )
             })()}
         </div>
+
+        {/* Delete block confirmation modal */}
+        <DeleteBlockConfirm
+            open={deleteConfirmIndex !== null}
+            blockName={deleteConfirmIndex !== null ? (blocks[deleteConfirmIndex]?.blockType || 'block') : ''}
+            onConfirm={() => {
+                if (deleteConfirmIndex === null) return
+                const blockName = blocks[deleteConfirmIndex]?.blockType || 'block'
+                onDeleteBlock?.(deleteConfirmIndex)
+                onBlockSelect?.(null)
+                setDeleteConfirmIndex(null)
+                toast.success(`Deleted ${blockName.replace(/-/g, ' ')}`, {
+                    duration: 5000,
+                    action: {
+                        label: 'Undo',
+                        onClick: () => {
+                            const { undo: storeUndo } = useEditorStore.getState()
+                            storeUndo()
+                        },
+                    },
+                })
+            }}
+            onCancel={() => setDeleteConfirmIndex(null)}
+        />
+        </>
     )
 }
 

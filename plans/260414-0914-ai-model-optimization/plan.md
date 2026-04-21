@@ -1,7 +1,7 @@
 ---
 title: "AI Model Optimization — replace gpt-4o with gpt-4.1-mini"
 description: "Swap hardcoded gpt-4o on site-gen + edit-block to gpt-4.1-mini via Vercel AI Gateway — ~85% cost cut with equal/better JSON fidelity."
-status: in-progress
+status: done
 priority: P1
 effort: 9h
 branch: feat/F01-ai-gen-variety-fix

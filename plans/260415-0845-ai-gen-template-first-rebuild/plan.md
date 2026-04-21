@@ -1,7 +1,7 @@
 ---
 title: "AI Gen Rebuild — Wix Template-First Approach"
 description: "Flip ech-prime AI gen từ LLM-creates-everything → designer-curated-templates + AI-matching. Multi-phase rebuild targeting Wix ADI quality."
-status: pending
+status: abandoned
 priority: P1
 effort: "10-14 weeks (see phase breakdown)"
 branch: feat/F01-ai-gen-template-first

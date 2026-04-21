@@ -73,6 +73,28 @@ function describeAction(result: AIEditResult): string {
     }
 }
 
+/** Build a bounded, always-valid-JSON copy of a block for inclusion in the
+ *  SELECTED BLOCK FULL DATA section. Caps string values + array lengths so
+ *  the stringified result is never truncated mid-structure. */
+function buildSafeBlockCopy(value: unknown, depth = 0): unknown {
+    if (depth > 5) return '[deep]'
+    if (typeof value === 'string') return value.length > 300 ? value.slice(0, 300) + '…' : value
+    if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value
+    if (Array.isArray(value)) {
+        const capped: unknown[] = value.slice(0, 10).map(v => buildSafeBlockCopy(v, depth + 1))
+        if (value.length > 10) capped.push(`…+${value.length - 10} more`)
+        return capped
+    }
+    if (value && typeof value === 'object') {
+        const out: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+            out[k] = buildSafeBlockCopy(v, depth + 1)
+        }
+        return out
+    }
+    return null
+}
+
 async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
     const { instruction, block, allBlocks, theme, siteName, currentPageSlug, currentPageTitle, chatHistory } = data
     const blockIndex = data.blockIndex ?? 0
@@ -117,7 +139,7 @@ async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
 - Current theme: ${JSON.stringify(theme || {})}
 - Total blocks on page: ${allBlocks?.length || 0}
 ${block ? `- Currently editing block #${blockIndex + 1}: type="${block.blockType}"` : '- No specific block selected'}
-${block ? `\n## SELECTED BLOCK FULL DATA\n\`\`\`json\n${JSON.stringify(block, null, 2).slice(0, 3000)}\n\`\`\`` : ''}
+${block ? `\n## SELECTED BLOCK FULL DATA\n\`\`\`json\n${JSON.stringify(buildSafeBlockCopy(block), null, 2)}\n\`\`\`` : ''}
 
 ## CURRENT PAGE BLOCKS
 ${blockSummary || '(empty page)'}
@@ -333,7 +355,7 @@ IMPORTANT RULES for nested fields:
         const maxIndex = allBlocks.length - 1
         const original = result.updates.length
         result.updates = result.updates.filter(u =>
-            typeof u.blockIndex === 'number' && u.blockIndex >= 0 && u.blockIndex <= maxIndex,
+            Number.isInteger(u.blockIndex) && u.blockIndex >= 0 && u.blockIndex <= maxIndex,
         )
         if (result.updates.length < original) {
             console.warn(`[AI edit-block] Filtered ${original - result.updates.length} out-of-bounds updates`)

@@ -72,5 +72,16 @@ coverage/
 
 ## Test harness output (Phase F01V test coverage)
 .harness-out/
+
+## Claude / ClaudeKit ephemeral runtime artifacts
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/session-state/
+.claude/hooks/.logs/
+.claude/settings.local.json
+
+## MCP / tool caches (local per dev)
+.serena/
+.wiki-repo/
 .env*.local
 .gstack/

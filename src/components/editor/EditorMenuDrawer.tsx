@@ -91,7 +91,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
 
     const handleLogout = async () => {
         try {
-            await fetch('/api/users/logout', {
+            await fetch('/api/auth/logout', {
                 method: 'POST',
                 credentials: 'include',
             })

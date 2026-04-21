@@ -337,7 +337,9 @@ describe('AI Streaming APIs', () => {
 
             const OpenAIMod = await import('openai')
             const OpenAI = OpenAIMod.default as any
-            // AI hallucinates blockIndex=99 on a 2-block page — backend must drop it
+            // AI hallucinates blockIndex=99 on a 2-block page — backend must drop it.
+            // Float indices (0.5, 1.7) also pass `typeof === 'number'` but are not valid
+            // array positions — Number.isInteger guard must reject them too.
             OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
                 choices: [{ message: { content: JSON.stringify({
                     action: 'update_multiple_blocks',
@@ -345,6 +347,8 @@ describe('AI Streaming APIs', () => {
                         { blockIndex: 0, changes: { headline: 'Xin chào' } },
                         { blockIndex: 99, changes: { headline: 'ghost section' } },
                         { blockIndex: -1, changes: { headline: 'underflow' } },
+                        { blockIndex: 0.5, changes: { headline: 'float low' } },
+                        { blockIndex: 1.7, changes: { headline: 'float mid' } },
                     ],
                     message: 'Translated all sections.',
                 }) } }],
@@ -369,6 +373,64 @@ describe('AI Streaming APIs', () => {
             expect(data.action).toBe('update_multiple_blocks')
             expect(data.updates).toHaveLength(1)
             expect(data.updates[0].blockIndex).toBe(0)
+        })
+
+        it('wraps SELECTED BLOCK FULL DATA as bounded valid JSON (TC-F01-NESTED-FULLDATA)', async () => {
+            process.env.OPENAI_API_KEY = 'test-key'
+
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as any
+            const createMock = OpenAI.prototype.chat.completions.create
+            createMock.mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({
+                    action: 'update_block',
+                    blockIndex: 0,
+                    changes: { description: 'shorter' },
+                    message: 'Trimmed description.',
+                }) } }],
+                model: 'gpt-4o-mini',
+                usage: { prompt_tokens: 100, completion_tokens: 200 },
+            })
+
+            const bigBlock = {
+                blockType: 'hero',
+                description: 'X'.repeat(5000),
+                items: Array.from({ length: 20 }, (_, i) => ({ label: `item-${i}` })),
+            }
+
+            const req = new NextRequest('http://localhost:3000/api/ai/edit-block', {
+                method: 'POST',
+                body: JSON.stringify({
+                    instruction: 'make description shorter',
+                    block: bigBlock,
+                    blockIndex: 0,
+                    allBlocks: [bigBlock],
+                })
+            })
+
+            const res = await EditBlockPOST(req)
+            expect(res.status).toBe(200)
+
+            // Find the call whose system prompt actually contains the SELECTED BLOCK FULL DATA
+            // section — other earlier tests share the prototype mock, so mock.calls is cumulative.
+            const calls = createMock.mock.calls as Array<[{ messages: Array<{ role: string; content: string }> }]>
+            const targetCall = [...calls].reverse().find(c => {
+                const sys = c[0]?.messages?.find((m) => m.role === 'system')?.content ?? ''
+                return sys.includes('## SELECTED BLOCK FULL DATA')
+            })
+            expect(targetCall).toBeDefined()
+            const systemPrompt = targetCall![0].messages.find((m) => m.role === 'system')!.content
+
+            expect(systemPrompt).toContain('## SELECTED BLOCK FULL DATA')
+            const match = systemPrompt.match(/## SELECTED BLOCK FULL DATA\n```json\n([\s\S]*?)\n```/)
+            expect(match).not.toBeNull()
+            const parsed = JSON.parse(match![1]) as Record<string, unknown>
+            expect(parsed.blockType).toBe('hero')
+            // description string capped to ≤301 chars (300 + ellipsis)
+            expect((parsed.description as string).length).toBeLessThanOrEqual(301)
+            // items array capped to 10 entries + 1 overflow marker = 11 max
+            expect(Array.isArray(parsed.items)).toBe(true)
+            expect((parsed.items as unknown[]).length).toBeLessThanOrEqual(11)
         })
     })
 

@@ -1,7 +1,7 @@
 ---
 title: "Vercel + Neon migration — complete step-by-step"
 description: "Migration plan DO→Vercel+Neon với checklist dò lỗi từng bước, ready cho event 200 users"
-status: pending
+status: done
 priority: P0
 effort: 16h
 branch: fix/F31-preview-nav-404

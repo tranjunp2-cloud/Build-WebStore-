@@ -1,7 +1,8 @@
 /**
  * Matrix builder — enumerates the cartesian product (category × variant × seed)
  * and pulls expected invariants from CATEGORY_REQUIREMENTS (single source of truth
- * since CATEGORY_DNA removal in commit bbbd0198 plan 2253 P3).
+ * since CATEGORY_DNA removal in commit bbbd0198 plan 2253 P3). Requirements carries
+ * mandatoryBlocks + minBlocks the harness guards need.
  */
 
 import {

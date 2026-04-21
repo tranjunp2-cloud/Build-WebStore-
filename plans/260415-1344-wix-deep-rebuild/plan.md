@@ -1,7 +1,7 @@
 ---
 title: "Template Wix-Deep Rebuild — Component-by-Component Fix"
 description: "Audit và fix từng block component để template gen render đạt chuẩn Wix — variants, visual diversity, theme defaults, image coverage"
-status: pending
+status: done
 priority: P0
 effort: 43-63h
 branch: feat/F01-ai-gen-seo-guard

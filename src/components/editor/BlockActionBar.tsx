@@ -9,6 +9,7 @@ interface BlockActionBarProps {
     blockType: string
     blockName: string
     totalBlocks: number
+    isMobile?: boolean
     onMoveUp: () => void
     onMoveDown: () => void
     onDuplicate: () => void
@@ -25,6 +26,7 @@ export function BlockActionBar({
     blockType,
     blockName,
     totalBlocks,
+    isMobile = false,
     onMoveUp,
     onMoveDown,
     onDuplicate,
@@ -36,6 +38,9 @@ export function BlockActionBar({
     // Hide for global blocks (navigation/footer)
     if (blockType === 'navigation' || blockType === 'footer') return null
 
+    const showDrag = !isMobile && onDragStart
+    const showMoveUpDown = isMobile
+
     return (
         <div
             className="absolute z-[55] flex items-center gap-0.5 rounded-xl border border-white/10 bg-[#1E293B]/95 px-1.5 py-1 shadow-2xl backdrop-blur-sm animate-in fade-in duration-150"
@@ -46,7 +51,7 @@ export function BlockActionBar({
             }}
             onMouseDown={(e) => e.stopPropagation()}
         >
-            {onDragStart ? (
+            {showDrag && (
                 <>
                     <button
                         type="button"
@@ -58,28 +63,31 @@ export function BlockActionBar({
                     </button>
                     <div className="h-5 w-px bg-white/10" />
                 </>
-            ) : null}
+            )}
 
-            <button
-                type="button"
-                className={ACTION_BTN}
-                onClick={onMoveUp}
-                disabled={blockIndex === 0}
-                title="Move up"
-            >
-                <ChevronUp className="h-4 w-4 text-slate-300" />
-            </button>
-            <button
-                type="button"
-                className={ACTION_BTN}
-                onClick={onMoveDown}
-                disabled={blockIndex >= totalBlocks - 1}
-                title="Move down"
-            >
-                <ChevronDown className="h-4 w-4 text-slate-300" />
-            </button>
-
-            <div className="h-5 w-px bg-white/10" />
+            {showMoveUpDown && (
+                <>
+                    <button
+                        type="button"
+                        className={ACTION_BTN}
+                        onClick={onMoveUp}
+                        disabled={blockIndex === 0}
+                        title="Move up"
+                    >
+                        <ChevronUp className="h-4 w-4 text-slate-300" />
+                    </button>
+                    <button
+                        type="button"
+                        className={ACTION_BTN}
+                        onClick={onMoveDown}
+                        disabled={blockIndex >= totalBlocks - 1}
+                        title="Move down"
+                    >
+                        <ChevronDown className="h-4 w-4 text-slate-300" />
+                    </button>
+                    <div className="h-5 w-px bg-white/10" />
+                </>
+            )}
 
             <button type="button" className={ACTION_BTN} onClick={onDuplicate} title="Duplicate block">
                 <Copy className="h-3.5 w-3.5 text-slate-300" />

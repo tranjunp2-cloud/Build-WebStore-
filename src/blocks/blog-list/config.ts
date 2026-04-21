@@ -20,7 +20,6 @@ export const blogListMeta: BlockMeta = {
     defaultVariant: 'cards',
     editableFields: ['headline', 'subheadline', 'limit'],
     quickActions: ['change-limit'],
-    aiVisible: false,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

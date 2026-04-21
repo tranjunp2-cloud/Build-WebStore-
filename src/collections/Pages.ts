@@ -1303,7 +1303,7 @@ export const Pages: CollectionConfig = {
         livePreview: {
             url: ({ data, req }) => {
                 const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
-                return `${baseUrl}/preview/${data?.site}/${data?.slug}?preview=true`
+                return `${baseUrl}/preview/${data?.site}?pageId=${data?.id}`
             },
         },
     },

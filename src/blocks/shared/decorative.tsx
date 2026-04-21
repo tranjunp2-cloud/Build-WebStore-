@@ -1,5 +1,8 @@
 'use client'
 
+import { RichText } from './RichText'
+import { hasInlineFormatting } from '@/lib/utils/rich-text-render'
+
 /**
  * Shared decorative SVG components for block renderers.
  * Adds visual richness without requiring actual images.
@@ -168,6 +171,10 @@ interface SectionLabelProps {
 }
 
 export function SectionLabel({ color, children }: SectionLabelProps) {
+    const content = typeof children === 'string' && hasInlineFormatting(children) 
+        ? <RichText text={children} as="span" /> 
+        : children
+
     return (
         <div
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6"
@@ -178,7 +185,7 @@ export function SectionLabel({ color, children }: SectionLabelProps) {
             }}
         >
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-            {children}
+            {content}
         </div>
     )
 }

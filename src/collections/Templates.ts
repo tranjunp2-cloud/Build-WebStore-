@@ -202,6 +202,16 @@ export const Templates: CollectionConfig = {
                 description: 'Per-block AI prompt overrides. Shape: { [blockSlug]: { prompt: string, updatedAt: string, updatedBy?: string } }',
             },
         },
+        {
+            name: 'blockSchemaVersion',
+            type: 'text',
+            maxLength: 64,
+            required: false,
+            admin: {
+                readOnly: true,
+                description: 'sha256 hash of block registry snapshot at seed-time. Enables per-template staleness detection.',
+            },
+        },
     ],
     timestamps: true,
 }

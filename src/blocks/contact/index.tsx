@@ -516,23 +516,32 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     // already caps at max-w-6xl = 1152px, and the nested max-w-5xl was
     // shrinking the form to ~820px on desktop, leaving huge empty space)
     // and switch to a 1:2 split so the form column gets ~66% instead of 60%.
+    const hasContactInfo = !!(email || phone || address)
     return (
         <ContactSection>
             <ContactHeader headline={headline} subtext={subtext} />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                {/* Contact Info */}
-                <div className="lg:col-span-1 space-y-6">
-                    {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
-                    {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
-                    {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
+            {hasContactInfo ? (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                    {/* Contact Info */}
+                    <div className="lg:col-span-1 space-y-6">
+                        {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
+                        {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
+                        {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
+                    </div>
+                    {/* Contact Form */}
+                    <div className="lg:col-span-2">
+                        <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
+                            <ContactForm formFields={formFields} siteId={siteId} />
+                        </GlassCard>
+                    </div>
                 </div>
-                {/* Contact Form */}
-                <div className="lg:col-span-2">
+            ) : (
+                <div className="max-w-xl mx-auto">
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
                         <ContactForm formFields={formFields} siteId={siteId} />
                     </GlassCard>
                 </div>
-            </div>
+            )}
         </ContactSection>
     )
 }

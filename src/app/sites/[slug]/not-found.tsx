@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { SiteRenderer, type SiteRendererProps, type NavPage } from '@/components/site-renderer/SiteRenderer'
-import { I18nText } from '@/components/storefront/I18nText'
+import { getServerI18n } from '@/i18n/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +58,7 @@ export default async function NotFound() {
     if (!site) return <Fallback404 />
 
     // Find 404 page — only published version for public visitors (BUG-F05-09)
+    // draft: false ensures we query the main pages table (published) not _pages_v (drafts)
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
@@ -73,6 +74,7 @@ export default async function NotFound() {
         },
         limit: 1,
         depth: 3,
+        draft: false,
     })
     const page404 = pagesResult.docs[0]
 
@@ -81,6 +83,7 @@ export default async function NotFound() {
         where: { site: { equals: site.id } },
         limit: 100,
         sort: 'createdAt',
+        draft: false,
     })
 
     // If 404 page exists WITH actual layout content, render it via SiteRenderer
@@ -111,12 +114,13 @@ export default async function NotFound() {
     )
 }
 
-function Fallback404() {
+async function Fallback404() {
+    const { t } = await getServerI18n()
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-            <h1 style={{ fontSize: '3rem', margin: 0, fontWeight: 700 }}><I18nText render={t => t.storefront.notFound.code} /></h1>
-            <p style={{ fontSize: '1.25rem', color: '#666', marginTop: '0.5rem' }}><I18nText render={t => t.storefront.notFound.title} /></p>
-            <Link href="/" style={{ marginTop: '1.5rem', color: '#0ea5e9', textDecoration: 'none', fontWeight: 500, padding: '0.5rem 1rem', border: '1px solid #0ea5e9', borderRadius: '0.375rem' }}><I18nText render={t => t.storefront.notFound.backHome} /></Link>
+            <h1 style={{ fontSize: '3rem', margin: 0, fontWeight: 700 }}>{t.storefront.notFound.code}</h1>
+            <p style={{ fontSize: '1.25rem', color: '#666', marginTop: '0.5rem' }}>{t.storefront.notFound.title}</p>
+            <Link href="/" style={{ marginTop: '1.5rem', color: '#0ea5e9', textDecoration: 'none', fontWeight: 500, padding: '0.5rem 1rem', border: '1px solid #0ea5e9', borderRadius: '0.375rem' }}>{t.storefront.notFound.backHome}</Link>
         </div>
     )
 }
