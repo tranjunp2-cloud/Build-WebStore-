@@ -59,12 +59,18 @@ export type SSEEvent = {
 /**
  * Generate a complete website using OpenAI GPT-4o with streaming.
  * Falls back to rule-based generation if API key missing or AI fails.
+ *
+ * @param blockPromptOverrides - Per-block prompt overrides from the admin template
+ *   matching this request's category. Shape: { [blockSlug]: { prompt, updatedAt } }.
+ *   Fetched by the caller (generate-site route) so this function stays DB-free.
+ *   Merged into buildUserPrompt so GPT tailors per-block content accordingly.
  */
 export async function generateSiteWithAI(
     rawBusinessInfo: BusinessInfoInput,
     extraInstructions?: string,
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
     referencePrompt?: string,
+    blockPromptOverrides?: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>,
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
     // intermittent "400 could not parse JSON body" from OpenAI when clipboard
@@ -116,6 +122,8 @@ export async function generateSiteWithAI(
     const hasCustomInput = Boolean(extraInstructions?.trim()) || Boolean(referencePrompt?.trim())
 
     if (genMode === 'template-first' && !hasCustomInput) {
+        // Note: template-first uses the curated composer (static content) + GPT for
+        // hero/SEO text only. Block prompt overrides apply to AI-first path only.
         const templateResult = await generateTemplateFirst(
             businessInfo, language, promptText, openai, events,
         )
@@ -161,12 +169,25 @@ export async function generateSiteWithAI(
         )
 
         const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
+        // Map stored override shape { [slug]: { prompt, updatedAt } } → { [slug]: { prompt } }
+        // as expected by buildUserPrompt. Empty-string prompts are filtered out inside buildUserPrompt.
+        const aiFirstOverrides = blockPromptOverrides
+            ? Object.fromEntries(
+                Object.entries(blockPromptOverrides)
+                    .filter(([, v]) => v?.prompt?.trim())
+                    .map(([slug, v]) => [slug, { prompt: v.prompt }])
+              )
+            : undefined
+        if (aiFirstOverrides && Object.keys(aiFirstOverrides).length > 0) {
+            console.log('[ai-gen] blockPromptOverrides sent (ai-first):', Object.keys(aiFirstOverrides))
+        }
         const userPromptText = buildUserPrompt(businessInfo, {
             extraInstructions: sanitizedExtra,
             language,
             referencePrompt: sanitizedRef,
             mood: themeMood,
             recipe: layoutRecipe,
+            blockPromptOverrides: aiFirstOverrides,
         })
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })

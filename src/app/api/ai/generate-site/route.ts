@@ -296,9 +296,63 @@ export async function POST(req: NextRequest) {
             })
         }
 
+        // Fetch block prompt overrides from the admin template matching this category.
+        // Best-effort: failure never blocks generation. Only applies to AI-first path —
+        // template-first uses a static composer + hero-only GPT personalization, so
+        // buildUserPrompt is never called there and overrides would have no effect.
+        // AI-first is active when: GEN_MODE=ai-first OR user provided custom input.
+        // Shape: { [blockSlug]: { prompt, updatedAt, updatedBy? } }
+        type BlockPromptOverridesMap = Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>
+        let blockPromptOverrides: BlockPromptOverridesMap | undefined
+        const isAiFirstPath = process.env.GEN_MODE?.trim() === 'ai-first'
+            || Boolean(extraInstructions?.trim())
+            || Boolean(referencePrompt?.trim())
+        if (isAiFirstPath) {
+            try {
+                const promptCategoryText = [
+                    businessInfo.businessName,
+                    businessInfo.industry,
+                    businessInfo.shortDescription,
+                    businessInfo.products,
+                ].join(' | ')
+                const resolvedCategory = resolveComposerCategory(promptCategoryText)
+                const tmplResult = await payload.find({
+                    collection: 'templates',
+                    where: {
+                        and: [
+                            { category: { contains: resolvedCategory } },
+                            { status: { equals: 'live' } },
+                        ],
+                    },
+                    limit: 1,
+                    depth: 0,
+                })
+                const tmplDoc = tmplResult.docs[0] as Record<string, unknown> | undefined
+                if (tmplDoc?.blockPromptOverrides && typeof tmplDoc.blockPromptOverrides === 'object') {
+                    const raw = tmplDoc.blockPromptOverrides as Record<string, unknown>
+                    const entries = Object.entries(raw).filter(([, v]) => {
+                        const meta = v as Record<string, unknown>
+                        return typeof meta?.prompt === 'string' && meta.prompt.trim().length > 0
+                    })
+                    if (entries.length > 0) {
+                        blockPromptOverrides = Object.fromEntries(
+                            entries.map(([slug, v]) => {
+                                const meta = v as { prompt: string; updatedAt: string; updatedBy?: string }
+                                return [slug, { prompt: meta.prompt, updatedAt: meta.updatedAt, updatedBy: meta.updatedBy }]
+                            })
+                        )
+                        console.log(`[generate-site] loaded ${entries.length} blockPromptOverrides from template ${String(tmplDoc.id)} (category=${resolvedCategory})`)
+                    }
+                }
+            } catch (err) {
+                // Non-critical — gen proceeds without overrides
+                console.warn('[generate-site] blockPromptOverrides fetch failed (non-fatal):', err instanceof Error ? err.message : err)
+            }
+        }
+
         // Generate with AI (or fallback)
         const { result, events } = await trackPhase('ai', () =>
-            generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt),
+            generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides),
         )
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
