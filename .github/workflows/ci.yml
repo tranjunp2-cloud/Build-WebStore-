@@ -144,6 +144,16 @@ jobs:
           echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
           echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
 
+      - name: Drift check (block registry ↔ templates)
+        # Plan 260419-2022 Phase 03 — fail PR if block variant/schema drift
+        # grows beyond baseline. Source-only scan (no DB), <30s.
+        run: npm run drift:check
+
+      - name: Harness quick gen
+        # Plan 260419-2022 Phase 03 — smoke test composer on 3 fixtures.
+        # Fails fast if composer blows up on real schemas.
+        run: npm run harness:quick
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -422,6 +432,17 @@ jobs:
           echo "::error::alias web-v2.dev.ecommercehub.my did not roll over to $EXPECTED (still $ACTUAL)"
           exit 1
 
+      - name: Seed templates (post-deploy)
+        # Plan 260419-2022 Phase 03 — force replace-all reseed against the
+        # freshly aliased deploy. Keeps Payload Templates in sync with
+        # shipped block code. ADR: force strategy chosen because admin
+        # doesn't edit templates directly today; revisit when editing UI
+        # lands. SEED_TOKEN mirrored in Vercel env (staging scope).
+        env:
+          DEPLOY_URL: https://web-v2.dev.ecommercehub.my
+          SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+        run: bash .github/scripts/seed-templates-post-deploy.sh
+
       - name: Notify deploy success
         if: success()
         uses: ./.github/actions/smart-notify
@@ -545,6 +566,15 @@ jobs:
           URL=$(vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN")
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Deployed: $URL"
+
+      - name: Seed templates (post-deploy)
+        # Plan 260419-2022 Phase 03 — mirror of staging seed step against prod
+        # alias. SEED_TOKEN must be mirrored in Vercel production env.
+        # NOTE: staging freshness gate deferred (see plan.md — nice-to-have).
+        env:
+          DEPLOY_URL: https://web-v2.ecommercehub.my
+          SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+        run: bash .github/scripts/seed-templates-post-deploy.sh
 
       - name: Notify deploy success
         if: success()

@@ -1,7 +1,7 @@
 ---
 title: "Builder UX Polish — Fix Critical Flow + Template Quality"
 description: "Fix 11 P1 issues in builder flow: mobile nav, footer grid, generation UX, block styling"
-status: pending
+status: abandoned
 priority: P0
 effort: 3d
 branch: feat/rebuild-user-flow

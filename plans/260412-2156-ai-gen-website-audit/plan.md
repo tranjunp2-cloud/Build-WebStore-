@@ -1,7 +1,7 @@
 ---
 title: "AI Website Generation Pipeline — Variety Audit & Fix"
 description: "Audit and fix why all AI-generated websites look identical despite 47+ blocks with 100+ variants"
-status: in_progress
+status: done
 priority: P1
 effort: 8-12d + 8-11h (Phase 06)
 branch: feat/F01-ai-gen-variety-fix

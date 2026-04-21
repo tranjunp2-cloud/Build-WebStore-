@@ -1,7 +1,7 @@
 ---
 title: "AI Gen — Unsplash media pipeline + Category DNA prompt rewrite"
 description: "Replace DALL-E with Unsplash as primary image source (Scope A) AND rewrite AI system prompt with CATEGORY_REQUIREMENTS + minimum-content enforcement (Scope B). Target: $0/gen, 5–10 real images, 10–12 blocks/category."
-status: in_progress
+status: done
 priority: P1
 effort: 32–48h (4–6 days) — core shipped, polish pending
 branch: feat/F01-ai-gen-variety-fix

@@ -195,3 +195,18 @@
 | **Rationale** | Drives AI content language (product descriptions, SEO keywords). Storefront UI labels switch via locale. Product names are user-entered (stay as-is). Bilingual = competitive advantage. |
 | **Status** | ✅ Decided — Added to F06 v2.0 |
 
+---
+
+## PD-017 — Post-deploy Template Seed Strategy
+
+| | |
+|---|---|
+| **Date** | 2026-04-19 |
+| **Decision** | Post-deploy template seed uses **force replace-all** (delete existing rows → reseed from `TEMPLATE_PRESETS`). |
+| **Options** | Force replace-all, Upsert-by-slug (merge content), Skip if no drift |
+| **Chosen** | **Force replace-all** on every staging + production deploy, via `POST /api/templates/seed?v3=true&force=true` with Bearer `SEED_TOKEN`. |
+| **Rationale** | Admin does not edit templates directly today (researcher-02 confirmed); templates are code-derived snapshots, not user data. Force replace is idempotent, zero-risk, and strictly simpler than upsert-by-slug (no merge logic, no schema diff to reason about). YAGNI. |
+| **Alternatives rejected** | **Upsert-by-slug** — more complex, would need per-template diff logic, no benefit while admin editing UI doesn't ship. |
+| **Revisit when** | Admin template-editing UI ships (plan 260419-2022 Phase 04 / Phase 05), at which point user customizations would be overwritten by force strategy. |
+| **Status** | ✅ Decided — Implemented in plan 260419-2022 Phase 03 (CI auto-seed after each deploy) |
+

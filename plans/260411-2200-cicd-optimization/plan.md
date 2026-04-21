@@ -1,7 +1,7 @@
 ---
 title: "CI/CD Optimization — Parallel Jobs + Vercel Deploy Notify"
 description: "Optimize CI from 8.7min→4.5min with parallel jobs, add Vercel deploy→Lark notifications"
-status: pending
+status: done
 priority: P1
 effort: 3h
 branch: staging

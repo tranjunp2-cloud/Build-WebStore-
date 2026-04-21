@@ -1,7 +1,7 @@
 /**
  * Guard: every category signature block (from fixture.expectedSignatureBlocks)
- * must be present in the homepage. Plan 2253 cleanup — previously referenced
- * the deleted CATEGORY_DNA constant; actual data comes from the harness matrix.
+ * must be present in the homepage. Sourced from CATEGORY_REQUIREMENTS.mandatoryBlocks
+ * at matrix-build time (post Plan 2253 cleanup that removed CATEGORY_DNA).
  * This is THE Ben-Ben guard — restaurant without menu-display/booking-widget/gallery
  * is the exact class we want to fail loudly.
  */

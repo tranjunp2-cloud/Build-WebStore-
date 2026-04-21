@@ -3,8 +3,10 @@ import config from '@payload-config'
 import { SEED_TEMPLATES } from '@/lib/ai/seed-templates'
 import { composeTemplate, composeFromBlueprint } from '@/lib/ai/template-composer'
 import { TEMPLATE_DEFINITIONS, TEMPLATE_PRESETS } from '@/lib/ai/template-definitions'
+import { computeBlockSchemaVersion } from '@/lib/ai/block-schema-version'
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
+import { timingSafeEqual } from 'node:crypto'
 
 /**
  * POST /api/templates/seed
@@ -17,10 +19,25 @@ import { withAuth } from '@/lib/auth'
  *   - ?force=true: delete existing templates before seeding
  *   - ?dry=true: return composed seeds without writing to DB
  *
- * Auth:
- *   - Normal: withAuth (JWT) — super-admin required in production
+ * Auth (checked in order, first match wins):
  *   - Internal: x-db-setup-key header matching PAYLOAD_SECRET (for db-setup.js auto-seed)
+ *   - CI:       Authorization: Bearer $SEED_TOKEN (post-deploy seed, plan 260419-2022)
+ *   - Normal:   withAuth (JWT) — super-admin required in production
  */
+
+/**
+ * Constant-time comparison for token strings. Falls back to `false` when
+ * either side is empty or the lengths differ (timingSafeEqual requires equal
+ * length Buffers, and length leakage is acceptable for this use case since
+ * tokens have a fixed length).
+ */
+function safeTokenEquals(a: string | null | undefined, b: string | null | undefined): boolean {
+    if (!a || !b) return false
+    const bufA = Buffer.from(a, 'utf8')
+    const bufB = Buffer.from(b, 'utf8')
+    if (bufA.length !== bufB.length) return false
+    return timingSafeEqual(bufA, bufB)
+}
 
 // ── Internal seed logic (shared by both auth paths) ──────────────────────
 
@@ -31,6 +48,10 @@ async function handleSeed(request: Request): Promise<NextResponse> {
         const v2 = url.searchParams.get('v2') === 'true'
         const v3 = url.searchParams.get('v3') === 'true'
         const dry = url.searchParams.get('dry') === 'true'
+
+        // Compute once per seed run — stamped on every inserted row so Phase
+        // 02 drift validator can flag stale templates (plan 260419-2022 Phase 05).
+        const blockSchemaVersion = computeBlockSchemaVersion()
 
         // ── v3: Blueprint-driven premium templates ─────────────────────
         if (v3) {
@@ -119,6 +140,7 @@ async function handleSeed(request: Request): Promise<NextResponse> {
                                 sortOrder: 0,
                                 isPremium: true,
                                 isFeatured: false,
+                                blockSchemaVersion,
                             },
                         })
                         return { name: seed.name, category: seed.category, personality: preset.personality, status: 'created' as const }
@@ -200,6 +222,7 @@ async function handleSeed(request: Request): Promise<NextResponse> {
                                 })),
                                 tags: [seed.category, seed.tier],
                                 sortOrder: 0, isPremium: seed.isPremium, isFeatured: false,
+                                blockSchemaVersion,
                             },
                         })
                         return { name: seed.name, category: seed.category, tier: seed.tier, status: 'created' as const }
@@ -250,6 +273,7 @@ async function handleSeed(request: Request): Promise<NextResponse> {
                     defaultTheme: tpl.defaultTheme, defaultBlocks: tpl.defaultBlocks,
                     tags: tpl.tags, sortOrder: tpl.sortOrder,
                     isPremium: tpl.isPremium, isFeatured: tpl.isFeatured,
+                    blockSchemaVersion,
                 },
             })
             results.push({ id: doc.id, name: doc.name })
@@ -269,12 +293,13 @@ async function handleSeed(request: Request): Promise<NextResponse> {
     }
 }
 
-// ── Route handler with dual auth ─────────────────────────────────────────
+// ── Route handler with tri-auth ──────────────────────────────────────────
 // 1. Internal: x-db-setup-key header matching PAYLOAD_SECRET (db-setup.js auto-seed)
-// 2. External: withAuth JWT — super-admin required in production
+// 2. CI:       Authorization: Bearer $SEED_TOKEN (CI post-deploy seed — plan 260419-2022)
+// 3. External: withAuth JWT — super-admin required in production
 
 export async function POST(request: Request) {
-    // Check internal auth first (db-setup.js auto-seed on same container)
+    // (1) Internal auth — same-container db-setup.js auto-seed
     const internalKey = request.headers.get('x-db-setup-key')
     const payloadSecret = process.env.PAYLOAD_SECRET
     if (internalKey && payloadSecret && internalKey === payloadSecret) {
@@ -282,7 +307,23 @@ export async function POST(request: Request) {
         return handleSeed(request)
     }
 
-    // Fall back to normal JWT auth
+    // (2) CI auth — Bearer SEED_TOKEN (constant-time compare)
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization')
+    const seedToken = process.env.SEED_TOKEN
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const presented = authHeader.slice('Bearer '.length).trim()
+        if (seedToken && safeTokenEquals(presented, seedToken)) {
+            console.log('[Seed] CI auth via Bearer SEED_TOKEN — bypassing JWT')
+            return handleSeed(request)
+        }
+        // Bearer present but does not match → reject without falling through to JWT.
+        return NextResponse.json({
+            success: false,
+            error: { code: 'UNAUTHORIZED', message: 'Invalid seed token' },
+        }, { status: 401 })
+    }
+
+    // (3) Fall back to normal JWT auth
     return withAuthSeed(request, {} as never)
 }
 

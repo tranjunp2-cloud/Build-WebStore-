@@ -1,7 +1,7 @@
 ---
 title: "Master Plan: Template System v2 — Wix-Level Quality"
 description: "Unified plan: design tokens + block variants + industry blocks + 50 templates + UX polish"
-status: pending
+status: abandoned
 priority: P0
 effort: 20d (4 sprints × 5 days)
 branch: feat/template-system-v2

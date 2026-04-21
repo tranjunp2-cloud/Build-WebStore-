@@ -25,11 +25,12 @@ export default async function DashboardLayout({
     
     const currentTenantInfo = typedUser?.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId)
     const currentUserRole = currentTenantInfo?.role || 'viewer'
+    const isSuperAdmin = Boolean(typedUser?.roles?.includes('super-admin'))
 
     return (
         <AppShell>
             <I18nProvider defaultLocale="en">
-                <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} currentUserRole={currentUserRole}>
+                <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
                     {children}
                 </CMSLayoutClient>
                 {typedUser && (
