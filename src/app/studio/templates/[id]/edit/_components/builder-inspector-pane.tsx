@@ -4,9 +4,9 @@
  * Right pane: 4-tab inspector for the selected section.
  * Tabs: Content | Variant | Settings | AI — ported from builder-inspector.jsx.
  * Functional wiring (Zustand + SectionFieldRenderer) unchanged.
+ * Phase D: added onOpenBlockDetail prop for inline block-detail overlay shortcut.
  */
 import { useState } from 'react'
-import Link from 'next/link'
 import { useBuilderStore } from '@/lib/admin/builder-store'
 import { getFieldSchema } from '@/lib/admin/section-field-schema'
 import { getBlockBySlug } from '@/lib/admin/block-registry-reader'
@@ -151,7 +151,11 @@ function AiTab({ blockSlug, aiVisible }: { blockSlug: string; aiVisible: boolean
 
 // ── Main inspector ────────────────────────────────────────────────────────────
 
-export function BuilderInspectorPane() {
+interface BuilderInspectorPaneProps {
+    onOpenBlockDetail?: (slug: string) => void
+}
+
+export function BuilderInspectorPane({ onOpenBlockDetail }: BuilderInspectorPaneProps = {}) {
     const [tab, setTab] = useState<Tab>('content')
     const [collapsed, setCollapsed] = useState(false)
     const { sections, selectedId, updateSelected } = useBuilderStore()
@@ -266,14 +270,26 @@ export function BuilderInspectorPane() {
                         <div className="title">{blockMeta.name}</div>
                         <div className="sub">{section.blockType}</div>
                     </div>
-                    <Link
-                        href={`/studio/blocks/${section.blockType}`}
-                        className="b-btn ghost"
-                        title="View block details and all variants"
-                        style={{ height: 28, padding: '0 8px', fontSize: 11 }}
-                    >
-                        👁 Details
-                    </Link>
+                    {onOpenBlockDetail ? (
+                        <button
+                            type="button"
+                            className="b-btn ghost b-insp-docs-link"
+                            title="View block docs inline"
+                            style={{ height: 28, padding: '0 8px', fontSize: 11 }}
+                            onClick={() => onOpenBlockDetail(section.blockType)}
+                        >
+                            📄 View block docs
+                        </button>
+                    ) : (
+                        <a
+                            href={`/studio/blocks/${section.blockType}`}
+                            className="b-btn ghost"
+                            title="View block details and all variants"
+                            style={{ height: 28, padding: '0 8px', fontSize: 11 }}
+                        >
+                            👁 Details
+                        </a>
+                    )}
                 </div>
 
                 {/* ── Content tab ── */}
