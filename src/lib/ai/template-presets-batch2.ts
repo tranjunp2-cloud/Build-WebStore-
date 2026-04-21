@@ -1256,7 +1256,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
         blocks: [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'centered' },
-          { blockType: 'contact-form' },
+          { blockType: 'contact-form', variant: 'card-float' },
           { blockType: 'footer', variant: 'mega' },
         ],
       },
@@ -1327,7 +1327,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
         blocks: [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'minimal' },
-          { blockType: 'contact-form' },
+          { blockType: 'contact-form', variant: 'card-float' },
           { blockType: 'map-embed' },
           { blockType: 'footer', variant: 'mega' },
         ],
@@ -1397,7 +1397,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
         blocks: [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'minimal' },
-          { blockType: 'contact-form' },
+          { blockType: 'contact-form', variant: 'card-float' },
           { blockType: 'footer', variant: 'mega' },
         ],
       },
@@ -1469,7 +1469,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
         blocks: [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'centered' },
-          { blockType: 'contact-form' },
+          { blockType: 'contact-form', variant: 'card-float' },
           { blockType: 'map-embed' },
           { blockType: 'footer', variant: 'mega' },
         ],
