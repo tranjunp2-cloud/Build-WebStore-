@@ -3841,9 +3841,13 @@ async function main() {
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS is_primary
 */
 
-main().catch((e) => {
-  console.error('[db-setup] Fatal:', e);
-  process.exit(1);
-});
+// Only run main() when invoked as CLI (not when required as a module).
+// Prevents side-effects (server.js spawn, stderr noise) when db-migrate-dev.js imports MIGRATIONS.
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('[db-setup] Fatal:', e);
+    process.exit(1);
+  });
+}
 
 module.exports = { MIGRATIONS };
