@@ -42,6 +42,8 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
         highlightToday = true,
     } = block
 
+    const safeVariant = ['grid', 'list', 'cards'].includes(variant) ? variant : 'grid'
+
     const today = new Date().getDay()
     const [activeDay, setActiveDay] = useState(today)
 
@@ -61,9 +63,22 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
     }, [classes])
 
     /* ── Grid variant: weekly timetable ──────────────────────────────────────── */
-    const renderGrid = () => (
-        <div className="overflow-x-auto -mx-6 px-6">
-            <div className="min-w-[800px]">
+    const renderGrid = () => {
+        let minHour = 7
+        let maxHour = 18
+        classes.forEach((c) => {
+            const match = c.startTime?.match(/^(\d{1,2})/)
+            if (match) {
+                const h = parseInt(match[1], 10)
+                minHour = Math.min(minHour, h)
+                maxHour = Math.max(maxHour, h)
+            }
+        })
+        const rowCount = Math.max(1, maxHour - minHour + 1)
+
+        return (
+        <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
                 <div className="grid grid-cols-8 gap-px rounded-2xl overflow-hidden" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                     {/* Header row */}
                     <div className="p-3 text-sm font-semibold opacity-50" style={{ background: `rgba(var(--brand-primary-rgb), 0.02)` }}>
@@ -85,8 +100,8 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                     ))}
 
                     {/* Time rows */}
-                    {Array.from({ length: 12 }, (_, i) => {
-                        const hour = 7 + i
+                    {Array.from({ length: rowCount }, (_, i) => {
+                        const hour = minHour + i
                         const timeLabel = `${hour.toString().padStart(2, '0')}:00`
                         return (
                             <div key={hour} className="contents">
@@ -95,8 +110,9 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                                 </div>
                                 {Array.from({ length: 7 }, (_, d) => {
                                     const cellClasses = classesByDay[d]?.filter((c) => {
-                                        const [h] = c.startTime.split(':').map(Number)
-                                        return h === hour
+                                        const hStr = c.startTime?.split(':')[0]
+                                        if (!hStr) return false
+                                        return parseInt(hStr, 10) === hour
                                     }) ?? []
                                     return (
                                         <div
@@ -111,12 +127,12 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                                             {cellClasses.map((c, ci) => (
                                                 <div
                                                     key={ci}
-                                                    className="p-2 rounded-lg text-xs mb-1"
+                                                    className="p-2 rounded-lg text-xs mb-1 overflow-hidden"
                                                     style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, borderLeft: `3px solid var(--brand-primary)` }}
                                                 >
-                                                    <p className="font-bold leading-tight">{c.name}</p>
-                                                    <p className="opacity-60">{c.startTime} - {c.endTime}</p>
-                                                    <p className="opacity-50">{c.instructor}</p>
+                                                    <p className="font-bold leading-tight truncate">{c.name}</p>
+                                                    <p className="opacity-60 truncate">{c.startTime} - {c.endTime}</p>
+                                                    <p className="opacity-50 truncate">{c.instructor}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -128,7 +144,8 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                 </div>
             </div>
         </div>
-    )
+        )
+    }
 
     /* ── List variant: day tabs + class rows ──────────────────────────────────── */
     const renderList = () => (
@@ -248,9 +265,9 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                     </Heading>
                 </div>
 
-                {variant === 'grid' && renderGrid()}
-                {variant === 'list' && renderList()}
-                {variant === 'cards' && renderCards()}
+                {safeVariant === 'grid' && renderGrid()}
+                {safeVariant === 'list' && renderList()}
+                {safeVariant === 'cards' && renderCards()}
             </div>
         </AnimatedSection>
     )
