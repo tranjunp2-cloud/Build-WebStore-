@@ -4,8 +4,7 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
-import { CTAButtons, HERO_CONTAINER, HeroBadge, safeAltText } from '../shared'
-import { HeroMediaOverlay } from '../hero-media-overlay'
+import { CTAButtons, HERO_CONTAINER, HeroBadge } from '../shared'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 
 void _CSS_VARS
@@ -20,19 +19,13 @@ export function ParallaxHero({ block, site }: BlockProps<HeroConfig>) {
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             {/* Full-bleed bg with parallax on desktop */}
-            <HeroMediaOverlay
-                field="image.url"
-                altText={safeAltText(image?.alt, headline)}
-                positionClass="absolute inset-0"
-            >
-                <div
-                    className="absolute inset-0 bg-cover bg-center parallax-hero-bg"
-                    style={{
-                        backgroundImage: `url(${image?.url || fallbackHeroUrl})`,
-                        backgroundAttachment: 'fixed',
-                    }}
-                />
-            </HeroMediaOverlay>
+            <div
+                className="absolute inset-0 bg-cover bg-center parallax-hero-bg"
+                style={{
+                    backgroundImage: `url(${image?.url || fallbackHeroUrl})`,
+                    backgroundAttachment: 'fixed',
+                }}
+            />
             {/* Disable fixed attachment on mobile via CSS */}
             <style dangerouslySetInnerHTML={{ __html: `
                 @media (max-width: 768px) {

@@ -5,8 +5,7 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
-import { CTAButtons, HERO_CONTAINER, HeroBadge, VideoControlButton, safeAltText } from '../shared'
-import { HeroMediaOverlay } from '../hero-media-overlay'
+import { CTAButtons, HERO_CONTAINER, HeroBadge, VideoControlButton } from '../shared'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 
 void _CSS_VARS
@@ -20,12 +19,6 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const [isPlaying, setIsPlaying] = useState(true)
-    const [isMobile, setIsMobile] = useState(false)
-
-    // Detect mobile to suppress autoplay
-    useEffect(() => {
-        setIsMobile(window.innerWidth < 768)
-    }, [])
 
     // Respect prefers-reduced-motion
     useEffect(() => {
@@ -53,33 +46,27 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
 
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
-            {/* Full-bleed background: video on desktop, poster only on mobile */}
-            <HeroMediaOverlay
-                field="image.url"
-                altText={safeAltText(image?.alt, headline)}
-                positionClass="absolute inset-0"
-                showVideoButton={true}
-                videoField="videoUrl"
-                currentVideoUrl={videoUrl}
-            >
-                {videoUrl && !isMobile ? (
-                    <video
-                        ref={videoRef}
-                        src={videoUrl}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        poster={image?.url || fallbackHeroUrl}
-                        className="absolute inset-0 w-full h-full object-cover"
-                    />
-                ) : (
-                    <div
-                        className="absolute inset-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url(${image?.url || fallbackHeroUrl})` }}
-                    />
-                )}
-            </HeroMediaOverlay>
+            {/* Full-bleed background video */}
+            {videoUrl ? (
+                <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    poster={image?.url || fallbackHeroUrl}
+                    className="absolute inset-0 w-full h-full object-cover"
+                />
+            ) : (
+                /* Poster image fallback when no video */
+                <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{
+                        backgroundImage: `url(${image?.url || fallbackHeroUrl})`,
+                    }}
+                />
+            )}
 
             {/* Dark overlay for text readability */}
             <div className="absolute inset-0 bg-black/50" />
@@ -126,8 +113,8 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
                 </motion.div>
             </div>
 
-            {/* Play/Pause button in corner — only when video is active (desktop) */}
-            {videoUrl && !isMobile && (
+            {/* Play/Pause button in corner */}
+            {videoUrl && (
                 <VideoControlButton
                     isPlaying={isPlaying}
                     onClick={togglePlayback}
