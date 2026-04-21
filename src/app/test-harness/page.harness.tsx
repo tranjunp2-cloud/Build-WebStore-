@@ -334,7 +334,7 @@ export default function HarnessIndexPage() {
               className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide"
               style={{ color: '#581c87' }}
             >
-              💾 Cached — {aiCacheMap.size} gen'd
+              💾 Cached — {aiCacheMap.size} gen&apos;d
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {Array.from(aiCacheMap.entries())
@@ -365,7 +365,7 @@ export default function HarnessIndexPage() {
                       {meta.siteName}
                     </div>
                     <div className="flex items-center justify-between text-[10px] opacity-70">
-                      <span>gen'd {timeAgo(meta.cachedAt)}</span>
+                      <span>gen&apos;d {timeAgo(meta.cachedAt)}</span>
                       <span>↗ open + prompts</span>
                     </div>
                   </Link>
@@ -379,7 +379,7 @@ export default function HarnessIndexPage() {
               className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide"
               style={{ color: '#581c87' }}
             >
-              ✨ Fresh — not yet gen'd ({categories.filter((c) => !aiCached.has(c)).length}) · clicking fires OpenAI call
+              ✨ Fresh — not yet gen&apos;d ({categories.filter((c) => !aiCached.has(c)).length}) · clicking fires OpenAI call
             </div>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7">
               {categories
