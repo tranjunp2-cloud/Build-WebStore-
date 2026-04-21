@@ -3,6 +3,7 @@ module.exports = {
     content: [
         './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
         './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/blocks/**/*.{js,ts,jsx,tsx,mdx}',
         // Exclude (payload) admin to avoid @layer conflicts with Payload CSS
         './src/app/(auth)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/(builder)/**/*.{js,ts,jsx,tsx,mdx}',
