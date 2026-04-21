@@ -3845,3 +3845,5 @@ main().catch((e) => {
   console.error('[db-setup] Fatal:', e);
   process.exit(1);
 });
+
+module.exports = { MIGRATIONS };
