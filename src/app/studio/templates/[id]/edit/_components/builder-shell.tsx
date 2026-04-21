@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useBuilderStore } from '@/lib/admin/builder-store'
-import type { Section } from '@/lib/admin/builder-store'
+import type { Section, BlockPromptOverride } from '@/lib/admin/builder-store'
 import { startAutoSave, loadAutoSave } from '@/lib/admin/builder-auto-save'
 import { BuilderHeader } from './builder-header'
 import { BuilderLibraryPane } from './builder-library-pane'
@@ -24,9 +24,11 @@ interface Props {
     initialName: string
     initialStatus: string
     initialSections: Section[]
+    /** Per-block AI prompt overrides from DB. Seeded into Zustand store on mount. */
+    initialBlockPromptOverrides?: Record<string, BlockPromptOverride>
 }
 
-export function BuilderShell({ templateId, initialName, initialStatus, initialSections }: Props) {
+export function BuilderShell({ templateId, initialName, initialStatus, initialSections, initialBlockPromptOverrides = {} }: Props) {
     const { load, addBlock } = useBuilderStore()
     const [name, setName] = useState(initialName)
     const [status, setStatus] = useState(initialStatus)
@@ -34,9 +36,10 @@ export function BuilderShell({ templateId, initialName, initialStatus, initialSe
     const [detailBlockSlug, setDetailBlockSlug] = useState<string | null>(null)
 
     // Initialise store: prefer localStorage auto-save, fall back to DB sections
+    // Always seed blockPromptOverrides from server (localStorage doesn't store them)
     useEffect(() => {
         const saved = loadAutoSave(templateId)
-        load(templateId, saved ?? initialSections)
+        load(templateId, saved ?? initialSections, initialBlockPromptOverrides)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [templateId])
 
@@ -113,6 +116,7 @@ export function BuilderShell({ templateId, initialName, initialStatus, initialSe
             <BuilderLibraryPane />
             <BuilderCanvasPane />
             <BuilderInspectorPane
+                templateId={templateId}
                 onOpenBlockDetail={(slug) => {
                     setDetailBlockSlug(slug)
                     setMode('block-detail')

@@ -3,6 +3,7 @@
  * builder-store.ts
  * Zustand store for the 3-pane template builder.
  * Manages sections state + mutations.
+ * Phase P3: added blockPromptOverrides map for per-template AI prompt overrides.
  */
 import { create } from 'zustand'
 
@@ -13,14 +14,22 @@ export interface Section {
     config: Record<string, unknown>
 }
 
+export type BlockPromptOverride = {
+    prompt: string
+    updatedAt: string
+    updatedBy?: string
+}
+
 interface BuilderState {
     templateId: number
     sections: Section[]
     selectedId: string | null
     dirty: boolean
+    /** Per-block AI prompt overrides for this template. Key = blockSlug. */
+    blockPromptOverrides: Record<string, BlockPromptOverride>
 
     // Mutations
-    load: (templateId: number, sections: Section[]) => void
+    load: (templateId: number, sections: Section[], overrides?: Record<string, BlockPromptOverride>) => void
     addBlock: (type: string, atIdx?: number) => void
     reorder: (fromIdx: number, toIdx: number) => void
     updateSelected: (patch: Record<string, unknown>) => void
@@ -29,6 +38,8 @@ interface BuilderState {
     duplicateSection: (id: string) => void
     select: (id: string | null) => void
     markClean: () => void
+    /** Upsert or remove a block prompt override in the local store (after API save). */
+    setBlockPromptOverride: (blockSlug: string, override: BlockPromptOverride | null) => void
 }
 
 function makeId(): string {
@@ -42,9 +53,10 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
     sections: [],
     selectedId: null,
     dirty: false,
+    blockPromptOverrides: {},
 
-    load(templateId, sections) {
-        set({ templateId, sections, selectedId: null, dirty: false })
+    load(templateId, sections, overrides = {}) {
+        set({ templateId, sections, selectedId: null, dirty: false, blockPromptOverrides: overrides })
     },
 
     addBlock(type, atIdx) {
@@ -114,5 +126,17 @@ export const useBuilderStore = create<BuilderState>((set, get) => ({
 
     markClean() {
         set({ dirty: false })
+    },
+
+    setBlockPromptOverride(blockSlug, override) {
+        set((state) => {
+            if (override === null) {
+                const { [blockSlug]: _removed, ...rest } = state.blockPromptOverrides
+                return { blockPromptOverrides: rest }
+            }
+            return {
+                blockPromptOverrides: { ...state.blockPromptOverrides, [blockSlug]: override },
+            }
+        })
     },
 }))

@@ -52,12 +52,21 @@ export default async function BuilderEditPage({ params }: PageProps) {
         )
         : []
 
+    // Phase P3: pass per-block prompt overrides to builder for inspector AI tab
+    const initialBlockPromptOverrides =
+        template.blockPromptOverrides != null &&
+        typeof template.blockPromptOverrides === 'object' &&
+        !Array.isArray(template.blockPromptOverrides)
+            ? (template.blockPromptOverrides as Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>)
+            : {}
+
     return (
         <BuilderShell
             templateId={Number(template.id)}
             initialName={typeof template.name === 'string' ? template.name : ''}
             initialStatus={typeof template.status === 'string' ? template.status : 'draft'}
             initialSections={initialSections}
+            initialBlockPromptOverrides={initialBlockPromptOverrides}
         />
     )
 }

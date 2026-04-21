@@ -5,9 +5,11 @@
  * Tabs: Content | Variant | Settings | AI — ported from builder-inspector.jsx.
  * Functional wiring (Zustand + SectionFieldRenderer) unchanged.
  * Phase D: added onOpenBlockDetail prop for inline block-detail overlay shortcut.
+ * Phase P3: AI tab shows editable per-template prompt override section.
  */
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useBuilderStore } from '@/lib/admin/builder-store'
+import type { BlockPromptOverride } from '@/lib/admin/builder-store'
 import { getFieldSchema } from '@/lib/admin/section-field-schema'
 import { getBlockBySlug } from '@/lib/admin/block-registry-reader'
 import { SectionFieldRenderer } from './section-field-renderer'
@@ -120,7 +122,70 @@ function SettingsTab({ visible, onToggleVisible }: {
 
 // ── AI tab ────────────────────────────────────────────────────────────────────
 
-function AiTab({ blockSlug, aiVisible }: { blockSlug: string; aiVisible: boolean }) {
+type AiTabProps = {
+    blockSlug: string
+    aiVisible: boolean
+    templateId: number
+    existingOverride: BlockPromptOverride | null
+}
+
+function AiTab({ blockSlug, aiVisible, templateId, existingOverride }: AiTabProps) {
+    const { setBlockPromptOverride } = useBuilderStore()
+    const [expanded, setExpanded] = useState(existingOverride !== null)
+    const [promptValue, setPromptValue] = useState(existingOverride?.prompt ?? '')
+    const [saving, setSaving] = useState(false)
+    const [saveMsg, setSaveMsg] = useState<string | null>(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    async function handleSave() {
+        const trimmed = promptValue.trim()
+        if (!trimmed) return
+        setSaving(true)
+        setSaveMsg(null)
+        try {
+            const res = await fetch(`/api/admin/templates/${templateId}/block-prompts`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blockSlug, prompt: trimmed }),
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const { data } = await res.json() as { data: Record<string, BlockPromptOverride> }
+            const saved = data[blockSlug]
+            if (saved) setBlockPromptOverride(blockSlug, saved)
+            setSaveMsg('Saved')
+        } catch {
+            setSaveMsg('Save failed')
+        } finally {
+            setSaving(false)
+            setTimeout(() => setSaveMsg(null), 2000)
+        }
+    }
+
+    async function handleReset() {
+        setSaving(true)
+        setSaveMsg(null)
+        try {
+            const res = await fetch(`/api/admin/templates/${templateId}/block-prompts`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blockSlug, prompt: null }),
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            setBlockPromptOverride(blockSlug, null)
+            setPromptValue('')
+            setSaveMsg('Reset to default')
+            setExpanded(false)
+        } catch {
+            setSaveMsg('Reset failed')
+        } finally {
+            setSaving(false)
+            setTimeout(() => setSaveMsg(null), 2000)
+        }
+    }
+
+    const hasOverride = useBuilderStore((s) => blockSlug in s.blockPromptOverrides)
+    const liveOverride = useBuilderStore((s) => s.blockPromptOverrides[blockSlug] ?? null)
+
     return (
         <>
             <div className="b-group">
@@ -131,19 +196,80 @@ function AiTab({ blockSlug, aiVisible }: { blockSlug: string; aiVisible: boolean
                     borderRadius: 6,
                     fontSize: 11.5,
                     color: 'var(--text-2)',
-                    marginBottom: 10,
                 }}>
                     {aiVisible
                         ? 'AI can generate this block automatically when creating templates.'
                         : <><strong>Manual only</strong> — AI will not auto-generate this block.</>}
                 </div>
             </div>
+
+            {/* AI prompt override — collapsible section */}
             <div className="b-group">
-                <div className="b-group-title">Prompt hint (AI)</div>
-                <textarea
-                    style={{ minHeight: 80 }}
-                    placeholder={`Prompt hint when AI generates ${blockSlug}…`}
-                />
+                <div
+                    className="b-group-title"
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    onClick={() => setExpanded((v) => !v)}
+                >
+                    <span>{expanded ? '▾' : '▸'}</span>
+                    AI prompt override
+                    {hasOverride && (
+                        <span className="b-pill-ai" style={{ fontSize: 10, marginLeft: 'auto' }}>
+                            active
+                        </span>
+                    )}
+                </div>
+
+                {expanded && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5 }}>
+                            Override the AI generation instructions for <strong>{blockSlug}</strong> in
+                            this template. Leave empty to use the global registry default.
+                        </div>
+                        <textarea
+                            ref={textareaRef}
+                            style={{ minHeight: 90, fontSize: 11.5, resize: 'vertical' }}
+                            placeholder={`e.g. "Generate hero for a B2B SaaS product — focus on ROI and efficiency…"`}
+                            value={promptValue}
+                            maxLength={4000}
+                            onChange={(e) => setPromptValue(e.target.value)}
+                        />
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', textAlign: 'right' }}>
+                            {promptValue.length}/4000
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <button
+                                className="b-btn"
+                                style={{ height: 28, padding: '0 12px', fontSize: 11 }}
+                                disabled={saving || !promptValue.trim()}
+                                onClick={handleSave}
+                            >
+                                {saving ? 'Saving…' : 'Save override'}
+                            </button>
+                            {hasOverride && (
+                                <button
+                                    className="b-btn ghost"
+                                    style={{ height: 28, padding: '0 10px', fontSize: 11, color: 'var(--danger)' }}
+                                    disabled={saving}
+                                    onClick={handleReset}
+                                >
+                                    Reset to default
+                                </button>
+                            )}
+                            {saveMsg && (
+                                <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 4 }}>
+                                    {saveMsg}
+                                </span>
+                            )}
+                        </div>
+                        {liveOverride?.updatedAt && (
+                            <div style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                                Last saved:{' '}
+                                {new Date(liveOverride.updatedAt).toLocaleString('vi-VN')}
+                                {liveOverride.updatedBy ? ` by ${liveOverride.updatedBy}` : ''}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </>
     )
@@ -153,12 +279,14 @@ function AiTab({ blockSlug, aiVisible }: { blockSlug: string; aiVisible: boolean
 
 interface BuilderInspectorPaneProps {
     onOpenBlockDetail?: (slug: string) => void
+    templateId?: number
 }
 
-export function BuilderInspectorPane({ onOpenBlockDetail }: BuilderInspectorPaneProps = {}) {
+export function BuilderInspectorPane({ onOpenBlockDetail, templateId }: BuilderInspectorPaneProps = {}) {
     const [tab, setTab] = useState<Tab>('content')
     const [collapsed, setCollapsed] = useState(false)
-    const { sections, selectedId, updateSelected } = useBuilderStore()
+    const { sections, selectedId, updateSelected, blockPromptOverrides, templateId: storeTemplateId } = useBuilderStore()
+    const resolvedTemplateId = templateId ?? storeTemplateId
     const section = sections.find((s) => s.id === selectedId) ?? null
     const blockMeta = section ? getBlockBySlug(section.blockType) : null
     const schema    = section ? getFieldSchema(section.blockType) : null
@@ -366,6 +494,8 @@ export function BuilderInspectorPane({ onOpenBlockDetail }: BuilderInspectorPane
                     <AiTab
                         blockSlug={section.blockType}
                         aiVisible={blockMeta.aiVisible}
+                        templateId={resolvedTemplateId}
+                        existingOverride={blockPromptOverrides[section.blockType] ?? null}
                     />
                 )}
             </div>
