@@ -11,7 +11,8 @@ import type { SiteData } from '@/blocks/types'
 import type { PageData } from '@/store/editorStore'
 import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogList'
 import DOMPurify from 'isomorphic-dompurify'
-import { I18nText } from '@/components/storefront/I18nText'
+import { getServerI18n } from '@/i18n/server'
+import { getSiteBasePath } from '@/lib/site-base-path'
 
 // Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
 export const dynamic = 'force-dynamic'
@@ -235,6 +236,9 @@ export default async function TenantSitePage({ params }: Props) {
         notFound()
     }
 
+    const { t } = await getServerI18n()
+    const base = await getSiteBasePath(slug)
+
     // AC-3: Maintenance mode — was published, now draft
     if ('maintenance' in data && data.maintenance) {
         return <MaintenancePage siteName={data.site?.name as string} />
@@ -246,9 +250,9 @@ export default async function TenantSitePage({ params }: Props) {
         return (
             <div className="min-h-screen bg-[#0B1120] text-white">
                 <div className="max-w-5xl mx-auto px-6 py-16">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4"><I18nText render={t => t.storefront.blog.title} /></h1>
-                    <p className="text-lg opacity-60 mb-12"><I18nText render={t => t.storefront.blog.latestStories} /></p>
-                    <StorefrontBlogList tenantId={String(tenant.id)} tenantSlug={slug} />
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4">{t.storefront.blog.title}</h1>
+                    <p className="text-lg opacity-60 mb-12">{t.storefront.blog.latestStories}</p>
+                    <StorefrontBlogList tenantId={String(tenant.id)} siteBasePath={base} />
                 </div>
             </div>
         )
@@ -315,8 +319,8 @@ export default async function TenantSitePage({ params }: Props) {
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">
-                        <Link href={`/sites/${slug}/blogs`} className="text-blue-500 hover:text-blue-400 font-medium">
-                            <I18nText render={t => t.storefront.blog.backToAll} />
+                        <Link href={`${base}/blogs`} className="text-blue-500 hover:text-blue-400 font-medium">
+                            {t.storefront.blog.backToAll}
                         </Link>
                     </div>
                 </article>
@@ -332,7 +336,7 @@ export default async function TenantSitePage({ params }: Props) {
 
     return (
         <SiteRenderer
-            site={{ ...site, tenantSlug: slug } as unknown as SiteData}
+            site={{ ...site, tenantSlug: slug, siteBasePath: base } as unknown as SiteData}
             page={page as unknown as PageData}
             pages={pages as unknown as NavPage[]}
             siteId={String(site.id)}

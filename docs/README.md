@@ -13,6 +13,11 @@
 | **QC** | [Features](#features) bên dưới → xem stories |
 | **DevOps** | [DEPLOY.md](../.github/DEPLOY.md) → [GIT_AND_CI_RULES.md](../.github/GIT_AND_CI_RULES.md) |
 | **Tất cả** | [PROJECT_ALIGNMENT.md](PROJECT_ALIGNMENT.md) (timeline, priority) |
+| **AI agents (Claude/Cursor)** | [CLAUDE.md](../CLAUDE.md) → [.claude/rules/](../.claude/rules/) (path-scoped rules) |
+| **Onboarding (src/ map)** | [CODEBASE_SUMMARY.md](CODEBASE_SUMMARY.md) → [architecture/_OVERVIEW.md](architecture/_OVERVIEW.md) |
+| **Release history** | [CHANGELOG.md](CHANGELOG.md) → [journals/](journals/) |
+| **Open blockers** | [tracking/OPEN_BLOCKERS.md](tracking/OPEN_BLOCKERS.md) |
+| **Code style** | [standards/CODE_STANDARDS.md](standards/CODE_STANDARDS.md) |
 
 ---
 
@@ -23,12 +28,28 @@ docs/
 ├── README.md                    ← Bạn đang đây (Team Hub)
 ├── PROJECT_ALIGNMENT.md         ← Timeline, priority, team rules, task tóm tắt
 ├── SPRINT0_DETAIL.md            ← Chi tiết từng task (files, steps, DoD)
+├── CODEBASE_SUMMARY.md          ← src/ directory map + key modules + entry points
+├── CHANGELOG.md                 ← Per-release notes (v1.0 →)
+├── TEST_CONVENTION.md           ← Test patterns, TC-ID mapping (authoritative)
+├── DB-LIFECYCLE.md              ← Schema change workflow
 │
 ├── prd/                         ← PRD mỗi feature (yêu cầu)
 ├── stories/                     ← User Stories + Gherkin AC
 ├── architecture/                ← Technical design
-├── design/DESIGN_WORKFLOW.md     ← Design Guide: rules + 28 screens + tokens + Figma (1 file)
+│   ├── _OVERVIEW.md             ← Unified layer diagram + F-feature index (read first)
+│   └── F*.md                    ← Per-feature architecture
+├── standards/                   ← Code + design standards
+│   ├── CODE_STANDARDS.md        ← Lint, TS, naming, imports, modularization
+│   ├── WEBSITE_TEMPLATE_STANDARDS.md
+│   ├── DESIGN_TOKENS.md
+│   └── AI_WEBSITE_GENERATION_GUIDE.md
+├── tracking/                    ← Live status
+│   ├── OPEN_BLOCKERS.md         ← Active v1.0/v1.1 blockers
+│   └── implementation_plan.md, product_plan.md, task.md, ...
+├── qa/                          ← Test cases per feature
+├── design/DESIGN_WORKFLOW.md     ← Design Guide: rules + screens + tokens + Figma
 ├── decisions/decisions-log.md   ← Product decisions đã chốt
+├── journals/                    ← Architectural decisions + incident post-mortems
 └── malaysia-market-context.md   ← Ngữ cảnh thị trường MY
 
 .github/

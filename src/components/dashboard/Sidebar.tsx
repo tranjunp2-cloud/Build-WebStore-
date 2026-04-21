@@ -31,6 +31,7 @@ import {
     Settings,
     Headphones,
     LogOut,
+    ShieldCheck,
 
     Menu,
     X,
@@ -53,6 +54,7 @@ interface NavItemConfig {
     href: string
     children?: NavChild[]
     badge?: boolean
+    superAdminOnly?: boolean
 }
 
 const NAV_ITEMS: NavItemConfig[] = [
@@ -84,6 +86,12 @@ const NAV_ITEMS: NavItemConfig[] = [
         icon: Headphones,
         href: '/help',
     },
+    {
+        label: { en: 'Templates Health', ms: 'Status Templat' },
+        icon: ShieldCheck,
+        href: '/templates-health',
+        superAdminOnly: true,
+    },
 ]
 
 
@@ -93,13 +101,14 @@ type SidebarProps = {
     userName: string
     userInitial: string
     currentUserRole?: string
+    isSuperAdmin?: boolean
     mobileOpen: boolean
     setMobileOpen: (open: boolean) => void
 }
 
 // ─── Component ───────────────────────────────────────────────────────────
 
-export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', mobileOpen, setMobileOpen }: SidebarProps) {
+export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', isSuperAdmin = false, mobileOpen, setMobileOpen }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { locale, toggleLocale } = useI18n()
@@ -115,23 +124,25 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
 
     // Filter NAV_ITEMS based on access rights
     const accessibleNavItems = useMemo(() => {
-        return NAV_ITEMS.map(item => {
-            if (item.href === '/settings' && item.children) {
-                // Return copied item with filtered children
-                return {
-                    ...item,
-                    children: item.children.filter(child => {
-                        // Only owner can see the Staff menu
-                        if (child.href === '/settings/staff') {
-                            return currentUserRole === 'owner';
-                        }
-                        return true;
-                    })
+        return NAV_ITEMS
+            .filter(item => !item.superAdminOnly || isSuperAdmin)
+            .map(item => {
+                if (item.href === '/settings' && item.children) {
+                    // Return copied item with filtered children
+                    return {
+                        ...item,
+                        children: item.children.filter(child => {
+                            // Only owner can see the Staff menu
+                            if (child.href === '/settings/staff') {
+                                return currentUserRole === 'owner';
+                            }
+                            return true;
+                        })
+                    }
                 }
-            }
-            return item;
-        })
-    }, [currentUserRole]);
+                return item;
+            })
+    }, [currentUserRole, isSuperAdmin]);
 
     // Close sidebar on route change
     useEffect(() => {

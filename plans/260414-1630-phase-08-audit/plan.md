@@ -1,7 +1,7 @@
 ---
 title: "AI Gen — Wire category theme presets to happy path (Phase 08 audit fix)"
 description: "Category theme-presets.ts (70 curated themes) exist but only consumed by fallback composer. Wire to AI happy path so every gen uses category-appropriate colors + fonts deterministically."
-status: pending
+status: abandoned
 priority: P0
 effort: 3-5h
 branch: feat/F01-ai-gen-variety-fix

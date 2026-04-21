@@ -1,7 +1,7 @@
 ---
 title: "AI Gen Test Harness — Visual Coverage for F01V"
 description: "Matrix runner + visual gallery + structural assertions to catch empty-hole bugs in AI-generated sites"
-status: in_progress
+status: done
 priority: P1
 effort: 4-6d
 progress: "6/6 phases + bug-fix round done (Sprint B1 + B2 complete)"

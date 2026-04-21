@@ -109,6 +109,16 @@ export const Templates: CollectionConfig = {
             defaultValue: 0,
             admin: { readOnly: true },
         },
+        {
+            name: 'blockSchemaVersion',
+            type: 'text',
+            maxLength: 64,
+            required: false,
+            admin: {
+                readOnly: true,
+                description: 'sha256 hash of block registry snapshot at seed-time. Enables per-template staleness detection.',
+            },
+        },
     ],
     timestamps: true,
 }

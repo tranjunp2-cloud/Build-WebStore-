@@ -90,8 +90,8 @@ npx tsx scripts/test-harness/cli.ts --categories=restaurant --variants=premium -
 
 Don't edit fixtures directly — they are generated. Instead:
 
-1. Add the category to `CATEGORY_DNA` in `src/lib/ai/template-definitions.ts`
-2. Make sure `signatureBlocks[]` lists the must-have blocks
+1. Add the category to `CATEGORY_REQUIREMENTS` in `src/lib/ai/category-requirements.ts`
+2. Make sure `mandatoryBlocks[]` lists the must-have blocks (harness uses these as `expectedSignatureBlocks`)
 3. Run `npm run harness:gen` — the matrix will pick up the new category automatically
 
 ## How to add a new structural guard

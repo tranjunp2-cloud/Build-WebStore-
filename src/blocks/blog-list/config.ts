@@ -20,5 +20,4 @@ export const blogListMeta: BlockMeta = {
     defaultVariant: 'cards',
     editableFields: ['headline', 'subheadline', 'limit'],
     quickActions: ['change-limit'],
-    aiVisible: false,
 }

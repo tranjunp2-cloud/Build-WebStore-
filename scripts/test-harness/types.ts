@@ -18,8 +18,8 @@ export type Fixture = {
   source: ComposerSource
   /** For 'blueprint' source — index into TEMPLATE_PRESETS */
   presetIndex?: number
-  /** Expected invariants (from CATEGORY_DNA) — checked by Phase 02 */
-  expectedSignatureBlocks: string[]
+  /** Expected invariants (from CATEGORY_REQUIREMENTS.mandatoryBlocks) — checked by Phase 02 */
+  expectedSignatureBlocks: readonly string[]
   expectedMinBlocks: number
   expectedMaxBlocks: number
 }
