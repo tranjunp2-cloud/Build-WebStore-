@@ -3186,6 +3186,30 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    text-align: left;
+    font: inherit;
+}
+
+/* Button variant — clickable stat card */
+.studio-shell button.b-stat {
+    cursor: pointer;
+    transition: background 120ms, border-color 120ms, transform 80ms;
+}
+
+.studio-shell button.b-stat:hover {
+    border-color: var(--accent);
+    background: var(--bg-hover, var(--bg-elev));
+}
+
+.studio-shell button.b-stat:active {
+    transform: translateY(1px);
+}
+
+/* Active filter — accent border + tinted bg */
+.studio-shell .b-stat.is-active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent) inset;
+    background: color-mix(in srgb, var(--accent) 6%, var(--bg-elev));
 }
 
 .studio-shell .b-stat-label {

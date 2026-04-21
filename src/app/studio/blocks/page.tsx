@@ -48,13 +48,6 @@ export default async function BlocksPage() {
         }
     })
 
-    // Stats for strip
-    const totalBlocks = cardData.length
-    const activeInTemplates = cardData.filter((b) => b.usageCount > 0).length
-    const aiVisible = cardData.filter((b) => b.aiVisible).length
-    const categories = new Set(cardData.map((b) => b.category)).size
-    const totalVariants = cardData.reduce((sum, b) => sum + b.variants.length, 0)
-
     return (
         <div className="page">
             {/* Header */}
@@ -67,36 +60,7 @@ export default async function BlocksPage() {
                 </div>
             </div>
 
-            {/* 5-stat strip */}
-            <div className="b-stats">
-                <div className="b-stat">
-                    <div className="b-stat-label">Total blocks</div>
-                    <div className="b-stat-val">{totalBlocks}</div>
-                    <div className="b-stat-sub">types</div>
-                </div>
-                <div className="b-stat">
-                    <div className="b-stat-label">Active in templates</div>
-                    <div className="b-stat-val">{activeInTemplates}</div>
-                    <div className="b-stat-sub">/ {totalBlocks} used</div>
-                </div>
-                <div className="b-stat">
-                    <div className="b-stat-label">AI-visible</div>
-                    <div className="b-stat-val">{aiVisible}</div>
-                    <div className="b-stat-sub">/ {totalBlocks}</div>
-                </div>
-                <div className="b-stat">
-                    <div className="b-stat-label">Categories</div>
-                    <div className="b-stat-val">{categories}</div>
-                    <div className="b-stat-sub">groups</div>
-                </div>
-                <div className="b-stat">
-                    <div className="b-stat-label">Total variants</div>
-                    <div className="b-stat-val">{totalVariants}</div>
-                    <div className="b-stat-sub">across all blocks</div>
-                </div>
-            </div>
-
-            {/* Block catalog grid (handles mode toggle internally) */}
+            {/* Block catalog grid — renders interactive 5-stat strip + mode toggle + grid */}
             <BlockCatalogGrid blocks={cardData} />
         </div>
     )

@@ -32,6 +32,7 @@ const CATEGORY_ORDER = [
 
 type Mode = 'matrix' | 'blocks' | 'impact'
 type SortBy = 'usage' | 'variants' | 'name'
+type QuickFilter = 'all' | 'used' | 'unused' | 'ai-visible' | 'ai-hidden'
 
 type Props = {
     blocks: BlockCardData[]
@@ -43,6 +44,7 @@ export function BlockCatalogGrid({ blocks, showHidden = false }: Props) {
     const [search, setSearch] = useState('')
     const [activeCategory, setActiveCategory] = useState<string>('all')
     const [sortBy, setSortBy] = useState<SortBy>('usage')
+    const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
 
     // Impact simulator state
     const [impactSlug, setImpactSlug] = useState<string>('')
@@ -79,12 +81,33 @@ export function BlockCatalogGrid({ blocks, showHidden = false }: Props) {
         return CATEGORY_ORDER.filter((c) => cats.has(c))
     }, [visibleBlocks])
 
-    // Apply search + category filter
+    // Stats derived from visibleBlocks (shared with stat strip)
+    const stats = useMemo(() => {
+        const total = visibleBlocks.length
+        const used = visibleBlocks.filter((b) => b.usageCount > 0).length
+        const aiVisible = visibleBlocks.filter((b) => b.aiVisible).length
+        const totalVariants = visibleBlocks.reduce((s, b) => s + b.variants.length, 0)
+        return {
+            total,
+            used,
+            unused: total - used,
+            aiVisible,
+            aiHidden: total - aiVisible,
+            categoryCount: new Set(visibleBlocks.map((b) => b.category)).size,
+            totalVariants,
+        }
+    }, [visibleBlocks])
+
+    // Apply search + category + quick filter
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase()
         return visibleBlocks.filter((b) => {
             const matchesCategory = activeCategory === 'all' || b.category === activeCategory
             if (!matchesCategory) return false
+            if (quickFilter === 'used' && b.usageCount === 0) return false
+            if (quickFilter === 'unused' && b.usageCount > 0) return false
+            if (quickFilter === 'ai-visible' && !b.aiVisible) return false
+            if (quickFilter === 'ai-hidden' && b.aiVisible) return false
             if (!q) return true
             return (
                 b.slug.toLowerCase().includes(q) ||
@@ -93,7 +116,17 @@ export function BlockCatalogGrid({ blocks, showHidden = false }: Props) {
                 b.description.toLowerCase().includes(q)
             )
         })
-    }, [visibleBlocks, search, activeCategory])
+    }, [visibleBlocks, search, activeCategory, quickFilter])
+
+    const toggleQuick = useCallback((f: QuickFilter) => {
+        setQuickFilter((prev) => (prev === f ? 'all' : f))
+    }, [])
+
+    const clearAll = useCallback(() => {
+        setQuickFilter('all')
+        setActiveCategory('all')
+        setSearch('')
+    }, [])
 
     // Sorted blocks for table/list view
     const blocksSorted = useMemo(() => {
@@ -121,6 +154,78 @@ export function BlockCatalogGrid({ blocks, showHidden = false }: Props) {
 
     return (
         <div className="flex flex-col gap-0">
+            {/* 5-stat strip — clickable cards apply quick filters to grid below */}
+            <div className="b-stats">
+                <button
+                    type="button"
+                    className={`b-stat${quickFilter === 'all' && activeCategory === 'all' && !search ? ' is-active' : ''}`}
+                    onClick={clearAll}
+                    title="Click to clear all filters"
+                >
+                    <div className="b-stat-label">Total blocks</div>
+                    <div className="b-stat-val">{stats.total}</div>
+                    <div className="b-stat-sub">
+                        {(quickFilter !== 'all' || activeCategory !== 'all' || search)
+                            ? 'click to clear filters'
+                            : 'types'}
+                    </div>
+                </button>
+                <button
+                    type="button"
+                    className={`b-stat${quickFilter === 'used' ? ' is-active' : ''}`}
+                    onClick={() => toggleQuick('used')}
+                    title={`Show ${stats.used} blocks used in templates`}
+                >
+                    <div className="b-stat-label">Active in templates</div>
+                    <div className="b-stat-val">{stats.used}</div>
+                    <div className="b-stat-sub">
+                        / {stats.total} used ·{' '}
+                        <span
+                            role="link"
+                            tabIndex={0}
+                            className="b-stat-link"
+                            onClick={(e) => { e.stopPropagation(); toggleQuick('unused') }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggleQuick('unused') } }}
+                            style={{ color: quickFilter === 'unused' ? 'var(--accent)' : 'var(--text-3)', textDecoration: 'underline', cursor: 'pointer' }}
+                        >
+                            {stats.unused} unused
+                        </span>
+                    </div>
+                </button>
+                <button
+                    type="button"
+                    className={`b-stat${quickFilter === 'ai-visible' ? ' is-active' : ''}`}
+                    onClick={() => toggleQuick('ai-visible')}
+                    title={`Show ${stats.aiVisible} blocks AI can pick`}
+                >
+                    <div className="b-stat-label">AI-visible</div>
+                    <div className="b-stat-val">{stats.aiVisible}</div>
+                    <div className="b-stat-sub">
+                        / {stats.total} ·{' '}
+                        <span
+                            role="link"
+                            tabIndex={0}
+                            className="b-stat-link"
+                            onClick={(e) => { e.stopPropagation(); toggleQuick('ai-hidden') }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggleQuick('ai-hidden') } }}
+                            style={{ color: quickFilter === 'ai-hidden' ? 'var(--accent)' : 'var(--text-3)', textDecoration: 'underline', cursor: 'pointer' }}
+                        >
+                            {stats.aiHidden} hidden
+                        </span>
+                    </div>
+                </button>
+                <div className="b-stat" title="See category pills below to filter">
+                    <div className="b-stat-label">Categories</div>
+                    <div className="b-stat-val">{stats.categoryCount}</div>
+                    <div className="b-stat-sub">see pills ↓</div>
+                </div>
+                <div className="b-stat" title="Sum of all variants across blocks">
+                    <div className="b-stat-label">Total variants</div>
+                    <div className="b-stat-val">{stats.totalVariants}</div>
+                    <div className="b-stat-sub">across all blocks</div>
+                </div>
+            </div>
+
             {/* Mode toggle + search row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
                 {/* Mode toggle */}
