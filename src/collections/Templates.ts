@@ -194,6 +194,14 @@ export const Templates: CollectionConfig = {
                 description: 'Auto-populated compliance result from Category DNA check. Do not edit manually.',
             },
         },
+        {
+            name: 'blockPromptOverrides',
+            type: 'json',
+            defaultValue: {},
+            admin: {
+                description: 'Per-block AI prompt overrides. Shape: { [blockSlug]: { prompt: string, updatedAt: string, updatedBy?: string } }',
+            },
+        },
     ],
     timestamps: true,
 }
