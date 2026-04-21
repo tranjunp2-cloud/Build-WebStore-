@@ -202,8 +202,36 @@ export function PreviewScripts() {
             return innerHTML
         }
 
+        // Debounce timer for live-typing sync — sends TEXT_EDITED while user is still typing
+        // so changes reach the parent store without waiting for blur.
+        let liveTypingTimer: ReturnType<typeof setTimeout> | null = null
+
+        const postLiveHtml = () => {
+            if (!currentEditingEl) return
+            const blockIndex = parseInt(currentEditingEl.closest('[data-block-index]')?.getAttribute('data-block-index') || '-1', 10)
+            if (blockIndex < 0) return
+            window.parent.postMessage({
+                type: 'TEXT_EDITED',
+                blockIndex,
+                searchKey: originalText,
+                oldHtml: originalHtml,
+                newHtml: buildCleanHtml(currentEditingEl),
+            }, parentOrigin)
+        }
+
+        const onInput = () => {
+            if (!currentEditingEl) return
+            if (liveTypingTimer) clearTimeout(liveTypingTimer)
+            liveTypingTimer = setTimeout(() => {
+                liveTypingTimer = null
+                postLiveHtml()
+            }, 1000)
+        }
+
         const cleanUpEditing = () => {
             if (!currentEditingEl) return
+            // Cancel any pending live-typing sync — we're about to send the final state
+            if (liveTypingTimer) { clearTimeout(liveTypingTimer); liveTypingTimer = null }
             // Build clean HTML BEFORE removing contenteditable (queryCommandState needs it)
             const cleanHtml = buildCleanHtml(currentEditingEl)
             currentEditingEl.removeAttribute('contenteditable')
@@ -700,6 +728,7 @@ export function PreviewScripts() {
         document.addEventListener('click', onTextClick)
         document.addEventListener('blur', onBlur, true) // capture phase
         document.addEventListener('keydown', onKeyDown)
+        document.addEventListener('input', onInput)
         document.addEventListener('click', onClick)
         document.addEventListener('dragover', onDragOver)
         document.addEventListener('dragleave', onDragLeave)
@@ -822,6 +851,8 @@ export function PreviewScripts() {
             document.removeEventListener('click', onTextClick)
             document.removeEventListener('blur', onBlur, true)
             document.removeEventListener('keydown', onKeyDown)
+            document.removeEventListener('input', onInput)
+            if (liveTypingTimer) clearTimeout(liveTypingTimer)
             document.removeEventListener('click', onClick)
             document.removeEventListener('dragover', onDragOver)
             document.removeEventListener('dragleave', onDragLeave)
