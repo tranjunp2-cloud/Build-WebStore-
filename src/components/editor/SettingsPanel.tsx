@@ -185,6 +185,7 @@ function SettingsPanelInner({
         return `${block.headline || ''}-${block.subheadline || ''}-${block.body || ''}-${block.variant || ''}`
     }, [block])
     const bk = `${blockIndex}-${blockDataVersion.length}` // short block key for input keys
+    const fbk = `footer-${((footerBlock?.columns as unknown[]) || []).length}-${footerBlock?.variant || ''}` // footer block key
 
     // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
     const storeBlocks = useEditorStore(state => state.blocks)
@@ -204,6 +205,7 @@ function SettingsPanelInner({
         social: true,
         theme: true,
     })
+    const [isFooterLayoutOpen, setIsFooterLayoutOpen] = useState(true)
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
     const [seoSlugInput, setSeoSlugInput] = useState('')
     const [seoTitleInput, setSeoTitleInput] = useState('')
@@ -640,50 +642,157 @@ function SettingsPanelInner({
         )
     }
 
-    const renderMenuContent = () => (
-        <div className="space-y-5">
-            {/* Logo Editor (AC-2) */}
-            <LogoEditor
-                currentLogo={((headerBlock as Record<string, unknown>)?.logo as string) || null}
-                onLogoChange={(logoUrl, faviconUrl) => {
-                    const changes: Record<string, unknown> = { logo: logoUrl }
-                    if (faviconUrl) changes.favicon = faviconUrl
-                    onHeaderUpdate?.(changes)
-                    if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
-                }}
-            />
+    const renderMenuContent = () => {
+        const footerCols = ((footerBlock?.columns as FooterColumn[]) || [])
+        const activeFooterLayout = footerCols.length === 0 ? 'simple' : footerCols.length <= 3 ? '3col' : '4col'
 
-            <div className={sectionCls}>
-                <label className={labelCls}>{s.navStyle}</label>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                    {(['standard', 'centered'] as const).map(style => (
-                        <button
-                            key={style}
-                            type="button"
-                            onClick={() => onHeaderUpdate?.({ navStyle: style })}
-                            className={cn(
-                                'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                (headerBlock as Record<string, unknown>)?.navStyle === style || (!((headerBlock as Record<string, unknown>)?.navStyle) && style === 'standard')
-                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                            )}
-                        >
-                            {style === 'standard' ? s.navStyleStandard : s.navStyleCentered}
-                        </button>
-                    ))}
-                </div>
-            </div>
+        const handleFooterLayout = (preset: 'simple' | '3col' | '4col') => {
+            if (preset === 'simple') {
+                onFooterUpdate?.({ variant: 'simple', columns: [] })
+            } else if (preset === '3col') {
+                const next = [...footerCols]
+                while (next.length < 3) next.push({ title: `Column ${next.length + 1}`, links: [] })
+                onFooterUpdate?.({ variant: 'expanded', columns: next.slice(0, 3) })
+            } else {
+                const next = [...footerCols]
+                while (next.length < 4) next.push({ title: `Column ${next.length + 1}`, links: [] })
+                onFooterUpdate?.({ variant: 'expanded', columns: next.slice(0, 4) })
+            }
+        }
 
-            {/* Navigation Editor (AC-1) */}
-            <div className={sectionCls}>
-                <NavigationEditor
-                    links={resolvedNavLinks}
-                    onUpdate={(links) => onHeaderUpdate?.({ links })}
-                    pages={pages}
+        return (
+            <div className="space-y-5">
+                {/* Logo Editor (AC-2) */}
+                <LogoEditor
+                    currentLogo={((headerBlock as Record<string, unknown>)?.logo as string) || null}
+                    onLogoChange={(logoUrl, faviconUrl) => {
+                        const changes: Record<string, unknown> = { logo: logoUrl }
+                        if (faviconUrl) changes.favicon = faviconUrl
+                        onHeaderUpdate?.(changes)
+                        if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
+                    }}
                 />
+
+                <div className={sectionCls}>
+                    <label className={labelCls}>{s.navStyle}</label>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                        {(['standard', 'centered'] as const).map(style => (
+                            <button
+                                key={style}
+                                type="button"
+                                onClick={() => onHeaderUpdate?.({ navStyle: style })}
+                                className={cn(
+                                    'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                                    (headerBlock as Record<string, unknown>)?.navStyle === style || (!((headerBlock as Record<string, unknown>)?.navStyle) && style === 'standard')
+                                        ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                        : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                                )}
+                            >
+                                {style === 'standard' ? s.navStyleStandard : s.navStyleCentered}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Navigation Editor (AC-1) */}
+                <div className={sectionCls}>
+                    <NavigationEditor
+                        links={resolvedNavLinks}
+                        onUpdate={(links) => onHeaderUpdate?.({ links })}
+                        pages={pages}
+                    />
+                </div>
+
+                {/* ─── Footer Settings ─────────────────────────────────────── */}
+                {footerBlock && (
+                    <div className={sectionCls}>
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="text-base leading-none">🦶</span>
+                            <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">Footer Settings</span>
+                        </div>
+
+                        {/* Layout Presets */}
+                        <div className="space-y-1.5 mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setIsFooterLayoutOpen(v => !v)}
+                                className="flex w-full items-center justify-between"
+                            >
+                                <span className="text-[13px] font-medium text-white">Layout</span>
+                                <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterLayoutOpen && 'rotate-180')} />
+                            </button>
+                            {isFooterLayoutOpen && (
+                                <div className="mt-2 space-y-1.5">
+                                    {([
+                                        { key: 'simple', label: 'Simple Footer' },
+                                        { key: '3col',   label: '3 Columns' },
+                                        { key: '4col',   label: '4 Columns' },
+                                    ] as { key: 'simple' | '3col' | '4col'; label: string }[]).map(({ key, label }) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => handleFooterLayout(key)}
+                                            className={cn(
+                                                'w-full rounded-xl border px-3 py-2 text-left text-[12px] font-medium transition-colors',
+                                                activeFooterLayout === key
+                                                    ? 'border-blue-500/50 bg-blue-500/20 text-blue-400'
+                                                    : 'border-white/5 bg-[#0b1120] text-white hover:bg-white/5',
+                                            )}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Copyright Text */}
+                        <div className="mb-4">
+                            <label className={labelCls}>Copyright Text</label>
+                            <Input
+                                key={`footer-copyright-${fbk}`}
+                                defaultValue={(footerBlock.copyrightText as string) || ''}
+                                placeholder="© 2026 Your Company. All rights reserved."
+                                onBlur={(e: FieldBlurEvent) => onFooterUpdate?.({ copyrightText: sanitizeInput(e.target.value) })}
+                                variant="editor"
+                                className="mt-1 h-8 text-[12px]"
+                            />
+                        </div>
+
+                        {/* Background Color */}
+                        <div className="mb-4">
+                            <label className={labelCls}>Background Color</label>
+                            <div className="mt-1.5 flex gap-2">
+                                <Input
+                                    key={`footer-bgcolor-${fbk}`}
+                                    defaultValue={(footerBlock.backgroundColor as string) || ''}
+                                    placeholder="#111827"
+                                    onBlur={(e: FieldBlurEvent) => {
+                                        const val = e.target.value.trim()
+                                        if (val && !CSS.supports('color', val)) {
+                                            toast.error('Invalid color value')
+                                            return
+                                        }
+                                        onFooterUpdate?.({ backgroundColor: val })
+                                    }}
+                                    variant="editor"
+                                    className="flex-1"
+                                />
+                                <input
+                                    type="color"
+                                    value={(footerBlock.backgroundColor as string) || '#111827'}
+                                    onChange={(e) => onFooterUpdate?.({ backgroundColor: e.target.value })}
+                                    aria-label="Pick background color"
+                                    className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5"
+                                />
+                            </div>
+                        </div>
+
+                    </div>
+                )}
             </div>
-        </div>
-    )
+        )
+    }
 
     const panelTitle = activeTab === 'global'
         ? s.globalSettings
@@ -1113,101 +1222,6 @@ function SettingsPanelInner({
                     </div>
                 )}
 
-                {/* ─── Footer Columns with Nested Links ─────────────────────────── */}
-                {bt === 'footer' && (
-                    <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">{s.footerColumns} ({((block.columns || []) as FooterColumn[]).length})</label>
-                        {((block.columns || []) as FooterColumn[]).map((col, colIdx) => (
-                            <div key={`col-${(col as FooterColumn).title}-${colIdx}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">{ti(s.columnN, { n: colIdx + 1 })}</span>
-                                    <button onClick={() => removeArrayItem('columns', colIdx)} aria-label={`Remove column ${colIdx + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
-                                </div>
-                                <Input defaultValue={col.title || ''} placeholder={s.columnTitle}
-                                    onBlur={(e: FieldBlurEvent) => {
-                                        const cols = [...((block.columns || []) as FooterColumn[])]
-                                        cols[colIdx] = { ...cols[colIdx], title: e.target.value }
-                                        onBlockUpdate(currentBlockIndex, { columns: cols })
-                                    }}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-
-                                {/* Nested links */}
-                                <div className="mt-2 space-y-1">
-                                    {(col.links || []).map((link: { label?: string; url?: string }, linkIdx: number) => (
-                                        <div key={`link-${colIdx}-${linkIdx}`} className="flex gap-1.5">
-                                            <Input
-                                                defaultValue={link.label || ''}
-                                                placeholder="Label"
-                                                onBlur={(e: FieldBlurEvent) => {
-                                                    const cols = [...((block.columns || []) as FooterColumn[])]
-                                                    const links = [...(cols[colIdx].links || [])]
-                                                    links[linkIdx] = { ...links[linkIdx], label: e.target.value }
-                                                    cols[colIdx] = { ...cols[colIdx], links }
-                                                    onBlockUpdate(currentBlockIndex, { columns: cols })
-                                                }}
-                                                variant="editor"
-                                                className="h-7 text-[11px] flex-1"
-                                            />
-                                            <Input
-                                                defaultValue={link.url || ''}
-                                                placeholder="/page"
-                                                onBlur={(e: FieldBlurEvent) => {
-                                                    const cols = [...((block.columns || []) as FooterColumn[])]
-                                                    const links = [...(cols[colIdx].links || [])]
-                                                    links[linkIdx] = { ...links[linkIdx], url: e.target.value }
-                                                    cols[colIdx] = { ...cols[colIdx], links }
-                                                    onBlockUpdate(currentBlockIndex, { columns: cols })
-                                                }}
-                                                variant="editor"
-                                                className="h-7 text-[11px] w-20"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const cols = [...((block.columns || []) as FooterColumn[])]
-                                                    const links = [...(cols[colIdx].links || [])].filter((_, i) => i !== linkIdx)
-                                                    cols[colIdx] = { ...cols[colIdx], links }
-                                                    onBlockUpdate(currentBlockIndex, { columns: cols })
-                                                }}
-                                                className="shrink-0 text-red-400 hover:text-red-300 text-[10px]"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {(col.links || []).length < 10 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const cols = [...((block.columns || []) as FooterColumn[])]
-                                                const links = [...(cols[colIdx].links || []), { label: '', url: '' }]
-                                                cols[colIdx] = { ...cols[colIdx], links }
-                                                onBlockUpdate(currentBlockIndex, { columns: cols })
-                                            }}
-                                            className="mt-1 flex w-full items-center justify-center gap-1 rounded border border-dashed border-white/10 py-1 text-[10px] text-slate-400 hover:border-white/20 hover:text-slate-300"
-                                        >
-                                            + Add link
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                        {/* Add Column button — max 4 */}
-                        {((block.columns || []) as FooterColumn[]).length < 4 && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const cols = [...((block.columns || []) as FooterColumn[]), { title: 'New Column', links: [] }]
-                                    onBlockUpdate(currentBlockIndex, { columns: cols })
-                                }}
-                                className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-white/10 py-2 text-xs text-slate-400 hover:border-white/20 hover:text-slate-300"
-                            >
-                                + Add column
-                            </button>
-                        )}
-                    </div>
-                )}
 
                 {bt === 'socialWidget' && (
                     <div className={sectionCls}>

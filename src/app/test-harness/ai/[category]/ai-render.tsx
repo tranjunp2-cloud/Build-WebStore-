@@ -5,9 +5,21 @@ import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import { generateSiteWithAI } from '@/lib/ai/openai-generator'
 import { getCategoryContent } from '@/lib/ai/content'
 import type { GenerationResult, GeneratedPage } from '@/lib/ai/generate-blocks'
+import {
+    buildSystemPrompt,
+    buildUserPrompt,
+    type BusinessInfoInput,
+} from '@/lib/ai/system-prompt'
 import { scoreFixture } from '../../../../../scripts/test-harness/rubric/scorer-lib'
 import type { HarnessBlock } from '../../../../../scripts/test-harness/types'
 import { ScoreOverlay } from '../../_components/score-overlay'
+
+/** Cache shape v2 — wraps input+output so harness UI can show prompts that went in. */
+type CacheEntry = {
+    input: BusinessInfoInput
+    output: GenerationResult
+    cachedAt: string
+}
 
 const CACHE_DIR = path.resolve(process.cwd(), '.harness-out/ai-cache')
 
@@ -15,47 +27,58 @@ function cachePathFor(category: string): string {
     return path.join(CACHE_DIR, `${category}.json`)
 }
 
-function readCache(category: string): GenerationResult | null {
+/** Build BusinessInfoInput from category content — pure, deterministic per category. */
+function buildInputForCategory(category: string): BusinessInfoInput | null {
+    const content = getCategoryContent(category)
+    const biz = content?.businesses?.[0]
+    if (!biz) return null
+    return {
+        businessName: biz.name,
+        industry: category,
+        shortDescription: biz.description,
+        products: biz.products?.join?.(', ') ?? '',
+        phone: biz.phone,
+        email: biz.email,
+        address: biz.address,
+    }
+}
+
+function readCache(category: string): CacheEntry | null {
     const p = cachePathFor(category)
     if (!fs.existsSync(p)) return null
     try {
-        return JSON.parse(fs.readFileSync(p, 'utf8')) as GenerationResult
+        const parsed = JSON.parse(fs.readFileSync(p, 'utf8')) as CacheEntry | GenerationResult
+        // v2 wrapped shape — has `input` + `output`
+        if (parsed && typeof parsed === 'object' && 'output' in parsed && 'input' in parsed) {
+            return parsed as CacheEntry
+        }
+        // v1 legacy — file is just the GenerationResult. Rehydrate input from category.
+        const input = buildInputForCategory(category)
+        if (!input) return null
+        return { input, output: parsed as GenerationResult, cachedAt: 'legacy-cache' }
     } catch {
         return null
     }
 }
 
-function writeCache(category: string, result: GenerationResult): void {
+function writeCache(category: string, entry: CacheEntry): void {
     try {
         fs.mkdirSync(CACHE_DIR, { recursive: true })
-        fs.writeFileSync(cachePathFor(category), JSON.stringify(result, null, 2))
+        fs.writeFileSync(cachePathFor(category), JSON.stringify(entry, null, 2))
     } catch (err) {
         console.warn('[ai-harness] cache write failed:', (err as Error).message)
     }
 }
 
-async function genForCategory(category: string): Promise<GenerationResult | null> {
-    const content = getCategoryContent(category)
-    const biz = content?.businesses?.[0]
-    if (!biz) return null
+async function genForCategory(category: string): Promise<CacheEntry | null> {
+    const input = buildInputForCategory(category)
+    if (!input) return null
 
     const prevMode = process.env.GEN_MODE
     process.env.GEN_MODE = 'ai-first'
     try {
-        const { result } = await generateSiteWithAI(
-            {
-                businessName: biz.name,
-                industry: category,
-                shortDescription: biz.description,
-                products: biz.products?.join?.(', ') ?? '',
-                phone: biz.phone,
-                email: biz.email,
-                address: biz.address,
-            },
-            undefined,
-            'en',
-        )
-        return result
+        const { result } = await generateSiteWithAI(input, undefined, 'en')
+        return { input, output: result, cachedAt: new Date().toISOString() }
     } finally {
         if (prevMode === undefined) delete process.env.GEN_MODE
         else process.env.GEN_MODE = prevMode
@@ -80,15 +103,15 @@ export async function renderAIHarness(category: string, slug: string | undefined
     const content = getCategoryContent(category)
     if (!content) notFound()
 
-    let result: GenerationResult | null = refresh ? null : readCache(category)
+    let entry: CacheEntry | null = refresh ? null : readCache(category)
     let cachedFrom: 'disk' | 'fresh' = 'disk'
 
-    if (!result) {
+    if (!entry) {
         cachedFrom = 'fresh'
         try {
-            result = await genForCategory(category)
-            if (!result) notFound()
-            writeCache(category, result)
+            entry = await genForCategory(category)
+            if (!entry) notFound()
+            writeCache(category, entry)
         } catch (err) {
             return (
                 <div className="p-10 font-mono">
@@ -102,12 +125,13 @@ export async function renderAIHarness(category: string, slug: string | undefined
         }
     }
 
+    const result = entry.output
     const page = resolvePage(result, slug)
     if (!page) {
         // Fallback: no pages → use flat blocks
         if (!slug || slug === 'home') {
             const blocks = result.blocks ?? []
-            return renderLayout(result, category, 'home', blocks as unknown as Record<string, unknown>[], cachedFrom, [])
+            return renderLayout(entry, category, 'home', blocks as unknown as Record<string, unknown>[], cachedFrom, [])
         }
         notFound()
     }
@@ -118,7 +142,7 @@ export async function renderAIHarness(category: string, slug: string | undefined
         title: p.title,
     }))
 
-    return renderLayout(result, category, normalizeSlug(page.slug), layout, cachedFrom, availableSlugs)
+    return renderLayout(entry, category, normalizeSlug(page.slug), layout, cachedFrom, availableSlugs)
 }
 
 function layoutToHarnessBlocks(layout: Record<string, unknown>[]): HarnessBlock[] {
@@ -133,13 +157,14 @@ function layoutToHarnessBlocks(layout: Record<string, unknown>[]): HarnessBlock[
 }
 
 function renderLayout(
-    result: GenerationResult,
+    entry: CacheEntry,
     category: string,
     currentSlug: string,
     layout: Record<string, unknown>[],
     cachedFrom: 'disk' | 'fresh',
     slugs: Array<{ slug: string; title: string }>,
 ) {
+    const result = entry.output
     const site = { theme: result.theme as Record<string, unknown> }
     const pageData = { layout }
     const prefix = `/test-harness/ai/${category}`
@@ -224,7 +249,121 @@ function renderLayout(
                 </div>
             )}
             <ScoreOverlay score={score} />
+            <DebugDrawer entry={entry} category={category} />
             <SiteRenderer site={site as never} page={pageData as never} />
         </div>
+    )
+}
+
+/** Collapsible floating drawer — shows business input, reconstructed prompts, and
+ * AI output summary. Re-builds prompts deterministically from saved input via
+ * buildSystemPrompt() + buildUserPrompt() — so what you see is what WOULD be sent
+ * on a fresh gen with the same input. */
+function DebugDrawer({ entry, category }: { entry: CacheEntry; category: string }) {
+    const { input, output, cachedAt } = entry
+    const systemPrompt = buildSystemPrompt('en')
+    const userPrompt = buildUserPrompt(input, undefined, 'en')
+
+    const outputSummary = {
+        siteName: output.siteName,
+        siteType: output.siteType,
+        language: output.language,
+        seo: output.seo,
+        theme: output.theme,
+        topLevelBlocks: output.blocks.length,
+        pages: (output.pages ?? []).map((p) => ({
+            slug: p.slug,
+            title: p.title,
+            blocks: p.blocks.length,
+        })),
+    }
+
+    const panelStyle: React.CSSProperties = {
+        position: 'fixed',
+        bottom: 60,
+        right: 10,
+        zIndex: 99,
+        width: 480,
+        maxWidth: 'calc(100vw - 20px)',
+        maxHeight: 'calc(100vh - 140px)',
+        background: '#0f0f0f',
+        color: '#e5e5e5',
+        border: '1px solid #3f3f46',
+        borderRadius: 10,
+        boxShadow: '0 12px 40px rgba(0,0,0,0.55)',
+        fontFamily: 'ui-monospace, Menlo, monospace',
+        fontSize: 11,
+        overflow: 'hidden',
+    }
+    const summaryStyle: React.CSSProperties = {
+        padding: '10px 14px',
+        cursor: 'pointer',
+        userSelect: 'none',
+        background: '#1a1a1a',
+        color: '#a78bfa',
+        fontWeight: 600,
+        listStyle: 'none',
+    }
+    const bodyStyle: React.CSSProperties = {
+        padding: 0,
+        maxHeight: 'calc(100vh - 200px)',
+        overflowY: 'auto',
+    }
+    const sectionStyle: React.CSSProperties = {
+        borderTop: '1px solid #262626',
+        padding: '10px 14px',
+    }
+    const labelStyle: React.CSSProperties = {
+        color: '#71717a',
+        fontSize: 10,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 6,
+    }
+    const preStyle: React.CSSProperties = {
+        margin: 0,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        lineHeight: 1.45,
+        color: '#d4d4d8',
+    }
+
+    return (
+        <details style={panelStyle}>
+            <summary style={summaryStyle}>
+                🔍 Inspect Prompts + Output — {category}
+            </summary>
+            <div style={bodyStyle}>
+                <div style={sectionStyle}>
+                    <div style={labelStyle}>Business Input (BusinessInfoInput)</div>
+                    <pre style={preStyle}>{JSON.stringify(input, null, 2)}</pre>
+                    <div style={{ ...labelStyle, marginTop: 8, color: '#52525b' }}>
+                        cachedAt: {cachedAt}
+                    </div>
+                </div>
+                <div style={sectionStyle}>
+                    <div style={labelStyle}>
+                        System Prompt ({systemPrompt.length.toLocaleString()} chars — reconstructed)
+                    </div>
+                    <pre style={preStyle}>{systemPrompt}</pre>
+                </div>
+                <div style={sectionStyle}>
+                    <div style={labelStyle}>
+                        User Prompt ({userPrompt.length.toLocaleString()} chars — reconstructed)
+                    </div>
+                    <pre style={preStyle}>{userPrompt}</pre>
+                </div>
+                <div style={sectionStyle}>
+                    <div style={labelStyle}>AI Output Summary</div>
+                    <pre style={preStyle}>{JSON.stringify(outputSummary, null, 2)}</pre>
+                </div>
+                <div style={sectionStyle}>
+                    <div style={labelStyle}>
+                        Full Output JSON ({JSON.stringify(output).length.toLocaleString()} bytes)
+                    </div>
+                    <pre style={preStyle}>{JSON.stringify(output, null, 2)}</pre>
+                </div>
+            </div>
+        </details>
     )
 }
