@@ -11,6 +11,7 @@ import { buildSystemPrompt, buildPersonalizePrompt, type BusinessInfoInput } fro
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
 import { composeTemplateResult } from './fallback-adapter'
+import { loadDisabledVariants } from '@/lib/admin/block-variant-disabled-loader'
 import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
@@ -611,16 +612,20 @@ export async function generateSiteWithAI(
  * Plan 260414-2249 phase-01: accept full BusinessInfoInput (not just name) so
  * user-supplied phone/email/address/products flow into composer block builders.
  */
-function generateWithFallback(
+async function generateWithFallback(
     prompt: string,
     events: SSEEvent[],
     language: 'en' | 'ms' | 'vi' = 'en',
     businessInfo?: BusinessInfoInput,
-): { result: GenerationResult; events: SSEEvent[] } {
+): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     events.push({ event: 'step', data: { step: 'fallback_analyzing', label: 'Analysing template library...', progress: 50 } })
     events.push({ event: 'step', data: { step: 'fallback_composing', label: 'Composing from smart templates...', progress: 60 } })
 
     const seed = Date.now()
+
+    // Load disabled variants once per gen session — ~5ms DB query.
+    // Empty set on error so gen proceeds normally.
+    const disabledSet = await loadDisabledVariants()
 
     // Plan 260415 fix-500 — composeFallbackResult now returns null (not
     // throws) for unrecoverable states. Treat null exactly like a thrown
@@ -628,7 +633,7 @@ function generateWithFallback(
     let composerResult: GenerationResult | null = null
     let composerErrMsg: string | null = null
     try {
-        composerResult = composeTemplateResult(prompt, seed, language, businessInfo)
+        composerResult = composeTemplateResult(prompt, seed, language, businessInfo, disabledSet)
     } catch (composerError: unknown) {
         composerErrMsg = composerError instanceof Error ? composerError.message : String(composerError)
     }
@@ -1981,10 +1986,14 @@ async function generateTemplateFirst(
     // Plan 260417-0837 item 1.2 — confirm template-first is the default path.
     console.log(`[AI] path=template-first category=${presetCategory} seed=${themeSeed} lang=${resolvedLang}`)
 
+    // Load disabled variants once before composer + GPT parallel race.
+    // ~5ms DB query; empty set on error so gen proceeds normally.
+    const disabledSet = await loadDisabledVariants()
+
     // Run composer + GPT personalize in parallel
     const [composerSettled, personalizeSettled] = await Promise.allSettled([
         // Composer: build full 5-page site from library (~0.5s)
-        Promise.resolve().then(() => composeTemplateResult(promptText, themeSeed, resolvedLang, businessInfo)),
+        Promise.resolve().then(() => composeTemplateResult(promptText, themeSeed, resolvedLang, businessInfo, disabledSet)),
         // GPT: personalize 4 text fields (~3-8s, timeout 10s)
         personalizeWithGPT(openai, businessInfo, presetCategory, resolvedLang),
     ])

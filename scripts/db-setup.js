@@ -2963,6 +2963,14 @@ const MIGRATIONS = [
     name: 'block_variants.alter_notes',
     sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS notes text;`,
   },
+  {
+    name: 'block_variants.alter_enabled',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true;`,
+  },
+  {
+    name: 'block_variants.alter_display_name',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS display_name varchar;`,
+  },
 
   ...[
     'hero', 'navigation', 'about', 'contact', 'footer',

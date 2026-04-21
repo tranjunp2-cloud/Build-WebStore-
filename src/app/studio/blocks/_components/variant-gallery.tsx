@@ -6,15 +6,20 @@
  * Default variant highlighted with accent border + star.
  * Each card: placeholder preview (stripe pattern or image) + action buttons.
  * Click preview → VariantZoomModal with device switcher.
+ * Phase G: disable toggle persisted via PATCH API (optimistic UI + revert on error).
+ * Phase H: pencil icon opens VariantEditModal for metadata edits.
  */
 import { useState } from 'react'
 import { Star, Eye, Pencil, Copy, Trash2 } from 'lucide-react'
 import { VariantZoomModal } from './variant-zoom-modal'
+import { VariantEditModal } from './variant-edit-modal'
 
 type VariantOverride = {
     variantName: string
     previewUrlOverride?: string | null
     notes?: string | null
+    enabled?: boolean
+    displayName?: string | null
 }
 
 type Cols = '1' | '2' | '3'
@@ -42,10 +47,63 @@ export function VariantGallery({
     const [activeVariant, setActiveVariant] = useState<string | null>(null)
     // local default override (client-only, does not persist — save button would call API in F07)
     const [localDefault, setLocalDefault] = useState<string>(defaultVariant)
-    // disabled map (client-only toggle state)
-    const [disabled, setDisabled] = useState<Record<string, boolean>>({})
 
-    const overrideMap = new Map(variantOverrides.map((v) => [v.variantName, v]))
+    // Phase G: disabled state seeded from variantOverrides, persisted via PATCH API
+    const initialDisabled: Record<string, boolean> = {}
+    variantOverrides.forEach((v) => {
+        if (v.enabled === false) initialDisabled[v.variantName] = true
+    })
+    const [disabled, setDisabled] = useState<Record<string, boolean>>(initialDisabled)
+    const [pendingToggle, setPendingToggle] = useState<Set<string>>(new Set())
+
+    // Phase H: overrides map for mutable displayName + metadata after save
+    const [overridesMap, setOverridesMap] = useState(
+        () => new Map(variantOverrides.map((v) => [v.variantName, v]))
+    )
+    const [editVariant, setEditVariant] = useState<string | null>(null)
+
+    async function toggleVariantEnabled(variantName: string) {
+        // Prevent double-fire on rapid clicks
+        if (pendingToggle.has(variantName)) return
+
+        const currentlyDisabled = !!disabled[variantName]
+        const nextEnabled = currentlyDisabled // true = re-enable, false = disable
+
+        // Optimistic update
+        setDisabled((d) => ({ ...d, [variantName]: !nextEnabled }))
+        setPendingToggle((p) => new Set(p).add(variantName))
+
+        try {
+            const res = await fetch(
+                `/api/admin/blocks/${blockSlug}/variants/${variantName}`,
+                {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: nextEnabled }),
+                }
+            )
+            if (!res.ok) throw new Error(`${res.status}`)
+        } catch (err) {
+            // Revert on failure
+            setDisabled((d) => ({ ...d, [variantName]: currentlyDisabled }))
+            console.error('[variant-toggle] failed', err)
+        } finally {
+            setPendingToggle((p) => {
+                const n = new Set(p)
+                n.delete(variantName)
+                return n
+            })
+        }
+    }
+
+    function handleSaved(variantName: string, patch: Partial<VariantOverride>) {
+        setOverridesMap((m) => {
+            const next = new Map(m)
+            const existing = next.get(variantName) ?? { variantName }
+            next.set(variantName, { ...existing, ...patch })
+            return next
+        })
+    }
 
     if (variants.length === 0) {
         return (
@@ -86,8 +144,9 @@ export function VariantGallery({
                 {variants.map((variant) => {
                     const isDefault = variant === localDefault
                     const isDisabled = !!disabled[variant]
-                    const override = overrideMap.get(variant)
+                    const override = overridesMap.get(variant)
                     const previewUrl = override?.previewUrlOverride ?? curatedPreviewUrl
+                    const displayName = override?.displayName || variant
 
                     return (
                         <div
@@ -100,7 +159,7 @@ export function VariantGallery({
                         >
                             {/* Card head: name + actions */}
                             <div className="b-var-card-head">
-                                <span className="name">{variant}</span>
+                                <span className="name">{displayName}</span>
                                 {isDefault && <span className="default-pill">Default</span>}
                                 <div className="actions">
                                     <button
@@ -119,7 +178,10 @@ export function VariantGallery({
                                     >
                                         <Eye size={13} />
                                     </button>
-                                    <button title="Edit variant code">
+                                    <button
+                                        title="Edit variant metadata"
+                                        onClick={() => setEditVariant(variant)}
+                                    >
                                         <Pencil size={13} />
                                     </button>
                                     <button title="Duplicate variant">
@@ -166,10 +228,12 @@ export function VariantGallery({
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
                                     <span>Enabled</span>
                                     <div
-                                        className={`b-switch${!isDisabled ? ' on' : ''}`}
-                                        onClick={() =>
-                                            setDisabled((d) => ({ ...d, [variant]: !d[variant] }))
-                                        }
+                                        className={[
+                                            'b-switch',
+                                            !isDisabled ? 'on' : '',
+                                            pendingToggle.has(variant) ? 'pending' : '',
+                                        ].filter(Boolean).join(' ')}
+                                        onClick={() => toggleVariantEnabled(variant)}
                                     />
                                 </div>
                             </div>
@@ -197,7 +261,23 @@ export function VariantGallery({
                     variantName={activeVariant}
                     previewUrl={curatedPreviewUrl}
                     editableFields={editableFields}
-                    variantOverride={overrideMap.get(activeVariant) ?? null}
+                    variantOverride={overridesMap.get(activeVariant) ?? null}
+                />
+            )}
+
+            {/* Edit metadata modal */}
+            {editVariant && (
+                <VariantEditModal
+                    open={true}
+                    onClose={() => setEditVariant(null)}
+                    blockSlug={blockSlug}
+                    variantName={editVariant}
+                    initial={{
+                        displayName: overridesMap.get(editVariant)?.displayName,
+                        notes: overridesMap.get(editVariant)?.notes,
+                        previewUrlOverride: overridesMap.get(editVariant)?.previewUrlOverride,
+                    }}
+                    onSaved={(patch) => handleSaved(editVariant, patch)}
                 />
             )}
         </>

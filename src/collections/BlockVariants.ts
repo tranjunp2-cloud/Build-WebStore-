@@ -50,6 +50,21 @@ export const BlockVariants: CollectionConfig = {
                 description: 'Internal notes about this variant (not shown to end users).',
             },
         },
+        {
+            name: 'displayName',
+            type: 'text',
+            admin: {
+                description: 'Human-friendly label shown in admin UI (falls back to variantName).',
+            },
+        },
+        {
+            name: 'enabled',
+            type: 'checkbox',
+            defaultValue: true,
+            admin: {
+                description: 'If unchecked, variant is hidden from AI gen selection pool.',
+            },
+        },
     ],
     timestamps: true,
 }

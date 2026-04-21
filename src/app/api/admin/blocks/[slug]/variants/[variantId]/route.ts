@@ -14,6 +14,8 @@ import config from '@payload-config'
 const PatchVariantSchema = z.object({
     previewUrlOverride: z.string().url().max(2048).optional().nullable().or(z.literal('')),
     notes: z.string().max(2000).optional().nullable(),
+    enabled: z.boolean().optional(),
+    displayName: z.string().max(100).optional().nullable(),
 })
 
 type RouteContext = { params: Promise<{ slug: string; variantId: string }> }

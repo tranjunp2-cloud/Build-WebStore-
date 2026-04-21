@@ -72,13 +72,25 @@ function simpleHash(str: string): number {
 /**
  * Select a variant deterministically based on seed.
  * Same seed + blockType + category = always same variant.
+ * disabledSet: optional set of `${blockType}:${variantName}` keys to exclude.
+ * If all variants are excluded, falls back to defaultVariant even if disabled (safer than crash).
  */
-function selectVariant(blockType: string, seed: number, category: string): string {
+function selectVariant(
+  blockType: string,
+  seed: number,
+  category: string,
+  disabledSet?: Set<string>,
+): string {
   const meta = blockRegistry.has(blockType) ? blockRegistry.getBlockMeta(blockType) : null
   if (!meta || meta.variants.length <= 1) return meta?.defaultVariant ?? 'default'
 
   const broken = BROKEN_VARIANTS[blockType] ?? []
-  const safe = meta.variants.filter(v => !broken.includes(v))
+  const safe = meta.variants.filter((v) => {
+    if (broken.includes(v)) return false
+    if (disabledSet?.has(`${blockType}:${v}`)) return false
+    return true
+  })
+  // All variants filtered out → fall back to defaultVariant (even if disabled) to avoid crash
   if (safe.length === 0) return meta.defaultVariant ?? meta.variants[0]!
 
   const hash = simpleHash(blockType + category + seed)
@@ -1357,11 +1369,12 @@ function buildHomePage(
   themePresetIndex: number,
   pages: string[],
   compositionSeed?: number,
+  disabledSet?: Set<string>,
 ): TemplatePage {
   // Helper: get variant for a block type — seed-based if available, else hardcoded default
   const getVariant = (blockType: string, fallback: string): string => {
     if (compositionSeed != null) {
-      return selectVariant(blockType, compositionSeed, category)
+      return selectVariant(blockType, compositionSeed, category, disabledSet)
     }
     // Legacy: use themePresetIndex for hero only, hardcoded for rest
     if (blockType === 'hero') {
@@ -1737,9 +1750,10 @@ function buildBlockFromSpec(
   pageNames: string[],
   compositionSeed?: number,
   mood?: ThemeMood,
+  disabledSet?: Set<string>,
 ): Record<string, unknown> {
   // Auto-select variant if not specified in blueprint and seed is available
-  const resolvedVariant = spec.variant ?? (compositionSeed != null ? selectVariant(spec.blockType, compositionSeed, category) : undefined)
+  const resolvedVariant = spec.variant ?? (compositionSeed != null ? selectVariant(spec.blockType, compositionSeed, category, disabledSet) : undefined)
   switch (spec.blockType) {
     case 'navigation':
       return { ...buildNavigation(biz, pageNames, category, mood), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
@@ -2050,6 +2064,7 @@ export function composeFromBlueprint(
   preset: TemplatePreset,
   compositionSeed?: number,
   bizOverride?: Partial<BusinessSample>,
+  disabledSet?: Set<string>,
 ): TemplateSeed | null {
   // Plan 260415 fix-500 — return null instead of throw so caller (e.g.
   // fallback-adapter.composeFallbackResult) can fall back to the legacy
@@ -2107,7 +2122,7 @@ export function composeFromBlueprint(
       title: page.name,
       slug: page.slug,
       layout: specs.map((spec) => {
-        const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood)
+        const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood, disabledSet)
         return applyContentValidation(block, templateLang)
       }),
     }
@@ -2151,7 +2166,7 @@ export function composeFromBlueprint(
 // ── Legacy composer (deprecated — kept for backward compat) ────────────────
 
 /** @deprecated Use composeFromBlueprint() with TemplatePreset instead */
-export function composeTemplate(input: ComposerInput): TemplateSeed | null {
+export function composeTemplate(input: ComposerInput, disabledSet?: Set<string>): TemplateSeed | null {
   // Plan 260415 fix-500 — return null instead of throw (same reason as
   // composeFromBlueprint above).
   const content = getCategoryContent(input.category)
@@ -2170,7 +2185,7 @@ export function composeTemplate(input: ComposerInput): TemplateSeed | null {
   const templatePages: TemplatePage[] = []
 
   // Home page (always present)
-  templatePages.push(buildHomePage(biz, content, input.category, input.variant, input.businessIndex, pages, input.compositionSeed))
+  templatePages.push(buildHomePage(biz, content, input.category, input.variant, input.businessIndex, pages, input.compositionSeed, disabledSet))
 
   // Additional pages for professional/premium
   if (input.variant === 'professional' || input.variant === 'premium') {
