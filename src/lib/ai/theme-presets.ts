@@ -162,14 +162,14 @@ export const BUSINESS_PRESETS: ThemePreset[] = [
 // ── F&B ──────────────────────────────────────────────────────────────────────
 export const FNB_PRESETS: ThemePreset[] = [
   { name: 'Kopitiam Classic', primaryColor: '#78350f', secondaryColor: '#92400e', accentColor: '#fbbf24', fontPairingId: 'artisan', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'subtle', moodId: 'elegant' },
-  { name: 'Bubble Tea Pop', primaryColor: '#d946ef', secondaryColor: '#e879f9', accentColor: '#fbbf24', fontPairingId: 'fresh-rounded', colorMode: 'light', spacingPreset: 'default', borderRadius: 'pill', shadowPreset: 'medium', moodId: 'playful' },
+  { name: 'Bubble Tea Pop', primaryColor: '#a21caf', secondaryColor: '#c026d3', accentColor: '#fbbf24', fontPairingId: 'fresh-rounded', colorMode: 'light', spacingPreset: 'default', borderRadius: 'pill', shadowPreset: 'medium', moodId: 'playful' },
   { name: 'Cafe Noir', primaryColor: '#292524', secondaryColor: '#57534e', accentColor: '#d4a574', fontPairingId: 'cafe-bistro', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'medium', moodId: 'editorial' },
   { name: 'Fresh Juice', primaryColor: '#16a34a', secondaryColor: '#65a30d', accentColor: '#f97316', fontPairingId: 'warm-friendly', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'playful' },
   { name: 'Night Lounge', primaryColor: '#be185d', secondaryColor: '#db2777', accentColor: '#fbbf24', fontPairingId: 'elegant-serif', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'dramatic', moodId: 'elegant' },
   // Plan 2253 Phase 02 — 3 new presets
   { name: 'Matcha House', primaryColor: '#166534', secondaryColor: '#84cc16', accentColor: '#fde68a', fontPairingId: 'hospitality', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'subtle', moodId: 'serene' },
   { name: 'Specialty Roast', primaryColor: '#451a03', secondaryColor: '#7c2d12', accentColor: '#fde68a', fontPairingId: 'boutique-serif', colorMode: 'light', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'editorial' },
-  { name: 'Dessert Bar', primaryColor: '#ec4899', secondaryColor: '#f472b6', accentColor: '#fef3c7', fontPairingId: 'magazine-cover', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'pill', shadowPreset: 'medium', moodId: 'playful' },
+  { name: 'Dessert Bar', primaryColor: '#be185d', secondaryColor: '#db2777', accentColor: '#fef3c7', fontPairingId: 'magazine-cover', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'pill', shadowPreset: 'medium', moodId: 'playful' },
 ]
 
 // ── Events / Wedding ────────────────────────────────────────────────────────
