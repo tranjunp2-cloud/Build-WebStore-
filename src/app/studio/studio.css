@@ -3708,6 +3708,14 @@
     overflow: hidden;
 }
 
+/* Iframe child positioned absolutely so transform-origin top-left aligns
+   with card top-left (flex centering would push iframe off-card). */
+.studio-shell .b-var-preview > iframe.b-var-iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
 .studio-shell .b-var-preview img {
     width: 100%;
     height: 100%;
