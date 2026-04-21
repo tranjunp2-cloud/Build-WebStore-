@@ -72,9 +72,39 @@ const FALLBACK_FEATURES: FeaturesConfig['features'] = [
     { icon: '🛡️', title: 'Trusted & Reliable', description: 'Years of consistent service excellence.' },
 ]
 
+// AI sometimes generates text strings (e.g. "Sparkles", "Clock") instead of emojis.
+// This utility maps them to standard emojis so they don't overflow the circular icon containers.
+export const parseFeatureIcon = (icon?: string) => {
+    if (!icon) return undefined;
+    if (/\p{Extended_Pictographic}/u.test(icon)) return icon; // Proper emoji detection (handles multi-codepoint sequences)
+    
+    const str = icon.toLowerCase();
+    if (str.includes('sparkle')) return '✨';
+    if (str.includes('clock') || str.includes('time')) return '⏰';
+    if (str.includes('heart') || str.includes('love') || str.includes('care')) return '❤️';
+    if (str.includes('star')) return '⭐';
+    if (str.includes('shield') || str.includes('safe') || str.includes('secure')) return '🛡️';
+    if (str.includes('check') || str.includes('tick')) return '✅';
+    if (str.includes('rocket') || str.includes('fast')) return '🚀';
+    if (str.includes('gem') || str.includes('premium') || str.includes('diamond')) return '💎';
+    if (str.includes('globe') || str.includes('world')) return '🌍';
+    if (str.includes('user') || str.includes('person') || str.includes('people')) return '👥';
+    if (str.includes('phone') || str.includes('call') || str.includes('contact')) return '📞';
+    if (str.includes('mail') || str.includes('email') || str.includes('message')) return '✉️';
+    if (str.includes('fire') || str.includes('hot')) return '🔥';
+    if (str.includes('lightbulb') || str.includes('idea')) return '💡';
+    
+    return '✨'; // default fallback for arbitrary AI text
+}
+
 export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
     const { headline, subheadline, features: rawFeatures = [], variant = 'grid-3' } = block
-    const features = rawFeatures.length > 0 ? rawFeatures : FALLBACK_FEATURES
+    
+    // Map icons safely before rendering
+    const features = (rawFeatures.length > 0 ? rawFeatures : FALLBACK_FEATURES).map(f => ({
+        ...f,
+        icon: parseFeatureIcon(f.icon)
+    }))
 
     /* Plan 260415 Lỗi E — empty state dev warn thay vì render header trống */
     if (!features.length) {
@@ -106,8 +136,10 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                         </IconContainer>
                                     </div>
                                 )}
-                                <Heading level={3} className="mb-3">{feature.title}</Heading>
-                                <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                                <div className="min-w-0 break-words">
+                                    <Heading level={3} className="mb-3">{feature.title}</Heading>
+                                    <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                                </div>
                             </HoverCard>
                         </StaggerItem>
                     ))}
@@ -142,7 +174,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                         {feature.icon}
                                     </div>
                                 )}
-                                <div>
+                                <div className="flex-1 min-w-0 break-words">
                                     <Heading level={4} className="mb-1">{feature.title}</Heading>
                                     <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
                                 </div>
@@ -187,7 +219,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                     )}
                                 </div>
                                 {/* Content side */}
-                                <div className={`flex-1 ${isEven ? 'md:text-right' : ''}`}>
+                                <div className={`flex-1 min-w-0 break-words ${isEven ? 'md:text-right' : ''}`}>
                                     <Heading level={3} className="mb-3">{feature.title}</Heading>
                                     <Body className="opacity-50 leading-relaxed">{feature.description}</Body>
                                 </div>
@@ -224,7 +256,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                         {feature.icon}
                                     </IconContainer>
                                 )}
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 break-words">
                                     <Heading level={4} className="mb-1">{feature.title}</Heading>
                                     <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
                                 </div>
@@ -270,10 +302,12 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                 </IconContainer>
                             )}
 
-                            <Heading level={3} className="mb-3 group-hover:opacity-100 transition-opacity">
-                                {feature.title}
-                            </Heading>
-                            <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                            <div className="min-w-0 break-words">
+                                <Heading level={3} className="mb-3 group-hover:opacity-100 transition-opacity">
+                                    {feature.title}
+                                </Heading>
+                                <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                            </div>
 
                             {/* Bottom accent line on hover */}
                             <div
@@ -329,7 +363,7 @@ function FeaturesCarousel({
                 {/* Nav arrows — desktop only */}
                 <button
                     onClick={() => scroll('left')}
-                    className={`flex absolute left-2 md:-left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollLeft ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
+                    className={`hidden md:flex absolute md:-left-4 top-1/2 -translate-y-1/2 z-20 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollLeft ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
                     style={{
                         background: CSS_VARS.surfacePrimary,
                         borderColor: 'rgba(var(--brand-primary-rgb), 0.2)',
@@ -341,7 +375,7 @@ function FeaturesCarousel({
                 </button>
                 <button
                     onClick={() => scroll('right')}
-                    className={`flex absolute right-2 md:-right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollRight ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
+                    className={`hidden md:flex absolute md:-right-4 top-1/2 -translate-y-1/2 z-20 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollRight ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
                     style={{
                         background: CSS_VARS.surfacePrimary,
                         borderColor: 'rgba(var(--brand-primary-rgb), 0.2)',
@@ -366,7 +400,7 @@ function FeaturesCarousel({
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: i * 0.1, duration: 0.4 }}
-                            className={`flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] snap-start ${CARD_PADDING.lg} rounded-2xl group transition-all duration-300 hover:shadow-xl`}
+                            className={`flex-shrink-0 w-[280px] sm:w-[320px] md:w-[360px] snap-start ${CARD_PADDING.md} rounded-2xl group transition-all duration-300 hover:shadow-xl`}
                             style={{
                                 background: 'linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)',
                                 border: '1px solid rgba(var(--brand-primary-rgb), 0.071)',
@@ -377,8 +411,10 @@ function FeaturesCarousel({
                                     {feature.icon}
                                 </IconContainer>
                             )}
-                            <Heading level={3} className="mb-3">{feature.title}</Heading>
-                            <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                            <div className="min-w-0 break-words">
+                                <Heading level={3} className="mb-3">{feature.title}</Heading>
+                                <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                            </div>
                         </motion.div>
                     ))}
                 </div>
