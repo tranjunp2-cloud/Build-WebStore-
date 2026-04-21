@@ -6,9 +6,13 @@
  *   - prompt: string → upserts override with updatedAt timestamp
  *
  * Guard: withSuperAdmin. Validates blockSlug ∈ block registry.
+ *
+ * Concurrency: uses atomic PostgreSQL jsonb_set / - operator so concurrent
+ * PATCH calls on different slugs never silently overwrite each other.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { sql } from 'drizzle-orm'
 import { withSuperAdmin } from '@/lib/admin/api-utils'
 import { getRegistrySlugs } from '@/lib/admin/block-registry-reader'
 import { getPayload } from 'payload'
@@ -29,6 +33,10 @@ export type BlockPromptOverride = {
 }
 
 export type BlockPromptOverridesMap = Record<string, BlockPromptOverride>
+
+// ── Drizzle row shape ─────────────────────────────────────────────────────────
+
+type UpdateRow = { block_prompt_overrides: unknown }
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
@@ -63,43 +71,54 @@ export const PATCH = async (req: NextRequest, ctx: RouteContext) => {
 
         const payload = await getPayload({ config })
 
-        // Fetch current overrides map
-        let template: Record<string, unknown>
+        // Verify template exists before touching it
         try {
-            template = await payload.findByID({
-                collection: 'templates',
-                id,
-                depth: 0,
-            }) as Record<string, unknown>
+            await payload.findByID({ collection: 'templates', id, depth: 0 })
         } catch {
             return NextResponse.json({ error: 'template not found' }, { status: 404 })
         }
 
-        const current = (template.blockPromptOverrides ?? {}) as BlockPromptOverridesMap
+        // Atomic jsonb operation — avoids read-modify-write race when concurrent
+        // PATCH calls update different slugs at the same time.
+        const db = (payload.db as unknown as { drizzle: { execute: (q: unknown) => Promise<unknown> } }).drizzle
+        let updatedOverrides: BlockPromptOverridesMap
 
-        let updated: BlockPromptOverridesMap
-        if (prompt === null) {
-            // Remove override for this blockSlug
-            const { [blockSlug]: _removed, ...rest } = current
-            updated = rest
-        } else {
-            // Upsert override with timestamp + author
-            updated = {
-                ...current,
-                [blockSlug]: {
+        try {
+            let rows: UpdateRow[]
+            if (prompt === null) {
+                // Remove the key from the jsonb column atomically
+                rows = await db.execute(sql`
+                    UPDATE templates
+                    SET block_prompt_overrides = COALESCE(block_prompt_overrides, '{}'::jsonb) - ${blockSlug}::text
+                    WHERE id = ${id}::int
+                    RETURNING block_prompt_overrides
+                `) as UpdateRow[]
+            } else {
+                const overrideValue = JSON.stringify({
                     prompt,
                     updatedAt: new Date().toISOString(),
-                    updatedBy: user.email,
-                },
+                    updatedBy: user.email ?? null,
+                })
+                // Merge a single key atomically — other concurrent writes to different
+                // keys are safe because || operates on disjoint key sets.
+                rows = await db.execute(sql`
+                    UPDATE templates
+                    SET block_prompt_overrides = COALESCE(block_prompt_overrides, '{}'::jsonb) || jsonb_build_object(${blockSlug}::text, ${overrideValue}::jsonb)
+                    WHERE id = ${id}::int
+                    RETURNING block_prompt_overrides
+                `) as UpdateRow[]
             }
+
+            if (!rows || rows.length === 0) {
+                return NextResponse.json({ error: 'template not found' }, { status: 404 })
+            }
+
+            updatedOverrides = (rows[0].block_prompt_overrides ?? {}) as BlockPromptOverridesMap
+        } catch (err) {
+            console.error('[block-prompts] atomic jsonb update failed:', err)
+            return NextResponse.json({ error: 'failed to update block prompt override' }, { status: 500 })
         }
 
-        await payload.update({
-            collection: 'templates',
-            id,
-            data: { blockPromptOverrides: updated },
-        })
-
-        return NextResponse.json({ data: updated })
+        return NextResponse.json({ data: updatedOverrides })
     })(req)
 }
