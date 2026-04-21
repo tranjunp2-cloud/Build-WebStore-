@@ -38,3 +38,6 @@ export const featuresMeta = {
     editableFields: ['headline', 'subheadline', 'features'],
     quickActions: ['Add feature', 'Rewrite all', 'Change icons'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = FeaturesConfigSchema

@@ -51,3 +51,6 @@ export const faqMeta = {
     editableFields: ['headline', 'items', 'allowMultiple'],
     quickActions: ['Add question', 'Rewrite answers', 'Generate FAQ'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = FAQConfigSchema

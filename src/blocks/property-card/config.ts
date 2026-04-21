@@ -58,3 +58,6 @@ export const propertyCardMeta = {
     quickActions: ['Add property', 'Filter by type', 'Update prices'],
     aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = PropertyCardConfigSchema

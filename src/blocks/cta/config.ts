@@ -69,3 +69,6 @@ export const ctaMeta = {
     editableFields: ['headline', 'subheadline', 'ctaLabel', 'ctaUrl', 'secondaryCtaLabel', 'secondaryCtaUrl'],
     quickActions: ['Rewrite CTA', 'Make urgent'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = CTAConfigSchema

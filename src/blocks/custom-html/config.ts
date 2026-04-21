@@ -19,3 +19,6 @@ export const customHtmlMeta: BlockMeta = {
     quickActions: [],
     aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = CustomHtmlConfigSchema

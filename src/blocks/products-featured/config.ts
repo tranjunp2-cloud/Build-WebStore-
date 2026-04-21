@@ -22,3 +22,6 @@ export const productsFeaturedMeta: BlockMeta = {
     quickActions: [],
     aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = ProductsFeaturedConfigSchema

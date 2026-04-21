@@ -8,3 +8,6 @@ export const GalleryConfigSchema = BaseBlockSchema.extend({
     images: z.array(z.object({ image: z.object({ url: z.string(), alt: z.string().optional() }), caption: z.string().optional() })).default([]),
 })
 export const galleryMeta = { type: 'gallery' as const, name: 'Gallery', description: 'Image gallery with grid, masonry, or carousel layout', icon: '🖼️', variants: ['grid', 'masonry', 'carousel', 'lightbox', 'filmstrip', 'justified'], defaultVariant: 'grid', editableFields: ['headline', 'images'], quickActions: ['Add images', 'Change layout'] }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = GalleryConfigSchema

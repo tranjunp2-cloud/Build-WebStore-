@@ -75,3 +75,6 @@ export const socialWidgetMeta = {
     editableFields: ['headline', 'links'],
     quickActions: ['Add social link', 'Update platform URLs'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = SocialWidgetConfigSchema

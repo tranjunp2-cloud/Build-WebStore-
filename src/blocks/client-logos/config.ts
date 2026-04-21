@@ -9,3 +9,6 @@ export const ClientLogosConfigSchema = BaseBlockSchema.extend({
     logos: z.array(z.object({ url: z.string(), alt: z.string(), linkUrl: z.string().optional() })).default([]),
 })
 export const clientLogosMeta = { type: 'client-logos' as const, name: 'Client Logos', description: 'Showcase partner and client brand logos', icon: '🏢', variants: ['scroll', 'grid', 'fade'], defaultVariant: 'scroll', editableFields: ['headline', 'logos'], quickActions: ['Add logo', 'Change layout'], aiVisible: false }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = ClientLogosConfigSchema

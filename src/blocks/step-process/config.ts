@@ -38,3 +38,6 @@ export const stepProcessMeta = {
     quickActions: ['Add step', 'Rewrite steps', 'Change layout'],
     aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = StepProcessConfigSchema
