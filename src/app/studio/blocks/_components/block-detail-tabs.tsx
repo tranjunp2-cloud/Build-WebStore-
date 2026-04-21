@@ -141,11 +141,19 @@ export function BlockDetailTabs({ block }: Props) {
 
 // ── AI & Prompts tab ──────────────────────────────────────────────────────────
 
+type PromptOverrideEntry = {
+    templateId: number | string
+    templateName: string
+    promptSnippet: string
+    updatedAt: string
+    updatedBy?: string
+}
+
 function AiTab({ block }: { block: BlockDetailData }) {
     const estimatedTokens = block.editableFields.length * 18 + block.variants.length * 12
     const tokenPct = Math.min(100, (estimatedTokens / 400) * 100)
 
-    const promptTemplate = `Block: ${block.slug}
+    const registryPrompt = `Block: ${block.slug}
 Description: ${block.description}
 Variants: ${block.variants.join(', ')}
 Fields: ${block.editableFields.join(', ')}
@@ -155,9 +163,25 @@ Usage guideline:
 - Default variant is "${block.defaultVariant}".
 - Be concise in headline (under 60 chars).`
 
+    const [overrides, setOverrides] = useState<PromptOverrideEntry[] | null>(null)
+    const [overrideError, setOverrideError] = useState<string | null>(null)
+
+    useEffect(() => {
+        let cancelled = false
+        fetch(`/api/admin/blocks/${encodeURIComponent(block.slug)}/prompt-overrides`)
+            .then((r) => r.json())
+            .then((d: { data?: PromptOverrideEntry[]; error?: string }) => {
+                if (cancelled) return
+                if (d.error) { setOverrideError(d.error); return }
+                setOverrides(d.data ?? [])
+            })
+            .catch(() => { if (!cancelled) setOverrideError('Failed to load overrides') })
+        return () => { cancelled = true }
+    }, [block.slug])
+
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            {/* AI visibility toggle */}
+            {/* AI visibility — read-only display */}
             <div className="b-ai-card">
                 <div className="b-group-title">Visibility cho AI generator</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
@@ -191,15 +215,20 @@ Usage guideline:
                 </div>
             </div>
 
-            {/* Prompt template */}
+            {/* Registry default prompt — read-only */}
             <div className="b-ai-card" style={{ gridColumn: '1 / -1' }}>
-                <div className="b-group-title">Prompt template (system message context)</div>
+                <div className="b-group-title">
+                    Registry default prompt
+                    <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text-3)', fontWeight: 400 }}>
+                        read-only · edit per-template in Template Editor → Inspector → AI tab
+                    </span>
+                </div>
                 <textarea
                     readOnly
-                    defaultValue={promptTemplate}
+                    defaultValue={registryPrompt}
                     style={{
                         width: '100%',
-                        minHeight: 140,
+                        minHeight: 130,
                         padding: 10,
                         fontFamily: 'var(--mono)',
                         fontSize: 11.5,
@@ -212,10 +241,85 @@ Usage guideline:
                         boxSizing: 'border-box',
                     }}
                 />
-                <p style={{ marginTop: 8, fontSize: 11, color: 'var(--text-3)' }}>
-                    Prompt editor và quick actions sẽ live-editable trong F07.
-                </p>
             </div>
+
+            {/* Template overrides list */}
+            <div className="b-ai-card" style={{ gridColumn: '1 / -1' }}>
+                <div className="b-group-title">
+                    Template overrides
+                    {overrides !== null && overrides.length > 0 && (
+                        <span className="b-tab-count" style={{ marginLeft: 8 }}>{overrides.length}</span>
+                    )}
+                </div>
+                <TemplateOverridesList
+                    blockSlug={block.slug}
+                    overrides={overrides}
+                    error={overrideError}
+                />
+            </div>
+        </div>
+    )
+}
+
+function TemplateOverridesList({
+    blockSlug,
+    overrides,
+    error,
+}: {
+    blockSlug: string
+    overrides: PromptOverrideEntry[] | null
+    error: string | null
+}) {
+    if (error) {
+        return <p style={{ margin: 0, fontSize: 12, color: 'var(--danger)' }}>{error}</p>
+    }
+    if (overrides === null) {
+        return <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>Loading…</p>
+    }
+    if (overrides.length === 0) {
+        return (
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>
+                No template-specific overrides yet. Edit a template in{' '}
+                <strong>Template Editor → select block → Inspector → AI tab</strong>.
+            </p>
+        )
+    }
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            {overrides.map((entry) => (
+                <Link
+                    key={entry.templateId}
+                    href={`/studio/templates/${entry.templateId}/edit?focusBlock=${encodeURIComponent(blockSlug)}`}
+                    style={{
+                        display: 'block',
+                        padding: '8px 10px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-sunk)',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                    }}
+                >
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                        {entry.templateName}
+                    </div>
+                    <div style={{
+                        fontSize: 11,
+                        color: 'var(--text-3)',
+                        marginTop: 2,
+                        fontFamily: 'var(--mono)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                    }}>
+                        {entry.promptSnippet}{entry.promptSnippet.length >= 80 ? '…' : ''}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3 }}>
+                        {new Date(entry.updatedAt).toLocaleDateString('vi-VN')}
+                        {entry.updatedBy ? ` · ${entry.updatedBy}` : ''}
+                    </div>
+                </Link>
+            ))}
         </div>
     )
 }
