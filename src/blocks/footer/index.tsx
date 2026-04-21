@@ -33,6 +33,20 @@ function SocialIcon({ platform }: { platform: string }) {
 // vars). Brand identity vars (`--brand-primary`, `--brand-primary-rgb`) stay
 // untouched per Option C additive strategy.
 
+// Shared opacity + brand-tint tokens — dedupe magic numbers across 6 variants.
+const FOOTER_OPACITY = {
+    title: 0.9,
+    body: 0.7,
+    caption: 0.5,
+} as const
+
+const FOOTER_BORDER_OPACITY = 0.082
+const FOOTER_DIVIDER_OPACITY = 0.063
+const FOOTER_BRAND_GRADIENT_STOP = 0.502
+
+// Progressive gap: tight mobile → comfortable desktop. Applied to all grid variants.
+const FOOTER_RESPONSIVE_GAP = 'gap-6 sm:gap-8 md:gap-10'
+
 type FooterSectionProps = {
     paddingClass: string
     showGradientLine?: boolean
@@ -126,7 +140,7 @@ function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoPro
                 <img src={logo.url} alt={logoText ? `${logoText} logo` : 'Company logo'} className={`${imgCls} w-auto`} />
             ) : (
                 <span style={{
-                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
+                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), ${FOOTER_BRAND_GRADIENT_STOP}))`,
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
@@ -176,8 +190,8 @@ function SocialIconList({ socials, iconSize = 'md', className = '' }: SocialIcon
                         rel={social.url?.startsWith('http') ? 'noopener noreferrer' : undefined}
                         className={`${sizeCls} ${TOUCH_TARGET.min} rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)]`}
                         style={{
-                            background: `rgba(var(--brand-primary-rgb), 0.063)`,
-                            border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
+                            background: `rgba(var(--brand-primary-rgb), ${FOOTER_DIVIDER_OPACITY})`,
+                            border: `1px solid rgba(var(--brand-primary-rgb), ${FOOTER_BORDER_OPACITY})`,
                             color: 'var(--brand-primary)',
                         }}
                     >
@@ -186,6 +200,18 @@ function SocialIconList({ socials, iconSize = 'md', className = '' }: SocialIcon
                 )
             })}
         </div>
+    )
+}
+
+/**
+ * Shared section title — unifies `<Heading level={4} opacity-90>` pattern
+ * across simple/expanded/mega-footer/dark-gradient variants (via LinkColumn).
+ */
+function FooterSectionTitle({ children, className = '' }: { children: ReactNode; className?: string }) {
+    return (
+        <Heading level={4} className={`mb-4 ${className}`.trim()} style={{ opacity: FOOTER_OPACITY.title }}>
+            {children}
+        </Heading>
     )
 }
 
@@ -203,7 +229,7 @@ function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
     const ulSpacing = spacing === 'tight' ? 'space-y-2.5' : 'space-y-3'
     return (
         <div>
-            <Heading level={4} className="mb-4 opacity-90">{title}</Heading>
+            <FooterSectionTitle>{title}</FooterSectionTitle>
             <ul className={ulSpacing}>
                 {(links || []).map((link, j) => (
                     <li key={`${link?.label || 'link'}-${j}`}>
@@ -220,7 +246,7 @@ function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
     )
 }
 
-const FOOTER_DIVIDER_STYLE = { borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }
+const FOOTER_DIVIDER_STYLE = { borderTop: `1px solid rgba(var(--brand-primary-rgb), ${FOOTER_DIVIDER_OPACITY})` }
 
 export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterConfig>) {
     void _theme
@@ -319,7 +345,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                     <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                         {/* Plan 260415 — grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5
                             với gap-6 mobile → gap-8 sm+ (Lỗi E — giảm gap mobile). */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 mb-12">
+                        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 ${FOOTER_RESPONSIVE_GAP} mb-12`}>
                             {/* Brand column */}
                             <div className="sm:col-span-2 md:col-span-1">
                                 <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="md" className="mb-3" />
@@ -376,7 +402,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                     height={1}
                 />
                 <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
-                    <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-10">
+                    <div className={`flex flex-col lg:flex-row lg:justify-between lg:items-start ${FOOTER_RESPONSIVE_GAP}`}>
                         {/* Logo + tagline */}
                         <div className="lg:max-w-xs">
                             <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-3" />
@@ -414,7 +440,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
         return (
             <FooterSection paddingClass="pt-16 md:pt-20 pb-8">
                 {/* 4-column links section */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${FOOTER_RESPONSIVE_GAP} mb-12`}>
                     {/* Brand column as first of 4 */}
                     <div>
                         <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4" />
@@ -500,7 +526,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // md 2-col trung gian vì 4 cột đều hơn với 1 brand + 3 link cols).
     return (
         <FooterSection paddingClass="pt-16 md:pt-20 pb-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-16">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 ${FOOTER_RESPONSIVE_GAP} mb-16`}>
                 {/* Brand Column */}
                 <div className="sm:col-span-2 md:col-span-1">
                     <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4" />

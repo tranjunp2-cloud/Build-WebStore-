@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { revalidateTag } from 'next/cache'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 
@@ -72,7 +73,22 @@ export async function PATCH(
         // This ensures site is only marked published when all pages are ready.
         // Editor saves with isDraft:true, so pages only have draft versions.
         // Paginate to handle sites with >100 pages.
+        //
+        // depth: 0 keeps relationships as IDs — passing populated objects back to
+        // payload.update() on Payload 3.79 causes silent validation drops on nested
+        // media/relationship fields, which previously made the promotion a no-op
+        // for newly-created draft pages (BUG-F05: new page stayed draft after Update).
         const failedPageIds: string[] = []
+        const failureDetails: Array<{
+            pageId: string
+            errName?: string
+            errMsg?: string
+            pgCode?: string
+            pgColumn?: string
+            pgTable?: string
+            causeMsg?: string
+            validationErrors?: Array<{ path?: string; message?: string }>
+        }> = []
         let hasMore = true
         let pageNum = 1
         while (hasMore) {
@@ -83,18 +99,45 @@ export async function PATCH(
                 page: pageNum,
                 sort: 'id',
                 draft: true,
+                depth: 0,
             })
 
             for (const pg of sitePages.docs) {
+                const pageId = String(pg.id)
                 try {
-                    // Promote full draft doc — strip system fields, keep everything else
-                    // so published version matches the latest draft exactly.
-                    const SYSTEM_FIELDS = new Set(['id', '_status', 'createdAt', 'updatedAt', 'sizes', '_verificationToken'])
+                    // Promote full draft doc — strip system/version fields, keep
+                    // everything else so published version matches latest draft.
+                    const SYSTEM_FIELDS = new Set([
+                        'id', '_status', 'createdAt', 'updatedAt', 'sizes',
+                        '_verificationToken', '_versionID', '_currentVersionId',
+                        'publishedDoc', 'version', 'latest',
+                    ])
                     const draft = pg as Record<string, unknown>
                     const data: Record<string, unknown> = {}
                     for (const [key, val] of Object.entries(draft)) {
-                        if (!SYSTEM_FIELDS.has(key)) data[key] = val
+                        if (SYSTEM_FIELDS.has(key)) continue
+                        if (val === undefined) continue
+                        data[key] = val
                     }
+                    // Explicitly include _status: 'published'. Payload 3.79's
+                    // update({ draft: false }) writes a new published *version*
+                    // but does NOT set _status on the main pages row (verified
+                    // in node_modules/payload/dist/collections/operations/
+                    // utilities/update.js:29 — _status is only touched when
+                    // isSavingDraft=true). Without this, the main row stays
+                    // _status='draft' after promote, and list queries keep
+                    // showing the Draft badge even though a published version
+                    // exists in _pages_v.
+                    data._status = 'published'
+
+                    // Drop block/array row `id` + `_uuid` before promote so
+                    // Payload's live block tables regenerate fresh UUIDs,
+                    // avoiding PG 23505 when AI-seeded block UUIDs collide
+                    // across pages. See stripArrayItemIds doc for details.
+                    if (Array.isArray(data.layout)) {
+                        data.layout = stripArrayItemIds(data.layout)
+                    }
+
                     await payload.update({
                         collection: 'pages',
                         id: pg.id,
@@ -102,8 +145,58 @@ export async function PATCH(
                         draft: false,
                     })
                 } catch (err) {
-                    console.warn(`[Publish] Failed to promote page ${pg.id}:`, err instanceof Error ? err.message : err)
-                    failedPageIds.push(String(pg.id))
+                    // Two distinct failure shapes bubble up here, and the old
+                    // handler only pulled out the first — so the second class
+                    // of failure surfaced to the user as `{pageId}` with zero
+                    // diagnostic detail.
+                    //
+                    //   1. Drizzle/pg errors — real detail on err.cause
+                    //      (.code/.column/.table/.message).
+                    //   2. Payload ValidationError — no .cause; detail lives
+                    //      on err.data.errors[] as {path,message}. Triggers
+                    //      whenever a nested required field on a block is
+                    //      blank (common on industry blocks whose required
+                    //      array rows were seeded empty by AI gen or an
+                    //      older composer).
+                    //
+                    // Always capture name+message so any un-classified error
+                    // type still gives the user something actionable.
+                    type PgErrLike = { code?: string; detail?: string; table?: string; column?: string; message?: string }
+                    type ValErrItem = { path?: string; message?: string }
+                    const cause = (err as { cause?: unknown })?.cause
+                    const pgErr: PgErrLike | null = cause && typeof cause === 'object' ? (cause as PgErrLike) : null
+                    const errName = err instanceof Error ? err.name : 'UnknownError'
+                    const errMsg = err instanceof Error ? err.message : String(err)
+                    const data = (err as { data?: unknown })?.data
+                    const rawErrors = data && typeof data === 'object' ? (data as { errors?: unknown }).errors : null
+                    const validationErrors: ValErrItem[] = Array.isArray(rawErrors)
+                        ? (rawErrors as ValErrItem[]).map(e => ({
+                            path: typeof e?.path === 'string' ? e.path : undefined,
+                            message: typeof e?.message === 'string' ? e.message : undefined,
+                        }))
+                        : []
+
+                    console.warn('[Publish] Failed to promote page', JSON.stringify({
+                        pageId,
+                        errName,
+                        errMsg: errMsg.slice(0, 300),
+                        pgCode: pgErr?.code,
+                        pgColumn: pgErr?.column,
+                        pgTable: pgErr?.table,
+                        causeMsg: pgErr?.message?.slice(0, 300),
+                        validationErrors,
+                    }))
+                    failedPageIds.push(pageId)
+                    failureDetails.push({
+                        pageId,
+                        errName,
+                        errMsg: errMsg.slice(0, 300),
+                        pgCode: pgErr?.code,
+                        pgColumn: pgErr?.column,
+                        pgTable: pgErr?.table,
+                        causeMsg: pgErr?.message?.slice(0, 300),
+                        validationErrors: validationErrors.length > 0 ? validationErrors : undefined,
+                    })
                 }
             }
 
@@ -113,6 +206,8 @@ export async function PATCH(
 
         if (failedPageIds.length > 0) {
             console.error(`[Publish] ${failedPageIds.length} page(s) failed to promote:`, failedPageIds)
+            // 500 (not 207) so fetch `res.ok` is false and the client surfaces
+            // the error to the user instead of cheerfully showing "published".
             return NextResponse.json(
                 {
                     success: false,
@@ -120,9 +215,10 @@ export async function PATCH(
                         code: 'PARTIAL_PUBLISH_FAILURE',
                         message: `Failed to publish ${failedPageIds.length} page(s). Please try again.`,
                         failedPages: failedPageIds,
+                        failures: failureDetails,
                     },
                 },
-                { status: 207 },
+                { status: 500 },
             )
         }
 

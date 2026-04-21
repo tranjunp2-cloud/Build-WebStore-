@@ -16,6 +16,8 @@ export type NavigationConfig = {
     logo?: ImageRef
     links: NavLink[]
     ctaButton?: { show: boolean; label: string; url: string }
+    /** Accessible label for screen readers. Defaults to "Main navigation" at render time. */
+    ariaLabel?: string
 }
 
 const NavLinkSchema: z.ZodType<NavLink> = z.lazy(() =>
@@ -37,6 +39,7 @@ export const NavigationConfigSchema = BaseBlockSchema.extend({
         label: z.string(),
         url: z.string(),
     }).optional(),
+    ariaLabel: z.string().optional(),
 })
 
 export const navigationMeta = {

@@ -1,6 +1,7 @@
 import type { BlockData, ThemeData } from '@/types/editor'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { getGalleryImages, getTeamAvatar } from '@/lib/images/industry-images'
+import { dedupSectionLabel } from './dedup-section-label'
 
 export type SupportedAddSectionType =
     | 'testimonials'
@@ -236,12 +237,13 @@ export function createAddSectionBlock({
                 ),
             }
 
-        case 'features':
+        case 'features': {
+            const headline = `Why customers choose ${brandName}`
             return {
                 blockType: 'features',
                 layout: 'grid-3',
-                sectionLabel: 'Why Choose Us',
-                headline: `Why customers choose ${brandName}`,
+                sectionLabel: dedupSectionLabel('Why Choose Us', headline),
+                headline,
                 subheadline: 'Three strong reasons to trust this offer.',
                 features: [
                     {
@@ -261,6 +263,7 @@ export function createAddSectionBlock({
                     },
                 ],
             }
+        }
 
         case 'team':
             return {
@@ -549,14 +552,16 @@ export function createAddSectionBlock({
                 ],
             }
 
-        case 'about':
+        case 'about': {
+            const aboutHeadline = 'Our Story'
             return {
                 blockType: 'about',
                 variant: 'simple',
-                sectionLabel: 'About Us',
-                headline: `Our Story`,
+                sectionLabel: dedupSectionLabel('About Us', aboutHeadline),
+                headline: aboutHeadline,
                 body: `${brandName} was founded with a simple mission: to deliver quality and value to every customer. With years of experience and a passionate team, we continue to grow and innovate.`,
             }
+        }
 
         case 'contact':
             return {

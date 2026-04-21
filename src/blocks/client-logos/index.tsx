@@ -12,23 +12,48 @@ void _CSS_VARS
 
 const CL_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
-function LogoImage({ logo, className }: { logo: LogoItem; className?: string }) {
-    const img = (
-        <img
-            src={logo?.url}
-            alt={logo?.alt}
-            className={`h-10 md:h-12 w-auto object-contain ${className || ''}`}
-            loading="lazy"
-        />
+// Initials placeholder when logo has no image url — mirrors logo-cloud pattern.
+// Used when content library supplies name-only entries (copyright-safe seed pool).
+function LogoPlaceholder({ name, className }: { name?: string; className?: string }) {
+    const initials = (name ?? '')
+        .split(/\s+/)
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || '?'
+    return (
+        <div
+            className={`h-10 md:h-12 px-5 rounded flex items-center justify-center text-sm font-bold uppercase tracking-wider ${className || ''}`}
+            style={{
+                border: `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
+                color: 'var(--brand-primary)',
+                background: `rgba(var(--brand-primary-rgb), 0.04)`,
+            }}
+        >
+            {initials}
+        </div>
     )
+}
+
+function LogoImage({ logo, className }: { logo: LogoItem; className?: string }) {
+    const visual = logo?.url
+        ? (
+            <img
+                src={logo.url}
+                alt={logo?.alt}
+                className={`h-10 md:h-12 w-auto object-contain ${className || ''}`}
+                loading="lazy"
+            />
+        )
+        : <LogoPlaceholder name={logo?.alt} className={className} />
     if (logo.linkUrl) {
         return (
             <a href={logo.linkUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                {img}
+                {visual}
             </a>
         )
     }
-    return <span className="flex-shrink-0">{img}</span>
+    return <span className="flex-shrink-0">{visual}</span>
 }
 
 function CLHeadline({ text }: { text?: string }) {

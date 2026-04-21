@@ -30,6 +30,9 @@ const protectedPaths = [
     '/account',
     '/help',
     '/blog',
+    '/products',
+    '/orders',
+    '/media',
 ]
 
 const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
@@ -96,11 +99,6 @@ export async function middleware(req: NextRequest) {
         const parts = pathname.split('/')
         if (parts.length >= 3) {
             const tenantSlug = parts[2]
-            // Gate ecom storefront routes (v1.0: landing pages only, ecom deferred to v1.1)
-            const remainingPath = '/' + parts.slice(3).join('/')
-            if (remainingPath.startsWith('/products') || remainingPath.startsWith('/checkout')) {
-                return NextResponse.rewrite(new URL('/not-found', req.url))
-            }
             const response = NextResponse.next()
             response.headers.set('x-tenant-slug', tenantSlug)
             response.headers.set('x-tenant-type', 'local')
@@ -115,10 +113,6 @@ export async function middleware(req: NextRequest) {
         hostname !== ADMIN_DOMAIN
 
     if (isSubdomain) {
-        // Gate ecom routes on subdomain (v1.0: landing pages only)
-        if (pathname.startsWith('/products') || pathname.startsWith('/checkout')) {
-            return NextResponse.rewrite(new URL('/not-found', req.url))
-        }
         const tenantSlug = hostname.replace(`.${PLATFORM_DOMAIN}`, '')
 
         // F23: Check if this is an old slug that needs 301 redirect

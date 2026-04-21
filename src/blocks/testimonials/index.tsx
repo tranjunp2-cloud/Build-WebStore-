@@ -5,7 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { TestimonialsConfig, TestimonialItem } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
-import { AvatarRing, GradientBlob } from '../shared/decorative'
+import {
+    AvatarRing,
+    GradientBlob,
+    LayeredShapes,
+    NoiseTexture,
+    TypographicMark,
+} from '../shared/decorative'
 import { getTeamAvatar } from '@/lib/images/industry-images'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText as _RichText } from '../shared/RichText'
@@ -26,20 +32,20 @@ type TestimonialsSectionProps = {
     showBlob?: boolean
     className?: string
     children: ReactNode
+    decorative?: ReactNode
 }
 
 /**
- * Outer wrapper used by all 8 variants. AnimatedSection (whileInView) +
- * GradientBlob decorative + token container. Cannot use SectionWrapper —
- * GradientBlob needs absolute positioning relative to the AnimatedSection
- * tag, not the inner max-w container.
+ * Outer wrapper used by all 8 variants. Phase A4 (260417) — `decorative` slot
+ * lets each variant pin its own visual vocabulary; falls back to GradientBlob.
+ * `showBlob={false}` still suppresses any decoration (used by simple variant).
  */
-function TestimonialsSection({ showBlob = true, className = '', children }: TestimonialsSectionProps) {
+function TestimonialsSection({ showBlob = true, className = '', children, decorative }: TestimonialsSectionProps) {
     return (
         <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden ${className}`.trim()}>
-            {showBlob && (
+            {showBlob && (decorative ?? (
                 <GradientBlob color={CSS_VARS.primary} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
-            )}
+            ))}
             <div className={`${TESTIMONIALS_CONTAINER} relative z-10`}>
                 {children}
             </div>
@@ -225,7 +231,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     // ── masonry variant ───────────────────────────────────────────────────
     if (variant === 'masonry') {
         return (
-            <TestimonialsSection>
+            <TestimonialsSection decorative={<NoiseTexture opacity={0.06} />}>
                 <TestimonialsHeader headline={headline} showSubtitle />
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                     {testimonials.map((t, i) => (
@@ -369,7 +375,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
 
     // ── Default: cards variant ────────────────────────────────────────────
     return (
-        <TestimonialsSection>
+        <TestimonialsSection decorative={<LayeredShapes color={CSS_VARS.primary} opacity={0.1} />}>
             <TestimonialsHeader headline={headline} showSubtitle />
             <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {testimonials.map((t, i) => (
@@ -452,7 +458,7 @@ function TestimonialsSpotlight({
     }
 
     return (
-        <TestimonialsSection>
+        <TestimonialsSection decorative={<TypographicMark text="“" color={CSS_VARS.primary} opacity={0.05} size="xl" />}>
             <TestimonialsHeader headline={headline} />
             <div className="flex flex-col lg:flex-row items-center gap-8 max-w-5xl mx-auto">
                 {/* Flanking — left */}

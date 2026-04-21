@@ -231,30 +231,6 @@ describe('SettingsPanel', () => {
         expect(defaultProps.onThemeChange).toHaveBeenCalledWith('colorMode', 'light')
     })
 
-    // ── Block actions ────────────────────────────────────────────────────
-
-    it('duplicate button calls onDuplicateBlock', () => {
-        // Arrange
-        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
-
-        // Act
-        fireEvent.click(screen.getByText(/duplicate/i))
-
-        // Assert
-        expect(defaultProps.onDuplicateBlock).toHaveBeenCalledWith(0)
-    })
-
-    it('delete button calls onDeleteBlock', () => {
-        // Arrange
-        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
-
-        // Act
-        fireEvent.click(screen.getByText(/delete/i))
-
-        // Assert
-        expect(defaultProps.onDeleteBlock).toHaveBeenCalledWith(0)
-    })
-
     // ── Theme not provided ───────────────────────────────────────────────
 
     it('does not render theme section when theme is undefined', () => {

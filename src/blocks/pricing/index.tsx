@@ -5,24 +5,25 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { PricingConfig } from './config'
 import { AnimatedSection, StaggerGrid as _StaggerGrid, StaggerItem as _StaggerItem, HoverCard as _HoverCard, staggerContainer, staggerItem } from '../shared/animations'
-import { GradientBlob } from '../shared/decorative'
+import { GradientBlob, GridLines } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 
+const FALLBACK_PLANS: PricingConfig['plans'] = [
+    { name: 'Starter', price: 'RM 99', period: 'mo', features: [{ text: 'Core features', included: true }, { text: 'Email support', included: true }], ctaLabel: 'Get Started', ctaUrl: '/contact' },
+    { name: 'Pro', price: 'RM 299', period: 'mo', features: [{ text: 'All Starter features', included: true }, { text: 'Priority support', included: true }, { text: 'Advanced tools', included: true }], ctaLabel: 'Choose Pro', ctaUrl: '/contact', highlighted: true },
+    { name: 'Enterprise', price: 'Custom', features: [{ text: 'All Pro features', included: true }, { text: 'Dedicated manager', included: true }], ctaLabel: 'Contact Sales', ctaUrl: '/contact' },
+]
+
 void _StaggerGrid
 void _StaggerItem
 void _HoverCard
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
-// Brand identity vars preserved per Option C additive strategy.
 
-// Plan 260415 Lỗi A (P1 SILENT) — dynamic `md:grid-cols-${n}` không được
-// Tailwind JIT scan → class không sinh ra → cards/toggle/tiered variants kẹt
-// 1 cột desktop. Fix bằng object map với class literal để JIT detect.
-// Clamp max 4 để grid rộng không overflow.
 const GRID_COLS_MD: Record<number, string> = {
     1: 'md:grid-cols-1',
     2: 'md:grid-cols-2',
@@ -38,19 +39,15 @@ function gridColsFor(count: number): string {
 type PricingSectionProps = {
     showBlob?: boolean
     children: ReactNode
+    decorative?: ReactNode
 }
 
-/**
- * Outer wrapper used by 7/8 variants. AnimatedSection + GradientBlob +
- * SectionWrapper container. Cards (default) variant skips the blob historically —
- * keep that by passing showBlob={false}.
- */
-function PricingSection({ showBlob = true, children }: PricingSectionProps) {
+function PricingSection({ showBlob = true, children, decorative }: PricingSectionProps) {
     return (
         <AnimatedSection className="relative overflow-hidden">
-            {showBlob && (
+            {showBlob && (decorative ?? (
                 <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
-            )}
+            ))}
             <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                 {children}
             </SectionWrapper>
@@ -130,7 +127,8 @@ function FeatureList({ features, className = 'space-y-3' }: FeatureListProps) {
 }
 
 export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
-    const { headline, subheadline, plans = [], variant = 'cards' } = block
+    const { headline, subheadline, plans: rawPlans = [], variant = 'cards' } = block
+    const plans = rawPlans.length > 0 ? rawPlans : FALLBACK_PLANS
 
     // ── horizontal variant ────────────────────────────────────────────────
     if (variant === 'horizontal') {
@@ -492,7 +490,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
 
     // ── Default: cards variant ────────────────────────────────────────────
     return (
-        <PricingSection showBlob={false}>
+        <PricingSection decorative={<GridLines color={CSS_VARS.primary} spacing={56} opacity={0.04} />}>
             <SectionHeader headline={headline} subheadline={subheadline} />
             <div className={`grid grid-cols-1 ${gridColsFor(Math.min(plans.length, 3))} gap-8 max-w-5xl mx-auto`}>
                 {plans.map((plan, i) => (

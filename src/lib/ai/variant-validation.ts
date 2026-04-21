@@ -11,6 +11,7 @@ export const VARIANT_MIN_CONTENT: Record<string, Record<string, number>> = {
     gallery: { masonry: 6, carousel: 3, grid: 4, lightbox: 4, filmstrip: 3, justified: 4 },
     pricing: { comparison: 2, table: 2, slider: 3, cards: 2, horizontal: 2, toggle: 2, tiered: 2, minimal: 1 },
     team: { grid: 2, list: 2 },
+    stats: { grid: 3, cards: 3, 'chart-bars': 3, row: 2, highlight: 1, 'inline-text': 1 },
 }
 
 /**

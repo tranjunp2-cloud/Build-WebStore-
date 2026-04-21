@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/db-setup.js --migrate-only && next build",
+  "buildCommand": "node scripts/db-setup.js --migrate-only && (if [ \"$ENABLE_HARNESS\" = \"1\" ]; then npx tsx scripts/test-harness/cli.ts --mode=full && npx tsx scripts/test-harness/rubric/scorer.ts || true; fi) && next build",
   "framework": "nextjs",
   "regions": ["sin1"],
   "functions": {

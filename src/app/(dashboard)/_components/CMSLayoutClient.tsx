@@ -12,10 +12,11 @@ type CMSLayoutClientProps = {
     userInitial: string
     userEmail: string
     currentUserRole?: string
+    isSuperAdmin?: boolean
     children: React.ReactNode
 }
 
-export function CMSLayoutClient({ userName, userInitial, userEmail, currentUserRole = 'viewer', children }: CMSLayoutClientProps) {
+export function CMSLayoutClient({ userName, userInitial, userEmail, currentUserRole = 'viewer', isSuperAdmin = false, children }: CMSLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const pathname = usePathname()
 
@@ -41,6 +42,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, currentUserR
                     userName={userName}
                     userInitial={userInitial}
                     currentUserRole={currentUserRole}
+                    isSuperAdmin={isSuperAdmin}
                     mobileOpen={sidebarOpen}
                     setMobileOpen={setSidebarOpen}
                 />

@@ -65,22 +65,31 @@ function normalise(
   seed: ReturnType<typeof composeFromBlueprint>,
   startedAt: number,
 ): HarnessResult {
+  const flattenLayout = (layout: unknown[]): HarnessBlock[] =>
+    (layout ?? []).map((b: any) => {
+      const { blockType, type, variant, ...rest } = b
+      return {
+        blockType: blockType ?? type ?? 'unknown',
+        variant,
+        data: rest,
+      }
+    })
+
   const homepage =
     seed.pages.find((p) => /home/i.test(p.slug) || /home/i.test(p.title)) ??
     seed.pages[0]
 
-  const blocks: HarnessBlock[] = (homepage?.layout ?? []).map((b: any) => {
-    const { blockType, type, variant, ...rest } = b
-    return {
-      blockType: blockType ?? type ?? 'unknown',
-      variant,
-      data: rest,
-    }
-  })
+  const blocks = flattenLayout(homepage?.layout ?? [])
+  const pages = seed.pages.map((p) => ({
+    title: p.title,
+    slug: p.slug,
+    blocks: flattenLayout(p.layout),
+  }))
 
   return {
     fixture,
     blocks,
+    pages,
     theme: (seed as any).theme ?? {},
     pageCount: seed.pages.length,
     durationMs: Date.now() - startedAt,

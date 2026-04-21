@@ -820,5 +820,78 @@ describe('POST /api/ai/apply-template', () => {
             expect(typeof templateFindCall[0].id).toBe('string')
             expect(templateFindCall[0].id).toBe('42')
         })
+
+        // ── TC-F07.049: multi-page template dedup ─────────────────────────────
+        // Bug repro: templatePages.flatMap across all pages concatenated nav+footer
+        // from every template page into the homepage Smart Mapping source, creating
+        // duplicate nav/footer blocks on the user's homepage layout.
+        it('TC-F07.049: multi-page template applies homepage-only blocks, no nav/footer duplication', async () => {
+            // Arrange — Professional-style template with 3 pages, each carrying nav+footer
+            mockTemplate = {
+                ...DEFAULT_TEMPLATE,
+                templatePages: [
+                    {
+                        title: 'Home',
+                        slug: 'home',
+                        isHomepage: true,
+                        layout: [
+                            { blockType: 'navigation', links: [] },
+                            { blockType: 'hero', variant: 'centered', headline: 'Tpl Hero' },
+                            { blockType: 'features', items: [] },
+                            { blockType: 'footer', logoText: 'Tpl Footer' },
+                        ],
+                    },
+                    {
+                        title: 'About',
+                        slug: 'about',
+                        isHomepage: false,
+                        layout: [
+                            { blockType: 'navigation', links: [] },
+                            { blockType: 'team', members: [] },
+                            { blockType: 'footer', logoText: 'Tpl Footer' },
+                        ],
+                    },
+                    {
+                        title: 'Contact',
+                        slug: 'contact',
+                        isHomepage: false,
+                        layout: [
+                            { blockType: 'navigation', links: [] },
+                            { blockType: 'contact', formFields: [] },
+                            { blockType: 'footer', logoText: 'Tpl Footer' },
+                        ],
+                    },
+                ],
+            }
+            // User homepage has 1 nav + 1 hero + 1 footer
+            mockHomepage = {
+                id: 201,
+                slug: 'home',
+                isHomepage: true,
+                layout: [
+                    { blockType: 'navigation', links: [{ label: 'User Link', url: '/' }] },
+                    { blockType: 'hero', variant: 'split', headline: 'User Hero' },
+                    { blockType: 'footer', logoText: 'User Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — user homepage updated with exactly 1 nav + 1 footer (no dupes)
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            const navCount = layout.filter(b => b.blockType === 'navigation').length
+            const footerCount = layout.filter(b => b.blockType === 'footer').length
+            expect(navCount).toBe(1)
+            expect(footerCount).toBe(1)
+            // User's footer content must be preserved (Smart Mapping intent)
+            const footer = layout.find(b => b.blockType === 'footer')
+            expect(footer?.logoText).toBe('User Footer')
+        })
     })
 })

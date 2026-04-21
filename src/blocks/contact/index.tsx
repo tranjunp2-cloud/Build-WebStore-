@@ -3,7 +3,7 @@
 import type { ReactNode, ComponentType } from 'react'
 import type { BlockProps } from '../types'
 import type { ContactConfig, FormField } from './config'
-import { useContactForm } from './useContactForm'
+import { useContactForm, PHONE_PATTERN_MY } from './useContactForm'
 import { AnimatedSection } from '../shared/animations'
 import { GradientBlob, SectionLabel, GlassCard } from '../shared/decorative'
 import { motion } from 'framer-motion'
@@ -213,7 +213,7 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
                 const error = errors[fieldName as keyof typeof errors]
                 const errorId = error ? `${fieldName}-error` : undefined
                 return (
-                    <div key={fieldName}>
+                    <div key={`${i}-${fieldName}`}>
                         <label htmlFor={fieldName} className="block text-sm font-medium mb-2 opacity-70">
                             {field.label}
                             {field.required && <span style={{ color: 'var(--brand-primary)' }}> *</span>}
@@ -292,7 +292,7 @@ function FormFieldInput({ field, error, errorId }: { field: FormField; error?: b
             {...commonProps}
             type={type}
             autoComplete={autoComplete}
-            pattern={field.fieldType === 'phone' ? '[0-9+\\s()-]{9,20}' : undefined}
+            pattern={field.fieldType === 'phone' ? PHONE_PATTERN_MY : undefined}
         />
     )
 }
@@ -516,23 +516,32 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     // already caps at max-w-6xl = 1152px, and the nested max-w-5xl was
     // shrinking the form to ~820px on desktop, leaving huge empty space)
     // and switch to a 1:2 split so the form column gets ~66% instead of 60%.
+    const hasContactInfo = !!(email || phone || address)
     return (
         <ContactSection>
             <ContactHeader headline={headline} subtext={subtext} />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                {/* Contact Info */}
-                <div className="lg:col-span-1 space-y-6">
-                    {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
-                    {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
-                    {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
+            {hasContactInfo ? (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                    {/* Contact Info */}
+                    <div className="lg:col-span-1 space-y-6">
+                        {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
+                        {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
+                        {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
+                    </div>
+                    {/* Contact Form */}
+                    <div className="lg:col-span-2">
+                        <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
+                            <ContactForm formFields={formFields} siteId={siteId} />
+                        </GlassCard>
+                    </div>
                 </div>
-                {/* Contact Form */}
-                <div className="lg:col-span-2">
+            ) : (
+                <div className="max-w-xl mx-auto">
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
                         <ContactForm formFields={formFields} siteId={siteId} />
                     </GlassCard>
                 </div>
-            </div>
+            )}
         </ContactSection>
     )
 }

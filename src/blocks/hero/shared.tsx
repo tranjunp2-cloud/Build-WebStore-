@@ -105,7 +105,7 @@ export function HeroBadge({ text, className = 'mb-6' }: HeroBadgeProps) {
             }}
         >
             <span className="w-1.5 h-1.5 rounded-full bg-white" aria-hidden="true" />
-            {text}
+            <RichText text={text} />
         </div>
     )
 }

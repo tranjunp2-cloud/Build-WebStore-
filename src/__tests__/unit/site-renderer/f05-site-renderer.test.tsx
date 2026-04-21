@@ -10,10 +10,6 @@ vi.mock('@/blocks/registry', () => ({
     },
 }))
 
-vi.mock('@/lib/navigation', () => ({
-    filterNavigationLinksByVisibility: vi.fn((links: unknown[]) => links ?? []),
-}))
-
 vi.mock('@/blocks/ErrorBoundary', () => ({
     BlockErrorBoundary: ({ children }: { children: React.ReactNode }) =>
         React.createElement(React.Fragment, null, children),
@@ -27,7 +23,6 @@ vi.mock('@/components/site-renderer/GoogleFontsLoader', () => ({
 // ── Imports — after mocks ──────────────────────────────────────────────────
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import { blockRegistry } from '@/blocks/registry'
-import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -44,7 +39,6 @@ function makeTestBlock(label: string) {
 }
 
 const mockGetComponent = vi.mocked(blockRegistry.getComponent)
-const mockFilterLinks = vi.mocked(filterNavigationLinksByVisibility)
 
 const defaultSite = {
     name: 'Test Site',
@@ -234,14 +228,15 @@ describe('[TC-F04-SR-02] SiteRenderer passes resolved theme config to block comp
             />
         )
 
-        // Assert — defaults from SiteRenderer source code
+        // Assert — defaults from SiteRenderer source code.
+        // Plan 260417 Wave 1 A2 — fallback changed dark cyan/magenta → light slate.
         expect(capturedProps[0]).toMatchObject({
-            primaryColor: '#0ea5e9',
-            secondaryColor: '#d946ef',
-            backgroundColor: '#09090b',
+            primaryColor: '#111827',
+            secondaryColor: '#374151',
+            backgroundColor: '#ffffff',
             fontHeading: 'Outfit',
             fontBody: 'Inter',
-            colorMode: 'dark',
+            colorMode: 'light',
         })
     })
 
@@ -462,27 +457,35 @@ describe('[TC-F04-SR-05] SiteRenderer renders empty content when layout is empty
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TC-F04.06 / TC-F04-SR-06 — navigation link filtering via filterNavigationLinksByVisibility
+// TC-F04-SR-06 — nav always shows every authored link, regardless of page
+// visibility. Hiding a page only affects its direct route (public query
+// returns 404); the menu itself stays stable so users never see items
+// disappear mid-session.
 // ═══════════════════════════════════════════════════════════════════════════
-describe('[TC-F04-SR-06] SiteRenderer applies navigation link filtering for nav blocks', () => {
+describe('[TC-F04-SR-06] SiteRenderer preserves all nav links regardless of page visibility', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('calls filterNavigationLinksByVisibility for navigation blockType', () => {
-        // Arrange
-        const NavBlock = makeTestBlock('navigation')
+    it('passes nav links through unchanged even when a target page has isVisible=false', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'nav-block' })
+        }
         mockGetComponent.mockReturnValue(NavBlock)
+
         const links = [
             { label: 'Home', url: '/' },
+            { label: 'Services', url: '/services' }, // target page hidden
             { label: 'About', url: '/about' },
         ]
         const pages = [
-            { id: '1', slug: 'about', isVisible: false },
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+            { id: '3', slug: '/about', isVisible: true },
         ]
-        mockFilterLinks.mockReturnValue([{ label: 'Home', url: '/' }])
 
-        // Act
         render(
             <SiteRenderer
                 site={defaultSite}
@@ -491,75 +494,7 @@ describe('[TC-F04-SR-06] SiteRenderer applies navigation link filtering for nav 
             />
         )
 
-        // Assert
-        expect(mockFilterLinks).toHaveBeenCalledWith(links, pages)
-    })
-
-    it('does NOT call filterNavigationLinksByVisibility for non-navigation blocks', () => {
-        // Arrange
-        const HeroBlock = makeTestBlock('hero')
-        mockGetComponent.mockReturnValue(HeroBlock)
-
-        // Act
-        render(
-            <SiteRenderer
-                site={defaultSite}
-                page={{ layout: [{ blockType: 'hero', links: [] }] }}
-            />
-        )
-
-        // Assert
-        expect(mockFilterLinks).not.toHaveBeenCalled()
-    })
-
-    it('passes filtered links (not original links) to NavigationBlock component', () => {
-        // Arrange
-        const capturedBlocks: Record<string, unknown>[] = []
-        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
-            capturedBlocks.push(block)
-            return React.createElement('div', { 'data-testid': 'nav-block' })
-        }
-        mockGetComponent.mockReturnValue(NavBlock)
-
-        const originalLinks = [
-            { label: 'Home', url: '/' },
-            { label: 'Hidden', url: '/hidden' },
-        ]
-        const filteredLinks = [{ label: 'Home', url: '/' }]
-        mockFilterLinks.mockReturnValue(filteredLinks)
-
-        // Act
-        render(
-            <SiteRenderer
-                site={defaultSite}
-                page={{ layout: [{ blockType: 'navigation', links: originalLinks }] }}
-                pages={[]}
-            />
-        )
-
-        // Assert — block passed to NavBlock must have the filtered links
-        expect(capturedBlocks[0].links).toEqual(filteredLinks)
-        expect(capturedBlocks[0].links).not.toEqual(originalLinks)
-    })
-
-    it('defaults pages to [] when not provided — passes empty array to filter', () => {
-        // Arrange
-        const NavBlock = makeTestBlock('navigation')
-        mockGetComponent.mockReturnValue(NavBlock)
-        const links = [{ label: 'Home', url: '/' }]
-        mockFilterLinks.mockReturnValue(links)
-
-        // Act
-        render(
-            <SiteRenderer
-                site={defaultSite}
-                page={{ layout: [{ blockType: 'navigation', links }] }}
-                // pages prop omitted intentionally
-            />
-        )
-
-        // Assert — second arg must be the default empty array
-        expect(mockFilterLinks).toHaveBeenCalledWith(links, [])
+        expect(capturedBlocks[0].links).toEqual(links)
     })
 })
 
@@ -774,10 +709,10 @@ describe('[TC-S1-004] SiteRenderer backward compat — legacy site with 2 colors
         // Act
         const { container } = render(<SiteRenderer site={site} page={{ layout: [] }} />)
 
-        // Assert
+        // Assert — Plan 260417 Wave 1 A2: fallback now light slate.
         const css = container.querySelector('style')?.textContent || ''
-        expect(css).toContain('--brand-primary: #0ea5e9')
-        expect(css).toContain('--brand-secondary: #d946ef')
+        expect(css).toContain('--brand-primary: #111827')
+        expect(css).toContain('--brand-secondary: #374151')
         expect(css).toContain('--font-heading:')
         expect(css).toContain('--font-body:')
         expect(css).toContain('--space-md:')

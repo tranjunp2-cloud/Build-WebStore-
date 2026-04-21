@@ -30,7 +30,6 @@ const HIDDEN_BLOCKS = new Set([
     'breadcrumb',        // out of scope: should auto-generate
     'video-background',  // out of scope: duplicates video variant
     'before-after',      // out of scope: too niche
-    'blog-list',         // missing: no CMS backend
     'download-cta',      // missing: no file hosting
     'google-maps',       // missing: requires API key config
     'countdown-timer',   // missing: client-side only, no persist
@@ -38,7 +37,7 @@ const HIDDEN_BLOCKS = new Set([
 
 const categoryConfig: Omit<CategoryConfig, 'label'>[] = [
     { id: 'basics', icon: '📦', blockTypes: ['hero', 'cta', 'about', 'features', 'step-process', 'service-cards'] },
-    { id: 'content', icon: '📄', blockTypes: ['faq', 'testimonials', 'social-proof', 'portfolio-grid'] },
+    { id: 'content', icon: '📄', blockTypes: ['faq', 'testimonials', 'social-proof', 'portfolio-grid', 'blog-list'] },
     { id: 'media', icon: '🖼️', blockTypes: ['gallery', 'video', 'carousel'] },
     { id: 'store', icon: '💼', blockTypes: ['pricing', 'feature-comparison', 'menu-food'] },
     { id: 'commerce', icon: '🛒', blockTypes: ['products-grid', 'products-featured', 'cartWidget'] },

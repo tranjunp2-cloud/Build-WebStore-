@@ -1,7 +1,7 @@
 ---
 title: "AI Builder Pipeline v2 — High-Fidelity URL Generation"
 description: "Pass scraped content to generator for ~70% match instead of ~35%"
-status: pending
+status: abandoned
 priority: P0
 effort: 2d
 branch: feat/rebuild-user-flow

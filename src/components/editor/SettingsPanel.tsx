@@ -2,7 +2,7 @@
 
 import React, { memo, useEffect, useMemo, useState } from 'react'
 import * as Tooltip from '@radix-ui/react-tooltip'
-import { ChevronDown, Copy, Globe2, Trash2, UploadCloud } from 'lucide-react'
+import { ChevronDown, Globe2, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
@@ -149,8 +149,6 @@ interface SettingsPanelProps {
     footerBlock?: BlockData | null
     pages?: PageData[]
     onThemeChange: (key: string, value: string) => void
-    onDeleteBlock: (idx: number) => void
-    onDuplicateBlock: (idx: number) => void
     onBlockFieldChange: (idx: number, field: string, value: string) => void
     onBlockUpdate: (idx: number, changes: Record<string, unknown>) => void
     onHeaderUpdate?: (changes: Record<string, unknown>) => void
@@ -174,7 +172,7 @@ interface SettingsPanelProps {
 // ─── Component ──────────────────────────────────────────────────────────
 function SettingsPanelInner({
     block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages, currentPageId,
-    onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
+    onThemeChange, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
     requestedTab,
 }: SettingsPanelProps) {
@@ -1415,20 +1413,6 @@ function SettingsPanelInner({
                     </div>
                 )}
 
-                {/* Block actions */}
-                <div className="border-t border-white/10 pt-4">
-                    <label className="text-xs font-medium uppercase text-gray-500">{s.actions}</label>
-                    <div className="mt-2 flex gap-2">
-                        <button onClick={() => onDuplicateBlock(currentBlockIndex)}
-                            className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
-                            <Copy className="h-3 w-3" /> {s.duplicate}
-                        </button>
-                        <button onClick={() => onDeleteBlock(currentBlockIndex)}
-                            className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors">
-                            <Trash2 className="h-3 w-3" /> {s.delete}
-                        </button>
-                    </div>
-                </div>
 
                 {/* Theme editing removed from Block tab — available in Global tab */}
                     </>

@@ -207,6 +207,245 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(body.error.code).toBe('NOT_FOUND')
     })
 
+    it('TC-F01-pub-09: promotes draft pages with depth:0 and draft:false so new pages go live after Update', async () => {
+        // Regression: new page stayed "draft" after user clicked Update because
+        // populated relationships (default depth=2) + unstripped version fields
+        // (_versionID, _currentVersionId) caused payload.update to silently
+        // drop the promotion for freshly-created draft pages.
+        const { getPayload } = await import('payload')
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: 'page-new', _status: 'draft', _versionID: 'v1', site: 'site-123', layout: [] },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        // find must use depth:0 so relationships come back as IDs, not populated objects
+        expect(findSpy).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'pages',
+            depth: 0,
+            draft: true,
+        }))
+
+        // update for each page must pass draft:false, strip version fields, and
+        // explicitly set _status:'published' (Payload 3.79 bug — update with
+        // draft:false doesn't flip _status on main row on its own)
+        const pageUpdate = updateSpy.mock.calls.find(c => c[0].collection === 'pages' && c[0].id === 'page-new')
+        expect(pageUpdate).toBeTruthy()
+        expect(pageUpdate![0].draft).toBe(false)
+        expect(pageUpdate![0].data._status).toBe('published')
+        expect(pageUpdate![0].data).not.toHaveProperty('_versionID')
+        expect(pageUpdate![0].data).not.toHaveProperty('_currentVersionId')
+    })
+
+    it('TC-F01-pub-12: strips block + nested array id/_uuid before promote so cross-page UUID collisions do not hit pg unique constraint', async () => {
+        // Regression (pages 790 + 793): AI generate-site seeded multiple pages
+        // with colliding block UUIDs. First page publishes OK, second page's
+        // promote hits live pages_blocks_*.id PK collision under a different
+        // _parent_id → PG error 23505 → wrapped into ValidationError
+        // {path:'id', message:'Value must be unique'}. Fix: drop block and
+        // nested-array row id + _uuid so column defaults (gen_random_uuid)
+        // regenerate safe UUIDs. Matches upstream Payload PR #11887.
+        const { getPayload } = await import('payload')
+
+        const draftPage = {
+            id: 'page-793',
+            _status: 'draft',
+            site: 'site-123',
+            title: 'Home',
+            layout: [
+                {
+                    id: 'block-uuid-shared-1', // <-- would collide with page-790's block
+                    _uuid: 'block-uuid-shared-1',
+                    blockType: 'hero',
+                    headline: 'Welcome',
+                    ctaButtons: [
+                        { id: 'cta-uuid-shared', _uuid: 'cta-uuid-shared', label: 'Go', url: '/' },
+                    ],
+                },
+                {
+                    id: 'block-uuid-shared-2',
+                    _uuid: 'block-uuid-shared-2',
+                    blockType: 'features',
+                    features: [
+                        { id: 'feat-uuid-shared', _uuid: 'feat-uuid-shared', title: 'Fast', description: 'Very' },
+                    ],
+                },
+            ],
+        }
+
+        const findSpy = vi.fn().mockResolvedValue({ docs: [draftPage], hasNextPage: false })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        const pageUpdateCall = updateSpy.mock.calls.find(c => c[0].collection === 'pages')
+        expect(pageUpdateCall).toBeTruthy()
+        const sentLayout = pageUpdateCall![0].data.layout as Array<Record<string, unknown>>
+
+        // Block rows stripped
+        expect(sentLayout).toHaveLength(2)
+        for (const block of sentLayout) {
+            expect(block).not.toHaveProperty('id')
+            expect(block).not.toHaveProperty('_uuid')
+            expect(block).toHaveProperty('blockType')
+        }
+
+        // Nested array rows (ctaButtons, features) stripped too
+        const hero = sentLayout.find(b => b.blockType === 'hero') as { ctaButtons: Array<Record<string, unknown>> }
+        expect(hero.ctaButtons[0]).not.toHaveProperty('id')
+        expect(hero.ctaButtons[0]).not.toHaveProperty('_uuid')
+        expect(hero.ctaButtons[0].label).toBe('Go')
+
+        const features = sentLayout.find(b => b.blockType === 'features') as { features: Array<Record<string, unknown>> }
+        expect(features.features[0]).not.toHaveProperty('id')
+        expect(features.features[0]).not.toHaveProperty('_uuid')
+        expect(features.features[0].title).toBe('Fast')
+    })
+
+    it('TC-F01-pub-10: surfaces Payload ValidationError in failures[] so user can diagnose missing required fields', async () => {
+        // Regression: page with an industry block (doctor-profile, property-card,
+        // class-schedule, etc.) whose nested required array row was seeded empty
+        // used to fail publish with an opaque {pageId:"793"} in failures[] —
+        // no errName, no errMsg, no validationErrors. That's because Payload's
+        // ValidationError has no .cause (unlike Drizzle-wrapped pg errors),
+        // so the old catch-block hit undefined on every extracted field.
+        const { getPayload } = await import('payload')
+
+        class FakeValidationError extends Error {
+            data: { collection?: string; errors: Array<{ path: string; message: string }> }
+            constructor() {
+                super('The following fields are invalid: doctors.0.name')
+                this.name = 'ValidationError'
+                this.data = {
+                    collection: 'pages',
+                    errors: [
+                        { path: 'layout.2.doctors.0.name', message: 'This field is required.' },
+                    ],
+                }
+            }
+        }
+
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [
+                { id: 'page-793', _status: 'draft', site: 'site-123', layout: [{ blockType: 'doctor-profile', doctors: [{}] }] },
+            ],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id }) => {
+            if (collection === 'pages' && id === 'page-793') {
+                throw new FakeValidationError()
+            }
+            return { id }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(500)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('PARTIAL_PUBLISH_FAILURE')
+        expect(body.error.failedPages).toEqual(['page-793'])
+        expect(body.error.failures).toHaveLength(1)
+
+        const failure = body.error.failures[0]
+        expect(failure.pageId).toBe('page-793')
+        expect(failure.errName).toBe('ValidationError')
+        expect(failure.errMsg).toContain('doctors.0.name')
+        expect(failure.validationErrors).toEqual([
+            { path: 'layout.2.doctors.0.name', message: 'This field is required.' },
+        ])
+    })
+
+    it('TC-F01-pub-11: surfaces generic errors without .cause in failures[] (errName + errMsg always present)', async () => {
+        // Sister-case to TC-F01-pub-10 — a plain TypeError (no .cause, no
+        // .data.errors) still needs to return something actionable, not an
+        // opaque {pageId} blob.
+        const { getPayload } = await import('payload')
+        const findSpy = vi.fn().mockResolvedValue({
+            docs: [{ id: 'page-99', _status: 'draft', site: 'site-123', layout: [] }],
+            hasNextPage: false,
+        })
+        const updateSpy = vi.fn().mockImplementation(async ({ collection }) => {
+            if (collection === 'pages') {
+                throw new TypeError("Cannot read properties of undefined (reading 'foo')")
+            }
+            return {}
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) return mockSiteRecord
+                return null
+            }),
+            find: findSpy,
+            update: updateSpy,
+        })
+
+        const req = makePatchReq('site-123')
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        const body = await res.json()
+
+        expect(res.status).toBe(500)
+        const failure = body.error.failures[0]
+        expect(failure.errName).toBe('TypeError')
+        expect(failure.errMsg).toContain("Cannot read properties of undefined")
+        expect(failure.validationErrors).toBeUndefined()
+    })
+
     it('TC-F01-pub-08: returns 429 when publish rate limit exceeded', async () => {
         // Arrange
         const resetAt = Date.now() + 60000

@@ -133,12 +133,12 @@ export function BeforeAfterBlock({ block, theme: _theme }: BlockProps<BeforeAfte
                     </div>
 
                     {/* Labels */}
-                    {beforeImage.label && (
+                    {beforeImage?.label && (
                         <span className="absolute bottom-4 left-4 z-20 px-3 py-1 rounded-full text-sm font-medium text-white bg-black/50 backdrop-blur-sm">
                             {beforeImage.label}
                         </span>
                     )}
-                    {afterImage.label && (
+                    {afterImage?.label && (
                         <span className="absolute bottom-4 right-4 z-20 px-3 py-1 rounded-full text-sm font-medium text-white bg-black/50 backdrop-blur-sm">
                             {afterImage.label}
                         </span>

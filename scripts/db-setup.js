@@ -28,6 +28,16 @@ function createPool() {
   if (!connStr) return null;
 
   const pg = require('pg');
+  // Honour sslmode=disable (or localhost, which Postgres typically doesn't run
+  // with SSL) so dev DBs work without forcing TLS. Hosted DBs (DO/Vercel/etc.)
+  // still get ssl:{rejectUnauthorized:false} which accepts their self-signed certs.
+  const sslmodeMatch = connStr.match(/[?&]sslmode=([^&]+)/);
+  const sslmode = sslmodeMatch ? sslmodeMatch[1].toLowerCase() : null;
+  const hostMatch = connStr.match(/@([^:/?]+)/);
+  const host = hostMatch ? hostMatch[1].toLowerCase() : '';
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal';
+  const useSsl = sslmode === 'disable' ? false : (isLocal ? false : { rejectUnauthorized: false });
+
   const cleanStr = connStr
     .replace(/[?&]sslmode=[^&]+/g, '')
     .replace(/\?&/, '?')
@@ -35,7 +45,7 @@ function createPool() {
 
   return new pg.Pool({
     connectionString: cleanStr,
-    ssl: { rejectUnauthorized: false },
+    ssl: useSsl,
     connectionTimeoutMillis: 10000,
   });
 }
@@ -521,6 +531,7 @@ const MIGRATIONS = [
   // templates
   { name: 'templates.sort_order', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order numeric DEFAULT 0;` },
   { name: 'templates.usage_count', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS usage_count numeric DEFAULT 0;` },
+  { name: 'templates.block_schema_version', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS block_schema_version varchar(64);` },
   // templates_tags
   { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
   // ── Templates: Tags array table ──
@@ -2486,11 +2497,366 @@ const MIGRATIONS = [
     name: 'sites.generation_status_backfill',
     sql: `UPDATE sites SET generation_status = 'completed' WHERE generation_status IS NULL;`,
   },
+  // ── Sites: siteType + aiGenerationMetadata (required by /api/ai/generate-site) ──
+  // Root cause 2026-04-20: Sites.ts declares siteType (select, required) and
+  // aiGenerationMetadata (group) but DB staging was seeded before these existed.
+  // CREATE TABLE IF NOT EXISTS skipped column adds → INSERT fails with
+  // "Failed query: insert into sites" on POST /api/ai/generate-site.
+  {
+    name: 'sites.site_type',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS site_type varchar DEFAULT 'business';`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_generated_at',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_generated_at timestamp(3) with time zone;`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_original_prompt',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_original_prompt varchar;`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_business_type',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_business_type varchar;`,
+  },
   // ── F16-04: Add metadata column for notification i18n ──
   {
     name: 'notifications.metadata',
     sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata jsonb;`,
   },
+
+  // ── Industry blocks (Plan 260417-0837 Phase 1.1) ────────────────────────────
+  // 6 blocks registered in Pages.ts — composer builds them but they were
+  // getting silently dropped by Payload because no schema existed.
+  // Unblocks WEAK cats: health, realestate, fitness, education, tech.
+
+  // doctor-profile ──────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_doctor_profile.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_doctor_profile" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_doctor_profile_doctors.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_doctor_profile_doctors" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, specialisation varchar, qualifications jsonb,
+      photo_url varchar, available_days jsonb, languages varchar,
+      consultation_fee varchar, bio varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_doctor_profile.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_doctor_profile" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_doctor_profile_doctors.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_doctor_profile_doctors" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, specialisation varchar, qualifications jsonb,
+      photo_url varchar, available_days jsonb, languages varchar,
+      consultation_fee varchar, bio varchar
+    );`,
+  },
+
+  // property-card ───────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_property_card.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_property_card" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      show_map boolean DEFAULT false, currency varchar DEFAULT 'RM'
+    );`,
+  },
+  {
+    name: 'pages_blocks_property_card_properties.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_property_card_properties" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar, price numeric, location varchar,
+      bedrooms integer, bathrooms integer, area numeric,
+      image_urls jsonb, type varchar, status varchar,
+      map_url varchar, description varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_property_card.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_property_card" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      show_map boolean, currency varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_property_card_properties.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_property_card_properties" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      title varchar, price numeric, location varchar,
+      bedrooms integer, bathrooms integer, area numeric,
+      image_urls jsonb, type varchar, status varchar,
+      map_url varchar, description varchar
+    );`,
+  },
+
+  // class-schedule ──────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_class_schedule.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_class_schedule" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar,
+      show_capacity boolean DEFAULT true, highlight_today boolean DEFAULT true
+    );`,
+  },
+  {
+    name: 'pages_blocks_class_schedule_classes.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_class_schedule_classes" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, instructor varchar, day integer,
+      start_time varchar, end_time varchar, capacity integer,
+      enrolled integer, category varchar, level varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_class_schedule.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_class_schedule" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar,
+      show_capacity boolean, highlight_today boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_class_schedule_classes.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_class_schedule_classes" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, instructor varchar, day integer,
+      start_time varchar, end_time varchar, capacity integer,
+      enrolled integer, category varchar, level varchar
+    );`,
+  },
+
+  // video-showcase ──────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_video_showcase.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_video_showcase" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      show_categories boolean DEFAULT true, autoplay boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'pages_blocks_video_showcase_videos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_video_showcase_videos" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar, thumbnail_url varchar, video_url varchar,
+      category varchar, duration varchar, description varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_video_showcase.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_video_showcase" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      show_categories boolean, autoplay boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_video_showcase_videos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_video_showcase_videos" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      title varchar, thumbnail_url varchar, video_url varchar,
+      category varchar, duration varchar, description varchar
+    );`,
+  },
+
+  // product-quick-view ──────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_product_quick_view.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_product_quick_view" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      columns integer DEFAULT 4, show_quick_view boolean DEFAULT true,
+      currency varchar DEFAULT 'RM'
+    );`,
+  },
+  {
+    name: 'pages_blocks_product_quick_view_products.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_product_quick_view_products" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, price numeric, original_price numeric,
+      image_urls jsonb, description varchar, variants jsonb,
+      badge varchar, cta_label varchar, cta_url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_product_quick_view.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_product_quick_view" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      columns integer, show_quick_view boolean, currency varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_product_quick_view_products.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_product_quick_view_products" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, price numeric, original_price numeric,
+      image_urls jsonb, description varchar, variants jsonb,
+      badge varchar, cta_label varchar, cta_url varchar
+    );`,
+  },
+
+  // feature-comparison ──────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_feature_comparison.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_feature_comparison" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_feature_comparison_products.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_feature_comparison_products" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, highlighted boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'pages_blocks_feature_comparison_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_feature_comparison_features" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, values jsonb
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_feature_comparison.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_feature_comparison" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_feature_comparison_products.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_feature_comparison_products" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, highlighted boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_feature_comparison_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_feature_comparison_features" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, values jsonb
+    );`,
+  },
+  // ── Fix: faq + pricing missing variant column (staging 500 on 2026-04-17) ──
+  {
+    name: 'pages_blocks_faq.add_variant',
+    sql: `ALTER TABLE "pages_blocks_faq" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: 'pages_blocks_pricing.add_variant',
+    sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_faq.add_variant',
+    sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_pricing.add_variant',
+    sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+
+  // ── Fix (2026-04-17, BUG-F05 new-page-stays-draft): `variant` was defined
+  // in every block's Payload schema (Pages.ts) but the original CREATE TABLE
+  // blocks here only listed it for a handful. Draft-save writes to the
+  // versioned `_pages_v_blocks_*` rows, which picked up the column via
+  // Payload's schema sync; the main `pages_blocks_*` rows never did.
+  // Promoting draft→published (PATCH /publish) then hit INSERT/UPDATE on the
+  // main table and silently failed the row — user saw "Update success" toast
+  // but status stayed Draft, hasUnpublishedChanges stayed true. Single bulk
+  // ALTER IF NOT EXISTS covers every block that has `variant` in Pages.ts.
+  ...[
+    'hero', 'navigation', 'about', 'contact', 'footer',
+    'social_widget', 'cart_widget', 'features', 'testimonials', 'gallery',
+    'stats', 'team', 'cta', 'newsletter', 'video',
+    'logo_cloud', 'blog_list', 'products_grid', 'products_featured',
+    'service_cards', 'carousel', 'step_process', 'divider',
+    'announcement_bar', 'whatsapp_button', 'google_maps', 'accordion',
+    'countdown_timer', 'social_proof', 'breadcrumb', 'client_logos',
+    'menu_food', 'portfolio_grid', 'doctor_profile', 'property_card',
+    'class_schedule', 'video_showcase', 'product_quick_view',
+    'feature_comparison',
+  ].flatMap(slug => [
+    {
+      name: `pages_blocks_${slug}.add_variant`,
+      sql: `ALTER TABLE "pages_blocks_${slug}" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+    },
+    {
+      name: `_pages_v_blocks_${slug}.add_variant`,
+      sql: `ALTER TABLE "_pages_v_blocks_${slug}" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+    },
+  ]),
 ];
 
 async function runMigrations(pool) {

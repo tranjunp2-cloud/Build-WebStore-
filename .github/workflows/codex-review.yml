@@ -1,10 +1,13 @@
 name: Codex PR Review
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  issue_comment:
-    types: [created]
+  # DISABLED auto-trigger to save OpenAI costs (~$50/mo)
+  # Uncomment below to re-enable auto review on PRs
+  # pull_request:
+  #   types: [opened, synchronize, reopened, ready_for_review]
+  # issue_comment:
+  #   types: [created]
+  workflow_dispatch:  # Manual trigger only — Actions tab → Run workflow
 
 concurrency:
   group: codex-review-${{ github.event.pull_request.number || github.event.issue.number }}

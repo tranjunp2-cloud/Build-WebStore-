@@ -1,7 +1,12 @@
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
-import { filterNavigationLinksByVisibility } from '@/lib/navigation'
+import {
+    HOMEPAGE_ALIASES,
+    buildSlugCanonicalMap,
+    rewriteLiveUrl,
+    splitPathAndTail,
+} from '@/lib/navigation-url'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { generatePageSchemas } from '@/lib/seo/json-ld'
@@ -109,34 +114,49 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
         (site as { id?: string | number })?.id ?? '',
     )
 
-    // Build slug → pageId map from pages[] prop. Both '/' and 'home' resolve to homepage.
+    // Use the real pages list as the source of truth for URL resolution:
+    //
+    // - slugToPageId: any-form slug → pageId. Editor preview routes nav
+    //   links to `/preview/{siteId}?pageId=...` so the iframe stays in
+    //   preview scope.
+    // - slugCanonical: any-form slug → canonical `/slug`. Live mode
+    //   rewrites nav/footer/cta URLs to the real slug, fixing cases like
+    //   AI-seeded `/Services` → stored `/services`. Built once via
+    //   buildSlugCanonicalMap; both helpers index three forms (exact,
+    //   lowercased, bare) so case and leading-slash drift both resolve.
     const slugToPageId = new Map<string, string>()
     for (const p of pages) {
         const pid = String(p.id)
         const rawSlug = (p.slug ?? '').trim()
         if (!rawSlug) continue
-        // Normalize: ensure leading slash, also store no-slash variant
         const withSlash = rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`
         slugToPageId.set(withSlash, pid)
         slugToPageId.set(withSlash.toLowerCase(), pid)
-        // Also map bare slug (e.g. 'about' → page)
         if (rawSlug !== '/') {
             slugToPageId.set(rawSlug.replace(/^\//, ''), pid)
         }
     }
-    // Always map '/' to homepage (first isHomepage page, or first page)
     const homepage = pages.find((p) => (p as NavPage & { isHomepage?: boolean }).isHomepage) ?? pages[0]
-    if (homepage) slugToPageId.set('/', String(homepage.id))
+    if (homepage) {
+        const homepageId = String(homepage.id)
+        slugToPageId.set('/', homepageId)
+        // Mirror buildSlugCanonicalMap's HOMEPAGE_ALIASES so preview clicks on
+        // `/Home`, `/Index`, etc. resolve the iframe to the homepage pageId
+        // instead of dead-ending at `#`. Sharing the const prevents drift.
+        for (const alias of HOMEPAGE_ALIASES) {
+            if (!slugToPageId.has(alias)) slugToPageId.set(alias, homepageId)
+        }
+    }
+
+    const slugCanonical = buildSlugCanonicalMap(pages as unknown as { id: string | number; slug?: string | null; isHomepage?: boolean | null }[])
 
     const rewritePreviewUrl = (url: string | undefined): string => {
         if (!url) return '#'
         if (/^https?:\/\//i.test(url)) return url
         if (url.startsWith('#')) return url
-        // Anchor links like "/#features" → preserve
         if (url.includes('#') && !url.startsWith('/')) return url
         if (!previewSiteId) return '#'
-        // Normalize the path portion (strip query/hash)
-        const path = url.split(/[?#]/)[0] ?? url
+        const [path] = splitPathAndTail(url)
         const hit =
             slugToPageId.get(path) ??
             slugToPageId.get(path.toLowerCase()) ??
@@ -144,6 +164,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
         if (hit) return `/preview/${previewSiteId}?pageId=${hit}`
         return '#'
     }
+
+    const rewriteUrl = isEditor
+        ? rewritePreviewUrl
+        : (url: string | undefined) => rewriteLiveUrl(url, slugCanonical)
 
     const rewriteFooterColumns = (columns: unknown): unknown => {
         if (!Array.isArray(columns)) return columns
@@ -153,48 +177,46 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
             return {
                 ...c,
                 links: Array.isArray(c.links)
-                    ? c.links.map((l) => ({ ...l, url: rewritePreviewUrl(l?.url) }))
+                    ? c.links.map((l) => ({ ...l, url: rewriteUrl(l?.url) }))
                     : c.links,
             }
         })
     }
 
-    const blocks = isEditor
-        ? rawBlocks.map((b) => {
-            if (b.blockType === 'navigation') {
-                return {
-                    ...b,
-                    links: b.links?.map((l) => ({ ...l, url: rewritePreviewUrl(l.url) })),
-                    ctaButton: b.ctaButton
-                        ? { ...b.ctaButton, url: rewritePreviewUrl(b.ctaButton.url) }
-                        : b.ctaButton,
-                }
+    const blocks = rawBlocks.map((b) => {
+        if (b.blockType === 'navigation') {
+            return {
+                ...b,
+                links: b.links?.map((l) => ({ ...l, url: rewriteUrl(l.url) })),
+                ctaButton: b.ctaButton
+                    ? { ...b.ctaButton, url: rewriteUrl(b.ctaButton.url) }
+                    : b.ctaButton,
             }
-            if (b.blockType === 'hero' && Array.isArray(b.ctaButtons)) {
-                return {
-                    ...b,
-                    ctaButtons: b.ctaButtons.map((btn) => ({
-                        ...btn,
-                        url: rewritePreviewUrl(btn?.url),
-                    })),
-                }
+        }
+        if (b.blockType === 'hero' && Array.isArray(b.ctaButtons)) {
+            return {
+                ...b,
+                ctaButtons: b.ctaButtons.map((btn) => ({
+                    ...btn,
+                    url: rewriteUrl(btn?.url),
+                })),
             }
-            if (b.blockType === 'footer') {
-                return {
-                    ...b,
-                    columns: rewriteFooterColumns(b.columns),
-                }
+        }
+        if (b.blockType === 'footer') {
+            return {
+                ...b,
+                columns: rewriteFooterColumns(b.columns),
             }
-            if (b.blockType === 'cta' && b.ctaButton && typeof b.ctaButton === 'object') {
-                const ctaBtn = b.ctaButton as { url?: string; [k: string]: unknown }
-                return {
-                    ...b,
-                    ctaButton: { ...ctaBtn, url: rewritePreviewUrl(ctaBtn.url) },
-                }
+        }
+        if (b.blockType === 'cta' && b.ctaButton && typeof b.ctaButton === 'object') {
+            const ctaBtn = b.ctaButton as { url?: string; [k: string]: unknown }
+            return {
+                ...b,
+                ctaButton: { ...ctaBtn, url: rewriteUrl(ctaBtn.url) },
             }
-            return b
-        })
-        : rawBlocks
+        }
+        return b
+    })
 
     // JSON-LD schemas — auto-detect from blocks present
     const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
@@ -268,12 +290,13 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                     return null
                 }
 
-                const normalizedBlock = block.blockType === 'navigation'
-                    ? {
-                        ...block,
-                        links: filterNavigationLinksByVisibility(block.links, pages),
-                    }
-                    : block
+                // Nav always renders every link the user authored, even when
+                // a target page is `isVisible=false`. Hiding only affects
+                // direct routing (public route query already returns 404 for
+                // hidden pages); the nav menu itself stays stable so users
+                // never see menu items disappear mid-session as they click
+                // around.
+                const normalizedBlock = block
 
                 const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
 

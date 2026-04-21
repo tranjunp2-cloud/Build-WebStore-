@@ -5,7 +5,14 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { FeaturesConfig } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
-import { IconContainer, SectionLabel, GradientBlob } from '../shared/decorative'
+import {
+    IconContainer,
+    SectionLabel,
+    GradientBlob,
+    GridLines,
+    AsymmetricGrid,
+    DuotoneOverlay,
+} from '../shared/decorative'
 import { Heading, Body } from '../shared/Typography'
 import { CARD_PADDING } from '@/lib/design-tokens'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -14,12 +21,15 @@ import { SectionWrapper } from '../shared/SectionWrapper'
 
 // Shared wrapper for all features variants — preserves AnimatedSection
 // (block-internal framer-motion) while delegating padding/container/inner
-// gutter to SectionWrapper tokens. The block keeps its decorative
-// GradientBlob since that is structural, not a Phase 05 concern.
-function FeaturesSection({ children }: { children: React.ReactNode }) {
+// gutter to SectionWrapper tokens. Phase A4 (260417) — accepts optional
+// `decorative` slot so each variant can pin its own visual vocabulary.
+// Falls back to the original GradientBlob for variants not in the A4 map.
+function FeaturesSection({ children, decorative }: { children: React.ReactNode; decorative?: React.ReactNode }) {
     return (
         <AnimatedSection className="relative overflow-hidden">
-            <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            {decorative ?? (
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            )}
             <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                 {children}
             </SectionWrapper>
@@ -55,8 +65,46 @@ function FeaturesHeader({
     )
 }
 
+const FALLBACK_FEATURES: FeaturesConfig['features'] = [
+    { icon: '⭐', title: 'Quality Service', description: 'Exceptional quality in every interaction.' },
+    { icon: '🚀', title: 'Fast Response', description: 'Quick turnaround on all requests.' },
+    { icon: '💎', title: 'Premium Experience', description: 'Carefully crafted for discerning customers.' },
+    { icon: '🛡️', title: 'Trusted & Reliable', description: 'Years of consistent service excellence.' },
+]
+
+// AI sometimes generates text strings (e.g. "Sparkles", "Clock") instead of emojis.
+// This utility maps them to standard emojis so they don't overflow the circular icon containers.
+export const parseFeatureIcon = (icon?: string) => {
+    if (!icon) return undefined;
+    if (/\p{Extended_Pictographic}/u.test(icon)) return icon; // Proper emoji detection (handles multi-codepoint sequences)
+    
+    const str = icon.toLowerCase();
+    if (str.includes('sparkle')) return '✨';
+    if (str.includes('clock') || str.includes('time')) return '⏰';
+    if (str.includes('heart') || str.includes('love') || str.includes('care')) return '❤️';
+    if (str.includes('star')) return '⭐';
+    if (str.includes('shield') || str.includes('safe') || str.includes('secure')) return '🛡️';
+    if (str.includes('check') || str.includes('tick')) return '✅';
+    if (str.includes('rocket') || str.includes('fast')) return '🚀';
+    if (str.includes('gem') || str.includes('premium') || str.includes('diamond')) return '💎';
+    if (str.includes('globe') || str.includes('world')) return '🌍';
+    if (str.includes('user') || str.includes('person') || str.includes('people')) return '👥';
+    if (str.includes('phone') || str.includes('call') || str.includes('contact')) return '📞';
+    if (str.includes('mail') || str.includes('email') || str.includes('message')) return '✉️';
+    if (str.includes('fire') || str.includes('hot')) return '🔥';
+    if (str.includes('lightbulb') || str.includes('idea')) return '💡';
+    
+    return '✨'; // default fallback for arbitrary AI text
+}
+
 export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
-    const { headline, subheadline, features = [], variant = 'grid-3' } = block
+    const { headline, subheadline, features: rawFeatures = [], variant = 'grid-3' } = block
+    
+    // Map icons safely before rendering
+    const features = (rawFeatures.length > 0 ? rawFeatures : FALLBACK_FEATURES).map(f => ({
+        ...f,
+        icon: parseFeatureIcon(f.icon)
+    }))
 
     /* Plan 260415 Lỗi E — empty state dev warn thay vì render header trống */
     if (!features.length) {
@@ -88,8 +136,10 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                         </IconContainer>
                                     </div>
                                 )}
-                                <Heading level={3} className="mb-3">{feature.title}</Heading>
-                                <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                                <div className="min-w-0 break-words">
+                                    <Heading level={3} className="mb-3">{feature.title}</Heading>
+                                    <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                                </div>
                             </HoverCard>
                         </StaggerItem>
                     ))}
@@ -124,7 +174,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                         {feature.icon}
                                     </div>
                                 )}
-                                <div>
+                                <div className="flex-1 min-w-0 break-words">
                                     <Heading level={4} className="mb-1">{feature.title}</Heading>
                                     <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
                                 </div>
@@ -139,7 +189,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
     // ── zigzag variant ────────────────────────────────────────────────────
     if (variant === 'zigzag') {
         return (
-            <FeaturesSection>
+            <FeaturesSection decorative={<AsymmetricGrid color={CSS_VARS.primary} opacity={0.05} />}>
                 <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
                 <motion.div
                     initial="hidden"
@@ -169,7 +219,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                     )}
                                 </div>
                                 {/* Content side */}
-                                <div className={`flex-1 ${isEven ? 'md:text-right' : ''}`}>
+                                <div className={`flex-1 min-w-0 break-words ${isEven ? 'md:text-right' : ''}`}>
                                     <Heading level={3} className="mb-3">{feature.title}</Heading>
                                     <Body className="opacity-50 leading-relaxed">{feature.description}</Body>
                                 </div>
@@ -206,7 +256,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                         {feature.icon}
                                     </IconContainer>
                                 )}
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 break-words">
                                     <Heading level={4} className="mb-1">{feature.title}</Heading>
                                     <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
                                 </div>
@@ -225,8 +275,12 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
         'grid-4': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
     }[variant] || 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
 
+    // A4 vocab: grid-3 gets architectural grid lines (other grid-N keep blob default)
+    const gridDecorative =
+        variant === 'grid-3' ? <GridLines color={CSS_VARS.primary} spacing={48} opacity={0.05} /> : undefined
+
     return (
-        <FeaturesSection>
+        <FeaturesSection decorative={gridDecorative}>
             <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
 
             {/* Feature Cards */}
@@ -248,10 +302,12 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                 </IconContainer>
                             )}
 
-                            <Heading level={3} className="mb-3 group-hover:opacity-100 transition-opacity">
-                                {feature.title}
-                            </Heading>
-                            <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                            <div className="min-w-0 break-words">
+                                <Heading level={3} className="mb-3 group-hover:opacity-100 transition-opacity">
+                                    {feature.title}
+                                </Heading>
+                                <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                            </div>
 
                             {/* Bottom accent line on hover */}
                             <div
@@ -300,14 +356,14 @@ function FeaturesCarousel({
     }, [updateScrollState])
 
     return (
-        <FeaturesSection>
+        <FeaturesSection decorative={<DuotoneOverlay color1={CSS_VARS.primary} color2={CSS_VARS.secondary} opacity={0.04} blendMode="soft-light" />}>
             <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
 
             <div className="relative">
                 {/* Nav arrows — desktop only */}
                 <button
                     onClick={() => scroll('left')}
-                    className={`flex absolute left-2 md:-left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollLeft ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
+                    className={`hidden md:flex absolute md:-left-4 top-1/2 -translate-y-1/2 z-20 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollLeft ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
                     style={{
                         background: CSS_VARS.surfacePrimary,
                         borderColor: 'rgba(var(--brand-primary-rgb), 0.2)',
@@ -319,7 +375,7 @@ function FeaturesCarousel({
                 </button>
                 <button
                     onClick={() => scroll('right')}
-                    className={`flex absolute right-2 md:-right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollRight ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
+                    className={`hidden md:flex absolute md:-right-4 top-1/2 -translate-y-1/2 z-20 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollRight ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
                     style={{
                         background: CSS_VARS.surfacePrimary,
                         borderColor: 'rgba(var(--brand-primary-rgb), 0.2)',
@@ -344,7 +400,7 @@ function FeaturesCarousel({
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: i * 0.1, duration: 0.4 }}
-                            className={`flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] snap-start ${CARD_PADDING.lg} rounded-2xl group transition-all duration-300 hover:shadow-xl`}
+                            className={`flex-shrink-0 w-[280px] sm:w-[320px] md:w-[360px] snap-start ${CARD_PADDING.md} rounded-2xl group transition-all duration-300 hover:shadow-xl`}
                             style={{
                                 background: 'linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)',
                                 border: '1px solid rgba(var(--brand-primary-rgb), 0.071)',
@@ -355,8 +411,10 @@ function FeaturesCarousel({
                                     {feature.icon}
                                 </IconContainer>
                             )}
-                            <Heading level={3} className="mb-3">{feature.title}</Heading>
-                            <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                            <div className="min-w-0 break-words">
+                                <Heading level={3} className="mb-3">{feature.title}</Heading>
+                                <Body size="small" className="opacity-50 leading-relaxed">{feature.description}</Body>
+                            </div>
                         </motion.div>
                     ))}
                 </div>

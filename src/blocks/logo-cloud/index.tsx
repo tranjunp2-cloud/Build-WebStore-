@@ -18,6 +18,28 @@ function LogoHeadline({ text }: { text?: string }) {
     )
 }
 
+/** Text placeholder for logos without valid image URL — shows initials in a styled div */
+function LogoPlaceholder({ name }: { name?: string }) {
+    const initials = (name ?? '')
+        .split(/\s+/)
+        .map((w) => w[0] ?? '')
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || '?'
+    return (
+        <div
+            className="h-8 px-4 rounded flex items-center justify-center text-xs font-bold uppercase tracking-wider opacity-60 hover:opacity-100 transition-opacity"
+            style={{
+                border: `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
+                color: 'var(--brand-primary)',
+                background: `rgba(var(--brand-primary-rgb), 0.04)`,
+            }}
+        >
+            {initials}
+        </div>
+    )
+}
+
 export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudConfig>) {
     void _theme
     const { headline, logos = [], variant = 'row' } = block
@@ -38,7 +60,11 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                                     background: `rgba(var(--brand-primary-rgb), 0.02)`,
                                 }}
                             >
-                                <img src={item.logo?.url} alt={item.logo?.alt || item.name} className="h-8 w-auto opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
+                                {item.logo?.url ? (
+                                    <img src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 w-auto opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
+                                ) : (
+                                    <LogoPlaceholder name={item.name} />
+                                )}
                             </div>
                         ))}
                     </div>
@@ -54,7 +80,11 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                 <LogoHeadline text={headline} />
                 <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
                     {logos.map((item, i) => (
-                        <img key={i} src={item.logo?.url} alt={item.logo?.alt || item.name} className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
+                        item.logo?.url ? (
+                            <img key={i} src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
+                        ) : (
+                            <LogoPlaceholder key={i} name={item.name} />
+                        )
                     ))}
                 </div>
             </SectionWrapper>

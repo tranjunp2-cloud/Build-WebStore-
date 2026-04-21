@@ -511,11 +511,18 @@ export async function POST(req: NextRequest) {
                 },
             })
 
-            // Delete old pages for this site
+            // Delete old pages for this site. depth:0 keeps relationships as IDs
+            // and skips the massive join across every block table — we only need
+            // ids for the delete loop. (Without this, default depth=2 produced a
+            // ~40-way join that failed loudly when any block table lagged a
+            // migration — cf. faq/pricing "variant" fixes in 355fc7c1/73dc271b.)
             const oldPages = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: site.id } },
                 limit: 100,
+                depth: 0,
+                pagination: false,
+                select: { id: true },
             })
             for (const oldPage of oldPages.docs) {
                 await payload.delete({ collection: 'pages', id: oldPage.id })
@@ -552,9 +559,20 @@ export async function POST(req: NextRequest) {
             result.siteName,
         )
 
+        // B4 fix: detect duplicate hero blocks — take first, log warning
+        const heroBlocks = sanitizedBlocks.filter(b => b.blockType === 'hero')
+        if (heroBlocks.length > 1) {
+            console.warn(`[generate-site] ${heroBlocks.length} hero blocks detected — keeping first, removing ${heroBlocks.length - 1} duplicates`)
+            for (let i = sanitizedBlocks.length - 1; i >= 0; i--) {
+                if (sanitizedBlocks[i]!.blockType === 'hero' && sanitizedBlocks[i] !== heroBlocks[0]) {
+                    sanitizedBlocks.splice(i, 1)
+                }
+            }
+        }
+
         // Inject DALL-E generated Hero Image into the hero block (legacy path, flag-gated)
         if (ENABLE_DALLE_HERO && heroMedia) {
-            const heroBlock = sanitizedBlocks.find(b => b.blockType === 'hero')
+            const heroBlock = heroBlocks[0] ?? null
             if (heroBlock) {
                 // Attach the payload block's backgroundImage field to the uploaded media ID (for DB save)
                 heroBlock.backgroundImage = heroMedia.id
@@ -866,6 +884,21 @@ export async function POST(req: NextRequest) {
         const errMsg = error instanceof Error ? error.message : String(error)
         const errStack = error instanceof Error ? error.stack : ''
 
+        // Drizzle wraps the real Postgres error (e.g. `column "variant" does not
+        // exist`) in a wrapper whose .message is just "Failed query: <sql>". The
+        // actionable detail lives on `.cause` (pg DatabaseError) with `code`,
+        // `detail`, `hint`, `table`, `column`, `position`. Without this, a
+        // missing-column migration produces an opaque 500 — see prior fixes for
+        // faq/pricing variant columns (commits 355fc7c1 / 73dc271b).
+        type PgErrLike = { code?: string; detail?: string; hint?: string; table?: string; column?: string; position?: string; message?: string }
+        const cause = (error as { cause?: unknown })?.cause
+        const pgErr: PgErrLike | null = cause && typeof cause === 'object' ? cause as PgErrLike : null
+        const causeMsg = pgErr?.message
+        const pgCode = pgErr?.code
+        const pgDetail = pgErr?.detail
+        const pgTable = pgErr?.table
+        const pgColumn = pgErr?.column
+
         // Plan 260415 fix-500 — structured error log with debugId + stage
         // context so Vercel log search can group failures + PM can cite a
         // support ID when users report "it broke". Stop leaking raw errMsg
@@ -873,7 +906,12 @@ export async function POST(req: NextRequest) {
         const debugId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
         console.error('[AI Generate Site Error]', JSON.stringify({
             debugId,
-            errMsg,
+            errMsg: errMsg.slice(0, 500),
+            causeMsg: causeMsg?.slice(0, 500),
+            pgCode,
+            pgDetail: pgDetail?.slice(0, 300),
+            pgTable,
+            pgColumn,
             pagesCreated: _createdPagesCount,
             siteId: _site?.id ?? null,
         }))
@@ -1037,8 +1075,13 @@ function buildGeneratedPages({
     }
 
     // Fallback: clone-based page generation for single-page AI response
+    // B4 fix: log if duplicate structural blocks found in fallback path
+    const heroCandidates = blocks.filter((block) => block.blockType === 'hero')
+    if (heroCandidates.length > 1) {
+        console.warn(`[buildGeneratedPages] fallback path: ${heroCandidates.length} hero blocks — using first`)
+    }
     const navigation = blocks.find((block) => block.blockType === 'navigation') || null
-    const hero = blocks.find((block) => block.blockType === 'hero') || null
+    const hero = heroCandidates[0] ?? null
     const about = blocks.find((block) => block.blockType === 'about') || null
     const features = blocks.find((block) => block.blockType === 'features') || null
     const testimonials = blocks.find((block) => block.blockType === 'testimonials') || null

@@ -52,6 +52,18 @@ export const eventsContent: CategoryContent = {
       heroSubheadline:
         'Weddings, galas, and corporate dinners — our grand ballroom sets the stage for unforgettable evenings.',
     },
+    {
+      name: 'KL Run & Ride Events',
+      tagline: 'Malaysia\'s Premier Sports Event Organiser',
+      description:
+        'KL Run & Ride organises certified running, cycling, and triathlon events across Malaysia. Our flagship KL Night Marathon draws 18,000 participants yearly. Event management packages from RM 45,000 cover route permit (DBKL), timing chip, medal design, water stations, and medical support. 12 years experience, 240+ events delivered.',
+      address: 'Unit 7-08, Plaza Pantai, Jalan 4/83A, Pantai Dalam, 59200 Kuala Lumpur',
+      phone: '+60 3-2282 1900',
+      email: 'race@klrunride.my',
+      heroHeadline: 'Move Malaysia, Event by Event',
+      heroSubheadline:
+        'Marathons, fun runs, and triathlons — certified race management that keeps 18,000+ runners coming back every year.',
+    },
   ],
   testimonials: [
     {

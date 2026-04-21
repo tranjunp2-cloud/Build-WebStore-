@@ -66,12 +66,36 @@ function resolveBodyFont(pairingId: string | null | undefined): string {
 const DEFAULT_HEADING_FONT = 'Outfit'
 const DEFAULT_BODY_FONT = 'Inter'
 
+// Plan 260417 Wave 1 A2 — fallback defaults changed from dark cyan/magenta
+// (`#0ea5e9` + `#d946ef`) to light neutral slate. Every preset in
+// `theme-presets.ts` writes a full 11-field palette, so this fallback only
+// hits when a site was saved with incomplete theme OR resolveTheme is called
+// with an empty object. Dark alien cyan/magenta scared users in staging.
+const FALLBACK_PRIMARY_COLOR = '#111827' // slate-900
+const FALLBACK_SECONDARY_COLOR = '#374151' // slate-700
+const FALLBACK_COLOR_MODE: 'light' | 'dark' = 'light'
+
 export function resolveTheme(
     partial: Partial<ThemeConfig> & { primaryColor?: string; colorMode?: 'light' | 'dark' },
 ): ThemeConfig {
-    const colorMode = partial.colorMode || 'dark'
+    const colorMode = partial.colorMode || FALLBACK_COLOR_MODE
     const isDark = colorMode === 'dark'
-    const primaryColor = partial.primaryColor || '#0ea5e9'
+    const primaryColor = partial.primaryColor || FALLBACK_PRIMARY_COLOR
+
+    // Dev-time warn when resolver has to fill ≥2 palette fields — signals a
+    // composer bug (picker should emit full 11-field preset). Never throws.
+    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') {
+        const missing: string[] = []
+        if (!partial.primaryColor) missing.push('primaryColor')
+        if (!partial.secondaryColor) missing.push('secondaryColor')
+        if (!partial.colorMode) missing.push('colorMode')
+        if (!partial.backgroundColor) missing.push('backgroundColor')
+        if (missing.length >= 2 && typeof console !== 'undefined' && typeof console.warn === 'function') {
+            console.warn(
+                `[theme] resolveTheme filling ${missing.length} defaults — picker likely emitted partial preset. Missing: ${missing.join(', ')}`,
+            )
+        }
+    }
 
     // Resolve font pair (pairingId → lookup, fallback to partial overrides)
     let fontHeading = partial.fontHeading || resolveHeadingFont(partial.fontPairingId)
@@ -90,13 +114,28 @@ export function resolveTheme(
         fontBody = DEFAULT_BODY_FONT
     }
 
+    // Mode-dependent defaults — used when the stored color matches the
+    // *opposite* mode's default, meaning it was never explicitly customized.
+    // Without this check, switching dark→light keeps a dark background.
+    const DARK_DEFAULTS = { bg: '#09090b', surface: '#111111', text: '#fafafa', muted: '#a1a1aa' }
+    const LIGHT_DEFAULTS = { bg: '#ffffff', surface: '#f8f8f8', text: '#09090b', muted: '#71717a' }
+
+    const resolveColor = (value: string | undefined, darkDefault: string, lightDefault: string): string => {
+        if (!value) return isDark ? darkDefault : lightDefault
+        // If the stored value matches the opposite mode's default, reset to current mode's default
+        // Hex is case-insensitive: `#FFFFFF` must match `#ffffff`
+        const opposite = isDark ? lightDefault : darkDefault
+        if (value.toLowerCase() === opposite.toLowerCase()) return isDark ? darkDefault : lightDefault
+        return value
+    }
+
     const resolved: ThemeConfig = {
         primaryColor,
-        secondaryColor: partial.secondaryColor || '#d946ef',
+        secondaryColor: partial.secondaryColor || FALLBACK_SECONDARY_COLOR,
         accentColor: partial.accentColor || lightenHex(primaryColor, 15),
-        surfaceColor: partial.surfaceColor || (isDark ? '#111111' : '#f8f8f8'),
-        textColor: partial.textColor || (isDark ? '#fafafa' : '#09090b'),
-        mutedColor: partial.mutedColor || (isDark ? '#a1a1aa' : '#71717a'),
+        surfaceColor: resolveColor(partial.surfaceColor, '#111111', '#f8f8f8'),
+        textColor: resolveColor(partial.textColor, '#fafafa', '#09090b'),
+        mutedColor: resolveColor(partial.mutedColor, '#a1a1aa', '#71717a'),
 
         fontPairingId: partial.fontPairingId ?? null,
         fontHeading,
@@ -107,7 +146,7 @@ export function resolveTheme(
         shadowPreset: partial.shadowPreset || 'subtle',
 
         colorMode,
-        backgroundColor: partial.backgroundColor || (isDark ? '#09090b' : '#ffffff'),
+        backgroundColor: resolveColor(partial.backgroundColor, '#09090b', '#ffffff'),
     }
 
     return resolved

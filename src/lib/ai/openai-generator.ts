@@ -6,14 +6,15 @@
 
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import { sanitizeBusinessInfo } from './sanitize-user-input'
 import { buildSystemPrompt, buildPersonalizePrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
-import { composeFallbackResult } from './fallback-adapter'
+import { composeTemplateResult } from './fallback-adapter'
 import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
-import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
+import { enforceMinimumStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
 import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { pickRecipe } from './category-recipes'
@@ -57,11 +58,17 @@ export type SSEEvent = {
  * Falls back to rule-based generation if API key missing or AI fails.
  */
 export async function generateSiteWithAI(
-    businessInfo: BusinessInfoInput,
+    rawBusinessInfo: BusinessInfoInput,
     extraInstructions?: string,
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
     referencePrompt?: string,
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
+    // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
+    // intermittent "400 could not parse JSON body" from OpenAI when clipboard
+    // carries broken Unicode (common from mobile emoji paste + Windows clip).
+    const businessInfo = sanitizeBusinessInfo(rawBusinessInfo)
+    const sanitizedExtra = extraInstructions ? (sanitizeBusinessInfo({ extraInstructions }).extraInstructions as string) : extraInstructions
+    const sanitizedRef = referencePrompt ? (sanitizeBusinessInfo({ referencePrompt }).referencePrompt as string) : referencePrompt
     const events: SSEEvent[] = []
     const promptText = [
         businessInfo.businessName,
@@ -126,9 +133,9 @@ export async function generateSiteWithAI(
 
         const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
         const userPromptText = buildUserPrompt(businessInfo, {
-            extraInstructions,
+            extraInstructions: sanitizedExtra,
             language,
-            referencePrompt,
+            referencePrompt: sanitizedRef,
             mood: themeMood,
             recipe: layoutRecipe,
         })
@@ -171,12 +178,22 @@ export async function generateSiteWithAI(
             // a clear attribution.
             if (err && typeof err === 'object') {
                 const apiErr = err as { status?: number; message?: string; error?: unknown }
+                // Plan 260417-0837 item 1.7 — structured logging for OpenAI 400
+                // parse failures. Prior logs lacked biz name/desc/reqBytes which
+                // are the three things we need to repro. No root-cause chase
+                // here, just surface enough signal to diagnose next session.
+                const bizName = (businessInfo.businessName ?? '').slice(0, 100)
+                const bizDesc = (businessInfo.shortDescription ?? '').slice(0, 200)
+                const reqBytes = systemPrompt.length + userPromptText.length
                 console.error(
-                    `[AI] OpenAI call FAILED status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} msg=${String(apiErr.message).slice(0, 300)}`,
+                    `[AI-400] OpenAI FAIL status=${apiErr.status ?? 'unknown'} model=${modelName} durationMs=${Date.now() - callStart} reqBytes=${reqBytes} bizName="${bizName}" msg=${String(apiErr.message).slice(0, 300)}`,
                 )
+                if (bizDesc) {
+                    console.error(`[AI-400] bizDesc="${bizDesc}"`)
+                }
                 if (apiErr.error) {
                     try {
-                        console.error(`[AI] OpenAI error body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
+                        console.error(`[AI-400] body: ${JSON.stringify(apiErr.error).slice(0, 500)}`)
                     } catch {
                         // ignore serialization failures
                     }
@@ -310,11 +327,13 @@ export async function generateSiteWithAI(
                 const rawPage = rawPages[p] as Record<string, unknown>
                 let pageBlocks = validateBlocks(Array.isArray(rawPage.blocks) ? rawPage.blocks : [])
 
-                // Plan 260415 Phase 04 — post-AI content swap runs on homepage
-                // only. Swaps generic AI-emitted blocks (hero/features/about/
-                // etc.) for curated composer output when content matches the
-                // generic blacklist AND doesn't reference user data.
-                if (p === 0 && postSwapEnabled && detectedCategory) {
+                // Plan 260417-0837 item 1.3 — post-AI content swap (hero/features/
+                // testimonials/faq/about/cta) now runs on ALL pages, not just
+                // homepage. SWAPPABLE_BLOCKS are shape-preserving — only the
+                // copy gets replaced with curated MY content when AI hits the
+                // generic blacklist. Safe on sub-pages because no block is
+                // injected; missing blocks stay missing.
+                if (postSwapEnabled && detectedCategory) {
                     const swapResult = postAISwapStep(
                         pageBlocks as Record<string, unknown>[],
                         enforcerBizOverride,
@@ -325,18 +344,26 @@ export async function generateSiteWithAI(
                     swapTelemetry.push(...swapResult.telemetry)
                 }
 
-                // Apply structure enforcer ONLY to homepage (other pages have own content requirements)
-                if (p === 0 && detectedCategory) {
-                    pageBlocks = enforceMinimumStructure(
-                        pageBlocks as Record<string, unknown>[],
-                        detectedCategory,
-                        enforcerCtx,
-                    ) as typeof pageBlocks
+                // Structure enforcement — homepage gets full `enforceMinimumStructure`
+                // (injects nav/footer/hero/mandatory blocks + pads to minBlocks).
+                // That logic is unsafe on sub-pages because it'd add nav+footer
+                // twice or inject mandatory blocks that don't belong on /about
+                // etc. Sub-pages still get item padding + grid alignment via the
+                // other enforcers below (plan 1.3 B5 fix).
+                if (detectedCategory) {
+                    if (p === 0) {
+                        pageBlocks = enforceMinimumStructure(
+                            pageBlocks as Record<string, unknown>[],
+                            detectedCategory,
+                            enforcerCtx,
+                        ) as typeof pageBlocks
+                    }
                     pageBlocks = enforceMinItems(
                         pageBlocks as Record<string, unknown>[],
                         detectedCategory,
                         enforcerCtx,
                     ) as typeof pageBlocks
+                    enforceGridAlignment(pageBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
                 }
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
@@ -450,6 +477,7 @@ export async function generateSiteWithAI(
                     detectedCategory,
                     enforcerCtx,
                 ) as typeof validBlocks
+                enforceGridAlignment(validBlocks as Record<string, unknown>[], detectedCategory, enforcerCtx)
             }
 
             // Phase 04 — page-level guards for single-page path
@@ -554,7 +582,7 @@ function generateWithFallback(
     let composerResult: GenerationResult | null = null
     let composerErrMsg: string | null = null
     try {
-        composerResult = composeFallbackResult(prompt, seed, language, businessInfo)
+        composerResult = composeTemplateResult(prompt, seed, language, businessInfo)
     } catch (composerError: unknown) {
         composerErrMsg = composerError instanceof Error ? composerError.message : String(composerError)
     }
@@ -688,15 +716,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['cards', 'spotlight', 'masonry', 'carousel'],
         footer: ['expanded', 'mega-footer', 'dark-gradient'],
         contact: ['split', 'map-split', 'form'],
-        stats: ['row', 'grid', 'highlight'],
+        stats: ['row', 'highlight', 'cards', 'inline-text'],
         gallery: ['masonry', 'carousel', 'grid'],
-        faq: ['accordion', 'simple'],
+        faq: ['accordion', 'simple', 'numbered'],
         pricing: ['cards', 'table', 'horizontal'],
-        about: ['split', 'story'],
-        cta: ['banner', 'inline'],
+        about: ['split', 'story', 'image-overlay', 'founder-quote'],
+        cta: ['banner', 'image-bg', 'mesh-gradient-hero', 'split-testimonial'],
         navigation: ['simple', 'transparent', 'centered'],
-        newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        newsletter: ['inline', 'banner', 'stacked-card'],
+        team: ['grid', 'list', 'bio-modal', 'cards-hover-reveal'],
     },
     ecommerce: {
         hero: ['slideshow', 'cards-overlay', 'gradient', 'split-right'],
@@ -704,15 +732,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['masonry', 'avatar-row', 'cards', 'carousel'],
         footer: ['expanded', 'minimal', 'simple'],
         contact: ['card-float', 'split', 'minimal-inline'],
-        stats: ['grid', 'row'],
+        stats: ['grid', 'row', 'cards', 'chart-bars'],
         gallery: ['grid', 'carousel', 'lightbox'],
-        faq: ['accordion', 'grid'],
+        faq: ['accordion', 'grid', 'two-column-accordion'],
         pricing: ['cards', 'toggle', 'comparison'],
-        about: ['simple', 'split'],
-        cta: ['banner', 'floating'],
+        about: ['simple', 'split', 'centered-large'],
+        cta: ['banner', 'floating-sticky', 'dark-card', 'image-bg'],
         navigation: ['simple', 'mega-menu', 'pill'],
-        newsletter: ['inline', 'popup'],
-        team: ['grid'],
+        newsletter: ['inline', 'popup', 'minimal'],
+        team: ['grid', 'compact-row'],
     },
     beauty: {
         hero: ['gradient', 'minimal', 'parallax', 'split-left'],
@@ -720,15 +748,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['minimal-quote', 'spotlight', 'carousel', 'masonry'],
         footer: ['centered-stack', 'dark-gradient', 'mega-footer'],
         contact: ['minimal-inline', 'card-float', 'split'],
-        stats: ['highlight', 'row'],
+        stats: ['highlight', 'row', 'cards', 'chart-bars'],
         gallery: ['justified', 'filmstrip', 'masonry'],
-        faq: ['accordion', 'simple'],
+        faq: ['accordion', 'simple', 'chat-bubbles'],
         pricing: ['cards', 'minimal', 'toggle'],
-        about: ['split', 'story'],
-        cta: ['floating', 'inline'],
+        about: ['split', 'story', 'founder-quote', 'centered-large'],
+        cta: ['card', 'mesh-gradient-hero', 'image-bg', 'floating-sticky'],
         navigation: ['transparent', 'simple', 'pill'],
-        newsletter: ['inline', 'popup'],
-        team: ['grid', 'list'],
+        newsletter: ['inline', 'popup', 'incentive-grid', 'stacked-card'],
+        team: ['cards-hover-reveal', 'grid', 'bio-modal'],
     },
     tech: {
         hero: ['gradient', 'split-video', 'minimal', 'parallax'],
@@ -736,15 +764,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['spotlight', 'cards', 'video-text'],
         footer: ['minimal', 'dark-gradient', 'expanded'],
         contact: ['split', 'form', 'card-float'],
-        stats: ['grid', 'highlight'],
+        stats: ['grid', 'highlight', 'chart-bars', 'cards'],
         gallery: ['grid', 'lightbox'],
-        faq: ['accordion', 'grid'],
+        faq: ['accordion', 'grid', 'numbered', 'two-column-accordion'],
         pricing: ['toggle', 'comparison', 'cards'],
-        about: ['simple', 'split'],
-        cta: ['inline', 'banner'],
+        about: ['simple', 'split', 'two-column', 'founder-quote'],
+        cta: ['dark-card', 'inline', 'mesh-gradient-hero', 'banner'],
         navigation: ['simple', 'transparent', 'pill'],
-        newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        newsletter: ['inline', 'banner', 'minimal', 'incentive-grid'],
+        team: ['grid', 'list', 'bio-modal', 'compact-row'],
     },
     business: {
         hero: ['centered', 'split-left', 'gradient', 'minimal'],
@@ -752,15 +780,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['cards', 'carousel', 'spotlight'],
         footer: ['expanded', 'mega-footer', 'dark-gradient'],
         contact: ['split', 'form', 'map-split'],
-        stats: ['row', 'grid', 'highlight'],
+        stats: ['row', 'grid', 'highlight', 'chart-bars'],
         gallery: ['grid', 'carousel'],
-        faq: ['accordion', 'grid', 'simple'],
+        faq: ['accordion', 'grid', 'simple', 'numbered'],
         pricing: ['cards', 'table', 'toggle'],
-        about: ['split', 'simple'],
-        cta: ['banner', 'inline'],
+        about: ['split', 'simple', 'two-column', 'centered-large'],
+        cta: ['banner', 'inline', 'split-testimonial', 'card'],
         navigation: ['simple', 'centered', 'mega-menu'],
-        newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        newsletter: ['inline', 'banner', 'stacked-card', 'incentive-grid'],
+        team: ['grid', 'list', 'bio-modal', 'compact-row'],
     },
     portfolio: {
         hero: ['magazine', 'parallax', 'cards-overlay', 'minimal'],
@@ -768,15 +796,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['video-text', 'minimal-quote', 'simple'],
         footer: ['centered-stack', 'simple', 'dark-gradient'],
         contact: ['minimal-inline', 'card-float', 'form'],
-        stats: ['highlight', 'row'],
+        stats: ['highlight', 'row', 'inline-text'],
         gallery: ['masonry', 'justified', 'lightbox'],
-        faq: ['simple', 'accordion'],
+        faq: ['simple', 'accordion', 'numbered'],
         pricing: ['minimal', 'cards'],
-        about: ['story', 'split'],
-        cta: ['inline', 'floating'],
+        about: ['story', 'image-overlay', 'founder-quote', 'centered-large'],
+        cta: ['dark-card', 'mesh-gradient-hero', 'image-bg', 'inline'],
         navigation: ['transparent', 'pill', 'simple'],
-        newsletter: ['inline'],
-        team: ['list', 'grid'],
+        newsletter: ['inline', 'minimal'],
+        team: ['cards-hover-reveal', 'bio-modal', 'horizontal-scroll'],
     },
     blog: {
         hero: ['minimal', 'split-left', 'fullscreen', 'centered'],
@@ -784,15 +812,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['simple', 'avatar-row', 'cards'],
         footer: ['simple', 'centered-stack', 'expanded'],
         contact: ['minimal-inline', 'form', 'split'],
-        stats: ['row', 'grid'],
+        stats: ['row', 'grid', 'inline-text'],
         gallery: ['grid', 'masonry'],
-        faq: ['accordion', 'simple'],
+        faq: ['accordion', 'simple', 'numbered', 'chat-bubbles'],
         pricing: ['cards', 'minimal'],
-        about: ['simple', 'story'],
-        cta: ['inline', 'banner'],
+        about: ['simple', 'story', 'two-column', 'founder-quote'],
+        cta: ['inline', 'card', 'split-testimonial'],
         navigation: ['simple', 'centered'],
-        newsletter: ['inline', 'banner', 'popup'],
-        team: ['list'],
+        newsletter: ['inline', 'banner', 'popup', 'minimal'],
+        team: ['list', 'compact-row'],
     },
     health: {
         hero: ['centered', 'split-left', 'minimal', 'gradient'],
@@ -800,15 +828,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['cards', 'spotlight', 'minimal-quote'],
         footer: ['expanded', 'simple', 'centered-stack'],
         contact: ['split', 'map-split', 'form'],
-        stats: ['row', 'highlight'],
+        stats: ['row', 'highlight', 'chart-bars', 'cards'],
         gallery: ['grid', 'carousel'],
-        faq: ['accordion', 'grid'],
+        faq: ['accordion', 'grid', 'numbered'],
         pricing: ['cards', 'table'],
-        about: ['split', 'simple'],
-        cta: ['banner', 'inline'],
+        about: ['split', 'simple', 'founder-quote', 'centered-large'],
+        cta: ['banner', 'card', 'split-testimonial', 'inline'],
         navigation: ['simple', 'centered'],
-        newsletter: ['inline'],
-        team: ['grid', 'list'],
+        newsletter: ['inline', 'stacked-card'],
+        team: ['grid', 'bio-modal', 'list'],
     },
     education: {
         hero: ['centered', 'split-right', 'gradient', 'magazine'],
@@ -816,15 +844,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['carousel', 'avatar-row', 'cards'],
         footer: ['expanded', 'mega-footer', 'simple'],
         contact: ['split', 'form', 'card-float'],
-        stats: ['row', 'grid'],
+        stats: ['row', 'grid', 'chart-bars', 'cards'],
         gallery: ['grid', 'carousel'],
-        faq: ['accordion', 'simple'],
+        faq: ['accordion', 'simple', 'numbered'],
         pricing: ['cards', 'table', 'toggle'],
-        about: ['split', 'story'],
-        cta: ['banner', 'inline'],
+        about: ['split', 'story', 'two-column', 'founder-quote'],
+        cta: ['banner', 'card', 'mesh-gradient-hero', 'split-testimonial'],
         navigation: ['simple', 'centered', 'mega-menu'],
-        newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        newsletter: ['inline', 'banner', 'incentive-grid'],
+        team: ['grid', 'bio-modal', 'cards-hover-reveal'],
     },
     realestate: {
         hero: ['fullscreen', 'parallax', 'slideshow', 'split-left'],
@@ -832,15 +860,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['spotlight', 'masonry', 'cards'],
         footer: ['expanded', 'mega-footer', 'dark-gradient'],
         contact: ['map-split', 'split', 'card-float'],
-        stats: ['grid', 'highlight', 'row'],
+        stats: ['grid', 'highlight', 'row', 'cards'],
         gallery: ['carousel', 'lightbox', 'grid'],
-        faq: ['accordion', 'simple'],
+        faq: ['accordion', 'simple', 'chat-bubbles'],
         pricing: ['cards', 'table'],
-        about: ['split', 'story'],
-        cta: ['banner', 'floating'],
+        about: ['split', 'story', 'image-overlay', 'centered-large'],
+        cta: ['image-bg', 'split-testimonial', 'banner', 'dark-card'],
         navigation: ['simple', 'transparent'],
-        newsletter: ['inline'],
-        team: ['grid'],
+        newsletter: ['inline', 'incentive-grid'],
+        team: ['grid', 'bio-modal', 'compact-row'],
     },
     fitness: {
         hero: ['fullscreen', 'parallax', 'split-video', 'gradient'],
@@ -848,15 +876,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['carousel', 'spotlight', 'cards'],
         footer: ['dark-gradient', 'mega-footer', 'expanded'],
         contact: ['split', 'form', 'card-float'],
-        stats: ['highlight', 'grid', 'row'],
+        stats: ['highlight', 'grid', 'row', 'chart-bars'],
         gallery: ['masonry', 'carousel', 'grid'],
-        faq: ['accordion', 'grid'],
+        faq: ['accordion', 'grid', 'chat-bubbles'],
         pricing: ['cards', 'toggle', 'comparison'],
-        about: ['split', 'simple'],
-        cta: ['banner', 'floating'],
+        about: ['split', 'simple', 'image-overlay', 'centered-large'],
+        cta: ['dark-card', 'mesh-gradient-hero', 'image-bg', 'floating-sticky'],
         navigation: ['transparent', 'simple', 'pill'],
-        newsletter: ['banner', 'inline'],
-        team: ['grid', 'list'],
+        newsletter: ['banner', 'inline', 'incentive-grid', 'stacked-card'],
+        team: ['cards-hover-reveal', 'horizontal-scroll', 'grid'],
     },
     creative: {
         hero: ['magazine', 'parallax', 'cards-overlay', 'minimal'],
@@ -864,15 +892,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['video-text', 'minimal-quote', 'masonry'],
         footer: ['centered-stack', 'dark-gradient', 'simple'],
         contact: ['minimal-inline', 'card-float', 'form'],
-        stats: ['highlight', 'row'],
+        stats: ['highlight', 'row', 'inline-text'],
         gallery: ['masonry', 'justified', 'filmstrip'],
-        faq: ['simple', 'grid'],
+        faq: ['simple', 'grid', 'chat-bubbles', 'numbered'],
         pricing: ['minimal', 'cards'],
-        about: ['story', 'split'],
-        cta: ['inline', 'floating'],
+        about: ['story', 'split', 'image-overlay', 'founder-quote'],
+        cta: ['dark-card', 'mesh-gradient-hero', 'image-bg', 'inline'],
         navigation: ['transparent', 'pill', 'sidebar'],
-        newsletter: ['popup', 'inline'],
-        team: ['list', 'grid'],
+        newsletter: ['popup', 'inline', 'minimal'],
+        team: ['horizontal-scroll', 'cards-hover-reveal', 'bio-modal', 'list'],
     },
     fnb: {
         hero: ['split-left', 'gradient', 'magazine', 'parallax'],
@@ -880,15 +908,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['cards', 'masonry', 'carousel', 'minimal-quote'],
         footer: ['expanded', 'centered-stack', 'dark-gradient'],
         contact: ['split', 'map-split', 'form'],
-        stats: ['row', 'highlight'],
+        stats: ['row', 'highlight', 'cards'],
         gallery: ['masonry', 'carousel', 'grid'],
-        faq: ['accordion', 'simple'],
+        faq: ['accordion', 'simple', 'chat-bubbles'],
         pricing: ['cards', 'horizontal'],
-        about: ['split', 'story'],
-        cta: ['banner', 'inline'],
+        about: ['split', 'story', 'image-overlay', 'founder-quote'],
+        cta: ['banner', 'image-bg', 'mesh-gradient-hero', 'card'],
         navigation: ['simple', 'transparent'],
-        newsletter: ['inline', 'banner'],
-        team: ['grid'],
+        newsletter: ['inline', 'banner', 'stacked-card'],
+        team: ['grid', 'cards-hover-reveal'],
     },
     events: {
         hero: ['fullscreen', 'gradient', 'split-left', 'centered'],
@@ -896,15 +924,15 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['carousel', 'spotlight', 'cards'],
         footer: ['mega-footer', 'dark-gradient', 'expanded'],
         contact: ['map-split', 'split', 'form'],
-        stats: ['row', 'grid', 'highlight'],
+        stats: ['row', 'grid', 'highlight', 'cards'],
         gallery: ['lightbox', 'carousel', 'grid'],
-        faq: ['accordion', 'simple'],
+        faq: ['accordion', 'simple', 'chat-bubbles'],
         pricing: ['cards', 'table'],
-        about: ['story', 'split'],
-        cta: ['banner', 'floating'],
+        about: ['story', 'split', 'image-overlay', 'centered-large'],
+        cta: ['banner', 'image-bg', 'mesh-gradient-hero', 'floating-sticky'],
         navigation: ['simple', 'transparent', 'centered'],
-        newsletter: ['banner', 'inline'],
-        team: ['grid', 'list'],
+        newsletter: ['banner', 'inline', 'stacked-card', 'popup'],
+        team: ['grid', 'cards-hover-reveal', 'horizontal-scroll'],
     },
     travel: {
         hero: ['fullscreen', 'parallax', 'slideshow', 'gradient'],
@@ -912,21 +940,26 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         testimonials: ['masonry', 'spotlight', 'carousel'],
         footer: ['mega-footer', 'expanded', 'dark-gradient'],
         contact: ['map-split', 'split', 'card-float'],
-        stats: ['row', 'highlight', 'grid'],
+        stats: ['row', 'highlight', 'grid', 'inline-text'],
         gallery: ['carousel', 'lightbox', 'masonry'],
-        faq: ['accordion', 'grid'],
+        faq: ['accordion', 'grid', 'chat-bubbles', 'numbered'],
         pricing: ['cards', 'toggle'],
-        about: ['story', 'split'],
-        cta: ['banner', 'inline'],
+        about: ['story', 'split', 'image-overlay', 'centered-large'],
+        cta: ['image-bg', 'mesh-gradient-hero', 'banner', 'split-testimonial'],
         navigation: ['transparent', 'simple'],
-        newsletter: ['inline', 'banner'],
-        team: ['grid', 'list'],
+        newsletter: ['inline', 'banner', 'incentive-grid'],
+        team: ['cards-hover-reveal', 'horizontal-scroll', 'grid'],
     },
 }
 
-/** Variants confirmed broken (no implementation or renders wrong) — NEVER select these */
+/** Variants confirmed broken (no implementation or renders wrong) — NEVER select these.
+ * Plan 260417 Wave 1 A3 — testimonials 'grid' and 'single' are in Zod enum but
+ * have no switch case in blocks/testimonials/index.tsx, so they fall through to
+ * the 'cards' default variant silently. Filter them out of AI variant picking.
+ */
 const BROKEN_VARIANTS: Record<string, string[]> = {
-    hero: ['animated-gradient'],  // No implementation — falls back to centered silently
+    hero: ['animated-gradient'],
+    testimonials: ['grid', 'single'],
 }
 
 // VARIANT_MIN_CONTENT + enforceMinContent moved to ./variant-validation to break
@@ -1210,7 +1243,7 @@ export function sanitizeBlockData(
             }
 
             // Content-count guard: ensure variant has enough items to render properly
-            const contentArrays = ['testimonials', 'features', 'items', 'images', 'plans', 'members', 'logos']
+            const contentArrays = ['testimonials', 'features', 'items', 'images', 'plans', 'members', 'logos', 'stats']
             for (const field of contentArrays) {
                 if (Array.isArray(s[field])) {
                     s.variant = enforceMinContent(s.blockType, s.variant as string, (s[field] as unknown[]).length)
@@ -1899,12 +1932,13 @@ async function generateTemplateFirst(
     const { preset: themePreset } = pickCategoryThemeWithMood(presetCategory, themeSeed)
     const resolvedLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
 
-    console.log(`[Template-First] category=${presetCategory} seed=${themeSeed} lang=${resolvedLang}`)
+    // Plan 260417-0837 item 1.2 — confirm template-first is the default path.
+    console.log(`[AI] path=template-first category=${presetCategory} seed=${themeSeed} lang=${resolvedLang}`)
 
     // Run composer + GPT personalize in parallel
     const [composerSettled, personalizeSettled] = await Promise.allSettled([
         // Composer: build full 5-page site from library (~0.5s)
-        Promise.resolve().then(() => composeFallbackResult(promptText, themeSeed, resolvedLang, businessInfo)),
+        Promise.resolve().then(() => composeTemplateResult(promptText, themeSeed, resolvedLang, businessInfo)),
         // GPT: personalize 4 text fields (~3-8s, timeout 10s)
         personalizeWithGPT(openai, businessInfo, presetCategory, resolvedLang),
     ])
@@ -1948,6 +1982,41 @@ async function generateTemplateFirst(
                 title: personalized.seoTitle,
                 description: personalized.seoDescription || composerResult.seo.description,
             }
+        }
+    }
+
+    // ── Structure enforcement ──
+    // Composer output can be sparse (beauty has only 2 industry blocks).
+    // Run the same enforcer that the AI-first path uses to pad homepage
+    // to minBlocks and fill thin arrays (testimonials, FAQ, features).
+    const enforcerBizOverride = mapBusinessInfo(businessInfo)
+    const { mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
+    const enforcerCtx = {
+        businessName: businessInfo.businessName,
+        industry: businessInfo.industry,
+        seed: themeSeed,
+        userBiz: enforcerBizOverride,
+        mood: themeMood,
+    }
+
+    // Enforce homepage blocks
+    let homepageBlocks = composerResult.blocks as Record<string, unknown>[]
+    homepageBlocks = enforceMinimumStructure(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
+    homepageBlocks = enforceMinItems(homepageBlocks, presetCategory, enforcerCtx) as typeof homepageBlocks
+    enforceGridAlignment(homepageBlocks, presetCategory, enforcerCtx)
+    composerResult.blocks = homepageBlocks as GeneratedBlock[]
+
+    // Enforce sub-pages too (at least 4 blocks each)
+    if (composerResult.pages) {
+        for (const page of composerResult.pages) {
+            if (page.isHomepage) {
+                page.blocks = homepageBlocks as GeneratedBlock[]
+                continue
+            }
+            let pageBlocks = page.blocks as unknown as Record<string, unknown>[]
+            pageBlocks = enforceMinItems(pageBlocks, presetCategory, enforcerCtx) as typeof pageBlocks
+            enforceGridAlignment(pageBlocks, presetCategory, enforcerCtx)
+            page.blocks = pageBlocks as GeneratedBlock[]
         }
     }
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 
 // ── Mocks ────────────────────────────────────────────────────────────────
@@ -169,6 +170,83 @@ describe('AIChatPanel', () => {
         expect(screen.getByText('External edit detected')).toBeInTheDocument()
     })
     
+    it('calls onAIAction with update_multiple_blocks from API response', async () => {
+        const multiBlockResponse = {
+            action: 'update_multiple_blocks',
+            updates: [
+                { blockIndex: 0, changes: { headline: 'Xin chào' } },
+                { blockIndex: 1, changes: { title: 'Về chúng tôi' } },
+            ],
+            message: 'Translated all sections to Vietnamese.',
+        }
+
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve(multiBlockResponse),
+        })
+
+        render(<AIChatPanel {...defaultProps} />)
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i)
+
+        fireEvent.change(input, { target: { value: 'Translate everything to Vietnamese' } })
+        await act(async () => {
+            fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', charCode: 13 })
+        })
+
+        await waitFor(() => {
+            expect(defaultProps.onAIAction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: 'update_multiple_blocks',
+                    updates: expect.arrayContaining([
+                        expect.objectContaining({ blockIndex: 0 }),
+                        expect.objectContaining({ blockIndex: 1 }),
+                    ]),
+                })
+            )
+        })
+
+        await waitFor(() => {
+            expect(screen.getByText('Translated all sections to Vietnamese.')).toBeInTheDocument()
+        })
+    })
+
+    // ── Hydration (MIN-5) ────────────────────────────────────────────────
+
+    it('TC-F05-HYDRATION-01 — server render produces welcome-only HTML (SSR-safe)', () => {
+        // Simulate SSR — renderToString never runs useEffect, so output reflects
+        // only what useState's initializer produced. Cache must not leak in.
+        sessionStorage.setItem('editor-chat-test-site', JSON.stringify([
+            { id: 'old', role: 'user', content: 'cached prompt', createdAt: '08:00 AM' },
+        ]))
+
+        const html = renderToString(<AIChatPanel {...defaultProps} siteId="test-site" />)
+
+        expect(html).toContain('Hello!')
+        expect(html).not.toContain('cached prompt')
+        // Welcome must not carry createdAt in initial render (non-deterministic
+        // time would break hydration). formatChatTime output contains ' AM'/' PM'
+        // on en-US; assert absence.
+        const welcomeSegment = html.split('Hello!')[1]?.slice(0, 200) ?? ''
+        expect(welcomeSegment).not.toMatch(/\b\d{1,2}:\d{2}\s?(AM|PM)\b/i)
+
+        sessionStorage.clear()
+    })
+
+    it('TC-F05-HYDRATION-02 — hydrates from localStorage after mount', async () => {
+        localStorage.setItem('editor-chat-test-site', JSON.stringify([
+            { id: 'old', role: 'user', content: 'cached prompt', createdAt: '08:00 AM' },
+        ]))
+
+        render(<AIChatPanel {...defaultProps} siteId="test-site" />)
+
+        await waitFor(() => {
+            expect(screen.getByText('cached prompt')).toBeInTheDocument()
+        })
+
+        localStorage.clear()
+    })
+
     it('prompts chip auto-fills input and submits', async () => {
         const mockFetch = vi.fn().mockResolvedValue({
             ok: true,

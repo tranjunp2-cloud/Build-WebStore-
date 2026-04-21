@@ -13,6 +13,7 @@
 
 import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
+import { pickLogosByCategory } from './content/client-logos-library'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
 import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
 import type { ThemeMood } from './theme-moods'
@@ -571,7 +572,21 @@ export function buildBlockFromLibrary(
                 blockType: 'logo-cloud',
                 variant: 'row',
                 headline: 'Trusted By',
-                logos: Array.from({ length: 6 }, (_, i) => ({ name: `Partner ${i + 1}` })),
+                logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
+                    .slice(0, 6)
+                    .map((l) => ({ name: l.name, ...(l.url ? { url: l.url } : {}) })),
+            }
+
+        case 'client-logos':
+            return {
+                blockType: 'client-logos',
+                variant: 'scroll',
+                headline: 'Trusted By Industry Leaders',
+                // Seed library lacks image urls (copyright); pass name as alt + empty url.
+                // Render falls back to initials badge placeholder — see LogoImage in client-logos/index.tsx.
+                logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
+                    .slice(0, 6)
+                    .map((l) => ({ url: l.url ?? '', alt: l.name })),
             }
 
         default: {

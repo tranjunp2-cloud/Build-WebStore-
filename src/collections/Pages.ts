@@ -121,6 +121,10 @@ const AboutBlock = {
                 { label: 'Simple', value: 'simple' },
                 { label: 'Split', value: 'split' },
                 { label: 'Story', value: 'story' },
+                { label: 'Two Column', value: 'two-column' },
+                { label: 'Founder Quote', value: 'founder-quote' },
+                { label: 'Centered Large', value: 'centered-large' },
+                { label: 'Image Overlay', value: 'image-overlay' },
             ],
         },
         {
@@ -472,6 +476,9 @@ const StatsBlock = {
                 { label: 'Row', value: 'row' },
                 { label: 'Grid', value: 'grid' },
                 { label: 'Highlight', value: 'highlight' },
+                { label: 'Cards', value: 'cards' },
+                { label: 'Inline Text', value: 'inline-text' },
+                { label: 'Chart Bars', value: 'chart-bars' },
             ],
         },
         { name: 'headline', type: 'text' },
@@ -491,6 +498,19 @@ const PricingBlock = {
     slug: 'pricing',
     labels: { singular: 'Pricing Section', plural: 'Pricing Sections' },
     fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'cards',
+            options: [
+                { label: 'Cards', value: 'cards' },
+                { label: 'Table', value: 'table' },
+                { label: 'Horizontal', value: 'horizontal' },
+                { label: 'Toggle', value: 'toggle' },
+                { label: 'Tiered', value: 'tiered' },
+                { label: 'Comparison', value: 'comparison' },
+                { label: 'Minimal', value: 'minimal' },
+                { label: 'Slider', value: 'slider' },
+            ],
+        },
         { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
@@ -520,6 +540,17 @@ const FAQBlock = {
     slug: 'faq',
     labels: { singular: 'FAQ Section', plural: 'FAQ Sections' },
     fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'accordion',
+            options: [
+                { label: 'Accordion', value: 'accordion' },
+                { label: 'Grid', value: 'grid' },
+                { label: 'Simple', value: 'simple' },
+                { label: 'Two Column Accordion', value: 'two-column-accordion' },
+                { label: 'Chat Bubbles', value: 'chat-bubbles' },
+                { label: 'Numbered', value: 'numbered' },
+            ],
+        },
         { name: 'headline', type: 'text', defaultValue: 'Frequently Asked Questions' },
         {
             name: 'faqs',
@@ -538,12 +569,17 @@ const TeamBlock = {
     fields: [
         {
             // Plan 260415 — persist team variant (grid vs list).
+            // Plan 260417 A5 — added 4 new variants for pool diversity.
             name: 'variant',
             type: 'select',
             defaultValue: 'grid',
             options: [
                 { label: 'Grid', value: 'grid' },
                 { label: 'List', value: 'list' },
+                { label: 'Cards (hover reveal)', value: 'cards-hover-reveal' },
+                { label: 'Horizontal Scroll', value: 'horizontal-scroll' },
+                { label: 'Bio Modal', value: 'bio-modal' },
+                { label: 'Compact Row', value: 'compact-row' },
             ],
         },
         { name: 'headline', type: 'text', defaultValue: 'Meet Our Team' },
@@ -571,7 +607,12 @@ const CTABlock = {
             options: [
                 { label: 'Banner', value: 'banner' },
                 { label: 'Inline', value: 'inline' },
-                { label: 'Floating', value: 'floating' },
+                { label: 'Card', value: 'card' },
+                { label: 'Floating Sticky', value: 'floating-sticky' },
+                { label: 'Image BG', value: 'image-bg' },
+                { label: 'Split Testimonial', value: 'split-testimonial' },
+                { label: 'Dark Card', value: 'dark-card' },
+                { label: 'Mesh Gradient Hero', value: 'mesh-gradient-hero' },
             ],
         },
         { name: 'headline', type: 'text' },
@@ -585,6 +626,8 @@ const CTABlock = {
                 { label: 'Outline', value: 'outline' },
             ],
         },
+        { name: 'secondaryCtaLabel', type: 'text' },
+        { name: 'secondaryCtaUrl', type: 'text' },
     ],
 }
 
@@ -598,6 +641,9 @@ const NewsletterBlock = {
                 { label: 'Inline', value: 'inline' },
                 { label: 'Popup', value: 'popup' },
                 { label: 'Banner', value: 'banner' },
+                { label: 'Stacked Card', value: 'stacked-card' },
+                { label: 'Minimal', value: 'minimal' },
+                { label: 'Incentive Grid', value: 'incentive-grid' },
             ],
         },
         { name: 'headline', type: 'text' },
@@ -1043,6 +1089,209 @@ const PortfolioGridBlock = {
     ],
 }
 
+// ── Industry-specific blocks (composer-driven, aiVisible=false) ─────────────
+// These 6 blocks were authored as React components but never registered in
+// Payload, so sanitizeBlocksForPayload was dropping them. Registering here
+// unblocks 5 WEAK categories (health, realestate, fitness, education, tech)
+// whose signature blocks were going to /dev/null.
+// Plan: plans/260417-0837-all-cate-full-and-strong/phase-01-hot-fixes.md (1.1)
+
+const DoctorProfileBlock = {
+    slug: 'doctor-profile',
+    labels: { singular: 'Doctor Profile', plural: 'Doctor Profiles' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'cards',
+            options: [
+                { label: 'Cards', value: 'cards' },
+                { label: 'Detailed', value: 'detailed' },
+                { label: 'List', value: 'list' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        {
+            name: 'doctors', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'specialisation', type: 'text' },
+                { name: 'qualifications', type: 'json' },
+                { name: 'photoUrl', type: 'text' },
+                { name: 'availableDays', type: 'json' },
+                { name: 'languages', type: 'text' },
+                { name: 'consultationFee', type: 'text' },
+                { name: 'bio', type: 'textarea' },
+            ],
+        },
+    ],
+}
+
+const PropertyCardBlock = {
+    slug: 'property-card',
+    labels: { singular: 'Property Card', plural: 'Property Cards' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'List', value: 'list' },
+                { label: 'Featured', value: 'featured' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'showMap', type: 'checkbox', defaultValue: false },
+        { name: 'currency', type: 'text', defaultValue: 'RM' },
+        {
+            name: 'properties', type: 'array',
+            fields: [
+                { name: 'title', type: 'text', required: true },
+                { name: 'price', type: 'number' },
+                { name: 'location', type: 'text' },
+                { name: 'bedrooms', type: 'number' },
+                { name: 'bathrooms', type: 'number' },
+                { name: 'area', type: 'number' },
+                { name: 'imageUrls', type: 'json' },
+                {
+                    name: 'type', type: 'select', defaultValue: 'sale',
+                    options: [
+                        { label: 'For Sale', value: 'sale' },
+                        { label: 'For Rent', value: 'rent' },
+                    ],
+                },
+                { name: 'status', type: 'text' },
+                { name: 'mapUrl', type: 'text' },
+                { name: 'description', type: 'textarea' },
+            ],
+        },
+    ],
+}
+
+const ClassScheduleBlock = {
+    slug: 'class-schedule',
+    labels: { singular: 'Class Schedule', plural: 'Class Schedules' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'List', value: 'list' },
+                { label: 'Cards', value: 'cards' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'showCapacity', type: 'checkbox', defaultValue: true },
+        { name: 'highlightToday', type: 'checkbox', defaultValue: true },
+        {
+            name: 'classes', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'instructor', type: 'text' },
+                { name: 'day', type: 'number', min: 0, max: 6 },
+                { name: 'startTime', type: 'text' },
+                { name: 'endTime', type: 'text' },
+                { name: 'capacity', type: 'number' },
+                { name: 'enrolled', type: 'number' },
+                { name: 'category', type: 'text' },
+                { name: 'level', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const VideoShowcaseBlock = {
+    slug: 'video-showcase',
+    labels: { singular: 'Video Showcase', plural: 'Video Showcases' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'Featured', value: 'featured' },
+                { label: 'Full-width', value: 'fullwidth' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'showCategories', type: 'checkbox', defaultValue: true },
+        { name: 'autoplay', type: 'checkbox', defaultValue: false },
+        {
+            name: 'videos', type: 'array',
+            fields: [
+                { name: 'title', type: 'text', required: true },
+                { name: 'thumbnailUrl', type: 'text' },
+                { name: 'videoUrl', type: 'text', required: true },
+                { name: 'category', type: 'text' },
+                { name: 'duration', type: 'text' },
+                { name: 'description', type: 'textarea' },
+            ],
+        },
+    ],
+}
+
+const ProductQuickViewBlock = {
+    slug: 'product-quick-view',
+    labels: { singular: 'Product Quick View', plural: 'Product Quick Views' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'grid',
+            options: [
+                { label: 'Grid', value: 'grid' },
+                { label: 'Carousel', value: 'carousel' },
+                { label: 'Minimal', value: 'minimal' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'columns', type: 'number', defaultValue: 4 },
+        { name: 'showQuickView', type: 'checkbox', defaultValue: true },
+        { name: 'currency', type: 'text', defaultValue: 'RM' },
+        {
+            name: 'products', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'price', type: 'number' },
+                { name: 'originalPrice', type: 'number' },
+                { name: 'imageUrls', type: 'json' },
+                { name: 'description', type: 'textarea' },
+                { name: 'variants', type: 'json' },
+                { name: 'badge', type: 'text' },
+                { name: 'ctaLabel', type: 'text' },
+                { name: 'ctaUrl', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const FeatureComparisonBlock = {
+    slug: 'feature-comparison',
+    labels: { singular: 'Feature Comparison', plural: 'Feature Comparisons' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'table',
+            options: [
+                { label: 'Table', value: 'table' },
+                { label: 'Cards', value: 'cards' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        {
+            name: 'products', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'highlighted', type: 'checkbox', defaultValue: false },
+            ],
+        },
+        {
+            name: 'features', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'values', type: 'json' },
+            ],
+        },
+    ],
+}
+
 export const Pages: CollectionConfig = {
     slug: 'pages',
     hooks: {
@@ -1133,6 +1382,13 @@ export const Pages: CollectionConfig = {
                 ClientLogosBlock,
                 MenuFoodBlock,
                 PortfolioGridBlock,
+                // Industry-specific (composer-driven, aiVisible=false in block meta)
+                DoctorProfileBlock,
+                PropertyCardBlock,
+                ClassScheduleBlock,
+                VideoShowcaseBlock,
+                ProductQuickViewBlock,
+                FeatureComparisonBlock,
             ] as Block[],
         },
         {
