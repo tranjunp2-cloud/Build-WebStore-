@@ -95,6 +95,7 @@ export function buildSystemPrompt(
 Preset name: "${preset.name}" — curated for ${category} businesses.
 Mood: ${moodHint(preset, category)}.
 Write hero headlines, section titles, and CTA copy that reinforces this mood. Do NOT default to generic blue/purple.
+Spacing: "${preset.spacingPreset}" — apply this consistently across ALL pages. When "relaxed", sections should feel open and airy; when "compact", sections should feel tight and dense; when "default", use standard spacing. NEVER mix spacing styles within the same website.
 `
       })()
     : ''
