@@ -225,6 +225,22 @@ function AiTab({ blockSlug, aiVisible, templateId, existingOverride }: AiTabProp
                             Override the AI generation instructions for <strong>{blockSlug}</strong> in
                             this template. Leave empty to use the global registry default.
                         </div>
+                        <div
+                            style={{
+                                fontSize: 10.5,
+                                color: 'var(--warning, #b45309)',
+                                background: 'color-mix(in srgb, var(--warning, #f59e0b) 10%, transparent)',
+                                border: '1px solid color-mix(in srgb, var(--warning, #f59e0b) 30%, transparent)',
+                                borderRadius: 4,
+                                padding: '6px 8px',
+                                lineHeight: 1.45,
+                            }}
+                        >
+                            ⚠ Chỉ áp dụng khi gen mode = <strong>AI-first</strong> (env
+                            <code style={{ fontFamily: 'var(--mono)', padding: '0 3px' }}>GEN_MODE=ai-first</code>
+                            {' '}hoặc user cung cấp extra instructions / reference prompt). Template-first
+                            (default path với 56 blueprints) dùng content từ industry library, bỏ qua override.
+                        </div>
                         <textarea
                             ref={textareaRef}
                             style={{ minHeight: 90, fontSize: 11.5, resize: 'vertical' }}

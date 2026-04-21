@@ -252,6 +252,18 @@ Usage guideline:
                         <span className="b-tab-count" style={{ marginLeft: 8 }}>{overrides.length}</span>
                     )}
                 </div>
+                <div
+                    style={{
+                        fontSize: 11, color: 'var(--warning, #b45309)',
+                        background: 'color-mix(in srgb, var(--warning, #f59e0b) 10%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--warning, #f59e0b) 30%, transparent)',
+                        borderRadius: 4, padding: '6px 10px', marginBottom: 10, lineHeight: 1.5,
+                    }}
+                >
+                    ⚠ Overrides chỉ áp dụng khi gen mode = <strong>AI-first</strong>
+                    (<code style={{ fontFamily: 'var(--mono)' }}>GEN_MODE=ai-first</code> hoặc user cung cấp extra instructions).
+                    Template-first default path dùng content từ industry library, bỏ qua override.
+                </div>
                 <TemplateOverridesList
                     blockSlug={block.slug}
                     overrides={overrides}
