@@ -107,6 +107,8 @@ export default async function BlockDetailPage({ params }: Props) {
             variantName: v.variantName as string,
             previewUrlOverride: (v.previewUrlOverride as string) ?? null,
             notes: (v.notes as string) ?? null,
+            enabled: (v.enabled as boolean | undefined) ?? true,
+            displayName: (v.displayName as string) ?? null,
         })),
         usedByTemplates,
     }

@@ -16,6 +16,8 @@ type VariantOverride = {
     variantName: string
     previewUrlOverride?: string | null
     notes?: string | null
+    enabled?: boolean
+    displayName?: string | null
 }
 
 type UsedByTemplate = {
