@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState, type ReactNode } from 'react'
+import { ImagePlus, Sparkles, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { compressImage } from '@/lib/media/compress-image'
@@ -68,29 +69,52 @@ export function HeroMediaOverlay({
     return (
         <div className={[positionClass ?? 'relative', 'group/media-overlay', className].filter(Boolean).join(' ')}>
             {children}
-            <div className="absolute inset-0 bg-black/0 group-hover/media-overlay:bg-black/30 transition-colors duration-200 flex items-center justify-center gap-2 opacity-0 group-hover/media-overlay:opacity-100 pointer-events-none group-hover/media-overlay:pointer-events-auto">
-                {uploading ? (
-                    <span className="text-white text-xs font-medium">Uploading...</span>
-                ) : (
-                    <>
-                        <button
-                            type="button"
-                            onClick={() => fileRef.current?.click()}
-                            className="px-3 py-1.5 rounded-lg bg-white/90 text-black text-xs font-semibold hover:bg-white transition-colors"
-                        >
-                            Change Image
-                        </button>
-                        {showVideoButton && videoField && (
+            <div className="absolute inset-0 bg-black/0 group-hover/media-overlay:bg-black/30 transition-colors duration-200 flex items-center justify-center opacity-0 group-hover/media-overlay:opacity-100 pointer-events-none group-hover/media-overlay:pointer-events-auto">
+                <div className="flex items-center gap-1 bg-[#1E293B] border border-white/10 shadow-2xl rounded-lg p-1.5">
+                    {uploading ? (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Uploading...
+                        </span>
+                    ) : (
+                        <>
                             <button
                                 type="button"
-                                onClick={() => setShowVideoPopover(true)}
-                                className="px-3 py-1.5 rounded-lg bg-white/90 text-black text-xs font-semibold hover:bg-white transition-colors"
+                                onClick={() => fileRef.current?.click()}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors"
                             >
-                                Change Video
+                                <ImagePlus className="w-4 h-4" />
+                                Change Image
                             </button>
-                        )}
-                    </>
-                )}
+                            {!showVideoButton && (
+                                <>
+                                    <div className="w-px h-5 bg-white/10 mx-1" />
+                                    <button
+                                        type="button"
+                                        onClick={() => toast.info('AI image generation coming soon')}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-400 hover:bg-cyan-400/10 rounded transition-colors"
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        Generate AI Image
+                                    </button>
+                                </>
+                            )}
+                            {showVideoButton && videoField && (
+                                <>
+                                    <div className="w-px h-5 bg-white/10 mx-1" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowVideoPopover(true)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-400 hover:bg-cyan-400/10 rounded transition-colors"
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        Change Video
+                                    </button>
+                                </>
+                            )}
+                        </>
+                    )}
+                </div>
             </div>
             <input
                 ref={fileRef}
