@@ -42,7 +42,7 @@ async function getSiteAndPost(tenantSlug: string, blogSlug: string) {
         collection: 'blogs',
         where: {
             and: [
-                { site: { equals: site.id } },
+                { tenant: { equals: tenant.id } },
                 { slug: { equals: blogSlug } },
                 { status: { equals: 'published' } },
             ],
