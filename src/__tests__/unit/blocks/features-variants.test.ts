@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { FeaturesConfigSchema, featuresMeta } from '@/blocks/features/config'
+import { parseFeatureIcon } from '@/blocks/features/index'
 
 // ── TC-S2-004: Features Block Variants ──────────────────────────────────────
 
@@ -84,5 +85,53 @@ describe('[TC-S2-004] Features Block Variants', () => {
         it('defaultVariant is "grid-3"', () => {
             expect(featuresMeta.defaultVariant).toBe('grid-3')
         })
+    })
+})
+
+// ── BUG-FEAT-006: parseFeatureIcon emoji detection regression ────────────────
+// Regression: icon.length <= 2 incorrectly flagged multi-codepoint emojis (e.g.
+// shield 🛡️ = length 3) as AI text and replaced them with ✨.
+// Fix: /\p{Extended_Pictographic}/u detects all emoji regardless of codepoint length.
+
+describe('[BUG-FEAT-006] parseFeatureIcon — emoji detection', () => {
+    it('preserves single-codepoint emoji (length 1)', () => {
+        expect(parseFeatureIcon('⭐')).toBe('⭐')
+    })
+
+    it('preserves surrogate-pair emoji (length 2)', () => {
+        expect(parseFeatureIcon('🔥')).toBe('🔥')
+    })
+
+    it('preserves emoji with variation selector (length 3) — regression case', () => {
+        // 🛡️ appears in FALLBACK_FEATURES; was silently replaced with ✨ before fix
+        expect(parseFeatureIcon('🛡️')).toBe('🛡️')
+    })
+
+    it('preserves ZWJ emoji sequences (length > 2)', () => {
+        expect(parseFeatureIcon('🏳️‍🌈')).toBe('🏳️‍🌈')
+    })
+
+    it('maps AI text string "Sparkles" to ✨', () => {
+        expect(parseFeatureIcon('Sparkles')).toBe('✨')
+    })
+
+    it('maps AI text string "Shield" to 🛡️', () => {
+        expect(parseFeatureIcon('Shield')).toBe('🛡️')
+    })
+
+    it('maps AI text string "Clock" to ⏰', () => {
+        expect(parseFeatureIcon('Clock')).toBe('⏰')
+    })
+
+    it('returns ✨ default for unknown arbitrary text', () => {
+        expect(parseFeatureIcon('ArbitraryAIText')).toBe('✨')
+    })
+
+    it('returns undefined for undefined input', () => {
+        expect(parseFeatureIcon(undefined)).toBeUndefined()
+    })
+
+    it('returns undefined for empty string', () => {
+        expect(parseFeatureIcon('')).toBeUndefined()
     })
 })
