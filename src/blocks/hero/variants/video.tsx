@@ -14,13 +14,15 @@ import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
 
 export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
-    const { headline, subheadline, ctaButtons = [], badge, videoUrl, image } = block
+    const { headline, subheadline, ctaButtons = [], badge, videoUrl: initialVideoUrl, image } = block
     const category = (site?.siteType as string) || 'business'
     const fallbackHeroUrl = getHeroImage(category)
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const [isPlaying, setIsPlaying] = useState(true)
     const [isMobile, setIsMobile] = useState(false)
+    const [videoUrl, setVideoUrl] = useState(initialVideoUrl)
+    const prevVideoUrlRef = useRef(initialVideoUrl)
 
     // Detect mobile to suppress autoplay
     useEffect(() => {
@@ -41,6 +43,14 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
         return () => mq.removeEventListener('change', handler)
     }, [])
 
+    // Explicit play() after first-upload React render — autoPlay alone may not fire on dynamic mount
+    useEffect(() => {
+        if (videoUrl && videoUrl !== prevVideoUrlRef.current) {
+            prevVideoUrlRef.current = videoUrl
+            videoRef.current?.play().catch(() => {})
+        }
+    }, [videoUrl])
+
     const togglePlayback = () => {
         if (!videoRef.current) return
         if (isPlaying) {
@@ -60,13 +70,13 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
                 positionClass="absolute inset-0"
                 showVideoButton={true}
                 videoField="videoUrl"
-                currentVideoUrl={videoUrl}
+                onVideoUploaded={(url) => { setVideoUrl(url); setIsPlaying(true) }}
             >
-                {videoUrl && !isMobile ? (
+                {videoUrl ? (
                     <video
                         ref={videoRef}
                         src={videoUrl}
-                        autoPlay
+                        autoPlay={!isMobile}
                         muted
                         loop
                         playsInline
@@ -81,8 +91,8 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
                 )}
             </HeroMediaOverlay>
 
-            {/* Dark overlay for text readability */}
-            <div className="absolute inset-0 bg-black/50" />
+            {/* Dark overlay for text readability — pointer-events-none lets HeroMediaOverlay hover fire */}
+            <div className="absolute inset-0 bg-black/50 pointer-events-none" />
 
             <div className={`${HERO_CONTAINER} relative z-10 text-center max-w-3xl`}>
                 {badge?.show && (
@@ -126,8 +136,8 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
                 </motion.div>
             </div>
 
-            {/* Play/Pause button in corner — only when video is active (desktop) */}
-            {videoUrl && !isMobile && (
+            {/* Play/Pause button in corner — only when video is active */}
+            {videoUrl && (
                 <VideoControlButton
                     isPlaying={isPlaying}
                     onClick={togglePlayback}

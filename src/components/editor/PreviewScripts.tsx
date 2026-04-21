@@ -100,6 +100,8 @@ export function PreviewScripts() {
                 return
             }
 
+            if (target.closest('[data-editor-control]')) return
+
             if (!validTags.includes(target.tagName) || target.children.length > 1) {
                 return
             }
@@ -277,6 +279,14 @@ export function PreviewScripts() {
                 ['DIV', 'SECTION', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL'].includes(c.tagName)
             )
             if (blockChildren.length > 1) return
+
+            // Skip structural containers that wrap editor control overlays (e.g. HeroMediaOverlay)
+            // — their innerText includes hidden button labels, which would fool the text check below
+            if (target.querySelector('[data-editor-control]')) return
+
+            // Skip elements with no meaningful text (e.g. pure CSS background/overlay divs)
+            const elementText = target.innerText?.trim()
+            if (!elementText || elementText.length < 2) return
 
             // Skip if already editing this element
             if (currentEditingEl === target) return

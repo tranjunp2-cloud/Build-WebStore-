@@ -528,6 +528,9 @@ function PreviewFrameInner({
                     updateBlock(blockIndex, nextBlock)
                     performSave(true)
                 }
+            } else if (e.data?.type === 'SHOW_TOAST') {
+                const { variant, message } = e.data as { variant: 'success' | 'error' | 'info'; message: string }
+                toast[variant]?.(message)
             }
         }
         window.addEventListener('message', handleMessage)

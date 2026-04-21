@@ -73,7 +73,6 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
                         altText={safeAltText(image?.alt, headline)}
                         showVideoButton={true}
                         videoField="videoUrl"
-                        currentVideoUrl={videoUrl}
                     >
                         <motion.div
                             initial={{ opacity: 0, x: 40 }}
