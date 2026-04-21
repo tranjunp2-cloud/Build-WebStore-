@@ -14,6 +14,8 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import { BlockDetailTabs } from '@/app/studio/blocks/_components/block-detail-tabs'
 import type { BlockDetailData } from '@/app/studio/blocks/_components/block-detail-tabs'
 import { getBlockBySlug } from '@/lib/admin/block-registry-reader'
+import { getSchemaForBlock, introspectSchema } from '@/lib/admin/block-schema-registry'
+import type { FieldMeta } from '@/lib/admin/block-schema-registry'
 
 interface Props {
     slug: string
@@ -47,6 +49,21 @@ interface BlockApiResponse {
     }>
 }
 
+/**
+ * Resolve real Zod-introspected FieldMeta[] for a block slug.
+ * Falls back to [] when configSchema is not yet exported (legacy blocks).
+ * Safe to call in client context — block-schema-registry imports are static.
+ */
+function getFieldsForBlock(slug: string): FieldMeta[] {
+    const schema = getSchemaForBlock(slug)
+    if (!schema) return []
+    try {
+        return introspectSchema(schema)
+    } catch {
+        return []
+    }
+}
+
 /** Normalise API response to BlockDetailData expected by BlockDetailTabs */
 function toBlockDetailData(api: BlockApiResponse): BlockDetailData {
     return {
@@ -72,8 +89,9 @@ function toBlockDetailData(api: BlockApiResponse): BlockDetailData {
         })),
         // usedByTemplates not returned by this route — pass empty for MVP
         usedByTemplates: [],
-        // fields not available in overlay context — schema tab falls back to legacy heuristic
-        fields: [],
+        // Real Zod-introspected fields from static schema registry (Phase P3 fix).
+        // Computed client-side — no server round-trip needed.
+        fields: getFieldsForBlock(api.slug),
     }
 }
 
@@ -107,6 +125,9 @@ export function BuilderBlockDetailOverlay({ slug, onAddToTemplate, onBack }: Pro
         return () => { cancelled = true }
     }, [slug])
 
+    // Real Zod fields computed once per slug — memoized to avoid re-introspecting on every render
+    const registryFields = useMemo(() => getFieldsForBlock(slug), [slug])
+
     // Fallback to registry data while API loads (avoids blank header)
     const displayBlock = blockData ?? (registryBlock ? {
         ...registryBlock,
@@ -117,7 +138,7 @@ export function BuilderBlockDetailOverlay({ slug, onAddToTemplate, onBack }: Pro
         hiddenFromCatalog: false,
         variantOverrides: [],
         usedByTemplates: [],
-        fields: [],
+        fields: registryFields,
     } satisfies BlockDetailData : null)
 
     if (!displayBlock) {
