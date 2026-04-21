@@ -70,7 +70,7 @@ export function HeroMediaOverlay({
         <div className={[positionClass ?? 'relative', 'group/media-overlay', className].filter(Boolean).join(' ')}>
             {children}
             <div className="absolute inset-0 bg-black/0 group-hover/media-overlay:bg-black/30 transition-colors duration-200 flex items-center justify-center opacity-0 group-hover/media-overlay:opacity-100 pointer-events-none group-hover/media-overlay:pointer-events-auto">
-                <div className="flex items-center gap-1 bg-[#1E293B] border border-white/10 shadow-2xl rounded-lg p-1.5">
+                <div data-editor-control className="flex items-center gap-1 bg-[#1E293B] border border-white/10 shadow-2xl rounded-lg p-1.5">
                     {uploading ? (
                         <span className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white">
                             <Loader2 className="w-4 h-4 animate-spin" />

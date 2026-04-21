@@ -257,6 +257,7 @@ export function PreviewScripts() {
 
         const onTextClick = (e: MouseEvent) => {
             let target = e.target as HTMLElement
+            if ((target as HTMLElement).closest('[data-editor-control]')) return
             const blockContainer = target.closest('[data-block-index]')
 
             if (!blockContainer) return
