@@ -5,7 +5,7 @@
  */
 import type React from 'react'
 
-const ALLOWED_TAGS = new Set(['b', 'i', 'u', 'strong', 'em', 'br', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+const ALLOWED_TAGS = new Set(['b', 'i', 'u', 'strong', 'em', 'br', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 's', 'del'])
 
 // Each entry: [regex to match the property declaration, CSS property name]
 const SAFE_STYLE_RULES: Array<RegExp> = [
@@ -31,12 +31,16 @@ export function sanitizeInlineHtml(html: string): string {
         const t = tag.toLowerCase()
         if (!ALLOWED_TAGS.has(t)) return ''
         if (match.startsWith('</')) return `</${t}>`
-        const styleMatch = (attrs as string).match(/style="([^"]*)"/)
+        const attrStr = attrs as string
+        const styleMatch = attrStr.match(/style="([^"]*)"/)
+        const hrefMatch = t === 'a' ? attrStr.match(/href="([^"]*)"/) : null
+        const safeParts: string[] = []
         if (styleMatch) {
             const safe = sanitizeStyleAttr(styleMatch[1])
-            if (safe) return `<${t} style="${safe}">`
+            if (safe) safeParts.push(`style="${safe}"`)
         }
-        return `<${t}>`
+        if (hrefMatch) safeParts.push(`href="${hrefMatch[1]}"`)
+        return safeParts.length > 0 ? `<${t} ${safeParts.join(' ')}>` : `<${t}>`
     })
 }
 

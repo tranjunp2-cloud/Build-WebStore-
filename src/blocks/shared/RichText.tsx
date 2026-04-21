@@ -30,7 +30,6 @@ export function RichText({ text, as: Tag = 'span', className, style }: RichTextP
         return <Tag className={className} style={style}>{text}</Tag>
     }
 
-    console.log("ALL RichText text prop:", text);
     const sanitized = sanitizeInlineHtml(text)
     const heading = extractHeadingWrapper(sanitized)
 

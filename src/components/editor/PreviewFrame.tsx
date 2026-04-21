@@ -282,6 +282,7 @@ function PreviewFrameInner({
     const dragPointerOffsetYRef = useRef<number | null>(null)
     const isHoveringControlsRef = useRef<boolean>(false)
     const textEditStopTimerRef = useRef<number | null>(null)
+    const currentLiveTextRef = useRef<string | null>(null)
     const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
     useEffect(() => {
         latestBlockLayoutsRef.current = blockLayouts
@@ -438,6 +439,7 @@ function PreviewFrameInner({
                 const startScrollY = e.data.scrollY ?? 0
                 setIframeScrollY(startScrollY)
                 setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex, blockType: e.data.blockType ?? '', originalText: e.data.originalText ?? '', scrollYAtStart: startScrollY })
+                currentLiveTextRef.current = e.data.originalText ?? null
                 setImageClickData(null)
             } else if (e.data?.type === 'TEXT_EDITING_STOPPED') {
                 textEditStopTimerRef.current = window.setTimeout(() => {
@@ -446,6 +448,7 @@ function PreviewFrameInner({
                         return
                     }
                     setTextEditingData(null)
+                    currentLiveTextRef.current = null
                     performSave(true)
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
@@ -471,7 +474,8 @@ function PreviewFrameInner({
                         const originalWrapsPlainText = originalHasHeadingWrapper &&
                             /^<h[1-6](?:\s[^>]*)?>([^<]*)<\/h[1-6]>$/i.test(originalValue.trim())
 
-                        let valueToSave = newHtml; console.log("TEXT_EDITED received newHtml:", JSON.stringify(newHtml));
+                        currentLiveTextRef.current = newHtml
+                        let valueToSave = newHtml
                         if (!originalHasHeadingWrapper || originalWrapsPlainText) {
                             const headingMatch = newHtml.match(/^<(h[1-6])(?:\s[^>]*)?>([\s\S]+?)<\/\1>$/i)
                             if (headingMatch) valueToSave = headingMatch[2]
@@ -751,7 +755,7 @@ function PreviewFrameInner({
         // Use hoverData if available, otherwise fall back to textEditingData context
         const blockIndex = hoverData?.blockIndex ?? textEditingData?.blockIndex ?? -1
         const blockType = hoverData?.blockType ?? textEditingData?.blockType ?? ''
-        const text = hoverData?.text ?? textEditingData?.originalText ?? ''
+        const text = hoverData?.text ?? currentLiveTextRef.current ?? textEditingData?.originalText ?? ''
         // When falling back to textEditingData (no hoverData), use exact-match only —
         // the fuzzy pass risks matching a different field with the same short substring.
         const fieldPath = hoverData?.fieldPath ??
@@ -899,7 +903,7 @@ function PreviewFrameInner({
                 >
                     <iframe
                         ref={(el) => { setFrameElement(el); frameElementRef.current = el }}
-                        key={iframeKey}
+                        key={effectiveIframeKey}
                         src={iframeSrc}
                         className="h-full w-full border-0"
                         title={t.editor.toolbar.sitePreview}

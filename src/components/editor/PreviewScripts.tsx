@@ -619,11 +619,8 @@ export function PreviewScripts() {
                     const sel = window.getSelection()
                     const hasSelection = sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
                     if (hasSelection) {
-                        // Wrap the selected text in a <span style="color:..."> 
-                        const range = sel.getRangeAt(0)
-                        // Remove existing color spans inside selection
-                        document.execCommand('removeFormat', false)
-                        // Then apply color via execCommand styleWithCSS
+                        // Wrap the selected text in a <span style="color:...">
+                        // Apply color via execCommand styleWithCSS
                         document.execCommand('styleWithCSS', false, 'true')
                         document.execCommand('foreColor', false, val)
                         document.execCommand('styleWithCSS', false, 'false')
@@ -638,6 +635,20 @@ export function PreviewScripts() {
                 // Re-save selection + update toolbar state
                 saveSelection()
                 postSelectionState()
+                // Immediately sync current HTML to parent so toolbar changes are
+                // persisted via the auto-save debounce without requiring a blur first
+                if (currentEditingEl) {
+                    const bi = parseInt(currentEditingEl.closest('[data-block-index]')?.getAttribute('data-block-index') || '-1', 10)
+                    if (bi >= 0) {
+                        window.parent.postMessage({
+                            type: 'TEXT_EDITED',
+                            blockIndex: bi,
+                            searchKey: originalText,
+                            oldHtml: originalHtml,
+                            newHtml: buildCleanHtml(currentEditingEl),
+                        }, parentOrigin)
+                    }
+                }
             }
             if (e.data?.type === 'STOP_TEXT_EDITING') {
                 toolbarActive = false
