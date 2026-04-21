@@ -51,6 +51,8 @@ type NavEntry = {
     label: string
     count?: (c: SidebarCounts) => number | null
     liveDot?: boolean
+    /** Show "Soon" pill — used for Phase 2 placeholder routes */
+    soon?: true
 }
 
 type NavSection = {
@@ -63,7 +65,7 @@ const NAV: NavSection[] = [
         section: 'Workspace',
         items: [
             { href: '/studio', label: 'Dashboard' },
-            { href: '/studio/analytics', label: 'Analytics' },
+            { href: '/studio/analytics', label: 'Analytics', soon: true },
         ],
     },
     {
@@ -96,13 +98,13 @@ const NAV: NavSection[] = [
         section: 'Organize',
         items: [
             { href: '/studio/categories', label: 'Categories' },
-            { href: '/studio/tags', label: 'Tags & AI prompts' },
+            { href: '/studio/tags', label: 'Tags & AI prompts', soon: true },
         ],
     },
     {
         section: 'Admin',
         items: [
-            { href: '/studio/settings', label: 'Settings' },
+            { href: '/studio/settings', label: 'Settings', soon: true },
         ],
     },
 ]
@@ -145,6 +147,24 @@ function NavItemRow({
                     )}
                     {!item.liveDot && showCount && (
                         <span className="count">{countVal}</span>
+                    )}
+                    {item.soon && !item.liveDot && !showCount && (
+                        <span
+                            style={{
+                                marginLeft: 'auto',
+                                fontSize: 10,
+                                fontWeight: 600,
+                                padding: '1px 6px',
+                                borderRadius: 999,
+                                background: 'var(--bg-sunk)',
+                                color: 'var(--text-3)',
+                                letterSpacing: '0.02em',
+                                lineHeight: '16px',
+                            }}
+                            aria-label="Coming soon"
+                        >
+                            Soon
+                        </span>
                     )}
                 </>
             )}

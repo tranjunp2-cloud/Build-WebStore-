@@ -2,11 +2,14 @@
 /**
  * Category split-pane: left = category list (280px), right = DNA editor.
  * Matches CategoriesPage layout from bundle pages.jsx.
+ * Persists selected category across page refreshes via sessionStorage (Phase 05 polish).
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DnaEditor } from './dna-editor'
 import { DnaCompliancePreview } from './dna-compliance-preview'
 import type { CategoryDNA } from '@/lib/admin/dna-compliance'
+
+const SESSION_KEY = 'pw_studio_category_selected'
 
 export type CategoryItem = {
     id: string
@@ -21,9 +24,31 @@ type Props = {
 
 type ActiveTab = 'editor' | 'preview'
 
+/** Read persisted category id from sessionStorage; fall back to first item. */
+function getInitialSelected(categories: CategoryItem[]): string {
+    if (categories.length === 0) return ''
+    try {
+        const stored = sessionStorage.getItem(SESSION_KEY)
+        if (stored && categories.some((c) => c.id === stored)) return stored
+    } catch {
+        // SSR or private-mode — ignore
+    }
+    return categories[0].id
+}
+
 export function CategorySplitPane({ categories }: Props) {
-    const [selectedId, setSelectedId] = useState<string>(categories[0]?.id ?? '')
+    const [selectedId, setSelectedId] = useState<string>(() => getInitialSelected(categories))
     const [activeTab, setActiveTab] = useState<ActiveTab>('editor')
+
+    // Persist selected category to sessionStorage on change
+    useEffect(() => {
+        if (!selectedId) return
+        try {
+            sessionStorage.setItem(SESSION_KEY, selectedId)
+        } catch {
+            // Ignore write errors in private-mode
+        }
+    }, [selectedId])
 
     // Local DNA state — updated optimistically on save
     const [localDna, setLocalDna] = useState<Record<string, CategoryDNA | null>>(
