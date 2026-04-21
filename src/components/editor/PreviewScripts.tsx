@@ -160,15 +160,15 @@ export function PreviewScripts() {
          * are completely independent.
          */
         const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        const rgbToHex = (rgb: string) => {
+            const m = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)$/)
+            if (!m) return rgb
+            return '#' + [m[1], m[2], m[3]].map(n => parseInt(n).toString(16).padStart(2, '0')).join('')
+        }
 
         const buildCleanHtml = (el: HTMLElement): string => {
             const text = el.innerText?.trim() || ''
             if (!text) return ''
-
-            const rawHtml = el.innerHTML
-            const isBold = /<b\b|<strong\b/i.test(rawHtml)
-            const isItalic = /<i\b|<em\b/i.test(rawHtml)
-            const isUnderline = /<u\b/i.test(rawHtml)
 
             // Detect text alignment
             const align = el.style.textAlign ||
@@ -176,20 +176,30 @@ export function PreviewScripts() {
                  el.classList.contains('text-right') ? 'right' :
                  el.classList.contains('text-justify') ? 'justify' : '')
 
-            let html = escapeHtml(text)
-            if (isUnderline) html = `<u>${html}</u>`
-            if (isItalic) html = `<i>${html}</i>`
-            if (isBold) html = `<b>${html}</b>`
+            // Collect element-level inline styles (color, fontSize, fontFamily)
+            // Skip CSS variable values like "var(--muted, #71717a)" injected by block templates
+            const inlineStyles: string[] = []
+            if (el.style.color && !el.style.color.startsWith('var(')) inlineStyles.push(`color:${el.style.color}`)
+            if (el.style.fontSize && !el.style.fontSize.startsWith('var(')) inlineStyles.push(`font-size:${el.style.fontSize}`)
+            if (el.style.fontFamily && !el.style.fontFamily.startsWith('var(')) inlineStyles.push(`font-family:${el.style.fontFamily}`)
+            if (align && align !== 'left') inlineStyles.push(`text-align:${align}`)
+
+            // Preserve innerHTML as-is (may contain partial <b>, <span style="color:">, etc.)
+            // but clean up excessive <font> tags from execCommand fallback
+            let innerHTML = el.innerHTML
+                .replace(/<font[^>]*color="([^"]+)"[^>]*>([<\s\S]*?)<\/font>/gi,
+                    (_m, color, inner) => `<span style="color:${color}">${inner}</span>`)
 
             if (HEADING_TAGS.includes(el.tagName)) {
-                const alignAttr = align && align !== 'left' ? ` style="text-align:${align}"` : ''
-                html = `<${el.tagName.toLowerCase()}${alignAttr}>${html}</${el.tagName.toLowerCase()}>`
-            } else if (align && align !== 'left') {
-                // Wrap in span with alignment for non-heading elements
-                html = `<span style="text-align:${align};display:block">${html}</span>`
+                const styleAttr = inlineStyles.length ? ` style="${inlineStyles.join(';')}"` : ''
+                return `<${el.tagName.toLowerCase()}${styleAttr}>${innerHTML}</${el.tagName.toLowerCase()}>`
+            } else if (inlineStyles.length) {
+                const needsBlock = inlineStyles.some(s => s.startsWith('text-align:'))
+                const displayPart = needsBlock ? ';display:block' : ''
+                return `<span style="${inlineStyles.join(';')}${displayPart}">${innerHTML}</span>`
             }
 
-            return html
+            return innerHTML
         }
 
         const cleanUpEditing = () => {
@@ -257,8 +267,13 @@ export function PreviewScripts() {
             window.parent.postMessage({
                 type: 'TEXT_EDITING_STARTED',
                 rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-                blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10)
+                blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10),
+                blockType: blockContainer.getAttribute('data-block-type') || '',
+                originalText: currentEditingEl.innerText?.trim() || '',
+                scrollY: window.scrollY,
             }, parentOrigin)
+            // Immediately push correct font/size/color state for the newly activated element
+            postSelectionState()
         }
 
         // Track whether parent toolbar is being used — skip blur cleanup if so
@@ -445,9 +460,14 @@ export function PreviewScripts() {
                     fontSize = parseFloat(window.getComputedStyle(currentEditingEl).fontSize) || 16
                 }
             }
-            // Read font family: inline style first, then computed
-            const fontFamily = currentEditingEl?.style.fontFamily ||
-                window.getComputedStyle(currentEditingEl!).fontFamily.split(',')[0].trim().replace(/['"]/g, '') || 'Inter'
+            // Read font family: inline style first, then computed — always strip quotes
+            const rawFF = currentEditingEl?.style.fontFamily ||
+                window.getComputedStyle(currentEditingEl!).fontFamily.split(',')[0].trim()
+            const fontFamily = rawFF.replace(/['"]/g, '').trim() || 'Inter'
+            // Read color: inline style first, then computed — convert rgb() → hex
+            const rawColor = currentEditingEl?.style.color ||
+                (currentEditingEl ? window.getComputedStyle(currentEditingEl).color : '')
+            const color = rawColor ? rgbToHex(rawColor) : '#000000'
             window.parent.postMessage({
                 type: 'SELECTION_STATE',
                 state: {
@@ -458,6 +478,7 @@ export function PreviewScripts() {
                     textAlign: align,
                     fontSize: Math.round(fontSize),
                     fontFamily,
+                    color,
                 }
             }, parentOrigin)
         }
@@ -523,34 +544,35 @@ export function PreviewScripts() {
                         saveSelection()
                     }
 
-                // ── bold/italic/underline: toggle by rebuilding innerHTML from scratch ──
+                // ── bold/italic/underline: apply to selection only (or whole element if nothing selected) ──
                 } else if (['bold', 'italic', 'underline'].includes(cmd)) {
-                    const rawHtml = currentEditingEl.innerHTML
-                    const text = currentEditingEl.innerText?.trim() || ''
-
-                    // Read current state from DOM
-                    let hasBold = /<b\b|<strong\b/i.test(rawHtml)
-                    let hasItalic = /<i\b|<em\b/i.test(rawHtml)
-                    let hasUnderline = /<u\b/i.test(rawHtml)
-
-                    // Toggle the requested format
-                    if (cmd === 'bold') hasBold = !hasBold
-                    if (cmd === 'italic') hasItalic = !hasItalic
-                    if (cmd === 'underline') hasUnderline = !hasUnderline
-
-                    // Rebuild clean HTML
-                    let newHtml = text
-                    if (hasUnderline) newHtml = `<u>${newHtml}</u>`
-                    if (hasItalic) newHtml = `<i>${newHtml}</i>`
-                    if (hasBold) newHtml = `<b>${newHtml}</b>`
-
-                    currentEditingEl.innerHTML = newHtml
-
-                    const range = document.createRange()
-                    range.selectNodeContents(currentEditingEl)
                     const sel = window.getSelection()
-                    sel?.removeAllRanges()
-                    sel?.addRange(range)
+                    const hasSelection = sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
+
+                    if (hasSelection) {
+                        // Apply only to selected text using execCommand
+                        const execMap: Record<string, string> = { bold: 'bold', italic: 'italic', underline: 'underline' }
+                        document.execCommand(execMap[cmd], false)
+                    } else {
+                        // No selection: toggle whole element
+                        const rawHtml = currentEditingEl.innerHTML
+                        const text = currentEditingEl.innerText?.trim() || ''
+                        let hasBold = /<b\b|<strong\b/i.test(rawHtml)
+                        let hasItalic = /<i\b|<em\b/i.test(rawHtml)
+                        let hasUnderline = /<u\b/i.test(rawHtml)
+                        if (cmd === 'bold') hasBold = !hasBold
+                        if (cmd === 'italic') hasItalic = !hasItalic
+                        if (cmd === 'underline') hasUnderline = !hasUnderline
+                        let newHtml = text
+                        if (hasUnderline) newHtml = `<u>${newHtml}</u>`
+                        if (hasItalic) newHtml = `<i>${newHtml}</i>`
+                        if (hasBold) newHtml = `<b>${newHtml}</b>`
+                        currentEditingEl.innerHTML = newHtml
+                        const range = document.createRange()
+                        range.selectNodeContents(currentEditingEl)
+                        sel?.removeAllRanges()
+                        sel?.addRange(range)
+                    }
                     saveSelection()
 
                 // ── alignment: set style.textAlign directly ──
@@ -563,16 +585,51 @@ export function PreviewScripts() {
                     // Also remove Tailwind text-align classes that might conflict
                     currentEditingEl.classList.remove('text-left', 'text-center', 'text-right', 'text-justify')
 
-                // ── fontSize: set style.fontSize directly (execCommand only accepts 1-7) ──
-                } else if (cmd === 'fontSize' && val) {
-                    const px = parseFloat(val)
-                    if (!isNaN(px) && px > 0) {
-                        currentEditingEl.style.fontSize = `${px}px`
+                // ── fontSize/fontName: apply to selection or whole element ──
+                } else if ((cmd === 'fontSize' || cmd === 'fontName') && val) {
+                    const sel = window.getSelection()
+                    const hasSelection = sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
+                    
+                    if (hasSelection) {
+                        document.execCommand('styleWithCSS', false, 'true')
+                        // For fontName, standard execCommand works fine with any string
+                        if (cmd === 'fontName') {
+                            document.execCommand('fontName', false, val)
+                        } else {
+                            // execCommand('fontSize') strictly accepts 1-7. We use an unused size marker (7), then patch it natively.
+                            document.execCommand('fontSize', false, '7')
+                            currentEditingEl.querySelectorAll('font[size="7"], [style*="font-size: -webkit-xxx-large"]').forEach(el => {
+                                el.removeAttribute('size')
+                                ;(el as HTMLElement).style.fontSize = `${parseFloat(val)}px`
+                            })
+                        }
+                        document.execCommand('styleWithCSS', false, 'false')
+                    } else {
+                        // Apply to entire element block if no specific selection
+                        if (cmd === 'fontName') {
+                            currentEditingEl.style.fontFamily = val
+                        } else {
+                            const px = parseFloat(val)
+                            if (!isNaN(px) && px > 0) currentEditingEl.style.fontSize = `${px}px`
+                        }
                     }
 
-                // ── fontName: set style.fontFamily directly ──
-                } else if (cmd === 'fontName' && val) {
-                    currentEditingEl.style.fontFamily = val
+                // ── foreColor: apply to selection only; fallback to whole element ──
+                } else if (cmd === 'foreColor' && val) {
+                    const sel = window.getSelection()
+                    const hasSelection = sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
+                    if (hasSelection) {
+                        // Wrap the selected text in a <span style="color:..."> 
+                        const range = sel.getRangeAt(0)
+                        // Remove existing color spans inside selection
+                        document.execCommand('removeFormat', false)
+                        // Then apply color via execCommand styleWithCSS
+                        document.execCommand('styleWithCSS', false, 'true')
+                        document.execCommand('foreColor', false, val)
+                        document.execCommand('styleWithCSS', false, 'false')
+                    } else {
+                        currentEditingEl.style.color = val
+                    }
 
                 // ── other commands: fallback to execCommand ──
                 } else {
@@ -611,6 +668,19 @@ export function PreviewScripts() {
                 }
                 themeStyle.textContent = e.data.css
             }
+            if (e.data?.type === 'SET_BLOCK_SELECTED') {
+                document.querySelectorAll('[data-block-index]').forEach((el) => {
+                    ;(el as HTMLElement).style.boxShadow = ''
+                })
+                const idx = e.data.blockIndex
+                if (idx !== null && idx !== undefined) {
+                    const el = document.querySelector(`[data-block-index="${idx}"]`) as HTMLElement | null
+                    if (el) {
+                        // inset box-shadow works inside overflow:hidden/border-radius, unlike outline
+                        el.style.boxShadow = 'inset 0 0 0 2px #3b82f6'
+                    }
+                }
+            }
         }
 
         document.addEventListener('mouseover', onMouseOver)
@@ -625,10 +695,52 @@ export function PreviewScripts() {
         document.addEventListener('drop', onDrop)
         window.addEventListener('message', onMessage)
         
+        const onIframeScroll = () => {
+            window.parent.postMessage({ type: 'IFRAME_SCROLL', scrollY: window.scrollY }, parentOrigin)
+        }
+
         window.addEventListener('load', postLayouts)
         window.addEventListener('resize', postLayouts)
         window.addEventListener('scroll', postLayouts, { passive: true })
-        document.addEventListener('DOMContentLoaded', postLayouts)
+        window.addEventListener('scroll', onIframeScroll, { passive: true })
+        
+        const applyScrollRestoration = () => {
+            postLayouts()
+            const params = new URLSearchParams(window.location.search)
+            const scrollToBlock = params.get('scrollToBlock')
+            const scrollY = params.get('scroll')
+
+            if (scrollToBlock !== null) {
+                const blockIdx = parseInt(scrollToBlock, 10)
+                if (!isNaN(blockIdx)) {
+                    // Try immediately
+                    let blockEl = document.querySelector(`[data-block-index="${blockIdx}"]`) as HTMLElement | null
+                    if (blockEl) {
+                        blockEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    } else {
+                        // Fallback retry
+                        setTimeout(() => {
+                            blockEl = document.querySelector(`[data-block-index="${blockIdx}"]`) as HTMLElement | null
+                            if (blockEl) blockEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        }, 100)
+                    }
+                    return
+                }
+            }
+
+            if (scrollY !== null) {
+                const y = parseInt(scrollY, 10)
+                if (!isNaN(y) && y > 0) {
+                    window.scrollTo({ top: y, behavior: 'instant' })
+                    // Fallback retry for next.js late hydration shifts
+                    setTimeout(() => window.scrollTo({ top: y, behavior: 'instant' }), 50)
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', applyScrollRestoration)
+        // Also run once just in case we missed DOMContentLoaded
+        applyScrollRestoration()
         
         const initTimeout = setTimeout(postLayouts, 50)
 
@@ -709,6 +821,7 @@ export function PreviewScripts() {
             window.removeEventListener('load', postLayouts)
             window.removeEventListener('resize', postLayouts)
             window.removeEventListener('scroll', postLayouts)
+            window.removeEventListener('scroll', onIframeScroll)
             document.removeEventListener('DOMContentLoaded', postLayouts)
         }
     }, [])

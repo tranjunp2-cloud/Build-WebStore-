@@ -30,6 +30,7 @@ export function RichText({ text, as: Tag = 'span', className, style }: RichTextP
         return <Tag className={className} style={style}>{text}</Tag>
     }
 
+    console.log("ALL RichText text prop:", text);
     const sanitized = sanitizeInlineHtml(text)
     const heading = extractHeadingWrapper(sanitized)
 
@@ -43,9 +44,9 @@ export function RichText({ text, as: Tag = 'span', className, style }: RichTextP
             finalClassName = `${finalClassName} ${HEADING_SIZES[heading.tag]}`.trim()
         }
 
-        // Merge alignment style from heading wrapper
-        const mergedStyle = heading.style
-            ? { ...style, textAlign: heading.style as React.CSSProperties['textAlign'] }
+        // Merge all inline styles from heading wrapper (color, fontSize, fontFamily, textAlign)
+        const mergedStyle = heading.inlineStyle
+            ? { ...heading.inlineStyle, ...style }
             : style
 
         return <HeadingTag className={finalClassName} style={mergedStyle} dangerouslySetInnerHTML={{ __html: heading.content }} />

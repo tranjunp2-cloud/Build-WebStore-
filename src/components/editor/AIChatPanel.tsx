@@ -3,7 +3,7 @@
 
 import React, { memo, useEffect, useRef, useState } from 'react'
 import DOMPurify from 'isomorphic-dompurify'
-import { RotateCcw, Send, WandSparkles } from 'lucide-react'
+import { RotateCcw, Send, Sparkles, X, WandSparkles } from 'lucide-react'
 import { AddSectionPromptChips } from './AddSectionPromptChips'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -38,6 +38,8 @@ interface AIChatPanelProps {
         id: string
         content: string
     } | null
+    blockContext?: { blockIndex: number; blockType: string } | null
+    onBlockContextDismiss?: () => void
     compact?: boolean
 }
 
@@ -59,13 +61,15 @@ function AIChatPanelInner({
     currentPageSlug,
     currentPageTitle,
     externalActivity,
+    blockContext,
+    onBlockContextDismiss,
     compact = false,
 }: AIChatPanelProps) {
 
     const { t } = useI18n()
     const ac = t.editor.aiChat
 
-    // BUG-F05-13: Persist chat history per site in sessionStorage
+    // BUG-F05-13: Persist chat history per site in localStorage
     const chatStorageKey = siteId ? `editor-chat-${siteId}` : null
 
     const [input, setInput] = useState('')
@@ -78,11 +82,17 @@ function AIChatPanelInner({
         content: ac.welcomeMessage,
     }])
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    // Skip the save effect's first run per chatStorageKey.
+    // Root cause: effects run in declaration order within the same render cycle.
+    // Hydration effect (1st) calls setMessages — state hasn't updated yet when
+    // save effect (2nd) runs, so save would write stale [welcome] to localStorage.
+    const skipNextSaveRef = useRef(true)
 
-    // MIN-5: hydrate from sessionStorage after mount to avoid SSR/CSR divergence.
+    // MIN-5: hydrate from localStorage after mount to avoid SSR/CSR divergence.
     useEffect(() => {
+        skipNextSaveRef.current = true // block save for this render cycle
         if (chatStorageKey) {
-            const saved = sessionStorage.getItem(chatStorageKey)
+            const saved = localStorage.getItem(chatStorageKey)
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved) as ChatMessage[]
@@ -92,7 +102,7 @@ function AIChatPanelInner({
                     }
                 } catch (err) {
                     if (process.env.NODE_ENV === 'development') console.error('[AIChatPanel] invalid cache', err)
-                    sessionStorage.removeItem(chatStorageKey)
+                    localStorage.removeItem(chatStorageKey)
                 }
             }
         }
@@ -104,10 +114,16 @@ function AIChatPanelInner({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [chatStorageKey])
 
-    // BUG-F05-13: Save messages to sessionStorage on change
+    // BUG-F05-13: Save messages to localStorage on change
     useEffect(() => {
         if (typeof window === 'undefined' || !chatStorageKey) return
-        sessionStorage.setItem(chatStorageKey, JSON.stringify(messages))
+        if (skipNextSaveRef.current) {
+            skipNextSaveRef.current = false
+            return
+        }
+        // Strip incomplete streaming messages — they render broken on next load
+        const toSave = messages.filter(m => !m.isStreaming)
+        localStorage.setItem(chatStorageKey, JSON.stringify(toSave))
     }, [messages, chatStorageKey])
 
     useEffect(() => {
@@ -238,10 +254,14 @@ function AIChatPanelInner({
     const handleSendChat = async () => {
         if (!input.trim() || isProcessing) return
 
-        const userMsg = input.trim()
+        const blockLabel = blockContext ? blockContext.blockType.replace(/-/g, ' ') : null
+        const userMsg = blockLabel
+            ? `[${blockLabel}] ${input.trim()}`
+            : input.trim()
         const assistantMessageId = `${Date.now()}-assistant`
 
         setInput('')
+        onBlockContextDismiss?.()
         setMessages(prev => [
             ...prev,
             { id: Date.now().toString(), role: 'user', content: userMsg, createdAt: formatChatTime() },
@@ -424,7 +444,24 @@ function AIChatPanelInner({
                     <div className={cn(
                         'group relative rounded-xl border border-white/[0.08] bg-[#1E293B]/80 pl-4 pr-12 py-3 transition-all focus-within:border-cyan-400/40 focus-within:bg-[#1E293B] focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]',
                         compact && 'px-4 py-3',
+                        blockContext && 'pt-2',
                     )}>
+                        {blockContext && (
+                            <div className="mb-2 flex items-center gap-1.5">
+                                <span className="flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300 border border-amber-500/20">
+                                    <Sparkles className="h-3 w-3" />
+                                    {blockContext.blockType.replace(/-/g, ' ')}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={onBlockContextDismiss}
+                                    className="rounded p-0.5 text-slate-500 hover:text-slate-300 transition-colors"
+                                    title="Remove context"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </div>
+                        )}
                         <textarea
                             value={input}
                             onChange={e => setInput(e.target.value)}
