@@ -759,6 +759,9 @@ const VARIANT_ALIASES: Record<string, string> = {
     'full-screen': 'fullscreen',
     'compact': 'minimal',
     'clean': 'minimal',
+    // Footer newsletter variants (hidden — alias to available variants)
+    'expanded': 'simple',
+    'mega-footer': 'dark-gradient',
     // Defaults
     'default': 'simple',
     'basic': 'simple',
