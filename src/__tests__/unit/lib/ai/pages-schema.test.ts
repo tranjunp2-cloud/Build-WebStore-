@@ -132,7 +132,7 @@ describe('pages-schema sanitizer', () => {
             expect(result!.stats).toHaveLength(1)
         })
 
-        it('footer.variant = "expanded" now preserved', () => {
+        it('footer.variant = "expanded" aliased to "simple" (newsletter variant hidden)', () => {
             const block = {
                 blockType: 'footer',
                 variant: 'expanded',
@@ -141,7 +141,7 @@ describe('pages-schema sanitizer', () => {
                 columns: [{ title: 'Pages', links: [{ label: 'Home', url: '/' }] }],
             }
             const result = sanitizeBlockForPayload(block)
-            expect(result!.variant).toBe('expanded')
+            expect(result!.variant).toBe('simple')
             expect(result!.columns).toHaveLength(1)
         })
     })

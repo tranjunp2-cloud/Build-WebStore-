@@ -551,16 +551,17 @@ describe('[TC-S2-013] Contact — Sprint 2 map-split variant schema validation',
 // TC-S2: Footer — Sprint 2 new variant (mega-footer)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('[TC-S2-014] Footer — Sprint 2 mega-footer variant schema validation', () => {
-    it('footerMeta lists mega-footer variant', () => {
-        expect(footerMeta.variants).toContain('mega-footer')
+describe('[TC-S2-014] Footer — Sprint 2 dark-gradient variant schema validation', () => {
+    it('footerMeta does NOT list mega-footer (newsletter variant hidden)', () => {
+        expect(footerMeta.variants).not.toContain('mega-footer')
+        expect(footerMeta.variants).not.toContain('expanded')
     })
 
-    it('FooterConfigSchema accepts variant=mega-footer with 4 columns and socials', () => {
+    it('FooterConfigSchema accepts variant=dark-gradient with 4 columns and socials', () => {
         // Arrange
         const input = {
             blockType: 'footer' as const,
-            variant: 'mega-footer',
+            variant: 'dark-gradient',
             logoText: 'MyBrand',
             tagline: 'Building the future, one site at a time',
             columns: [
@@ -583,7 +584,7 @@ describe('[TC-S2-014] Footer — Sprint 2 mega-footer variant schema validation'
         // Assert
         expect(result.success).toBe(true)
         if (result.success) {
-            expect(result.data.variant).toBe('mega-footer')
+            expect(result.data.variant).toBe('dark-gradient')
             expect(result.data.columns).toHaveLength(4)
             expect(result.data.socials).toHaveLength(3)
             expect(result.data.copyrightText).toContain('2026')

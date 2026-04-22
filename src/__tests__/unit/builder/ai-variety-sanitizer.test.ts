@@ -16,7 +16,7 @@ vi.mock('@/blocks/registry', () => ({
         hero: { type: 'hero', variants: ['centered', 'split-left', 'fullscreen', 'gradient', 'parallax', 'magazine', 'minimal'], defaultVariant: 'centered' },
         features: { type: 'features', variants: ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag', 'carousel'], defaultVariant: 'grid-3' },
         testimonials: { type: 'testimonials', variants: ['cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote'], defaultVariant: 'cards' },
-        footer: { type: 'footer', variants: ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient'], defaultVariant: 'simple' },
+        footer: { type: 'footer', variants: ['simple', 'minimal', 'centered-stack', 'dark-gradient'], defaultVariant: 'simple' },
         contact: { type: 'contact', variants: ['form', 'split', 'card-float', 'minimal-inline'], defaultVariant: 'form' },
         navigation: { type: 'navigation', variants: ['simple', 'centered', 'transparent', 'pill'], defaultVariant: 'simple' },
       }

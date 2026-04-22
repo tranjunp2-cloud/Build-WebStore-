@@ -53,7 +53,7 @@ const PAGES_VARIANTS: Record<string, string[]> = {
     navigation: ['simple', 'centered', 'mega-menu', 'transparent', 'sidebar', 'pill'],
     about: ['simple', 'split', 'story', 'two-column', 'founder-quote', 'centered-large', 'image-overlay'],
     contact: ['form', 'info-only', 'split', 'card-float', 'map-split', 'minimal-inline'],
-    footer: ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient'],
+    footer: ['simple', 'minimal', 'centered-stack', 'dark-gradient'],
     features: ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag', 'carousel'],
     testimonials: [
         'cards', 'carousel', 'simple', 'masonry', 'spotlight',

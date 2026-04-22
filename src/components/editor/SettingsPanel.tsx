@@ -61,6 +61,8 @@ const SOCIAL_PLATFORM_META: Record<SocialWidgetLink['platform'], { mark: string;
 const FONT_OPTIONS = ['Outfit', 'Inter', 'DM Sans', 'Playfair Display', 'Roboto', 'Poppins', 'Plus Jakarta Sans']
 const labelCls = "text-[11px] font-medium text-slate-400"
 const sectionCls = "border-t border-white/10 pt-4"
+// Hide newsletter variants from footer UI — feature not ready for users
+const FOOTER_HIDDEN_VARIANTS = new Set(['expanded', 'mega-footer'])
 
 type FieldBlurEvent = React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
 export type SettingsTab = 'global' | 'seo' | 'menu' | 'block'
@@ -644,19 +646,17 @@ function SettingsPanelInner({
 
     const renderMenuContent = () => {
         const footerCols = ((footerBlock?.columns as FooterColumn[]) || [])
-        const activeFooterLayout = footerCols.length === 0 ? 'simple' : footerCols.length <= 3 ? '3col' : '4col'
+        const activeFooterLayout = footerCols.length === 0 ? null : footerCols.length <= 2 ? '2col' : '3col'
 
-        const handleFooterLayout = (preset: 'simple' | '3col' | '4col') => {
-            if (preset === 'simple') {
-                onFooterUpdate?.({ variant: 'simple', columns: [] })
-            } else if (preset === '3col') {
+        const handleFooterLayout = (preset: '2col' | '3col') => {
+            if (preset === '2col') {
                 const next = [...footerCols]
-                while (next.length < 3) next.push({ title: `Column ${next.length + 1}`, links: [] })
-                onFooterUpdate?.({ variant: 'expanded', columns: next.slice(0, 3) })
+                while (next.length < 2) next.push({ title: `Column ${next.length + 1}`, links: [] })
+                onFooterUpdate?.({ variant: 'simple', columns: next.slice(0, 2) })
             } else {
                 const next = [...footerCols]
-                while (next.length < 4) next.push({ title: `Column ${next.length + 1}`, links: [] })
-                onFooterUpdate?.({ variant: 'expanded', columns: next.slice(0, 4) })
+                while (next.length < 3) next.push({ title: `Column ${next.length + 1}`, links: [] })
+                onFooterUpdate?.({ variant: 'simple', columns: next.slice(0, 3) })
             }
         }
 
@@ -724,10 +724,9 @@ function SettingsPanelInner({
                             {isFooterLayoutOpen && (
                                 <div className="mt-2 space-y-1.5">
                                     {([
-                                        { key: 'simple', label: 'Simple Footer' },
-                                        { key: '3col',   label: '3 Columns' },
-                                        { key: '4col',   label: '4 Columns' },
-                                    ] as { key: 'simple' | '3col' | '4col'; label: string }[]).map(({ key, label }) => (
+                                        { key: '2col', label: '2 Columns' },
+                                        { key: '3col', label: '3 Columns' },
+                                    ] as { key: '2col' | '3col'; label: string }[]).map(({ key, label }) => (
                                         <button
                                             key={key}
                                             type="button"
@@ -925,7 +924,7 @@ function SettingsPanelInner({
                     <div>
                         <label className="text-xs font-medium uppercase text-gray-500">{s.variant}</label>
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                            {info?.variants.map(v => (
+                            {info?.variants.filter(v => bt !== 'footer' || !FOOTER_HIDDEN_VARIANTS.has(v)).map(v => (
                                 <button key={v}
                                     onClick={() => onBlockFieldChange(currentBlockIndex, 'variant', v)}
                                     className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors',

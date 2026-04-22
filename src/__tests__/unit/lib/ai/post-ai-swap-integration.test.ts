@@ -53,7 +53,7 @@ describe('Phase 04 integration — realistic AI response shapes', () => {
                 },
                 {
                     blockType: 'footer',
-                    variant: 'expanded',
+                    variant: 'simple',
                     logoText: 'Beauty Salon',
                 },
             ]

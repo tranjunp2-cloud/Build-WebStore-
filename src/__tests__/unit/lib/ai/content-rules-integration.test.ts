@@ -20,7 +20,7 @@ vi.mock('@/blocks/registry', () => ({
                 navigation: { type: 'navigation', variants: ['simple', 'centered'], defaultVariant: 'simple' },
                 features: { type: 'features', variants: ['grid-3', 'grid-4', 'list'], defaultVariant: 'grid-3' },
                 testimonials: { type: 'testimonials', variants: ['cards', 'carousel', 'simple'], defaultVariant: 'cards' },
-                footer: { type: 'footer', variants: ['simple', 'expanded'], defaultVariant: 'simple' },
+                footer: { type: 'footer', variants: ['simple', 'minimal', 'centered-stack', 'dark-gradient'], defaultVariant: 'simple' },
                 contact: { type: 'contact', variants: ['form', 'split'], defaultVariant: 'form' },
             }
             return metas[type] ?? null

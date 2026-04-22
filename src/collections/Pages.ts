@@ -223,10 +223,8 @@ const FooterBlock = {
             defaultValue: 'simple',
             options: [
                 { label: 'Simple', value: 'simple' },
-                { label: 'Expanded', value: 'expanded' },
                 { label: 'Minimal', value: 'minimal' },
                 { label: 'Centered Stack', value: 'centered-stack' },
-                { label: 'Mega Footer', value: 'mega-footer' },
                 { label: 'Dark Gradient', value: 'dark-gradient' },
             ],
         },
