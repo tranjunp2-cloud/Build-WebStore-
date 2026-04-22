@@ -33,3 +33,6 @@ export const teamMeta = {
     editableFields: ['headline', 'members'],
     quickActions: ['Add member', 'Generate bio'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = TeamConfigSchema

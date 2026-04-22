@@ -53,3 +53,6 @@ export const heroMeta = {
     editableFields: ['headline', 'subheadline', 'ctaButtons', 'image', 'badge', 'videoUrl', 'gradientPreset', 'images'],
     quickActions: ['Rewrite headline', 'Change CTA', 'Change style'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = HeroConfigSchema

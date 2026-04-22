@@ -8,3 +8,6 @@ export const GoogleMapsConfigSchema = BaseBlockSchema.extend({
     height: z.number().default(400),
 })
 export const googleMapsMeta = { type: 'google-maps' as const, name: 'Google Maps', description: 'Embedded Google Maps with optional address card', icon: '📍', variants: ['full-width', 'card'], defaultVariant: 'full-width', editableFields: ['embedUrl', 'headline', 'address', 'height'], quickActions: ['Change height', 'Edit address'], aiVisible: false }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = GoogleMapsConfigSchema

@@ -64,3 +64,6 @@ export const aboutMeta = {
     editableFields: ['headline', 'body', 'image'],
     quickActions: ['Rewrite professional', 'Shorten', 'Add story'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = AboutConfigSchema

@@ -8,3 +8,6 @@ export const AnnouncementBarConfigSchema = BaseBlockSchema.extend({
     dismissible: z.boolean().default(true), backgroundColor: z.string().optional(),
 })
 export const announcementBarMeta = { type: 'announcement-bar' as const, name: 'Announcement Bar', description: 'Top banner for promotions and announcements', icon: '📢', variants: ['gradient', 'solid', 'minimal'], defaultVariant: 'gradient', editableFields: ['message', 'linkText', 'linkUrl', 'dismissible'], quickActions: ['Edit message', 'Add link', 'Toggle dismiss'], aiVisible: false }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = AnnouncementBarConfigSchema

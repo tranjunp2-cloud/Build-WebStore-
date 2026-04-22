@@ -531,6 +531,10 @@ const MIGRATIONS = [
   // templates
   { name: 'templates.sort_order', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order numeric DEFAULT 0;` },
   { name: 'templates.usage_count', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS usage_count numeric DEFAULT 0;` },
+  { name: 'templates.status', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS status varchar DEFAULT 'live';` },
+  { name: 'templates.scheduled_for', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS scheduled_for timestamp;` },
+  { name: 'templates.personality', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS personality varchar;` },
+  { name: 'templates.block_prompt_overrides', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS block_prompt_overrides jsonb DEFAULT '{}'::jsonb;` },
   { name: 'templates.block_schema_version', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS block_schema_version varchar(64);` },
   // templates_tags
   { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
@@ -2836,6 +2840,161 @@ const MIGRATIONS = [
   // main table and silently failed the row — user saw "Update success" toast
   // but status stayed Draft, hasUnpublishedChanges stayed true. Single bulk
   // ALTER IF NOT EXISTS covers every block that has `variant` in Pages.ts.
+  // ── Template Quality Scores (Phase 03 — Quality Integration) ────────────────
+  // Persists per-template rubric score snapshots. Each row = one scoring run.
+  // Array sub-table uses varchar id + _parent_id + _order + _uuid per convention.
+  {
+    name: 'template_quality_scores.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_quality_scores (
+      id serial PRIMARY KEY,
+      template_id integer REFERENCES templates(id) ON DELETE CASCADE,
+      rubric_version varchar NOT NULL,
+      avg_score numeric NOT NULL,
+      pass_rubric boolean DEFAULT false,
+      scorer varchar DEFAULT 'manual',
+      scored_at timestamp DEFAULT now(),
+      updated_at timestamp DEFAULT now() NOT NULL,
+      created_at timestamp DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'template_quality_scores.template_scored_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_quality_scores_template_scored_idx
+      ON template_quality_scores (template_id, scored_at DESC);`,
+  },
+  {
+    name: 'template_quality_scores_dimensions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_quality_scores_dimensions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES template_quality_scores(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar NOT NULL,
+      score numeric NOT NULL,
+      weight numeric NOT NULL,
+      criteria_met integer DEFAULT 0,
+      criteria_total integer DEFAULT 0
+    );`,
+  },
+  {
+    name: 'template_quality_scores_dimensions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_quality_scores_dimensions_parent_idx
+      ON template_quality_scores_dimensions (_parent_id);`,
+  },
+  // Idempotent ALTER TABLE fallbacks — safe if tables already created above
+  {
+    name: 'template_quality_scores.alter_template_id',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS template_id integer;`,
+  },
+  {
+    name: 'template_quality_scores.alter_rubric_version',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS rubric_version varchar;`,
+  },
+  {
+    name: 'template_quality_scores.alter_avg_score',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS avg_score numeric;`,
+  },
+  {
+    name: 'template_quality_scores.alter_pass_rubric',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS pass_rubric boolean DEFAULT false;`,
+  },
+  {
+    name: 'template_quality_scores.alter_scorer',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS scorer varchar DEFAULT 'manual';`,
+  },
+  {
+    name: 'template_quality_scores.alter_scored_at',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS scored_at timestamp DEFAULT now();`,
+  },
+
+  // ── Phase 04: Block Catalog ──
+  {
+    name: 'block_catalog_entries.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS block_catalog_entries (
+      id serial PRIMARY KEY,
+      slug varchar NOT NULL UNIQUE,
+      description_override text,
+      description_override_vi text,
+      display_order integer DEFAULT 0,
+      curated_preview_url varchar,
+      hidden_from_catalog boolean DEFAULT false,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'block_catalog_entries.slug_idx',
+    sql: `CREATE INDEX IF NOT EXISTS block_catalog_entries_slug_idx ON block_catalog_entries (slug);`,
+  },
+  {
+    name: 'block_catalog_entries.alter_slug',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS slug varchar;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_description_override',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS description_override text;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_description_override_vi',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS description_override_vi text;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_display_order',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS display_order integer DEFAULT 0;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_curated_preview_url',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS curated_preview_url varchar;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_hidden_from_catalog',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS hidden_from_catalog boolean DEFAULT false;`,
+  },
+  {
+    name: 'block_variants.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS block_variants (
+      id serial PRIMARY KEY,
+      block_slug varchar NOT NULL,
+      variant_name varchar NOT NULL,
+      preview_url_override varchar,
+      notes text,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'block_variants.block_slug_idx',
+    sql: `CREATE INDEX IF NOT EXISTS block_variants_block_slug_idx ON block_variants (block_slug);`,
+  },
+  {
+    name: 'block_variants.alter_block_slug',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS block_slug varchar;`,
+  },
+  {
+    name: 'block_variants.alter_variant_name',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS variant_name varchar;`,
+  },
+  {
+    name: 'block_variants.alter_preview_url_override',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS preview_url_override varchar;`,
+  },
+  {
+    name: 'block_variants.alter_notes',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS notes text;`,
+  },
+  {
+    name: 'block_variants.alter_enabled',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true;`,
+  },
+  {
+    name: 'block_variants.alter_display_name',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS display_name varchar;`,
+  },
+
   ...[
     'hero', 'navigation', 'about', 'contact', 'footer',
     'social_widget', 'cart_widget', 'features', 'testimonials', 'gallery',
@@ -2857,6 +3016,373 @@ const MIGRATIONS = [
       sql: `ALTER TABLE "_pages_v_blocks_${slug}" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
     },
   ]),
+
+  // ── AiGenerationRecords: Phase 05 Monitoring ──────────────────────────────
+  {
+    name: 'ai_generation_records.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_generation_records (
+      id serial PRIMARY KEY,
+      site_id integer REFERENCES sites(id) ON DELETE SET NULL,
+      user_id integer REFERENCES users(id) ON DELETE SET NULL,
+      endpoint varchar NOT NULL,
+      category varchar,
+      prompt_mode varchar NOT NULL DEFAULT 'full',
+      prompt_text text,
+      prompt_hash varchar,
+      output_snapshot jsonb,
+      status varchar NOT NULL DEFAULT 'running',
+      error_log text,
+      duration_ms integer,
+      cost_usd numeric,
+      completed_at timestamp,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'ai_generation_records.created_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_created_at_idx ON ai_generation_records (created_at DESC);`,
+  },
+  {
+    name: 'ai_generation_records.status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_status_idx ON ai_generation_records (status);`,
+  },
+  {
+    name: 'ai_generation_records.user_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_user_id_idx ON ai_generation_records (user_id);`,
+  },
+  {
+    name: 'ai_generation_records_selected_blocks.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_selected_blocks (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      value varchar);`,
+  },
+  {
+    name: 'ai_generation_records_selected_blocks.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_selected_blocks_parent_idx ON ai_generation_records_selected_blocks (_parent_id);`,
+  },
+  // ALTER TABLE safety clones — idempotent if table was created by pushDevSchema
+  {
+    name: 'ai_generation_records.alter_site_id',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS site_id integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_user_id',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS user_id integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_endpoint',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS endpoint varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_category',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS category varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_mode',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_mode varchar NOT NULL DEFAULT 'full';`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_text',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_text text;`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_hash',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_hash varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_output_snapshot',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS output_snapshot jsonb;`,
+  },
+  {
+    name: 'ai_generation_records.alter_status',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'running';`,
+  },
+  {
+    name: 'ai_generation_records.alter_error_log',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS error_log text;`,
+  },
+  {
+    name: 'ai_generation_records.alter_duration_ms',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS duration_ms integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_cost_usd',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS cost_usd numeric;`,
+  },
+  {
+    name: 'ai_generation_records.alter_completed_at',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS completed_at timestamp;`,
+  },
+
+  // ── Phase 06: TemplateIssues ──────────────────────────────────────────────
+  {
+    name: 'template_issues.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues (
+  id serial PRIMARY KEY,
+  title varchar NOT NULL,
+  description text,
+  severity varchar NOT NULL DEFAULT 'medium',
+  category varchar NOT NULL DEFAULT 'other',
+  status varchar NOT NULL DEFAULT 'open',
+  related_type varchar NOT NULL,
+  related_id varchar NOT NULL,
+  reported_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+  assigned_to_id integer REFERENCES users(id) ON DELETE SET NULL,
+  resolved_at timestamp,
+  updated_at timestamp DEFAULT now(),
+  created_at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues.create_status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_status_idx ON template_issues (status);`,
+  },
+  {
+    name: 'template_issues.create_severity_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_severity_idx ON template_issues (severity);`,
+  },
+  {
+    name: 'template_issues.create_related_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_related_idx ON template_issues (related_type, related_id);`,
+  },
+  {
+    name: 'template_issues_comments.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues_comments (
+  id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  _order integer NOT NULL DEFAULT 0,
+  _parent_id integer NOT NULL REFERENCES template_issues(id) ON DELETE CASCADE,
+  _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+  author_id integer REFERENCES users(id) ON DELETE SET NULL,
+  body text NOT NULL,
+  created_at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues_comments.create_parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_comments_parent_idx ON template_issues_comments (_parent_id);`,
+  },
+  {
+    name: 'template_issues_timeline.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues_timeline (
+  id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  _order integer NOT NULL DEFAULT 0,
+  _parent_id integer NOT NULL REFERENCES template_issues(id) ON DELETE CASCADE,
+  _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+  event varchar NOT NULL,
+  actor_id integer REFERENCES users(id) ON DELETE SET NULL,
+  data jsonb,
+  at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues_timeline.create_parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_timeline_parent_idx ON template_issues_timeline (_parent_id);`,
+  },
+  // ALTER TABLE fallbacks for all template_issues columns
+  {
+    name: 'template_issues.alter_title',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS title varchar NOT NULL DEFAULT '';`,
+  },
+  {
+    name: 'template_issues.alter_description',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS description text;`,
+  },
+  {
+    name: 'template_issues.alter_severity',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS severity varchar NOT NULL DEFAULT 'medium';`,
+  },
+  {
+    name: 'template_issues.alter_category',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS category varchar NOT NULL DEFAULT 'other';`,
+  },
+  {
+    name: 'template_issues.alter_status',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'open';`,
+  },
+  {
+    name: 'template_issues.alter_related_type',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_type varchar;`,
+  },
+  {
+    name: 'template_issues.alter_related_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_id varchar;`,
+  },
+  {
+    name: 'template_issues.alter_reported_by_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS reported_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_issues.alter_assigned_to_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS assigned_to_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_issues.alter_resolved_at',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
+  },
+
+  // ── Phase 07: AI Quality Dashboard indexes ─────────────────────────────────
+  // Composite index on template_quality_scores(template_id, scored_at DESC)
+  // Note: template_quality_scores_template_scored_idx covers (template_id, scored_at DESC)
+  // so idx_tqs_template_scored is a safe alias — CREATE INDEX IF NOT EXISTS skips if identical.
+  {
+    name: 'template_quality_scores.idx_tqs_template_scored',
+    sql: `CREATE INDEX IF NOT EXISTS idx_tqs_template_scored ON template_quality_scores(template_id, scored_at DESC);`,
+  },
+  // Composite index on ai_generation_records(created_at DESC, status)
+  {
+    name: 'ai_generation_records.idx_agr_created_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_agr_created_status ON ai_generation_records(created_at DESC, status);`,
+  },
+
+  // ── Phase 08: Category DNA + Content Packs + Review ──────────────────────
+
+  // Categories: add dna jsonb column
+  {
+    name: 'categories.alter_dna',
+    sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS dna jsonb;`,
+  },
+
+  // Templates: add dna_compliance_cache jsonb column
+  {
+    name: 'templates.alter_dna_compliance_cache',
+    sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS dna_compliance_cache jsonb;`,
+  },
+
+  // ContentPacks parent table
+  {
+    name: 'content_packs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs (
+      id serial PRIMARY KEY,
+      name varchar NOT NULL,
+      description text,
+      cover_image_id integer REFERENCES media(id) ON DELETE SET NULL,
+      category varchar,
+      personality varchar,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now()
+    );`,
+  },
+
+  // ContentPacks tags array sub-table (Payload array convention: varchar id, _order, _parent_id, _uuid)
+  {
+    name: 'content_packs_tags.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs_tags (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES content_packs(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tag varchar
+    );`,
+  },
+  {
+    name: 'content_packs_tags.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS content_packs_tags_parent_idx ON content_packs_tags (_parent_id);`,
+  },
+  // Phase 08 fix: Payload creates {collection}_rels table for relationship hasMany fields
+  // (includedTemplates). Without this table, list queries fail with:
+  //   error: relation "content_packs_rels" does not exist
+  {
+    name: 'content_packs_rels.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs_rels (
+      id serial PRIMARY KEY,
+      "order" integer,
+      parent_id integer NOT NULL,
+      path varchar NOT NULL,
+      templates_id integer
+    );`,
+  },
+  {
+    name: 'content_packs_rels.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS content_packs_rels_parent_idx ON content_packs_rels (parent_id);`,
+  },
+
+  // Phase 08 data seed: backfill 6 category DNA records (guard: only if dna IS NULL)
+  // Wrapped as a DO block so it runs atomically and is idempotent.
+  {
+    name: 'categories.seed_dna_fnb',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","menu-food","gallery","booking-widget","footer"],"recommendedBlocks":["testimonials","gallery-masonry","cta","google-maps"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["class-schedule","doctor-profile","property-card"],"typicalPersonalities":["warm-traditional","warm-homestyle","bold-dark"],"minSections":5,"aiPromptHint":"Warm, inviting tone focused on food experiences. Emphasize ambiance, freshness, and hospitality."}'::jsonb WHERE slug = 'fnb' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_retail',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","products-grid","cart-widget","testimonials","footer"],"recommendedBlocks":["products-featured","cta","newsletter","pricing"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","class-schedule","doctor-profile"],"typicalPersonalities":["modern-vibrant","soft-feminine","editorial-clean"],"minSections":5,"aiPromptHint":"Confident, product-forward tone. Highlight deals, quality, and social proof. Drive conversion."}'::jsonb WHERE slug = 'retail' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_portfolio',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","portfolio-grid","about","contact","footer"],"recommendedBlocks":["testimonials","stats","team","cta"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","products-grid","cart-widget","class-schedule"],"typicalPersonalities":["editorial-clean","bold-dark","luxury-travel"],"minSections":5,"aiPromptHint":"Sophisticated, minimal tone. Let the work speak. Emphasize craft, process, and results."}'::jsonb WHERE slug = 'portfolio' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_news',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","blog-list","newsletter","footer"],"recommendedBlocks":["stats","testimonials","cta","social-widget"],"mandatoryOrder":["navigation","hero","blog-list","footer"],"forbiddenBlocks":["menu-food","products-grid","booking-widget","class-schedule"],"typicalPersonalities":["editorial-clean","modern-vibrant"],"minSections":5,"aiPromptHint":"Clear, authoritative tone. Prioritize readability and information hierarchy. Build trust through consistency."}'::jsonb WHERE slug = 'news' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_beauty',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","service-cards","booking-widget","gallery","testimonials","footer"],"recommendedBlocks":["gallery-masonry","before-after","team","newsletter","cta"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["products-grid","cart-widget","class-schedule","blog-list"],"typicalPersonalities":["soft-feminine","calm-wellness","luxury-travel"],"minSections":6,"aiPromptHint":"Elegant, nurturing tone. Evoke transformation, self-care, and indulgence. Subtle luxury feel."}'::jsonb WHERE slug = 'beauty' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_education',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","class-schedule","features","contact","footer"],"recommendedBlocks":["testimonials","faq","team","stats","cta","pricing"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","cart-widget","booking-widget","gallery-masonry"],"typicalPersonalities":["modern-vibrant","calm-wellness","editorial-clean"],"minSections":6,"aiPromptHint":"Encouraging, clear, and structured tone. Highlight outcomes, expertise, and learning journey."}'::jsonb WHERE slug = 'education' AND dna IS NULL;`,
+  },
+  // ── Phase 09: TemplateVersions ───────────────────────────────────────────
+  {
+    name: 'template_versions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_versions (
+      id serial PRIMARY KEY,
+      template_id integer REFERENCES templates(id) ON DELETE CASCADE,
+      version_number integer NOT NULL,
+      sections_snapshot jsonb NOT NULL DEFAULT '[]'::jsonb,
+      changelog text,
+      created_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now()
+    );`,
+  },
+  {
+    name: 'template_versions.create_index',
+    sql: `CREATE INDEX IF NOT EXISTS template_versions_template_version_idx
+      ON template_versions (template_id, version_number DESC);`,
+  },
+  // ALTER TABLE fallbacks (idempotent — in case table pre-existed without all cols)
+  {
+    name: 'template_versions.add_col_template_id',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS template_id integer REFERENCES templates(id) ON DELETE CASCADE;`,
+  },
+  {
+    name: 'template_versions.add_col_version_number',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS version_number integer;`,
+  },
+  {
+    name: 'template_versions.add_col_sections_snapshot',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS sections_snapshot jsonb NOT NULL DEFAULT '[]'::jsonb;`,
+  },
+  {
+    name: 'template_versions.add_col_changelog',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS changelog text;`,
+  },
+  {
+    name: 'template_versions.add_col_created_by_id',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS created_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_versions.add_col_updated_at',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now();`,
+  },
+  {
+    name: 'template_versions.add_col_created_at',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now();`,
+  },
+
+  // ── Phase 04: AiGenerationRecord override-rate fields ────────────────────
+  // Pre-migration rows return NULL override rate; acceptable per product (rolling 30d window).
+  {
+    name: 'ai_generation_records.add_field_count_columns',
+    sql: `ALTER TABLE ai_generation_records
+      ADD COLUMN IF NOT EXISTS fields_total integer,
+      ADD COLUMN IF NOT EXISTS fields_filled integer,
+      ADD COLUMN IF NOT EXISTS fields_edited integer DEFAULT 0;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -2884,6 +3410,13 @@ const COLLECTION_SLUGS = [
   'seo_meta_jobs', 'notifications', 'subscribers',
   'contact_submissions',
   'ai_usage_logs',
+  'template_quality_scores',
+  'block_catalog_entries',
+  'block_variants',
+  'ai_generation_records',
+  'template_issues',
+  'content_packs',
+  'template_versions',
 ];
 
 /**
@@ -3331,7 +3864,13 @@ async function main() {
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS is_primary
 */
 
-main().catch((e) => {
-  console.error('[db-setup] Fatal:', e);
-  process.exit(1);
-});
+// Only run main() when invoked as CLI (not when required as a module).
+// Prevents side-effects (server.js spawn, stderr noise) when db-migrate-dev.js imports MIGRATIONS.
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('[db-setup] Fatal:', e);
+    process.exit(1);
+  });
+}
+
+module.exports = { MIGRATIONS };

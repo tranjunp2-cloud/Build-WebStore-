@@ -184,6 +184,7 @@ export function composeTemplateResult(
     seed: number,
     language: Language = 'en',
     info?: BusinessInfoInput | string,
+    disabledSet?: Set<string>,
 ): GenerationResult | null {
     // Plan 260415 fix-500 — return null on any unrecoverable composer
     // failure so the caller (openai-generator.generateWithFallback) can
@@ -201,7 +202,7 @@ export function composeTemplateResult(
         bizOverride = Object.keys(mapped).length > 0 ? mapped : undefined
     }
 
-    const templateSeed = composeFromBlueprint(preset, seed, bizOverride)
+    const templateSeed = composeFromBlueprint(preset, seed, bizOverride, disabledSet)
     if (!templateSeed) {
         console.warn(`[fallback-adapter] composeFromBlueprint returned null for ${preset.category}`)
         return null

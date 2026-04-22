@@ -49,3 +49,6 @@ export const serviceCardsMeta = {
     editableFields: ['headline', 'subheadline', 'services'],
     quickActions: ['Add service', 'Rewrite descriptions', 'Change icons'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = ServiceCardsConfigSchema

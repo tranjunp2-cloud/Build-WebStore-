@@ -9,3 +9,6 @@ export const AccordionConfigSchema = BaseBlockSchema.extend({
     items: z.array(z.object({ title: z.string(), content: z.string() })).default([]),
 })
 export const accordionMeta = { type: 'accordion' as const, name: 'Accordion', description: 'Expandable content sections', icon: '📂', variants: ['bordered', 'separated', 'flush'], defaultVariant: 'bordered', editableFields: ['headline', 'description', 'items'], quickActions: ['Add item', 'Expand all', 'Rewrite content'], aiVisible: false }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = AccordionConfigSchema

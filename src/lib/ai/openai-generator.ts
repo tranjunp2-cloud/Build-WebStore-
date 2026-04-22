@@ -11,6 +11,7 @@ import { buildSystemPrompt, buildPersonalizePrompt, type BusinessInfoInput } fro
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
 import { composeTemplateResult } from './fallback-adapter'
+import { loadDisabledVariants } from '@/lib/admin/block-variant-disabled-loader'
 import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
@@ -19,6 +20,8 @@ import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
+import { startCapture, finishCapture } from './capture-generation'
+import { countSnapshotFields } from './snapshot-field-counter'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
 import { mapBusinessInfo } from './business-info-mapper'
 import type { BusinessSample } from './content/types'
@@ -56,12 +59,18 @@ export type SSEEvent = {
 /**
  * Generate a complete website using OpenAI GPT-4o with streaming.
  * Falls back to rule-based generation if API key missing or AI fails.
+ *
+ * @param blockPromptOverrides - Per-block prompt overrides from the admin template
+ *   matching this request's category. Shape: { [blockSlug]: { prompt, updatedAt } }.
+ *   Fetched by the caller (generate-site route) so this function stays DB-free.
+ *   Merged into buildUserPrompt so GPT tailors per-block content accordingly.
  */
 export async function generateSiteWithAI(
     rawBusinessInfo: BusinessInfoInput,
     extraInstructions?: string,
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
     referencePrompt?: string,
+    blockPromptOverrides?: Record<string, { prompt: string; updatedAt: string; updatedBy?: string }>,
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     // Strip lone UTF-16 surrogates + NUL bytes from pasted user input — prevents
     // intermittent "400 could not parse JSON body" from OpenAI when clipboard
@@ -77,10 +86,24 @@ export async function generateSiteWithAI(
         businessInfo.products,
     ].join(' | ')
 
+    // Phase 05 monitoring — capture generation record (best-effort, never blocks)
+    const cap = await startCapture({
+        endpoint: 'site-generator',
+        prompt: promptText,
+        category: businessInfo.industry ?? undefined,
+    })
+
     const openai = getOpenAI()
     if (!openai) {
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
-        return generateWithFallback(promptText, events, 'en', businessInfo)
+        const fallbackResult = await generateWithFallback(promptText, events, 'en', businessInfo)
+        const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
+        await finishCapture(cap, {
+            status: 'success',
+            selectedBlocks: fallbackBlocks,
+            outputSnapshot: { path: 'fallback-no-key', siteName: fallbackResult.result.siteName },
+        })
+        return fallbackResult
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -99,10 +122,24 @@ export async function generateSiteWithAI(
     const hasCustomInput = Boolean(extraInstructions?.trim()) || Boolean(referencePrompt?.trim())
 
     if (genMode === 'template-first' && !hasCustomInput) {
+        // Note: template-first uses the curated composer (static content) + GPT for
+        // hero/SEO text only. Block prompt overrides apply to AI-first path only.
         const templateResult = await generateTemplateFirst(
             businessInfo, language, promptText, openai, events,
         )
-        if (templateResult) return templateResult
+        if (templateResult) {
+            const tfBlocks = templateResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
+            // Phase 04: count fields from actual blocks for override-rate tracking
+            const tfFieldCounts = countSnapshotFields({ blocks: templateResult.result.blocks as Record<string, unknown>[] })
+            await finishCapture(cap, {
+                status: 'success',
+                selectedBlocks: tfBlocks,
+                outputSnapshot: { path: 'template-first', siteName: templateResult.result.siteName },
+                fieldsTotal: tfFieldCounts.fieldsTotal,
+                fieldsFilled: tfFieldCounts.fieldsFilled,
+            })
+            return templateResult
+        }
         // templateResult === null → composer failed, fall through to AI-first
         console.warn('[AI] Template-first returned null — falling back to AI-first path')
     }
@@ -132,12 +169,25 @@ export async function generateSiteWithAI(
         )
 
         const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
+        // Map stored override shape { [slug]: { prompt, updatedAt } } → { [slug]: { prompt } }
+        // as expected by buildUserPrompt. Empty-string prompts are filtered out inside buildUserPrompt.
+        const aiFirstOverrides = blockPromptOverrides
+            ? Object.fromEntries(
+                Object.entries(blockPromptOverrides)
+                    .filter(([, v]) => v?.prompt?.trim())
+                    .map(([slug, v]) => [slug, { prompt: v.prompt }])
+              )
+            : undefined
+        if (aiFirstOverrides && Object.keys(aiFirstOverrides).length > 0) {
+            console.log('[ai-gen] blockPromptOverrides sent (ai-first):', Object.keys(aiFirstOverrides))
+        }
         const userPromptText = buildUserPrompt(businessInfo, {
             extraInstructions: sanitizedExtra,
             language,
             referencePrompt: sanitizedRef,
             mood: themeMood,
             recipe: layoutRecipe,
+            blockPromptOverrides: aiFirstOverrides,
         })
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
@@ -547,13 +597,31 @@ export async function generateSiteWithAI(
             },
         })
 
+        const aiBlocks = validBlocks.map((b) => String((b as Record<string, unknown>).blockType ?? ''))
+        // Phase 04: count fields for override-rate tracking
+        const aiFieldCounts = countSnapshotFields({ blocks: validBlocks as Record<string, unknown>[] })
+        await finishCapture(cap, {
+            status: 'success',
+            selectedBlocks: aiBlocks,
+            outputSnapshot: { path: 'ai-first', siteName: result.siteName, totalBlocks: validBlocks.length },
+            fieldsTotal: aiFieldCounts.fieldsTotal,
+            fieldsFilled: aiFieldCounts.fieldsFilled,
+        })
+
         return { result, events }
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
         events.push({ event: 'error', data: { code: 'ai_fallback', message: 'Using smart templates', retryable: false } })
         const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
-        return generateWithFallback(promptText, events, fallbackLang, businessInfo)
+        const fallbackResult = await generateWithFallback(promptText, events, fallbackLang, businessInfo)
+        const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
+        await finishCapture(cap, {
+            status: 'success',
+            selectedBlocks: fallbackBlocks,
+            outputSnapshot: { path: 'ai-first-fallback', siteName: fallbackResult.result.siteName, error: errMessage.slice(0, 200) },
+        })
+        return fallbackResult
     }
 }
 
@@ -565,16 +633,20 @@ export async function generateSiteWithAI(
  * Plan 260414-2249 phase-01: accept full BusinessInfoInput (not just name) so
  * user-supplied phone/email/address/products flow into composer block builders.
  */
-function generateWithFallback(
+async function generateWithFallback(
     prompt: string,
     events: SSEEvent[],
     language: 'en' | 'ms' | 'vi' = 'en',
     businessInfo?: BusinessInfoInput,
-): { result: GenerationResult; events: SSEEvent[] } {
+): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     events.push({ event: 'step', data: { step: 'fallback_analyzing', label: 'Analysing template library...', progress: 50 } })
     events.push({ event: 'step', data: { step: 'fallback_composing', label: 'Composing from smart templates...', progress: 60 } })
 
     const seed = Date.now()
+
+    // Load disabled variants once per gen session — ~5ms DB query.
+    // Empty set on error so gen proceeds normally.
+    const disabledSet = await loadDisabledVariants()
 
     // Plan 260415 fix-500 — composeFallbackResult now returns null (not
     // throws) for unrecoverable states. Treat null exactly like a thrown
@@ -582,7 +654,7 @@ function generateWithFallback(
     let composerResult: GenerationResult | null = null
     let composerErrMsg: string | null = null
     try {
-        composerResult = composeTemplateResult(prompt, seed, language, businessInfo)
+        composerResult = composeTemplateResult(prompt, seed, language, businessInfo, disabledSet)
     } catch (composerError: unknown) {
         composerErrMsg = composerError instanceof Error ? composerError.message : String(composerError)
     }
@@ -1935,10 +2007,14 @@ async function generateTemplateFirst(
     // Plan 260417-0837 item 1.2 — confirm template-first is the default path.
     console.log(`[AI] path=template-first category=${presetCategory} seed=${themeSeed} lang=${resolvedLang}`)
 
+    // Load disabled variants once before composer + GPT parallel race.
+    // ~5ms DB query; empty set on error so gen proceeds normally.
+    const disabledSet = await loadDisabledVariants()
+
     // Run composer + GPT personalize in parallel
     const [composerSettled, personalizeSettled] = await Promise.allSettled([
         // Composer: build full 5-page site from library (~0.5s)
-        Promise.resolve().then(() => composeTemplateResult(promptText, themeSeed, resolvedLang, businessInfo)),
+        Promise.resolve().then(() => composeTemplateResult(promptText, themeSeed, resolvedLang, businessInfo, disabledSet)),
         // GPT: personalize 4 text fields (~3-8s, timeout 10s)
         personalizeWithGPT(openai, businessInfo, presetCategory, resolvedLang),
     ])

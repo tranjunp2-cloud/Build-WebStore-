@@ -26,3 +26,6 @@ export const cartWidgetMeta = {
     quickActions: ['Open cart', 'Toggle cart label'],
     aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = CartWidgetConfigSchema

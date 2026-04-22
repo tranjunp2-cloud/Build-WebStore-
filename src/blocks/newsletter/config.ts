@@ -40,3 +40,6 @@ export const newsletterMeta = {
     editableFields: ['headline', 'subheadline', 'buttonLabel'],
     quickActions: ['Change copy'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = NewsletterConfigSchema

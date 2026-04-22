@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { buildMaintenanceHtml } from '@/lib/maintenance'
 
 const ADMIN_PATHS = ['/admin', '/api']
+// Studio internal admin — requires super-admin role (checked below)
+const STUDIO_PATH = '/studio'
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
 
 /**
@@ -67,6 +69,41 @@ export async function middleware(req: NextRequest) {
         ) {
             return NextResponse.next()
         }
+    }
+
+    // ── Studio admin guard (/studio/*) ────────────────────────────────
+    // Edge-runtime: cannot call Payload local API. Decode JWT directly via jose.
+    // Defense-in-depth: layout.tsx also calls requireSuperAdmin() on the server.
+    if (pathname.startsWith(STUDIO_PATH)) {
+        const tokenCookie = req.cookies.get('payload-token')?.value
+        if (!tokenCookie) {
+            url.pathname = '/admin'
+            return NextResponse.redirect(url)
+        }
+        try {
+            // Payload v3 signs JWT with a derived key (not raw PAYLOAD_SECRET),
+            // so jose's jwtVerify fails in edge runtime. We decode unverified
+            // and defer real verification to the Next.js server layer:
+            // layout.tsx calls requireSuperAdmin() which hits Payload local API.
+            // Cookie is httpOnly and set by Payload server — middleware decoding
+            // it here is only a routing hint, not the security boundary.
+            const { decodeJwt } = await import('jose')
+            const decoded = decodeJwt(tokenCookie)
+            const roles = (decoded.roles as string[] | undefined) ?? []
+            const exp = decoded.exp as number | undefined
+            if (exp && exp * 1000 < Date.now()) {
+                url.pathname = '/admin'
+                return NextResponse.redirect(url)
+            }
+            if (!roles.includes('super-admin')) {
+                url.pathname = '/admin'
+                return NextResponse.redirect(url)
+            }
+        } catch {
+            url.pathname = '/admin'
+            return NextResponse.redirect(url)
+        }
+        return NextResponse.next()
     }
 
     // ── API and admin routes: pass through ─────────────────────────────

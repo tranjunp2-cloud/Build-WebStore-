@@ -27,6 +27,13 @@ import { Categories } from './collections/Categories'
 import { Notifications } from './collections/Notifications'
 import { PushSubscriptions } from './collections/PushSubscriptions'
 import { AiUsageLogs } from './collections/AiUsageLogs'
+import { TemplateQualityScores } from './collections/TemplateQualityScores'
+import { BlockCatalogEntries } from './collections/BlockCatalogEntries'
+import { BlockVariants } from './collections/BlockVariants'
+import { AiGenerationRecords } from './collections/AiGenerationRecords'
+import { TemplateIssues } from './collections/TemplateIssues'
+import { ContentPacks } from './collections/ContentPacks'
+import { TemplateVersions } from './collections/TemplateVersions'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -126,6 +133,13 @@ export default buildConfig({
     Notifications,
     PushSubscriptions,
     AiUsageLogs,
+    TemplateQualityScores,
+    BlockCatalogEntries,
+    BlockVariants,
+    AiGenerationRecords,
+    TemplateIssues,
+    ContentPacks,
+    TemplateVersions,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',
