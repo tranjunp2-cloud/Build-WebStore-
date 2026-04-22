@@ -623,11 +623,8 @@ describe('[TC-S2-015] Design token audit — Sprint 2 variant configs carry no h
         // Act + Assert
         expect(result.success).toBe(true)
         if (result.success) {
-            // headline, subheadline, height — none should look like a hex color
+            // headline must not look like a hex color (height field removed from HeroConfigSchema in GH-12)
             expect(HARDCODED_HEX_RE.test(result.data.headline)).toBe(false)
-            expect(result.data.height).toBeDefined()
-            // height is a CSS value like '90vh' — must NOT be a bare hex
-            expect(HARDCODED_HEX_RE.test(result.data.height)).toBe(false)
         }
     })
 

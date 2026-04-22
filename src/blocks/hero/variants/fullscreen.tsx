@@ -7,14 +7,14 @@ import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob } from '../../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
-import { HERO_CONTAINER } from '../shared'
+import { HERO_CONTAINER, HERO_MIN_HEIGHT } from '../shared'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 
 export function FullscreenHero({ block }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [] } = block
 
     return (
-        <AnimatedSection className="relative py-32 flex items-center overflow-hidden">
+        <AnimatedSection className={`relative ${HERO_MIN_HEIGHT} flex items-center overflow-hidden`}>
             <GradientBlob color={CSS_VARS.primary} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.06} />
             <div className={`${HERO_CONTAINER} text-center max-w-3xl relative z-10`}>
                 <motion.h1

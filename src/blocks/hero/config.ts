@@ -12,9 +12,7 @@ export type HeroConfig = {
     ctaButtons?: CTAButton[]
     image?: ImageRef
     badge?: { show: boolean; text: string }
-    overlay?: boolean
     overlayOpacity?: number
-    height?: string
     // New optional fields
     videoUrl?: string
     gradientPreset?: 'aurora' | 'sunset' | 'ocean' | 'forest'
@@ -32,9 +30,7 @@ export const HeroConfigSchema = BaseBlockSchema.extend({
     ctaButtons: z.array(CTAButtonSchema).default([]),
     image: ImageRefSchema.optional(),
     badge: z.object({ show: z.boolean(), text: z.string() }).optional(),
-    overlay: z.boolean().default(false),
     overlayOpacity: z.number().min(0).max(1).default(0.4),
-    height: z.string().default('90vh'),
     videoUrl: z.string().optional(),
     gradientPreset: z.enum(['aurora', 'sunset', 'ocean', 'forest']).optional(),
     images: z.array(ImageRefSchema).optional(),
