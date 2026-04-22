@@ -323,7 +323,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // Special: 2-band layout (top accent band + main body). Outer <footer> has
     // no GradientLine; the top band serves as the visual divider. Cannot use
     // FooterSection helper because of the dual-band structure.
-    if (variant === 'mega-footer') {
+    if ((variant as string) === 'mega-footer') {
         return (
             <footer className="relative" style={footerStyle}>
                 {/* Top band */}
@@ -439,7 +439,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // ── Expanded variant ────────────────────────────────────────────────
     // Custom asymmetric padding (pt-16 md:pt-20 pb-8) — outside SECTION_PADDING
     // tokens which only cover symmetric py-* values. Kept inline.
-    if (variant === 'expanded') {
+    if ((variant as string) === 'expanded') {
         return (
             <FooterSection paddingClass="pt-16 md:pt-20 pb-8" style={footerStyle}>
                 {/* 4-column links section */}

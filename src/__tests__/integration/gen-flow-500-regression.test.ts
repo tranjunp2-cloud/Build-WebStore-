@@ -431,7 +431,7 @@ describe('Gen Flow 500 Regression Tests', () => {
             expect(result!.variant).toBe('split')
         })
 
-        it('footer block with variant="expanded" now preserved', () => {
+        it('footer block with variant="expanded" is aliased to "simple" (newsletter variant hidden)', () => {
             const block = {
                 blockType: 'footer',
                 variant: 'expanded',
@@ -441,7 +441,7 @@ describe('Gen Flow 500 Regression Tests', () => {
                 ],
             }
             const result = sanitizeBlockForPayload(block)
-            expect(result!.variant).toBe('expanded')
+            expect(result!.variant).toBe('simple')
             const cols = result!.columns as Array<Record<string, unknown>>
             expect(cols[0]).not.toHaveProperty('id')
             expect(cols[0]!.title).toBe('Pages')

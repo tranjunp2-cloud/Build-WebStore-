@@ -1450,7 +1450,7 @@ function buildHomePage(
   }
 
   // Footer always last
-  blocks.push({ ...buildFooter(biz, pages), variant: getVariant('footer', 'expanded') })
+  blocks.push({ ...buildFooter(biz, pages), variant: getVariant('footer', 'simple') })
 
   return { title: 'Home', slug: '/', layout: blocks }
 }

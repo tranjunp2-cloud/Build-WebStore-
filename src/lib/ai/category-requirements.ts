@@ -175,23 +175,24 @@ export const CONTACT_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
 
 /**
  * Plan 260415 — footer variant rotation per category. Supported set:
- * simple / expanded / minimal / centered-stack / mega-footer / dark-gradient.
+ * simple / minimal / centered-stack / dark-gradient.
+ * Note: expanded + mega-footer hidden (newsletter feature not ready).
  */
 export const FOOTER_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
-    beauty: ['centered-stack', 'expanded', 'minimal'],
-    restaurant: ['expanded', 'dark-gradient', 'mega-footer'],
-    fnb: ['expanded', 'centered-stack', 'minimal'],
-    tech: ['mega-footer', 'expanded', 'dark-gradient'],
-    health: ['expanded', 'minimal', 'centered-stack'],
-    education: ['expanded', 'mega-footer', 'centered-stack'],
-    realestate: ['expanded', 'dark-gradient', 'mega-footer'],
-    fitness: ['dark-gradient', 'expanded', 'centered-stack'],
+    beauty: ['centered-stack', 'simple', 'minimal'],
+    restaurant: ['simple', 'dark-gradient', 'centered-stack'],
+    fnb: ['simple', 'centered-stack', 'minimal'],
+    tech: ['dark-gradient', 'simple', 'minimal'],
+    health: ['simple', 'minimal', 'centered-stack'],
+    education: ['simple', 'dark-gradient', 'centered-stack'],
+    realestate: ['simple', 'dark-gradient', 'minimal'],
+    fitness: ['dark-gradient', 'simple', 'centered-stack'],
     creative: ['centered-stack', 'minimal', 'dark-gradient'],
-    business: ['expanded', 'mega-footer', 'minimal'],
-    ecommerce: ['mega-footer', 'expanded', 'centered-stack'],
-    events: ['dark-gradient', 'expanded', 'centered-stack'],
-    blog: ['minimal', 'centered-stack', 'expanded'],
-    travel: ['dark-gradient', 'expanded', 'mega-footer'],
+    business: ['simple', 'dark-gradient', 'minimal'],
+    ecommerce: ['dark-gradient', 'simple', 'centered-stack'],
+    events: ['dark-gradient', 'simple', 'centered-stack'],
+    blog: ['minimal', 'centered-stack', 'simple'],
+    travel: ['dark-gradient', 'simple', 'centered-stack'],
 }
 
 /**

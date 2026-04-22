@@ -187,7 +187,7 @@ const VARIANT_OPTIONS: Record<string, string[]> = {
     features: ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag'],
     testimonials: ['cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote'],
     contact: ['form', 'split', 'card-float', 'minimal-inline'],
-    footer: ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient'],
+    footer: ['simple', 'minimal', 'centered-stack', 'dark-gradient'],
     faq: ['accordion', 'grid', 'simple', 'two-column-accordion', 'chat-bubbles', 'numbered'],
     cta: ['banner', 'inline', 'card', 'floating-sticky', 'image-bg', 'split-testimonial', 'dark-card', 'mesh-gradient-hero'],
     stats: ['row', 'grid', 'highlight', 'cards', 'inline-text', 'chart-bars'],
