@@ -503,3 +503,50 @@ describe('sanitizeBlockVariant', () => {
         expect(result).toBe(block)
     })
 })
+
+describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 backward-compat)', () => {
+    it('TC-F05-save-14: footer with variant="expanded" → aliased to "simple"', () => {
+        // Arrange — old DB record with removed variant
+        const blocks = [{ blockType: 'footer', variant: 'expanded', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — Payload select no longer includes "expanded"
+        expect(result[0].variant).toBe('simple')
+    })
+
+    it('TC-F05-save-15: footer with variant="mega-footer" → aliased to "dark-gradient"', () => {
+        // Arrange — old DB record with removed variant
+        const blocks = [{ blockType: 'footer', variant: 'mega-footer', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — Payload select no longer includes "mega-footer"
+        expect(result[0].variant).toBe('dark-gradient')
+    })
+
+    it('TC-F05-save-16: footer with valid variant → unchanged', () => {
+        // Arrange
+        const blocks = [{ blockType: 'footer', variant: 'minimal', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — valid variants must not be aliased
+        expect(result[0].variant).toBe('minimal')
+    })
+
+    it('TC-F05-save-17: non-footer block with "expanded" variant is NOT aliased by footer guard', () => {
+        // Arrange — 'expanded' on a hero block should NOT be aliased as footer logic
+        // (sanitizeBlockVariant handles coercion for non-footer blocks separately)
+        const blocks = [{ blockType: 'hero', variant: 'centered', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — hero variant untouched by footer alias guard
+        expect(result[0].variant).toBe('centered')
+    })
+})
