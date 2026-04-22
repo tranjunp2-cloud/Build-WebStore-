@@ -179,7 +179,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
 
         return (
             <AppShell>
-                <div className="overflow-x-hidden min-height-screen">
+                <div className="min-h-screen">
                     {/* Render with true SiteRenderer in Editor Mode */}
                     <PreviewSiteRenderer
                         site={site}

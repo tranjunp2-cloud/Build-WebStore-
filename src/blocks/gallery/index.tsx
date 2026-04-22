@@ -13,6 +13,7 @@ import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 // Brand identity vars preserved per Option C additive strategy.
@@ -47,6 +48,7 @@ type ImageItem = GalleryConfig['images'][number]
 
 type GalleryImageCardProps = {
     item: ImageItem
+    index?: number
     aspect?: 'square' | '4/3' | 'video' | 'auto'
     className?: string
     overlayClickable?: boolean
@@ -63,7 +65,8 @@ const ASPECT_CLASS = {
  * Image card with hover-overlay caption + decorative placeholder fallback.
  * Used 4+ times across grid/masonry/carousel/lightbox variants.
  */
-function GalleryImageCard({ item, aspect = 'square', className = '', overlayClickable = false }: GalleryImageCardProps) {
+function GalleryImageCard({ item, index, aspect = 'square', className = '', overlayClickable = false }: GalleryImageCardProps) {
+    const isOwner = useIsOwner()
     const aspectCls = ASPECT_CLASS[aspect]
 
     if (item.image?.url) {
@@ -72,6 +75,7 @@ function GalleryImageCard({ item, aspect = 'square', className = '', overlayClic
                 <img
                     src={item.image.url}
                     alt={item.caption || item.image.alt || ''}
+                    data-image-index={index}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 {item.caption && (
@@ -84,13 +88,23 @@ function GalleryImageCard({ item, aspect = 'square', className = '', overlayClic
                         <span className="opacity-0 group-hover:opacity-100 text-white text-2xl transition-opacity duration-300" aria-hidden="true">⊕</span>
                     </div>
                 )}
+                {isOwner && !overlayClickable && (
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center pointer-events-none">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 rounded-full p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                <circle cx="12" cy="13" r="4"/>
+                            </svg>
+                        </div>
+                    </div>
+                )}
             </div>
         )
     }
 
     return (
         <div
-            className={`${aspectCls} rounded-2xl flex items-center justify-center ${className}`.trim()}
+            className={`relative ${aspectCls} rounded-2xl flex items-center justify-center ${className}`.trim()}
             style={{
                 background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
                 border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
@@ -98,6 +112,16 @@ function GalleryImageCard({ item, aspect = 'square', className = '', overlayClic
             aria-hidden="true"
         >
             <span className="text-2xl opacity-20">📷</span>
+            {isOwner && (
+                <div className="absolute inset-0 group-hover:bg-black/10 transition-colors duration-300 rounded-2xl flex items-center justify-center pointer-events-none">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 rounded-full p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -106,15 +130,21 @@ export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) 
     const { headline, images: rawImages = [], variant = 'grid' } = block
     const category = (site?.siteType as string) || 'business'
 
-    // BUG-F01-26: Fallback to industry-specific images when all images lack URLs
-    // (e.g., Unsplash pipeline failed or image FK stripped during save)
-    const hasAnyImage = rawImages.some((img: Record<string, unknown>) => img?.image && typeof img.image === 'object' && (img.image as Record<string, unknown>)?.url)
-    const images = hasAnyImage
-        ? rawImages
-        : getGalleryImages(category, 6).map((url, i) => ({
-            image: { url, alt: `Gallery image ${i + 1}` },
-            caption: rawImages[i]?.caption || '',
-        }))
+    // Per-slot fallback: slots with a real image show it; null slots show the Unsplash fallback
+    // for that index. This way, replacing one stock image doesn't wipe fallbacks for other slots.
+    const fallbackUrls = getGalleryImages(category, 6)
+    const slotCount = Math.max(rawImages.length, fallbackUrls.length)
+    const images = Array.from({ length: slotCount }, (_, i) => {
+        const item = rawImages[i] as Record<string, unknown> | undefined
+        const img = item?.image
+        if (img && typeof img === 'object' && (img as Record<string, unknown>)?.url) {
+            return item as GalleryConfig['images'][number]
+        }
+        return {
+            image: { url: fallbackUrls[i % fallbackUrls.length]!, alt: `Gallery image ${i + 1}` },
+            caption: (item?.caption as string) || '',
+        }
+    })
 
     // ── Lightbox variant ──────────────────────────────────────────────────
     if (variant === 'lightbox') {
@@ -148,7 +178,7 @@ export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) 
             <StaggerGrid className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {images.map((item, i) => (
                     <StaggerItem key={i} className="group">
-                        <GalleryImageCard item={item} aspect="square" />
+                        <GalleryImageCard item={item} index={i} aspect="square" />
                     </StaggerItem>
                 ))}
             </StaggerGrid>
@@ -166,7 +196,7 @@ function MasonryGallery({ headline, images, theme: _theme }: { headline?: string
             <StaggerGrid className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
                 {images.map((item, i) => (
                     <StaggerItem key={i} className="break-inside-avoid group">
-                        <GalleryImageCard item={item} aspect={item.image?.url ? 'auto' : 'video'} />
+                        <GalleryImageCard item={item} index={i} aspect={item.image?.url ? 'auto' : 'video'} />
                     </StaggerItem>
                 ))}
             </StaggerGrid>
@@ -223,7 +253,7 @@ function CarouselGallery({ headline, images, theme: _theme }: { headline?: strin
                                 key={i}
                                 className="w-full flex-shrink-0 md:w-1/2 lg:w-1/3 px-2 group"
                             >
-                                <GalleryImageCard item={item} aspect="4/3" />
+                                <GalleryImageCard item={item} index={i} aspect="4/3" />
                             </div>
                         ))}
                     </motion.div>
@@ -370,7 +400,7 @@ function LightboxGallery({ headline, images, theme: _theme }: { headline?: strin
                 <StaggerGrid className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {images.map((item, i) => (
                         <StaggerItem key={i} className="group cursor-pointer" onClick={() => setSelectedIndex(i)}>
-                            <GalleryImageCard item={item} aspect="square" overlayClickable />
+                            <GalleryImageCard item={item} index={i} aspect="square" overlayClickable />
                         </StaggerItem>
                     ))}
                 </StaggerGrid>
@@ -436,6 +466,7 @@ function LightboxGallery({ headline, images, theme: _theme }: { headline?: strin
                                 <img
                                     src={images[selectedIndex]?.image?.url}
                                     alt={images[selectedIndex].caption || images[selectedIndex].image.alt || ''}
+                                    data-image-index={selectedIndex}
                                     className="max-w-full max-h-[80vh] object-contain rounded-lg"
                                 />
                             )}
@@ -475,6 +506,7 @@ function FilmstripGallery({ headline, images, theme: _theme }: { headline?: stri
                             <img
                                 src={images[activeIndex].image.url}
                                 alt={images[activeIndex].caption || images[activeIndex].image.alt || ''}
+                                data-image-index={activeIndex}
                                 className="w-full h-full object-cover"
                             />
                         ) : (
@@ -518,6 +550,7 @@ function FilmstripGallery({ headline, images, theme: _theme }: { headline?: stri
                                 <img
                                     src={item.image?.url}
                                     alt={item.caption || item.image.alt || ''}
+                                    data-image-index={i}
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -565,6 +598,7 @@ function JustifiedGallery({ headline, images, theme: _theme }: { headline?: stri
                                     <img
                                         src={item.image?.url}
                                         alt={item.caption || item.image.alt || ''}
+                                        data-image-index={i}
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                     />
                                     <div

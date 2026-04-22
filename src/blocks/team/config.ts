@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { BaseBlockSchema } from '../types'
 
-export type TeamMember = { name: string; role: string; avatar?: { url: string; alt?: string }; bio?: string; socials?: { platform: string; url: string }[] }
+export type TeamMember = { name: string; role: string; image?: { url: string; alt?: string }; bio?: string; socials?: { platform: string; url: string }[] }
 
 export type TeamVariant = 'grid' | 'list' | 'cards-hover-reveal' | 'horizontal-scroll' | 'bio-modal' | 'compact-row'
 
@@ -17,7 +17,7 @@ export const TeamConfigSchema = BaseBlockSchema.extend({
     members: z.array(z.object({
         name: z.string(),
         role: z.string(),
-        avatar: z.object({ url: z.string(), alt: z.string().optional() }).optional(),
+        image: z.object({ url: z.string(), alt: z.string().optional() }).optional(),
         bio: z.string().optional(),
         socials: z.array(z.object({ platform: z.string(), url: z.string() })).optional(),
     })).default([]),

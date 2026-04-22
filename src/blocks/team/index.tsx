@@ -110,18 +110,19 @@ function InitialsAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md
  * Nếu avatar URL 404 hoặc load fail → tự swap sang initials đẹp, không icon
  * broken. Vẫn dùng raw <img> (chưa next/image) để giảm scope PR.
  */
-function MemberAvatar({ member }: { member: TeamMember }) {
+function MemberAvatar({ member, imageIndex }: { member: TeamMember; imageIndex?: number }) {
     const [imgError, setImgError] = useState(false)
-    if (!member.avatar?.url || imgError) {
+    if (!member.image?.url || imgError) {
         return <InitialsAvatar name={member.name} />
     }
     return (
         <img
-            src={member.avatar.url}
-            alt={member.avatar.alt || `${member.name} portrait`}
+            src={member.image.url}
+            alt={member.image.alt || `${member.name} portrait`}
             className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
             loading="lazy"
             onError={() => setImgError(true)}
+            data-image-index={imageIndex}
         />
     )
 }
@@ -249,7 +250,7 @@ function GridVariant({
                             }}
                         >
                             <article aria-label={`${m.name}, ${m.role}`}>
-                                <MemberAvatar member={m} />
+                                <MemberAvatar member={m} imageIndex={i} />
                                 <MemberMeta member={m} align="center" />
                                 <SocialLinks socials={m.socials} name={m.name} />
                             </article>
@@ -289,7 +290,7 @@ function ListVariant({
                     >
                         <article className="flex flex-col sm:flex-row items-center sm:items-start gap-4 w-full" aria-label={`${m.name}, ${m.role}`}>
                             <div className="flex-shrink-0">
-                                <MemberAvatar member={m} />
+                                <MemberAvatar member={m} imageIndex={i} />
                             </div>
                             <div className="flex-1 text-center sm:text-left min-w-0">
                                 <MemberMeta member={m} align="left" />
@@ -336,7 +337,7 @@ function CardsHoverRevealVariant({
                             }}
                         >
                             <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
-                                <MemberAvatar member={m} />
+                                <MemberAvatar member={m} imageIndex={i} />
                             </div>
                             <div
                                 className="absolute inset-x-0 bottom-0 p-5 text-center translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"
@@ -401,7 +402,7 @@ function HorizontalScrollVariant({
                         }}
                         aria-label={`${m.name}, ${m.role}`}
                     >
-                        <MemberAvatar member={m} />
+                        <MemberAvatar member={m} imageIndex={i} />
                         <MemberMeta member={m} align="center" />
                         <SocialLinks socials={m.socials} name={m.name} />
                     </article>
@@ -453,7 +454,7 @@ function BioModalVariant({
                             }}
                             aria-label={`Open bio for ${m.name}`}
                         >
-                            <MemberAvatar member={m} />
+                            <MemberAvatar member={m} imageIndex={i} />
                             <p className="font-semibold text-sm truncate" style={{ color: CSS_VARS.text }}>{m.name}</p>
                             <p className="text-xs truncate" style={{ color: CSS_VARS.muted }}>{m.role}</p>
                         </button>
@@ -522,12 +523,13 @@ function CompactRowVariant({
                         style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.08)' }}
                     >
                         <div className="flex-shrink-0 w-12 h-12">
-                            {m.avatar?.url ? (
+                            {m.image?.url ? (
                                 <img
-                                    src={m.avatar.url}
-                                    alt={m.avatar.alt || `${m.name} portrait`}
+                                    src={m.image.url}
+                                    alt={m.image.alt || `${m.name} portrait`}
                                     className="w-12 h-12 rounded-full object-cover"
                                     loading="lazy"
+                                    data-image-index={i}
                                 />
                             ) : (
                                 <div

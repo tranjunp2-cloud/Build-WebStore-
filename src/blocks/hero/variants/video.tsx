@@ -20,14 +20,8 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const [isPlaying, setIsPlaying] = useState(true)
-    const [isMobile, setIsMobile] = useState(false)
     const [videoUrl, setVideoUrl] = useState(initialVideoUrl)
     const prevVideoUrlRef = useRef(initialVideoUrl)
-
-    // Detect mobile to suppress autoplay
-    useEffect(() => {
-        setIsMobile(window.innerWidth < 768)
-    }, [])
 
     // Respect prefers-reduced-motion
     useEffect(() => {
@@ -63,7 +57,7 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
 
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
-            {/* Full-bleed background: video on desktop, poster only on mobile */}
+            {/* Full-bleed background video — muted + playsInline satisfies mobile autoplay policy */}
             <HeroMediaOverlay
                 field="image.url"
                 altText={safeAltText(image?.alt, headline)}
@@ -76,7 +70,7 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
                     <video
                         ref={videoRef}
                         src={videoUrl}
-                        autoPlay={!isMobile}
+                        autoPlay
                         muted
                         loop
                         playsInline

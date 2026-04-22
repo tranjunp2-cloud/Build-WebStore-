@@ -38,7 +38,7 @@ export function FullscreenHero({ block }: BlockProps<HeroConfig>) {
                                     ? { border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`, color: 'var(--brand-primary)' }
                                     : { background: 'var(--brand-primary)', color: '#fff', boxShadow: `0 4px 20px rgba(var(--brand-primary-rgb), 0.188)` }}
                             >
-                                {btn.label}
+                                <RichText text={btn.label} as="span" />
                             </motion.a>
                         ))}
                     </div>

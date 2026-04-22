@@ -13,6 +13,14 @@ import { getGalleryImages } from '@/lib/images/industry-images'
 
 void _CSS_VARS
 
+function stripHtml(html: string): string {
+    return html
+        .replace(/<[^>]+>/g, '')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+        .replace(/<[^>]+>/g, '') // second pass for decoded tags
+        .trim()
+}
+
 function PortfolioGridSection({ children }: { children: ReactNode }) {
     return (
         <AnimatedSection>
@@ -28,9 +36,10 @@ type Project = NonNullable<PortfolioGridConfig['projects']>[number]
 type ProjectCardProps = {
     project: Project
     className?: string
+    imageIndex?: number
 }
 
-function ProjectCard({ project, className = '' }: ProjectCardProps) {
+function ProjectCard({ project, className = '', imageIndex }: ProjectCardProps) {
     const Wrapper = project.linkUrl ? 'a' : 'div'
     const linkProps = project.linkUrl
         ? { href: project.linkUrl, target: '_blank' as const, rel: 'noopener noreferrer' }
@@ -41,10 +50,11 @@ function ProjectCard({ project, className = '' }: ProjectCardProps) {
                 src={project.imageUrl}
                 alt={project.title}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                data-image-index={imageIndex}
             />
-            {/* Hover overlay */}
+            {/* Hover overlay — pointer-events-none so mouse events reach the <img> for editor image-replace */}
             <div
-                className="absolute inset-0 flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                className="absolute inset-0 flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                 style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.867), rgba(var(--brand-primary-rgb), 0.251), transparent)` }}
             >
                 <Caption className="font-semibold uppercase tracking-wider text-white/80 mb-1 block">{project.category}</Caption>
@@ -59,14 +69,15 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
     const { headline, subheadline, projects: rawProjects = [], variant = 'grid' } = block
     const category = (site?.siteType as string) || 'business'
 
-    // Fallback to industry images when all projects lack image URLs
-    const hasAnyImage = rawProjects.some((p) => p.imageUrl)
-    const projects = hasAnyImage
-        ? rawProjects
-        : rawProjects.map((p, i) => ({
-            ...p,
-            imageUrl: getGalleryImages(category, rawProjects.length)[i] || getGalleryImages(category, 1)[0],
-        }))
+    // Per-slot fallback: prefer project.image.url (Payload upload), fallback to imageUrl (AI gen string), then Unsplash
+    const fallbackUrls = getGalleryImages(category, 6)
+    const projects = Array.from({ length: Math.max(rawProjects.length, fallbackUrls.length) }, (_, i) => {
+        const p = rawProjects[i]
+        const imgSrc = (p?.image as { url?: string } | undefined)?.url || p?.imageUrl
+        const cat = stripHtml(p?.category || '')
+        if (imgSrc) return { ...p, imageUrl: imgSrc, category: cat }
+        return { ...p, imageUrl: fallbackUrls[i % fallbackUrls.length] ?? fallbackUrls[0], title: p?.title || '', category: cat, description: p?.description || '' }
+    })
 
     const categories = useMemo(() => {
         const cats = Array.from(new Set(projects.map((p) => p.category)))
@@ -75,9 +86,13 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
 
     const [activeCategory, setActiveCategory] = useState('All')
 
-    const filtered = activeCategory === 'All'
-        ? projects
-        : projects.filter((p) => p.category === activeCategory)
+    // Track original index through filter so imageIndex always maps to the correct projects[] slot
+    const filtered = useMemo(() =>
+        projects
+            .map((project, index) => ({ project, index }))
+            .filter(({ project }) => activeCategory === 'All' || project.category === activeCategory),
+        [projects, activeCategory]
+    )
 
     return (
         <PortfolioGridSection>
@@ -108,10 +123,10 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             {/* Showcase variant: first item large */}
             {variant === 'showcase' && filtered.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <ProjectCard project={filtered[0]} className="aspect-[4/3]" />
+                    <ProjectCard project={filtered[0].project} className="aspect-[4/3]" imageIndex={filtered[0].index} />
                     <div className="grid grid-cols-2 gap-6">
-                        {filtered.slice(1, 5).map((project, i) => (
-                            <ProjectCard key={i} project={project} className="aspect-square" />
+                        {filtered.slice(1, 5).map(({ project, index }) => (
+                            <ProjectCard key={index} project={project} className="aspect-square" imageIndex={index} />
                         ))}
                     </div>
                 </div>
@@ -120,11 +135,12 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             {/* Masonry variant */}
             {variant === 'masonry' && (
                 <div className="columns-2 md:columns-3 gap-6 space-y-6">
-                    {filtered.map((project, i) => (
+                    {filtered.map(({ project, index }, i) => (
                         <ProjectCard
-                            key={i}
+                            key={index}
                             project={project}
                             className={`break-inside-avoid ${i % 3 === 0 ? 'aspect-[3/4]' : 'aspect-square'}`}
+                            imageIndex={index}
                         />
                     ))}
                 </div>
@@ -133,8 +149,8 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             {/* Grid variant */}
             {variant === 'grid' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filtered.map((project, i) => (
-                        <ProjectCard key={i} project={project} className="aspect-[4/3]" />
+                    {filtered.map(({ project, index }) => (
+                        <ProjectCard key={index} project={project} className="aspect-[4/3]" imageIndex={index} />
                     ))}
                 </div>
             )}
@@ -142,8 +158,8 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
             {/* Showcase remaining items */}
             {variant === 'showcase' && filtered.length > 5 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filtered.slice(5).map((project, i) => (
-                        <ProjectCard key={i} project={project} className="aspect-[4/3]" />
+                    {filtered.slice(5).map(({ project, index }) => (
+                        <ProjectCard key={index} project={project} className="aspect-[4/3]" imageIndex={index} />
                     ))}
                 </div>
             )}

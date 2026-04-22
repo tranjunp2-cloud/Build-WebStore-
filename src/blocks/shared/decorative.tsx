@@ -218,9 +218,10 @@ interface AvatarRingProps {
     src?: string
     name: string
     size?: number
+    imageIndex?: number
 }
 
-export function AvatarRing({ color, src, name, size = 48 }: AvatarRingProps) {
+export function AvatarRing({ color, src, name, size = 48, imageIndex }: AvatarRingProps) {
     const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
     return (
@@ -236,7 +237,7 @@ export function AvatarRing({ color, src, name, size = 48 }: AvatarRingProps) {
             }}
         >
             {src ? (
-                <img src={src} alt={name} className="w-full h-full rounded-full object-cover" />
+                <img src={src} alt={name} className="w-full h-full rounded-full object-cover" data-image-index={imageIndex} />
             ) : initials}
         </div>
     )

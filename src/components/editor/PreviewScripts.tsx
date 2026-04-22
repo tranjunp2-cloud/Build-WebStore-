@@ -21,6 +21,8 @@ export function PreviewScripts() {
 
         const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
         const excludedBlockTypes = ['navigation', 'footer']
+        // Blocks whose images come from external product catalog — image editing not supported
+        const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
         
         let hoveredEl: HTMLElement | null = null
         let hoverTimer: number | null = null
@@ -86,17 +88,20 @@ export function PreviewScripts() {
             }
 
             if (target.tagName === 'IMG') {
-                if (hoverTimer) clearTimeout(hoverTimer)
-                hoverTimer = window.setTimeout(() => {
-                    const rect = target.getBoundingClientRect()
-                    window.parent.postMessage({
-                        type: 'IMAGE_HOVERED',
-                        rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-                        src: (target as HTMLImageElement).src,
-                        blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10),
-                        blockType: blockContainer.getAttribute('data-block-type')
-                    }, parentOrigin)
-                }, 200)
+                const imgBlockType = blockContainer.getAttribute('data-block-type') || ''
+                if (!imageReadOnlyBlockTypes.has(imgBlockType)) {
+                    if (hoverTimer) clearTimeout(hoverTimer)
+                    hoverTimer = window.setTimeout(() => {
+                        const rect = target.getBoundingClientRect()
+                        window.parent.postMessage({
+                            type: 'IMAGE_HOVERED',
+                            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+                            src: (target as HTMLImageElement).src,
+                            blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10),
+                            blockType: imgBlockType
+                        }, parentOrigin)
+                    }, 200)
+                }
                 return
             }
 
@@ -389,14 +394,20 @@ export function PreviewScripts() {
                 const blockType = blockContainer.getAttribute('data-block-type')
                 
                 if (blockType && excludedBlockTypes.includes(blockType)) return
+                if (blockType && imageReadOnlyBlockTypes.has(blockType)) return
 
                 const rect = target.getBoundingClientRect()
+                const imageIndexAttr = (target as HTMLElement).getAttribute('data-image-index')
+                const imageIndex = imageIndexAttr !== null ? parseInt(imageIndexAttr, 10) : undefined
+                const totalImagesInBlock = blockContainer.querySelectorAll('img[data-image-index]').length || undefined
                 window.parent.postMessage({
                     type: 'IMAGE_EDITING_STARTED',
                     rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
                     src: (target as HTMLImageElement).src,
                     blockIndex,
-                    blockType
+                    blockType,
+                    imageIndex,
+                    totalImagesInBlock
                 }, parentOrigin)
             }
         }

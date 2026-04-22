@@ -231,7 +231,7 @@ function PreviewFrameInner({
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number; blockType: string; originalText: string; scrollYAtStart: number } | null>(null)
     const [iframeScrollY, setIframeScrollY] = useState(0)
-    const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string } | null>(null)
+    const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string; imageIndex?: number; totalImagesInBlock?: number } | null>(null)
     // Scroll position to restore after iframe reload
     const savedScrollYRef = useRef<number>(0)
     const scrollToBlockIndexRef = useRef<number | null>(null)
@@ -505,7 +505,7 @@ function PreviewFrameInner({
                     }
                 }, 100)
             } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
-                setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType })
+                setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType, imageIndex: e.data.imageIndex, totalImagesInBlock: e.data.totalImagesInBlock })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
                 setWysiwygState(e.data.state)
@@ -624,13 +624,31 @@ function PreviewFrameInner({
             const block = blocks[blockIndex]
             const newMediaId = uploadedMedia.id
 
+            // Skip URL-based strategies for blocks where imageIndex precisely identifies the array slot.
+            // Strategies 1-5 can false-positive on OTHER array items (e.g. testimonials[0].avatar
+            // matching when the user clicked testimonials[1]); Strategy 7 handles these correctly.
+            const ARRAY_BLOCK_TYPES = new Set(['carousel', 'portfolio-grid', 'team', 'testimonials', 'social-proof', 'logo-cloud'])
+            const hasArrayIndex = imageClickData.imageIndex !== undefined && ARRAY_BLOCK_TYPES.has(imageClickData.blockType)
+
             // Strategy 1: Find URL string match in block data (text fields with URL)
             const fieldPath = block ? findStringFieldPath(block, src, src) : null
+            const UPLOAD_FIELD_SET = new Set(['image', 'backgroundImage', 'logo', 'avatar', 'ogImage'])
 
-            if (block && fieldPath) {
-                const clone = JSON.parse(JSON.stringify(blocks))
-                const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, newUrl)
-                updateBlock(blockIndex, nextBlock)
+            if (block && fieldPath && !hasArrayIndex) {
+                // When path descends into a Payload upload object (e.g. ['image','url']),
+                // truncate to the upload field and store newMediaId — otherwise save would
+                // re-extract the old id from { id: old, url: new } via normalizeUploadField.
+                const uploadAncestorIdx = fieldPath.findIndex(
+                    seg => typeof seg === 'string' && UPLOAD_FIELD_SET.has(seg as string)
+                )
+                if (uploadAncestorIdx >= 0) {
+                    const truncatedPath = fieldPath.slice(0, uploadAncestorIdx + 1)
+                    const nextBlock = updateValueAtPath(block as Record<string, unknown>, truncatedPath, newMediaId)
+                    updateBlock(blockIndex, nextBlock)
+                } else {
+                    const nextBlock = updateValueAtPath(block as Record<string, unknown>, fieldPath, newUrl)
+                    updateBlock(blockIndex, nextBlock)
+                }
             } else if (block) {
                 // Strategy 2: Find image/upload field by name convention
                 // Payload upload fields: image, backgroundImage, posterImage, logo, avatar, etc.
@@ -638,6 +656,8 @@ function PreviewFrameInner({
                 const IMAGE_FIELD_NAMES = ['image', 'backgroundImage', 'background_image', 'posterImage', 'logo', 'avatar', 'thumbnail']
                 const blockData = block as Record<string, unknown>
                 let matched = false
+
+                if (!hasArrayIndex) {
 
                 // Try matching: non-null fields first (ID or populated object with matching URL)
                 for (const fieldName of IMAGE_FIELD_NAMES) {
@@ -703,9 +723,11 @@ function PreviewFrameInner({
                 }
 
                 // Strategy 5: Partial URL match in nested strings
-                if (!matched) {
+                // Skip for gallery with imageIndex — Strategy 6 handles that case exclusively
+                // to avoid empty-string caption fields matching any URL (target.includes('') === true).
+                if (!matched && !(imageClickData.blockType === 'gallery' && imageClickData.imageIndex !== undefined)) {
                     const findPartialPath = (obj: unknown, target: string, path: Array<string | number> = []): Array<string | number> | null => {
-                        if (typeof obj === 'string' && (target.includes(obj) || obj.includes(target))) return path
+                        if (typeof obj === 'string' && obj.length > 0 && (target.includes(obj) || obj.includes(target))) return path
                         if (Array.isArray(obj)) {
                             for (let i = 0; i < obj.length; i++) {
                                 const p = findPartialPath(obj[i], target, [...path, i])
@@ -724,6 +746,61 @@ function PreviewFrameInner({
                     if (partialPath) {
                         const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
                         updateBlock(blockIndex, nextBlock)
+                        matched = true
+                    }
+                }
+                } // end !hasArrayIndex (Strategies 2–5)
+
+                // Strategy 6: Gallery fallback — use data-image-index to target array slot directly
+                // Non-destructive: reads current images from Zustand store, only updates the clicked slot.
+                // Pre-fills null slots up to totalImagesInBlock so existing stock placeholders are preserved
+                // as null entries (gallery will show real images where set, otherwise falls back per-slot).
+                // Must use newMediaId (numeric Payload media ID) — normalizeUploadField strips objects
+                // without .id to null before persistence.
+                if (!matched && imageClickData.imageIndex !== undefined && imageClickData.blockType === 'gallery') {
+                    const idx = imageClickData.imageIndex
+                    const currentBlock = blocks[blockIndex] as Record<string, unknown>
+                    const currentImages = Array.isArray(currentBlock.images)
+                        ? [...currentBlock.images as Array<Record<string, unknown>>]
+                        : []
+                    const totalSlots = Math.max(
+                        imageClickData.totalImagesInBlock ?? 0,
+                        idx + 1,
+                        currentImages.length
+                    )
+                    while (currentImages.length < totalSlots) {
+                        currentImages.push({ image: null, caption: '' })
+                    }
+                    currentImages[idx] = { ...currentImages[idx], image: newMediaId }
+                    updateBlock(blockIndex, { images: currentImages })
+                    matched = true
+                }
+
+                // Strategy 7: Universal array-image handler for all other blocks with imageIndex.
+                // All use upload fields (numeric Payload media ID) — imageUrl string fields were a mismatch
+                // vs Pages.ts schema which defines image: upload for carousel and portfolio-grid items.
+                if (!matched && imageClickData.imageIndex !== undefined) {
+                    const ARRAY_IMAGE_CONFIG: Record<string, { arrayField: string; imageSubField: string }> = {
+                        carousel:         { arrayField: 'items',        imageSubField: 'image' },
+                        'portfolio-grid': { arrayField: 'projects',     imageSubField: 'image' },
+                        team:             { arrayField: 'members',      imageSubField: 'image' },
+                        testimonials:     { arrayField: 'testimonials', imageSubField: 'avatar' },
+                        'social-proof':   { arrayField: 'reviews',      imageSubField: 'avatar' },
+                        'logo-cloud':     { arrayField: 'logos',        imageSubField: 'logo'   },
+                    }
+                    const arrayConfig = ARRAY_IMAGE_CONFIG[imageClickData.blockType]
+                    if (arrayConfig) {
+                        const idx = imageClickData.imageIndex
+                        const currentBlock = blocks[blockIndex] as Record<string, unknown>
+                        const currentArray = Array.isArray(currentBlock[arrayConfig.arrayField])
+                            ? [...currentBlock[arrayConfig.arrayField] as Array<Record<string, unknown>>]
+                            : []
+                        // Pad array to idx if block has fewer items than rendered fallback slots
+                        while (currentArray.length <= idx) {
+                            currentArray.push({} as Record<string, unknown>)
+                        }
+                        currentArray[idx] = { ...currentArray[idx], [arrayConfig.imageSubField]: newMediaId }
+                        updateBlock(blockIndex, { [arrayConfig.arrayField]: currentArray })
                         matched = true
                     }
                 }
@@ -1311,7 +1388,7 @@ function PreviewFrameInner({
                         <ImageToolbar 
                             onImageSelect={handleImageReplace} 
                             isProcessing={isImageProcessing}
-                            onAiGenerate={() => { toast.info(t.editor.preview.aiContextLocked.replace('{blockType}', imageClickData.blockType)) }} 
+                             
                         />
                     </div>
                 )

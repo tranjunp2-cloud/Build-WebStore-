@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, type ReactNode } from 'react'
-import { ImagePlus, Sparkles, Loader2, Film } from 'lucide-react'
+import { ImagePlus, Loader2, Film } from 'lucide-react'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 
 const parentToast = {
@@ -41,6 +41,7 @@ export function HeroMediaOverlay({
     const videoFileRef = useRef<HTMLInputElement>(null)
     const [uploading, setUploading] = useState(false)
     const [isTextEditing, setIsTextEditing] = useState(false)
+    const [isHovered, setIsHovered] = useState(false)
 
     useEffect(() => {
         let textEditingTarget: EventTarget | null = null
@@ -65,6 +66,22 @@ export function HeroMediaOverlay({
             document.removeEventListener('focusout', onFocusout)
         }
     }, [])
+
+    // Track hover on the parent element (section) so the toolbar shows even when sibling
+    // content divs (e.g. glass card in cards-overlay) sit on top and intercept mouse events.
+    useEffect(() => {
+        if (!isOwner || !callback) return
+        const parent = containerRef.current?.parentElement
+        if (!parent) return
+        const onEnter = () => setIsHovered(true)
+        const onLeave = () => setIsHovered(false)
+        parent.addEventListener('mouseenter', onEnter)
+        parent.addEventListener('mouseleave', onLeave)
+        return () => {
+            parent.removeEventListener('mouseenter', onEnter)
+            parent.removeEventListener('mouseleave', onLeave)
+        }
+    }, [isOwner, callback])
 
     if (!isOwner || !callback) return <>{children}</>
 
@@ -136,9 +153,8 @@ export function HeroMediaOverlay({
             <div
                 data-editor-control
                 className={[
-                    'absolute inset-0 z-10 bg-black/0 transition-colors duration-200 flex items-start justify-end p-2',
-                    'opacity-0 pointer-events-none',
-                    !isTextEditing && 'group-hover/media-overlay:bg-black/30 group-hover/media-overlay:opacity-100 group-hover/media-overlay:pointer-events-auto',
+                    'absolute inset-0 z-10 transition-colors duration-200 flex items-start justify-end p-2',
+                    isHovered && !isTextEditing ? 'bg-black/30 opacity-100 pointer-events-auto' : 'bg-black/0 opacity-0 pointer-events-none',
                 ].filter(Boolean).join(' ')}
             >
                 <div data-editor-control className="flex items-center gap-1 bg-[#1E293B] border border-white/10 shadow-2xl rounded-lg p-1.5">
@@ -158,19 +174,6 @@ export function HeroMediaOverlay({
                                     <ImagePlus className="w-4 h-4" />
                                     Change Image
                                 </button>
-                            )}
-                            {!showVideoButton && (
-                                <>
-                                    <div className="w-px h-5 bg-white/10 mx-1" />
-                                    <button
-                                        type="button"
-                                        onClick={() => parentToast.info('AI image generation coming soon')}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-400 hover:bg-cyan-400/10 rounded transition-colors"
-                                    >
-                                        <Sparkles className="w-4 h-4" />
-                                        Generate AI Image
-                                    </button>
-                                </>
                             )}
                             {showVideoButton && videoField && (
                                 <button
