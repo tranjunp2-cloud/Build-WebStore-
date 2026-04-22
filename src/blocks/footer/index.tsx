@@ -46,6 +46,9 @@ const FOOTER_BRAND_GRADIENT_STOP = 0.502
 
 // Progressive gap: tight mobile → comfortable desktop. Applied to all grid variants.
 const FOOTER_RESPONSIVE_GAP = 'gap-6 sm:gap-8 md:gap-10'
+// Tailwind JIT-safe lookup — dynamic class strings are not detected at build time.
+// md:grid-cols-1 md:grid-cols-2 md:grid-cols-3 md:grid-cols-4 md:grid-cols-5 md:grid-cols-6
+const FOOTER_MD_COLS: Record<number, string> = { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4', 5: 'md:grid-cols-5', 6: 'md:grid-cols-6' }
 
 type FooterSectionProps = {
     paddingClass: string
@@ -167,8 +170,8 @@ type SocialIconListProps = {
  * tap area đạt chuẩn mobile.
  */
 const SOCIAL_BUTTON_SIZE = {
-    sm: 'w-11 h-11',
-    md: 'w-11 h-11',
+    sm: 'w-7 h-7',
+    md: 'w-8 h-8',
 } as const
 
 /**
@@ -190,7 +193,7 @@ function SocialIconList({ socials, iconSize = 'md', className = '' }: SocialIcon
                         aria-label={aria}
                         target={social.url?.startsWith('http') ? '_blank' : undefined}
                         rel={social.url?.startsWith('http') ? 'noopener noreferrer' : undefined}
-                        className={`${sizeCls} ${TOUCH_TARGET.min} rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)]`}
+                        className={`${sizeCls} aspect-square shrink-0 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)]`}
                         style={{
                             background: `rgba(var(--brand-primary-rgb), ${FOOTER_DIVIDER_OPACITY})`,
                             border: `1px solid rgba(var(--brand-primary-rgb), ${FOOTER_BORDER_OPACITY})`,
@@ -525,13 +528,12 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     }
 
     // ── Default: simple ──────────────────────────────────────────────────
-    // Plan 260415 Lỗi D — grid responsive sm:grid-cols-2 md:grid-cols-4 (bỏ
-    // md 2-col trung gian vì 4 cột đều hơn với 1 brand + 3 link cols).
+    const mdColsCls = FOOTER_MD_COLS[Math.min(Math.max(columns.length + 1, 1), 6)] ?? 'md:grid-cols-1'
     return (
         <FooterSection paddingClass="pt-16 md:pt-20 pb-8" style={footerStyle}>
-            <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 ${FOOTER_RESPONSIVE_GAP} mb-16`}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${mdColsCls} ${FOOTER_RESPONSIVE_GAP} mb-16`}>
                 {/* Brand Column */}
-                <div className="sm:col-span-2 md:col-span-1">
+                <div>
                     <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4" />
                     {tagline && (
                         <Body size="small" className="opacity-70 leading-relaxed max-w-xs">{tagline}</Body>
