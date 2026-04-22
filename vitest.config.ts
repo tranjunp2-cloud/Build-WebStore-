@@ -106,6 +106,14 @@ export default defineConfig({
                 'src/app/(frontend)/onboarding/OnboardingClient.tsx',
                 // Hooks requiring React render context — tested via component/E2E
                 'src/hooks/**',
+                // Studio admin UI — super-admin only, tested via E2E + manual QA
+                'src/app/studio/**',
+                // Admin API routes — super-admin gated, tested via integration + E2E
+                'src/app/api/admin/**',
+                // Preview SSR route — iframe preview, tested via E2E visual diff
+                'src/app/(preview)/**',
+                // Admin helpers — registry reader + loaders, tested via admin routes + E2E
+                'src/lib/admin/**',
             ],
             thresholds: {
                 // CI fails if coverage drops below these minimums

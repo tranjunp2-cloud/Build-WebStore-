@@ -42,3 +42,6 @@ export const portfolioGridMeta = {
     quickActions: ['Add project', 'Change layout', 'Edit categories'],
     aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = PortfolioGridConfigSchema

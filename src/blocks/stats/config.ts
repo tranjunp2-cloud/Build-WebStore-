@@ -36,3 +36,6 @@ export const statsMeta = {
     editableFields: ['headline', 'stats'],
     quickActions: ['Add stat', 'Update numbers'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = StatsConfigSchema

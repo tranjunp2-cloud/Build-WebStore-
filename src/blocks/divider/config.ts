@@ -7,3 +7,6 @@ export const DividerConfigSchema = BaseBlockSchema.extend({
     height: z.number().default(40), color: z.string().optional(),
 })
 export const dividerMeta = { type: 'divider' as const, name: 'Divider', description: 'Visual separator between sections', icon: '➖', variants: ['line', 'dots', 'wave', 'spacer'], defaultVariant: 'line', editableFields: ['height', 'color'], quickActions: ['Change style'], aiVisible: false }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = DividerConfigSchema

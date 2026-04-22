@@ -48,3 +48,6 @@ export const videoShowcaseMeta = {
     quickActions: ['Add video', 'Filter categories', 'Toggle autoplay'],
     aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = VideoShowcaseConfigSchema

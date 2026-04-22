@@ -12,3 +12,6 @@ export const SocialProofConfigSchema = BaseBlockSchema.extend({
     })).default([]),
 })
 export const socialProofMeta = { type: 'social-proof' as const, name: 'Social Proof', description: 'Customer reviews with star ratings and avatars', icon: '⭐', variants: ['cards', 'minimal', 'grid'], defaultVariant: 'cards', editableFields: ['headline', 'reviews'], quickActions: ['Add review', 'Change layout'], aiVisible: false }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = SocialProofConfigSchema

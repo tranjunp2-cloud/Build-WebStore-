@@ -42,3 +42,6 @@ export const carouselMeta = {
     quickActions: ['Add slide', 'Toggle autoplay', 'Change layout'],
     aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = CarouselConfigSchema

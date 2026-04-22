@@ -22,3 +22,6 @@ export const productsGridMeta: BlockMeta = {
     editableFields: ['headline', 'subheadline', 'limit', 'category'],
     quickActions: ['change-limit'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = ProductsGridConfigSchema

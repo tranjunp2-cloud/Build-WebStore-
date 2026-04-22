@@ -10,3 +10,6 @@ export const FooterConfigSchema = BaseBlockSchema.extend({
     copyrightText: z.string().optional(), backgroundColor: z.string().optional(), socials: z.array(z.object({ platform: z.string(), url: z.string() })).optional(),
 })
 export const footerMeta = { type: 'footer' as const, name: 'Footer', description: 'Site footer with links, social media, and copyright', icon: '🔻', variants: ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient'], defaultVariant: 'simple', editableFields: ['logoText', 'tagline', 'columns', 'copyrightText', 'socials'], quickActions: ['Add column', 'Add social links'] }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = FooterConfigSchema

@@ -49,3 +49,6 @@ export const reviewCardsMeta = {
     editableFields: ['headline', 'subheadline', 'reviews', 'showAverage', 'totalReviewCount'],
     quickActions: ['Add review', 'Sort by rating', 'Toggle average'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = ReviewCardsConfigSchema

@@ -289,6 +289,14 @@ export type BuildUserPromptOptions = {
    * prompt — tells GPT the exact order of blocks to emit.
    */
   recipe?: CategoryRecipe
+  /**
+   * Phase P3 — per-template block prompt overrides.
+   * When an admin has set a custom prompt for a block in a specific template,
+   * inject it as an additional BLOCK OVERRIDES section so GPT tailors
+   * content for that block to match the override instructions.
+   * Shape: { [blockSlug]: { prompt: string } }
+   */
+  blockPromptOverrides?: Record<string, { prompt: string }>
 }
 
 export function buildUserPrompt(
@@ -302,12 +310,14 @@ export function buildUserPrompt(
   let extraInstructions: string | undefined
   let mood: ThemeMood | undefined
   let recipe: CategoryRecipe | undefined
+  let blockPromptOverrides: Record<string, { prompt: string }> | undefined
   if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
     extraInstructions = extraInstructionsOrOptions
   } else {
     extraInstructions = extraInstructionsOrOptions.extraInstructions
     mood = extraInstructionsOrOptions.mood
     recipe = extraInstructionsOrOptions.recipe
+    blockPromptOverrides = extraInstructionsOrOptions.blockPromptOverrides
     if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
     if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
   }
@@ -360,6 +370,20 @@ export function buildUserPrompt(
     parts.push(
       `\nRHYTHM: ${recipe.label} (${recipe.rhythm})\nBlock sequence: ${sequence}\nRequired blocks (must be present): ${required}\nRationale: ${recipe.description}\nIMPORTANT: Emit blocks in this exact order. You may omit optional blocks but do not reorder them.`,
     )
+  }
+
+  // Phase P3 — inject per-block prompt overrides when present.
+  // Each override is appended as a targeted instruction so GPT tailors content
+  // for that specific block type. Skipped for reference-prompt path (recreation
+  // mode should follow the source content, not custom prompts).
+  if (!referencePrompt && blockPromptOverrides) {
+    const overrideEntries = Object.entries(blockPromptOverrides).filter(([, v]) => v?.prompt?.trim())
+    if (overrideEntries.length > 0) {
+      const lines = overrideEntries.map(([slug, v]) => `  - **${slug}**: ${v.prompt.trim()}`)
+      parts.push(
+        `\nBLOCK OVERRIDES (apply these specific instructions when generating each named block):\n${lines.join('\n')}`,
+      )
+    }
   }
 
   // Append reference content from ContentBrief (URL/Image extraction)

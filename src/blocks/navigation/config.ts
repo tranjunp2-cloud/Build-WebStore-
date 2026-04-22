@@ -52,3 +52,6 @@ export const navigationMeta = {
     editableFields: ['logoText', 'links', 'ctaButton'],
     quickActions: ['Add link', 'Change logo', 'Toggle CTA'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = NavigationConfigSchema
