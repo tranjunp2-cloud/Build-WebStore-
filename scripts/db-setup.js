@@ -3411,6 +3411,33 @@ const MIGRATIONS = [
       ADD COLUMN IF NOT EXISTS fields_filled integer,
       ADD COLUMN IF NOT EXISTS fields_edited integer DEFAULT 0;`,
   },
+
+  // ── Pages: Data cleanup for F05 Footer variants ──
+  // Migrate legacy variant values to the new supported values cleanly in the database
+  {
+    name: 'pages_blocks_footer.data_migration_variants',
+    sql: `
+      UPDATE pages_blocks_footer SET variant = 'simple' WHERE variant = 'expanded';
+      UPDATE pages_blocks_footer SET variant = 'dark-gradient' WHERE variant = 'mega-footer';
+      UPDATE _pages_v_blocks_footer SET variant = 'simple' WHERE variant = 'expanded';
+      UPDATE _pages_v_blocks_footer SET variant = 'dark-gradient' WHERE variant = 'mega-footer';
+      
+      -- Update Global Site Footers stored in JSONB
+      UPDATE sites 
+      SET footer_block = (REPLACE(REPLACE(footer_block::text, '"variant":"expanded"', '"variant":"simple"'), '"variant":"mega-footer"', '"variant":"dark-gradient"'))::jsonb
+      WHERE footer_block IS NOT NULL;
+      
+      -- Update Template Layouts stored in JSONB
+      UPDATE templates_template_pages
+      SET layout = (REPLACE(REPLACE(layout::text, '"variant":"expanded"', '"variant":"simple"'), '"variant":"mega-footer"', '"variant":"dark-gradient"'))::jsonb
+      WHERE layout IS NOT NULL;
+      
+      -- Update Template Version Snapshots stored in JSONB
+      UPDATE template_versions
+      SET sections_snapshot = (REPLACE(REPLACE(sections_snapshot::text, '"variant":"expanded"', '"variant":"simple"'), '"variant":"mega-footer"', '"variant":"dark-gradient"'))::jsonb
+      WHERE sections_snapshot IS NOT NULL;
+    `,
+  },
 ];
 
 async function runMigrations(pool) {
