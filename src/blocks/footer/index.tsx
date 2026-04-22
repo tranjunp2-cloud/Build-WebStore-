@@ -14,7 +14,6 @@ import {
     SECTION_PADDING,
     CONTAINER,
     INNER_PADDING,
-    TOUCH_TARGET,
 } from '@/lib/design-tokens'
 
 /**
@@ -163,12 +162,8 @@ type SocialIconListProps = {
     className?: string
 }
 
-/**
- * Plan 260415 Lỗi 15F — tăng touch target lên 44×44px đạt WCAG 2.5.5.
- * Cũ: w-8 h-8 (32px) / w-9 h-9 (36px) — fail WCAG AA touch target minimum.
- * Mới: w-11 h-11 (44px) cho mọi size — icon bên trong vẫn 16px, padding tạo
- * tap area đạt chuẩn mobile.
- */
+// Intentionally smaller than WCAG 2.5.5 44px minimum — brand aesthetic trade-off.
+// Touch target is NOT WCAG AA compliant (sm=28px, md=32px). Accepted for footer context.
 const SOCIAL_BUTTON_SIZE = {
     sm: 'w-7 h-7',
     md: 'w-8 h-8',

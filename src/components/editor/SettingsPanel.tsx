@@ -796,7 +796,7 @@ function SettingsPanelInner({
                                         <input
                                             ref={footerLogoRef}
                                             type="file"
-                                            accept="image/jpeg,image/png,image/webp"
+                                            accept="image/jpeg,image/png"
                                             className="hidden"
                                             onChange={handleFooterLogoUpload}
                                         />
@@ -903,7 +903,7 @@ function SettingsPanelInner({
                             <label className={labelCls}>Background Color</label>
                             <div className="mt-1.5 flex gap-2">
                                 <Input
-                                    key={`footer-bgcolor-${fbk}`}
+                                    key={`footer-bgcolor-${fbk}-${(footerBlock?.backgroundColor as string) || ''}`}
                                     defaultValue={(footerBlock?.backgroundColor as string) || ''}
                                     placeholder="#0f172a"
                                     onBlur={(e: FieldBlurEvent) => onFooterUpdate?.({ backgroundColor: e.target.value.trim() || undefined })}
