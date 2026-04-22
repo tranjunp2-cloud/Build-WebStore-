@@ -1290,6 +1290,34 @@ const MIGRATIONS = [
     sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS push_subscriptions_id integer;`,
   },
   {
+    name: 'payload_locked_documents_rels.template_quality_scores_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS template_quality_scores_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.block_catalog_entries_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS block_catalog_entries_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.block_variants_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS block_variants_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.ai_generation_records_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS ai_generation_records_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.template_issues_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS template_issues_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.content_packs_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS content_packs_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.template_versions_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS template_versions_id integer;`,
+  },
+  {
     name: 'payload_preferences_rels.notifications_id',
     sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS notifications_id integer;`,
   },
