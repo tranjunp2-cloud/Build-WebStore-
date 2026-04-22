@@ -341,6 +341,9 @@ export default function EditorPage() {
         if (!siteId || !hasUnsavedChanges || !autoSaveEnabled || templateApplied) return
 
         const timer = window.setTimeout(() => {
+            // Skip if user is currently inline editing — the TEXT_EDITING_STOPPED
+            // pipeline saves the final state and avoids overwriting partial edits.
+            if (useEditorStore.getState().isInlineEditing) return
             void handleSave({ showToast: false, refreshPreview: true })
         }, autoSaveIntervalMs)
 
@@ -1127,6 +1130,9 @@ export default function EditorPage() {
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
                             onPageNavigate={handlePageSelected}
+                            onInlineEditSave={async () => {
+                                await handleSave({ showToast: false, refreshPreview: true })
+                            }}
                         />
                     </div>
 

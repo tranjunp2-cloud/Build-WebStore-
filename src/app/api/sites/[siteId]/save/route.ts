@@ -155,15 +155,20 @@ export async function PATCH(
                     requestedPage = await payload.findByID({
                         collection: 'pages',
                         id: pageId,
+                        draft: true,
                     })
                 } catch {
-                    // Page not found — fall through to homepage
+                    // Page not found
                 }
                 const requestedPageSiteId =
                     typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
 
                 if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
                     page = requestedPage
+                } else {
+                    // pageId was specified but page not found or belongs to different site —
+                    // refuse rather than silently saving to the homepage (data integrity)
+                    return NextResponse.json({ error: 'Page not found', pageId }, { status: 404 })
                 }
             }
 
@@ -175,6 +180,7 @@ export async function PATCH(
                         isHomepage: { equals: true },
                     },
                     limit: 1,
+                    draft: true,
                 })
 
                 if (pagesResult.docs.length === 0) {
@@ -182,6 +188,7 @@ export async function PATCH(
                         collection: 'pages',
                         where: { site: { equals: numericSiteId } },
                         limit: 1,
+                        draft: true,
                     })
                 }
 

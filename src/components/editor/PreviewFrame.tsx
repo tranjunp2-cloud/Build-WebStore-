@@ -30,6 +30,8 @@ interface PreviewFrameProps {
     onPageNavigate?: (pageId: string) => void
     onBlockAIEdit?: (blockIndex: number, blockType: string) => void
     disableDragDrop?: boolean
+    /** Called after inline text editing stops — should save + reload preview. */
+    onInlineEditSave?: () => Promise<boolean | void>
 }
 
 type HoverRect = {
@@ -188,6 +190,13 @@ function getValueAtPath(source: Record<string, unknown>, path: Array<string | nu
     return cursor
 }
 
+type InlineEditPayload = {
+    blockIndex: number
+    searchKey: string
+    oldHtml?: string
+    newHtml: string
+}
+
 function PreviewFrameInner({
     siteId,
     pageId,
@@ -204,11 +213,14 @@ function PreviewFrameInner({
     onPageNavigate,
     onBlockAIEdit,
     disableDragDrop = false,
+    onInlineEditSave,
 }: PreviewFrameProps) {
     const { t } = useI18n()
-    const { blocks, updateBlock, performSave, theme: storeTheme } = useEditorStore()
+    const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
     const blocksRef = useRef(blocks)
     useEffect(() => { blocksRef.current = blocks }, [blocks])
+    const onInlineEditSaveRef = useRef(onInlineEditSave)
+    useEffect(() => { onInlineEditSaveRef.current = onInlineEditSave }, [onInlineEditSave])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
 
@@ -283,10 +295,43 @@ function PreviewFrameInner({
     const isHoveringControlsRef = useRef<boolean>(false)
     const textEditStopTimerRef = useRef<number | null>(null)
     const currentLiveTextRef = useRef<string | null>(null)
+    const pendingInlineEditRef = useRef<InlineEditPayload | null>(null)
     const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
     useEffect(() => {
         latestBlockLayoutsRef.current = blockLayouts
     }, [blockLayouts])
+
+    const applyInlineEditPayload = useCallback((payload: InlineEditPayload | null) => {
+        if (!payload) return false
+
+        const { blockIndex, searchKey, oldHtml, newHtml } = payload
+        if (newHtml === undefined || Number.isNaN(blockIndex)) return false
+
+        const currentBlocks = blocksRef.current
+        const block = currentBlocks[blockIndex]
+        const matchHtml = oldHtml ?? searchKey
+        const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, matchHtml) : null
+        if (!fieldPath || !block) return false
+
+        const originalValue = String(getValueAtPath(block, fieldPath) ?? '')
+        const originalHasHeadingWrapper = /^<h[1-6][\s>]/i.test(originalValue.trim())
+        const originalWrapsPlainText = originalHasHeadingWrapper &&
+            /^<h[1-6](?:\s[^>]*)?>([^<]*)<\/h[1-6]>$/i.test(originalValue.trim())
+
+        currentLiveTextRef.current = newHtml
+        let valueToSave = newHtml
+        if (!originalHasHeadingWrapper || originalWrapsPlainText) {
+            const headingMatch = newHtml.match(/^<(h[1-6])(?:\s[^>]*)?>([\s\S]+?)<\/\1>$/i)
+            if (headingMatch) valueToSave = headingMatch[2]
+        }
+
+        if (originalValue === valueToSave) return true
+
+        const clone = JSON.parse(JSON.stringify(currentBlocks))
+        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, valueToSave)
+        updateBlock(blockIndex, nextBlock)
+        return true
+    }, [updateBlock])
 
     const syncDragPosition = useCallback((clientY: number, sourceIndex?: number) => {
         if (!frameElement) return
@@ -436,6 +481,14 @@ function PreviewFrameInner({
                     clearTimeout(textEditStopTimerRef.current)
                     textEditStopTimerRef.current = null
                 }
+                // Suspend all auto-saves while inline editing is active.
+                // Also clear any pending timer that carries stale blocks from before this session.
+                setIsInlineEditing(true)
+                const { autoSaveTimer: pendingStoreTimer } = useEditorStore.getState()
+                if (pendingStoreTimer) {
+                    clearTimeout(pendingStoreTimer)
+                    useEditorStore.setState({ autoSaveTimer: null })
+                }
                 const startScrollY = e.data.scrollY ?? 0
                 setIframeScrollY(startScrollY)
                 setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex, blockType: e.data.blockType ?? '', originalText: e.data.originalText ?? '', scrollYAtStart: startScrollY })
@@ -447,44 +500,24 @@ function PreviewFrameInner({
                     if (document.activeElement?.closest('[data-wysiwyg-toolbar]')) {
                         return
                     }
-                    setTextEditingData(null)
                     currentLiveTextRef.current = null
-                    performSave(true)
+                    applyInlineEditPayload(pendingInlineEditRef.current)
+                    // Save FIRST (blocks already updated by TEXT_EDITED), then resume
+                    // auto-saves and unfreeze iframe so it reloads with the just-saved data.
+                    // Prefer onInlineEditSave (component's handleSave) — it bypasses the
+                    // isSaving guard that can block performSave when a concurrent save is in flight.
+                    void (onInlineEditSaveRef.current?.() ?? performSave(true)).finally(() => {
+                        pendingInlineEditRef.current = null
+                        setIsInlineEditing(false)
+                        setTextEditingData(null)
+                    })
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
-                const { searchKey, newHtml, blockIndex } = e.data
+                const { searchKey, oldHtml, newHtml, blockIndex } = e.data
                 if (newHtml !== undefined) {
-                    const currentBlocks = blocksRef.current
-                    const block = currentBlocks[blockIndex]
-                    const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, searchKey) : null
-                    if (fieldPath && block) {
-                        const originalValue = String(getValueAtPath(block, fieldPath) ?? '')
-                        // Only keep a heading wrapper if the original field already stored one (RichText
-                        // pattern like "<h2>Title</h2>"). For all other fields — plain text, bold/italic
-                        // inline HTML, etc. — the block component provides the heading tag itself, so
-                        // storing <hX> causes it to render as literal text.
-                        const originalHasHeadingWrapper = /^<h[1-6][\s>]/i.test(originalValue.trim())
-
-                        // Secondary check: if the original value stores a heading wrapper around
-                        // plain text (e.g. template data `<h4 style="...">Jennifer Ooi</h4>` in a
-                        // plain-text field like `member.name`), treat it as a plain-text field and
-                        // strip the wrapper on save. Without this, each edit re-adds a heading
-                        // wrapper, producing accumulating nesting: `<h4><h4>...</h4></h4>`.
-                        // A "wrapper around plain text" = the inner content contains no child tags.
-                        const originalWrapsPlainText = originalHasHeadingWrapper &&
-                            /^<h[1-6](?:\s[^>]*)?>([^<]*)<\/h[1-6]>$/i.test(originalValue.trim())
-
-                        currentLiveTextRef.current = newHtml
-                        let valueToSave = newHtml
-                        if (!originalHasHeadingWrapper || originalWrapsPlainText) {
-                            const headingMatch = newHtml.match(/^<(h[1-6])(?:\s[^>]*)?>([\s\S]+?)<\/\1>$/i)
-                            if (headingMatch) valueToSave = headingMatch[2]
-                        }
-
-                        const clone = JSON.parse(JSON.stringify(currentBlocks))
-                        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, valueToSave)
-                        updateBlock(blockIndex, nextBlock)
-                    }
+                    const payload: InlineEditPayload = { blockIndex, searchKey, oldHtml, newHtml }
+                    pendingInlineEditRef.current = payload
+                    applyInlineEditPayload(payload)
                 }
             } else if (e.data?.type === 'IFRAME_SCROLL') {
                 const scrollY = e.data.scrollY ?? 0
@@ -522,7 +555,7 @@ function PreviewFrameInner({
             window.removeEventListener('message', handleMessage)
         }
     // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
-    }, [cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, setIsEditing, updateBlock])
+    }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, setIsEditing, updateBlock])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
