@@ -541,12 +541,13 @@ describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 back
     it('TC-F05-save-17: non-footer block with "expanded" variant is NOT aliased by footer guard', () => {
         // Arrange — 'expanded' on a hero block should NOT be aliased as footer logic
         // (sanitizeBlockVariant handles coercion for non-footer blocks separately)
-        const blocks = [{ blockType: 'hero', variant: 'centered', columns: [] }]
+        const blocks = [{ blockType: 'hero', variant: 'expanded', columns: [] }]
 
         // Act
         const result = normalizeBlocksForPersistence(blocks)
 
-        // Assert — hero variant untouched by footer alias guard
+        // Assert — footer alias guard skips non-footer blocks; sanitizeBlockVariant
+        // then coerces 'expanded' (invalid for hero) to hero's default 'centered'.
         expect(result[0].variant).toBe('centered')
     })
 })

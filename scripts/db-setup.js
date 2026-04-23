@@ -3422,20 +3422,60 @@ const MIGRATIONS = [
       UPDATE _pages_v_blocks_footer SET variant = 'simple' WHERE variant = 'expanded';
       UPDATE _pages_v_blocks_footer SET variant = 'dark-gradient' WHERE variant = 'mega-footer';
       
-      -- Update Global Site Footers stored in JSONB
-      UPDATE sites 
-      SET footer_block = (REPLACE(REPLACE(footer_block::text, '"variant":"expanded"', '"variant":"simple"'), '"variant":"mega-footer"', '"variant":"dark-gradient"'))::jsonb
-      WHERE footer_block IS NOT NULL;
-      
-      -- Update Template Layouts stored in JSONB
+      -- Update Global Site Footers stored in JSONB (single block object — direct jsonb_set)
+      UPDATE sites
+      SET footer_block = CASE
+        WHEN footer_block->>'variant' = 'expanded'    THEN jsonb_set(footer_block, '{variant}', '"simple"')
+        WHEN footer_block->>'variant' = 'mega-footer' THEN jsonb_set(footer_block, '{variant}', '"dark-gradient"')
+        ELSE footer_block
+      END
+      WHERE footer_block IS NOT NULL
+        AND footer_block->>'variant' IN ('expanded', 'mega-footer');
+
+      -- Update Template Layouts stored in JSONB (mixed-block array — only touch footer blocks)
+      -- COALESCE guards against jsonb_agg returning NULL on empty arrays ([] → [] not NULL)
+      -- jsonb_typeof guard prevents error if layout is not an array (scalar/object)
       UPDATE templates_template_pages
-      SET layout = (REPLACE(REPLACE(layout::text, '"variant":"expanded"', '"variant":"simple"'), '"variant":"mega-footer"', '"variant":"dark-gradient"'))::jsonb
-      WHERE layout IS NOT NULL;
-      
-      -- Update Template Version Snapshots stored in JSONB
+      SET layout = COALESCE(
+        (
+          SELECT jsonb_agg(
+            CASE
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'expanded'
+                THEN jsonb_set(elem, '{variant}', '"simple"')
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'mega-footer'
+                THEN jsonb_set(elem, '{variant}', '"dark-gradient"')
+              ELSE elem
+            END
+          )
+          FROM jsonb_array_elements(layout) AS elem
+        ),
+        '[]'::jsonb
+      )
+      WHERE layout IS NOT NULL
+        AND jsonb_typeof(layout) = 'array'
+        AND layout::text LIKE '%"blockType":"footer"%';
+
+      -- Update Template Version Snapshots stored in JSONB (mixed-block array — only touch footer blocks)
+      -- Same COALESCE + jsonb_typeof guards as above
       UPDATE template_versions
-      SET sections_snapshot = (REPLACE(REPLACE(sections_snapshot::text, '"variant":"expanded"', '"variant":"simple"'), '"variant":"mega-footer"', '"variant":"dark-gradient"'))::jsonb
-      WHERE sections_snapshot IS NOT NULL;
+      SET sections_snapshot = COALESCE(
+        (
+          SELECT jsonb_agg(
+            CASE
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'expanded'
+                THEN jsonb_set(elem, '{variant}', '"simple"')
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'mega-footer'
+                THEN jsonb_set(elem, '{variant}', '"dark-gradient"')
+              ELSE elem
+            END
+          )
+          FROM jsonb_array_elements(sections_snapshot) AS elem
+        ),
+        '[]'::jsonb
+      )
+      WHERE sections_snapshot IS NOT NULL
+        AND jsonb_typeof(sections_snapshot) = 'array'
+        AND sections_snapshot::text LIKE '%"blockType":"footer"%';
     `,
   },
 ];
