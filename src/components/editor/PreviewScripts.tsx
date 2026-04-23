@@ -87,16 +87,20 @@ export function PreviewScripts() {
                 }, parentOrigin)
             }
 
-            if (target.tagName === 'IMG') {
+            // Detect both real <img> and non-img placeholder elements (e.g. InitialsAvatar, LogoPlaceholder)
+            // that carry data-image-index so they can also trigger image-replace in the editor.
+            const imgEl = target.tagName === 'IMG' ? target
+                : (target.getAttribute('data-image-index') !== null ? target : null)
+            if (imgEl) {
                 const imgBlockType = blockContainer.getAttribute('data-block-type') || ''
                 if (!imageReadOnlyBlockTypes.has(imgBlockType)) {
                     if (hoverTimer) clearTimeout(hoverTimer)
                     hoverTimer = window.setTimeout(() => {
-                        const rect = target.getBoundingClientRect()
+                        const rect = imgEl.getBoundingClientRect()
                         window.parent.postMessage({
                             type: 'IMAGE_HOVERED',
                             rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-                            src: (target as HTMLImageElement).src,
+                            src: imgEl.tagName === 'IMG' ? (imgEl as HTMLImageElement).src : '',
                             blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10),
                             blockType: imgBlockType
                         }, parentOrigin)
@@ -279,6 +283,8 @@ export function PreviewScripts() {
                 target = target.parentElement!
             }
             if (!target || target === blockContainer || !validTags.includes(target.tagName)) return
+            // Skip image-placeholder elements — clicking them triggers image-replace, not text-edit
+            if (target.getAttribute('data-image-index') !== null) return
             // Don't edit elements with many block-level children (sections, not text)
             const blockChildren = Array.from(target.children).filter(c =>
                 ['DIV', 'SECTION', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL'].includes(c.tagName)
@@ -384,26 +390,30 @@ export function PreviewScripts() {
                 e.preventDefault()
                 e.stopPropagation()
             }
-            if (target.tagName === 'IMG') {
+            // Also detect non-img placeholder elements (InitialsAvatar, LogoPlaceholder) via data-image-index
+            const imgEl = target.tagName === 'IMG' ? target
+                : (target.getAttribute('data-image-index') !== null ? target : null)
+            if (imgEl) {
                 e.preventDefault()
                 e.stopPropagation()
-                const blockContainer = target.closest('[data-block-index]')
+                const blockContainer = imgEl.closest('[data-block-index]')
                 if (!blockContainer) return
-                
+
                 const blockIndex = parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10)
                 const blockType = blockContainer.getAttribute('data-block-type')
-                
+
                 if (blockType && excludedBlockTypes.includes(blockType)) return
                 if (blockType && imageReadOnlyBlockTypes.has(blockType)) return
 
-                const rect = target.getBoundingClientRect()
-                const imageIndexAttr = (target as HTMLElement).getAttribute('data-image-index')
+                const rect = imgEl.getBoundingClientRect()
+                const imageIndexAttr = imgEl.getAttribute('data-image-index')
                 const imageIndex = imageIndexAttr !== null ? parseInt(imageIndexAttr, 10) : undefined
-                const totalImagesInBlock = blockContainer.querySelectorAll('img[data-image-index]').length || undefined
+                const src = imgEl.tagName === 'IMG' ? (imgEl as HTMLImageElement).src : ''
+                const totalImagesInBlock = blockContainer.querySelectorAll('[data-image-index]').length || undefined
                 window.parent.postMessage({
                     type: 'IMAGE_EDITING_STARTED',
                     rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-                    src: (target as HTMLImageElement).src,
+                    src,
                     blockIndex,
                     blockType,
                     imageIndex,

@@ -90,7 +90,7 @@ function hashHue(name: string): number {
     return hash
 }
 
-function InitialsAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
+function InitialsAvatar({ name, size = 'md', imageIndex }: { name: string; size?: 'sm' | 'md' | 'lg'; imageIndex?: number }) {
     const initials = getInitials(name)
     const hue = hashHue(name)
     const sizeCls = size === 'lg' ? 'w-32 h-32 text-3xl' : size === 'sm' ? 'w-16 h-16 text-base' : 'w-24 h-24 text-2xl'
@@ -99,6 +99,7 @@ function InitialsAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md
             className={`${sizeCls} rounded-full mx-auto mb-4 flex items-center justify-center font-bold text-white`}
             style={{ background: `hsl(${hue}, 55%, 50%)` }}
             aria-hidden="true"
+            data-image-index={imageIndex}
         >
             {initials}
         </div>
@@ -113,7 +114,7 @@ function InitialsAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md
 function MemberAvatar({ member, imageIndex }: { member: TeamMember; imageIndex?: number }) {
     const [imgError, setImgError] = useState(false)
     if (!member.image?.url || imgError) {
-        return <InitialsAvatar name={member.name} />
+        return <InitialsAvatar name={member.name} imageIndex={imageIndex} />
     }
     return (
         <img
@@ -536,6 +537,7 @@ function CompactRowVariant({
                                     className="w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold text-white"
                                     style={{ background: `hsl(${hashHue(m.name)}, 55%, 50%)` }}
                                     aria-hidden="true"
+                                    data-image-index={i}
                                 >
                                     {getInitials(m.name)}
                                 </div>
