@@ -517,7 +517,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         return await attemptSave(0)
     },
 
-    markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now(), saveStatus: 'saved' }),
+    markSaved: () => set({ hasUnsavedChanges: false, hasUnpublishedChanges: true, lastSavedAt: Date.now(), saveStatus: 'saved' }),
     markPublished: () => set({ hasUnpublishedChanges: false }),
     setIsSaving: (saving) => set({ isSaving: saving }),
 
