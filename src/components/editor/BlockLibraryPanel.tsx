@@ -2,51 +2,31 @@
 
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Search } from 'lucide-react'
-import { blockRegistry } from '@/blocks/registry'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
 import { useI18n } from '@/i18n'
+import { listAllBlocks } from '@/lib/admin/block-registry-reader'
 
-type LibraryCategoryId = 'basics' | 'store' | 'content' | 'form' | 'widgets' | 'media' | 'layout' | 'commerce'
+// ── Category display config (i18n labels + icons, Malay) ──────────────────────
 
-type CategoryConfig = {
-    id: LibraryCategoryId
-    label: string
-    icon: string
-    blockTypes: string[]
+const CATEGORY_DISPLAY: Record<string, { icon: string; label: string }> = {
+    basics:   { icon: '📦', label: 'Asas' },
+    content:  { icon: '📄', label: 'Kandungan' },
+    media:    { icon: '🖼️', label: 'Media' },
+    store:    { icon: '💼', label: 'Perniagaan' },
+    commerce: { icon: '🛒', label: 'Perdagangan' },
+    form:     { icon: '📝', label: 'Borang & Hubungi' },
+    widgets:  { icon: '🔧', label: 'Widget' },
+    layout:   { icon: '📐', label: 'Susun Atur' },
 }
 
-/** BUG-F05-021: Blocks to hide from the library panel.
- *  - Duplicate functionality (have variant replacements)
- *  - Out of scope per PRD
- *  - Missing backend / tech constraints
- *  Kept in registry for backward compatibility with existing sites. */
-const HIDDEN_BLOCKS = new Set([
-    'gallery-masonry',   // → use gallery variant=masonry
-    'pricing-table',     // → use pricing variant=table
-    'accordion',         // → use faq variant=accordion
-    'client-logos',      // → use logo-cloud
-    'custom-html',       // out of scope: no HTML/CSS injection
-    'breadcrumb',        // out of scope: should auto-generate
-    'video-background',  // out of scope: duplicates video variant
-    'before-after',      // out of scope: too niche
-    'download-cta',      // missing: no file hosting
-    'google-maps',       // missing: requires API key config
-    'countdown-timer',   // missing: client-side only, no persist
-])
+// Canonical display order — matches editor UX taxonomy
+const CATEGORY_ORDER = ['basics', 'content', 'media', 'store', 'commerce', 'form', 'widgets', 'layout'] as const
 
-const categoryConfig: Omit<CategoryConfig, 'label'>[] = [
-    { id: 'basics', icon: '📦', blockTypes: ['hero', 'cta', 'about', 'features', 'step-process', 'service-cards'] },
-    { id: 'content', icon: '📄', blockTypes: ['faq', 'testimonials', 'social-proof', 'portfolio-grid', 'blog-list'] },
-    { id: 'media', icon: '🖼️', blockTypes: ['gallery', 'video', 'carousel'] },
-    { id: 'store', icon: '💼', blockTypes: ['pricing', 'feature-comparison', 'menu-food'] },
-    { id: 'commerce', icon: '🛒', blockTypes: ['products-grid', 'products-featured', 'cartWidget'] },
-    { id: 'form', icon: '📝', blockTypes: ['contact', 'newsletter', 'whatsapp-button'] },
-    { id: 'widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget', 'team'] },
-    { id: 'layout', icon: '📐', blockTypes: ['divider', 'announcement-bar'] },
-]
+// ── Icon overrides (slug → icon) ─────────────────────────────────────────────
+// Provides a curated icon experience for known blocks, overrides meta.icon
 
-const itemIconOverrides: Record<string, string> = {
+const BLOCK_ICON_OVERRIDES: Record<string, string> = {
     'custom-html': '🧱',
     hero: '🎯',
     gallery: '🖼️',
@@ -75,18 +55,6 @@ const itemIconOverrides: Record<string, string> = {
     carousel: '🎠',
 }
 
-function getBlockMeta(blockType: string, blockTranslations?: Record<string, { name: string; description: string }>) {
-    const meta = blockRegistry.getBlockMeta(blockType)
-    const translated = blockTranslations?.[blockType]
-    return {
-        type: blockType,
-        name: translated?.name || meta?.name || blockType,
-        description: translated?.description || meta?.description || 'Reusable page block',
-        icon: itemIconOverrides[blockType] || meta?.icon || '🧩',
-        defaultVariant: meta?.defaultVariant || meta?.variants?.[0] || 'default',
-    }
-}
-
 interface BlockLibraryPanelProps {
     blocks: BlockData[]
     selectedBlock: number | null
@@ -104,32 +72,61 @@ export function BlockLibraryPanel({
     const categoryLabels = bl.categories as Record<string, string>
     const blockTranslations = bl.blocks as Record<string, { name: string; description: string }>
     const [query, setQuery] = useState('')
-    const [expandedCategory, setExpandedCategory] = useState<LibraryCategoryId>('basics')
+    const [expandedCategory, setExpandedCategory] = useState<string>('basics')
+
+    // Build visible categories from registry on every render cycle.
+    // listAllBlocks() is module-level cached (process lifetime), so this is O(n) array work only.
+    const allRegistryBlocks = listAllBlocks()
+    const visibleBlocks = allRegistryBlocks
+        .filter(b => b.aiVisible !== false)
+        .filter(b => !b.isSystem)
+        .filter(b => b.category !== 'archive')
+
+    // Group by category
+    const registryByCategory = new Map<string, typeof visibleBlocks>()
+    for (const b of visibleBlocks) {
+        const arr = registryByCategory.get(b.category) ?? []
+        arr.push(b)
+        registryByCategory.set(b.category, arr)
+    }
+
+    // Build ordered category list (only categories that have blocks)
+    const baseCategories = CATEGORY_ORDER
+        .filter(cat => registryByCategory.has(cat))
+        .map(cat => ({
+            id: cat,
+            icon: CATEGORY_DISPLAY[cat]?.icon ?? '📦',
+            // i18n label: prefer translated string from i18n system, fall back to Malay hardcode
+            label: categoryLabels[cat] || CATEGORY_DISPLAY[cat]?.label || cat,
+            blocks: registryByCategory.get(cat)!,
+        }))
 
     const categories = useMemo(() => {
         const keyword = query.trim().toLowerCase()
 
-        return categoryConfig.map(category => {
-            const items = category.blockTypes
-                .filter(bt => !HIDDEN_BLOCKS.has(bt))
-                .map(bt => getBlockMeta(bt, blockTranslations))
-                .filter(item => {
-                    if (!keyword) return true
-                    return (
-                        item.name.toLowerCase().includes(keyword)
-                        || item.description.toLowerCase().includes(keyword)
-                        || item.type.toLowerCase().includes(keyword)
-                    )
-                })
+        return baseCategories.map(category => {
+            const items = category.blocks.map(b => ({
+                type: b.slug,
+                name: blockTranslations?.[b.slug]?.name || b.name,
+                description: blockTranslations?.[b.slug]?.description || b.description,
+                icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
+                defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
+            })).filter(item => {
+                if (!keyword) return true
+                return (
+                    item.name.toLowerCase().includes(keyword)
+                    || item.description.toLowerCase().includes(keyword)
+                    || item.type.toLowerCase().includes(keyword)
+                )
+            })
 
             return {
                 ...category,
-                label: categoryLabels[category.id] || category.id,
                 items,
-                totalCount: category.blockTypes.length,
+                totalCount: category.blocks.length,
             }
-        }).filter(category => category.items.length > 0 || !keyword)
-    }, [query, categoryLabels, blockTranslations])
+        }).filter(category => category.items.length > 0 || !query.trim())
+    }, [query, baseCategories, blockTranslations])
 
     const handleAddBlock = (blockType: string, variant: string) => {
         const afterIndex = selectedBlock ?? (blocks.length - 1)

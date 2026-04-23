@@ -26,6 +26,7 @@ export type NormalizedBlock = {
     defaultVariant: string
     editableFields: string[]
     aiVisible: boolean
+    isSystem: boolean
 }
 
 // Vietnamese name map (curated for common blocks; others fall back to English)
@@ -110,6 +111,7 @@ export function listAllBlocks(): NormalizedBlock[] {
                 defaultVariant: '',
                 editableFields: [],
                 aiVisible: true,
+                isSystem: false,
             }
         }
         return {
@@ -123,6 +125,7 @@ export function listAllBlocks(): NormalizedBlock[] {
             defaultVariant: meta.defaultVariant,
             editableFields: meta.editableFields,
             aiVisible: meta.aiVisible ?? true,
+            isSystem: meta.isSystem ?? false,
         }
     })
     return _cached
