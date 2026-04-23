@@ -62,6 +62,7 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
                 field="image.url"
                 altText={safeAltText(image?.alt, headline)}
                 positionClass="absolute inset-0"
+                showImageButton={false}
                 showVideoButton={true}
                 videoField="videoUrl"
                 onVideoUploaded={(url) => { setVideoUrl(url); setIsPlaying(true) }}

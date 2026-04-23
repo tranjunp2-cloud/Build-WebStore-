@@ -531,6 +531,12 @@ function PreviewFrameInner({
                     const clone = JSON.parse(JSON.stringify(currentBlocks))
                     const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value as string | number | Record<string, unknown>)
                     updateBlock(blockIndex, nextBlock)
+                    // Push updated block back to iframe so React re-renders with new field values
+                    // without a full iframe reload (which would lose scroll position).
+                    frameElementRef.current?.contentWindow?.postMessage(
+                        { type: 'UPDATE_BLOCK_DATA', blockIndex, blockData: nextBlock },
+                        window.location.origin,
+                    )
                     performSave(true)
                 }
             } else if (e.data?.type === 'SHOW_TOAST') {

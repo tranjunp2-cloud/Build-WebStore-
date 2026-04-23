@@ -2,7 +2,6 @@
 
 import { useRef, useState, useEffect, type ReactNode } from 'react'
 import { ImagePlus, Loader2, Film } from 'lucide-react'
-import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 
 const parentToast = {
     success: (msg: string) => window.parent.postMessage({ type: 'SHOW_TOAST', variant: 'success', message: msg }, window.location.origin),
@@ -19,6 +18,7 @@ type HeroMediaOverlayProps = {
     altText?: string
     className?: string
     positionClass?: string
+    showImageButton?: boolean
     showVideoButton?: boolean
     videoField?: string
     onVideoUploaded?: (url: string) => void
@@ -30,6 +30,7 @@ export function HeroMediaOverlay({
     altText = 'Hero image',
     className = '',
     positionClass,
+    showImageButton = true,
     showVideoButton = false,
     videoField,
     onVideoUploaded,
@@ -98,6 +99,7 @@ export function HeroMediaOverlay({
             const formData = new FormData()
             formData.append('file', compressed)
             formData.append('alt', altText)
+            const { uploadMediaAction } = await import('@/app/(dashboard)/actions/media')
             const uploaded = await Promise.race([
                 uploadMediaAction(formData),
                 new Promise<never>((_, reject) =>
@@ -131,6 +133,7 @@ export function HeroMediaOverlay({
             const formData = new FormData()
             formData.append('file', file)
             formData.append('alt', 'Hero video')
+            const { uploadMediaAction } = await import('@/app/(dashboard)/actions/media')
             const uploaded = await Promise.race([
                 uploadMediaAction(formData),
                 new Promise<never>((_, reject) =>
@@ -174,6 +177,7 @@ export function HeroMediaOverlay({
                         </span>
                     ) : (
                         <>
+                            {showImageButton && (
                             <button
                                 type="button"
                                 onClick={() => imageFileRef.current?.click()}
@@ -182,6 +186,7 @@ export function HeroMediaOverlay({
                                 <ImagePlus className="w-4 h-4" />
                                 Change Image
                             </button>
+                            )}
                             {showVideoButton && videoField && (
                                 <button
                                     type="button"

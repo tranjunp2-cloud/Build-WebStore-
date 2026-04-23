@@ -71,6 +71,7 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
                     <HeroMediaOverlay
                         field="image.url"
                         altText={safeAltText(image?.alt, headline)}
+                        showImageButton={false}
                         showVideoButton={true}
                         videoField="videoUrl"
                     >

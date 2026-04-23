@@ -193,3 +193,17 @@ describe('TC-F30-HMO-009: Change Video triggers video file input', () => {
         expect(videoInput.type).toBe('file')
     })
 })
+
+describe('TC-F30-HMO-010: showImageButton=false hides Change Image button', () => {
+    it('shows only Change Video when showImageButton=false and showVideoButton=true (video hero)', () => {
+        vi.mocked(useIsOwner).mockReturnValue(true)
+        vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
+        render(
+            <HeroMediaOverlay field="image.url" showImageButton={false} showVideoButton={true} videoField="videoUrl">
+                <div />
+            </HeroMediaOverlay>
+        )
+        expect(screen.queryByText('Change Image')).toBeNull()
+        expect(screen.getByText('Change Video')).toBeTruthy()
+    })
+})
