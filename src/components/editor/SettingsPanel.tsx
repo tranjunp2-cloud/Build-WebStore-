@@ -2,7 +2,7 @@
 
 import React, { memo, useEffect, useMemo, useState } from 'react'
 import * as Tooltip from '@radix-ui/react-tooltip'
-import { ChevronDown, Globe2, UploadCloud } from 'lucide-react'
+import { ChevronDown, Globe2, Loader2, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
@@ -11,7 +11,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
 import { BlockImageEditor } from './BlockImageEditor'
+import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
+import { FooterLinkEditor } from './footer-link-editor'
+import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
@@ -56,6 +59,14 @@ const SOCIAL_PLATFORM_META: Record<SocialWidgetLink['platform'], { mark: string;
     linkedin: { mark: 'in', accent: '#0284c7' },
     youtube: { mark: '▶', accent: '#dc2626' },
 }
+
+const FOOTER_SOCIAL_PLATFORMS = [
+    { key: 'facebook',  label: 'Facebook URL' },
+    { key: 'twitter',   label: 'Twitter URL' },
+    { key: 'instagram', label: 'Instagram URL' },
+    { key: 'linkedin',  label: 'LinkedIn URL' },
+    { key: 'youtube',   label: 'YouTube URL' },
+] as const
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const FONT_OPTIONS = ['Outfit', 'Inter', 'DM Sans', 'Playfair Display', 'Roboto', 'Poppins', 'Plus Jakarta Sans']
@@ -207,7 +218,10 @@ function SettingsPanelInner({
         social: true,
         theme: true,
     })
-    const [isFooterLayoutOpen, setIsFooterLayoutOpen] = useState(true)
+    const [isFooterBrandOpen, setIsFooterBrandOpen] = useState(false)
+    const [isFooterSocialOpen, setIsFooterSocialOpen] = useState(false)
+    const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false)
+    const footerLogoRef = React.useRef<HTMLInputElement>(null)
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
     const [seoSlugInput, setSeoSlugInput] = useState('')
     const [seoTitleInput, setSeoTitleInput] = useState('')
@@ -559,23 +573,23 @@ function SettingsPanelInner({
                         <span className={cn('text-[10px] text-slate-500', metaDescriptionWarning && 'text-amber-400')}>{seoDescriptionValue.length}/160 {s.characters}</span>
                     </div>
                 </div>
-                
+
                 <div className={sectionCls}>
                     <label className="text-xs font-medium uppercase text-gray-500">{s.googlePreview}</label>
                     <div className="mt-3 rounded-[8px] border border-[#25324A] bg-white p-4">
-                        <div className="text-[14px] text-[#202124] truncate" style={{fontFamily: 'arial,sans-serif'}}>
+                        <div className="text-[14px] text-[#202124] truncate" style={{ fontFamily: 'arial,sans-serif' }}>
                             <span className="text-[12px] text-[#202124] flex items-center gap-2">
                                 <Globe2 className="w-4 h-4 text-slate-400" />
                                 {siteName || 'Your Website'}
                             </span>
                         </div>
-                        <div className="text-[12px] text-[#006621] mt-1 truncate" style={{fontFamily: 'arial,sans-serif'}}>
+                        <div className="text-[12px] text-[#006621] mt-1 truncate" style={{ fontFamily: 'arial,sans-serif' }}>
                             https://{previewDomain}/{normalizedPreviewPath}
                         </div>
-                        <div className="text-[18px] text-[#1a0dab] font-normal mt-1 truncate hover:underline cursor-pointer leading-[1.2]" style={{fontFamily: 'arial,sans-serif'}}>
+                        <div className="text-[18px] text-[#1a0dab] font-normal mt-1 truncate hover:underline cursor-pointer leading-[1.2]" style={{ fontFamily: 'arial,sans-serif' }}>
                             {seoTitleValue || 'Page Title'}
                         </div>
-                        <div className="text-[13px] text-[#4d5156] mt-1 line-clamp-2 leading-[1.4]" style={{fontFamily: 'arial,sans-serif'}}>
+                        <div className="text-[13px] text-[#4d5156] mt-1 line-clamp-2 leading-[1.4]" style={{ fontFamily: 'arial,sans-serif' }}>
                             {seoDescriptionValue || 'Provide a meta description to help users know what this page is about before they click on the search result.'}
                         </div>
                     </div>
@@ -594,7 +608,7 @@ function SettingsPanelInner({
                                     method: 'POST'
                                 })
                                 if (res.ok) {
-                                const data = await res.json()
+                                    const data = await res.json()
                                     const proposed = data.proposed || data
                                     const applyChanges = async () => {
                                         if (proposed.title) setSeoTitleInput(proposed.title)
@@ -644,22 +658,26 @@ function SettingsPanelInner({
         )
     }
 
-    const renderMenuContent = () => {
-        const footerCols = ((footerBlock?.columns as FooterColumn[]) || [])
-        const activeFooterLayout = footerCols.length === 0 ? null : footerCols.length <= 2 ? '2col' : '3col'
-
-        const handleFooterLayout = (preset: '2col' | '3col') => {
-            if (preset === '2col') {
-                const next = [...footerCols]
-                while (next.length < 2) next.push({ title: `Column ${next.length + 1}`, links: [] })
-                onFooterUpdate?.({ variant: 'simple', columns: next.slice(0, 2) })
-            } else {
-                const next = [...footerCols]
-                while (next.length < 3) next.push({ title: `Column ${next.length + 1}`, links: [] })
-                onFooterUpdate?.({ variant: 'simple', columns: next.slice(0, 3) })
-            }
+    const handleFooterLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setIsUploadingFooterLogo(true)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('alt', 'Logo')
+            const uploaded = await uploadMediaAction(formData)
+            if (!uploaded?.url) throw new Error('Upload succeeded but no URL returned')
+            onFooterUpdate?.({ logo: { url: uploaded.url, alt: (footerBlock?.logo as { alt?: string } | undefined)?.alt || '' } })
+        } catch {
+            toast.error('Failed to upload logo')
+        } finally {
+            setIsUploadingFooterLogo(false)
+            if (footerLogoRef.current) footerLogoRef.current.value = ''
         }
+    }
 
+    const renderMenuContent = () => {
         return (
             <div className="space-y-5">
                 {/* Logo Editor (AC-2) */}
@@ -707,50 +725,179 @@ function SettingsPanelInner({
                 {footerBlock && (
                     <div className={sectionCls}>
                         <div className="flex items-center gap-2 mb-4">
-                            <span className="text-base leading-none">🦶</span>
-                            <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">Footer Settings</span>
+                            <span className="text-base leading-none">🎨</span>
+                            <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.footerSettings}</span>
                         </div>
 
-                        {/* Layout Presets */}
-                        <div className="space-y-1.5 mb-4">
+                        {/* Footer Style */}
+                        <div className="mb-4">
+                            <label className={labelCls}>{s.footerStyle}</label>
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                {([
+                                    { key: 'simple', label: s.footerStyleSimple },
+                                    { key: 'minimal', label: s.footerStyleMinimal },
+                                    { key: 'centered-stack', label: s.footerStyleCentered },
+                                    { key: 'dark-gradient', label: s.dark },
+                                ] as { key: string; label: string }[]).map(({ key, label }) => (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => onFooterUpdate?.({ variant: key })}
+                                        className={cn(
+                                            'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                                            (footerBlock.variant as string) === key || (!footerBlock.variant && key === 'simple')
+                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                                        )}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Brand & Logo */}
+                        <div className="mb-4">
                             <button
                                 type="button"
-                                onClick={() => setIsFooterLayoutOpen(v => !v)}
-                                className="flex w-full items-center justify-between"
+                                onClick={() => setIsFooterBrandOpen(v => !v)}
+                                className="flex w-full items-center justify-between rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 py-2.5 text-[13px] font-medium text-white"
                             >
-                                <span className="text-[13px] font-medium text-white">Layout</span>
-                                <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterLayoutOpen && 'rotate-180')} />
+                                <span>🏢 {s.brandLogo}</span>
+                                <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterBrandOpen && 'rotate-180')} />
                             </button>
-                            {isFooterLayoutOpen && (
-                                <div className="mt-2 space-y-1.5">
-                                    {([
-                                        { key: '2col', label: '2 Columns' },
-                                        { key: '3col', label: '3 Columns' },
-                                    ] as { key: '2col' | '3col'; label: string }[]).map(({ key, label }) => (
+                            {isFooterBrandOpen && (() => {
+                                const currentLogoUrl = (footerBlock?.logo as { url?: string } | undefined)?.url || ''
+                                return (
+                                <div className="mt-1 space-y-3 rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 pb-3 pt-2.5">
+                                    {/* Upload Logo */}
+                                    <div>
+                                        <label className={labelCls}>{s.uploadLogo}</label>
                                         <button
-                                            key={key}
                                             type="button"
-                                            onClick={() => handleFooterLayout(key)}
-                                            className={cn(
-                                                'w-full rounded-xl border px-3 py-2 text-left text-[12px] font-medium transition-colors',
-                                                activeFooterLayout === key
-                                                    ? 'border-blue-500/50 bg-blue-500/20 text-blue-400'
-                                                    : 'border-white/5 bg-[#0b1120] text-white hover:bg-white/5',
-                                            )}
+                                            onClick={() => footerLogoRef.current?.click()}
+                                            disabled={isUploadingFooterLogo}
+                                            className="mt-1 flex h-24 w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-dashed border-blue-500/20 bg-[#0b1120] text-slate-400 transition-colors hover:border-blue-500/40 disabled:opacity-50"
                                         >
-                                            {label}
+                                            {isUploadingFooterLogo ? (
+                                                <Loader2 className="h-5 w-5 animate-spin" />
+                                            ) : currentLogoUrl ? (
+                                                <>
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={currentLogoUrl} alt="Logo preview" className="max-h-14 max-w-full object-contain" />
+                                                    <span className="text-[10px] text-slate-500">{s.clickToChange}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <UploadCloud className="h-5 w-5" />
+                                                    <span className="text-[12px] font-medium">{s.clickToUpload}</span>
+                                                </>
+                                            )}
                                         </button>
-                                    ))}
+                                        <input
+                                            ref={footerLogoRef}
+                                            type="file"
+                                            accept="image/jpeg,image/png"
+                                            className="hidden"
+                                            onChange={handleFooterLogoUpload}
+                                        />
+                                    </div>
+                                    {/* Paste URL */}
+                                    <div>
+                                        <p className="text-[12px] text-slate-400">{s.pasteImageUrl}</p>
+                                        <Input
+                                            key={`footer-logo-url-${fbk}-${currentLogoUrl}`}
+                                            defaultValue={currentLogoUrl}
+                                            placeholder="https://example.com/logo.png"
+                                            onBlur={(e: FieldBlurEvent) => {
+                                                const url = e.target.value.trim()
+                                                if (url && !isValidUrl(url)) {
+                                                    toast.error(s.invalidUrlFormat)
+                                                    e.target.value = currentLogoUrl
+                                                    return
+                                                }
+                                                onFooterUpdate?.({ logo: { url, alt: (footerBlock?.logo as { alt?: string } | undefined)?.alt || '' } })
+                                            }}
+                                            variant="editor"
+                                            className="mt-1 h-8 text-[12px]"
+                                        />
+                                    </div>
+                                    {/* Company Description */}
+                                    <div>
+                                        <label className={labelCls}>{s.companyDescription}</label>
+                                        <Textarea
+                                            key={`footer-tagline-${fbk}`}
+                                            defaultValue={(footerBlock?.tagline as string) || ''}
+                                            placeholder={s.companyDescPlaceholder}
+                                            onBlur={(e: FieldBlurEvent) => onFooterUpdate?.({ tagline: sanitizeInput(e.target.value) })}
+                                            className="mt-1 min-h-[66px] resize-none rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#0b1120] px-3 py-2 text-[12px] text-white placeholder:text-slate-400 outline-none focus:border-blue-500/30"
+                                        />
+                                    </div>
+                                </div>
+                                )
+                            })()}
+                        </div>
+
+                        {/* Column Link Editor — rendered directly, no extra wrapper label */}
+                        <FooterLinkEditor
+                            columns={(footerBlock?.columns as FooterColumn[]) || []}
+                            onUpdate={(cols) => onFooterUpdate?.({ columns: cols })}
+                        />
+
+                        {/* Social Media */}
+                        <div className="mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setIsFooterSocialOpen(v => !v)}
+                                className="flex w-full items-center justify-between rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 py-2.5 text-[13px] font-medium text-white"
+                            >
+                                <span>{s.socialMedia}</span>
+                                <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterSocialOpen && 'rotate-180')} />
+                            </button>
+                            {isFooterSocialOpen && (
+                                <div className="mt-1 space-y-3 rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 pb-3 pt-2.5">
+                                    {FOOTER_SOCIAL_PLATFORMS.map(({ key, label }) => {
+                                        const PlatformIcon = SOCIAL_ICONS[key]
+                                        const currentUrl = ((footerBlock?.socials as { platform: string; url: string }[] | undefined) || [])
+                                            .find(s => s.platform === key)?.url || ''
+                                        return (
+                                            <div key={key} className="flex flex-col gap-1.5">
+                                                <label className="flex items-center gap-1.5 text-[12px] font-medium text-slate-400">
+                                                    {PlatformIcon && <PlatformIcon size={12} className="shrink-0" />}
+                                                    {label}
+                                                </label>
+                                                <Input
+                                                    key={`footer-social-${key}-${fbk}`}
+                                                    defaultValue={currentUrl}
+                                                    placeholder={`https://${key}.com/yourcompany`}
+                                                    onBlur={(e: FieldBlurEvent) => {
+                                                        const val = e.target.value.trim()
+                                                        if (val && !isValidUrl(val)) {
+                                                            toast.error('Invalid URL format')
+                                                            e.target.value = currentUrl
+                                                            return
+                                                        }
+                                                        const existing = ((footerBlock?.socials as { platform: string; url: string }[] | undefined) || [])
+                                                            .filter(s => s.platform !== key)
+                                                        const updated = val ? [...existing, { platform: key, url: val }] : existing
+                                                        onFooterUpdate?.({ socials: updated })
+                                                    }}
+                                                    variant="editor"
+                                                    className="h-8 text-[12px]"
+                                                />
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             )}
                         </div>
 
                         {/* Copyright Text */}
                         <div className="mb-4">
-                            <label className={labelCls}>Copyright Text</label>
+                            <label className={labelCls}>{s.copyrightText}</label>
                             <Input
                                 key={`footer-copyright-${fbk}`}
-                                defaultValue={(footerBlock.copyrightText as string) || ''}
+                                defaultValue={(footerBlock?.copyrightText as string) || ''}
                                 placeholder="© 2026 Your Company. All rights reserved."
                                 onBlur={(e: FieldBlurEvent) => onFooterUpdate?.({ copyrightText: sanitizeInput(e.target.value) })}
                                 variant="editor"
@@ -760,28 +907,21 @@ function SettingsPanelInner({
 
                         {/* Background Color */}
                         <div className="mb-4">
-                            <label className={labelCls}>Background Color</label>
+                            <label className={labelCls}>{s.backgroundColor}</label>
                             <div className="mt-1.5 flex gap-2">
                                 <Input
-                                    key={`footer-bgcolor-${fbk}`}
-                                    defaultValue={(footerBlock.backgroundColor as string) || ''}
-                                    placeholder="#111827"
-                                    onBlur={(e: FieldBlurEvent) => {
-                                        const val = e.target.value.trim()
-                                        if (val && !CSS.supports('color', val)) {
-                                            toast.error('Invalid color value')
-                                            return
-                                        }
-                                        onFooterUpdate?.({ backgroundColor: val })
-                                    }}
+                                    key={`footer-bgcolor-${fbk}-${(footerBlock?.backgroundColor as string) || ''}`}
+                                    defaultValue={(footerBlock?.backgroundColor as string) || ''}
+                                    placeholder="#0f172a"
+                                    onBlur={(e: FieldBlurEvent) => onFooterUpdate?.({ backgroundColor: e.target.value.trim() || undefined })}
                                     variant="editor"
-                                    className="flex-1"
+                                    className="h-8 text-[12px]"
                                 />
                                 <input
                                     type="color"
-                                    value={(footerBlock.backgroundColor as string) || '#111827'}
+                                    value={(footerBlock?.backgroundColor as string) || '#0f172a'}
                                     onChange={(e) => onFooterUpdate?.({ backgroundColor: e.target.value })}
-                                    aria-label="Pick background color"
+                                    aria-label={s.pickBgColor}
                                     className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5"
                                 />
                             </div>
@@ -805,9 +945,9 @@ function SettingsPanelInner({
         ? s.blockDesc
         : activeTab === 'seo'
             ? s.seoDesc
-        : activeTab === 'menu'
-            ? s.menuDesc
-            : s.globalDesc
+            : activeTab === 'menu'
+                ? s.menuDesc
+                : s.globalDesc
 
     const info = block ? getBlockInfo(block.blockType) : null
     const bt = block?.blockType
@@ -902,534 +1042,534 @@ function SettingsPanelInner({
                 </div>
 
                 <div className="space-y-5">
-                {activeTab === 'global' ? renderGlobalContent() : null}
-                {activeTab === 'seo' ? renderSeoContent() : null}
-                {activeTab === 'menu' ? renderMenuContent() : null}
-                {activeTab === 'block' && !block ? (
-                    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
-                        {s.selectBlockMsg}
-                    </div>
-                ) : null}
-
-                {activeTab === 'block' && block ? (
-                    <>
-                        <div className="rounded-2xl border border-[#25324A] bg-[#172033] px-4 py-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-white">{info?.icon} {info?.label}</span>
-                                <span className="text-xs text-gray-500">#{currentBlockIndex + 1}</span>
-                            </div>
+                    {activeTab === 'global' ? renderGlobalContent() : null}
+                    {activeTab === 'seo' ? renderSeoContent() : null}
+                    {activeTab === 'menu' ? renderMenuContent() : null}
+                    {activeTab === 'block' && !block ? (
+                        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
+                            {s.selectBlockMsg}
                         </div>
-                {/* Variant Switcher */}
-                {(info?.variants?.length || 0) > 1 && (
-                    <div>
-                        <label className="text-xs font-medium uppercase text-gray-500">{s.variant}</label>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                            {info?.variants.filter(v => bt !== 'footer' || !FOOTER_HIDDEN_VARIANTS.has(v)).map(v => (
-                                <button key={v}
-                                    onClick={() => onBlockFieldChange(currentBlockIndex, 'variant', v)}
-                                    className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                                        block.variant === v ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
-                                    {v.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                    ) : null}
 
-                {/* Layout & Spacing */}
-                {block.blockType !== 'navigation' && block.blockType !== 'footer' && (
-                    <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
-                        <div className="mt-3 space-y-3">
-                            <div>
+                    {activeTab === 'block' && block ? (
+                        <>
+                            <div className="rounded-2xl border border-[#25324A] bg-[#172033] px-4 py-3">
                                 <div className="flex items-center justify-between">
-                                    <span className={labelCls}>Top Spacing</span>
-                                    <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingTop ?? 32))}px</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min={0} max={120} step={4}
-                                    defaultValue={Number((block.style as Record<string, unknown>)?.paddingTop ?? 32)}
-                                    onChange={(e) => {
-                                        const val = Number(e.target.value)
-                                        const prevStyle = (block.style as Record<string, unknown>) || {}
-                                        onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingTop: val } })
-                                    }}
-                                    className="mt-1 w-full accent-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <div className="flex items-center justify-between">
-                                    <span className={labelCls}>Bottom Spacing</span>
-                                    <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32))}px</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min={0} max={120} step={4}
-                                    defaultValue={Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32)}
-                                    onChange={(e) => {
-                                        const val = Number(e.target.value)
-                                        const prevStyle = (block.style as Record<string, unknown>) || {}
-                                        onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingBottom: val } })
-                                    }}
-                                    className="mt-1 w-full accent-blue-500"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* ─── Common Text Fields ──────────────────────── */}
-                {block.logoText !== undefined && (
-                    <div>
-                        <label className={labelCls}>{s.logoText}</label>
-                        <Input defaultValue={stripHtmlForDisplay(block.logoText)} key={`logo-${bk}`}
-                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'logoText', e.target.value)}
-                            variant="editor"
-                            className={editorInputClassName} />
-                    </div>
-                )}
-
-                {block.headline !== undefined && (
-                    <div>
-                        <label className={labelCls}>{s.headline}</label>
-                        <Input defaultValue={stripHtmlForDisplay(block.headline)} key={`hl-${bk}`}
-                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
-                            variant="editor"
-                            className={editorInputClassName} />
-                    </div>
-                )}
-
-                {block.subheadline !== undefined && (
-                    <div>
-                        <label className={labelCls}>{s.subheadline}</label>
-                        <Textarea defaultValue={stripHtmlForDisplay(block.subheadline)} rows={2} key={`sub-${bk}`}
-                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subheadline', e.target.value)}
-                            variant="editor"
-                            className={editorTextareaClassName} />
-                    </div>
-                )}
-
-                {block.sectionLabel !== undefined && (
-                    <div>
-                        <label className={labelCls}>{s.sectionLabel}</label>
-                        <Input defaultValue={stripHtmlForDisplay(block.sectionLabel)} key={`sl-${bk}`}
-                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'sectionLabel', e.target.value)}
-                            variant="editor"
-                            className={editorInputClassName} />
-                    </div>
-                )}
-
-                {block.body !== undefined && (
-                    <div>
-                        <label className={labelCls}>{s.bodyText}</label>
-                        <Textarea defaultValue={stripHtmlForDisplay(block.body)} rows={4} key={`body-${bk}`}
-                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'body', e.target.value)}
-                            variant="editor"
-                            className={editorTextareaClassName} />
-                    </div>
-                )}
-
-                {block.subtext !== undefined && (
-                    <div>
-                        <label className={labelCls}>{s.description}</label>
-                        <Textarea defaultValue={stripHtmlForDisplay(block.subtext)} rows={3} key={`subtext-${bk}`}
-                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subtext', e.target.value)}
-                            variant="editor"
-                            className={editorTextareaClassName} />
-                    </div>
-                )}
-
-                {block.tagline !== undefined && (
-                    <div>
-                        <label className={labelCls}>{s.tagline}</label>
-                        <Textarea defaultValue={stripHtmlForDisplay(block.tagline)} rows={2} key={`tag-${bk}`}
-                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'tagline', e.target.value)}
-                            variant="editor"
-                            className={editorTextareaClassName} />
-                    </div>
-                )}
-
-                {/* ─── Contact Fields ─────────────────────────── */}
-                {(bt === 'contact') && (
-                    <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">{s.contactInfo}</label>
-                        <div className="mt-3 space-y-3">
-                            <div>
-                                <label className={labelCls}>{s.email}</label>
-                                <Input type="email" defaultValue={(block.email as string) || ''} key={`email-${bk}`}
-                                    onBlur={(e: FieldBlurEvent) => {
-                                        if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
-                                            onBlockFieldChange(currentBlockIndex, 'email', e.target.value)
-                                        } else {
-                                            toast.error(s.invalidEmail)
-                                        }
-                                    }}
-                                    variant="editor"
-                                    className={editorInputClassName} placeholder={s.emailPlaceholder} />
-                            </div>
-                            <div>
-                                <label className={labelCls}>{s.phone}</label>
-                                <Input defaultValue={(block.phone as string) || ''} key={`phone-${bk}`}
-                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'phone', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName} placeholder={s.phonePlaceholder} />
-                            </div>
-                            <div>
-                                <label className={labelCls}>{s.address}</label>
-                                <Textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${bk}`}
-                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'address', e.target.value)}
-                                    variant="editor"
-                                    className={editorTextareaClassName} placeholder={s.addressPlaceholder} />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* ─── CTA Fields ─────────────────────────────── */}
-                {(block.ctaLabel !== undefined || block.ctaUrl !== undefined) && (
-                    <div>
-                        <label className={labelCls}>{s.ctaButton}</label>
-                        <div className="mt-1.5 space-y-2">
-                            <Input defaultValue={stripHtmlForDisplay(block.ctaLabel)} key={`ctalbl-${bk}`}
-                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaLabel', e.target.value)}
-                                variant="editor"
-                                className={editorInputClassName} placeholder={s.buttonText} />
-                            <Input defaultValue={(block.ctaUrl as string) || ''} key={`ctaurl-${bk}`}
-                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaUrl', e.target.value)}
-                                variant="editor"
-                                className={editorInputClassName} placeholder={s.buttonUrl} />
-                        </div>
-                    </div>
-                )}
-
-                {block.copyrightText !== undefined && (
-                    <div>
-                        <label className={labelCls}>{s.copyright}</label>
-                        <Input defaultValue={block.copyrightText as string} key={`copy-${bk}`}
-                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'copyrightText', e.target.value)}
-                            variant="editor"
-                            className={editorInputClassName} />
-                    </div>
-                )}
-
-                {/* ─── Hero CTA Buttons ───────────────────────── */}
-                {bt === 'hero' && ((block.ctaButtons || []) as CtaButton[]).length > 0 && (
-                    <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">{s.ctaButtons}</label>
-                        {((block.ctaButtons || []) as CtaButton[]).map((btn, i) => (
-                            <div key={`cta-${btn.label}-${btn.url}-${i}`} className="mt-3 rounded-lg bg-white/5 p-3 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">{ti(s.buttonN, { n: i + 1 })}</span>
-                                    <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
-                                </div>
-                                <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder={s.label}
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-                                <Input defaultValue={btn.url || ''} placeholder={s.url}
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'url', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-                            </div>
-                        ))}
-                        <button onClick={() => addArrayItem('ctaButtons', { label: 'New Button', url: '#' })}
-                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addButton}</button>
-                    </div>
-                )}
-
-                {/* ─── Navigation Links ───────────────────────── */}
-                {bt === 'navigation' && (
-                    <div className={sectionCls}>
-                        <NavigationEditor
-                            links={normalizeNavLinkItems((block.links || []) as Array<Record<string, unknown>>, pages)}
-                            onUpdate={(links) => onBlockUpdate(currentBlockIndex, { links })}
-                            pages={pages}
-                        />
-                        {/* Nav CTA */}
-                        {!!block.ctaButton && (
-                            <div className="mt-3">
-                                <label className={labelCls}>{s.ctaButton}</label>
-                                <Input defaultValue={stripHtmlForDisplay((block.ctaButton as CtaButton)?.label)} placeholder={s.buttonText}
-                                    onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), label: e.target.value } })}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-                                <Input defaultValue={(block.ctaButton as CtaButton)?.url || ''} placeholder={s.buttonUrl}
-                                    onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), url: e.target.value } })}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* ─── Features Items ─────────────────────────── */}
-                {bt === 'features' && (
-                    <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">{s.features} ({((block.features || []) as FeatureItem[]).length})</label>
-                        {((block.features || []) as FeatureItem[]).map((feat, i) => (
-                            <div key={`feat-${feat.title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">{feat.icon || '✦'} {ti(s.featureN, { n: i + 1 })}</span>
-                                    <button onClick={() => removeArrayItem('features', i)} aria-label={`Remove feature ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
-                                </div>
-                                <Input defaultValue={feat.title || ''} placeholder={s.title}
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'title', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-                                <Textarea defaultValue={feat.description || ''} rows={2} placeholder={s.description}
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'description', e.target.value)}
-                                    variant="editor"
-                                    className={editorTextareaClassName} />
-                                <Input defaultValue={feat.icon || ''} placeholder={s.icon}
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'icon', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-                            </div>
-                        ))}
-                        <button onClick={() => addArrayItem('features', { title: 'New Feature', description: '', icon: '✦' })}
-                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addFeature}</button>
-                    </div>
-                )}
-
-                {/* ─── Testimonials ───────────────────────────── */}
-                {bt === 'testimonials' && (
-                    <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">{s.testimonials} ({((block.testimonials || []) as TestimonialItem[]).length})</label>
-                        {((block.testimonials || []) as TestimonialItem[]).map((item, i) => (
-                            <div key={`test-${item.name}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">{ti(s.reviewN, { n: i + 1 })}</span>
-                                    <button onClick={() => removeArrayItem('testimonials', i)} aria-label={`Remove testimonial ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
-                                </div>
-                                <Input defaultValue={item.name || ''} placeholder={s.name}
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'name', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-                                <Input defaultValue={item.title || ''} placeholder={s.titleRole}
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'title', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName} />
-                                <Textarea defaultValue={item.quote || ''} rows={2} placeholder={s.quote}
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'quote', e.target.value)}
-                                    variant="editor"
-                                    className={editorTextareaClassName} />
-                            </div>
-                        ))}
-                        <button onClick={() => addArrayItem('testimonials', { name: s.defaultCustomerName, title: '', quote: s.defaultReviewQuote, rating: 5 })}
-                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addTestimonial}</button>
-                    </div>
-                )}
-
-
-                {bt === 'socialWidget' && (
-                    <div className={sectionCls}>
-                        {(() => {
-                            const normalizedSocialBlock = normalizeSocialWidgetConfig(block as Record<string, unknown>)
-
-                            return (
-                                <>
-                        <label className="text-xs font-medium uppercase text-gray-500">{s.socialWidget}</label>
-                        <div className="mt-3 space-y-3">
-                            <div>
-                                <label className={labelCls}>{s.headline}</label>
-                                <Input
-                                    defaultValue={(normalizedSocialBlock.headline as string) || ''}
-                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName}
-                                    placeholder={s.stayConnected}
-                                />
-                            </div>
-                            <div>
-                                <label className={labelCls}>{s.displayStyle}</label>
-                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                    {['floating', 'inline'].map(variant => (
-                                        <button
-                                            key={variant}
-                                            type="button"
-                                            onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
-                                            className={cn(
-                                                'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                                (block.variant || 'floating') === variant
-                                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                            )}
-                                        >
-                                            {variant}
-                                        </button>
-                                    ))}
+                                    <span className="text-sm font-medium text-white">{info?.icon} {info?.label}</span>
+                                    <span className="text-xs text-gray-500">#{currentBlockIndex + 1}</span>
                                 </div>
                             </div>
-                            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-                                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
-                                    {s.platforms}
-                                </p>
-                                <p className="mt-2 text-xs text-slate-400">
-                                    {s.platformsDesc}
-                                </p>
-                            </div>
-                            {(normalizedSocialBlock.links as SocialWidgetLink[]).map((link, i) => (
-                                <div key={`social-${i}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-3">
-                                            <span
-                                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white/90 text-[11px] font-black uppercase tracking-[0.04em]"
-                                                style={{
-                                                    color: SOCIAL_PLATFORM_META[link.platform].accent,
-                                                    borderColor: `${SOCIAL_PLATFORM_META[link.platform].accent}22`,
+                            {/* Variant Switcher */}
+                            {(info?.variants?.length || 0) > 1 && (
+                                <div>
+                                    <label className="text-xs font-medium uppercase text-gray-500">{s.variant}</label>
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {info?.variants.filter(v => bt !== 'footer' || !FOOTER_HIDDEN_VARIANTS.has(v)).map(v => (
+                                            <button key={v}
+                                                onClick={() => onBlockFieldChange(currentBlockIndex, 'variant', v)}
+                                                className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                                                    block.variant === v ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
+                                                {v.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Layout & Spacing */}
+                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
+                                    <div className="mt-3 space-y-3">
+                                        <div>
+                                            <div className="flex items-center justify-between">
+                                                <span className={labelCls}>Top Spacing</span>
+                                                <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingTop ?? 32))}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0} max={120} step={4}
+                                                defaultValue={Number((block.style as Record<string, unknown>)?.paddingTop ?? 32)}
+                                                onChange={(e) => {
+                                                    const val = Number(e.target.value)
+                                                    const prevStyle = (block.style as Record<string, unknown>) || {}
+                                                    onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingTop: val } })
                                                 }}
-                                            >
-                                                {SOCIAL_PLATFORM_META[link.platform].mark}
-                                            </span>
-                                            <div>
-                                                <p className="text-sm font-medium text-white">
-                                                    {(s.socialPlatforms as Record<string, { label: string }>)[link.platform]?.label || link.platform}
-                                                </p>
-                                                <p className="text-[11px] text-slate-500">
-                                                    {link.platform === 'whatsapp' ? s.socialHintWhatsapp : s.socialHintDefault}
-                                                </p>
+                                                className="mt-1 w-full accent-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between">
+                                                <span className={labelCls}>Bottom Spacing</span>
+                                                <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32))}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0} max={120} step={4}
+                                                defaultValue={Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32)}
+                                                onChange={(e) => {
+                                                    const val = Number(e.target.value)
+                                                    const prevStyle = (block.style as Record<string, unknown>) || {}
+                                                    onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingBottom: val } })
+                                                }}
+                                                className="mt-1 w-full accent-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ─── Common Text Fields ──────────────────────── */}
+                            {block.logoText !== undefined && (
+                                <div>
+                                    <label className={labelCls}>{s.logoText}</label>
+                                    <Input defaultValue={stripHtmlForDisplay(block.logoText)} key={`logo-${bk}`}
+                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'logoText', e.target.value)}
+                                        variant="editor"
+                                        className={editorInputClassName} />
+                                </div>
+                            )}
+
+                            {block.headline !== undefined && (
+                                <div>
+                                    <label className={labelCls}>{s.headline}</label>
+                                    <Input defaultValue={stripHtmlForDisplay(block.headline)} key={`hl-${bk}`}
+                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
+                                        variant="editor"
+                                        className={editorInputClassName} />
+                                </div>
+                            )}
+
+                            {block.subheadline !== undefined && (
+                                <div>
+                                    <label className={labelCls}>{s.subheadline}</label>
+                                    <Textarea defaultValue={stripHtmlForDisplay(block.subheadline)} rows={2} key={`sub-${bk}`}
+                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subheadline', e.target.value)}
+                                        variant="editor"
+                                        className={editorTextareaClassName} />
+                                </div>
+                            )}
+
+                            {block.sectionLabel !== undefined && (
+                                <div>
+                                    <label className={labelCls}>{s.sectionLabel}</label>
+                                    <Input defaultValue={stripHtmlForDisplay(block.sectionLabel)} key={`sl-${bk}`}
+                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'sectionLabel', e.target.value)}
+                                        variant="editor"
+                                        className={editorInputClassName} />
+                                </div>
+                            )}
+
+                            {block.body !== undefined && (
+                                <div>
+                                    <label className={labelCls}>{s.bodyText}</label>
+                                    <Textarea defaultValue={stripHtmlForDisplay(block.body)} rows={4} key={`body-${bk}`}
+                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'body', e.target.value)}
+                                        variant="editor"
+                                        className={editorTextareaClassName} />
+                                </div>
+                            )}
+
+                            {block.subtext !== undefined && (
+                                <div>
+                                    <label className={labelCls}>{s.description}</label>
+                                    <Textarea defaultValue={stripHtmlForDisplay(block.subtext)} rows={3} key={`subtext-${bk}`}
+                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subtext', e.target.value)}
+                                        variant="editor"
+                                        className={editorTextareaClassName} />
+                                </div>
+                            )}
+
+                            {block.tagline !== undefined && (
+                                <div>
+                                    <label className={labelCls}>{s.tagline}</label>
+                                    <Textarea defaultValue={stripHtmlForDisplay(block.tagline)} rows={2} key={`tag-${bk}`}
+                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'tagline', e.target.value)}
+                                        variant="editor"
+                                        className={editorTextareaClassName} />
+                                </div>
+                            )}
+
+                            {/* ─── Contact Fields ─────────────────────────── */}
+                            {(bt === 'contact') && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">{s.contactInfo}</label>
+                                    <div className="mt-3 space-y-3">
+                                        <div>
+                                            <label className={labelCls}>{s.email}</label>
+                                            <Input type="email" defaultValue={(block.email as string) || ''} key={`email-${bk}`}
+                                                onBlur={(e: FieldBlurEvent) => {
+                                                    if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
+                                                        onBlockFieldChange(currentBlockIndex, 'email', e.target.value)
+                                                    } else {
+                                                        toast.error(s.invalidEmail)
+                                                    }
+                                                }}
+                                                variant="editor"
+                                                className={editorInputClassName} placeholder={s.emailPlaceholder} />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>{s.phone}</label>
+                                            <Input defaultValue={(block.phone as string) || ''} key={`phone-${bk}`}
+                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'phone', e.target.value)}
+                                                variant="editor"
+                                                className={editorInputClassName} placeholder={s.phonePlaceholder} />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>{s.address}</label>
+                                            <Textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${bk}`}
+                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'address', e.target.value)}
+                                                variant="editor"
+                                                className={editorTextareaClassName} placeholder={s.addressPlaceholder} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ─── CTA Fields ─────────────────────────────── */}
+                            {(block.ctaLabel !== undefined || block.ctaUrl !== undefined) && (
+                                <div>
+                                    <label className={labelCls}>{s.ctaButton}</label>
+                                    <div className="mt-1.5 space-y-2">
+                                        <Input defaultValue={stripHtmlForDisplay(block.ctaLabel)} key={`ctalbl-${bk}`}
+                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaLabel', e.target.value)}
+                                            variant="editor"
+                                            className={editorInputClassName} placeholder={s.buttonText} />
+                                        <Input defaultValue={(block.ctaUrl as string) || ''} key={`ctaurl-${bk}`}
+                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaUrl', e.target.value)}
+                                            variant="editor"
+                                            className={editorInputClassName} placeholder={s.buttonUrl} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {block.copyrightText !== undefined && (
+                                <div>
+                                    <label className={labelCls}>{s.copyright}</label>
+                                    <Input defaultValue={block.copyrightText as string} key={`copy-${bk}`}
+                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'copyrightText', e.target.value)}
+                                        variant="editor"
+                                        className={editorInputClassName} />
+                                </div>
+                            )}
+
+                            {/* ─── Hero CTA Buttons ───────────────────────── */}
+                            {bt === 'hero' && ((block.ctaButtons || []) as CtaButton[]).length > 0 && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">{s.ctaButtons}</label>
+                                    {((block.ctaButtons || []) as CtaButton[]).map((btn, i) => (
+                                        <div key={`cta-${btn.label}-${btn.url}-${i}`} className="mt-3 rounded-lg bg-white/5 p-3 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-gray-500">{ti(s.buttonN, { n: i + 1 })}</span>
+                                                <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
+                                            </div>
+                                            <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder={s.label}
+                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
+                                                variant="editor"
+                                                className={editorInputClassName} />
+                                            <Input defaultValue={btn.url || ''} placeholder={s.url}
+                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'url', e.target.value)}
+                                                variant="editor"
+                                                className={editorInputClassName} />
+                                        </div>
+                                    ))}
+                                    <button onClick={() => addArrayItem('ctaButtons', { label: 'New Button', url: '#' })}
+                                        className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addButton}</button>
+                                </div>
+                            )}
+
+                            {/* ─── Navigation Links ───────────────────────── */}
+                            {bt === 'navigation' && (
+                                <div className={sectionCls}>
+                                    <NavigationEditor
+                                        links={normalizeNavLinkItems((block.links || []) as Array<Record<string, unknown>>, pages)}
+                                        onUpdate={(links) => onBlockUpdate(currentBlockIndex, { links })}
+                                        pages={pages}
+                                    />
+                                    {/* Nav CTA */}
+                                    {!!block.ctaButton && (
+                                        <div className="mt-3">
+                                            <label className={labelCls}>{s.ctaButton}</label>
+                                            <Input defaultValue={stripHtmlForDisplay((block.ctaButton as CtaButton)?.label)} placeholder={s.buttonText}
+                                                onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), label: e.target.value } })}
+                                                variant="editor"
+                                                className={editorInputClassName} />
+                                            <Input defaultValue={(block.ctaButton as CtaButton)?.url || ''} placeholder={s.buttonUrl}
+                                                onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), url: e.target.value } })}
+                                                variant="editor"
+                                                className={editorInputClassName} />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ─── Features Items ─────────────────────────── */}
+                            {bt === 'features' && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">{s.features} ({((block.features || []) as FeatureItem[]).length})</label>
+                                    {((block.features || []) as FeatureItem[]).map((feat, i) => (
+                                        <div key={`feat-${feat.title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-gray-500">{feat.icon || '✦'} {ti(s.featureN, { n: i + 1 })}</span>
+                                                <button onClick={() => removeArrayItem('features', i)} aria-label={`Remove feature ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
+                                            </div>
+                                            <Input defaultValue={feat.title || ''} placeholder={s.title}
+                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'title', e.target.value)}
+                                                variant="editor"
+                                                className={editorInputClassName} />
+                                            <Textarea defaultValue={feat.description || ''} rows={2} placeholder={s.description}
+                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'description', e.target.value)}
+                                                variant="editor"
+                                                className={editorTextareaClassName} />
+                                            <Input defaultValue={feat.icon || ''} placeholder={s.icon}
+                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'icon', e.target.value)}
+                                                variant="editor"
+                                                className={editorInputClassName} />
+                                        </div>
+                                    ))}
+                                    <button onClick={() => addArrayItem('features', { title: 'New Feature', description: '', icon: '✦' })}
+                                        className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addFeature}</button>
+                                </div>
+                            )}
+
+                            {/* ─── Testimonials ───────────────────────────── */}
+                            {bt === 'testimonials' && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">{s.testimonials} ({((block.testimonials || []) as TestimonialItem[]).length})</label>
+                                    {((block.testimonials || []) as TestimonialItem[]).map((item, i) => (
+                                        <div key={`test-${item.name}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-gray-500">{ti(s.reviewN, { n: i + 1 })}</span>
+                                                <button onClick={() => removeArrayItem('testimonials', i)} aria-label={`Remove testimonial ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
+                                            </div>
+                                            <Input defaultValue={item.name || ''} placeholder={s.name}
+                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'name', e.target.value)}
+                                                variant="editor"
+                                                className={editorInputClassName} />
+                                            <Input defaultValue={item.title || ''} placeholder={s.titleRole}
+                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'title', e.target.value)}
+                                                variant="editor"
+                                                className={editorInputClassName} />
+                                            <Textarea defaultValue={item.quote || ''} rows={2} placeholder={s.quote}
+                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'quote', e.target.value)}
+                                                variant="editor"
+                                                className={editorTextareaClassName} />
+                                        </div>
+                                    ))}
+                                    <button onClick={() => addArrayItem('testimonials', { name: s.defaultCustomerName, title: '', quote: s.defaultReviewQuote, rating: 5 })}
+                                        className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addTestimonial}</button>
+                                </div>
+                            )}
+
+
+                            {bt === 'socialWidget' && (
+                                <div className={sectionCls}>
+                                    {(() => {
+                                        const normalizedSocialBlock = normalizeSocialWidgetConfig(block as Record<string, unknown>)
+
+                                        return (
+                                            <>
+                                                <label className="text-xs font-medium uppercase text-gray-500">{s.socialWidget}</label>
+                                                <div className="mt-3 space-y-3">
+                                                    <div>
+                                                        <label className={labelCls}>{s.headline}</label>
+                                                        <Input
+                                                            defaultValue={(normalizedSocialBlock.headline as string) || ''}
+                                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
+                                                            variant="editor"
+                                                            className={editorInputClassName}
+                                                            placeholder={s.stayConnected}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelCls}>{s.displayStyle}</label>
+                                                        <div className="mt-2 grid grid-cols-2 gap-2">
+                                                            {['floating', 'inline'].map(variant => (
+                                                                <button
+                                                                    key={variant}
+                                                                    type="button"
+                                                                    onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
+                                                                    className={cn(
+                                                                        'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
+                                                                        (block.variant || 'floating') === variant
+                                                                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                                            : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
+                                                                    )}
+                                                                >
+                                                                    {variant}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                                                        <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+                                                            {s.platforms}
+                                                        </p>
+                                                        <p className="mt-2 text-xs text-slate-400">
+                                                            {s.platformsDesc}
+                                                        </p>
+                                                    </div>
+                                                    {(normalizedSocialBlock.links as SocialWidgetLink[]).map((link, i) => (
+                                                        <div key={`social-${i}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div className="flex items-center gap-3">
+                                                                    <span
+                                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white/90 text-[11px] font-black uppercase tracking-[0.04em]"
+                                                                        style={{
+                                                                            color: SOCIAL_PLATFORM_META[link.platform].accent,
+                                                                            borderColor: `${SOCIAL_PLATFORM_META[link.platform].accent}22`,
+                                                                        }}
+                                                                    >
+                                                                        {SOCIAL_PLATFORM_META[link.platform].mark}
+                                                                    </span>
+                                                                    <div>
+                                                                        <p className="text-sm font-medium text-white">
+                                                                            {(s.socialPlatforms as Record<string, { label: string }>)[link.platform]?.label || link.platform}
+                                                                        </p>
+                                                                        <p className="text-[11px] text-slate-500">
+                                                                            {link.platform === 'whatsapp' ? s.socialHintWhatsapp : s.socialHintDefault}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => updateArrayItem('links', i, 'enabled', link.enabled === false)}
+                                                                    className={cn(
+                                                                        'rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors',
+                                                                        link.enabled === false
+                                                                            ? 'bg-white/10 text-slate-400'
+                                                                            : 'bg-green-500/15 text-green-300',
+                                                                    )}
+                                                                >
+                                                                    {link.enabled === false ? s.hidden : s.visible}
+                                                                </button>
+                                                            </div>
+                                                            <Input
+                                                                defaultValue={link.url || ''}
+                                                                placeholder={(s.socialPlatforms as Record<string, { placeholder: string }>)[link.platform]?.placeholder || ''}
+                                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('links', i, 'url', e.target.value)}
+                                                                variant="editor"
+                                                                className={editorInputClassName}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )
+                                    })()}
+                                </div>
+                            )}
+
+                            {bt === 'cartWidget' && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">{s.cartWidget}</label>
+                                    <div className="mt-3 space-y-3">
+                                        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+                                                {s.checkoutBehavior}
+                                            </p>
+                                            <p className="mt-2 text-xs text-slate-400">
+                                                {s.checkoutDesc}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>{s.displayStyle}</label>
+                                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                                {['floating', 'inline'].map(variant => (
+                                                    <button
+                                                        key={variant}
+                                                        type="button"
+                                                        onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
+                                                        className={cn(
+                                                            'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
+                                                            (block.variant || 'floating') === variant
+                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
+                                                        )}
+                                                    >
+                                                        {variant}
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => updateArrayItem('links', i, 'enabled', link.enabled === false)}
-                                            className={cn(
-                                                'rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors',
-                                                link.enabled === false
-                                                    ? 'bg-white/10 text-slate-400'
-                                                    : 'bg-green-500/15 text-green-300',
-                                            )}
-                                        >
-                                            {link.enabled === false ? s.hidden : s.visible}
-                                        </button>
+                                        <div>
+                                            <label className={labelCls}>{s.buttonLabel}</label>
+                                            <Input
+                                                defaultValue={(block.label as string) || s.cart}
+                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', e.target.value)}
+                                                variant="editor"
+                                                className={editorInputClassName}
+                                                placeholder={s.cart}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>{s.showTextLabel}</label>
+                                            <div className="mt-2 flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onBlockUpdate(currentBlockIndex, { showLabel: !block.showLabel })}
+                                                    className={cn(
+                                                        'rounded-full px-3 py-2 text-xs font-medium transition-colors',
+                                                        block.showLabel
+                                                            ? 'bg-blue-500/15 text-blue-300'
+                                                            : 'bg-white/5 text-slate-400 hover:bg-white/10',
+                                                    )}
+                                                >
+                                                    {block.showLabel ? s.labelVisible : s.iconOnly}
+                                                </button>
+                                                <span className="text-[11px] text-slate-500">
+                                                    {s.badgeDesc}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <Input
-                                        defaultValue={link.url || ''}
-                                        placeholder={(s.socialPlatforms as Record<string, { placeholder: string }>)[link.platform]?.placeholder || ''}
-                                        onBlur={(e: FieldBlurEvent) => updateArrayItem('links', i, 'url', e.target.value)}
-                                        variant="editor"
-                                        className={editorInputClassName}
+                                </div>
+                            )}
+
+                            {/* Image Editor — for blocks with image/backgroundImage fields */}
+                            {block && (block.image || block.backgroundImage || block.heroImage) && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">Image</label>
+                                    <div className="mt-2">
+                                        <BlockImageEditor
+                                            imageUrl={String(block.image || block.backgroundImage || block.heroImage || '')}
+                                            altText={String(block.imageAlt || block.alt || '')}
+                                            onImageChange={(url) => {
+                                                const field = block.image ? 'image' : block.backgroundImage ? 'backgroundImage' : 'heroImage'
+                                                onBlockFieldChange(currentBlockIndex, field, url)
+                                            }}
+                                            onAltTextChange={(alt) => {
+                                                const field = block.imageAlt !== undefined ? 'imageAlt' : 'alt'
+                                                onBlockFieldChange(currentBlockIndex, field, alt)
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Breadcrumb Editor */}
+                            {block && block.blockType === 'breadcrumb' && (
+                                <div className={sectionCls}>
+                                    <BreadcrumbEditor
+                                        items={Array.isArray(block.items) ? block.items as { label: string; url: string }[] : []}
+                                        mode={(block.mode as 'auto' | 'manual') || 'auto'}
+                                        homeLabel={String(block.homeLabel || 'Home')}
+                                        separator={String(block.separator || '/')}
+                                        showIcon={Boolean(block.showIcon)}
+                                        onChange={(changes) => {
+                                            onBlockUpdate(currentBlockIndex, {
+                                                ...changes,
+                                                ...(changes.showIcon !== undefined ? { variant: changes.showIcon ? 'with-icon' : 'simple' } : {}),
+                                            })
+                                        }}
                                     />
                                 </div>
-                            ))}
-                        </div>
-                                </>
-                            )
-                        })()}
-                    </div>
-                )}
-
-                {bt === 'cartWidget' && (
-                    <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">{s.cartWidget}</label>
-                        <div className="mt-3 space-y-3">
-                            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-                                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
-                                    {s.checkoutBehavior}
-                                </p>
-                                <p className="mt-2 text-xs text-slate-400">
-                                    {s.checkoutDesc}
-                                </p>
-                            </div>
-                            <div>
-                                <label className={labelCls}>{s.displayStyle}</label>
-                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                    {['floating', 'inline'].map(variant => (
-                                        <button
-                                            key={variant}
-                                            type="button"
-                                            onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
-                                            className={cn(
-                                                'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                                (block.variant || 'floating') === variant
-                                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                            )}
-                                        >
-                                            {variant}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className={labelCls}>{s.buttonLabel}</label>
-                                <Input
-                                    defaultValue={(block.label as string) || s.cart}
-                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', e.target.value)}
-                                    variant="editor"
-                                    className={editorInputClassName}
-                                    placeholder={s.cart}
-                                />
-                            </div>
-                            <div>
-                                <label className={labelCls}>{s.showTextLabel}</label>
-                                <div className="mt-2 flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => onBlockUpdate(currentBlockIndex, { showLabel: !block.showLabel })}
-                                        className={cn(
-                                            'rounded-full px-3 py-2 text-xs font-medium transition-colors',
-                                            block.showLabel
-                                                ? 'bg-blue-500/15 text-blue-300'
-                                                : 'bg-white/5 text-slate-400 hover:bg-white/10',
-                                        )}
-                                    >
-                                        {block.showLabel ? s.labelVisible : s.iconOnly}
-                                    </button>
-                                    <span className="text-[11px] text-slate-500">
-                                        {s.badgeDesc}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Image Editor — for blocks with image/backgroundImage fields */}
-                {block && (block.image || block.backgroundImage || block.heroImage) && (
-                    <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">Image</label>
-                        <div className="mt-2">
-                            <BlockImageEditor
-                                imageUrl={String(block.image || block.backgroundImage || block.heroImage || '')}
-                                altText={String(block.imageAlt || block.alt || '')}
-                                onImageChange={(url) => {
-                                    const field = block.image ? 'image' : block.backgroundImage ? 'backgroundImage' : 'heroImage'
-                                    onBlockFieldChange(currentBlockIndex, field, url)
-                                }}
-                                onAltTextChange={(alt) => {
-                                    const field = block.imageAlt !== undefined ? 'imageAlt' : 'alt'
-                                    onBlockFieldChange(currentBlockIndex, field, alt)
-                                }}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Breadcrumb Editor */}
-                {block && block.blockType === 'breadcrumb' && (
-                    <div className={sectionCls}>
-                        <BreadcrumbEditor
-                            items={Array.isArray(block.items) ? block.items as { label: string; url: string }[] : []}
-                            mode={(block.mode as 'auto' | 'manual') || 'auto'}
-                            homeLabel={String(block.homeLabel || 'Home')}
-                            separator={String(block.separator || '/')}
-                            showIcon={Boolean(block.showIcon)}
-                            onChange={(changes) => {
-                                onBlockUpdate(currentBlockIndex, {
-                                    ...changes,
-                                    ...(changes.showIcon !== undefined ? { variant: changes.showIcon ? 'with-icon' : 'simple' } : {}),
-                                })
-                            }}
-                        />
-                    </div>
-                )}
+                            )}
 
 
-                {/* Theme editing removed from Block tab — available in Global tab */}
-                    </>
-                ) : null}
+                            {/* Theme editing removed from Block tab — available in Global tab */}
+                        </>
+                    ) : null}
                 </div>
             </div>
         </div>

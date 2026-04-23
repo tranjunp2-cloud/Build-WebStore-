@@ -4,6 +4,93 @@
 
 ---
 
+## 0. End-to-End Flow (Tổng quan)
+
+Toàn bộ luồng từ Story → Code → Deploy → QA:
+
+```
+┌─ STORY ──────────────────────────────────────────────────────────────┐
+│ PM viết docs/stories/F*.md → push staging                           │
+│     ↓ story-sync.yml                                                │
+│ Auto-create GitHub Issue (labels: user-story, wave, priority)       │
+│     ↓ UIUX + BA review → label "status:ready"                      │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ CODE ───────────────────────────────────────────────────────────────┐
+│ Dev pick issue → tạo branch: feat/FXX-YY-mô-tả                     │
+│     ↓ code + commit (conventional, lowercase, ≤72 chars)            │
+│     ↓ /ship (hoặc manual push + PR)                                 │
+│         ├─ merge staging → branch                                   │
+│         ├─ run tests + check coverage                               │
+│         ├─ pre-landing review                                       │
+│         ├─ commit + push                                            │
+│         └─ create PR → staging (auto-link issue #N)                 │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ PR AUTOMATION ──────────────────────────────────────────────────────┐
+│ pr-lifecycle.yml:                                                    │
+│     ├─ Auto-label: size (S/M/L/XL), type, area                     │
+│     ├─ Smart issue linking (story ID from title/branch)             │
+│     └─ Board → Code Review column                                   │
+│ ci.yml:                                                              │
+│     ├─ Lint → Typecheck → Test → Build                              │
+│     ├─ Quality Metrics comment (coverage, bundle, failing tests)    │
+│     └─ Docker build check                                           │
+│ codex-review.yml:                                                    │
+│     └─ AI Code Review (P1/P2 comments)                              │
+│ CODEOWNERS:                                                          │
+│     └─ Auto-request reviewer (FE/BE/Infra/Docs)                    │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ REVIEW + MERGE ─────────────────────────────────────────────────────┐
+│ Reviewer approve + CI pass → label "ready-to-merge"                 │
+│     ↓ Dev/PM merge PR                                               │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ DEPLOY + HEALTH CHECK ─────────────────────────────────────────────┐
+│ Push staging → ci.yml → sync secrets → deploy DigitalOcean          │
+│     ↓ staging-health.yml (auto-trigger)                             │
+│         ├─ HTTP health, DB check, env vars                          │
+│         └─ Lark notify result                                       │
+│     ↓ smart-notify → Lark CI/CD group                               │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ QA TESTING ─────────────────────────────────────────────────────────┐
+│ issue-lifecycle.yml:                                                 │
+│     PR merged → linked issues auto-label "qa:pending"               │
+│     Board → QA Testing column                                       │
+│     ↓ QC tests on staging                                           │
+│         ├─ Pass → QC close issue → Done ✅                          │
+│         └─ Fail → label "qa:failed" → bug report → dev fix → PR mới│
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ RELEASE ────────────────────────────────────────────────────────────┐
+│ All QA pass → PM create PR: staging → main                          │
+│     ↓ CI pass → merge → deploy production                           │
+│     ↓ release-changelog.yml → auto-generate changelog               │
+│     ↓ Lark notify: production deployed                              │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Lark Notification Channels
+
+| Channel | Nhận thông báo khi |
+|---------|-------------------|
+| **[PrimeWeb - V2] CI/CD** | Deploy, CI fail, health check |
+| **[Prime Web v2] Task - Report** | PR opened/merged, issue updates |
+| **[ECH MY] Squad Team** | Sprint rituals (start, standup, review) |
+
+### Stale Detection (Tự động)
+
+| Đối tượng | Điều kiện | Hành động |
+|-----------|-----------|-----------|
+| PR chưa review | >4h | Lark reminder 2x/ngày |
+| PR không hoạt động | >5 ngày | Label "stale" |
+| Issue assigned, không update | >3 ngày | Lark reminder |
+| Issue chưa assign | >24h | Alert PM |
+
+---
+
 ## 1. Git Rules
 
 ### Branch Naming
