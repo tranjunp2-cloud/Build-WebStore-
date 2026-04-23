@@ -2244,7 +2244,11 @@
             "domains": "Domain",
             "staff": "Kakitangan",
             "helpCenter": "Pusat Bantuan",
-            "logout": "Log Keluar"
+            "logout": "Log Keluar",
+            "unsavedConfirm": "Anda mempunyai perubahan yang belum disimpan. Tinggalkan editor tetap?",
+            "unsavedTitle": "Perubahan Belum Disimpan",
+            "unsavedLeave": "Tinggalkan Tetap",
+            "unsavedStay": "Kekal"
         },
         "blockLibrary": {
             "searchPlaceholder": "Cari blok...",
@@ -2308,7 +2312,22 @@
             "uploading": "Memuat naik...",
             "clickToUpload": "Klik untuk muat naik",
             "altSiteLogo": "Logo Laman",
-            "altFavicon": "Favicon"
+            "altFavicon": "Favicon",
+            "remove": "Buang",
+            "removeTitle": "Buang Logo",
+            "confirmRemove": "Buang logo ini? Ini akan mengosongkan logo dari laman anda.",
+            "replace": "Ganti",
+            "cancel": "Batal"
+        },
+        "ogImageEditor": {
+            "invalidFormat": "Hanya imej JPG, PNG, atau WebP diterima",
+            "success": "Imej sosial dimuat naik",
+            "error": "Gagal memuat naik imej",
+            "replace": "Ganti",
+            "remove": "Buang",
+            "uploading": "Memuat naik...",
+            "clickToUpload": "Klik untuk muat naik imej sosial",
+            "hint": "Saiz disyorkan: 1200 × 630 px (JPG, PNG, atau WebP)"
         },
         "navigation": {
             "title": "Pautan Navigasi",
@@ -2378,7 +2397,7 @@
             "navStyleStandard": "Standard",
             "navStyleCentered": "Berpusat",
             "globalSettings": "Tetapan Laman Global",
-            "seoSettings": "Tetapan SEO",
+            "seoSettings": "SEO & Sosial",
             "menuSettings": "Tetapan Menu",
             "blockSettings": "Tetapan Blok",
             "globalDesc": "Urus identiti perniagaan, maklumat hubungan, dan saluran sosial.",
@@ -2444,6 +2463,7 @@
             "columnN": "Lajur {n}",
             "defaultCustomerName": "Pelanggan",
             "defaultReviewQuote": "Pengalaman yang hebat!",
+            "socialImage": "Imej Perkongsian Sosial",
             "footerSettings": "Tetapan Footer",
             "footerStyle": "Gaya Footer",
             "footerStyleSimple": "Mudah",

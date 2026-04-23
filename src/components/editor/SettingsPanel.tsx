@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
+import { OgImageEditor } from './og-image-editor'
 import { BlockImageEditor } from './BlockImageEditor'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
@@ -217,6 +218,7 @@ function SettingsPanelInner({
         contact: true,
         social: true,
         theme: true,
+        seo: true,
     })
     const [isFooterBrandOpen, setIsFooterBrandOpen] = useState(false)
     const [isFooterSocialOpen, setIsFooterSocialOpen] = useState(false)
@@ -449,6 +451,22 @@ function SettingsPanelInner({
             ))}
 
             {renderGlobalAccordion('theme', s.themeColors, renderThemeContent())}
+
+            {renderGlobalAccordion('seo', s.seoSettings, (
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.socialImage}</label>
+                        <div className="mt-2">
+                            <OgImageEditor
+                                currentOgImage={typeof site?.seo?.ogImage === 'string' ? site.seo.ogImage : null}
+                                onOgImageChange={(url) => {
+                                    void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: url } })
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            ))}
         </div>
     )
 

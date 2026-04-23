@@ -2244,7 +2244,11 @@
             "domains": "Domains",
             "staff": "Staff",
             "helpCenter": "Help Center",
-            "logout": "Logout"
+            "logout": "Logout",
+            "unsavedConfirm": "You have unsaved changes. Leave the editor anyway?",
+            "unsavedTitle": "Unsaved Changes",
+            "unsavedLeave": "Leave Anyway",
+            "unsavedStay": "Stay"
         },
         "blockLibrary": {
             "searchPlaceholder": "Search blocks...",
@@ -2308,7 +2312,22 @@
             "uploading": "Uploading...",
             "clickToUpload": "Click to upload",
             "altSiteLogo": "Site Logo",
-            "altFavicon": "Favicon"
+            "altFavicon": "Favicon",
+            "remove": "Remove",
+            "removeTitle": "Remove Logo",
+            "confirmRemove": "Remove this logo? This will clear the logo from your site.",
+            "replace": "Replace",
+            "cancel": "Cancel"
+        },
+        "ogImageEditor": {
+            "invalidFormat": "Only JPG, PNG, or WebP images are accepted",
+            "success": "Social image uploaded",
+            "error": "Failed to upload image",
+            "replace": "Replace",
+            "remove": "Remove",
+            "uploading": "Uploading...",
+            "clickToUpload": "Click to upload social image",
+            "hint": "Recommended size: 1200 × 630 px (JPG, PNG, or WebP)"
         },
         "navigation": {
             "title": "Navigation Links",
@@ -2378,7 +2397,7 @@
             "navStyleStandard": "Standard",
             "navStyleCentered": "Centered",
             "globalSettings": "Global Site Settings",
-            "seoSettings": "SEO Settings",
+            "seoSettings": "SEO & Social",
             "menuSettings": "Menu Settings",
             "blockSettings": "Block Settings",
             "globalDesc": "Manage business identity, contact info, and social channels.",
@@ -2444,6 +2463,7 @@
             "columnN": "Column {n}",
             "defaultCustomerName": "Customer",
             "defaultReviewQuote": "Great experience!",
+            "socialImage": "Social Share Image",
             "footerSettings": "Footer Settings",
             "footerStyle": "Footer Style",
             "footerStyleSimple": "Simple",

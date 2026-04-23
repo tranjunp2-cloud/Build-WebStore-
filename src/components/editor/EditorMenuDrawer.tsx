@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
     ChevronDown,
     Globe,
@@ -35,10 +35,12 @@ type EditorMenuDrawerProps = {
     currentUserRole?: string
     userName?: string
     userInitial?: string
+    hasUnsavedChanges?: boolean
 }
 
-export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial }: EditorMenuDrawerProps) {
+export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial, hasUnsavedChanges }: EditorMenuDrawerProps) {
     const pathname = usePathname()
+    const router = useRouter()
     const { t, locale, toggleLocale } = useI18n()
     const menu = t.editor.menu
     const [expandedGroups, setExpandedGroups] = useState<string[]>(['/editor'])
@@ -103,6 +105,13 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
         }
     }
 
+    const guardedNavigate = (href: string) => (e: React.MouseEvent) => {
+        e.preventDefault()
+        if (hasUnsavedChanges && !window.confirm(menu.unsavedConfirm)) return
+        onClose()
+        router.push(href)
+    }
+
     if (!open) return null
 
     return (
@@ -160,7 +169,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                                                     <Link
                                                         key={child.href}
                                                         href={child.href}
-                                                        onClick={onClose}
+                                                        onClick={guardedNavigate(child.href)}
                                                         className={cn(
                                                             'flex h-10 items-center gap-[18px] rounded-[12px] px-4 text-[14px] font-medium transition-colors',
                                                             childActive
@@ -188,7 +197,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                onClick={onClose}
+                                onClick={guardedNavigate(item.href)}
                                 className={cn(
                                     'flex h-[44px] items-center gap-3 rounded-[16px] px-4 text-[14px] font-medium transition-colors',
                                     isActive
@@ -211,7 +220,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 <div className="flex flex-col gap-3 border-t border-white/[0.08] px-3 pt-[17px]" style={{ height: 182 }}>
                     {/* User info + Notification bell */}
                     <div className="flex items-center gap-3">
-                        <Link href="/dashboard/settings" className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
+                        <Link href="/dashboard/settings" onClick={guardedNavigate('/dashboard/settings')} className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0)] shadow-[0_0_0_2px_rgba(59,130,246,0.3)] text-[12px] font-bold text-white overflow-hidden">
                                 {userInitial || '?'}
                             </div>
@@ -255,7 +264,10 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
 
                     <button
                         type="button"
-                        onClick={handleLogout}
+                        onClick={() => {
+                            if (hasUnsavedChanges && !window.confirm(menu.unsavedConfirm)) return
+                            void handleLogout()
+                        }}
                         className="flex h-[44px] items-center gap-3 rounded-[16px] border border-white/[0.08] pl-4 text-[14px] font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
                     >
                         <LogOut className="h-4 w-4 shrink-0" />
