@@ -161,22 +161,53 @@ describe('EditorStore', () => {
             expect(useEditorStore.getState().saveStatus).toBe('saved')
         })
 
-        it('TC-F12.06: should include isDraft: true when saving', async () => {
+        it('TC-F12.06: should include isDraft, headerBlock, and footerBlock when saving', async () => {
             ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
-            
+
+            const header = { blockType: 'navigation', links: [{ label: 'Home' }] }
+            const footer = { blockType: 'footer', text: 'Footer' }
+            useEditorStore.getState().init('site-1', mockBlocks, mockTheme, 'Test Site', header, footer)
             useEditorStore.getState().updateBlock(0, { heading: 'Draft payload' })
             vi.advanceTimersByTime(3000)
             await Promise.resolve()
-            
+
             if ((global.fetch as any).mock.calls.length === 0) {
                 throw new Error("fetch was not called")
             }
 
             const fetchCallParams = (global.fetch as any).mock.calls[0][1]
             const requestBody = JSON.parse(fetchCallParams.body)
-            
+
             expect(requestBody.isDraft).toBe(true)
             expect(requestBody.blocks[0].heading).toBe('Draft payload')
+            expect(requestBody.headerBlock).toEqual(expect.objectContaining({ blockType: 'navigation' }))
+            expect(requestBody.footerBlock).toEqual(expect.objectContaining({ blockType: 'footer' }))
+        })
+
+        it('TC-F12.14: setAutoSaveEnabled(false) should prevent auto-save from firing', async () => {
+            useEditorStore.getState().setAutoSaveEnabled(false)
+            useEditorStore.getState().updateBlock(0, { heading: 'Should not auto-save' })
+            vi.advanceTimersByTime(5000)
+            await Promise.resolve()
+            expect(global.fetch).not.toHaveBeenCalled()
+            // hasUnsavedChanges still true — just not persisted
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(true)
+        })
+
+        it('TC-F12.15: setAutoSaveEnabled(true) should re-enable auto-save', async () => {
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+            useEditorStore.getState().setAutoSaveEnabled(false)
+            useEditorStore.getState().updateBlock(0, { heading: 'Pending' })
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve()
+            expect(global.fetch).not.toHaveBeenCalled()
+
+            // Re-enable and trigger a new change — should auto-save
+            useEditorStore.getState().setAutoSaveEnabled(true)
+            useEditorStore.getState().updateBlock(0, { heading: 'After re-enable' })
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve()
+            expect(global.fetch).toHaveBeenCalledTimes(1)
         })
 
         it('TC-F12.12: should handle token expiration (401) gracefully without retrying', async () => {

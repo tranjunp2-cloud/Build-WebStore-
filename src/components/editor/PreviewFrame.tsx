@@ -14,6 +14,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { useI18n } from '@/i18n'
 
+export interface PreviewFrameHandle {
+    /** Send a postMessage to the preview iframe without triggering a full reload. */
+    sendToIframe: (message: object) => void
+}
+
 interface PreviewFrameProps {
     siteId: string
     pageId: string | null
@@ -33,6 +38,8 @@ interface PreviewFrameProps {
     disableDragDrop?: boolean
     /** Called after inline text editing stops — should save + reload preview. */
     onInlineEditSave?: () => Promise<boolean | void>
+    /** Called after mount with an imperative handle; called with null on unmount. */
+    onHandleReady?: (handle: PreviewFrameHandle | null) => void
 }
 
 type HoverRect = {
@@ -216,6 +223,7 @@ function PreviewFrameInner({
     onBlockAIEdit,
     disableDragDrop = false,
     onInlineEditSave,
+    onHandleReady,
 }: PreviewFrameProps) {
     const { t } = useI18n()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
@@ -253,6 +261,17 @@ function PreviewFrameInner({
     const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
     const frameElementRef = useRef<HTMLIFrameElement | null>(null)
     const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null)
+
+    // Expose imperative handle so parent can send postMessages without a full reload
+    useEffect(() => {
+        if (!onHandleReady) return
+        onHandleReady({
+            sendToIframe: (msg) => frameElementRef.current?.contentWindow?.postMessage(msg, window.location.origin),
+        })
+        return () => onHandleReady(null)
+    // onHandleReady is a stable callback ref from parent — only run on mount/unmount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // Live theme update — send CSS variables to iframe without reload
     useEffect(() => {

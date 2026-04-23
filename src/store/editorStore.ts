@@ -128,6 +128,7 @@ type EditorActions = {
     markSaved: () => void
     markPublished: () => void
     setIsSaving: (saving: boolean) => void
+    setAutoSaveEnabled: (val: boolean) => void
 
     // Reset
     reset: () => void
@@ -440,14 +441,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     // ── Save (F-07) ─────────────────────────────────────────────────────
     handleContentChange: () => {
-        const { autoSaveTimer, siteId, isInlineEditing } = get()
+        const { autoSaveTimer, siteId, isInlineEditing, autoSaveEnabled } = get()
         if (!siteId) return
 
+        // Always mark dirty — auto-save disabled only suspends scheduling, not tracking
         set({ hasUnsavedChanges: true, saveStatus: 'idle' })
 
-        // Suspend auto-save while inline editing is active. The TEXT_EDITING_STOPPED
-        // pipeline (performSave after editing) handles persisting the final state.
-        if (isInlineEditing) return
+        // Suspend scheduling while auto-save is disabled (e.g. template applied) or
+        // inline editing is active (TEXT_EDITING_STOPPED pipeline handles that case)
+        if (!autoSaveEnabled || isInlineEditing) return
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
 
@@ -471,9 +473,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const RETRY_DELAYS = [5000, 10000, 20000]
 
         const attemptSave = async (retryCount = 0): Promise<boolean> => {
-            // Re-read currentPageId from store each attempt to prevent stale closure
-            // after page switch (blocks/theme already re-read below)
-            const { blocks, theme, currentPageId: pageIdNow } = get()
+            // Re-read all state each attempt to prevent stale closure after page switch
+            const { blocks, theme, headerBlock, footerBlock, currentPageId: pageIdNow } = get()
             try {
                 const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
                 if (pageIdNow) {
@@ -482,7 +483,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                 const res = await fetch(saveUrl.toString(), {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ blocks, theme, isDraft: true }),
+                    credentials: 'include',
+                    body: JSON.stringify({ blocks, theme, headerBlock, footerBlock, isDraft: true }),
                 })
 
                 if (res.ok) {
@@ -520,6 +522,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     markSaved: () => set({ hasUnsavedChanges: false, hasUnpublishedChanges: true, lastSavedAt: Date.now(), saveStatus: 'saved' }),
     markPublished: () => set({ hasUnpublishedChanges: false }),
     setIsSaving: (saving) => set({ isSaving: saving }),
+    setAutoSaveEnabled: (val) => set({ autoSaveEnabled: val }),
 
     // ── Header/Footer (F-05-07) ──────────────────────────────────────────
 
@@ -536,8 +539,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             headerBlock: newHeader,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     updateFooterBlock: (changes) => {
@@ -553,19 +556,25 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             footerBlock: newFooter,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
-    reset: () => set({
-        siteId: null, blocks: [], theme: {}, siteName: '',
-        headerBlock: null, footerBlock: null,
-        pages: [], currentPageId: null,
-        history: [], historyIndex: -1,
-        isAIStreaming: false,
-        isInlineEditing: false,
-        hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
-        autoSaveEnabled: true, autoSaveIntervalMs: 3000,
-        saveStatus: 'idle', autoSaveTimer: null,
-    }),
+    reset: () => {
+        // Cancel any pending auto-save/retry timer before clearing state — prevents
+        // stale cross-site writes when the user navigates to a different site.
+        const { autoSaveTimer } = get()
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+        set({
+            siteId: null, blocks: [], theme: {}, siteName: '',
+            headerBlock: null, footerBlock: null,
+            pages: [], currentPageId: null,
+            history: [], historyIndex: -1,
+            isAIStreaming: false,
+            isInlineEditing: false,
+            hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
+            autoSaveEnabled: true, autoSaveIntervalMs: 3000,
+            saveStatus: 'idle', autoSaveTimer: null,
+        })
+    },
 }))
