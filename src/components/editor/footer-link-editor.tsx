@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/i18n'
 import {
     DndContext, closestCenter,
     PointerSensor, TouchSensor, KeyboardSensor,
@@ -35,6 +36,8 @@ interface SortableLinkProps {
 }
 
 function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProps) {
+    const { t } = useI18n()
+    const s = t.editor.settings
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
 
     return (
@@ -47,7 +50,7 @@ function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProp
                 {/* Drag handle — listeners scoped here so inputs are unaffected */}
                 <button
                     type="button"
-                    aria-label="Drag to reorder"
+                    aria-label={s.dragToReorder}
                     className="mt-1 shrink-0 touch-none cursor-grab text-slate-600 hover:text-slate-400 active:cursor-grabbing"
                     {...listeners}
                     {...attributes}
@@ -82,7 +85,7 @@ function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProp
                 <button
                     type="button"
                     onClick={onRemove}
-                    aria-label="Remove link"
+                    aria-label={s.removeLink}
                     className="flex h-7 w-7 shrink-0 items-start justify-center pt-[6px] text-slate-400 transition-colors hover:text-red-400"
                 >
                     <Trash2 className="h-4 w-4" />
@@ -100,6 +103,8 @@ interface FooterLinkEditorProps {
 }
 
 export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
+    const { t, ti } = useI18n()
+    const s = t.editor.settings
     const [openCols, setOpenCols] = useState<Set<number>>(new Set())
 
     const sensors = useSensors(
@@ -191,11 +196,11 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
                             <div className="space-y-3 border-t border-[rgba(59,130,246,0.04)] px-3 pb-3 pt-3">
 
                                 <div className="space-y-1.5">
-                                    <label className={labelCls}>Column Title</label>
+                                    <label className={labelCls}>{s.columnTitle}</label>
                                     <Input
                                         key={`col-title-${ci}-${col.title}`}
                                         defaultValue={col.title}
-                                        placeholder="Column Title"
+                                        placeholder={s.columnTitle}
                                         onBlur={(e) => updateColTitle(ci, e.target.value)}
                                         variant="editor"
                                         className="h-8 text-[14px]"
@@ -204,7 +209,7 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
 
                                 {links.length > 0 && (
                                     <div className="space-y-1.5">
-                                        <label className={labelCls}>Links</label>
+                                        <label className={labelCls}>{s.links}</label>
                                         <DndContext
                                             sensors={sensors}
                                             collisionDetection={closestCenter}
@@ -239,18 +244,18 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
                                         className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-[rgba(59,130,246,0.07)] bg-[#0B1120] py-2 text-[12px] font-medium leading-4 text-[#F8FAFC] transition-colors hover:border-[rgba(59,130,246,0.15)] hover:bg-[#0d1528]"
                                     >
                                         <Plus className="h-4 w-4" />
-                                        Add Link
+                                        {s.addLink}
                                     </button>
                                 )}
 
                                 <button
                                     type="button"
                                     onClick={() => removeCol(ci)}
-                                    aria-label={`Remove column ${ci + 1}`}
+                                    aria-label={ti(s.columnN, { n: ci + 1 })}
                                     className="flex w-full items-center justify-center gap-1.5 rounded-[10px] border border-red-500/10 bg-transparent py-1.5 text-[11px] text-red-400/60 transition-colors hover:border-red-500/30 hover:text-red-400"
                                 >
                                     <Trash2 className="h-3.5 w-3.5" />
-                                    Remove Column
+                                    {s.removeColumn}
                                 </button>
                             </div>
                         )}
@@ -265,7 +270,7 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
                     className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 py-2 text-xs text-slate-400 transition-colors hover:border-white/20 hover:text-slate-300"
                 >
                     <Plus className="h-3.5 w-3.5" />
-                    Add Column
+                    {s.addColumn}
                 </button>
             )}
         </div>

@@ -726,18 +726,18 @@ function SettingsPanelInner({
                     <div className={sectionCls}>
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-base leading-none">🎨</span>
-                            <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">Footer Settings</span>
+                            <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.footerSettings}</span>
                         </div>
 
                         {/* Footer Style */}
                         <div className="mb-4">
-                            <label className={labelCls}>Footer Style</label>
+                            <label className={labelCls}>{s.footerStyle}</label>
                             <div className="mt-2 grid grid-cols-2 gap-2">
                                 {([
-                                    { key: 'simple', label: 'Simple' },
-                                    { key: 'minimal', label: 'Minimal' },
-                                    { key: 'centered-stack', label: 'Centered' },
-                                    { key: 'dark-gradient', label: 'Dark' },
+                                    { key: 'simple', label: s.footerStyleSimple },
+                                    { key: 'minimal', label: s.footerStyleMinimal },
+                                    { key: 'centered-stack', label: s.footerStyleCentered },
+                                    { key: 'dark-gradient', label: s.dark },
                                 ] as { key: string; label: string }[]).map(({ key, label }) => (
                                     <button
                                         key={key}
@@ -763,7 +763,7 @@ function SettingsPanelInner({
                                 onClick={() => setIsFooterBrandOpen(v => !v)}
                                 className="flex w-full items-center justify-between rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 py-2.5 text-[13px] font-medium text-white"
                             >
-                                <span>🏢 Brand &amp; Logo</span>
+                                <span>🏢 {s.brandLogo}</span>
                                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterBrandOpen && 'rotate-180')} />
                             </button>
                             {isFooterBrandOpen && (() => {
@@ -772,7 +772,7 @@ function SettingsPanelInner({
                                 <div className="mt-1 space-y-3 rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 pb-3 pt-2.5">
                                     {/* Upload Logo */}
                                     <div>
-                                        <label className={labelCls}>Upload Logo</label>
+                                        <label className={labelCls}>{s.uploadLogo}</label>
                                         <button
                                             type="button"
                                             onClick={() => footerLogoRef.current?.click()}
@@ -785,12 +785,12 @@ function SettingsPanelInner({
                                                 <>
                                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                                     <img src={currentLogoUrl} alt="Logo preview" className="max-h-14 max-w-full object-contain" />
-                                                    <span className="text-[10px] text-slate-500">Click to change</span>
+                                                    <span className="text-[10px] text-slate-500">{s.clickToChange}</span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <UploadCloud className="h-5 w-5" />
-                                                    <span className="text-[12px] font-medium">Click to upload</span>
+                                                    <span className="text-[12px] font-medium">{s.clickToUpload}</span>
                                                 </>
                                             )}
                                         </button>
@@ -804,7 +804,7 @@ function SettingsPanelInner({
                                     </div>
                                     {/* Paste URL */}
                                     <div>
-                                        <p className="text-[12px] text-slate-400">Or paste image URL below</p>
+                                        <p className="text-[12px] text-slate-400">{s.pasteImageUrl}</p>
                                         <Input
                                             key={`footer-logo-url-${fbk}-${currentLogoUrl}`}
                                             defaultValue={currentLogoUrl}
@@ -812,7 +812,7 @@ function SettingsPanelInner({
                                             onBlur={(e: FieldBlurEvent) => {
                                                 const url = e.target.value.trim()
                                                 if (url && !isValidUrl(url)) {
-                                                    toast.error('Invalid URL format')
+                                                    toast.error(s.invalidUrlFormat)
                                                     e.target.value = currentLogoUrl
                                                     return
                                                 }
@@ -824,11 +824,11 @@ function SettingsPanelInner({
                                     </div>
                                     {/* Company Description */}
                                     <div>
-                                        <label className={labelCls}>Company Description</label>
+                                        <label className={labelCls}>{s.companyDescription}</label>
                                         <Textarea
                                             key={`footer-tagline-${fbk}`}
                                             defaultValue={(footerBlock?.tagline as string) || ''}
-                                            placeholder="Brief description about your company..."
+                                            placeholder={s.companyDescPlaceholder}
                                             onBlur={(e: FieldBlurEvent) => onFooterUpdate?.({ tagline: sanitizeInput(e.target.value) })}
                                             className="mt-1 min-h-[66px] resize-none rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#0b1120] px-3 py-2 text-[12px] text-white placeholder:text-slate-400 outline-none focus:border-blue-500/30"
                                         />
@@ -851,7 +851,7 @@ function SettingsPanelInner({
                                 onClick={() => setIsFooterSocialOpen(v => !v)}
                                 className="flex w-full items-center justify-between rounded-xl border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)] px-3 py-2.5 text-[13px] font-medium text-white"
                             >
-                                <span>Social Media</span>
+                                <span>{s.socialMedia}</span>
                                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isFooterSocialOpen && 'rotate-180')} />
                             </button>
                             {isFooterSocialOpen && (
@@ -894,7 +894,7 @@ function SettingsPanelInner({
 
                         {/* Copyright Text */}
                         <div className="mb-4">
-                            <label className={labelCls}>Copyright Text</label>
+                            <label className={labelCls}>{s.copyrightText}</label>
                             <Input
                                 key={`footer-copyright-${fbk}`}
                                 defaultValue={(footerBlock?.copyrightText as string) || ''}
@@ -907,7 +907,7 @@ function SettingsPanelInner({
 
                         {/* Background Color */}
                         <div className="mb-4">
-                            <label className={labelCls}>Background Color</label>
+                            <label className={labelCls}>{s.backgroundColor}</label>
                             <div className="mt-1.5 flex gap-2">
                                 <Input
                                     key={`footer-bgcolor-${fbk}-${(footerBlock?.backgroundColor as string) || ''}`}
@@ -921,7 +921,7 @@ function SettingsPanelInner({
                                     type="color"
                                     value={(footerBlock?.backgroundColor as string) || '#0f172a'}
                                     onChange={(e) => onFooterUpdate?.({ backgroundColor: e.target.value })}
-                                    aria-label="Pick background color"
+                                    aria-label={s.pickBgColor}
                                     className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5"
                                 />
                             </div>
