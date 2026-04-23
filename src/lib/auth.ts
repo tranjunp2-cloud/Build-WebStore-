@@ -102,6 +102,8 @@ export async function getCurrentUser(req?: Request) {
 
         return null
     } catch (error) {
+        // error == null catches both null and undefined thrown by payload.auth() for invalid/expired tokens
+        if (error == null) return null
         const msg = error instanceof Error ? error.message : String(error)
         if (msg.includes('signature verification failed')) {
             console.error(

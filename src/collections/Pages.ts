@@ -1387,7 +1387,13 @@ export const Pages: CollectionConfig = {
                 VideoShowcaseBlock,
                 ProductQuickViewBlock,
                 FeatureComparisonBlock,
-            ] as Block[],
+            ].map(b => ({
+                ...b,
+                fields: [
+                    ...(b as { fields: unknown[] }).fields,
+                    { name: 'blockSpacing', type: 'json' as const },
+                ],
+            })) as Block[],
         },
         {
             name: 'seo',
