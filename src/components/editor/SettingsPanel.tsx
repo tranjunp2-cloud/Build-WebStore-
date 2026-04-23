@@ -13,6 +13,7 @@ import { LogoEditor } from './LogoEditor'
 import { BlockImageEditor } from './BlockImageEditor'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
+import { FooterLinkEditor } from './footer-link-editor'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { PageData } from '@/store/editorStore'
@@ -836,6 +837,12 @@ function SettingsPanelInner({
                                 )
                             })()}
                         </div>
+
+                        {/* Column Link Editor — rendered directly, no extra wrapper label */}
+                        <FooterLinkEditor
+                            columns={(footerBlock?.columns as FooterColumn[]) || []}
+                            onUpdate={(cols) => onFooterUpdate?.({ columns: cols })}
+                        />
 
                         {/* Social Media */}
                         <div className="mb-4">
