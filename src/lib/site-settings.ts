@@ -21,15 +21,20 @@ export type SiteBranding = {
 
 const SOCIAL_PLATFORM_ORDER = ['facebook', 'whatsapp', 'instagram', 'linkedin', 'youtube', 'twitter', 'tiktok'] as const
 
+function stripHtml(value: string | undefined | null): string {
+    if (!value) return ''
+    return value.replace(/<[^>]*>/g, '').trim()
+}
+
 export function mergeContactInfoWithSite<T extends { email?: string; phone?: string; address?: string }>(
     block: T,
     siteContactInfo?: SiteContactInfo | null,
 ) {
     return {
         ...block,
-        email: block.email || siteContactInfo?.email || '',
-        phone: block.phone || siteContactInfo?.phone || '',
-        address: block.address || siteContactInfo?.address || '',
+        email: stripHtml(block.email || siteContactInfo?.email),
+        phone: stripHtml(block.phone || siteContactInfo?.phone),
+        address: stripHtml(block.address || siteContactInfo?.address),
     }
 }
 
