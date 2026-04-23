@@ -1087,6 +1087,30 @@ const PortfolioGridBlock = {
     ],
 }
 
+const GalleryMasonryBlock = {
+    slug: 'gallery-masonry',
+    labels: { singular: 'Gallery Masonry', plural: 'Gallery Masonries' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'masonry',
+            options: [
+                { label: 'Masonry', value: 'masonry' },
+                { label: 'Grid 3', value: 'grid-3' },
+                { label: 'Grid 4', value: 'grid-4' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        {
+            name: 'images', type: 'array',
+            fields: [
+                { name: 'url', type: 'text' },
+                { name: 'alt', type: 'text' },
+                { name: 'caption', type: 'text' },
+            ],
+        },
+    ],
+}
+
 // ── Industry-specific blocks (composer-driven, aiVisible=false) ─────────────
 // These 6 blocks were authored as React components but never registered in
 // Payload, so sanitizeBlocksForPayload was dropping them. Registering here
@@ -1380,6 +1404,7 @@ export const Pages: CollectionConfig = {
                 ClientLogosBlock,
                 MenuFoodBlock,
                 PortfolioGridBlock,
+                GalleryMasonryBlock,
                 // Industry-specific (composer-driven, aiVisible=false in block meta)
                 DoctorProfileBlock,
                 PropertyCardBlock,

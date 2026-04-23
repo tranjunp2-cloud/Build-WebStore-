@@ -2016,6 +2016,25 @@ const MIGRATIONS = [
       title varchar, description varchar, image_id integer, category varchar, link_url varchar
     );`,
   },
+  {
+    name: 'pages_blocks_gallery_masonry.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_gallery_masonry" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_gallery_masonry_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_gallery_masonry_images" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      url text, alt varchar, caption varchar
+    );`,
+  },
   // ── _pages_v (version tables) for new AI blocks ──
   // id: serial (integer auto-increment), _path: text NOT NULL
   {
@@ -2286,6 +2305,21 @@ const MIGRATIONS = [
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_portfolio_grid_projects" (
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
       _uuid varchar, title varchar, description varchar, image_id integer, category varchar, link_url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_gallery_masonry.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery_masonry" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_gallery_masonry_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery_masonry_images" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, url text, alt varchar, caption varchar
     );`,
   },
   // ── F16: Notifications table ─────────────────────────────────────
@@ -3031,7 +3065,7 @@ const MIGRATIONS = [
     'service_cards', 'carousel', 'step_process', 'divider',
     'announcement_bar', 'whatsapp_button', 'google_maps', 'accordion',
     'countdown_timer', 'social_proof', 'breadcrumb', 'client_logos',
-    'menu_food', 'portfolio_grid', 'doctor_profile', 'property_card',
+    'menu_food', 'portfolio_grid', 'gallery_masonry', 'doctor_profile', 'property_card',
     'class_schedule', 'video_showcase', 'product_quick_view',
     'feature_comparison',
   ].flatMap(slug => [
