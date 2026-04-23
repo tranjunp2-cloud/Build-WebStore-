@@ -2485,7 +2485,16 @@
             "removeColumn": "Buang Lajur",
             "addLink": "Tambah Pautan",
             "removeLink": "Buang pautan",
-            "dragToReorder": "Seret untuk susun semula"
+            "dragToReorder": "Seret untuk susun semula",
+            "breadcrumbSettings": "Tetapan Roti",
+            "breadcrumbMode": "Mod",
+            "breadcrumbAuto": "Auto",
+            "breadcrumbAutoDesc": "Jana laluan roti secara automatik daripada laluan URL",
+            "breadcrumbHomeLabel": "Label Laman Utama",
+            "breadcrumbSeparator": "Pemisah",
+            "breadcrumbShowOnAllPages": "Tunjuk di Semua Halaman",
+            "breadcrumbShowOnAllPagesDesc": "Papar roti di setiap halaman",
+            "breadcrumbPreview": "Pratonton"
         },
         "statusBar": {
             "connected": "Disambungkan",
