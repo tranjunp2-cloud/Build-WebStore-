@@ -2327,7 +2327,8 @@
             "remove": "Remove",
             "uploading": "Uploading...",
             "clickToUpload": "Click to upload social image",
-            "hint": "Recommended size: 1200 × 630 px (JPG, PNG, or WebP)"
+            "hint": "Recommended size: 1200 × 630 px (JPG, PNG, or WebP)",
+            "alt": "Social share image"
         },
         "navigation": {
             "title": "Navigation Links",

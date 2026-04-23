@@ -128,6 +128,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
         const action = pendingAction
         setPendingAction(null)
         if (action === 'logout') {
+            onClose()
             void handleLogout()
         } else if (action) {
             onClose()

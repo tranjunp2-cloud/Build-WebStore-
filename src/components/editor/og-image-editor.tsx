@@ -33,7 +33,7 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
             const processed = await processImageFile(file)
             const formData = new FormData()
             formData.append('file', processed)
-            formData.append('alt', 'Social share image')
+            formData.append('alt', oi.alt)
             const uploaded = await uploadMediaAction(formData)
             if (!uploaded?.url) throw new Error('Upload returned no URL')
             onOgImageChange(uploaded.url as string)

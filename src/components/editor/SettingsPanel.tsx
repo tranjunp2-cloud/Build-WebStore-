@@ -354,7 +354,11 @@ function SettingsPanelInner({
                                 currentLogo={(siteBranding.logo as string) || ((headerBlock as Record<string, unknown>)?.logo as string) || null}
                                 onLogoChange={(logoUrl, faviconUrl) => {
                                     const siteBrandingChanges: Record<string, unknown> = { logo: logoUrl }
-                                    if (faviconUrl) siteBrandingChanges.favicon = faviconUrl
+                                    if (faviconUrl) {
+                                        siteBrandingChanges.favicon = faviconUrl
+                                    } else if (!logoUrl) {
+                                        siteBrandingChanges.favicon = ''
+                                    }
                                     onHeaderUpdate?.(siteBrandingChanges)
                                     onFooterUpdate?.(siteBrandingChanges)
                                     void onSiteSettingsChange?.({ branding: siteBrandingChanges })
@@ -703,7 +707,11 @@ function SettingsPanelInner({
                     currentLogo={((headerBlock as Record<string, unknown>)?.logo as string) || null}
                     onLogoChange={(logoUrl, faviconUrl) => {
                         const changes: Record<string, unknown> = { logo: logoUrl }
-                        if (faviconUrl) changes.favicon = faviconUrl
+                        if (faviconUrl) {
+                            changes.favicon = faviconUrl
+                        } else if (!logoUrl) {
+                            changes.favicon = ''
+                        }
                         onHeaderUpdate?.(changes)
                         if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
                     }}

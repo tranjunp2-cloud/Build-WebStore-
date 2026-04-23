@@ -2327,7 +2327,8 @@
             "remove": "Buang",
             "uploading": "Memuat naik...",
             "clickToUpload": "Klik untuk muat naik imej sosial",
-            "hint": "Saiz disyorkan: 1200 × 630 px (JPG, PNG, atau WebP)"
+            "hint": "Saiz disyorkan: 1200 × 630 px (JPG, PNG, atau WebP)",
+            "alt": "Imej perkongsian sosial"
         },
         "navigation": {
             "title": "Pautan Navigasi",
