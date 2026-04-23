@@ -1779,14 +1779,6 @@ function buildBlockFromSpec(
       return { ...buildStats(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'gallery':
       return { ...buildGallery(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
-    case 'gallery-masonry': {
-      const count = spec.count ?? 6
-      const images = Array.from({ length: count }, (_, i) => ({
-        url: NEUTRAL_FALLBACK_SVG,
-        alt: `${biz.name} photo ${i + 1}`,
-      }))
-      return { blockType: 'gallery-masonry', variant: resolvedVariant ?? 'masonry', headline: `${biz.name} Gallery`, images }
-    }
     case 'faq':
       return { ...buildFAQ(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'cta':
