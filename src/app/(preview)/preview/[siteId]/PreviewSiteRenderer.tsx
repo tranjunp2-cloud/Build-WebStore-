@@ -8,9 +8,10 @@ interface Props {
     site: SiteRendererProps['site']
     page: SiteRendererProps['page']
     pages: NavPage[]
+    isBuilderPreview?: boolean
 }
 
-export function PreviewSiteRenderer({ site, page: initialPage, pages }: Props) {
+export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderPreview }: Props) {
     const [page, setPage] = useState(initialPage)
 
     const handleBlockFieldChange = useCallback((blockIndex: number, field: string, value: unknown) => {
@@ -43,6 +44,7 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages }: Props) {
             page={page}
             pages={pages}
             isEditor={true}
+            isBuilderPreview={isBuilderPreview}
             isOwner={true}
             onBlockFieldChange={handleBlockFieldChange}
         />

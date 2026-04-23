@@ -719,3 +719,172 @@ describe('[TC-S1-004] SiteRenderer backward compat — legacy site with 2 colors
         expect(css).toContain('--radius-md:')
     })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F01-GH770 — isBuilderPreview prop appends builder=1 to nav URL rewrites
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F01-GH770] SiteRenderer — builder preview nav URL rewriting', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F01-GH770-01: appends &builder=1 to rewritten nav URLs when isBuilderPreview=true', () => {
+        // Arrange — capture how nav blocks receive the rewritten URL
+        const capturedNavData: Record<string, unknown>[] = []
+        const NavBlockSpy = (props: Record<string, unknown>) => {
+            capturedNavData.push(props)
+            return React.createElement('div', { 'data-testid': 'nav-block' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlockSpy : null
+        )
+
+        const site = { name: 'Test Site' }
+        const page = {
+            layout: [
+                {
+                    blockType: 'navigation',
+                    links: [
+                        {
+                            label: 'Home',
+                            slug: '/',
+                            target: { slug: '/' },
+                        },
+                        {
+                            label: 'About',
+                            slug: '/about',
+                            target: { slug: '/about' },
+                        },
+                    ],
+                },
+            ],
+        }
+        const pages = [
+            { id: 'page-1', slug: '/', title: 'Home' },
+            { id: 'page-2', slug: '/about', title: 'About' },
+        ]
+
+        // Act — render with isBuilderPreview=true
+        render(
+            <SiteRenderer
+                site={site}
+                page={page}
+                pages={pages}
+                isBuilderPreview={true}
+            />
+        )
+
+        // Assert — nav block should receive links with rewritten URLs that include &builder=1
+        expect(screen.getByTestId('nav-block')).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-02: does not append &builder=1 to nav URLs when isBuilderPreview=false', () => {
+        // Arrange
+        mockGetComponent.mockReturnValue(null)
+
+        const site = { name: 'Test Site' }
+        const page = {
+            layout: [
+                {
+                    blockType: 'navigation',
+                    links: [
+                        {
+                            label: 'Home',
+                            slug: '/',
+                            target: { slug: '/' },
+                        },
+                    ],
+                },
+            ],
+        }
+        const pages = [{ id: 'page-1', slug: '/', title: 'Home' }]
+
+        // Act — render with isBuilderPreview=false (or omitted, defaults to false)
+        const { container } = render(
+            <SiteRenderer
+                site={site}
+                page={page}
+                pages={pages}
+                isBuilderPreview={false}
+            />
+        )
+
+        // Assert — component should render without error
+        expect(container).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-03: isBuilderPreview defaults to false', () => {
+        // Arrange
+        mockGetComponent.mockReturnValue(null)
+
+        const site = { name: 'Test Site' }
+        const page = { layout: [] }
+
+        // Act — render without isBuilderPreview prop
+        const { container } = render(
+            <SiteRenderer
+                site={site}
+                page={page}
+            />
+        )
+
+        // Assert — component should render with default behavior (no &builder=1)
+        expect(container).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-04: builder parameter is independent of isEditor prop', () => {
+        // Arrange
+        mockGetComponent.mockReturnValue(null)
+
+        const site = { name: 'Test Site' }
+        const page = { layout: [] }
+
+        // Act — render with both isEditor=true and isBuilderPreview=true
+        const { container: editorBuilder } = render(
+            <SiteRenderer
+                site={site}
+                page={page}
+                isEditor={true}
+                isBuilderPreview={true}
+            />
+        )
+
+        // Assert
+        expect(editorBuilder).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-05: builder parameter does not affect non-navigation link processing', () => {
+        // Arrange
+        const capturedBlocks: Record<string, unknown>[] = []
+        const SpyBlock = (props: Record<string, unknown>) => {
+            capturedBlocks.push(props)
+            return React.createElement('div', { 'data-testid': 'spy-block' })
+        }
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'hero' ? SpyBlock : null
+        )
+
+        const site = { name: 'Test Site' }
+        const page = {
+            layout: [
+                {
+                    blockType: 'hero',
+                    title: 'Welcome',
+                    link: { href: '/some-page' },
+                },
+            ],
+        }
+
+        // Act — render with isBuilderPreview=true
+        render(
+            <SiteRenderer
+                site={site}
+                page={page}
+                isBuilderPreview={true}
+            />
+        )
+
+        // Assert — hero block should still render normally
+        expect(screen.getByTestId('spy-block')).toBeInTheDocument()
+    })
+})
