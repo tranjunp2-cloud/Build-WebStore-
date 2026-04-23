@@ -12,15 +12,17 @@ export function replaceDropHintCSS(css: string, text: string): string {
 
 export function PreviewScripts() {
     useEffect(() => {
-        let parentOrigin = '*'
+        let parentOrigin = window.location.origin
         try {
             parentOrigin = new URL(document.referrer).origin
         } catch (e) {
-            parentOrigin = window.location.origin // fallback
+            // keep window.location.origin fallback
         }
 
         const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
         const excludedBlockTypes = ['navigation', 'footer']
+        // Blocks whose images come from external product catalog — image editing not supported
+        const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
         
         let hoveredEl: HTMLElement | null = null
         let hoverTimer: number | null = null
@@ -85,20 +87,29 @@ export function PreviewScripts() {
                 }, parentOrigin)
             }
 
-            if (target.tagName === 'IMG') {
-                if (hoverTimer) clearTimeout(hoverTimer)
-                hoverTimer = window.setTimeout(() => {
-                    const rect = target.getBoundingClientRect()
-                    window.parent.postMessage({
-                        type: 'IMAGE_HOVERED',
-                        rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-                        src: (target as HTMLImageElement).src,
-                        blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10),
-                        blockType: blockContainer.getAttribute('data-block-type')
-                    }, parentOrigin)
-                }, 200)
+            // Detect both real <img> and non-img placeholder elements (e.g. InitialsAvatar, LogoPlaceholder)
+            // that carry data-image-index so they can also trigger image-replace in the editor.
+            const imgEl = target.tagName === 'IMG' ? target
+                : (target.getAttribute('data-image-index') !== null ? target : null)
+            if (imgEl) {
+                const imgBlockType = blockContainer.getAttribute('data-block-type') || ''
+                if (!imageReadOnlyBlockTypes.has(imgBlockType)) {
+                    if (hoverTimer) clearTimeout(hoverTimer)
+                    hoverTimer = window.setTimeout(() => {
+                        const rect = imgEl.getBoundingClientRect()
+                        window.parent.postMessage({
+                            type: 'IMAGE_HOVERED',
+                            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+                            src: imgEl.tagName === 'IMG' ? (imgEl as HTMLImageElement).src : '',
+                            blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10),
+                            blockType: imgBlockType
+                        }, parentOrigin)
+                    }, 200)
+                }
                 return
             }
+
+            if (target.closest('[data-editor-control]')) return
 
             if (!validTags.includes(target.tagName) || target.children.length > 1) {
                 return
@@ -257,6 +268,7 @@ export function PreviewScripts() {
 
         const onTextClick = (e: MouseEvent) => {
             let target = e.target as HTMLElement
+            if ((target as HTMLElement).closest('[data-editor-control]')) return
             const blockContainer = target.closest('[data-block-index]')
 
             if (!blockContainer) return
@@ -271,11 +283,21 @@ export function PreviewScripts() {
                 target = target.parentElement!
             }
             if (!target || target === blockContainer || !validTags.includes(target.tagName)) return
+            // Skip image-placeholder elements — clicking them triggers image-replace, not text-edit
+            if (target.getAttribute('data-image-index') !== null) return
             // Don't edit elements with many block-level children (sections, not text)
             const blockChildren = Array.from(target.children).filter(c =>
                 ['DIV', 'SECTION', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL'].includes(c.tagName)
             )
             if (blockChildren.length > 1) return
+
+            // Skip structural containers that wrap editor control overlays (e.g. HeroMediaOverlay)
+            // — their innerText includes hidden button labels, which would fool the text check below
+            if (target.querySelector('[data-editor-control]')) return
+
+            // Skip elements with no meaningful text (e.g. pure CSS background/overlay divs)
+            const elementText = target.innerText?.trim()
+            if (!elementText || elementText.length < 2) return
 
             // Skip if already editing this element
             if (currentEditingEl === target) return
@@ -368,24 +390,34 @@ export function PreviewScripts() {
                 e.preventDefault()
                 e.stopPropagation()
             }
-            if (target.tagName === 'IMG') {
+            // Also detect non-img placeholder elements (InitialsAvatar, LogoPlaceholder) via data-image-index
+            const imgEl = target.tagName === 'IMG' ? target
+                : (target.getAttribute('data-image-index') !== null ? target : null)
+            if (imgEl) {
                 e.preventDefault()
                 e.stopPropagation()
-                const blockContainer = target.closest('[data-block-index]')
+                const blockContainer = imgEl.closest('[data-block-index]')
                 if (!blockContainer) return
-                
+
                 const blockIndex = parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10)
                 const blockType = blockContainer.getAttribute('data-block-type')
-                
-                if (blockType && excludedBlockTypes.includes(blockType)) return
 
-                const rect = target.getBoundingClientRect()
+                if (blockType && excludedBlockTypes.includes(blockType)) return
+                if (blockType && imageReadOnlyBlockTypes.has(blockType)) return
+
+                const rect = imgEl.getBoundingClientRect()
+                const imageIndexAttr = imgEl.getAttribute('data-image-index')
+                const imageIndex = imageIndexAttr !== null ? parseInt(imageIndexAttr, 10) : undefined
+                const src = imgEl.tagName === 'IMG' ? (imgEl as HTMLImageElement).src : ''
+                const totalImagesInBlock = blockContainer.querySelectorAll('[data-image-index]').length || undefined
                 window.parent.postMessage({
                     type: 'IMAGE_EDITING_STARTED',
                     rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-                    src: (target as HTMLImageElement).src,
+                    src,
                     blockIndex,
-                    blockType
+                    blockType,
+                    imageIndex,
+                    totalImagesInBlock
                 }, parentOrigin)
             }
         }

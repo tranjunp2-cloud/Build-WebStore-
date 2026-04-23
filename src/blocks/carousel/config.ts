@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { BaseBlockSchema } from '../types'
 
 export type CarouselItem = {
-    imageUrl: string
+    image?: { id?: number; url: string; alt?: string }
+    imageUrl?: string  // legacy AI gen compat — prefer image.url
     title?: string
     description?: string
     linkUrl?: string
@@ -24,7 +25,8 @@ export const CarouselConfigSchema = BaseBlockSchema.extend({
     autoplay: z.boolean().default(true),
     interval: z.number().default(5000),
     items: z.array(z.object({
-        imageUrl: z.string(),
+        image: z.object({ id: z.number().optional(), url: z.string(), alt: z.string().optional() }).optional(),
+        imageUrl: z.string().optional(),
         title: z.string().optional(),
         description: z.string().optional(),
         linkUrl: z.string().optional(),

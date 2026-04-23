@@ -4,7 +4,8 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
-import { CTAButtons, HERO_CONTAINER, HeroBadge } from '../shared'
+import { CTAButtons, HERO_CONTAINER, HeroBadge, safeAltText } from '../shared'
+import { HeroMediaOverlay } from '../hero-media-overlay'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 
 void _CSS_VARS
@@ -12,21 +13,25 @@ import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
 
 export function CardsOverlayHero({ block, site }: BlockProps<HeroConfig>) {
-    const { headline, subheadline, ctaButtons = [], image, badge } = block
+    const { headline, subheadline, ctaButtons = [], image, badge, overlayOpacity = 0.4 } = block
     const category = (site?.siteType as string) || 'business'
     const fallbackHeroUrl = getHeroImage(category)
 
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             {/* Full-width background image */}
-            <div
-                className="absolute inset-0 bg-cover bg-center"
-                style={{
-                    backgroundImage: `url(${image?.url || fallbackHeroUrl})`,
-                }}
-            />
-            {/* Dark overlay */}
-            <div className="absolute inset-0 bg-black/60" />
+            <HeroMediaOverlay
+                field="image.url"
+                altText={safeAltText(image?.alt, headline)}
+                positionClass="absolute inset-0"
+            >
+                <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${image?.url || fallbackHeroUrl})` }}
+                />
+            </HeroMediaOverlay>
+            {/* Dark overlay — opacity from config */}
+            <div className="absolute inset-0 bg-transparent" style={{ background: `rgba(0,0,0,${overlayOpacity})` }} />
 
             <div className={`${HERO_CONTAINER} relative z-10 flex items-center justify-center`}>
                 <motion.div

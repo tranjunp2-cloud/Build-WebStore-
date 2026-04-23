@@ -107,6 +107,7 @@ type AuthorMetaProps = {
     layout?: 'inline' | 'stacked'
     nameWeight?: 'semibold' | 'bold'
     showAvatar?: boolean
+    imageIndex?: number
     className?: string
 }
 
@@ -121,6 +122,7 @@ function AuthorMeta({
     layout = 'inline',
     nameWeight = 'semibold',
     showAvatar = true,
+    imageIndex,
     className = '',
 }: AuthorMetaProps) {
     const subtitle = (title || company) ? [title, company].filter(Boolean).join(' \u2022 ') : undefined
@@ -140,7 +142,7 @@ function AuthorMeta({
     return (
         <div className={`flex items-center gap-3 ${className}`.trim()}>
             {showAvatar && (
-                <AvatarRing color={CSS_VARS.primary} src={avatar?.url || fallbackSrc} name={name} size={avatarSize} />
+                <AvatarRing color={CSS_VARS.primary} src={avatar?.url || fallbackSrc} name={name} size={avatarSize} imageIndex={imageIndex} />
             )}
             <div>
                 <p className={nameClass}>{name}</p>
@@ -258,6 +260,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                 avatar={t.avatar}
                                 fallbackSrc={getTeamAvatar(category, i)}
                                 avatarSize={40}
+                                imageIndex={i}
                             />
                         </motion.div>
                     ))}
@@ -311,7 +314,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                                 </div>
                                             </>
                                         ) : (
-                                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={120} />
+                                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={120} imageIndex={i} />
                                         )}
                                     </div>
                                     {/* Text side */}
@@ -327,6 +330,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                             avatar={t.avatar}
                                             fallbackSrc={getTeamAvatar(category, i)}
                                             avatarSize={44}
+                                            imageIndex={i}
                                         />
                                     </div>
                                 </div>
@@ -409,6 +413,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                 avatar={t.avatar}
                                 fallbackSrc={getTeamAvatar(category, i)}
                                 avatarSize={44}
+                                imageIndex={i}
                                 className="mt-auto"
                             />
                         </HoverCard>
@@ -483,7 +488,7 @@ function TestimonialsSpotlight({
                         }}
                     >
                         <div className="flex justify-center mb-6">
-                            <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx)} name={center.name} size={72} />
+                            <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx)} name={center.name} size={72} imageIndex={centerIdx} />
                         </div>
                         <StarRating count={center.rating || 5} size="lg" className="flex justify-center gap-0.5 mb-4" />
                         <Body size="lg" className="opacity-70 mb-6 italic">
@@ -584,7 +589,7 @@ function TestimonialsMinimalQuote({
                             &ldquo;{t.quote}&rdquo;
                         </blockquote>
                         <div className="flex items-center justify-center gap-3">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={48} />
+                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={48} imageIndex={currentIndex} />
                             <AuthorMeta
                                 name={t.name}
                                 title={t.title}
@@ -685,7 +690,7 @@ function TestimonialsCarousel({
                         aria-atomic="true"
                     >
                         <div className="flex justify-center mb-6">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={72} />
+                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={72} imageIndex={currentIndex} />
                         </div>
                         <StarRating count={t.rating || 5} size="lg" className="flex justify-center gap-0.5 mb-5" />
                         <Body size="lg" className="italic opacity-70 mb-6">
@@ -754,6 +759,7 @@ function TestimonialsAvatarRow({
                             src={t.avatar?.url || getTeamAvatar(category, i)}
                             name={t.name}
                             size={56}
+                            imageIndex={i}
                         />
                     </button>
                 ))}
