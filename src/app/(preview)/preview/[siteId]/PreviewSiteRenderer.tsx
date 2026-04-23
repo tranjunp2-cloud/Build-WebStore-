@@ -5,9 +5,7 @@ import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 
 interface Props {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     site: any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     page: any
     pages: NavPage[]
 }
