@@ -317,73 +317,6 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
         )
     }
 
-    // ── Mega Footer variant ───────────────────────────────────────────────
-    // Special: 2-band layout (top accent band + main body). Outer <footer> has
-    // no GradientLine; the top band serves as the visual divider. Cannot use
-    // FooterSection helper because of the dual-band structure.
-    if ((variant as string) === 'mega-footer') {
-        return (
-            <footer className="relative" style={footerStyle}>
-                {/* Top band */}
-                <div className="py-10" style={{ background: `var(--brand-primary)` }}>
-                    <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} text-center`}>
-                        <Heading level={3} className="text-white mb-2">Stay Connected</Heading>
-                        <Body size="small" className="text-white/70 mb-4">
-                            Subscribe for the latest updates and news.
-                        </Body>
-                        {/* Plan 260415 Lỗi A — wire vào FooterNewsletterForm, không còn inert */}
-                        <FooterNewsletterForm
-                            siteId={siteId}
-                            variant="mega-footer"
-                            placeholder="Enter your email"
-                            buttonLabel="Subscribe"
-                        />
-                    </div>
-                </div>
-
-                {/* Main footer content */}
-                <div className="pt-14 pb-8">
-                    <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
-                        {/* Plan 260415 — grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5
-                            với gap-6 mobile → gap-8 sm+ (Lỗi E — giảm gap mobile). */}
-                        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 ${FOOTER_RESPONSIVE_GAP} mb-12`}>
-                            {/* Brand column */}
-                            <div className="sm:col-span-2 md:col-span-1">
-                                <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="md" className="mb-3" />
-                                {tagline && (
-                                    <Body size="small" className="opacity-70 leading-relaxed max-w-xs">{tagline}</Body>
-                                )}
-                            </div>
-
-                            {/* Link columns */}
-                            {columns.map((col, i) => (
-                                <LinkColumn key={`${col.title}-${i}`} title={col.title} links={col.links || []} spacing="tight" />
-                            ))}
-                        </div>
-
-                        {/* Bottom bar */}
-                        <div
-                            className="pt-6 flex flex-col md:flex-row items-center justify-between gap-4"
-                            style={FOOTER_DIVIDER_STYLE}
-                        >
-                            <Caption className="opacity-60">{copyrightLine}</Caption>
-                            <div className="flex items-center gap-4 flex-wrap justify-center">
-                                <SocialIconList socials={socialsArr} iconSize="sm" />
-                                <div className="flex gap-4">
-                                    <a href={legalLinks.privacy} className="opacity-60 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded">
-                                        <Caption>Privacy</Caption>
-                                    </a>
-                                    <a href={legalLinks.terms} className="opacity-60 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded">
-                                        <Caption>Terms</Caption>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </footer>
-        )
-    }
 
     // ── Dark Gradient variant ─────────────────────────────────────────────
     if (variant === 'dark-gradient') {
@@ -434,57 +367,6 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
         )
     }
 
-    // ── Expanded variant ────────────────────────────────────────────────
-    // Custom asymmetric padding (pt-16 md:pt-20 pb-8) — outside SECTION_PADDING
-    // tokens which only cover symmetric py-* values. Kept inline.
-    if ((variant as string) === 'expanded') {
-        return (
-            <FooterSection paddingClass="pt-16 md:pt-20 pb-8" style={footerStyle}>
-                {/* 4-column links section */}
-                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${FOOTER_RESPONSIVE_GAP} mb-12`}>
-                    {/* Brand column as first of 4 */}
-                    <div>
-                        <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4" />
-                        {tagline && (
-                            <Body size="small" className="opacity-40 leading-relaxed max-w-xs">{tagline}</Body>
-                        )}
-                        <SocialIconList socials={socialsArr} className="mt-6" />
-                    </div>
-
-                    {/* Link columns (up to 3) */}
-                    {columns.slice(0, 3).map((col, i) => (
-                        <LinkColumn key={i} title={col.title} links={col.links || []} />
-                    ))}
-                </div>
-
-                {/* Divider */}
-                <div style={FOOTER_DIVIDER_STYLE} />
-
-                {/* Plan 260415 Lỗi A — wire newsletter form, không còn inert. */}
-                <div className="py-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div>
-                        <Heading level={4} className="mb-1">Subscribe to our newsletter</Heading>
-                        <Body size="small" className="opacity-70">
-                            Get the latest updates delivered to your inbox.
-                        </Body>
-                    </div>
-                    <div className="w-full md:w-auto md:max-w-md">
-                        <FooterNewsletterForm
-                            siteId={siteId}
-                            variant="expanded"
-                            placeholder="Enter your email"
-                            buttonLabel="Subscribe"
-                        />
-                    </div>
-                </div>
-
-                {/* Copyright bar */}
-                <div className="pt-6 text-center" style={FOOTER_DIVIDER_STYLE}>
-                    <Caption className="opacity-60">{copyrightLine}</Caption>
-                </div>
-            </FooterSection>
-        )
-    }
 
     // ── Minimal variant ──────────────────────────────────────────────────
     // Plan 260415 Lỗi 14F — minimal variant không show GradientLine (visual noise unnecessary).

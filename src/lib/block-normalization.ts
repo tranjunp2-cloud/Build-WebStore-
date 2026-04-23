@@ -147,6 +147,13 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             b = normalizeSocialWidgetConfig(b) as Record<string, unknown>
         }
 
+        // Alias footer variants removed from Payload select options — backward-compat
+        // for existing DB records that stored 'expanded' or 'mega-footer' before PR #757.
+        if (b.blockType === 'footer') {
+            if (b.variant === 'expanded') b.variant = 'simple'
+            else if (b.variant === 'mega-footer') b.variant = 'dark-gradient'
+        }
+
         // Coerce invalid variants to defaults — Payload rejects with
         // "invalid selection" when variant doesn't match block enum.
         b = sanitizeBlockVariant(b)
