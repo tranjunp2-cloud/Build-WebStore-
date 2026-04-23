@@ -151,6 +151,7 @@ type ContactFormProps = {
     siteId?: string
     className?: string
     submitLabel?: string
+    inline?: boolean
 }
 
 /**
@@ -163,7 +164,7 @@ type ContactFormProps = {
  * - Success state replaces form với "Thanks" message
  * - Honeypot field (name="website") ẩn cho bot
  */
-function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel = 'Send Message →' }: ContactFormProps) {
+function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel = 'Send Message →', inline = false }: ContactFormProps) {
     const requiredFieldNames = formFields
         .filter(f => f.required)
         .map(f => f.fieldName || f.fieldType || 'message')
@@ -200,25 +201,17 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
 
     return (
         <form className={className} onSubmit={handleSubmit} noValidate>
-            {/* Honeypot — ẩn khỏi user, bot fill thì reject */}
-            <div style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }} aria-hidden="true">
-                <label>
-                    Website
-                    <input type="text" name="website" tabIndex={-1} autoComplete="off" />
-                </label>
-            </div>
-
             {formFields.map((field, i) => {
                 const fieldName = field.fieldName || field.fieldType || `field-${i}`
                 const error = errors[fieldName as keyof typeof errors]
                 const errorId = error ? `${fieldName}-error` : undefined
                 return (
-                    <div key={`${i}-${fieldName}`}>
+                    <div key={`${i}-${fieldName}`} className={inline ? 'flex-1 min-w-[180px]' : ''}>
                         <label htmlFor={fieldName} className="block text-sm font-medium mb-2 opacity-70">
                             {field.label}
                             {field.required && <span style={{ color: 'var(--brand-primary)' }}> *</span>}
                         </label>
-                        <FormFieldInput field={field} error={!!error} errorId={errorId} />
+                        <FormFieldInput field={field} error={!!error} errorId={errorId} inlineRows={inline ? 1 : undefined} />
                         {error && (
                             <p id={errorId} className="mt-1 text-xs" style={{ color: '#ef4444' }} role="alert">
                                 {error}
@@ -243,6 +236,14 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
             )}
 
             <SubmitButton label={submitLabel} isSubmitting={state === 'loading'} />
+
+            {/* Honeypot at end — avoids space-y margin being applied to the first visible field */}
+            <div style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }} aria-hidden="true">
+                <label>
+                    Website
+                    <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+                </label>
+            </div>
         </form>
     )
 }
@@ -255,7 +256,7 @@ function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel 
 const INPUT_BASE_CLASS =
     'w-full px-4 py-3 rounded-xl text-sm outline-none transition-colors bg-[rgba(var(--brand-primary-rgb),0.03)] border border-[rgba(var(--brand-primary-rgb),0.12)] focus-visible:border-[rgba(var(--brand-primary-rgb),0.45)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.18)] disabled:opacity-50 disabled:cursor-not-allowed'
 
-function FormFieldInput({ field, error, errorId }: { field: FormField; error?: boolean; errorId?: string }) {
+function FormFieldInput({ field, error, errorId, inlineRows }: { field: FormField; error?: boolean; errorId?: string; inlineRows?: number }) {
     const name = field.fieldName || field.fieldType || 'field'
     const isTextarea = field.fieldType === 'textarea'
     const type = field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'
@@ -284,7 +285,7 @@ function FormFieldInput({ field, error, errorId }: { field: FormField; error?: b
     }
 
     if (isTextarea) {
-        return <textarea {...commonProps} rows={4} className={INPUT_BASE_CLASS + errorClass + ' resize-none'} />
+        return <textarea {...commonProps} rows={inlineRows ?? 4} className={INPUT_BASE_CLASS + errorClass + ' resize-none'} />
     }
 
     return (
@@ -396,10 +397,10 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                 <ContactHeader headline={headline} subtext={subtext} />
 
                 {/* Plan 260415 — drop inner max-w-5xl; outer CONTACT_CONTAINER already caps at max-w-6xl. */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                    {/* Map + Contact Info */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
+                    {/* Map + Contact Info — mt-8 = CARD_PADDING.lg so card border aligns with "Name *" in GlassCard */}
                     <div
-                        className={`rounded-xl aspect-video lg:aspect-auto flex flex-col items-center justify-center ${CARD_PADDING.lg} overflow-hidden`}
+                        className="rounded-xl flex flex-col px-8 pb-8 overflow-hidden mt-8"
                         style={{
                             background: `rgba(var(--brand-primary-rgb), 0.04)`,
                             border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
@@ -409,20 +410,21 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                             <iframe
                                 title="Location map"
                                 src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
-                                className="w-full h-48 rounded-lg mb-4 border-0"
+                                className="w-full rounded-b-lg mb-4 border-0 -mx-8"
+                                style={{ width: 'calc(100% + 4rem)', minHeight: '240px' }}
                                 loading="lazy"
                                 referrerPolicy="no-referrer-when-downgrade"
                             />
                         ) : (
                             <div
-                                className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mb-4"
+                                className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mb-4 mt-8"
                                 style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}
                                 aria-hidden="true"
                             >
                                 <MapPin size={28} />
                             </div>
                         )}
-                        {address && <Body size="small" className="font-medium text-center opacity-70">{address}</Body>}
+                        {address && <Body size="small" className="font-medium opacity-70">{address}</Body>}
                         {email && (
                             <Body size="small" className="opacity-50 mt-2">
                                 <Mail size={12} className="inline mr-1" style={{ color: 'var(--brand-primary)' }} aria-hidden="true" />
@@ -437,7 +439,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                         )}
                     </div>
 
-                    {/* Contact form */}
+                    {/* Contact form — GlassCard unchanged */}
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
                         <ContactForm formFields={formFields} siteId={siteId} />
                     </GlassCard>
@@ -467,8 +469,9 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                     <ContactForm
                         formFields={formFields}
                         siteId={siteId}
-                        className="flex flex-wrap gap-4 items-start"
+                        className="flex flex-wrap gap-4 items-end"
                         submitLabel="Send"
+                        inline
                     />
                 </SectionWrapper>
             </AnimatedSection>
@@ -495,13 +498,13 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
             <ContactSection>
                 <ContactHeader headline={headline} subtext={subtext} />
                 {/* Plan 260415 — drop inner max-w-5xl; outer CONTACT_CONTAINER already caps at max-w-6xl. */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
                     {/* Form */}
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
                         <ContactForm formFields={formFields} siteId={siteId} />
                     </GlassCard>
                     {/* Contact Info */}
-                    <div className="space-y-6">
+                    <div className="space-y-6 pt-8">
                         {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
                         {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
                         {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
