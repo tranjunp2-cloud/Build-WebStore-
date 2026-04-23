@@ -17,7 +17,7 @@ type PreviewLayoutBlock = Record<string, unknown> & {
 
 interface PreviewPageProps {
     params: Promise<{ siteId: string }>
-    searchParams: Promise<{ pageId?: string; v?: string }>
+    searchParams: Promise<{ pageId?: string; v?: string; builder?: string }>
 }
 
 export const dynamic = 'force-dynamic'
@@ -36,7 +36,7 @@ export const viewport: Viewport = {
 
 export default async function PreviewPage({ params, searchParams }: PreviewPageProps) {
     const { siteId } = await params
-    const { pageId } = await searchParams
+    const { pageId, builder } = await searchParams
     
     // 1. Auth Check (P0 Security Rule - Auth Redirect)
     const user = await getCurrentUser() as PlatformUser | null
@@ -199,10 +199,11 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                         site={site}
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
+                        isBuilderPreview={!!builder}
                     />
 
-                    {/* Editor specific listeners */}
-                    <PreviewScripts />
+                    {/* Editor-specific listeners — skip in builder preview to allow nav link clicks */}
+                    {!builder && <PreviewScripts />}
                 </div>
             </AppShell>
         )

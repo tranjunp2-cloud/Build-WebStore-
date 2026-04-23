@@ -59,6 +59,7 @@ export type SiteRendererProps = {
     }
     pages?: NavPage[]
     isEditor?: boolean
+    isBuilderPreview?: boolean
     siteId?: string
     isOwner?: boolean
     onBlockFieldChange?: (blockIndex: number, field: string, value: unknown) => void
@@ -92,7 +93,7 @@ function applyGlobalSystemBlocks(
     return nextBlocks
 }
 
-export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuilderPreview = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -173,7 +174,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
             slugToPageId.get(path) ??
             slugToPageId.get(path.toLowerCase()) ??
             slugToPageId.get(path.replace(/^\//, ''))
-        if (hit) return `/preview/${previewSiteId}?pageId=${hit}`
+        if (hit) return `/preview/${previewSiteId}?pageId=${hit}${isBuilderPreview ? '&builder=1' : ''}`
         return '#'
     }
 

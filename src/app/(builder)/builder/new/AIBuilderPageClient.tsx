@@ -91,6 +91,18 @@ function LivePreview({
             axis="y"
             className="min-h-full w-full"
             onReorder={(newOrder) => onReorder?.(newOrder)}
+            // Guard for streaming phase only (siteId not yet set). Once generation
+            // completes, BuilderPreviewSurface switches to an iframe so SiteRenderer
+            // rewrites links correctly. During streaming, blocks render directly in
+            // DOM without URL rewriting, so internal hrefs would hit the app router
+            // → CMS 404 (GH #770). External, mailto, tel, and #hash pass through.
+            onClick={(e) => {
+                const anchor = (e.target as Element).closest('a')
+                if (!anchor) return
+                const href = anchor.getAttribute('href') ?? ''
+                if (href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#')) return
+                e.preventDefault()
+            }}
             style={{
                 fontFamily: `'${theme.fontBody}', sans-serif`,
                 background: resolved.backgroundColor,

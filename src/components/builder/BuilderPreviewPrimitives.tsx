@@ -68,7 +68,7 @@ function BuilderMobilePreviewShell({ children, siteId }: BuilderMobilePreviewShe
                 </div>
                 {siteId ? (
                     <iframe
-                        src={`/preview/${siteId}?v=${Date.now()}`}
+                        src={`/preview/${siteId}?v=${Date.now()}&builder=1`}
                         className="h-full w-full border-0"
                         title="Mobile preview"
                     />
@@ -108,12 +108,26 @@ export function BuilderPreviewSurface({
         )
     }
 
+    // Desktop with siteId (post-generation): use iframe so SiteRenderer rewrites nav
+    // links to /preview/{siteId}?pageId=... — enables page navigation without leaving
+    // the builder. Without siteId (streaming phase) fall back to children (LivePreview).
+    const desktopContent = siteId ? (
+        <iframe
+            src={`/preview/${siteId}?v=${Date.now()}&builder=1`}
+            className="h-full w-full border-0"
+            title="Website preview"
+        />
+    ) : children
+
     if (variant === 'fullwidth') {
         return (
             <div className="flex h-full items-start justify-center px-10 pt-8">
                 <div className="h-full max-h-[5094px] w-full max-w-[1280px] overflow-hidden rounded-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
-                    <div className="h-full overflow-y-auto rounded-[inherit] border border-transparent shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]">
-                        {children}
+                    <div className={cn(
+                        "h-full rounded-[inherit] border border-transparent shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]",
+                        siteId ? "overflow-hidden" : "overflow-y-auto",
+                    )}>
+                        {desktopContent}
                     </div>
                 </div>
             </div>
@@ -123,7 +137,7 @@ export function BuilderPreviewSurface({
     return (
         <div className="h-full overflow-hidden rounded-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
             <div className="h-full overflow-hidden rounded-[inherit] border border-transparent shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]">
-                {children}
+                {desktopContent}
             </div>
         </div>
     )
