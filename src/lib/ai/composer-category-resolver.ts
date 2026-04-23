@@ -34,7 +34,7 @@ const COMPOSER_TYPE_KEYWORDS: Record<ComposerCategory, string[]> = {
     realestate: ['real estate', 'property', 'agent', 'condo', 'apartment', 'listing', 'realty', 'bất động sản', 'nhà đất'],
     fitness:    ['gym', 'fitness', 'yoga', 'pilates', 'crossfit', 'personal trainer', 'workout', 'phòng tập'],
     fnb:        ['cafe', 'café', 'coffee', 'bakery', 'bubble tea', 'kopitiam', 'dessert', 'juice bar', 'tea', 'quán cafe', 'tiệm bánh'],
-    events:     ['wedding', 'event', 'party', 'photography', 'venue', 'ceremony', 'planner', 'cưới hỏi', 'sự kiện'],
+    events:     ['wedding', 'event', 'events', 'party', 'photography', 'venue', 'ceremony', 'planner', 'cưới hỏi', 'sự kiện'],
     travel:     ['travel', 'tour', 'hotel', 'resort', 'homestay', 'agency', 'trip', 'vacation', 'du lịch', 'khách sạn'],
     creative:   ['portfolio', 'photographer', 'designer', 'artist', 'freelance', 'studio', 'illustrator', 'creative'],
     blog:       ['blog', 'article', 'newsletter', 'writer', 'journal', 'publication', 'tạp chí'],

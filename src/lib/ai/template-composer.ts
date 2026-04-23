@@ -1778,8 +1778,7 @@ function buildBlockFromSpec(
     case 'stats':
       return { ...buildStats(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'gallery':
-    case 'gallery-masonry':
-      return { ...buildGallery(biz), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildGallery(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'faq':
       return { ...buildFAQ(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'cta':
@@ -1813,7 +1812,7 @@ function buildBlockFromSpec(
       return buildProductQuickView(biz, category)
     case 'portfolio-grid': {
       const count = spec.count ?? 6
-      const items = Array.from({ length: count }, (_, i) => ({
+      const projects = Array.from({ length: count }, (_, i) => ({
         title: `${biz.name} Project ${i + 1}`,
         category: ['Branding', 'Web Design', 'Photography', 'Illustration'][i % 4],
         image: NEUTRAL_FALLBACK_SVG,
@@ -1824,7 +1823,7 @@ function buildBlockFromSpec(
         variant: resolvedVariant ?? 'masonry',
         headline: 'Our Work',
         subheadline: biz.tagline ?? 'Selected projects',
-        items,
+        projects,
       }
     }
     case 'service-cards':
@@ -1875,7 +1874,7 @@ function buildBlockFromSpec(
       }
     }
     case 'countdown-timer':
-      return { blockType: 'countdown-timer', variant: resolvedVariant ?? 'elegant', targetDate: '2026-12-31T00:00:00' }
+      return { blockType: 'countdown-timer', variant: resolvedVariant ?? 'banner', headline: biz.name, targetDate: '2026-12-31T00:00:00' }
     case 'blog-list': {
       // Enforce min 3 for hero-card/masonry variants
       const count = Math.max(spec.count ?? 3, 4)
