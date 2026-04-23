@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
 
 vi.mock('@/store/editorStore', () => ({
@@ -71,5 +71,55 @@ describe('PreviewFrame', () => {
         render(<PreviewFrame {...defaultProps} pageId="page-456" />)
         const iframe = screen.getByTitle('Site Preview') as HTMLIFrameElement
         expect(iframe.getAttribute('src')).toContain('pageId=page-456')
+    })
+
+    // TC-F05-07-06: Click Header → viền highlight xuất hiện, Panel Settings chuyển sang Navigation Links
+    it('TC-F05-07-06: shows selection overlay when global block (navigation) is clicked', async () => {
+        const onBlockSelect = vi.fn()
+        render(<PreviewFrame {...defaultProps} onBlockSelect={onBlockSelect} />)
+
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                data: {
+                    type: 'BLOCK_CONTAINER_CLICKED',
+                    blockIndex: -1,
+                    layout: { top: 100, left: 0, width: 1440, height: 80, blockIndex: -1, blockType: 'navigation' },
+                },
+                origin: window.location.origin,
+            }))
+        })
+
+        await waitFor(() => {
+            expect(onBlockSelect).toHaveBeenCalledWith(-1, 'navigation')
+        })
+        // Selection overlay label should be visible
+        expect(screen.getByText('navigation')).toBeInTheDocument()
+    })
+
+    // TC-F05-07-06: Click canvas clears global block selection overlay
+    it('TC-F05-07-06: clears global block selection overlay on canvas click', async () => {
+        render(<PreviewFrame {...defaultProps} />)
+
+        // First select a global block
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                data: {
+                    type: 'BLOCK_CONTAINER_CLICKED',
+                    blockIndex: -1,
+                    layout: { top: 0, left: 0, width: 1440, height: 80, blockIndex: -1, blockType: 'footer' },
+                },
+                origin: window.location.origin,
+            }))
+        })
+        await waitFor(() => expect(screen.getByText('footer')).toBeInTheDocument())
+
+        // Then click canvas
+        act(() => {
+            window.dispatchEvent(new MessageEvent('message', {
+                data: { type: 'PREVIEW_CANVAS_CLICKED' },
+                origin: window.location.origin,
+            }))
+        })
+        await waitFor(() => expect(screen.queryByText('footer')).not.toBeInTheDocument())
     })
 })

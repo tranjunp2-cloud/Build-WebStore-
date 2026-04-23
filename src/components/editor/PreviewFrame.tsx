@@ -225,6 +225,7 @@ function PreviewFrameInner({
     useEffect(() => { onInlineEditSaveRef.current = onInlineEditSave }, [onInlineEditSave])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
+    const [selectedGlobalBlockLayout, setSelectedGlobalBlockLayout] = useState<BlockLayoutRect | null>(null)
 
     const [blockLayouts, setBlockLayouts] = useState<BlockLayoutRect[]>([])
     const [dragState, setDragStateRaw] = useState<DragState | null>(null)
@@ -469,14 +470,22 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'BLOCK_CONTAINER_CLICKED') {
                 const blockIndex = Number(e.data.blockIndex)
                 const blockType = e.data.layout?.blockType as string | undefined
+                const isGlobalClick = blockType !== undefined && ['navigation', 'footer', 'breadcrumb'].includes(blockType)
                 if (!Number.isNaN(blockIndex)) {
                     onBlockSelect?.(blockIndex, blockType)
                     setHoverData(null)
-                    setBlockHover(e.data.layout as BlockLayoutRect)
+                    if (isGlobalClick) {
+                        setSelectedGlobalBlockLayout(e.data.layout as BlockLayoutRect)
+                        setBlockHover(null)
+                    } else {
+                        setSelectedGlobalBlockLayout(null)
+                        setBlockHover(e.data.layout as BlockLayoutRect)
+                    }
                     setIsEditing(false)
                 }
             } else if (e.data?.type === 'PREVIEW_CANVAS_CLICKED') {
                 onBlockSelect?.(null)
+                setSelectedGlobalBlockLayout(null)
             } else if (e.data?.type === 'TEXT_EDITING_STARTED') {
                 // Global blocks (nav, footer, breadcrumb) are not inline-editable — ignore
                 const globalBlockTypes = ['navigation', 'footer', 'breadcrumb']
@@ -631,6 +640,7 @@ function PreviewFrameInner({
         setIsSubmitting(false)
         setTextEditingData(null)
         setImageClickData(null)
+        setSelectedGlobalBlockLayout(null)
     }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
 
     const handleExecCommand = useCallback(async (command: string, value?: string) => {
@@ -1255,6 +1265,24 @@ function PreviewFrameInner({
                         )
                     })()}
                 </>
+            ) : null}
+
+            {/* Selection frame for global blocks (nav/footer/breadcrumb) — solid blue border */}
+            {selectedGlobalBlockLayout && overlayOffset && !dragState ? (
+                <div
+                    className="pointer-events-none absolute border-2 border-blue-500 bg-blue-500/10 transition-all duration-100"
+                    style={{
+                        top: overlayOffset.top + selectedGlobalBlockLayout.top,
+                        left: overlayOffset.left + selectedGlobalBlockLayout.left,
+                        width: selectedGlobalBlockLayout.width,
+                        height: selectedGlobalBlockLayout.height,
+                        zIndex: 31,
+                    }}
+                >
+                    <span className="absolute left-0 top-0 -translate-y-full rounded-t-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white capitalize">
+                        {selectedGlobalBlockLayout.blockType?.replace(/-/g, ' ')}
+                    </span>
+                </div>
             ) : null}
 
             <AnimatePresence>
