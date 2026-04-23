@@ -2032,7 +2032,7 @@ const MIGRATIONS = [
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      url text, alt varchar, caption varchar
+      url varchar, alt varchar, caption varchar
     );`,
   },
   // ── _pages_v (version tables) for new AI blocks ──
@@ -2319,7 +2319,7 @@ const MIGRATIONS = [
     name: '_pages_v_blocks_gallery_masonry_images.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery_masonry_images" (
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
-      _uuid varchar, url text, alt varchar, caption varchar
+      _uuid varchar, url varchar, alt varchar, caption varchar
     );`,
   },
   // ── F16: Notifications table ─────────────────────────────────────
