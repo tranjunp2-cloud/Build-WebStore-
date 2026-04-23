@@ -25,6 +25,7 @@ export const cartWidgetMeta = {
     editableFields: ['label', 'showLabel'],
     quickActions: ['Open cart', 'Toggle cart label'],
     aiVisible: true,
+    category: 'commerce' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

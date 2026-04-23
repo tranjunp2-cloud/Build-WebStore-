@@ -41,6 +41,7 @@ export const portfolioGridMeta = {
     editableFields: ['headline', 'subheadline', 'projects'],
     quickActions: ['Add project', 'Change layout', 'Edit categories'],
     aiVisible: true,
+    category: 'content' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

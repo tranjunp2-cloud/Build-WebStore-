@@ -9,7 +9,7 @@ export const FooterConfigSchema = BaseBlockSchema.extend({
     tagline: z.string().optional(), columns: z.array(z.object({ title: z.string(), links: z.array(z.object({ label: z.string(), url: z.string() })) })).default([]),
     copyrightText: z.string().optional(), backgroundColor: z.string().optional(), socials: z.array(z.object({ platform: z.string(), url: z.string() })).optional(),
 })
-export const footerMeta = { type: 'footer' as const, name: 'Footer', description: 'Site footer with links, social media, and copyright', icon: '🔻', variants: ['simple', 'minimal', 'centered-stack', 'dark-gradient'], defaultVariant: 'simple', editableFields: ['logoText', 'tagline', 'columns', 'copyrightText', 'socials'], quickActions: ['Add column', 'Add social links'] }
+export const footerMeta = { type: 'footer' as const, name: 'Footer', description: 'Site footer with links, social media, and copyright', icon: '🔻', variants: ['simple', 'minimal', 'centered-stack', 'dark-gradient'], defaultVariant: 'simple', editableFields: ['logoText', 'tagline', 'columns', 'copyrightText', 'socials'], quickActions: ['Add column', 'Add social links'], category: 'nav' as const, isSystem: true }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
 export const configSchema = FooterConfigSchema

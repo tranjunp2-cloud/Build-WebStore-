@@ -126,6 +126,20 @@ export type BlockMeta = {
      * whatsapp-button, cart widgets, etc.
      */
     aiVisible?: boolean
+    /**
+     * Phase 1 of block-registry-single-source refactor.
+     * Canonical category for Studio catalog + user Editor palette grouping.
+     * Values: 'basics' | 'content' | 'media' | 'store' | 'commerce' | 'form'
+     *       | 'widgets' | 'layout' | 'nav' | 'archive'
+     * Phase 2 will swap block-registry-reader to read from here instead of CATEGORY_MAP.
+     * Phase 3 will swap BlockLibraryPanel to consume registry instead of hardcode.
+     */
+    category?: 'basics' | 'content' | 'media' | 'store' | 'commerce' | 'form' | 'widgets' | 'layout' | 'nav' | 'archive'
+    /**
+     * true for blocks that are auto-placed (navigation, footer) and should NOT
+     * appear in the user-facing Editor block palette. Phase 3 consumer.
+     */
+    isSystem?: boolean
 }
 
 // ── CTA Button (shared across blocks) ────────────────────────────────────────

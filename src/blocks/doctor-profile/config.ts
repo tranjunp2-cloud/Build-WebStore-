@@ -47,6 +47,7 @@ export const doctorProfileMeta = {
     editableFields: ['headline', 'subheadline', 'doctors'],
     quickActions: ['Add doctor', 'Update availability', 'Edit qualifications'],
     aiVisible: false,
+    category: 'archive' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

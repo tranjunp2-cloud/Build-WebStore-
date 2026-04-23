@@ -39,6 +39,7 @@ export const newsletterMeta = {
     defaultVariant: 'inline' as const,
     editableFields: ['headline', 'subheadline', 'buttonLabel'],
     quickActions: ['Change copy'],
+    category: 'form' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

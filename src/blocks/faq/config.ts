@@ -50,6 +50,7 @@ export const faqMeta = {
     defaultVariant: 'accordion' as const,
     editableFields: ['headline', 'items', 'allowMultiple'],
     quickActions: ['Add question', 'Rewrite answers', 'Generate FAQ'],
+    category: 'content' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

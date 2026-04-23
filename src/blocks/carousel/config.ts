@@ -41,6 +41,7 @@ export const carouselMeta = {
     editableFields: ['headline', 'autoplay', 'interval', 'items'],
     quickActions: ['Add slide', 'Toggle autoplay', 'Change layout'],
     aiVisible: true,
+    category: 'media' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

@@ -57,6 +57,7 @@ export const propertyCardMeta = {
     editableFields: ['headline', 'subheadline', 'properties', 'showMap', 'currency'],
     quickActions: ['Add property', 'Filter by type', 'Update prices'],
     aiVisible: false,
+    category: 'archive' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

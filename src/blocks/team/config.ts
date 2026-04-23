@@ -32,6 +32,7 @@ export const teamMeta = {
     defaultVariant: 'grid' as const,
     editableFields: ['headline', 'members'],
     quickActions: ['Add member', 'Generate bio'],
+    category: 'widgets' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

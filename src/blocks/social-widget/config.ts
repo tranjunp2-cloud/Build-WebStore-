@@ -74,6 +74,7 @@ export const socialWidgetMeta = {
     defaultVariant: 'floating',
     editableFields: ['headline', 'links'],
     quickActions: ['Add social link', 'Update platform URLs'],
+    category: 'widgets' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

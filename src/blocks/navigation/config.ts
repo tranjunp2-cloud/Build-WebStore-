@@ -51,6 +51,8 @@ export const navigationMeta = {
     defaultVariant: 'simple',
     editableFields: ['logoText', 'links', 'ctaButton'],
     quickActions: ['Add link', 'Change logo', 'Toggle CTA'],
+    category: 'nav' as const,
+    isSystem: true,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
