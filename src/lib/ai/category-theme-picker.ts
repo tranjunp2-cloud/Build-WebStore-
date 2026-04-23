@@ -33,6 +33,7 @@ import {
 } from './theme-presets'
 import { THEME_MOODS, type ThemeMood } from './theme-moods'
 import { seededShufflePick } from './seeded-random'
+import { checkContrast, generatePalette, relativeLuminance } from '../theme/color-utils'
 
 export type { ThemePreset } from './theme-presets'
 export type { ThemeMood } from './theme-moods'
@@ -48,6 +49,38 @@ export type { ThemeMood } from './theme-moods'
 export interface CategoryTheme {
     preset: ThemePreset
     mood: ThemeMood
+}
+
+/**
+ * Validate WCAG contrast quality for a theme preset. Pure, deterministic.
+ * Returns warning messages; empty array = clean.
+ *
+ * Checks:
+ *  1. Dark-mode primary luminance floor (< 0.04 heuristic — check 2 is the authoritative AA-Large gate)
+ *  2. Primary vs generated surface.primary (AA-Large, 3:1)
+ *  3. Accent vs generated surface.primary (AA-Large, 3:1)
+ *  4. Accent vs primary differentiation (ratio < 1.5 → too similar)
+ *
+ * Called by pickCategoryTheme in dev/test mode. No-op in production.
+ */
+export function validatePresetContrast(preset: ThemePreset): string[] {
+    const warnings: string[] = []
+    const palette = generatePalette(preset.primaryColor, preset.colorMode)
+    const surface = palette.surface.primary
+
+    if (preset.colorMode === 'dark' && relativeLuminance(preset.primaryColor) < 0.04) {
+        warnings.push(`primary ${preset.primaryColor} luminance < 0.04 (invisible on dark surface)`)
+    }
+    if (!checkContrast(preset.primaryColor, surface).passAALarge) {
+        warnings.push(`primary ${preset.primaryColor} vs surface ${surface} fails AA-Large`)
+    }
+    if (!checkContrast(preset.accentColor, surface).passAALarge) {
+        warnings.push(`accent ${preset.accentColor} vs surface ${surface} fails AA-Large`)
+    }
+    if (checkContrast(preset.accentColor, preset.primaryColor).ratio < 1.5) {
+        warnings.push(`accent ${preset.accentColor} too similar to primary ${preset.primaryColor}`)
+    }
+    return warnings
 }
 
 /**
@@ -84,7 +117,14 @@ export function pickCategoryTheme(category: string, seed: number): ThemePreset {
     // Plan 2253 Phase 02 — fixes R3 (modulo-5 hash clustering).
     // Fisher-Yates seeded shuffle distributes presets more evenly across
     // djb2-biased business name hashes (common names cluster on low indices).
-    return seededShufflePick(presets, seed) ?? presets[0]!
+    const preset = seededShufflePick(presets, seed) ?? presets[0]!
+    if (process.env.NODE_ENV !== 'production') {
+        const warnings = validatePresetContrast(preset)
+        if (warnings.length > 0) {
+            warnings.forEach(w => console.warn(`[preset-validator] ${preset.name}: ${w}`))
+        }
+    }
+    return preset
 }
 
 /**

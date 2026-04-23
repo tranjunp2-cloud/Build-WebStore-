@@ -12,8 +12,9 @@ import {
     getCategoryThemeOptions,
     canonicalizeCategory,
     hashBusinessName,
+    validatePresetContrast,
 } from '@/lib/ai/category-theme-picker'
-import { CATEGORY_PRESETS, BUSINESS_PRESETS } from '@/lib/ai/theme-presets'
+import { CATEGORY_PRESETS, BUSINESS_PRESETS, type ThemePreset } from '@/lib/ai/theme-presets'
 import { hexToHSL } from '@/lib/theme/color-utils'
 
 const KNOWN_CATEGORIES = [
@@ -173,6 +174,69 @@ describe('hashBusinessName', () => {
             const h = hashBusinessName(name)
             expect(h).toBeGreaterThanOrEqual(0)
             expect(Number.isFinite(h)).toBe(true)
+        }
+    })
+})
+
+// ── TC-F01D-CP.60–64 — Preset contrast validator ────────────────────────────
+
+describe('validatePresetContrast', () => {
+    // Dark mode: primary #dc2626 (L≈0.179) vs dark surface (L≈0.005) → 4.16:1 ✓
+    // Accent #fbbf24 (L≈0.595) vs dark surface → 11.7:1 ✓, vs primary → 2.82:1 ✓
+    const BASE: ThemePreset = {
+        name: 'Test Base',
+        primaryColor: '#dc2626',
+        secondaryColor: '#f97316',
+        accentColor: '#fbbf24',
+        fontPairingId: 'bold-impact',
+        colorMode: 'dark',
+        spacingPreset: 'default',
+        borderRadius: 'rounded',
+        shadowPreset: 'medium',
+        moodId: 'bold',
+    }
+
+    it('TC-F01D-CP.60 — returns [] for a known-good preset', () => {
+        expect(validatePresetContrast(BASE)).toEqual([])
+    })
+
+    it('TC-F01D-CP.61 — flags dark-mode primary with luminance < 0.04', () => {
+        const preset: ThemePreset = {
+            ...BASE,
+            primaryColor: '#0f172a',  // very dark navy, luminance ≈ 0.016
+            colorMode: 'dark',
+        }
+        const warnings = validatePresetContrast(preset)
+        expect(warnings.some(w => w.includes('luminance < 0.04'))).toBe(true)
+    })
+
+    it('TC-F01D-CP.62 — flags accent failing AA-Large vs surface', () => {
+        // On a dark surface (L≈0.005), white-ish accent would pass.
+        // Use light mode + pale yellow accent to reliably fail on near-white surface.
+        const preset: ThemePreset = {
+            ...BASE,
+            primaryColor: '#dc2626',
+            accentColor: '#fef3c7',   // near-white yellow — luminance ≈ 0.905, contrast vs dark surface ≫3 ✓
+            colorMode: 'light',       // light surface ~L99 — accent ratio ≈ 1.06:1 → fails
+        }
+        const warnings = validatePresetContrast(preset)
+        expect(warnings.some(w => w.includes('accent') && w.includes('fails AA-Large'))).toBe(true)
+    })
+
+    it('TC-F01D-CP.63 — flags accent too similar to primary (ratio < 1.5)', () => {
+        // accent == primary → contrast ratio 1.0 < 1.5 → differentiation warning
+        const preset: ThemePreset = { ...BASE, accentColor: BASE.primaryColor }
+        const warnings = validatePresetContrast(preset)
+        expect(warnings.some(w => w.includes('too similar to primary'))).toBe(true)
+    })
+
+    it('TC-F01D-CP.64 — no primary contrast warnings across all dark-mode presets (post phases 01-02)', () => {
+        // Phases 01-02 fixed dark-mode primary contrast. Light-mode primary contrast
+        // (medium-brightness colors like sky blue on white) is Phase 03 scope — not checked here.
+        const darkPresets = Object.values(CATEGORY_PRESETS).flat().filter(p => p.colorMode === 'dark')
+        for (const p of darkPresets) {
+            const primaryWarnings = validatePresetContrast(p).filter(w => w.startsWith('primary'))
+            expect(primaryWarnings, `${p.name}: primary contrast warnings found`).toEqual([])
         }
     })
 })
