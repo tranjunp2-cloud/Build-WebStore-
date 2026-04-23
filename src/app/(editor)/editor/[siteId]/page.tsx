@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
@@ -105,6 +105,7 @@ export default function EditorPage() {
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
     const [showSaveGuard, setShowSaveGuard] = useState(false)
+    const reorderSaveTimerRef = useRef<number | null>(null)
 
     const { isOnline, isSyncing } = useConnectivity()
     const { isMaster, reclaimAuthority } = useTabAuthority(siteId)
@@ -272,6 +273,12 @@ export default function EditorPage() {
     const handleSave = useCallback(async (options: SaveOptions = {}) => {
         if (!siteId) return false
 
+        // Cancel any pending reorder-triggered save to prevent double-fire
+        if (reorderSaveTimerRef.current !== null) {
+            window.clearTimeout(reorderSaveTimerRef.current)
+            reorderSaveTimerRef.current = null
+        }
+
         const snapshot = useEditorStore.getState()
         const currentBlocks = snapshot.blocks
         const currentTheme = snapshot.theme
@@ -341,6 +348,9 @@ export default function EditorPage() {
         if (!siteId || !hasUnsavedChanges || !autoSaveEnabled || templateApplied) return
 
         const timer = window.setTimeout(() => {
+            // Skip if user is currently inline editing — the TEXT_EDITING_STOPPED
+            // pipeline saves the final state and avoids overwriting partial edits.
+            if (useEditorStore.getState().isInlineEditing) return
             void handleSave({ showToast: false, refreshPreview: true })
         }, autoSaveIntervalMs)
 
@@ -358,6 +368,15 @@ export default function EditorPage() {
         window.addEventListener('beforeunload', handleBeforeUnload)
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
     }, [hasUnsavedChanges])
+
+    // Clear pending reorder-save timer on unmount
+    useEffect(() => {
+        return () => {
+            if (reorderSaveTimerRef.current !== null) {
+                window.clearTimeout(reorderSaveTimerRef.current)
+            }
+        }
+    }, [])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -507,16 +526,23 @@ export default function EditorPage() {
         void saveWithRetry({ showToast: false, refreshPreview: true })
     }, [updateBlock, saveWithRetry])
 
-    const handleReorderBlocks = useCallback(async (fromIndex: number, toIndex: number) => {
+    const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return
         reorderBlocks(fromIndex, toIndex)
         setSelectedBlock(toIndex)
-        // Save FIRST so iframe reloads with correct order from DB
-        await handleSave({ showToast: false, refreshPreview: true })
         setChatActivity({
             id: `reorder-${Date.now()}`,
             content: `Moved block #${fromIndex + 1} to position #${toIndex + 1}`,
         })
+
+        // Coalesce consecutive reorders — save once after 500ms idle
+        if (reorderSaveTimerRef.current !== null) {
+            window.clearTimeout(reorderSaveTimerRef.current)
+        }
+        reorderSaveTimerRef.current = window.setTimeout(() => {
+            reorderSaveTimerRef.current = null
+            void handleSave({ showToast: false, refreshPreview: true })
+        }, 500)
     }, [reorderBlocks, handleSave])
 
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
@@ -957,6 +983,7 @@ export default function EditorPage() {
                 currentUserRole={userData?.role}
                 userName={userData?.name}
                 userInitial={userData?.initial}
+                hasUnsavedChanges={hasUnsavedChanges}
             />
 
             <EditorToolbar
@@ -1126,7 +1153,14 @@ export default function EditorPage() {
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
+                            onImageReplaced={async () => {
+                                await handleSave({ showToast: false, refreshPreview: false })
+                                setIframeKey(key => key + 1)
+                            }}
                             onPageNavigate={handlePageSelected}
+                            onInlineEditSave={async () => {
+                                await handleSave({ showToast: false, refreshPreview: true })
+                            }}
                         />
                     </div>
 

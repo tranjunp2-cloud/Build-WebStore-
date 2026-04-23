@@ -46,6 +46,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     reactCompiler: false,
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
   },
   logging: {
     fetches: {

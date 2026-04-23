@@ -21,35 +21,28 @@ export function GradientHero({ block, site }: BlockProps<HeroConfig>) {
     }
     const [c1, c2, c3] = presets[gradientPreset] || presets.aurora
 
-    const gradientKeyframes = `
+    const gradientStyles = `
         @keyframes heroGradientShift {
             0%, 100% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            [data-hero-gradient-bg] { animation: none !important; }
         }
     `
 
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
-            <style dangerouslySetInnerHTML={{ __html: gradientKeyframes }} />
+            <style dangerouslySetInnerHTML={{ __html: gradientStyles }} />
             <div
                 className="absolute inset-0"
+                data-hero-gradient-bg
                 style={{
                     background: `linear-gradient(-45deg, ${c1}, ${c2}, ${c3}, ${c1})`,
                     backgroundSize: '400% 400%',
                     animation: 'heroGradientShift 8s ease infinite',
                 }}
             />
-            {/* prefers-reduced-motion: stop animation */}
-            <style dangerouslySetInnerHTML={{ __html: `
-                @media (prefers-reduced-motion: reduce) {
-                    [data-hero-gradient-bg] { animation: none !important; }
-                }
-            `}} />
-            <div className="absolute inset-0" data-hero-gradient-bg style={{
-                background: `linear-gradient(-45deg, ${c1}, ${c2}, ${c3}, ${c1})`,
-                backgroundSize: '400% 400%',
-                animation: 'heroGradientShift 8s ease infinite',
-            }} />
 
             <div className={`${HERO_CONTAINER} relative z-10 text-center max-w-4xl`}>
                 {badge?.show && (

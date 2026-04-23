@@ -20,7 +20,7 @@ export const productsFeaturedMeta: BlockMeta = {
     defaultVariant: 'hero-product',
     editableFields: ['headline', 'subheadline'],
     quickActions: [],
-    aiVisible: false,
+    aiVisible: true,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

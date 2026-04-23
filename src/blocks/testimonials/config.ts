@@ -9,7 +9,7 @@ export const TestimonialsConfigSchema = BaseBlockSchema.extend({
     headline: z.string().optional(),
     testimonials: z.array(z.object({ quote: z.string(), name: z.string(), title: z.string().optional(), company: z.string().optional(), rating: z.number().min(1).max(5).default(5), avatar: z.object({ url: z.string(), alt: z.string().optional() }).optional() })).default([]),
 })
-export const testimonialsMeta = { type: 'testimonials' as const, name: 'Testimonials', description: 'Customer reviews and testimonials', icon: '💬', variants: ['cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote', 'avatar-row', 'video-text', 'grid', 'single'], defaultVariant: 'cards', editableFields: ['headline', 'testimonials'], quickActions: ['Add testimonial', 'Rewrite quotes'] }
+export const testimonialsMeta = { type: 'testimonials' as const, name: 'Testimonials', description: 'Customer reviews and testimonials', icon: '💬', variants: ['cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote', 'avatar-row', 'video-text', 'grid', 'single'], defaultVariant: 'cards', editableFields: ['headline', 'testimonials'], quickActions: ['Add testimonial', 'Rewrite quotes'], aiVisible: false }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
 export const configSchema = TestimonialsConfigSchema

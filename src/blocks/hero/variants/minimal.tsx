@@ -62,7 +62,7 @@ export function MinimalHero({ block }: BlockProps<HeroConfig>) {
                                 boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)`,
                             }}
                         >
-                            {ctaButtons[0].label}
+                            <RichText text={ctaButtons[0].label} as="span" />
                         </motion.a>
                     </motion.div>
                 )}

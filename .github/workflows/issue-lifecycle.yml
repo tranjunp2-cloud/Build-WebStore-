@@ -625,3 +625,26 @@ jobs:
           meta-right-value: "${{ steps.stale.outputs.count }} items"
           content: ${{ steps.stale.outputs.content }}
           buttons: '[{"text":"📋 View Issues","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Auser-story","type":"primary"}]'
+
+  # ──────────────────────────────────────
+  # AI Estimate: auto-estimate effort + set dates when size label added
+  # ──────────────────────────────────────
+  ai-estimate:
+    name: 'AI: Estimate effort'
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'labeled' &&
+      startsWith(github.event.label.name, 'size:')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      repository-projects: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Estimate and set dates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+        run: node .github/scripts/estimate-issue.js

@@ -18,8 +18,9 @@ function LogoHeadline({ text }: { text?: string }) {
     )
 }
 
-/** Text placeholder for logos without valid image URL — shows initials in a styled div */
-function LogoPlaceholder({ name }: { name?: string }) {
+/** Text placeholder for logos without valid image URL — shows initials in a styled div.
+ *  data-image-index enables editor image-replace on placeholder click (no real <img> present). */
+function LogoPlaceholder({ name, imageIndex }: { name?: string; imageIndex?: number }) {
     const initials = (name ?? '')
         .split(/\s+/)
         .map((w) => w[0] ?? '')
@@ -34,6 +35,7 @@ function LogoPlaceholder({ name }: { name?: string }) {
                 color: 'var(--brand-primary)',
                 background: `rgba(var(--brand-primary-rgb), 0.04)`,
             }}
+            data-image-index={imageIndex}
         >
             {initials}
         </div>
@@ -61,9 +63,9 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                                 }}
                             >
                                 {item.logo?.url ? (
-                                    <img src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 w-auto opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
+                                    <img src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 w-auto opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" data-image-index={i} />
                                 ) : (
-                                    <LogoPlaceholder name={item.name} />
+                                    <LogoPlaceholder name={item.name} imageIndex={i} />
                                 )}
                             </div>
                         ))}
@@ -81,9 +83,9 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                 <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
                     {logos.map((item, i) => (
                         item.logo?.url ? (
-                            <img key={i} src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
+                            <img key={i} src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" data-image-index={i} />
                         ) : (
-                            <LogoPlaceholder key={i} name={item.name} />
+                            <LogoPlaceholder key={i} name={item.name} imageIndex={i} />
                         )
                     ))}
                 </div>

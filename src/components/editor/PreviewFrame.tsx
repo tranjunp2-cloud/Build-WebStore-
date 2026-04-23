@@ -27,9 +27,12 @@ interface PreviewFrameProps {
     onDeleteBlock?: (index: number) => void
     onDuplicateBlock?: (index: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
+    onImageReplaced?: () => void
     onPageNavigate?: (pageId: string) => void
     onBlockAIEdit?: (blockIndex: number, blockType: string) => void
     disableDragDrop?: boolean
+    /** Called after inline text editing stops — should save + reload preview. */
+    onInlineEditSave?: () => Promise<boolean | void>
 }
 
 type HoverRect = {
@@ -163,7 +166,7 @@ function findStringFieldPathTwoPass(
 function updateValueAtPath(
     source: Record<string, unknown>,
     path: Array<string | number>,
-    nextValue: string,
+    nextValue: string | number | Record<string, unknown>,
 ): Record<string, unknown> {
     const clone = JSON.parse(JSON.stringify(source)) as Record<string, unknown>
     let cursor: Record<string, unknown> | Array<unknown> = clone
@@ -188,6 +191,13 @@ function getValueAtPath(source: Record<string, unknown>, path: Array<string | nu
     return cursor
 }
 
+type InlineEditPayload = {
+    blockIndex: number
+    searchKey: string
+    oldHtml?: string
+    newHtml: string
+}
+
 function PreviewFrameInner({
     siteId,
     pageId,
@@ -201,14 +211,18 @@ function PreviewFrameInner({
     onDeleteBlock,
     onDuplicateBlock,
     onBlockDrop,
+    onImageReplaced,
     onPageNavigate,
     onBlockAIEdit,
     disableDragDrop = false,
+    onInlineEditSave,
 }: PreviewFrameProps) {
     const { t } = useI18n()
-    const { blocks, updateBlock, performSave, theme: storeTheme } = useEditorStore()
+    const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
     const blocksRef = useRef(blocks)
     useEffect(() => { blocksRef.current = blocks }, [blocks])
+    const onInlineEditSaveRef = useRef(onInlineEditSave)
+    useEffect(() => { onInlineEditSaveRef.current = onInlineEditSave }, [onInlineEditSave])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
 
@@ -229,7 +243,7 @@ function PreviewFrameInner({
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number; blockType: string; originalText: string; scrollYAtStart: number } | null>(null)
     const [iframeScrollY, setIframeScrollY] = useState(0)
-    const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string } | null>(null)
+    const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string; imageIndex?: number; totalImagesInBlock?: number } | null>(null)
     // Scroll position to restore after iframe reload
     const savedScrollYRef = useRef<number>(0)
     const scrollToBlockIndexRef = useRef<number | null>(null)
@@ -283,10 +297,43 @@ function PreviewFrameInner({
     const isHoveringControlsRef = useRef<boolean>(false)
     const textEditStopTimerRef = useRef<number | null>(null)
     const currentLiveTextRef = useRef<string | null>(null)
+    const pendingInlineEditRef = useRef<InlineEditPayload | null>(null)
     const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
     useEffect(() => {
         latestBlockLayoutsRef.current = blockLayouts
     }, [blockLayouts])
+
+    const applyInlineEditPayload = useCallback((payload: InlineEditPayload | null) => {
+        if (!payload) return false
+
+        const { blockIndex, searchKey, oldHtml, newHtml } = payload
+        if (newHtml === undefined || Number.isNaN(blockIndex)) return false
+
+        const currentBlocks = blocksRef.current
+        const block = currentBlocks[blockIndex]
+        const matchHtml = oldHtml ?? searchKey
+        const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, matchHtml) : null
+        if (!fieldPath || !block) return false
+
+        const originalValue = String(getValueAtPath(block, fieldPath) ?? '')
+        const originalHasHeadingWrapper = /^<h[1-6][\s>]/i.test(originalValue.trim())
+        const originalWrapsPlainText = originalHasHeadingWrapper &&
+            /^<h[1-6](?:\s[^>]*)?>([^<]*)<\/h[1-6]>$/i.test(originalValue.trim())
+
+        currentLiveTextRef.current = newHtml
+        let valueToSave = newHtml
+        if (!originalHasHeadingWrapper || originalWrapsPlainText) {
+            const headingMatch = newHtml.match(/^<(h[1-6])(?:\s[^>]*)?>([\s\S]+?)<\/\1>$/i)
+            if (headingMatch) valueToSave = headingMatch[2]
+        }
+
+        if (originalValue === valueToSave) return true
+
+        const clone = JSON.parse(JSON.stringify(currentBlocks))
+        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, valueToSave)
+        updateBlock(blockIndex, nextBlock)
+        return true
+    }, [updateBlock])
 
     const syncDragPosition = useCallback((clientY: number, sourceIndex?: number) => {
         if (!frameElement) return
@@ -436,6 +483,14 @@ function PreviewFrameInner({
                     clearTimeout(textEditStopTimerRef.current)
                     textEditStopTimerRef.current = null
                 }
+                // Suspend all auto-saves while inline editing is active.
+                // Also clear any pending timer that carries stale blocks from before this session.
+                setIsInlineEditing(true)
+                const { autoSaveTimer: pendingStoreTimer } = useEditorStore.getState()
+                if (pendingStoreTimer) {
+                    clearTimeout(pendingStoreTimer)
+                    useEditorStore.setState({ autoSaveTimer: null })
+                }
                 const startScrollY = e.data.scrollY ?? 0
                 setIframeScrollY(startScrollY)
                 setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex, blockType: e.data.blockType ?? '', originalText: e.data.originalText ?? '', scrollYAtStart: startScrollY })
@@ -447,44 +502,24 @@ function PreviewFrameInner({
                     if (document.activeElement?.closest('[data-wysiwyg-toolbar]')) {
                         return
                     }
-                    setTextEditingData(null)
                     currentLiveTextRef.current = null
-                    performSave(true)
+                    applyInlineEditPayload(pendingInlineEditRef.current)
+                    // Save FIRST (blocks already updated by TEXT_EDITED), then resume
+                    // auto-saves and unfreeze iframe so it reloads with the just-saved data.
+                    // Prefer onInlineEditSave (component's handleSave) — it bypasses the
+                    // isSaving guard that can block performSave when a concurrent save is in flight.
+                    void (onInlineEditSaveRef.current?.() ?? performSave(true)).finally(() => {
+                        pendingInlineEditRef.current = null
+                        setIsInlineEditing(false)
+                        setTextEditingData(null)
+                    })
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
-                const { searchKey, newHtml, blockIndex } = e.data
+                const { searchKey, oldHtml, newHtml, blockIndex } = e.data
                 if (newHtml !== undefined) {
-                    const currentBlocks = blocksRef.current
-                    const block = currentBlocks[blockIndex]
-                    const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, searchKey) : null
-                    if (fieldPath && block) {
-                        const originalValue = String(getValueAtPath(block, fieldPath) ?? '')
-                        // Only keep a heading wrapper if the original field already stored one (RichText
-                        // pattern like "<h2>Title</h2>"). For all other fields — plain text, bold/italic
-                        // inline HTML, etc. — the block component provides the heading tag itself, so
-                        // storing <hX> causes it to render as literal text.
-                        const originalHasHeadingWrapper = /^<h[1-6][\s>]/i.test(originalValue.trim())
-
-                        // Secondary check: if the original value stores a heading wrapper around
-                        // plain text (e.g. template data `<h4 style="...">Jennifer Ooi</h4>` in a
-                        // plain-text field like `member.name`), treat it as a plain-text field and
-                        // strip the wrapper on save. Without this, each edit re-adds a heading
-                        // wrapper, producing accumulating nesting: `<h4><h4>...</h4></h4>`.
-                        // A "wrapper around plain text" = the inner content contains no child tags.
-                        const originalWrapsPlainText = originalHasHeadingWrapper &&
-                            /^<h[1-6](?:\s[^>]*)?>([^<]*)<\/h[1-6]>$/i.test(originalValue.trim())
-
-                        currentLiveTextRef.current = newHtml
-                        let valueToSave = newHtml
-                        if (!originalHasHeadingWrapper || originalWrapsPlainText) {
-                            const headingMatch = newHtml.match(/^<(h[1-6])(?:\s[^>]*)?>([\s\S]+?)<\/\1>$/i)
-                            if (headingMatch) valueToSave = headingMatch[2]
-                        }
-
-                        const clone = JSON.parse(JSON.stringify(currentBlocks))
-                        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, valueToSave)
-                        updateBlock(blockIndex, nextBlock)
-                    }
+                    const payload: InlineEditPayload = { blockIndex, searchKey, oldHtml, newHtml }
+                    pendingInlineEditRef.current = payload
+                    applyInlineEditPayload(payload)
                 }
             } else if (e.data?.type === 'IFRAME_SCROLL') {
                 const scrollY = e.data.scrollY ?? 0
@@ -503,7 +538,7 @@ function PreviewFrameInner({
                     }
                 }, 100)
             } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
-                setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType })
+                setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType, imageIndex: e.data.imageIndex, totalImagesInBlock: e.data.totalImagesInBlock })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
                 setWysiwygState(e.data.state)
@@ -514,6 +549,35 @@ function PreviewFrameInner({
                 onBlockDrop?.(index, blockData)
             } else if (e.data?.type === 'PAGE_NAVIGATE') {
                 onPageNavigate?.(String(e.data.pageId))
+            } else if (e.data?.type === 'BLOCK_FIELD_CHANGED') {
+                const { blockIndex, field, value } = e.data as { blockIndex: number; field: string; value: unknown }
+                const currentBlocks = blocksRef.current
+                const isAllowedValue = (v: unknown): v is string | number | Record<string, unknown> =>
+                    typeof v === 'string' || typeof v === 'number' ||
+                    (v !== null && typeof v === 'object' && !Array.isArray(v))
+                if (currentBlocks[blockIndex] && isAllowedValue(value)) {
+                    const BLOCKED_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
+                    const path = (field as string).split('.').map((seg: string) =>
+                        /^\d+$/.test(seg) ? Number(seg) : seg
+                    ).filter((seg) => !BLOCKED_PATH_SEGMENTS.has(String(seg))) as Array<string | number>
+                    if (path.length === 0) return
+                    const clone = JSON.parse(JSON.stringify(currentBlocks))
+                    const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value as string | number | Record<string, unknown>)
+                    updateBlock(blockIndex, nextBlock)
+                    // Push updated block back to iframe so React re-renders with new field values
+                    // without a full iframe reload (which would lose scroll position).
+                    frameElementRef.current?.contentWindow?.postMessage(
+                        { type: 'UPDATE_BLOCK_DATA', blockIndex, blockData: nextBlock },
+                        window.location.origin,
+                    )
+                    performSave(true)
+                }
+            } else if (e.data?.type === 'SHOW_TOAST') {
+                const { variant, message } = e.data as { variant: string; message: string }
+                const ALLOWED_TOAST_VARIANTS = new Set(['success', 'error', 'info'] as const)
+                if (ALLOWED_TOAST_VARIANTS.has(variant as 'success' | 'error' | 'info')) {
+                    toast[variant as 'success' | 'error' | 'info'](message)
+                }
             }
         }
         window.addEventListener('message', handleMessage)
@@ -522,7 +586,7 @@ function PreviewFrameInner({
             window.removeEventListener('message', handleMessage)
         }
     // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
-    }, [cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, setIsEditing, updateBlock])
+    }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, setIsEditing, updateBlock])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -594,55 +658,216 @@ function PreviewFrameInner({
             formData.append('file', file)
             formData.append('alt', t.editor.preview.altUploadedImage)
 
-            const uploadedMedia = await uploadMediaAction(formData)
+            // Timeout after 30s to prevent frozen button on S3/network issues
+            const uploadedMedia = await Promise.race([
+                uploadMediaAction(formData),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('Upload timeout')), 30000)
+                ),
+            ])
             const newUrl = uploadedMedia.url
 
             const { blockIndex, src } = imageClickData
             const block = blocks[blockIndex]
-            const fieldPath = block ? findStringFieldPath(block, src, src) : null
+            const newMediaId = uploadedMedia.id
 
-            if (block && fieldPath) {
-                const clone = JSON.parse(JSON.stringify(blocks))
-                const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, newUrl)
-                updateBlock(blockIndex, nextBlock)
-            } else {
-                // Fallback image swapping logic if exact src fieldPath didn't match absolute vs relative URL
-                const clone = JSON.parse(JSON.stringify(blocks))
-                // Try finding with partial match
-                let foundPath = null
-                const findPartialPath = (obj: unknown, target: string, path: Array<string | number> = []): Array<string | number> | null => {
-                    if (typeof obj === 'string' && (target.includes(obj) || obj.includes(target))) return path
-                    if (Array.isArray(obj)) {
-                        for (let i=0; i<obj.length; i++) {
-                            const p = findPartialPath(obj[i], target, [...path, i])
-                            if (p) return p
-                        }
-                    } else if (obj && typeof obj === 'object') {
-                        for (const k in obj) {
-                            const p = findPartialPath((obj as Record<string, unknown>)[k], target, [...path, k])
-                            if (p) return p
-                        }
-                    }
-                    return null
-                }
-                const partialPath = findPartialPath(clone[blockIndex], new URL(src, window.location.origin).pathname)
-                if (partialPath) {
-                    const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
+            // Skip URL-based strategies for blocks where imageIndex precisely identifies the array slot.
+            // Strategies 1-5 can false-positive on OTHER array items (e.g. testimonials[0].avatar
+            // matching when the user clicked testimonials[1]); Strategy 7 handles these correctly.
+            const ARRAY_BLOCK_TYPES = new Set(['carousel', 'portfolio-grid', 'team', 'testimonials', 'social-proof', 'logo-cloud'])
+            const hasArrayIndex = imageClickData.imageIndex !== undefined && ARRAY_BLOCK_TYPES.has(imageClickData.blockType)
+
+            // Strategy 1: Find URL string match in block data (text fields with URL)
+            const fieldPath = block ? findStringFieldPath(block, src, src) : null
+            const UPLOAD_FIELD_SET = new Set(['image', 'backgroundImage', 'logo', 'avatar', 'ogImage'])
+
+            if (block && fieldPath && !hasArrayIndex) {
+                // When path descends into a Payload upload object (e.g. ['image','url']),
+                // truncate to the upload field and store newMediaId — otherwise save would
+                // re-extract the old id from { id: old, url: new } via normalizeUploadField.
+                const uploadAncestorIdx = fieldPath.findIndex(
+                    seg => typeof seg === 'string' && UPLOAD_FIELD_SET.has(seg as string)
+                )
+                if (uploadAncestorIdx >= 0) {
+                    const truncatedPath = fieldPath.slice(0, uploadAncestorIdx + 1)
+                    const nextBlock = updateValueAtPath(block as Record<string, unknown>, truncatedPath, newMediaId)
                     updateBlock(blockIndex, nextBlock)
                 } else {
+                    const nextBlock = updateValueAtPath(block as Record<string, unknown>, fieldPath, newUrl)
+                    updateBlock(blockIndex, nextBlock)
+                }
+            } else if (block) {
+                // Strategy 2: Find image/upload field by name convention
+                // Payload upload fields: image, backgroundImage, posterImage, logo, avatar, etc.
+                // Values can be: number (ID), populated object {id,url}, or null (cleared/stripped by save)
+                const IMAGE_FIELD_NAMES = ['image', 'backgroundImage', 'background_image', 'posterImage', 'logo', 'avatar', 'thumbnail']
+                const blockData = block as Record<string, unknown>
+                let matched = false
+
+                if (!hasArrayIndex) {
+
+                // Try matching: non-null fields first (ID or populated object with matching URL)
+                for (const fieldName of IMAGE_FIELD_NAMES) {
+                    const val = blockData[fieldName]
+                    if (val !== undefined && val !== null) {
+                        const isMatch = typeof val === 'number' ||
+                            (typeof val === 'object' && 'url' in (val as Record<string, unknown>) &&
+                                src.includes(String((val as Record<string, unknown>).url)))
+                        if (isMatch) {
+                            updateBlock(blockIndex, { [fieldName]: newMediaId })
+                            matched = true
+                            break
+                        }
+                    }
+                }
+
+                // Strategy 3: field exists but is null (save may have stripped the ID)
+                // — set it to the new media ID
+                if (!matched) {
+                    for (const fieldName of IMAGE_FIELD_NAMES) {
+                        if (fieldName in blockData && (blockData[fieldName] === null || typeof blockData[fieldName] === 'number')) {
+                            updateBlock(blockIndex, { [fieldName]: newMediaId })
+                            matched = true
+                            break
+                        }
+                    }
+                }
+
+                // Strategy 4: Deep search nested arrays for image fields with URL match
+                // Only matches populated objects where URL matches clicked src (safe for arrays)
+                if (!matched) {
+                    const NESTED_IMAGE_KEYS = new Set(['image', 'avatar', 'logo', 'backgroundImage', 'posterImage', 'thumbnail'])
+                    const srcPathname = new URL(src, window.location.origin).pathname
+                    const findNestedImageByUrl = (obj: unknown, path: Array<string | number> = []): Array<string | number> | null => {
+                        if (Array.isArray(obj)) {
+                            for (let i = 0; i < obj.length; i++) {
+                                const p = findNestedImageByUrl(obj[i], [...path, i])
+                                if (p) return p
+                            }
+                        } else if (obj && typeof obj === 'object') {
+                            for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+                                if (NESTED_IMAGE_KEYS.has(k) && v && typeof v === 'object' && 'url' in (v as Record<string, unknown>)) {
+                                    const url = String((v as Record<string, unknown>).url)
+                                    if (src.includes(url) || url.includes(srcPathname)) {
+                                        return [...path, k]
+                                    }
+                                }
+                                if (typeof v === 'object' && v !== null) {
+                                    const p = findNestedImageByUrl(v, [...path, k])
+                                    if (p) return p
+                                }
+                            }
+                        }
+                        return null
+                    }
+                    const clone = JSON.parse(JSON.stringify(blocks))
+                    const nestedPath = findNestedImageByUrl(clone[blockIndex])
+                    if (nestedPath) {
+                        const nextBlock = updateValueAtPath(clone[blockIndex], nestedPath, newMediaId)
+                        updateBlock(blockIndex, nextBlock)
+                        matched = true
+                    }
+                }
+
+                // Strategy 5: Partial URL match in nested strings
+                // Skip for gallery with imageIndex — Strategy 6 handles that case exclusively
+                // to avoid empty-string caption fields matching any URL (target.includes('') === true).
+                if (!matched && !(imageClickData.blockType === 'gallery' && imageClickData.imageIndex !== undefined)) {
+                    const findPartialPath = (obj: unknown, target: string, path: Array<string | number> = []): Array<string | number> | null => {
+                        if (typeof obj === 'string' && obj.length > 0 && (target.includes(obj) || obj.includes(target))) return path
+                        if (Array.isArray(obj)) {
+                            for (let i = 0; i < obj.length; i++) {
+                                const p = findPartialPath(obj[i], target, [...path, i])
+                                if (p) return p
+                            }
+                        } else if (obj && typeof obj === 'object') {
+                            for (const k in obj) {
+                                const p = findPartialPath((obj as Record<string, unknown>)[k], target, [...path, k])
+                                if (p) return p
+                            }
+                        }
+                        return null
+                    }
+                    const clone = JSON.parse(JSON.stringify(blocks))
+                    const partialPath = findPartialPath(clone[blockIndex], new URL(src, window.location.origin).pathname)
+                    if (partialPath) {
+                        const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
+                        updateBlock(blockIndex, nextBlock)
+                        matched = true
+                    }
+                }
+                } // end !hasArrayIndex (Strategies 2–5)
+
+                // Strategy 6: Gallery fallback — use data-image-index to target array slot directly
+                // Non-destructive: reads current images from Zustand store, only updates the clicked slot.
+                // Pre-fills null slots up to totalImagesInBlock so existing stock placeholders are preserved
+                // as null entries (gallery will show real images where set, otherwise falls back per-slot).
+                // Must use newMediaId (numeric Payload media ID) — normalizeUploadField strips objects
+                // without .id to null before persistence.
+                if (!matched && imageClickData.imageIndex !== undefined && imageClickData.blockType === 'gallery') {
+                    const idx = imageClickData.imageIndex
+                    const currentBlock = blocks[blockIndex] as Record<string, unknown>
+                    const currentImages = Array.isArray(currentBlock.images)
+                        ? [...currentBlock.images as Array<Record<string, unknown>>]
+                        : []
+                    const totalSlots = Math.max(
+                        imageClickData.totalImagesInBlock ?? 0,
+                        idx + 1,
+                        currentImages.length
+                    )
+                    while (currentImages.length < totalSlots) {
+                        currentImages.push({ image: null, caption: '' })
+                    }
+                    currentImages[idx] = { ...currentImages[idx], image: newMediaId }
+                    updateBlock(blockIndex, { images: currentImages })
+                    matched = true
+                }
+
+                // Strategy 7: Universal array-image handler for all other blocks with imageIndex.
+                // All use upload fields (numeric Payload media ID) — imageUrl string fields were a mismatch
+                // vs Pages.ts schema which defines image: upload for carousel and portfolio-grid items.
+                if (!matched && imageClickData.imageIndex !== undefined) {
+                    const ARRAY_IMAGE_CONFIG: Record<string, { arrayField: string; imageSubField: string }> = {
+                        carousel:         { arrayField: 'items',        imageSubField: 'image' },
+                        'portfolio-grid': { arrayField: 'projects',     imageSubField: 'image' },
+                        team:             { arrayField: 'members',      imageSubField: 'image' },
+                        testimonials:     { arrayField: 'testimonials', imageSubField: 'avatar' },
+                        'social-proof':   { arrayField: 'reviews',      imageSubField: 'avatar' },
+                        'logo-cloud':     { arrayField: 'logos',        imageSubField: 'logo'   },
+                    }
+                    const arrayConfig = ARRAY_IMAGE_CONFIG[imageClickData.blockType]
+                    if (arrayConfig) {
+                        const idx = imageClickData.imageIndex
+                        const currentBlock = blocks[blockIndex] as Record<string, unknown>
+                        const currentArray = Array.isArray(currentBlock[arrayConfig.arrayField])
+                            ? [...currentBlock[arrayConfig.arrayField] as Array<Record<string, unknown>>]
+                            : []
+                        // Pad array to idx if block has fewer items than rendered fallback slots
+                        while (currentArray.length <= idx) {
+                            currentArray.push({} as Record<string, unknown>)
+                        }
+                        currentArray[idx] = { ...currentArray[idx], [arrayConfig.imageSubField]: newMediaId }
+                        updateBlock(blockIndex, { [arrayConfig.arrayField]: currentArray })
+                        matched = true
+                    }
+                }
+
+                if (!matched) {
                     toast.error(t.editor.preview.mapImageError)
                 }
             }
 
             toast.success(t.editor.preview.imageReplaceSuccess)
             setImageClickData(null)
+            // Trigger save + iframe refresh so preview shows the new image
+            onImageReplaced?.()
         } catch (error) {
             console.error('Image replace error:', error)
             toast.error(t.editor.preview.imageReplaceFailed)
         } finally {
             setIsImageProcessing(false)
         }
-    }, [blocks, imageClickData, updateBlock])
+    }, [blocks, imageClickData, onImageReplaced, updateBlock])
 
     const isDragging = dragState !== null
     const dragSourceIndex = dragState?.sourceIndex
@@ -1210,7 +1435,7 @@ function PreviewFrameInner({
                         <ImageToolbar 
                             onImageSelect={handleImageReplace} 
                             isProcessing={isImageProcessing}
-                            onAiGenerate={() => { toast.info(t.editor.preview.aiContextLocked.replace('{blockType}', imageClickData.blockType)) }} 
+                             
                         />
                     </div>
                 )

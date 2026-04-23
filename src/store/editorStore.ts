@@ -61,6 +61,10 @@ type EditorState = {
     // AI streaming guard (F-11)
     isAIStreaming: boolean
 
+    // Inline editing guard — true while user is editing text directly in iframe.
+    // Auto-save is suspended during this window to prevent stale-block saves.
+    isInlineEditing: boolean
+
     // Save status (F-07)
     hasUnsavedChanges: boolean
     hasUnpublishedChanges: boolean
@@ -114,6 +118,9 @@ type EditorActions = {
 
     // AI streaming state (F-11)
     setIsAIStreaming: (streaming: boolean) => void
+
+    // Inline editing guard
+    setIsInlineEditing: (editing: boolean) => void
 
     // Save (F-07)
     handleContentChange: () => void
@@ -192,6 +199,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     historyIndex: -1,
     maxHistory: MAX_HISTORY,
     isAIStreaming: false,
+    isInlineEditing: false,
     hasUnsavedChanges: false,
     hasUnpublishedChanges: false,
     lastSavedAt: null,
@@ -426,12 +434,20 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     setIsAIStreaming: (streaming) => set({ isAIStreaming: streaming }),
 
+    // ── Inline Editing Guard ─────────────────────────────────────────────
+
+    setIsInlineEditing: (editing) => set({ isInlineEditing: editing }),
+
     // ── Save (F-07) ─────────────────────────────────────────────────────
     handleContentChange: () => {
-        const { autoSaveTimer, siteId } = get()
+        const { autoSaveTimer, siteId, isInlineEditing } = get()
         if (!siteId) return
 
         set({ hasUnsavedChanges: true, saveStatus: 'idle' })
+
+        // Suspend auto-save while inline editing is active. The TEXT_EDITING_STOPPED
+        // pipeline (performSave after editing) handles persisting the final state.
+        if (isInlineEditing) return
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
 
@@ -501,7 +517,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         return await attemptSave(0)
     },
 
-    markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now(), saveStatus: 'saved' }),
+    markSaved: () => set({ hasUnsavedChanges: false, hasUnpublishedChanges: true, lastSavedAt: Date.now(), saveStatus: 'saved' }),
     markPublished: () => set({ hasUnpublishedChanges: false }),
     setIsSaving: (saving) => set({ isSaving: saving }),
 
@@ -547,6 +563,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         pages: [], currentPageId: null,
         history: [], historyIndex: -1,
         isAIStreaming: false,
+        isInlineEditing: false,
         hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
         autoSaveEnabled: true, autoSaveIntervalMs: 3000,
         saveStatus: 'idle', autoSaveTimer: null,

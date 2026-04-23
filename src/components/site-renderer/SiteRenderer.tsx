@@ -14,13 +14,21 @@ import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
 import { OwnerProvider } from './OwnerContext'
+import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
 export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
 
 export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
-type PreviewBlock = { blockType: string; links?: NavLinkItem[]; ctaButton?: { url?: string; [key: string]: unknown }; ctaButtons?: Array<{ url?: string; [key: string]: unknown }>; [key: string]: unknown }
+type PreviewBlock = {
+    blockType: string
+    links?: NavLinkItem[]
+    ctaButton?: { url?: string; [key: string]: unknown }
+    ctaButtons?: Array<{ url?: string; [key: string]: unknown }>
+    __editorBlockIndex?: number
+    [key: string]: unknown
+}
 
 export type SiteRendererProps = {
     site: {
@@ -53,6 +61,7 @@ export type SiteRendererProps = {
     isEditor?: boolean
     siteId?: string
     isOwner?: boolean
+    onBlockFieldChange?: (blockIndex: number, field: string, value: unknown) => void
 }
 
 function applyGlobalSystemBlocks(
@@ -66,7 +75,7 @@ function applyGlobalSystemBlocks(
 
     if (siteHeaderBlock?.blockType === 'navigation') {
         const navIndex = nextBlocks.findIndex(block => block.blockType === 'navigation')
-        const normalizedHeader = { ...siteHeaderBlock, blockType: 'navigation' }
+        const normalizedHeader = { ...siteHeaderBlock, blockType: 'navigation', __editorBlockIndex: -1 }
         nextBlocks = navIndex >= 0
             ? nextBlocks.map((block, index) => index === navIndex ? normalizedHeader : block)
             : [normalizedHeader, ...nextBlocks]
@@ -74,7 +83,7 @@ function applyGlobalSystemBlocks(
 
     if (siteFooterBlock?.blockType === 'footer') {
         const footerIndex = nextBlocks.findIndex(block => block.blockType === 'footer')
-        const normalizedFooter = { ...siteFooterBlock, blockType: 'footer' }
+        const normalizedFooter = { ...siteFooterBlock, blockType: 'footer', __editorBlockIndex: -1 }
         nextBlocks = footerIndex >= 0
             ? nextBlocks.map((block, index) => index === footerIndex ? normalizedFooter : block)
             : [...nextBlocks, normalizedFooter]
@@ -83,7 +92,7 @@ function applyGlobalSystemBlocks(
     return nextBlocks
 }
 
-export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -103,7 +112,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
 
     const themeCSS = generateThemeCSS(theme)
 
-    const pageBlocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
+    const pageBlocks: PreviewBlock[] = ((page?.layout as PreviewBlock[]) || []).map((block, index) => ({
+        ...block,
+        __editorBlockIndex: block.__editorBlockIndex ?? index,
+    }))
     const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site)
 
     // In editor preview, rewrite internal nav/CTA links so subpages are navigable.
@@ -310,19 +322,25 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                         paddingBottom: blockStyle?.paddingBottom !== undefined ? `${blockStyle.paddingBottom}px` : 'var(--block-spacing-default)',
                     }
 
+                const callbackValue = onBlockFieldChange
+                    ? { blockIndex: index, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(index, field, value) }
+                    : null
+
                 const blockContent = (
-                    <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <HeadingProvider level={headingLevel}>
-                            <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
-                        </HeadingProvider>
-                    </BlockErrorBoundary>
+                    <BlockEditCallbackProvider value={callbackValue}>
+                        <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
+                            <HeadingProvider level={headingLevel}>
+                                <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
+                            </HeadingProvider>
+                        </BlockErrorBoundary>
+                    </BlockEditCallbackProvider>
                 )
 
                 if (isEditor) {
                     return (
                         <div
                             key={`${block.blockType}-${index}`}
-                            data-block-index={index}
+                            data-block-index={block.__editorBlockIndex ?? index}
                             data-block-type={block.blockType}
                             className="group/block relative w-full"
                             style={spacingStyle}
