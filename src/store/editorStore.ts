@@ -560,15 +560,21 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         get().handleContentChange()
     },
 
-    reset: () => set({
-        siteId: null, blocks: [], theme: {}, siteName: '',
-        headerBlock: null, footerBlock: null,
-        pages: [], currentPageId: null,
-        history: [], historyIndex: -1,
-        isAIStreaming: false,
-        isInlineEditing: false,
-        hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
-        autoSaveEnabled: true, autoSaveIntervalMs: 3000,
-        saveStatus: 'idle', autoSaveTimer: null,
-    }),
+    reset: () => {
+        // Cancel any pending auto-save/retry timer before clearing state — prevents
+        // stale cross-site writes when the user navigates to a different site.
+        const { autoSaveTimer } = get()
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+        set({
+            siteId: null, blocks: [], theme: {}, siteName: '',
+            headerBlock: null, footerBlock: null,
+            pages: [], currentPageId: null,
+            history: [], historyIndex: -1,
+            isAIStreaming: false,
+            isInlineEditing: false,
+            hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
+            autoSaveEnabled: true, autoSaveIntervalMs: 3000,
+            saveStatus: 'idle', autoSaveTimer: null,
+        })
+    },
 }))

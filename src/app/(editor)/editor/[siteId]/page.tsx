@@ -480,8 +480,8 @@ export default function EditorPage() {
             }
 
             setSaveSuccess(true)
-            // Only reload iframe when visual fields change (branding, header/footer block)
-            const needsReload = !!(changes.branding || changes.headerBlock || changes.footerBlock)
+            // Reload iframe when visually-impacting fields change
+            const needsReload = !!(changes.name || changes.branding || changes.headerBlock || changes.footerBlock)
             if (needsReload) setIframeKey(key => key + 1)
             window.setTimeout(() => setSaveSuccess(false), 1800)
         } catch (error) {
@@ -1240,6 +1240,15 @@ export default function EditorPage() {
                             data.site?.theme || {},
                             `Apply template: ${templateName}`
                         )
+
+                        // Disable auto-save BEFORE mutating store — prevents the 3s debounce
+                        // timer from firing before user confirms the template save guard.
+                        store.setAutoSaveEnabled(false)
+                        const pendingTimer = useEditorStore.getState().autoSaveTimer
+                        if (pendingTimer) {
+                            clearTimeout(pendingTimer)
+                            useEditorStore.setState({ autoSaveTimer: null })
+                        }
 
                         // Update header/footer
                         if (data.site?.headerBlock) store.updateHeaderBlock(data.site.headerBlock)
