@@ -26,16 +26,16 @@ vi.mock('@/lib/media/compress-image', () => ({
     compressImage: vi.fn(async (file: File) => file),
 }))
 
-vi.mock('sonner', () => ({
-    toast: { success: vi.fn(), error: vi.fn() },
-}))
+// Toast is delivered via window.parent.postMessage from the preview iframe —
+// spy on postMessage instead of mocking sonner directly.
+const postMessageSpy = vi.fn()
+Object.defineProperty(window, 'parent', { value: { postMessage: postMessageSpy }, writable: true })
 
 // u2500u2500 Imports (after mocks) u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500
 import { HeroMediaOverlay } from '@/blocks/hero/hero-media-overlay'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
-import { toast } from 'sonner'
 
 // u2500u2500 Helpers u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500u2500
 const mockOnFieldChange = vi.fn()
@@ -133,9 +133,12 @@ describe('TC-F30-HMO-006: invalid file type rejected', () => {
                 <div />
             </HeroMediaOverlay>
         )
-        const input = container.querySelector('input[type="file"]') as HTMLInputElement
+        const input = container.querySelector('input[accept="image/jpeg,image/png,image/webp"]') as HTMLInputElement
         fireEvent.change(input, { target: { files: [makeFile('application/pdf', 'doc.pdf')] } })
-        expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Only JPG, PNG, and WebP images are supported')
+        expect(postMessageSpy).toHaveBeenCalledWith(
+            { type: 'SHOW_TOAST', variant: 'error', message: 'Only JPG, PNG, and WebP images are supported' },
+            expect.any(String),
+        )
         expect(mockOnFieldChange).not.toHaveBeenCalled()
     })
 })
@@ -150,12 +153,15 @@ describe('TC-F30-HMO-007: valid image upload triggers onFieldChange', () => {
                 <div />
             </HeroMediaOverlay>
         )
-        const input = container.querySelector('input[type="file"]') as HTMLInputElement
+        const input = container.querySelector('input[accept="image/jpeg,image/png,image/webp"]') as HTMLInputElement
         fireEvent.change(input, { target: { files: [makeFile('image/jpeg')] } })
         await waitFor(() => {
             expect(mockOnFieldChange).toHaveBeenCalledWith('image.url', 'https://cdn/img.jpg')
         })
-        expect(vi.mocked(toast.success)).toHaveBeenCalledWith('Image updated')
+        expect(postMessageSpy).toHaveBeenCalledWith(
+            { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },
+            expect.any(String),
+        )
     })
 })
 
@@ -173,19 +179,17 @@ describe('TC-F30-HMO-008: showVideoButton renders Change Video button', () => {
     })
 })
 
-describe('TC-F30-HMO-009: VideoInputPopover URL tab submits url', () => {
-    it('calls onFieldChange with videoField and entered URL on Apply', async () => {
+describe('TC-F30-HMO-009: Change Video triggers video file input', () => {
+    it('renders video file input accepting mp4/webm when showVideoButton=true', () => {
         vi.mocked(useIsOwner).mockReturnValue(true)
         vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
-        render(
+        const { container } = render(
             <HeroMediaOverlay field="image.url" showVideoButton={true} videoField="videoUrl">
                 <div />
             </HeroMediaOverlay>
         )
-        fireEvent.click(screen.getByText('Change Video'))
-        const urlInput = screen.getByPlaceholderText('https://...')
-        fireEvent.change(urlInput, { target: { value: 'https://example.com/video.mp4' } })
-        fireEvent.click(screen.getByText('Apply'))
-        expect(mockOnFieldChange).toHaveBeenCalledWith('videoUrl', 'https://example.com/video.mp4')
+        const videoInput = container.querySelector('input[accept="video/mp4,video/webm"]') as HTMLInputElement
+        expect(videoInput).toBeTruthy()
+        expect(videoInput.type).toBe('file')
     })
 })

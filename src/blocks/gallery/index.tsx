@@ -109,6 +109,7 @@ function GalleryImageCard({ item, index, aspect = 'square', className = '', over
                 background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
                 border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
             }}
+            data-image-index={index}
             aria-hidden="true"
         >
             <span className="text-2xl opacity-20">📷</span>

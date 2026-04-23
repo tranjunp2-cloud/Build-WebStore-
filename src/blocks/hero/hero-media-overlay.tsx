@@ -127,7 +127,12 @@ export function HeroMediaOverlay({
             const formData = new FormData()
             formData.append('file', file)
             formData.append('alt', 'Hero video')
-            const uploaded = await uploadMediaAction(formData)
+            const uploaded = await Promise.race([
+                uploadMediaAction(formData),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('Upload timeout')), 30000)
+                ),
+            ])
             const video = containerRef.current?.querySelector('video')
             if (video) {
                 // Subsequent upload: update src in-place — no React re-render, no flicker
@@ -165,16 +170,14 @@ export function HeroMediaOverlay({
                         </span>
                     ) : (
                         <>
-                            {!showVideoButton && (
-                                <button
-                                    type="button"
-                                    onClick={() => imageFileRef.current?.click()}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors"
-                                >
-                                    <ImagePlus className="w-4 h-4" />
-                                    Change Image
-                                </button>
-                            )}
+                            <button
+                                type="button"
+                                onClick={() => imageFileRef.current?.click()}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 rounded transition-colors"
+                            >
+                                <ImagePlus className="w-4 h-4" />
+                                Change Image
+                            </button>
                             {showVideoButton && videoField && (
                                 <button
                                     type="button"

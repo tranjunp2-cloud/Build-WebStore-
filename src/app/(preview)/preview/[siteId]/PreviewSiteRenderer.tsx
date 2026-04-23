@@ -2,11 +2,11 @@
 
 import { useCallback } from 'react'
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
-import type { NavPage } from '@/components/site-renderer/SiteRenderer'
+import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 
 interface Props {
-    site: any
-    page: any
+    site: SiteRendererProps['site']
+    page: SiteRendererProps['page']
     pages: NavPage[]
 }
 

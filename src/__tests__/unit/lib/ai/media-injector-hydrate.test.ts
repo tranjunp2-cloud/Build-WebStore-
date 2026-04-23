@@ -7,6 +7,14 @@
  *   TC-F05-12-03 → ingestUrlToMediaIfNeeded: {id,url} → extract id
  *   TC-F05-12-04 → ingestUrlToMediaIfNeeded: disallowed host → null
  *   TC-F05-12-05 → ingestUrlToMediaIfNeeded: upload failure → null (no throw)
+ *   TC-F05-12-06 → ingestUrlToMediaIfNeeded: allowlisted host fetch+upload → returns new Media id
+ *   TC-F05-12-07 → ingestUrlToMediaIfNeeded: HTTP 500 → null (no throw)
+ *   TC-F05-12-08 → ingestUrlToMediaIfNeeded: bare URL string on allowlisted host → ingests
+ *   TC-F05-12-09 → ingestUrlToMediaIfNeeded: null/undefined/non-image → null
+ *   TC-F05-12-10 → hydrateUrlUploadsToMedia: hero top-level image regression guardrail
+ *   TC-F05-12-11 → hydrateUrlUploadsToMedia: disallowed host partial — other slots still ingest
+ *   TC-F05-12-12 → hydrateUrlUploadsToMedia: empty blocks → zeros, no calls
+ *   TC-F05-12-13 → hydrateUrlUploadsToMedia: caps at 50 slots, remainder skipped
  *
  * Source:
  *   src/lib/ai/media-injector.ts (ingestUrlToMediaIfNeeded, hydrateUrlUploadsToMedia)
@@ -74,7 +82,7 @@ describe('ingestUrlToMediaIfNeeded', () => {
     expect(payload.create).not.toHaveBeenCalled();
   });
 
-  it('{url, alt} on allowlisted host → fetches + uploads → returns new Media id', async () => {
+  it('TC-F05-12-06: {url, alt} on allowlisted host → fetches + uploads → returns new Media id', async () => {
     const fetchSpy = mockFetchOk();
     vi.stubGlobal('fetch', fetchSpy);
     const payload = fakePayload(async () => ({ id: 999 }));
@@ -114,7 +122,7 @@ describe('ingestUrlToMediaIfNeeded', () => {
     expect(payload.create).not.toHaveBeenCalled();
   });
 
-  it('fetch HTTP 500 → returns null (no throw)', async () => {
+  it('TC-F05-12-07: fetch HTTP 500 → returns null (no throw)', async () => {
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
@@ -149,7 +157,7 @@ describe('ingestUrlToMediaIfNeeded', () => {
     expect(result).toBeNull();
   });
 
-  it('bare URL string on allowlisted host → ingests', async () => {
+  it('TC-F05-12-08: bare URL string on allowlisted host → ingests', async () => {
     vi.stubGlobal('fetch', mockFetchOk());
     const payload = fakePayload(async () => ({ id: 123 }));
 
@@ -162,7 +170,7 @@ describe('ingestUrlToMediaIfNeeded', () => {
     expect(result).toBe(123);
   });
 
-  it('null / undefined / non-image value → null', async () => {
+  it('TC-F05-12-09: null / undefined / non-image value → null', async () => {
     const payload = fakePayload();
     expect(await ingestUrlToMediaIfNeeded(null, CTX, payload)).toBeNull();
     expect(await ingestUrlToMediaIfNeeded(undefined, CTX, payload)).toBeNull();
@@ -222,7 +230,7 @@ describe('hydrateUrlUploadsToMedia', () => {
     }
   });
 
-  it('hero top-level image {url,alt} → hydrated to numeric (PR #681 regression guardrail)', async () => {
+  it('TC-F05-12-10: hero top-level image {url,alt} → hydrated to numeric (regression guardrail)', async () => {
     vi.stubGlobal('fetch', mockFetchOk());
     const payload = fakePayload(async () => ({ id: 777 }));
 
@@ -239,7 +247,7 @@ describe('hydrateUrlUploadsToMedia', () => {
     expect(blocks[0]!.image).toBe(777);
   });
 
-  it('disallowed host on one slot — other allowlisted slots still ingest', async () => {
+  it('TC-F05-12-11: disallowed host on one slot — other allowlisted slots still ingest', async () => {
     const fetchSpy = mockFetchOk();
     vi.stubGlobal('fetch', fetchSpy);
     let nextId = 500;
@@ -266,14 +274,14 @@ describe('hydrateUrlUploadsToMedia', () => {
     expect(typeof images[1]!.image).toBe('number');
   });
 
-  it('empty blocks → returns zeros, no calls', async () => {
+  it('TC-F05-12-12: empty blocks → returns zeros, no calls', async () => {
     const payload = fakePayload();
     const result = await hydrateUrlUploadsToMedia([], payload, CTX);
     expect(result).toEqual({ hydrated: 0, failed: 0, skipped: 0 });
     expect(payload.create).not.toHaveBeenCalled();
   });
 
-  it('caps at 50 slots per call, remainder recorded as skipped', async () => {
+  it('TC-F05-12-13: caps at 50 slots per call, remainder recorded as skipped', async () => {
     vi.stubGlobal('fetch', mockFetchOk());
     let nextId = 1;
     const payload = fakePayload(async () => ({ id: nextId++ }));

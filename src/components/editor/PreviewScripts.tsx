@@ -12,11 +12,11 @@ export function replaceDropHintCSS(css: string, text: string): string {
 
 export function PreviewScripts() {
     useEffect(() => {
-        let parentOrigin = '*'
+        let parentOrigin = window.location.origin
         try {
             parentOrigin = new URL(document.referrer).origin
         } catch (e) {
-            parentOrigin = window.location.origin // fallback
+            // keep window.location.origin fallback
         }
 
         const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']

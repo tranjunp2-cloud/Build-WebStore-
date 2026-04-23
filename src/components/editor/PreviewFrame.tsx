@@ -519,18 +519,23 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'BLOCK_FIELD_CHANGED') {
                 const { blockIndex, field, value } = e.data as { blockIndex: number; field: string; value: unknown }
                 const currentBlocks = blocksRef.current
-                if (currentBlocks[blockIndex]) {
+                if (currentBlocks[blockIndex] && (typeof value === 'string' || typeof value === 'number')) {
+                    const BLOCKED_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
                     const path = (field as string).split('.').map((seg: string) =>
                         /^\d+$/.test(seg) ? Number(seg) : seg
-                    ) as Array<string | number>
+                    ).filter((seg) => !BLOCKED_PATH_SEGMENTS.has(String(seg))) as Array<string | number>
+                    if (path.length === 0) return
                     const clone = JSON.parse(JSON.stringify(currentBlocks))
-                    const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value as string)
+                    const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value)
                     updateBlock(blockIndex, nextBlock)
                     performSave(true)
                 }
             } else if (e.data?.type === 'SHOW_TOAST') {
-                const { variant, message } = e.data as { variant: 'success' | 'error' | 'info'; message: string }
-                toast[variant]?.(message)
+                const { variant, message } = e.data as { variant: string; message: string }
+                const ALLOWED_TOAST_VARIANTS = new Set(['success', 'error', 'info'] as const)
+                if (ALLOWED_TOAST_VARIANTS.has(variant as 'success' | 'error' | 'info')) {
+                    toast[variant as 'success' | 'error' | 'info'](message)
+                }
             }
         }
         window.addEventListener('message', handleMessage)
