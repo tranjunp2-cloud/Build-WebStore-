@@ -124,8 +124,8 @@ export function brandTintedLight(brandHex: string): string {
 
 // ── Contrast Checking (WCAG 2.1) ────────────────────────────────────────────
 
-/** Relative luminance per WCAG 2.1 formula. */
-function relativeLuminance(hex: string): number {
+/** Relative luminance per WCAG 2.1 formula. Returns 0 for invalid hex. */
+export function relativeLuminance(hex: string): number {
     if (!isValidHex(hex)) return 0
     const r = parseInt(hex.slice(1, 3), 16) / 255
     const g = parseInt(hex.slice(3, 5), 16) / 255
@@ -222,8 +222,9 @@ export function generatePalette(
                 inverse: brandTintedDark(safePrimary),
                 muted: tintNeutral(safePrimary, 55),
             },
-            border: tintNeutral(safePrimary, 22),
-            divider: tintNeutral(safePrimary, 18),
+            // L=42/44 ensures ≥3:1 contrast vs surface.primary (L=8) across all hues (WCAG AA-Large)
+            border: tintNeutral(safePrimary, 44),
+            divider: tintNeutral(safePrimary, 42),
         }
     }
 
