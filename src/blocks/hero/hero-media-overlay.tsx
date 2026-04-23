@@ -104,7 +104,11 @@ export function HeroMediaOverlay({
                     setTimeout(() => reject(new Error('Upload timeout')), 30000)
                 ),
             ])
-            callback.onFieldChange(field, uploaded.url)
+            // Strip ".url" suffix to get the Payload upload field root (e.g. "image.url" → "image").
+            // Send a hydrated object {id, url} so the block renders immediately AND the save route
+            // can extract the integer Media ID via normalizeUploadField.
+            const imageField = field.endsWith('.url') ? field.slice(0, -4) : field
+            callback.onFieldChange(imageField, { id: uploaded.id, url: uploaded.url, alt: altText })
             parentToast.success('Image updated')
         } catch (err) {
             parentToast.error(err instanceof Error ? err.message : 'Upload failed')

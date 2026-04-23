@@ -144,19 +144,19 @@ describe('TC-F30-HMO-006: invalid file type rejected', () => {
 })
 
 describe('TC-F30-HMO-007: valid image upload triggers onFieldChange', () => {
-    it('compresses, uploads, calls onFieldChange with url, shows success toast', async () => {
+    it('strips .url suffix, calls onFieldChange with hydrated object {id,url}, shows success toast', async () => {
         vi.mocked(useIsOwner).mockReturnValue(true)
         vi.mocked(useBlockEditCallback).mockReturnValue(mockCallback)
-        vi.mocked(uploadMediaAction).mockResolvedValue({ url: 'https://cdn/img.jpg' } as never)
+        vi.mocked(uploadMediaAction).mockResolvedValue({ id: 101, url: 'https://cdn/img.jpg' } as never)
         const { container } = render(
-            <HeroMediaOverlay field="image.url">
+            <HeroMediaOverlay field="image.url" altText="Hero image">
                 <div />
             </HeroMediaOverlay>
         )
         const input = container.querySelector('input[accept="image/jpeg,image/png,image/webp"]') as HTMLInputElement
         fireEvent.change(input, { target: { files: [makeFile('image/jpeg')] } })
         await waitFor(() => {
-            expect(mockOnFieldChange).toHaveBeenCalledWith('image.url', 'https://cdn/img.jpg')
+            expect(mockOnFieldChange).toHaveBeenCalledWith('image', { id: 101, url: 'https://cdn/img.jpg', alt: 'Hero image' })
         })
         expect(postMessageSpy).toHaveBeenCalledWith(
             { type: 'SHOW_TOAST', variant: 'success', message: 'Image updated' },

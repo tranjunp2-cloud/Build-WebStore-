@@ -164,7 +164,7 @@ function findStringFieldPathTwoPass(
 function updateValueAtPath(
     source: Record<string, unknown>,
     path: Array<string | number>,
-    nextValue: string | number,
+    nextValue: string | number | Record<string, unknown>,
 ): Record<string, unknown> {
     const clone = JSON.parse(JSON.stringify(source)) as Record<string, unknown>
     let cursor: Record<string, unknown> | Array<unknown> = clone
@@ -519,14 +519,17 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'BLOCK_FIELD_CHANGED') {
                 const { blockIndex, field, value } = e.data as { blockIndex: number; field: string; value: unknown }
                 const currentBlocks = blocksRef.current
-                if (currentBlocks[blockIndex] && (typeof value === 'string' || typeof value === 'number')) {
+                const isAllowedValue = (v: unknown): v is string | number | Record<string, unknown> =>
+                    typeof v === 'string' || typeof v === 'number' ||
+                    (v !== null && typeof v === 'object' && !Array.isArray(v))
+                if (currentBlocks[blockIndex] && isAllowedValue(value)) {
                     const BLOCKED_PATH_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype'])
                     const path = (field as string).split('.').map((seg: string) =>
                         /^\d+$/.test(seg) ? Number(seg) : seg
                     ).filter((seg) => !BLOCKED_PATH_SEGMENTS.has(String(seg))) as Array<string | number>
                     if (path.length === 0) return
                     const clone = JSON.parse(JSON.stringify(currentBlocks))
-                    const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value)
+                    const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, path, value as string | number | Record<string, unknown>)
                     updateBlock(blockIndex, nextBlock)
                     performSave(true)
                 }
