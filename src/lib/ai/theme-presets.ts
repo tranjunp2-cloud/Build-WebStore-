@@ -38,7 +38,7 @@ export const RESTAURANT_PRESETS: ThemePreset[] = [
   { name: 'Heritage Gold', primaryColor: '#92400e', secondaryColor: '#b45309', accentColor: '#d4a574', fontPairingId: 'elegant-serif', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'medium', moodId: 'elegant' },
   // Plan 2253 Phase 02 — 3 new presets for variety (R3 fix — 5→8 per category)
   { name: 'Coastal Catch', primaryColor: '#0e7490', secondaryColor: '#0891b2', accentColor: '#fbbf24', fontPairingId: 'magazine-cover', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'editorial' },
-  { name: 'Smoke & Char', primaryColor: '#3f3f46', secondaryColor: '#71717a', accentColor: '#f97316', fontPairingId: 'contemporary', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'sharp', shadowPreset: 'medium', moodId: 'bold' },
+  { name: 'Smoke & Char', primaryColor: '#61616b', secondaryColor: '#71717a', accentColor: '#f97316', fontPairingId: 'contemporary', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'sharp', shadowPreset: 'medium', moodId: 'bold' },
   { name: 'Sunset Rustic', primaryColor: '#b91c1c', secondaryColor: '#d97706', accentColor: '#fef3c7', fontPairingId: 'warm-editorial', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'subtle', moodId: 'playful' },
 ]
 
@@ -47,11 +47,11 @@ export const ECOMMERCE_PRESETS: ThemePreset[] = [
   { name: 'Shopfront Clean', primaryColor: '#2563eb', secondaryColor: '#3b82f6', accentColor: '#f59e0b', fontPairingId: 'modern-clean', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'tech-minimal' },
   { name: 'Midnight Mall', primaryColor: '#7c3aed', secondaryColor: '#a78bfa', accentColor: '#f472b6', fontPairingId: 'startup-vibe', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'soft', shadowPreset: 'medium', moodId: 'bold' },
   { name: 'Fresh Market', primaryColor: '#059669', secondaryColor: '#34d399', accentColor: '#f97316', fontPairingId: 'geometric', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'playful' },
-  { name: 'Luxury Boutique', primaryColor: '#1e1b4b', secondaryColor: '#4338ca', accentColor: '#c4b5fd', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'elegant' },
+  { name: 'Luxury Boutique', primaryColor: '#5953c1', secondaryColor: '#4338ca', accentColor: '#c4b5fd', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'elegant' },
   { name: 'Warm Bazaar', primaryColor: '#b45309', secondaryColor: '#d97706', accentColor: '#dc2626', fontPairingId: 'warm-friendly', colorMode: 'light', spacingPreset: 'default', borderRadius: 'soft', shadowPreset: 'subtle', moodId: 'playful' },
   // Plan 2253 Phase 02 — 3 new presets
   { name: 'Pastel Shelf', primaryColor: '#db2777', secondaryColor: '#f472b6', accentColor: '#a3e635', fontPairingId: 'hospitality', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'pill', shadowPreset: 'subtle', moodId: 'playful' },
-  { name: 'Industrial Cart', primaryColor: '#0f172a', secondaryColor: '#334155', accentColor: '#f59e0b', fontPairingId: 'classical', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'sharp', shadowPreset: 'medium', moodId: 'bold' },
+  { name: 'Industrial Cart', primaryColor: '#3e5fad', secondaryColor: '#334155', accentColor: '#f59e0b', fontPairingId: 'classical', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'sharp', shadowPreset: 'medium', moodId: 'bold' },
   { name: 'Earth Tones', primaryColor: '#78350f', secondaryColor: '#b45309', accentColor: '#a3e635', fontPairingId: 'magazine-cover', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'serene' },
 ]
 
@@ -65,7 +65,7 @@ export const BEAUTY_PRESETS: ThemePreset[] = [
   // Plan 2253 Phase 02 — 3 new presets
   { name: 'Champagne Silk', primaryColor: '#a16207', secondaryColor: '#ca8a04', accentColor: '#fde68a', fontPairingId: 'boutique-serif', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'medium', moodId: 'elegant' },
   { name: 'Botanical Spa', primaryColor: '#15803d', secondaryColor: '#65a30d', accentColor: '#fcd34d', fontPairingId: 'contemporary', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'serene' },
-  { name: 'Velvet Noir', primaryColor: '#6d28d9', secondaryColor: '#a855f7', accentColor: '#fbcfe8', fontPairingId: 'magazine-cover', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'editorial' },
+  { name: 'Velvet Noir', primaryColor: '#7b3cdd', secondaryColor: '#a855f7', accentColor: '#fbcfe8', fontPairingId: 'magazine-cover', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'editorial' },
 ]
 
 // ── Tech ─────────────────────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ export const TECH_PRESETS: ThemePreset[] = [
   { name: 'Minimal Code', primaryColor: '#0ea5e9', secondaryColor: '#38bdf8', accentColor: '#a3e635', fontPairingId: 'minimal-swiss', colorMode: 'light', spacingPreset: 'compact', borderRadius: 'sharp', shadowPreset: 'none', moodId: 'tech-minimal' },
   { name: 'Dark Console', primaryColor: '#22c55e', secondaryColor: '#4ade80', accentColor: '#fbbf24', fontPairingId: 'retro-modern', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'tech-minimal' },
   // Plan 2253 Phase 02 — 3 new presets
-  { name: 'Developer Slate', primaryColor: '#1e293b', secondaryColor: '#475569', accentColor: '#06b6d4', fontPairingId: 'contemporary', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'sharp', shadowPreset: 'subtle', moodId: 'tech-minimal' },
+  { name: 'Developer Slate', primaryColor: '#48638e', secondaryColor: '#475569', accentColor: '#06b6d4', fontPairingId: 'contemporary', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'sharp', shadowPreset: 'subtle', moodId: 'tech-minimal' },
   { name: 'AI Violet', primaryColor: '#9333ea', secondaryColor: '#c084fc', accentColor: '#22d3ee', fontPairingId: 'boutique-serif', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic', moodId: 'bold' },
   { name: 'Daylight Build', primaryColor: '#0369a1', secondaryColor: '#0284c7', accentColor: '#f97316', fontPairingId: 'classical', colorMode: 'light', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'tech-minimal' },
 ]
@@ -110,14 +110,14 @@ export const EDUCATION_PRESETS: ThemePreset[] = [
 // ── Real Estate ──────────────────────────────────────────────────────────────
 export const REALESTATE_PRESETS: ThemePreset[] = [
   { name: 'Executive Blue', primaryColor: '#1e3a5f', secondaryColor: '#2563eb', accentColor: '#d4a574', fontPairingId: 'pro-corporate', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'elegant' },
-  { name: 'Luxury Gold', primaryColor: '#78350f', secondaryColor: '#92400e', accentColor: '#d4a574', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'elegant' },
+  { name: 'Luxury Gold', primaryColor: '#a34814', secondaryColor: '#92400e', accentColor: '#d4a574', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'elegant' },
   { name: 'City Modern', primaryColor: '#0f172a', secondaryColor: '#334155', accentColor: '#0ea5e9', fontPairingId: 'minimal-swiss', colorMode: 'light', spacingPreset: 'default', borderRadius: 'sharp', shadowPreset: 'subtle', moodId: 'tech-minimal' },
   { name: 'Garden Estate', primaryColor: '#166534', secondaryColor: '#15803d', accentColor: '#fbbf24', fontPairingId: 'elegant-serif', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'medium', moodId: 'serene' },
-  { name: 'Penthouse Dark', primaryColor: '#1e1b4b', secondaryColor: '#4338ca', accentColor: '#f59e0b', fontPairingId: 'editorial', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic', moodId: 'editorial' },
+  { name: 'Penthouse Dark', primaryColor: '#5953c1', secondaryColor: '#4338ca', accentColor: '#f59e0b', fontPairingId: 'editorial', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic', moodId: 'editorial' },
   // Plan 2253 Phase 02 — 3 new presets
   { name: 'Mediterranean', primaryColor: '#075985', secondaryColor: '#0369a1', accentColor: '#fcd34d', fontPairingId: 'magazine-cover', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'medium', moodId: 'editorial' },
   { name: 'Desert Sand', primaryColor: '#a16207', secondaryColor: '#d97706', accentColor: '#fed7aa', fontPairingId: 'warm-editorial', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'subtle', moodId: 'serene' },
-  { name: 'Metropolitan', primaryColor: '#1f2937', secondaryColor: '#374151', accentColor: '#10b981', fontPairingId: 'contemporary', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'tech-minimal' },
+  { name: 'Metropolitan', primaryColor: '#4b6486', secondaryColor: '#374151', accentColor: '#10b981', fontPairingId: 'contemporary', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'tech-minimal' },
 ]
 
 // ── Fitness ──────────────────────────────────────────────────────────────────
@@ -128,9 +128,9 @@ export const FITNESS_PRESETS: ThemePreset[] = [
   { name: 'Neon Gym', primaryColor: '#a3e635', secondaryColor: '#84cc16', accentColor: '#22d3ee', fontPairingId: 'futuristic', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'bold' },
   { name: 'Fresh Active', primaryColor: '#2563eb', secondaryColor: '#3b82f6', accentColor: '#f97316', fontPairingId: 'geometric', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'tech-minimal' },
   // Plan 2253 Phase 02 — 3 new presets
-  { name: 'Crossfit Graphite', primaryColor: '#18181b', secondaryColor: '#52525b', accentColor: '#facc15', fontPairingId: 'contemporary', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'sharp', shadowPreset: 'dramatic', moodId: 'bold' },
+  { name: 'Crossfit Graphite', primaryColor: '#62626f', secondaryColor: '#52525b', accentColor: '#facc15', fontPairingId: 'contemporary', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'sharp', shadowPreset: 'dramatic', moodId: 'bold' },
   { name: 'Yoga Sunrise', primaryColor: '#d97706', secondaryColor: '#fbbf24', accentColor: '#fda4af', fontPairingId: 'hospitality', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'pill', shadowPreset: 'subtle', moodId: 'serene' },
-  { name: 'Boxing Crimson', primaryColor: '#991b1b', secondaryColor: '#dc2626', accentColor: '#f4f4f5', fontPairingId: 'boutique-serif', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'bold' },
+  { name: 'Boxing Crimson', primaryColor: '#bf2222', secondaryColor: '#dc2626', accentColor: '#f4f4f5', fontPairingId: 'boutique-serif', colorMode: 'dark', spacingPreset: 'compact', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'bold' },
 ]
 
 // ── Creative ─────────────────────────────────────────────────────────────────
@@ -149,21 +149,21 @@ export const CREATIVE_PRESETS: ThemePreset[] = [
 // ── Business ─────────────────────────────────────────────────────────────────
 export const BUSINESS_PRESETS: ThemePreset[] = [
   { name: 'Corporate Trust', primaryColor: '#1e3a5f', secondaryColor: '#2563eb', accentColor: '#f59e0b', fontPairingId: 'pro-corporate', colorMode: 'light', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'subtle', moodId: 'elegant' },
-  { name: 'Executive Dark', primaryColor: '#0f172a', secondaryColor: '#1e293b', accentColor: '#d4a574', fontPairingId: 'editorial', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'editorial' },
+  { name: 'Executive Dark', primaryColor: '#3e5fad', secondaryColor: '#1e293b', accentColor: '#d4a574', fontPairingId: 'editorial', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'editorial' },
   { name: 'Clean Consult', primaryColor: '#4f46e5', secondaryColor: '#6366f1', accentColor: '#06b6d4', fontPairingId: 'modern-clean', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'tech-minimal' },
   { name: 'Green Enterprise', primaryColor: '#166534', secondaryColor: '#22c55e', accentColor: '#fbbf24', fontPairingId: 'humanist', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'serene' },
-  { name: 'Prestige Gold', primaryColor: '#78350f', secondaryColor: '#92400e', accentColor: '#d4a574', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'elegant' },
+  { name: 'Prestige Gold', primaryColor: '#a34814', secondaryColor: '#92400e', accentColor: '#d4a574', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'subtle', shadowPreset: 'dramatic', moodId: 'elegant' },
   // Plan 2253 Phase 02 — 3 new presets
   { name: 'Law Office', primaryColor: '#451a03', secondaryColor: '#78350f', accentColor: '#fef3c7', fontPairingId: 'classical', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'sharp', shadowPreset: 'subtle', moodId: 'elegant' },
   { name: 'Accounting Sage', primaryColor: '#065f46', secondaryColor: '#047857', accentColor: '#fde047', fontPairingId: 'contemporary', colorMode: 'light', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'serene' },
-  { name: 'Agency Midnight', primaryColor: '#1e1b4b', secondaryColor: '#3730a3', accentColor: '#fb923c', fontPairingId: 'magazine-cover', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic', moodId: 'editorial' },
+  { name: 'Agency Midnight', primaryColor: '#5953c1', secondaryColor: '#3730a3', accentColor: '#fb923c', fontPairingId: 'magazine-cover', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic', moodId: 'editorial' },
 ]
 
 // ── F&B ──────────────────────────────────────────────────────────────────────
 export const FNB_PRESETS: ThemePreset[] = [
   { name: 'Kopitiam Classic', primaryColor: '#78350f', secondaryColor: '#92400e', accentColor: '#fbbf24', fontPairingId: 'artisan', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'subtle', moodId: 'elegant' },
   { name: 'Bubble Tea Pop', primaryColor: '#a21caf', secondaryColor: '#c026d3', accentColor: '#fbbf24', fontPairingId: 'fresh-rounded', colorMode: 'light', spacingPreset: 'default', borderRadius: 'pill', shadowPreset: 'medium', moodId: 'playful' },
-  { name: 'Cafe Noir', primaryColor: '#292524', secondaryColor: '#57534e', accentColor: '#d4a574', fontPairingId: 'cafe-bistro', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'medium', moodId: 'editorial' },
+  { name: 'Cafe Noir', primaryColor: '#6a605d', secondaryColor: '#57534e', accentColor: '#d4a574', fontPairingId: 'cafe-bistro', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'medium', moodId: 'editorial' },
   { name: 'Fresh Juice', primaryColor: '#16a34a', secondaryColor: '#65a30d', accentColor: '#f97316', fontPairingId: 'warm-friendly', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'playful' },
   { name: 'Night Lounge', primaryColor: '#be185d', secondaryColor: '#db2777', accentColor: '#fbbf24', fontPairingId: 'elegant-serif', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'dramatic', moodId: 'elegant' },
   // Plan 2253 Phase 02 — 3 new presets
@@ -175,14 +175,14 @@ export const FNB_PRESETS: ThemePreset[] = [
 // ── Events / Wedding ────────────────────────────────────────────────────────
 export const EVENTS_PRESETS: ThemePreset[] = [
   { name: 'Elegant Blush', primaryColor: '#be185d', secondaryColor: '#ec4899', accentColor: '#fbbf24', fontPairingId: 'elegant-serif', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'subtle', moodId: 'elegant' },
-  { name: 'Royal Night', primaryColor: '#1e1b4b', secondaryColor: '#4338ca', accentColor: '#d4a574', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic', moodId: 'elegant' },
+  { name: 'Royal Night', primaryColor: '#5953c1', secondaryColor: '#4338ca', accentColor: '#d4a574', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic', moodId: 'elegant' },
   { name: 'Garden Party', primaryColor: '#166534', secondaryColor: '#22c55e', accentColor: '#f9a8d4', fontPairingId: 'artisan', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'pill', shadowPreset: 'subtle', moodId: 'playful' },
-  { name: 'Modern Gala', primaryColor: '#0f172a', secondaryColor: '#334155', accentColor: '#f59e0b', fontPairingId: 'minimal-swiss', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'tech-minimal' },
+  { name: 'Modern Gala', primaryColor: '#3e5fad', secondaryColor: '#334155', accentColor: '#f59e0b', fontPairingId: 'minimal-swiss', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'tech-minimal' },
   { name: 'Rustic Charm', primaryColor: '#92400e', secondaryColor: '#b45309', accentColor: '#fef3c7', fontPairingId: 'warm-friendly', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'medium', moodId: 'serene' },
   // Plan 2253 Phase 02 — 3 new presets
   { name: 'Champagne Toast', primaryColor: '#a16207', secondaryColor: '#eab308', accentColor: '#fff7ed', fontPairingId: 'boutique-serif', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'medium', moodId: 'elegant' },
   { name: 'Beach Ceremony', primaryColor: '#0891b2', secondaryColor: '#06b6d4', accentColor: '#fed7aa', fontPairingId: 'hospitality', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'pill', shadowPreset: 'subtle', moodId: 'serene' },
-  { name: 'Winter Wonder', primaryColor: '#1e40af', secondaryColor: '#3b82f6', accentColor: '#e0e7ff', fontPairingId: 'magazine-cover', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'dramatic', moodId: 'editorial' },
+  { name: 'Winter Wonder', primaryColor: '#2e57db', secondaryColor: '#3b82f6', accentColor: '#e0e7ff', fontPairingId: 'magazine-cover', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'dramatic', moodId: 'editorial' },
 ]
 
 // ── Blog / Media ────────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ export const BLOG_PRESETS: ThemePreset[] = [
 // ── Travel / Tourism ────────────────────────────────────────────────────────
 export const TRAVEL_PRESETS: ThemePreset[] = [
   { name: 'Tropical Escape', primaryColor: '#0891b2', secondaryColor: '#06b6d4', accentColor: '#f59e0b', fontPairingId: 'warm-friendly', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'playful' },
-  { name: 'Explorer Dark', primaryColor: '#1e3a5f', secondaryColor: '#2563eb', accentColor: '#22d3ee', fontPairingId: 'geometric', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'bold' },
+  { name: 'Explorer Dark', primaryColor: '#3363a3', secondaryColor: '#2563eb', accentColor: '#22d3ee', fontPairingId: 'geometric', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium', moodId: 'bold' },
   { name: 'Heritage Trail', primaryColor: '#92400e', secondaryColor: '#b45309', accentColor: '#fbbf24', fontPairingId: 'elegant-serif', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'medium', moodId: 'elegant' },
   { name: 'Backpacker Fresh', primaryColor: '#16a34a', secondaryColor: '#65a30d', accentColor: '#f97316', fontPairingId: 'startup-vibe', colorMode: 'light', spacingPreset: 'compact', borderRadius: 'rounded', shadowPreset: 'subtle', moodId: 'playful' },
   { name: 'Island Night', primaryColor: '#7c3aed', secondaryColor: '#a78bfa', accentColor: '#fbbf24', fontPairingId: 'creative-studio', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic', moodId: 'editorial' },

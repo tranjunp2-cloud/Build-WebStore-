@@ -242,6 +242,49 @@ describe('generatePalette', () => {
     })
 })
 
+// TC-F01D-03.10 → TC-F01D-03.13 — dark-mode contrast regression guards
+describe('generatePalette — dark mode contrast (TC-F01D-03.10–03.13)', () => {
+    // #6366f1 (H=239 indigo) is the worst-case hue for divider contrast — included as regression guard
+    const BRAND_HUES = ['#dc2626', '#16a34a', '#0ea5e9', '#eab308', '#d946ef', '#6366f1']
+
+    it('TC-F01D-03.10 — dark divider passes WCAG AA-Large vs surface.primary (all hues)', () => {
+        BRAND_HUES.forEach(brand => {
+            const p = generatePalette(brand, 'dark')
+            const result = checkContrast(p.divider, p.surface.primary)
+            expect(result.passAALarge).toBe(true)
+        })
+    })
+
+    it('TC-F01D-03.11 — dark border passes WCAG AA-Large vs surface.primary (all hues)', () => {
+        BRAND_HUES.forEach(brand => {
+            const p = generatePalette(brand, 'dark')
+            const result = checkContrast(p.border, p.surface.primary)
+            expect(result.passAALarge).toBe(true)
+        })
+    })
+
+    it('TC-F01D-03.12 — dark border is lighter than divider (visual hierarchy)', () => {
+        BRAND_HUES.forEach(brand => {
+            const p = generatePalette(brand, 'dark')
+            const dividerL = hexToHSL(p.divider).l
+            const borderL = hexToHSL(p.border).l
+            expect(borderL).toBeGreaterThan(dividerL)
+        })
+    })
+
+    it('TC-F01D-03.13 — light mode divider is lighter than dark mode divider (no light/dark swap)', () => {
+        // Non-regression: dark-mode fix must not accidentally affect light mode branch.
+        // Light divider (L=90) always lighter than dark divider (L=40) → different branches intact.
+        BRAND_HUES.forEach(brand => {
+            const light = generatePalette(brand, 'light')
+            const dark  = generatePalette(brand, 'dark')
+            const lightDividerL = hexToHSL(light.divider).l
+            const darkDividerL  = hexToHSL(dark.divider).l
+            expect(lightDividerL).toBeGreaterThan(darkDividerL)
+        })
+    })
+})
+
 describe('validateThemeColors', () => {
     it('flags pure black text', () => {
         const warnings = validateThemeColors({ textColor: '#000000', backgroundColor: '#ffffff' })
