@@ -19,25 +19,22 @@ export async function waitForDashboard(page: Page) {
 }
 
 /**
- * Get first siteId from the sites page by extracting from site card editor links.
- * Falls back to /dashboard if /sites yields nothing.
+ * Get first siteId from dashboard by extracting from site card links.
  * Returns null if no sites found.
  */
 export async function getFirstSiteId(page: Page): Promise<string | null> {
-    for (const path of ['/sites', '/dashboard']) {
-        await navigateTo(page, path)
+    await navigateTo(page, '/dashboard')
 
-        const editorLinks = page.locator('a[href*="/editor/"]')
-        const count = await editorLinks.count()
-        if (count === 0) continue
+    // Look for editor links like /editor/123
+    const editorLinks = page.locator('a[href*="/editor/"]')
+    const count = await editorLinks.count()
+    if (count === 0) return null
 
-        const href = await editorLinks.first().getAttribute('href')
-        if (!href) continue
+    const href = await editorLinks.first().getAttribute('href')
+    if (!href) return null
 
-        const match = href.match(/\/editor\/(\d+)/)
-        if (match) return match[1]
-    }
-    return null
+    const match = href.match(/\/editor\/(\d+)/)
+    return match ? match[1] : null
 }
 
 /**
