@@ -33,14 +33,14 @@ export const PortfolioGridConfigSchema = BaseBlockSchema.extend({
 
 export const portfolioGridMeta = {
     type: 'portfolio-grid' as const,
-    name: 'Portfolio Grid',
+    name: 'Portfolio',
     description: 'Filterable portfolio grid with hover overlays',
     icon: '🎨',
     variants: ['grid', 'masonry', 'showcase'],
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'projects'],
     quickActions: ['Add project', 'Change layout', 'Edit categories'],
-    aiVisible: false,
+    aiVisible: true,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
