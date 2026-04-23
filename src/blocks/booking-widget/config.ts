@@ -50,6 +50,7 @@ export const bookingWidgetMeta = {
     defaultVariant: 'inline',
     editableFields: ['headline', 'subheadline', 'services', 'availableDays', 'timeSlotInterval', 'startTime', 'endTime', 'bookingUrl', 'showPrice'],
     quickActions: ['Add service', 'Change time slots', 'Update availability'],
+    aiVisible: false,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

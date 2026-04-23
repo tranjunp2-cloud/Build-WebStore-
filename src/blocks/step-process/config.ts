@@ -36,7 +36,7 @@ export const stepProcessMeta = {
     defaultVariant: 'vertical',
     editableFields: ['headline', 'subheadline', 'steps'],
     quickActions: ['Add step', 'Rewrite steps', 'Change layout'],
-    aiVisible: false,
+    aiVisible: true,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
