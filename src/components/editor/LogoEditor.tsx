@@ -178,7 +178,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
                 <DialogContent className="max-w-sm border-white/[0.08] bg-[#0F172A] text-white">
                     <DialogHeader>
-                        <DialogTitle className="text-white">{le.remove} Logo</DialogTitle>
+                        <DialogTitle className="text-white">{le.removeTitle}</DialogTitle>
                         <DialogDescription className="text-slate-400">
                             {le.confirmRemove}
                         </DialogDescription>
@@ -189,7 +189,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                             onClick={() => setShowRemoveDialog(false)}
                             className="flex-1 rounded-[10px] border border-white/[0.08] py-2 text-[13px] font-medium text-slate-300 hover:bg-white/5 transition-colors"
                         >
-                            Cancel
+                            {le.cancel}
                         </button>
                         <button
                             type="button"

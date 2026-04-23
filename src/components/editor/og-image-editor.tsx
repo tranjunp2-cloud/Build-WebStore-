@@ -5,6 +5,7 @@ import { Loader2, Upload, X } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { toast } from 'sonner'
+import { useI18n } from '@/i18n'
 
 interface OgImageEditorProps {
     currentOgImage?: string | null
@@ -14,6 +15,8 @@ interface OgImageEditorProps {
 const ACCEPTED = 'image/jpeg,image/png,image/webp'
 
 export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditorProps) {
+    const { t } = useI18n()
+    const oi = t.editor.ogImageEditor
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isUploading, setIsUploading] = useState(false)
 
@@ -21,7 +24,7 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
         const file = e.target.files?.[0]
         if (!file) return
         if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
-            toast.error('Please upload a JPG, PNG, or WebP image.')
+            toast.error(oi.invalidFormat)
             if (fileInputRef.current) fileInputRef.current.value = ''
             return
         }
@@ -34,10 +37,10 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
             const uploaded = await uploadMediaAction(formData)
             if (!uploaded?.url) throw new Error('Upload returned no URL')
             onOgImageChange(uploaded.url as string)
-            toast.success('Social image updated')
+            toast.success(oi.success)
         } catch (err) {
             console.error('OG image upload failed', err)
-            toast.error('Upload failed. Please try again.')
+            toast.error(oi.error)
         } finally {
             setIsUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -60,7 +63,7 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
                             disabled={isUploading}
                             className="text-[11px] text-slate-300 hover:text-white"
                         >
-                            Replace
+                            {oi.replace}
                         </button>
                         <button
                             type="button"
@@ -68,7 +71,7 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
                             disabled={isUploading}
                             className="inline-flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300"
                         >
-                            <X className="h-3 w-3" /> Remove
+                            <X className="h-3 w-3" /> {oi.remove}
                         </button>
                     </div>
                 </div>
@@ -81,11 +84,11 @@ export function OgImageEditor({ currentOgImage, onOgImageChange }: OgImageEditor
                 >
                     {isUploading ? <Loader2 className="h-5 w-5 animate-spin text-slate-400" /> : <Upload className="h-5 w-5 text-slate-400" strokeWidth={1.8} />}
                     <span className="text-xs font-medium text-[#94A3B8]">
-                        {isUploading ? 'Uploading…' : 'Click to upload social image'}
+                        {isUploading ? oi.uploading : oi.clickToUpload}
                     </span>
                 </button>
             )}
-            <p className="text-[10px] text-slate-500">Recommended: 1200×630 PNG or JPG (used for social share previews)</p>
+            <p className="text-[10px] text-slate-500">{oi.hint}</p>
         </div>
     )
 }
