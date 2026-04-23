@@ -180,7 +180,7 @@ interface SettingsPanelProps {
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
-    requestedTab?: { tab: SettingsTab; key: number } | null
+    requestedTab?: { tab: SettingsTab; key: number; section?: string } | null
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -210,6 +210,9 @@ function SettingsPanelInner({
 
     // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
     const storeBlocks = useEditorStore(state => state.blocks)
+    // Breadcrumb config stored globally in headerBlock.breadcrumbConfig
+    const breadcrumbCfg = (headerBlock as Record<string, unknown> | null | undefined)?.breadcrumbConfig as
+        { homeLabel?: string; separator?: string; showOnAllPages?: boolean } | undefined
     const resolvedNavLinks = useMemo(() => {
         const headerLinks = (((headerBlock as Record<string, unknown>)?.links as Array<Record<string, unknown>>) || [])
         if (headerLinks.length > 0) return normalizeNavLinkItems(headerLinks, pages)
@@ -237,11 +240,22 @@ function SettingsPanelInner({
     const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
     const [seoFieldError, setSeoFieldError] = useState<string | null>(null)
 
+    const breadcrumbSectionRef = React.useRef<HTMLDivElement>(null)
+    const breadcrumbScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
         if (requestedTab) {
             setActiveTab(requestedTab.tab)
-            return
+            if (requestedTab.section === 'breadcrumb') {
+                if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
+                breadcrumbScrollTimerRef.current = setTimeout(() => {
+                    breadcrumbSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 80)
+            }
+            return () => {
+                if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
+            }
         }
         if (block) {
             setActiveTab('block')
@@ -751,6 +765,23 @@ function SettingsPanelInner({
                         links={resolvedNavLinks}
                         onUpdate={(links) => onHeaderUpdate?.({ links })}
                         pages={pages}
+                    />
+                </div>
+
+                {/* ─── Breadcrumb Settings ─────────────────────────────────── */}
+                <div ref={breadcrumbSectionRef} className={sectionCls}>
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="text-base leading-none">🍞</span>
+                        <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.breadcrumbSettings}</span>
+                    </div>
+                    <BreadcrumbEditor
+                        homeLabel={String(breadcrumbCfg?.homeLabel || 'Home')}
+                        separator={String(breadcrumbCfg?.separator || '/')}
+                        showOnAllPages={Boolean(breadcrumbCfg?.showOnAllPages ?? true)}
+                        pageSlug={activePage?.slug ?? undefined}
+                        onChange={(changes) => {
+                            onHeaderUpdate?.({ breadcrumbConfig: { ...breadcrumbCfg, ...changes } })
+                        }}
                     />
                 </div>
 
@@ -1582,24 +1613,6 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {/* Breadcrumb Editor */}
-                            {block && block.blockType === 'breadcrumb' && (
-                                <div className={sectionCls}>
-                                    <BreadcrumbEditor
-                                        items={Array.isArray(block.items) ? block.items as { label: string; url: string }[] : []}
-                                        mode={(block.mode as 'auto' | 'manual') || 'auto'}
-                                        homeLabel={String(block.homeLabel || 'Home')}
-                                        separator={String(block.separator || '/')}
-                                        showIcon={Boolean(block.showIcon)}
-                                        onChange={(changes) => {
-                                            onBlockUpdate(currentBlockIndex, {
-                                                ...changes,
-                                                ...(changes.showIcon !== undefined ? { variant: changes.showIcon ? 'with-icon' : 'simple' } : {}),
-                                            })
-                                        }}
-                                    />
-                                </div>
-                            )}
 
 
                             {/* Theme editing removed from Block tab — available in Global tab */}

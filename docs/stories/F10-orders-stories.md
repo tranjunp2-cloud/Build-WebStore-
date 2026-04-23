@@ -65,10 +65,10 @@ THEN  I see the shared "No Data" Empty State component
 #### AC-1.2: View QR Payment Proof
 
 ```gherkin
-GIVEN I am viewing an Order Detail
-WHEN  the order was paid via QR Banking
+GIVEN I am viewing an Order Detail of an order paid via QR Banking
+WHEN  the `paymentMethod` is `qr_banking`
 THEN  I can see the uploaded Payment Proof image
-  AND I can click on the image to view it in full size (lightbox) without breaking the layout
+  AND I can click on the image to view it in full size (lightbox)
 ```
 
 #### AC-Bulk-Confirm: Merchant Bulk Confirms Orders
@@ -82,9 +82,11 @@ THEN  all selected orders are updated to "Confirmed"
 
 ### Additional Criteria
 
-- [ ] Order statuses chuẩn hoá: Pending → Confirmed → Ready to Ship → Shipped → Completed (có nhánh Cancelled / Refunded).
+- [ ] Order statuses chuẩn hoá (`orderStatus`): Pending → Confirmed → Ready to Ship → Shipped → Completed (có nhánh Cancelled / Refunded).
+- [ ] Payment statuses chuẩn hoá (`paymentStatus`): Unpaid, Paid, Cancelled, Refunded. COD khởi tạo là `Unpaid`, QR khởi tạo là `Paid`.
+- [ ] COD Workflow: Khi merchant update `orderStatus` lên `Completed`, hệ thống tự động mark `paymentStatus` thành `Paid`.
+- [ ] Cancel/Refund Workflow: Khi order bị `Cancelled`, `paymentStatus` thành `Cancelled`. Khi order bị manual Refund, `paymentStatus` đổi thành `Refunded`.
 - [ ] Customer email confirmation được gửi ra tự động khi status là Confirmed, Shipped, Cancelled.
-- [ ] Khả năng xử lý Refund thủ công khi đơn hàng ở trạng thái Shipped hoặc Completed.
 - [ ] Có thể thay đổi trạng thái đơn hàng (đơn manual) từ cả List page và Details view.
 
 ### Definition of Done
@@ -116,6 +118,7 @@ GIVEN I have items in my cart and proceed to checkout
 WHEN  I select COD or QR Banking and complete the checkout form
 THEN  my order is created successfully
   AND I am redirected to /order/{id}/confirm showing order summary
+  AND if COD, order `paymentStatus` is `Unpaid`
 ```
 
 #### AC-2: Checkout Error Handling
@@ -134,6 +137,7 @@ GIVEN I am at the checkout page
 WHEN  I select "QR Banking" as my payment method
 THEN  the system displays the Merchant's QR Code image
   AND the "Proceed/Confirm Order" button is disabled until I upload a Payment Proof Image
+  AND upon success, order `paymentStatus` is set to `Paid`
   AND if I upload an image > 2MB or invalid format, an error is shown
 ```
 

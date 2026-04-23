@@ -89,6 +89,32 @@ function applyGlobalSystemBlocks(
             : [...nextBlocks, normalizedFooter]
     }
 
+    // Inject breadcrumb globally from headerBlock.breadcrumbConfig
+    const breadcrumbCfg = (siteHeaderBlock as Record<string, unknown> | null | undefined)?.breadcrumbConfig as
+        { homeLabel?: string; separator?: string; showOnAllPages?: boolean } | undefined
+    // Only inject breadcrumb when user has explicitly configured it; existing sites without the
+    // config key must not get breadcrumb auto-enabled (would surprise published site owners).
+    // Treat null same as false — Payload CMS may store unset booleans as null.
+    const showBreadcrumb = breadcrumbCfg !== undefined &&
+        breadcrumbCfg.showOnAllPages !== false &&
+        breadcrumbCfg.showOnAllPages !== null
+    // Remove any per-page breadcrumb blocks (legacy manual adds) — breadcrumb is global-only now.
+    // DB data is unchanged; only the render is suppressed.
+    nextBlocks = nextBlocks.filter(b => b.blockType !== 'breadcrumb')
+    if (showBreadcrumb) {
+        const navIdx = nextBlocks.findIndex(b => b.blockType === 'navigation')
+        const breadcrumbBlock: PreviewBlock = {
+            blockType: 'breadcrumb',
+            homeLabel: breadcrumbCfg?.homeLabel || 'Home',
+            separator: breadcrumbCfg?.separator || '/',
+            showIcon: false,
+            showOnAllPages: true,
+            items: [],
+            __editorBlockIndex: -1,
+        }
+        nextBlocks.splice(navIdx >= 0 ? navIdx + 1 : 0, 0, breadcrumbBlock)
+    }
+
     return nextBlocks
 }
 
@@ -116,7 +142,13 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
         ...block,
         __editorBlockIndex: block.__editorBlockIndex ?? index,
     }))
-    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site)
+    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site).map(b => {
+        if (b.blockType !== 'breadcrumb') return b
+        // Pass page slug so breadcrumb renders correct path (in editor, usePathname returns /preview/... not the real slug)
+        // Runtime check required: Payload may store slug as null; type cast alone doesn't guard this
+        const slug = (page as Record<string, unknown>)?.slug
+        return { ...b, _pageSlug: typeof slug === 'string' ? slug : undefined }
+    })
 
     // In editor preview, rewrite internal nav/CTA links so subpages are navigable.
     // - Internal paths ("/about") → /preview/{siteId}?pageId={matchedPageId} (keeps iframe in preview scope)
@@ -227,6 +259,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                 ctaButton: { ...ctaBtn, url: rewriteUrl(ctaBtn.url) },
             }
         }
+        if (b.blockType === 'breadcrumb') {
+            // Rewrite the home URL so clicking "Home" in editor preview navigates correctly
+            return { ...b, _homeUrl: rewriteUrl('/') }
+        }
         return b
     })
 
@@ -313,7 +349,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                 const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
 
                 // Block spacing — navigation/footer default to 0, others use custom or default
-                const isGlobalBlock = block.blockType === 'navigation' || block.blockType === 'footer'
+                const isGlobalBlock = block.blockType === 'navigation' || block.blockType === 'footer' || block.blockType === 'breadcrumb'
                 const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
                 const spacingStyle = isGlobalBlock
                     ? {}

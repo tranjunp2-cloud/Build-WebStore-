@@ -114,7 +114,27 @@ THEN  hiện alert banner "Incorrect email or password"
   AND password field cleared
 ```
 
+#### AC-2a: Error — Workspace bị khóa tạm thời (inactivated)
 
+```gherkin
+GIVEN user (Owner hoặc Staff) nhập đúng email + password
+  AND workspace mà user thuộc về đang ở trạng thái `suspended` (SSO inactivated)
+WHEN  hệ thống check workspace status sau khi xác thực mật khẩu
+THEN  KHÔNG gửi OTP, KHÔNG cấp session
+  AND hiển thị thông báo: "Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ nhà cung cấp dịch vụ."
+  AND KHÔNG redirect, giữ nguyên trang login
+```
+
+#### AC-2b: Error — Workspace đã bị xóa (terminated)
+
+```gherkin
+GIVEN user (Owner hoặc Staff) nhập đúng email + password
+  AND workspace mà user thuộc về đang ở trạng thái `terminated` (SSO terminated)
+WHEN  hệ thống check workspace status sau khi xác thực mật khẩu
+THEN  KHÔNG gửi OTP, KHÔNG cấp session
+  AND hiển thị thông báo: "Tài khoản của bạn đã bị xóa. Vui lòng liên hệ nhà cung cấp dịch vụ để tạo lại."
+  AND KHÔNG redirect, giữ nguyên trang login
+```
 
 #### AC-3: UI — Split Screen Layout & Brand Banner
 

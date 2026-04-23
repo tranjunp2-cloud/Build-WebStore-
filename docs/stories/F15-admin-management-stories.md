@@ -1,201 +1,583 @@
-# F15 Admin Management (Super Admin System)
-> **Status:** Draft (Proposal) | **Created:** 2026-03-17 | **Agent:** `Antigravity BA/PO Copilot`
+# User Stories: Admin Management — Phase 1 (F15)
 
-## 1. Feature Framing & Context
-- **Problem/Opportunity**: Chuyển đổi sang mô hình kinh doanh SaaS (Software as a Service) với nhiều cấp độ gói cước đòi hỏi đội ngũ nội bộ cần một hệ thống quản trị trung tâm (Super Admin Panel) mạnh mẽ. Hệ thống này giúp quản lý tập trung toàn bộ khách hàng, gói cước, doanh thu và cấu hình hệ thống.
-- **Target Users**: Internal Team của nền tảng (Super Admin, System Admin, Sales/Support Staff).
-- **Business Objective**: 
-  1. Theo dõi sức khỏe kinh doanh SaaS (MRR, Churn rate, LTV).
-  2. Vận hành, hỗ trợ và quản lý phân cấp người dùng (Owner vs Employee) một cách rõ ràng.
-  3. Quản lý linh hoạt các gói Subscription (Freemium, Starter, Standard, Professional) và các chiến dịch Khuyến mãi (Promotion/Coupon).
-- **Assumptions**: Hệ thống thanh toán (Payment Gateway) đã được tích hợp (F15) để xử lý recurring billing cho SaaS.
-- **Risks/Dependencies**: Cần định nghĩa rõ ranh giới phân quyền: Quyền của System Admin (truy cập toàn hệ thống) vs Quyền của Workspace Owner (chỉ trong cửa hàng của họ).
+> **Feature:** F15 — Admin Management
+> **Ưu tiên:** P1 | **Tham chiếu PRD:** [F15-admin-management.md](../prd/F15-admin-management.md)
+> **Cập nhật:** 2026-04-15 | **Version:** 2.0
 
 ---
 
-## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+## Tiêu chí chấp nhận toàn cục (Admin Panel)
 
 > **Áp dụng cho mọi User Story trong file này.**
 
 ```gherkin
-GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
-THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
-  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+GIVEN  user có role `super-admin` truy cập `/admin-panel/*`
+THEN   nội dung render bên trong Admin Panel layout riêng (KHÔNG dùng F18 CMS Layout)
+  AND  AdminSidebar và AdminHeader hiển thị đúng, không bị che khuất
+  AND  user KHÔNG có role `super-admin` bị redirect về `/dashboard`
 ```
 
 ---
 
-## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+## Bối cảnh Account Provisioning
 
-> **Áp dụng cho mọi User Story trong file này.**
+> Áp dụng cho tất cả stories liên quan đến dữ liệu user/tenant.
+
+- Tất cả Owner account tạo **100% từ SSO (TM Legacy)** qua `POST /api/v1/sso/provision`.
+- Không có form đăng ký cho Owner (UI đã ẩn). Staff được Owner mời.
+- 4 gói: **Freemium, Starter, Standard, Professional** — hiện tại giới hạn **giống nhau**.
+- Plan gán từ SSO `pack_code`. Admin chỉ **xem** (chỉ đọc), không chỉnh sửa.
+
+---
+
+## Phase 1 — Activity Logs
+
+### US-F15-01: Activity Logs — Nhật ký hoạt động
+
+**Phase 1** | **P0** | **M** | **Trạng thái:** Ready
+**Branch:** `feat/F15-01-activity-logs`
+
+#### Story
+
+```
+As a   Super Admin
+I want mọi thao tác mutation và auth event được ghi lại tự động
+So that tôi có thể truy vết khi có sự cố và đảm bảo tính minh bạch của hệ thống
+```
+
+#### AC-1: Ghi log Mutations
 
 ```gherkin
-GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
-THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
-  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+GIVEN  một user thực hiện thao tác create, update, hoặc delete trên bất kỳ collection nào:
+       Users, Tenants, Products, Orders, Sites, Pages, Blogs, BlogCategories
+WHEN   thao tác hoàn thành thành công
+THEN   hệ thống tạo một entry trong activity_logs với: actor_id, action (create|update|delete),
+       resource (collection slug), resource_id, tenant_id, ip_address, user_agent, metadata, created_at
+  AND  việc ghi log là fire-and-forget — lỗi ghi log KHÔNG block request gốc
+```
+
+#### AC-2: Ghi log Auth Events
+
+```gherkin
+GIVEN  một user cố gắng đăng nhập, đăng nhập thành công, đăng xuất, hoặc đổi mật khẩu
+WHEN   auth event xảy ra
+THEN   hệ thống tạo một entry trong activity_logs với action = login | logout | login_failed | password_reset
+  AND  với login_failed: metadata bao gồm email đã thử (KHÔNG bao gồm mật khẩu)
+  AND  log entry bao gồm ip_address và user_agent từ request headers
+```
+
+#### AC-2a: Ghi log AI Events
+
+```gherkin
+GIVEN  một user sử dụng bất kỳ tính năng AI nào
+WHEN   AI request hoàn thành (thành công hoặc thất bại)
+THEN   hệ thống tạo một entry trong activity_logs với action tương ứng:
+
+  Thành công:
+  - ai_generate_site — tạo website bằng AI (metadata: blocks count, time_ms, language)
+  - ai_edit_block — chỉnh sửa block bằng AI trong editor (metadata: block_id, block_type)
+  - ai_rewrite_text — viết lại text bằng AI (metadata: field)
+  - ai_generate_seo — tự động tạo SEO metadata (metadata: site_id)
+  - ai_generate_blog — tạo blog bằng AI (metadata: title)
+  - ai_product_description — tạo mô tả sản phẩm bằng AI (metadata: product_id)
+  - ai_bulk_parse — import sản phẩm hàng loạt bằng AI (metadata: products_count)
+  - ai_extract_from_url — tạo site từ URL (metadata: source_url)
+  - ai_apply_template — áp dụng template thay vì AI gen (metadata: template_id)
+
+  Thất bại (ai_generate_site_failed):
+  - metadata.error_code = VALIDATION_ERROR (400) — form input không hợp lệ
+  - metadata.error_code = UNAUTHORIZED (401) — chưa đăng nhập / token hết hạn
+  - metadata.error_code = PAYMENT_REQUIRED (402) — đã gen 1 lần, không cho gen lại
+  - metadata.error_code = CONTENT_UNSAFE (400) — nội dung nhạy cảm / NSFW
+  - metadata.error_code = RATE_LIMIT (429) — gửi request quá nhanh (>5/phút hoặc >20/giờ)
+  - metadata.error_code = TIMEOUT (500) — OpenAI API quá chậm (>300s)
+  - metadata.error_code = AI_API_ERROR (500) — OpenAI trả lỗi (overloaded, maintenance)
+  - metadata.error_code = AI_PARSE_ERROR (500) — AI trả JSON không hợp lệ
+  - metadata.error_code = AI_API_KEY_INVALID (500) — API key sai hoặc hết quota
+  - metadata.error_code = DB_SAVE_FAILED (500) — lưu site/pages vào DB thất bại
+  - metadata.error_code = TENANT_CREATE_FAILED (500) — tạo tenant tự động thất bại
+  - metadata.error_code = SSE_DISCONNECT (0) — mất kết nối giữa chừng streaming
+  - metadata.error_code = PARTIAL_SUCCESS — tạo được >=1 page nhưng lỗi giữa chừng
+
+  AND  mọi AI failed log bao gồm: error_code, error_message, time_ms
+  AND  AI thành công log bao gồm: model, cost_usd (nếu có), time_ms
+```
+
+#### AC-2b: Ghi log Website Editor Events
+
+```gherkin
+GIVEN  một user thao tác với website trong editor
+WHEN   thao tác hoàn thành
+THEN   hệ thống tạo entry với action tương ứng:
+
+  Website lifecycle:
+  - site_publish — publish website ra live (metadata: site_id, slug, url)
+  - site_unpublish — gỡ website khỏi live (metadata: site_id, slug)
+
+  Editor save (PATCH /api/sites/[siteId]/save):
+  - site_save — lưu chỉnh sửa trong editor (metadata ghi chi tiết những gì thay đổi):
+    metadata.changes_summary bao gồm danh sách thay đổi được phát hiện:
+    · blocks_reordered: true/false — user kéo thả đổi vị trí block
+    · blocks_added: ["hero", "faq"] — block mới được thêm vào
+    · blocks_removed: ["testimonials"] — block bị xóa
+    · blocks_modified: ["hero", "about"] — block có nội dung thay đổi (text, images, links)
+    · theme_changed: true/false — đổi màu, font, hoặc style
+    · header_changed: true/false — sửa navigation header (links, logo)
+    · footer_changed: true/false — sửa footer
+    · site_name_changed: true/false — đổi tên website
+    · contact_info_changed: true/false — sửa thông tin liên hệ
+    · social_links_changed: true/false — sửa social media links
+    · branding_changed: true/false — sửa logo/branding
+    · seo_changed: true/false — sửa SEO metadata
+    metadata.page_id — trang nào được sửa
+    metadata.blocks_count — tổng số blocks sau khi lưu
+
+  Page management:
+  - page_update — sửa page settings: visibility, slug, SEO (metadata: page_id, fields_changed)
+  - page_delete — xóa page (soft delete via deletedAt) (metadata: page_id, page_title)
+
+  SEO tools:
+  - seo_fix — sửa SEO cho 1 page (metadata: site_id, page_id, fixes_applied)
+  - seo_fix_all — sửa SEO cho tất cả pages (metadata: site_id, pages_count)
+  - seo_auto_meta_toggle — bật/tắt auto SEO metadata (metadata: site_id, enabled)
+```
+
+> **Lưu ý kỹ thuật:** `changes_summary` trong `site_save` được tính bằng cách so sánh
+> blocks/theme TRƯỚC và SAU khi save. API route đọc state hiện tại trước khi update,
+> diff với payload mới, rồi ghi metadata. Nếu diff quá nặng (performance), chỉ ghi
+> `blocks_count_before` vs `blocks_count_after` + `fields_changed` list.
+
+#### AC-2c: Ghi log Domain & Slug Events
+
+```gherkin
+GIVEN  một user thay đổi subdomain hoặc custom domain
+WHEN   thao tác hoàn thành
+THEN   hệ thống tạo entry với action tương ứng:
+  - slug_change — đổi subdomain workspace (metadata: old_slug, new_slug, tenant_id)
+  - domain_add — thêm custom domain (metadata: domain, tenant_id)
+  - domain_remove — xóa custom domain (metadata: domain, tenant_id)
+```
+
+#### AC-2d: Ghi log Staff & Account Events
+
+```gherkin
+GIVEN  một user thao tác quản lý nhân viên hoặc tài khoản
+WHEN   thao tác hoàn thành
+THEN   hệ thống tạo entry với action tương ứng:
+  - invite_staff — mời nhân viên vào workspace (metadata: invited_email, tenant_id)
+  - remove_staff — xóa nhân viên khỏi workspace (metadata: removed_user_id, tenant_id)
+  - account_reset — reset toàn bộ tài khoản (metadata: tenants_reset, collections_cleared)
+  - plan_change — plan thay đổi qua SSO (metadata: old_plan, new_plan)
+  - sso_status_change — trạng thái SSO thay đổi (metadata: old_status, new_status, reason)
+    · activated → workspace mở lại, Owner + Staff đăng nhập được
+    · inactivated → workspace bị khóa tạm, Owner + Staff KHÔNG đăng nhập được
+    · terminated → workspace bị xóa, website unpublish, dữ liệu giữ 90 ngày
+```
+
+#### AC-3: Truy vấn Activity Logs
+
+```gherkin
+GIVEN  Super Admin truy cập /admin-panel/activity-logs
+WHEN   trang tải xong
+THEN   một DataTable phân trang hiển thị: Thời gian, Người thực hiện (tên + email), Hành động,
+       Tài nguyên, ID tài nguyên, Tenant, Địa chỉ IP
+  AND  phân trang phía server (50 mỗi trang, tối đa 200)
+  AND  API phản hồi trong vòng 500ms ở p95 cho tới 1 triệu dòng
+```
+
+#### AC-4: Lọc Activity Logs
+
+```gherkin
+GIVEN  Super Admin đang xem trang activity logs
+WHEN   họ áp dụng bộ lọc: loại hành động (multi-select), khoảng thời gian, tìm kiếm user
+THEN   bảng cập nhật chỉ hiển thị các entries phù hợp
+  AND  các bộ lọc kết hợp theo logic AND
+  AND  xóa bộ lọc khôi phục danh sách đầy đủ
+```
+
+#### AC-5: Xem chi tiết Log
+
+```gherkin
+GIVEN  Super Admin click vào một dòng log entry
+WHEN   dòng mở rộng
+THEN   metadata JSON tree hiển thị ở dạng dễ đọc
+  AND  metadata KHÔNG BAO GIỜ chứa mật khẩu, mã OTP, hoặc Stripe secrets
+```
+
+#### AC-6: Tính bất biến của Log
+
+```gherkin
+GIVEN  bất kỳ API consumer nào (bao gồm Super Admin)
+WHEN   họ cố gắng update hoặc create activity logs qua public API
+THEN   hệ thống trả về 403 Forbidden
+  AND  chỉ Super Admin có thể xóa logs (chỉ cho mục đích GDPR erasure)
+  AND  logs là append-only trong vận hành bình thường
+```
+
+#### AC-7: Trạng thái trống
+
+```gherkin
+GIVEN  bảng activity_logs trống (hệ thống mới)
+WHEN   Super Admin xem /admin-panel/activity-logs
+THEN   hiển thị thông báo trạng thái trống "Chưa có nhật ký hoạt động nào"
+  AND  không có lỗi hoặc crash xảy ra
 ```
 
 ---
 
-## 2. Proposed Modules & Prioritization
+## Phase 2 — Quản lý User + Broadcast UI + Admin Layout
 
-Dưới đây là các Epic được đề xuất, phân loại theo độ ưu tiên **Mid** (Cần thiết cho vận hành cơ bản SaaS) và **Low** (Tính năng nâng cao, có thể bổ sung ở Phase sau).
+### US-F15-02: Quản lý User & Workspace
 
-### Epic 1: SaaS Analytics Dashboard (Priority: Mid)
-*Focus: Cung cấp "trung tâm chỉ huy" (command center) cho Admin với các chỉ số kinh doanh sống còn.*
-- **Tính năng chính**: Biểu đồ MRR, số lượng Active Workspaces, tỉ lệ Conversion (từ Freemium lên Paid), Churn rate.
+**Phase 2** | **P0** | **L** | **Trạng thái:** Ready
+**Branch:** `feat/F15-02-user-management`
+**Phụ thuộc:** US-F15-01 (Activity Logs — cho inline activity timeline)
 
-### Epic 2: Advanced User & Workspace Management (Priority: Mid)
-*Focus: Quản lý danh sách khách hàng, theo dõi phân cấp.*
-- **Tính năng chính**: Danh sách Workspaces; Xem chi tiết một Workspace gồm danh sách Users bên trong (hiển thị rõ dạng cây phân cấp Owner -> Staff); Quản lý trạng thái Active/Ban của user.
-- **✨ Tính năng đề xuất thêm**: **Impersonate Account** (Đăng nhập dưới tư cách Owner để debug/hỗ trợ kĩ thuật trực tiếp mà không cần xin mật khẩu).
+#### Story
 
-### Epic 3: Subscription & Promotion Management (Priority: Mid)
-*Focus: Trái tim của mô hình SaaS kinh doanh.*
-- **Tính năng chính**: Cấu hình limit/feature cho 4 tier (Freemium, Starter, Standard, Pro); Quản lý mã giảm giá (Discount/Voucher) áp dụng linh hoạt theo tier (ví dụ coupon chỉ dành cho gói Pro); Theo dõi lịch sử nâng cấp/hạ cấp/hủy gói.
-- **✨ Tính năng đề xuất thêm**: **Trial Extension** (Admin có quyền gia hạn thêm X ngày trial cho một khách hàng tiềm năng cụ thể).
+```
+As a   Super Admin
+I want xem danh sách users và workspaces, tìm kiếm, lọc, và suspend/unsuspend users
+So that tôi có thể quản lý tài khoản và xử lý vi phạm mà không cần truy vấn DB trực tiếp
+```
 
-### Epic 4: System Audit Logs (Priority: Low)
-*Focus: Bảo mật và truy vết.*
-- **✨ Tính năng đề xuất thêm**: Lưu lại toàn bộ lịch sử thao tác của System Admin (Ai đã đổi cấu hình gói cước, ai đã ban user X) để đảm bảo tính minh bạch.
+#### AC-1: Danh sách Users
 
-### Epic 5: Global Notifications & Broadcast (Priority: Low)
-*Focus: Giao tiếp với khách hàng.*
-- **✨ Tính năng đề xuất thêm**: Gửi in-app banner alert cho toàn bộ hệ thống hoặc theo tệp khách hàng (vd: "Hệ thống bảo trì 2h sáng" hoặc "Giảm 50% khi nâng cấp gói Pro tháng này").
+```gherkin
+GIVEN  Super Admin truy cập /admin-panel/users
+WHEN   trang tải xong
+THEN   một DataTable phân trang hiển thị: Tên (link tới chi tiết), Email, Badge vai trò,
+       Tenant chính + Plan, Badge trạng thái workspace (active/suspended/terminated),
+       Lần đăng nhập cuối, Ngày tạo
+  AND  Owner hiển thị thêm badge SSO status: activated (xanh) | inactivated (vàng) | terminated (đỏ)
+  AND  Staff bị ảnh hưởng bởi workspace suspended/terminated hiển thị badge cảnh báo
+  AND  phân trang phía server (50 mỗi trang)
+  AND  trang tải trong vòng 1 giây cho tới 50 nghìn users
+```
 
-### Epic 6: Automated Campaigns & Multi-channel Messaging (Priority: Mid)
-*Focus: Tự động hóa tiếp thị và chăm sóc khách hàng qua đa kênh.*
-- **Tính năng chính**: Tạo chiến dịch (Campaigns) tự động gửi mã khuyến mãi dựa trên hành vi (VD: Đăng ký mới, Sắp hết hạn Trial, Abandoned Cart); Tích hợp gửi thông báo qua Email (SendGrid/Mailchimp, SES) và Social Media (Zalo ZNS, Facebook Messenger/WhatsApp).
+#### AC-2: Tìm kiếm Users
 
+```gherkin
+GIVEN  Super Admin đang ở trang danh sách users
+WHEN   họ gõ vào ô tìm kiếm
+THEN   kết quả lọc theo email hoặc tên (không phân biệt hoa thường)
+  AND  tìm kiếm có debounce (300ms)
+  AND  xóa tìm kiếm khôi phục danh sách đầy đủ
+```
+
+#### AC-3: Lọc Users
+
+```gherkin
+GIVEN  Super Admin đang ở trang danh sách users
+WHEN   họ chọn bộ lọc Vai trò (super-admin | tenant-owner | staff) và/hoặc bộ lọc Trạng thái (active | suspended)
+THEN   bảng chỉ hiển thị users phù hợp
+  AND  các bộ lọc kết hợp theo logic AND
+```
+
+#### AC-4: Trang chi tiết User
+
+```gherkin
+GIVEN  Super Admin click vào một dòng user trong danh sách
+WHEN   trang chi tiết user tải (/admin-panel/users/[id])
+THEN   hiển thị: thông tin hồ sơ (tên, email, vai trò, ngày tạo, lần đăng nhập cuối),
+       tất cả tenant memberships (với vai trò, trạng thái membership, plan),
+       link "Xem workspace" (mở tenant trong tab mới),
+       và 20 entries activity log gần nhất (từ Phase 1 API)
+
+  AND  nếu user là Owner:
+       hiển thị trạng thái SSO: activated (badge xanh) | inactivated (badge vàng) | terminated (badge đỏ)
+       hiển thị SSO info: customerId, serviceId, packCode, orderId
+
+  AND  nếu user là Staff:
+       hiển thị workspace membership status: pending | active | suspended
+       hiển thị cảnh báo nếu workspace bị suspended/terminated:
+       "Workspace này đang bị khóa (inactivated) — Staff không thể đăng nhập"
+       hoặc "Workspace này đã bị xóa (terminated) — Staff mất quyền truy cập"
+```
+
+#### ~~AC-5: Tạm ngưng User~~ — **Deferred**
+
+> Chưa cần suspend user lúc này. Ưu tiên xem lỗi/sự cố user gặp phải qua activity logs.
+
+#### ~~AC-6: Bỏ tạm ngưng User~~ — **Deferred**
+
+#### ~~AC-7: Không thể tạm ngưng chính mình~~ — **Deferred**
+
+#### AC-5: Xem lỗi user gặp phải
+
+```gherkin
+GIVEN  Super Admin đang xem trang chi tiết user
+WHEN   họ xem phần "Hoạt động gần đây" (activity logs)
+THEN   các entry với action = "login_failed" hoặc lỗi hệ thống hiển thị rõ ràng
+  AND  mỗi entry hiển thị: thời gian, loại lỗi, IP, metadata (nếu có)
+  AND  Admin có thể lọc chỉ xem các events lỗi
+```
+
+#### AC-6: Danh sách Workspaces
+
+```gherkin
+GIVEN  Super Admin truy cập /admin-panel/workspaces
+WHEN   trang tải xong
+THEN   một DataTable phân trang hiển thị: Tên, Slug, Email chủ sở hữu, Badge plan,
+       Badge trạng thái (active/trialing/past_due/cancelled/suspended/terminated),
+       SSO status (activated/inactivated/terminated), Số lượng user, Dung lượng đã dùng/giới hạn, Ngày tạo
+  AND  bộ lọc dropdown có sẵn cho: Plan, Trạng thái, SSO Status
+  AND  workspace bị terminated hiển thị badge đỏ + ghi chú "Gói đã bị xóa trên SSO"
+  AND  workspace bị suspended hiển thị badge vàng + ghi chú "Đang bị khóa tạm thời"
+  AND  click vào dòng mở Payload admin cho tenant đó trong tab mới
+```
+
+#### AC-9: Trạng thái trống
+
+```gherkin
+GIVEN  Super Admin tìm kiếm một user/workspace không tồn tại
+WHEN   kết quả trả về trống
+THEN   hiển thị thông báo "Không tìm thấy user nào" / "Không tìm thấy workspace nào" với nút xóa bộ lọc
+```
 
 ---
 
-## 3. User Stories
+### US-F15-05: Broadcast Notification UI
 
-### Epic 1: SaaS Analytics Dashboard
-#### US-F15-01: Xem tổng quan các chỉ số SaaS
-```text
-AS A System Admin
-I WANT TO xem dashboard tổng quan với các chỉ số MRR, số user active, tỉ lệ upgrade
-SO THAT tôi nắm được tình hình kinh doanh tổng thể theo thời gian thực.
-```
-- **Acceptance Criteria:**
-  - Hiển thị các card metric: Total Revenue, Total Active Workspaces, Paid Workspaces.
-  - Hiển thị biểu đồ phân bổ user theo 4 gói: Freemium, Starter, Standard, Pro.
-  - Có thể filter dữ liệu theo thời gian (Today, Last 7 days, This Month, Last Month, YTD).
+**Phase 2** | **P1** | **S** | **Trạng thái:** Ready
+**Branch:** `feat/F15-02-user-management` (gộp chung với Phase 2)
 
-### Epic 2: Advanced User & Workspace Management
-#### US-F15-02: Quản lý danh sách và phân cấp tài khoản
-```text
-AS A System Admin
-I WANT TO xem danh sách tất cả các workspaces và tài khoản thuộc workspace đó
-SO THAT tôi có thể quản lý, phân loại và theo dõi hoạt động của họ.
-```
-- **Acceptance Criteria:**
-  - Bảng danh sách Workspace hiển thị: Tên store, Gói hiện tại, Tình trạng (Trạng thái thanh toán), Ngày tạo.
-  - Khi click vào 1 Workspace, hiển thị danh sách Users thuộc workspace đó, UI thể hiện rõ badge phân cấp "Owner" và "Staff".
-  - Admin có quyền Disable/Ban một workspace nếu vi phạm điều khoản.
+#### Story
 
-#### US-F15-03: Đăng nhập giả lập (Impersonation) - [Suggested]
-```text
-AS A System Admin (Support Role)
-I WANT TO đăng nhập vào hệ thống dưới góc nhìn của một User/Workspace cụ thể
-SO THAT tôi có thể trực tiếp kiểm tra lỗi hoặc hỗ trợ cấu hình mà không cần hỏi mật khẩu.
 ```
-- **Acceptance Criteria:**
-  - Có nút "Impersonate" tại trang chi tiết Workspace.
-  - Khi click, hệ thống tạo một phiên đăng nhập ảo và có banner mốc chú ý: "You are viewing as [Store Name]. Click here to exit."
-  - Mọi thao tác ghi log phải hiển thị là Admin A act as User B.
+As a   Super Admin
+I want gửi thông báo broadcast tới tất cả users từ giao diện admin
+So that tôi có thể thông báo bảo trì, cập nhật, hoặc khuyến mãi mà không cần truy cập DB
+```
 
-### Epic 3: Subscription & Promotion Management
-#### US-F15-04: Cấu hình gói Subscription
-```text
-AS A System Admin
-I WANT TO quản lý và chỉnh sửa giới hạn (limits/features) của 4 tier SaaS
-SO THAT tôi có thể linh hoạt thay đổi chính sách kinh doanh mà không cần hard-code.
-```
-- **Acceptance Criteria:**
-  - Giao diện cho phép edit thông số của Freemium, Starter, Standard, Professional.
-  - Có thể bật/tắt các feature-flags hoặc thay đổi định mức (ví dụ: Gói Starter tối đa 100 sản phẩm, Pro không giới hạn).
-  - **Security (Yêu cầu mật khẩu):** Khi Admin nhấn Lưu (Save) hoặc Thêm gói/Thay đổi cấu hình, hệ thống bắt buộc hiển thị modal yêu cầu nhập lại Mật khẩu Admin để xác nhận hành động này. Thao tác chỉ được thực thi khi mật khẩu đúng.
-  - **Dynamic Sync:** Khi cấu hình gói thay đổi, giao diện và chức năng phía User (thuộc gói đó) ngay lập tức phải bị block/unblock các giới hạn tương ứng mà không cần User đăng nhập lại.
+#### AC-1: Form Broadcast
 
-#### US-F15-05: Quản lý Khuyến mãi (Promotion/Voucher) cho Subscription
-```text
-AS A System Admin
-I WANT TO tạo mã giảm giá áp dụng theo từng gói subscription
-SO THAT tôi có thể chạy các chiến dịch marketing thúc đẩy upsell.
+```gherkin
+GIVEN  Super Admin truy cập /admin-panel/broadcast
+WHEN   trang tải xong
+THEN   một form hiển thị với các trường: Tiêu đề (bắt buộc, tối đa 200 ký tự),
+       Nội dung (bắt buộc, tối đa 2000 ký tự), URL hành động (tùy chọn),
+       Đối tượng nhận (dropdown: "Tất cả" — hiện tại chỉ có tùy chọn này)
 ```
-- **Acceptance Criteria:**
-  - Form tạo Promotion Code gồm: Mã code, % giảm / Số tiền giảm, Thời hạn, Giới hạn lượt dùng.
-  - Field "Áp dụng cho gói": Cho phép checklist chọn [Freemium, Starter, Standard, Pro]. VD coupon chỉ áp dụng khi mua gói Pro.
 
-### Epic 4: System Audit Logs (Low Priority)
-#### US-F15-06: Theo dõi Audit Logs của hệ thống
-```text
-AS A Super Admin
-I WANT TO xem lịch sử thao tác của các nhân viên System Admin khác
-SO THAT tôi đảm bảo an toàn hệ thống và dễ dàng truy vết khi có lỗi sai sót dữ liệu.
-```
-- **Acceptance Criteria:**
-  - Bảng Audit log hiển thị: Timestamp, Admin Name, Action category, Target ID, IP Address.
+#### AC-2: Gửi Broadcast
 
-### Epic 5: Global Notifications & Announcements (Low Priority)
-#### US-F15-07: Gửi In-app Broadcast & Release Notes
-```text
-AS A System Admin
-I WANT TO soạn và đẩy notification, feature release notes bằng công cụ soạn thảo trực quan
-SO THAT tôi có thể thông báo cập nhật, gói mới hoặc khuyến mãi kèm hình ảnh/text sinh động.
+```gherkin
+GIVEN  Super Admin điền form broadcast với dữ liệu hợp lệ
+WHEN   họ click [Gửi] và xác nhận qua dialog
+THEN   hệ thống gọi POST /api/admin/broadcasts (API đã có sẵn)
+  AND  toast "Đã gửi broadcast tới {N} users" xuất hiện khi thành công
+  AND  bảo vệ XSS: thẻ HTML bị loại bỏ khỏi tiêu đề/nội dung
+  AND  kiểm tra URL: chỉ cho phép đường dẫn nội bộ (/) hoặc http(s)://
 ```
-- **Acceptance Criteria:**
-  - Form tạo notification sử dụng **Rich Text Editor / Block Editor** (cho phép chèn Text có format, Hình ảnh banner, Nút kêu gọi hành động - Call to Action).
-  - Có tuỳ chọn phân loại tin: Release Update, Promotion, System Alert.
-  - Target audience: theo phân loại gói (All, Free plan, Paid plan).
-  - User sẽ thấy popup/banner đẹp hoặc trang Release Notes ngay trên hệ thống của họ tuỳ theo tuỳ chọn hiển thị.
 
-### Epic 6: Automated Campaigns & Multi-channel Messaging
-#### US-F15-08: Tạo chiến dịch tự động (Automated Campaigns)
-```text
-AS A Marketing/System Admin
-I WANT TO thiết lập các quy tắc tự động gửi khuyến mãi thông báo dựa trên trigger (hành vi khách hàng)
-SO THAT tôi có thể tối ưu tỷ lệ chuyển đổi (conversion rate) mà không cần thao tác tay.
-```
-- **Acceptance Criteria:**
-  - Form tạo Campaign có các Trigger options: `On Trial Signup`, `Trial Expiring in 3 days`, `Cart Abandoned`, `Plan Downgraded`.
-  - Admin đính kèm mã Promotion/Voucher vào logic của Campaign.
-  - Có trang thống kê Campaign Performance: Số lượng tin đã gửi, Tỷ lệ Mở (Open rate), Tỷ lệ Sử dụng coupon (Redemption rate).
+#### AC-3: Xử lý lỗi Broadcast
 
-#### US-F15-09: Tích hợp Đa kênh (Email & Social Apps)
-```text
-AS A System Admin
-I WANT TO cấu hình kết nối với hệ thống Email và Mạng xã hội (Zalo ZNS, Facebook Messenger)
-SO THAT hệ thống kết nối với các contact channel của khách hàng để push promotion tự động.
+```gherkin
+GIVEN  Super Admin gửi broadcast không hợp lệ (tiêu đề trống, nội dung quá dài, URL không hợp lệ)
+WHEN   kiểm tra validation thất bại
+THEN   thông báo lỗi inline hiển thị bên cạnh trường không hợp lệ
+  AND  form KHÔNG được gửi đi
 ```
-- **Acceptance Criteria:**
-  - Giao diện Admin có "Integrations Settings" để nhập API Key, Secret/Token cho: Email provider (Postmark, SendGrid) và Social Apps (Zalo OA, Facebook Page).
-  - Khi thiết lập Campaign (US-F15-08), Admin có thể chọn 1 hoặc nhiều Channel: `Email`, `Zalo`, `Messenger` và soạn message template/nội dung tương ứng cho từng kênh.
 
-### Epic 7: Mobile Responsiveness
-#### US-F15-10: Mobile Web UX — Responsive SaaS Dashboard
-```text
-AS A System Admin on the go
-I WANT TO quản lý hệ thống trên điện thoại di động
-SO THAT tôi có thể xử lý các sự cố khẩn cấp (ban account, check doanh thu) khi không ngồi máy tính.
+#### AC-4: Broadcasts gần đây
+
+```gherkin
+GIVEN  Super Admin đang ở trang broadcast
+WHEN   trang tải xong
+THEN   danh sách broadcasts gần đây hiển thị bên dưới form
+  AND  mỗi entry hiển thị: tiêu đề, preview nội dung, ngày gửi, số người nhận
 ```
-- **Acceptance Criteria:**
-  - Overview Metrics (MRR, Users) form horizontally scrollable cards or stack vertically on mobile (< 768px).
-  - Complex data tables (List of Workspaces) transform into individual Cards or collapse secondary columns, making primary actions (Impersonate, Edit) highly accessible via touch.
 
 ---
 
-## 4. Open Questions & Next Steps
-1. **Phân quyền nội bộ Admin:** Chúng ta có cần chia nhỏ role trong nội bộ System Admin không? (Ví dụ: `Super Admin` toàn quyền, `Support Staff` chỉ được xem user và impersonate nhưng không được tạo Promotion, `Marketing` chỉ được tạo Promotion/Campaign?).
-2. **Billing cycle:** Hệ thống SaaS sẽ thu phí theo chu kỳ Tháng (Monthly) hay có thêm chu kỳ Năm (Yearly)?
-3. **Thanh toán:** Chúng ta sử dụng cổng thanh toán nào cho recurring billing? (Stripe, VNPay, PayPal...?).
-4. **Third-party Services (Social/Email):** Ngân sách/phân loại nhà cung cấp nào ưu tiên tích hợp trước? (VN thường dùng Zalo ZNS thay vì SMS).
+### US-F15-06: Admin Panel Layout & Login Routing
 
-> **BƯỚC TIẾP THEO:**
-> Nếu PO/BA đồng ý với đề xuất và scope này, tôi sẽ tiến hành tạo file `F15-admin-management.md` chi tiết theo chuẩn `PRD_TEMPLATE`.
+**Phase 2** | **P0** | **M** | **Trạng thái:** Ready
+**Branch:** `feat/F15-02-user-management` (gộp chung với Phase 2)
 
+#### Story
 
+```
+As a   Super Admin
+I want có giao diện admin riêng, tách biệt với tenant dashboard
+So that tôi không bị nhầm lẫn và có thể truy cập nhanh các công cụ quản trị
+```
 
+#### AC-1: Admin Layout
+
+```gherkin
+GIVEN  một user có role `super-admin` truy cập /admin-panel
+WHEN   trang tải xong
+THEN   Admin Panel layout render với:
+       AdminSidebar (dark theme, badge "ADMIN" ở header),
+       AdminHeader (chỉ báo admin),
+       và vùng nội dung chính
+  AND  layout này tách biệt với layout tenant dashboard
+```
+
+#### AC-2: Redirect sau đăng nhập
+
+```gherkin
+GIVEN  một user đăng nhập thành công tại /login
+WHEN   hệ thống kiểm tra user.roles
+THEN   nếu roles bao gồm `super-admin` → redirect tới /admin-panel
+  AND  nếu roles bao gồm `tenant-owner` → redirect tới /dashboard (hành vi hiện tại)
+```
+
+#### AC-3: Bảo vệ Route
+
+```gherkin
+GIVEN  một user KHÔNG có role `super-admin` cố truy cập /admin-panel/*
+WHEN   middleware kiểm tra role
+THEN   user bị redirect về /dashboard
+  AND  các API endpoint dưới /api/admin/* trả về 403 Forbidden
+```
+
+#### AC-4: Thanh điều hướng Admin Sidebar
+
+```gherkin
+GIVEN  Super Admin đang trong Admin Panel
+WHEN   họ nhìn vào sidebar
+THEN   các mục menu hiển thị:
+       Dashboard (/admin-panel) — Phase 3
+       Users (/admin-panel/users) — Phase 2
+       Workspaces (/admin-panel/workspaces) — Phase 2
+       Activity Logs (/admin-panel/activity-logs) — Phase 1
+       Broadcast (/admin-panel/broadcast) — Phase 2
+  AND  các mục menu CHỈ hiển thị cho users có role `super-admin`
+```
+
+---
+
+## Phase 3 — Lịch sử sử dụng & Dashboard KPIs
+
+### US-F15-03: Admin Dashboard KPIs
+
+**Phase 3** | **P1** | **M** | **Trạng thái:** Ready
+**Branch:** `feat/F15-03-usage-history`
+**Phụ thuộc:** US-F15-01 (Activity Logs — cho chỉ số "Hoạt động hôm nay")
+
+#### Story
+
+```
+As a   Super Admin
+I want xem dashboard tổng quan với các chỉ số KPI của platform
+So that tôi nắm được tình hình sử dụng hệ thống mà không cần truy vấn DB
+```
+
+#### AC-1: KPI Cards
+
+```gherkin
+GIVEN  Super Admin truy cập /admin-panel (trang chủ dashboard)
+WHEN   trang tải xong
+THEN   các KPI cards hiển thị:
+       Tổng số users đã đăng ký (đếm),
+       Hoạt động hôm nay (số users riêng biệt có entry activity_log hôm nay),
+       Mới trong tuần (users tạo trong 7 ngày qua),
+       Tổng chi phí AI tháng này (tổng ai_usage_logs.cost_usd)
+  AND  các cards hiển thị dữ liệu chính xác khớp với truy vấn DB
+```
+
+#### AC-2: Phân bổ Tenants
+
+```gherkin
+GIVEN  Super Admin đang ở dashboard
+WHEN   họ xem phần tenants
+THEN   Tenants theo Plan hiển thị phân bổ: Freemium / Starter / Standard / Professional
+  AND  Tenants theo Trạng thái hiển thị: active / trialing / past_due / cancelled / suspended
+  AND  các con số khớp với tổng số tenants thực tế trong DB
+```
+
+#### AC-3: Tự động làm mới
+
+```gherkin
+GIVEN  Super Admin đang ở dashboard
+WHEN   60 giây trôi qua
+THEN   dữ liệu KPI tự động làm mới mà không cần tải lại trang
+  AND  không có nhấp nháy khi làm mới
+```
+
+#### AC-4: Trạng thái trống Dashboard
+
+```gherkin
+GIVEN  hệ thống chưa có users hoặc tenants (cài đặt mới)
+WHEN   Super Admin xem dashboard
+THEN   các KPI cards hiển thị "0" hoặc "—" (không phải lỗi)
+  AND  "Hoạt động hôm nay" hiển thị "—" nếu bảng activity_logs trống
+  AND  không có lỗi chia cho 0
+```
+
+---
+
+### US-F15-04: Lịch sử sử dụng & Thông tin Plan
+
+**Phase 3** | **P1** | **M** | **Trạng thái:** Ready
+**Branch:** `feat/F15-03-usage-history` (gộp chung với Phase 3)
+**Phụ thuộc:** US-F15-02 (Trang chi tiết User)
+
+#### Story
+
+```
+As a   Super Admin
+I want xem chi tiết mức độ sử dụng của từng tenant và thông tin plan/SSO
+So that tôi hiểu rõ tenant nào đang active, đang dùng bao nhiêu tài nguyên
+```
+
+#### AC-1: Tab Thống kê sử dụng
+
+```gherkin
+GIVEN  Super Admin đang ở trang chi tiết user (/admin-panel/users/[id])
+WHEN   họ xem tab "Sử dụng" (tab mới thêm trong Phase 3)
+THEN   hiển thị các thẻ thống kê:
+       Số lượng Products, Số lượng Orders, Số lượng Blogs, Số lượng Sites,
+       Dung lượng đã dùng so với giới hạn (thanh tiến trình),
+       AI site đã tạo (badge có/không + số lần tạo)
+  AND  dữ liệu được lấy từ GET /api/admin/users/[id]/usage
+```
+
+#### AC-2: Thông tin Plan & SSO
+
+```gherkin
+GIVEN  Super Admin đang xem tab Sử dụng
+WHEN   dữ liệu tải xong
+THEN   thẻ "Plan & SSO" hiển thị (chỉ đọc):
+       Plan hiện tại (Freemium/Starter/Standard/Professional) với badge,
+       SSO pack_code, customer_id, service_id, order_id
+  AND  tất cả trường là chỉ đọc (không có nút chỉnh sửa)
+```
+
+#### AC-3: Phân tích chi phí AI
+
+```gherkin
+GIVEN  Super Admin đang xem tab Sử dụng cho một tenant đã dùng tính năng AI
+WHEN   phần AI usage tải xong
+THEN   hiển thị: tổng chi phí AI (USD) tháng này,
+       và bảng 10 lượt gọi AI gần nhất với: endpoint, model, chi phí, độ trễ, thời gian
+  AND  nếu chưa có AI usage, hiển thị "Chưa có dữ liệu sử dụng AI"
+```
+
+#### AC-4: Độ chính xác dữ liệu sử dụng
+
+```gherkin
+GIVEN  một tenant có số liệu đã biết (ví dụ: 42 products, 180 orders)
+WHEN   Super Admin xem tab Sử dụng
+THEN   các con số hiển thị khớp với tổng thực tế trong DB
+  AND  API phản hồi trong vòng 1 giây
+```
+
+---
+
+## Stories Deferred (Ngoài phạm vi Phase 1)
+
+> Các stories sau **KHÔNG nằm trong Phase 1**. Giữ lại để tham chiếu khi lên plan tiếp theo.
+
+| Story ID | Tiêu đề | Lý do Deferred |
+|----------|---------|----------------|
+| ~~US-F15-07~~ | Impersonation (Xem với tư cách Tenant) | Phức tạp security — cần session management riêng, audit trail đặc biệt |
+| ~~US-F15-08~~ | Cấu hình Subscription Tier | 4 gói hiện tại giới hạn giống nhau, chưa cần config UI |
+| ~~US-F15-09~~ | Quản lý Khuyến mãi/Voucher | Phụ thuộc Subscription Tier Config |
+| ~~US-F15-10~~ | Chiến dịch tự động | Cần trigger engine riêng (event-driven) |
+| ~~US-F15-11~~ | Tích hợp đa kênh | Cần budget third-party (Zalo ZNS, SendGrid, Messenger) |
+| ~~US-F15-12~~ | MRR/Churn Analytics Dashboard | Chưa có recurring revenue data |
+| ~~US-F15-13~~ | Mobile Responsive Admin | Phase 1 ưu tiên desktop, responsive sau |

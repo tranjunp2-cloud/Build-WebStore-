@@ -2485,7 +2485,16 @@
             "removeColumn": "Remove Column",
             "addLink": "Add Link",
             "removeLink": "Remove link",
-            "dragToReorder": "Drag to reorder"
+            "dragToReorder": "Drag to reorder",
+            "breadcrumbSettings": "Breadcrumb Settings",
+            "breadcrumbMode": "Mode",
+            "breadcrumbAuto": "Auto",
+            "breadcrumbAutoDesc": "Automatically generates breadcrumb from URL path",
+            "breadcrumbHomeLabel": "Home Label",
+            "breadcrumbSeparator": "Separator",
+            "breadcrumbShowOnAllPages": "Show on All Pages",
+            "breadcrumbShowOnAllPagesDesc": "Display breadcrumb on every page",
+            "breadcrumbPreview": "Preview"
         },
         "statusBar": {
             "connected": "Connected",

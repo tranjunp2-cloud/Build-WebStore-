@@ -20,7 +20,7 @@ export function PreviewScripts() {
         }
 
         const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
-        const excludedBlockTypes = ['navigation', 'footer']
+        const excludedBlockTypes = ['navigation', 'footer', 'breadcrumb']
         // Blocks whose images come from external product catalog — image editing not supported
         const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
         
@@ -368,7 +368,8 @@ export function PreviewScripts() {
             if (clickedBlock) {
                 const blockIndex = parseInt(clickedBlock.getAttribute('data-block-index') || '-1', 10)
                 const blockType = clickedBlock.getAttribute('data-block-type')
-                if (blockIndex >= 0) {
+                const isGlobal = ['navigation', 'footer', 'breadcrumb'].includes(blockType || '')
+                if (blockIndex >= 0 || isGlobal) {
                     const rect = clickedBlock.getBoundingClientRect()
                     window.parent.postMessage({
                         type: 'BLOCK_CONTAINER_CLICKED',
@@ -387,8 +388,26 @@ export function PreviewScripts() {
 
             let anchor = target.closest('a')
             if (anchor && window !== window.parent) {
-                e.preventDefault()
-                e.stopPropagation()
+                const anchorBlock = anchor.closest('[data-block-index]')
+                const anchorBlockType = anchorBlock?.getAttribute('data-block-type')
+                if (anchorBlockType === 'breadcrumb') {
+                    // Always block raw iframe navigation for breadcrumb anchors in editor preview.
+                    // Extract pageId and notify parent so page selector stays in sync.
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const href = anchor.getAttribute('href') || ''
+                    if (href && href !== '#') {
+                        try {
+                            const pageId = new URL(href, window.location.href).searchParams.get('pageId')
+                            if (pageId) {
+                                window.parent.postMessage({ type: 'PAGE_NAVIGATE', pageId }, parentOrigin)
+                            }
+                        } catch (_) { /* invalid href — swallow */ }
+                    }
+                } else {
+                    e.preventDefault()
+                    e.stopPropagation()
+                }
             }
             // Also detect non-img placeholder elements (InitialsAvatar, LogoPlaceholder) via data-image-index
             const imgEl = target.tagName === 'IMG' ? target

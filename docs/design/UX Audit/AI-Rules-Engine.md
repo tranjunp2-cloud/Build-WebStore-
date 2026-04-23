@@ -56,189 +56,368 @@ Output: Validated Design Tokens / Blocks / Content
 
 ---
 
-### A.2 Industry Mapping — Palette chi tiết theo ngành
+### A.2 Industry Mapping — Color Pool & Palette Themes
+
+> **Cách AI dùng section này:**
+> 1. Xác định `industry` + `sub_type` từ user input
+> 2. Lấy toàn bộ **Approved Color Pool** làm vùng màu hợp lệ
+> 3. Chọn 1 trong các **Palette Themes** làm bộ khởi điểm
+> 4. Điều chỉnh theo brand keyword nếu user cung cấp
+> 5. Validate WCAG AA + Saturation Guardrail trước khi output
 
 ---
 
 #### 🍕 F&B — Nhà hàng / Cafe / Ẩm thực
 
-> **Tâm lý màu sắc:** Kích thích vị giác, tạo cảm giác ấm áp và mời gọi. Màu ấm (Red, Orange, Yellow) được chứng minh kích thích sự thèm ăn.
+> **Tâm lý:** Màu ấm kích thích vị giác và sự thèm ăn. Màu lạnh (Blue, Grey) bị chứng minh là làm giảm cảm giác ngon miệng — tránh dùng làm primary.
 
-| Token | Light Mode | Dark Mode | Ghi chú |
-|-------|-----------|-----------|---------|
-| Primary | `#E53935` Red 600 | `#EF5350` Red 400 | Nhà hàng / Ẩm thực đặc sắc |
-| Primary Alt | `#FF6D00` Deep Orange | `#FF8A50` | Cafe / Fast food |
-| Primary Alt | `#388E3C` Green 700 | `#66BB6A` | Organic / Healthy food |
-| Secondary | `#FFC107` Amber 500 | `#FFD54F` | Điểm nhấn ấm, kích thích |
-| CTA / Button | `#FF6D00` Deep Orange | `#FF8A50` | Urgency + Appetite |
-| Background | `#FFFDE7` Cream | `#1A1208` Dark warm | Ấm áp, không gây mỏi mắt |
-| Neutral text | `#3E2723` Brown 900 | `#EFEBE9` | Gần với màu gỗ/đất |
+**Approved Color Pool:**
 
-**Avoided:** `#B0BEC5` (Cold Grey), `#78909C` (Blue Grey) — màu lạnh làm giảm cảm giác ngon miệng.
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Reds | `#C62828` `#D32F2F` `#E53935` `#EF5350` `#EF9A9A` | Primary — nhà hàng đặc sắc |
+| Deep Oranges | `#E65100` `#EF6C00` `#F57C00` `#FF6D00` `#FF8F00` | Primary/CTA — cafe, fast food |
+| Ambers | `#FF8F00` `#FFA000` `#FFB300` `#FFC107` `#FFD54F` | Secondary — ấm áp, kích thích |
+| Yellows | `#F57F17` `#F9A825` `#FBC02D` `#FDD835` `#FFEE58` | Accent — highlight |
+| Organic Greens | `#1B5E20` `#2E7D32` `#388E3C` `#43A047` `#558B2F` `#689F38` | Primary — healthy/organic |
+| Earth Browns | `#3E2723` `#4E342E` `#5D4037` `#6D4C41` `#795548` `#8D6E63` `#A1887F` | Neutral — gỗ, đất, cà phê |
+| Warm Backgrounds | `#FFF8E1` `#FFFDE7` `#FFF9C4` `#FFECB3` `#FAF0E6` | Background light |
+| Dark Warm Bgs | `#1A1208` `#1C1005` `#2C1810` `#3E2723` | Background dark |
 
-**Sub-type rules:**
+**Avoided:** `#B0BEC5` `#78909C` `#607D8B` (Cold Blue-Grey) — giảm cảm giác ngon miệng.
+
+**Palette Themes (AI chọn 1):**
+
+| Theme | Primary | Secondary | CTA | Background | Mood |
+|-------|---------|-----------|-----|------------|------|
+| 🍝 Bistro Classic | `#E53935` | `#FFC107` | `#FF6D00` | `#FFFDE7` | Ấm, quen thuộc |
+| ☕ Cafe Artisan | `#795548` | `#FF8F00` | `#EF6C00` | `#FFF8E1` | Cozy, craft |
+| 🥗 Fresh Organic | `#388E3C` | `#8D6E63` | `#43A047` | `#F9FBE7` | Tươi sạch, tự nhiên |
+| 🍽️ Fine Dining | `#212121` | `#B8860B` | `#C8961C` | `#FAF0E6` | Sang trọng, tối giản |
+| 🌮 Street Food | `#FF6D00` | `#FDD835` | `#E65100` | `#FFFFFF` | Năng động, vui vẻ |
+| 🍜 Asian Fusion | `#C62828` | `#FFD600` | `#D32F2F` | `#212121` | Đậm đà, bản sắc |
+
+**Sub-type quick map:**
 ```
-IF sub_type == 'cafe':    primary = #FF6D00 (Warm Orange) + #795548 (Coffee Brown)
-IF sub_type == 'organic': primary = #388E3C (Forest Green) + #8D6E63 (Earth Brown)
-IF sub_type == 'fine_dining': primary = #212121 (Black) + #B8860B (Dark Gold)
+cafe        → Theme "Cafe Artisan"  hoặc "Street Food"
+fine_dining → Theme "Fine Dining"   hoặc "Bistro Classic"
+organic     → Theme "Fresh Organic"
+fast_food   → Theme "Street Food"   hoặc "Asian Fusion"
+asian       → Theme "Asian Fusion"  hoặc "Bistro Classic"
 ```
 
 ---
 
 #### 🛍️ Ecommerce — Bán lẻ / Thời trang / Shop online
 
-> **Tâm lý màu sắc:** Tạo cảm giác muốn mua, kết hợp tin cậy (Blue) với urgency (Orange/Red). Thời trang thiên về aesthetic và identity thương hiệu.
+> **Tâm lý:** Trust (Blue) kết hợp Urgency (Orange/Red) thúc đẩy mua hàng. Fashion ưu tiên identity brand — cho phép palette đặc sắc hơn.
 
-| Token | Light Mode | Dark Mode | Ghi chú |
-|-------|-----------|-----------|---------|
-| Primary | `#1565C0` Blue 800 | `#42A5F5` Blue 400 | Trust — bán lẻ tổng hợp |
-| Primary Alt | `#212121` Near Black | `#EEEEEE` | Fashion / Luxury |
-| Secondary | `#F8BBD0` Pink 100 | `#F48FB1` Pink 300 | Fashion feminine |
-| CTA / Button | `#FF6D00` Deep Orange | `#FF8A50` | Sale / Urgency |
-| CTA Alt | `#D32F2F` Red 700 | `#EF5350` | Flash sale, countdown |
-| Badge/Sale | `#C62828` Red 800 | `#EF9A9A` | Discount tag |
-| Background | `#FFFFFF` hoặc `#F5F5F5` | `#121212` | Clean, product-focused |
-| Neutral | `#757575` Grey 600 | `#9E9E9E` | |
+**Approved Color Pool:**
 
-**Sub-type rules:**
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Trust Blues | `#0D47A1` `#1565C0` `#1976D2` `#1E88E5` `#2196F3` `#42A5F5` | Primary — bán lẻ tin cậy |
+| Fashion Blacks | `#000000` `#121212` `#1C1C1E` `#212121` `#424242` | Primary — luxury, streetwear |
+| Fashion Pinks | `#880E4F` `#AD1457` `#C2185B` `#E91E63` `#F06292` `#F48FB1` `#F8BBD0` | Secondary — feminine |
+| Luxury Purples | `#4A148C` `#6A1B9A` `#7B1FA2` `#9C27B0` `#AB47BC` `#CE93D8` | Primary/Accent — premium |
+| Urgency Oranges | `#BF360C` `#D84315` `#E64A19` `#FF3D00` `#FF5722` `#FF6D00` | CTA — sale, urgency |
+| Premium Golds | `#827717` `#9E8E00` `#B8860B` `#DAA520` `#FFD700` `#F9A825` | Accent — luxury feel |
+| Greens (eco) | `#1B5E20` `#2E7D32` `#388E3C` `#43A047` `#4CAF50` | Accent — sustainable brand |
+| Neutrals | `#FAFAFA` `#F5F5F5` `#EEEEEE` `#BDBDBD` `#757575` `#9E9E9E` | Background, text |
+| Dark Bgs | `#121212` `#1C1C1E` `#212121` `#000000` | Background dark mode |
+
+**Palette Themes (AI chọn 1):**
+
+| Theme | Primary | Secondary | CTA | Background | Mood |
+|-------|---------|-----------|-----|------------|------|
+| 👑 Fashion Luxury | `#212121` | `#B8860B` Gold | `#DAA520` | `#FAF0E6` | Sang trọng, tối giản |
+| 💗 Fashion Feminine | `#E91E63` | `#F8BBD0` | `#C2185B` | `#FFF0F5` | Ngọt ngào, nữ tính |
+| 🖤 Streetwear Bold | `#212121` | `#FF3D00` | `#FF5722` | `#FFFFFF` | Cá tính, mạnh mẽ |
+| 🌸 Pastel Cute | `#CE93D8` | `#F48FB1` | `#AB47BC` | `#FFF8E1` | Dễ thương, trendy |
+| 🛒 Retail General | `#1565C0` | `#FF6D00` | `#FF6D00` | `#FFFFFF` | Tin cậy + urgency |
+| 🌿 Eco Conscious | `#2E7D32` | `#DAA520` | `#388E3C` | `#F9FBE7` | Bền vững, tự nhiên |
+| 🎭 Vintage Boutique | `#4E342E` | `#DAA520` | `#6D4C41` | `#FAF0E6` | Cổ điển, vintage |
+
+**Sub-type quick map:**
 ```
-IF sub_type == 'fashion_luxury': primary = #212121 + #B8860B (Gold), no bright Orange CTA
-IF sub_type == 'fashion_casual': primary = #E91E63 (Pink) + #FF6D00, high-energy
-IF sub_type == 'retail_general': primary = #1565C0, CTA = #FF6D00
+fashion_luxury   → Theme "Fashion Luxury"   hoặc "Vintage Boutique"
+fashion_casual   → Theme "Fashion Feminine" hoặc "Pastel Cute"
+streetwear       → Theme "Streetwear Bold"
+retail_general   → Theme "Retail General"
+eco_sustainable  → Theme "Eco Conscious"
+kids_toys        → Theme "Pastel Cute"
 ```
 
 ---
 
 #### 💻 Tech — Công nghệ / IT / SaaS
 
-> **Tâm lý màu sắc:** Tin cậy, chuyên nghiệp, đổi mới. Blue và Indigo truyền đạt sự ổn định và công nghệ. Purple gợi sự sáng tạo và AI/innovation.
+> **Tâm lý:** Blue = tin cậy & ổn định. Indigo = hiện đại. Purple = AI/innovation. Dark mode là first-class citizen cho developer tools.
 
-| Token | Light Mode | Dark Mode | Ghi chú |
-|-------|-----------|-----------|---------|
-| Primary | `#1565C0` Blue 800 | `#42A5F5` Blue 400 | Classic SaaS trust |
-| Primary Alt | `#3949AB` Indigo 600 | `#7986CB` Indigo 300 | Modern / Developer tool |
-| Primary Alt | `#6A1B9A` Purple 900 | `#CE93D8` Purple 200 | AI / Creative Tech |
-| Secondary | `#00897B` Teal 600 | `#4DB6AC` Teal 300 | Success states, highlights |
-| CTA / Button | `#1E88E5` Blue 600 | `#64B5F6` | Primary action |
-| Accent | `#7C4DFF` Deep Purple A200 | `#B388FF` | Feature badges, tags |
-| Background | `#FAFAFA` | `#0D1117` GitHub-style | |
-| Code/Mono bg | `#F5F5F5` | `#161B22` | |
+**Approved Color Pool:**
 
-**Avoided:** `#E53935` Red làm primary (dùng cho Error state only), màu quá ấm làm mất cảm giác tech.
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Blues | `#0D47A1` `#1565C0` `#1976D2` `#1E88E5` `#2196F3` `#42A5F5` `#64B5F6` `#90CAF9` | Primary — SaaS classic |
+| Indigos | `#1A237E` `#283593` `#3949AB` `#3F51B5` `#5C6BC0` `#7986CB` `#9FA8DA` | Primary — modern dev |
+| Purples | `#4527A0` `#512DA8` `#5E35B1` `#673AB7` `#7E57C2` `#9575CD` `#B39DDB` | Primary — AI, creative |
+| Teals | `#004D40` `#00695C` `#00796B` `#00897B` `#26A69A` `#4DB6AC` | Secondary — success, growth |
+| Cyans | `#006064` `#00838F` `#00ACC1` `#00BCD4` `#26C6DA` `#4DD0E1` | Accent — modern, fresh |
+| Neon Accents | `#651FFF` `#7C4DFF` `#AA00FF` `#00E5FF` `#1DE9B6` | Accent — AI/futuristic |
+| Light Bgs | `#FAFAFA` `#F8FBFF` `#EEF2FF` `#E8EAF6` `#E3F2FD` | Background light |
+| Dark Bgs | `#0D1117` `#161B22` `#1C2128` `#0D0D1A` `#0A0E27` | Background dark |
 
-**Saturation rule:** Giữ saturation ≤ 85% để tránh gây mỏi mắt khi dùng nhiều giờ.
+**Palette Themes (AI chọn 1):**
+
+| Theme | Primary | Secondary | CTA | Background | Mood |
+|-------|---------|-----------|-----|------------|------|
+| 🏢 Classic SaaS | `#1565C0` | `#00897B` | `#1E88E5` | `#FAFAFA` | Tin cậy, enterprise |
+| 🌑 Developer Dark | `#3949AB` | `#00BCD4` | `#42A5F5` | `#0D1117` | Hacker, focused |
+| 🤖 AI Purple | `#6A1B9A` | `#7C4DFF` | `#9575CD` | `#0D0D1A` | Futuristic, AI |
+| 🚀 Startup Fresh | `#1E88E5` | `#00ACC1` | `#1976D2` | `#F8FBFF` | Năng động, clean |
+| 🏛️ Enterprise Navy | `#1A237E` | `#455A64` | `#3949AB` | `#FAFAFA` | Ổn định, corporate |
+| 💚 Open Source | `#2E7D32` | `#37474F` | `#43A047` | `#F9FBE7` | Community, open |
+| ⚡ Neon Cyber | `#212121` | `#00E5FF` | `#7C4DFF` | `#0A0A0A` | Edgy, gaming/crypto |
+
+**Sub-type quick map:**
+```
+saas_b2b       → Theme "Classic SaaS"    hoặc "Enterprise Navy"
+developer_tool → Theme "Developer Dark"  hoặc "Open Source"
+ai_ml          → Theme "AI Purple"       hoặc "Neon Cyber"
+startup        → Theme "Startup Fresh"   hoặc "Classic SaaS"
+cybersecurity  → Theme "Neon Cyber"      hoặc "Developer Dark"
+fintech        → Theme "Enterprise Navy" hoặc "Classic SaaS"
+```
 
 ---
 
 #### 🏥 Healthcare — Y tế / Nha khoa / Phòng khám
 
-> **Tâm lý màu sắc:** Sạch sẽ, an toàn, đáng tin. Teal và Light Blue tạo cảm giác vô trùng và chuyên nghiệp y tế. Tránh Red đậm (liên tưởng nguy hiểm/máu).
+> **Tâm lý:** Teal/Blue = sạch sẽ, vô trùng, đáng tin. Green = sức khỏe, phục hồi. Lavender = bình tĩnh (mental health). **Tuyệt đối tránh Red đậm.**
 
-| Token | Light Mode | Dark Mode | Ghi chú |
-|-------|-----------|-----------|---------|
-| Primary | `#00897B` Teal 600 | `#4DB6AC` Teal 300 | Y tế tổng quát |
-| Primary Alt | `#039BE5` Light Blue 600 | `#4FC3F7` | Nha khoa, phòng khám |
-| Secondary | `#A5D6A7` Light Green | `#66BB6A` | Recovery, wellness |
-| CTA / Button | `#00796B` Teal 700 | `#26A69A` | Đặt lịch, tư vấn |
-| Alert/Error | `#FF8A65` Deep Orange 300 | `#FF7043` | Thay thế Red cho cảnh báo |
-| Background | `#FFFFFF` hoặc `#E0F7FA` | `#0A1929` | Trắng tinh / xanh lạnh nhạt |
-| Neutral | `#546E7A` Blue Grey | `#90A4AE` | |
+**Approved Color Pool:**
 
-**Avoided:** `#B71C1C` (Dark Red), `#D32F2F` (Red) — gây liên tưởng đến máu, nguy hiểm.
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Teals | `#004D40` `#00695C` `#00796B` `#00897B` `#009688` `#26A69A` `#4DB6AC` `#80CBC4` | Primary — y tế tổng quát |
+| Light Blues | `#01579B` `#0277BD` `#0288D1` `#039BE5` `#03A9F4` `#29B6F6` `#4FC3F7` `#81D4FA` | Primary — nha khoa, phòng khám |
+| Mint Greens | `#B2DFDB` `#80CBC4` `#4DB6AC` `#26A69A` `#009688` | Secondary — tươi mát |
+| Soft Greens | `#1B5E20` `#2E7D32` `#388E3C` `#43A047` `#66BB6A` `#A5D6A7` `#C8E6C9` | Secondary — sức khỏe, phục hồi |
+| Lavenders | `#4527A0` `#7B1FA2` `#AB47BC` `#CE93D8` `#E1BEE7` `#F3E5F5` | Primary — mental health, spa |
+| Safe Warm | `#E65100` `#EF6C00` `#FF8A65` `#FFAB40` `#FFD54F` | Alert (thay Red) — cảnh báo |
+| Clean Whites | `#FFFFFF` `#FAFAFA` `#F5F5F5` `#E0F7FA` `#E0F2F1` `#E8F5E9` | Background |
+| Dark Bgs | `#0A1929` `#001E3C` `#0A2540` `#0D2137` | Background dark |
 
-**Saturation rule:** `saturation <= 70%` — màu quá saturate gây cảm giác kém chuyên nghiệp trong y tế.
+**Avoided:** `#B71C1C` `#C62828` `#D32F2F` `#E53935` — bất kỳ Red đậm nào.
+
+**Palette Themes (AI chọn 1):**
+
+| Theme | Primary | Secondary | CTA | Background | Mood |
+|-------|---------|-----------|-----|------------|------|
+| 🏥 Medical Clinical | `#039BE5` | `#4DB6AC` | `#00796B` | `#FFFFFF` | Vô trùng, chuyên nghiệp |
+| 🌿 Wellness Spa | `#00897B` | `#A5D6A7` | `#00796B` | `#E0F7FA` | Thư giãn, tự nhiên |
+| 🦷 Dental Fresh | `#29B6F6` | `#B2DFDB` | `#0288D1` | `#FAFAFA` | Sạch sẽ, tươi sáng |
+| 🧠 Mental Health | `#7B1FA2` | `#4DB6AC` | `#AB47BC` | `#F3E5F5` | Bình tĩnh, an toàn |
+| 👶 Pediatric Friendly | `#26C6DA` | `#81C784` | `#00ACC1` | `#FFF9C4` | Thân thiện, vui tươi |
+| 💊 Pharmacy Clean | `#1976D2` | `#4DB6AC` | `#1565C0` | `#FFFFFF` | Rõ ràng, đáng tin |
+
+**Sub-type quick map:**
+```
+general_hospital → Theme "Medical Clinical"
+spa_wellness     → Theme "Wellness Spa"
+dental           → Theme "Dental Fresh"
+mental_health    → Theme "Mental Health"
+pediatrics       → Theme "Pediatric Friendly"
+pharmacy         → Theme "Pharmacy Clean"
+```
 
 ---
 
 #### 🏠 Real Estate — Bất động sản
 
-> **Tâm lý màu sắc:** Sang trọng, ổn định, giá trị lâu dài. Navy và Gold truyền đạt đẳng cấp và sự thịnh vượng. Earth tones gợi sự gắn bó với đất đai, tổ ấm.
+> **Tâm lý:** Navy + Gold = sang trọng & thịnh vượng. Earth tones = gắn bó với đất đai, tổ ấm. Green = eco/tự nhiên. Tránh màu neon hoặc quá playful — làm mất uy tín với tài sản giá trị lớn.
 
-| Token | Light Mode | Dark Mode | Ghi chú |
-|-------|-----------|-----------|---------|
-| Primary | `#1A237E` Indigo 900 (Navy) | `#5C6BC0` Indigo 400 | Sang trọng, tin cậy |
-| Primary Alt | `#F9A825` Amber 800 (Gold) | `#FFD54F` | Premium / Luxury RE |
-| Secondary | `#37474F` Blue Grey 700 | `#78909C` | Neutral authority |
-| CTA / Button | `#F9A825` Gold | `#FFD54F` | Premium feel |
-| CTA Alt | `#2E7D32` Green 800 | `#66BB6A` | Eco / Green building |
-| Accent | `#5D4037` Brown 700 | `#8D6E63` | Earth / Land feel |
-| Background | `#FAFAFA` hoặc `#EFEBE9` | `#0A0E1A` Dark Navy | |
-| Neutral | `#455A64` Blue Grey | `#90A4AE` | |
+**Approved Color Pool:**
 
-**Avoided:** Màu neon, gradient phức tạp, màu quá playful — gây mất cảm giác đáng tin về tài sản giá trị lớn.
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Navys | `#0A0E2A` `#0D1B4B` `#1A237E` `#283593` `#1E3A5F` `#01579B` | Primary — sang trọng, tin cậy |
+| Golds | `#7B5F00` `#9E7E00` `#B8860B` `#C8961C` `#DAA520` `#F9A825` `#FFB300` | Secondary/CTA — premium value |
+| Eco Greens | `#1B5E20` `#2E7D32` `#33691E` `#388E3C` `#558B2F` `#689F38` | Accent — eco, green living |
+| Earth Browns | `#3E2723` `#4E342E` `#5D4037` `#6D4C41` `#795548` `#8D6E63` `#BCAAA4` | Neutral — đất, gỗ, ấm áp |
+| Silvers | `#37474F` `#455A64` `#546E7A` `#607D8B` `#78909C` `#90A4AE` `#B0BEC5` | Neutral — hiện đại, đô thị |
+| Warm Beiges | `#FAF0E6` `#FFF8E1` `#EFEBE9` `#D7CCC8` `#BCAAA4` | Background — ấm áp |
+| Luxury Blacks | `#000000` `#121212` `#1C1C1C` `#212121` | Primary — ultra luxury |
+| Ocean Blues | `#01579B` `#0277BD` `#0288D1` `#0D47A1` | Primary — coastal, resort |
 
-**Saturation rule:** `saturation <= 80%` — palette phải mang tính ổn định, không flashy.
+**Palette Themes (AI chọn 1):**
+
+| Theme | Primary | Secondary | CTA | Background | Mood |
+|-------|---------|-----------|-----|------------|------|
+| 👑 Heritage Prestige | `#1A237E` | `#DAA520` | `#F9A825` | `#FAF0E6` | Cổ điển, hoàng gia |
+| 🏙️ Modern Luxury | `#212121` | `#B8860B` | `#DAA520` | `#FAFAFA` | Đương đại, tối giản |
+| 🌿 Green Living | `#2E7D32` | `#795548` | `#388E3C` | `#F9FBE7` | Eco, tự nhiên |
+| 🌊 Coastal Premium | `#01579B` | `#90A4AE` | `#0288D1` | `#FAFAFA` | Resort, biển |
+| 🏗️ Urban Contemporary | `#37474F` | `#B0BEC5` | `#546E7A` | `#FFFFFF` | Đô thị, hiện đại |
+| 🌴 Tropical Paradise | `#00695C` | `#DAA520` | `#00796B` | `#FFFDE7` | Nhiệt đới, resort |
+
+**Sub-type quick map:**
+```
+luxury_villa    → Theme "Heritage Prestige" hoặc "Modern Luxury"
+apartment       → Theme "Urban Contemporary"
+eco_resort      → Theme "Green Living"      hoặc "Tropical Paradise"
+beachfront      → Theme "Coastal Premium"   hoặc "Tropical Paradise"
+commercial_re   → Theme "Modern Luxury"     hoặc "Urban Contemporary"
+```
 
 ---
 
 #### 💼 Service — Freelancer / Agency / Portfolio
 
-> **Tâm lý màu sắc:** Chuyên nghiệp nhưng có cá tính. Agency thường dùng Dark + 1 bold accent để thể hiện sự sáng tạo. Freelancer có thể dùng personal brand color.
+> **Tâm lý:** Chuyên nghiệp nhưng có cá tính riêng. Agency dùng dark bg + 1 bold accent để tạo impression mạnh. Freelancer linh hoạt theo personal brand. 1 pop color là vũ khí bí mật.
 
-| Token | Light Mode | Dark Mode | Ghi chú |
-|-------|-----------|-----------|---------|
-| Primary | `#37474F` Blue Grey 700 | `#ECEFF1` | Professional neutral |
-| Primary Alt | `#4527A0` Deep Purple 900 | `#9575CD` | Creative Agency |
-| Primary Alt | `#1A237E` Navy | `#5C6BC0` | Corporate Service |
-| Secondary | `#ECEFF1` Blue Grey 50 | `#263238` | |
-| CTA / Button | `#FF6F00` Amber 900 | `#FFB300` | Stand out, confident |
-| CTA Alt | `#00BFA5` Teal A700 | `#64FFDA` | Modern Agency |
-| Accent (Pop) | Brand-specific bright | | 1 bold pop color |
-| Background | `#FFFFFF` hoặc `#FAFAFA` | `#1C1C1E` | |
-| Neutral | `#616161` Grey | `#9E9E9E` | |
+**Approved Color Pool:**
 
-**Rule:** Agency portfolio được phép dùng 1 unexpected accent color (ví dụ: Electric Yellow `#FFEA00`, Hot Pink `#E91E63`) để tạo impression. Tuy nhiên phải đảm bảo WCAG AA.
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Dark Foundations | `#000000` `#121212` `#1C1C1E` `#212121` `#263238` `#37474F` | Primary dark — creative agency |
+| Professional Blues | `#0D47A1` `#1565C0` `#1A237E` `#1976D2` `#283593` | Primary — corporate service |
+| Creative Purples | `#1A0533` `#311B92` `#4527A0` `#512DA8` `#6A1B9A` `#7E57C2` `#9575CD` | Primary — creative studio |
+| Pop Accents — Yellow | `#FFD600` `#FFEA00` `#FFFF00` `#FDD835` `#F9A825` | Accent — energy, boldness |
+| Pop Accents — Pink | `#E91E63` `#F50057` `#FF1744` `#FF4081` `#FF80AB` | Accent — bold, feminine |
+| Pop Accents — Cyan | `#00B0FF` `#00BCD4` `#00E5FF` `#1DE9B6` `#64FFDA` | Accent — modern, fresh |
+| Pop Accents — Green | `#00C853` `#69F0AE` `#76FF03` `#CCFF90` | Accent — growth, fresh |
+| Pop Accents — Orange | `#FF6D00` `#FF9100` `#FFAB40` `#FF6F00` | Accent — confident, warm |
+| Neutrals | `#FAFAFA` `#F5F5F5` `#EEEEEE` `#9E9E9E` `#757575` `#BDBDBD` | Background, text |
+
+**Rule — Pop Accent:** Chọn đúng 1 pop color, dùng làm CTA + highlight. Không mix 2 pop colors.
+
+**Palette Themes (AI chọn 1):**
+
+| Theme | Foundation | Pop Accent | CTA | Background | Mood |
+|-------|-----------|-----------|-----|------------|------|
+| 🎨 Dark Creative | `#1C1C1E` | `#7C4DFF` Purple | `#651FFF` | `#0D0D0D` | Bí ẩn, sáng tạo |
+| 🏢 Corporate Clean | `#1A237E` | `#F9A825` Gold | `#FF6F00` | `#FAFAFA` | Tin cậy, chuyên nghiệp |
+| ⬜ Minimal Studio | `#212121` | `#FFEA00` Yellow | `#FFD600` | `#FFFFFF` | Tối giản, táo bạo |
+| 💥 Bold Agency | `#4527A0` | `#FF6D00` Orange | `#E64A19` | `#FFFFFF` | Táo bạo, ấn tượng |
+| 💙 Tech Consultant | `#37474F` | `#00E5FF` Cyan | `#00BCD4` | `#FAFAFA` | Hiện đại, tech-forward |
+| 💎 Premium Studio | `#121212` | `#DAA520` Gold | `#B8860B` | `#0A0A0A` | Sang trọng, exclusive |
+| 🌸 Creative Freelancer | `#1C1C1E` | `#E91E63` Pink | `#C2185B` | `#FAFAFA` | Cá tính, memorable |
+
+**Sub-type quick map:**
+```
+digital_agency   → Theme "Dark Creative"      hoặc "Bold Agency"
+design_studio    → Theme "Minimal Studio"     hoặc "Dark Creative"
+corporate_consult→ Theme "Corporate Clean"    hoặc "Tech Consultant"
+freelance_dev    → Theme "Tech Consultant"    hoặc "Minimal Studio"
+freelance_design → Theme "Creative Freelancer" hoặc "Premium Studio"
+branding_agency  → Theme "Bold Agency"        hoặc "Premium Studio"
+```
 
 ---
 
 #### 🎓 Education — Giáo dục / Đào tạo
 
-> **Tâm lý màu sắc:** Hài hòa, tập trung, truyền cảm hứng học tập. Blue và Green hỗ trợ nhận thức và ghi nhớ. Yellow tạo sự lạc quan và năng lượng.
+> **Tâm lý:** Blue hỗ trợ tập trung và ghi nhớ. Green = phát triển/tăng trưởng. Yellow = lạc quan, năng lượng. Tránh palette quá tương phản gây căng thẳng khi học dài giờ.
 
-| Token | Light Mode | Dark Mode | Ghi chú |
-|-------|-----------|-----------|---------|
-| Primary | `#1565C0` Blue 800 | `#42A5F5` Blue 400 | Tin cậy, học thuật |
-| Primary Alt | `#6A1B9A` Purple 900 | `#CE93D8` | Creative Education |
-| Secondary | `#FBC02D` Yellow 700 | `#FFD54F` | Optimism, energy |
-| CTA / Button | `#1976D2` Blue 700 | `#64B5F6` | Enroll, Start Learning |
-| Accent | `#43A047` Green 600 | `#81C784` | Growth, progress |
-| Background | `#FAFAFA` hoặc `#E3F2FD` | `#0D1321` | Light, không gây mỏi mắt |
-| Neutral | `#546E7A` | `#90A4AE` | |
+**Approved Color Pool:**
 
-**Contrast rule:** Luôn dùng analogous hoặc triadic palette — tránh complementary pairs có delta_hue < 30° gây căng thẳng thị giác khi học dài giờ.
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Trust Blues | `#0D47A1` `#1565C0` `#1976D2` `#1E88E5` `#2196F3` `#42A5F5` `#64B5F6` | Primary — học thuật |
+| Creative Purples | `#4527A0` `#512DA8` `#6A1B9A` `#7B1FA2` `#8E24AA` `#AB47BC` `#CE93D8` | Primary — trường sáng tạo |
+| Growth Greens | `#1B5E20` `#2E7D32` `#388E3C` `#43A047` `#4CAF50` `#66BB6A` `#81C784` | Secondary — phát triển |
+| Energy Yellows | `#F57F17` `#F9A825` `#FBC02D` `#FDD835` `#FFEE58` `#FFF176` | Secondary — lạc quan |
+| Warm Oranges | `#BF360C` `#E64A19` `#FF5722` `#FF7043` `#FF8A65` `#FFAB91` | Accent — nhiệt tình |
+| Deep Teals | `#004D40` `#00695C` `#00796B` `#00897B` `#26A69A` | Accent — STEM, science |
+| Light Bgs | `#FAFAFA` `#F8FBFF` `#EEF2FF` `#E8F5E9` `#E3F2FD` `#FFF9C4` | Background |
+| Dark Bgs | `#0D1321` `#1A237E` `#0D1B2A` `#1A1A2E` | Background dark |
 
-**Saturation rule:** `saturation <= 80%` — màu hài hòa, không gây phân tâm.
+**Palette Themes (AI chọn 1):**
+
+| Theme | Primary | Secondary | CTA | Background | Mood |
+|-------|---------|-----------|-----|------------|------|
+| 🎓 Academic Classic | `#1565C0` | `#FBC02D` | `#1976D2` | `#FAFAFA` | Nghiêm túc, uy tín |
+| 🎨 Creative Kids | `#7B1FA2` | `#66BB6A` | `#8E24AA` | `#FFF9C4` | Vui nhộn, tưởng tượng |
+| 💻 Online Learning | `#1976D2` | `#00BCD4` | `#1E88E5` | `#F8FBFF` | Hiện đại, digital |
+| 🔬 STEM Focus | `#3949AB` | `#00897B` | `#3F51B5` | `#F5F5F5` | Khoa học, logic |
+| 🌍 Language School | `#43A047` | `#FF5722` | `#388E3C` | `#FFFDE7` | Đa dạng, thân thiện |
+| 🏛️ University Prestige | `#1A237E` | `#C8A800` | `#283593` | `#FAFAFA` | Học thuật, danh giá |
+| 🌟 EdTech Startup | `#512DA8` | `#00ACC1` | `#7C4DFF` | `#0D1321` | Đổi mới, tech-forward |
+
+**Sub-type quick map:**
+```
+k12_school      → Theme "Creative Kids"      hoặc "Academic Classic"
+university      → Theme "University Prestige" hoặc "Academic Classic"
+online_platform → Theme "Online Learning"    hoặc "EdTech Startup"
+stem_center     → Theme "STEM Focus"
+language_center → Theme "Language School"
+coding_bootcamp → Theme "EdTech Startup"     hoặc "STEM Focus"
+```
 
 ---
 
 #### 🏋️ Fitness — Gym / Thể hình / Yoga
 
-> **Tâm lý màu sắc:** Năng lượng, sức mạnh, thúc đẩy hành động (Gym). Hoặc cân bằng, thư thái, kết nối cơ thể-tâm trí (Yoga). Hai sub-type có palette hoàn toàn khác nhau.
+> **Tâm lý Gym:** Năng lượng, sức mạnh, kết quả ngay. Màu mạnh (Red, Orange, Black) tạo động lực.
+> **Tâm lý Yoga:** Cân bằng, thư thái, kết nối nội tâm. Màu đất + Teal + Lavender tạo sự bình an.
+> Hai sub-type có **vùng màu và rule hoàn toàn khác nhau.**
 
-| Token | Gym (Light) | Gym (Dark) | Yoga (Light) | Yoga (Dark) |
-|-------|------------|------------|-------------|------------|
-| Primary | `#D32F2F` Red 700 | `#EF5350` | `#00695C` Teal 800 | `#4DB6AC` |
-| Secondary | `#212121` Black | `#424242` | `#558B2F` Lt Green 800 | `#AED581` |
-| CTA | `#FF6D00` Orange | `#FF8A50` | `#00796B` Teal 700 | `#26A69A` |
-| Accent | `#FFD600` Yellow | `#FFFF00` | `#EDE7F6` Lavender | `#7E57C2` |
-| Background | `#FAFAFA` / `#FFEBEE` | `#0D0D0D` | `#F9FBE7` | `#0A1A15` |
-| Neutral | `#424242` | `#9E9E9E` | `#5D4037` | `#A1887F` |
+**Approved Color Pool — Gym / Sport:**
 
-**Sub-type rules:**
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Power Reds | `#B71C1C` `#C62828` `#D32F2F` `#E53935` `#EF5350` | Primary — energy, power |
+| Fire Oranges | `#BF360C` `#D84315` `#E64A19` `#FF3D00` `#FF5722` `#FF6D00` | Primary/CTA — urgency, fire |
+| Electric Yellows | `#F57F17` `#F9A825` `#FFD600` `#FFEA00` `#FFFF00` | Accent — highlight, achievement |
+| Power Blacks | `#000000` `#0D0D0D` `#121212` `#1C1C1C` `#212121` | Foundation — strength |
+| Electric Blues | `#0D47A1` `#0288D1` `#01579B` `#1565C0` | Primary Alt — sport team |
+| Neon Greens | `#00E676` `#69F0AE` `#76FF03` `#CCFF90` | Accent — neon, gaming gym |
+| Sport Whites | `#FFFFFF` `#FAFAFA` `#F5F5F5` | Background light |
+| Dark Gym Bgs | `#000000` `#0D0D0D` `#121212` `#1A0505` | Background dark |
+
+**Approved Color Pool — Yoga / Wellness:**
+
+| Nhóm | Hex options | Vai trò |
+|------|------------|---------|
+| Healing Teals | `#004D40` `#00695C` `#00796B` `#00897B` `#26A69A` `#4DB6AC` `#80CBC4` | Primary |
+| Earth Greens | `#33691E` `#558B2F` `#689F38` `#7CB342` `#8BC34A` `#AED581` | Secondary |
+| Calming Lavenders | `#4527A0` `#512DA8` `#7E57C2` `#9575CD` `#B39DDB` `#D1C4E9` `#EDE7F6` | Primary Alt |
+| Warm Earth | `#3E2723` `#5D4037` `#795548` `#8D6E63` `#A1887F` `#BCAAA4` `#D7CCC8` | Neutral |
+| Sage Greens | `#558B2F` `#689F38` `#8BC34A` `#AED581` `#DCEDC8` `#F1F8E9` | Accent |
+| Warm Lights | `#FFF8E1` `#F9FBE7` `#F1F8E9` `#E8F5E9` `#E0F7FA` | Background light |
+| Yoga Dark Bgs | `#0A1A15` `#0A1A0A` `#101820` `#1A1010` | Background dark |
+
+**Palette Themes — Gym (AI chọn 1):**
+
+| Theme | Primary | Secondary | CTA | Background | Mood |
+|-------|---------|-----------|-----|------------|------|
+| 🔥 Power Red | `#D32F2F` | `#212121` | `#FF6D00` | `#FAFAFA` | Sức mạnh, quyết tâm |
+| ⚡ Electric Sport | `#0288D1` | `#000000` | `#00E5FF` Neon | `#000000` | Thể thao, điện tử |
+| 🖤 Dark Warrior | `#212121` | `#FF3D00` | `#FFD600` | `#0D0D0D` | Chiến binh, kỷ luật |
+| 🟠 Sport Orange | `#E64A19` | `#212121` | `#FF5722` | `#FFFFFF` | Năng động, open |
+| 🌙 Neon Night | `#000000` | `#76FF03` | `#00E5FF` | `#0A0A0A` | Gaming gym, Gen Z |
+
+**Palette Themes — Yoga (AI chọn 1):**
+
+| Theme | Primary | Secondary | CTA | Background | Mood |
+|-------|---------|-----------|-----|------------|------|
+| 🌿 Earth Zen | `#00796B` | `#795548` | `#00695C` | `#F9FBE7` | Mặt đất, thiền định |
+| 💜 Lavender Calm | `#7E57C2` | `#4DB6AC` | `#9575CD` | `#EDE7F6` | Bình yên, tâm linh |
+| 🌲 Forest Retreat | `#558B2F` | `#00796B` | `#689F38` | `#F1F8E9` | Thiên nhiên, rừng |
+| 🌅 Sunrise Flow | `#FF8A65` | `#FFD54F` | `#EF6C00` | `#FFF8E1` | Bình minh, ấm áp |
+| 🌊 Ocean Breath | `#0288D1` | `#26A69A` | `#039BE5` | `#E0F7FA` | Biển cả, tự do |
+
+**Sub-type quick map:**
 ```
-IF sub_type == 'gym':
-    primary = #D32F2F + #212121
-    ALLOW high_contrast = true (energy, bold)
-    PREFER high saturation (85-100%)
-
-IF sub_type == 'yoga' OR sub_type == 'wellness':
-    primary = #00695C + #558B2F
-    REQUIRE harmony_score >= 0.75 (calming)
-    AVOID high-contrast harsh pairs
-    saturation <= 75%
-
-IF sub_type == 'sport_general':
-    primary = #FF6D00 + #212121 (energetic but versatile)
+gym_bodybuilding → Theme "Power Red"      hoặc "Dark Warrior"
+crossfit         → Theme "Sport Orange"   hoặc "Power Red"
+sport_general    → Theme "Electric Sport" hoặc "Sport Orange"
+esports_gym      → Theme "Neon Night"
+yoga_studio      → Theme "Earth Zen"      hoặc "Lavender Calm"
+mindfulness      → Theme "Lavender Calm"  hoặc "Ocean Breath"
+outdoor_fitness  → Theme "Forest Retreat" hoặc "Sunrise Flow"
+pilates          → Theme "Sunrise Flow"   hoặc "Earth Zen"
 ```
 
 ---
