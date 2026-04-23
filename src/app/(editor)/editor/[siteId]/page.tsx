@@ -11,6 +11,7 @@ import { EditorSidebar, type EditorSidebarTabId } from '@/components/editor/Edit
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
+import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import type { AIAction } from '@/types/editor'
@@ -106,6 +107,8 @@ export default function EditorPage() {
     const [templateApplied, setTemplateApplied] = useState(false)
     const [showSaveGuard, setShowSaveGuard] = useState(false)
     const reorderSaveTimerRef = useRef<number | null>(null)
+    // Imperative handle to send postMessages to iframe without full reload (Gap B)
+    const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
 
     const { isOnline, isSyncing } = useConnectivity()
     const { isMaster, reclaimAuthority } = useTabAuthority(siteId)
@@ -119,8 +122,6 @@ export default function EditorPage() {
     const hasUnpublishedChanges = useEditorStore(state => state.hasUnpublishedChanges)
     const lastSavedAt = useEditorStore(state => state.lastSavedAt)
     const isSaving = useEditorStore(state => state.isSaving)
-    const autoSaveEnabled = useEditorStore(state => state.autoSaveEnabled)
-    const autoSaveIntervalMs = useEditorStore(state => state.autoSaveIntervalMs)
     const init = useEditorStore(state => state.init)
     const setPages = useEditorStore(state => state.setPages)
     const setCurrentPageId = useEditorStore(state => state.setCurrentPageId)
@@ -143,6 +144,7 @@ export default function EditorPage() {
     const markSaved = useEditorStore(state => state.markSaved)
     const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
+    const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
 
     const currentBlock = useMemo(
         () => (selectedBlock !== null ? blocks[selectedBlock] || null : null),
@@ -279,6 +281,13 @@ export default function EditorPage() {
             reorderSaveTimerRef.current = null
         }
 
+        // Cancel the store's pending auto-save timer — explicit saves subsume it
+        const storeTimer = useEditorStore.getState().autoSaveTimer
+        if (storeTimer) {
+            clearTimeout(storeTimer)
+            useEditorStore.setState({ autoSaveTimer: null })
+        }
+
         const snapshot = useEditorStore.getState()
         const currentBlocks = snapshot.blocks
         const currentTheme = snapshot.theme
@@ -343,19 +352,10 @@ export default function EditorPage() {
         }
     }, [markSaved, page, setIsSaving, siteId])
 
+    // Suspend store auto-save while a template is applied (user must confirm first)
     useEffect(() => {
-        // Pause auto-save while template was just applied (user must confirm save first)
-        if (!siteId || !hasUnsavedChanges || !autoSaveEnabled || templateApplied) return
-
-        const timer = window.setTimeout(() => {
-            // Skip if user is currently inline editing — the TEXT_EDITING_STOPPED
-            // pipeline saves the final state and avoids overwriting partial edits.
-            if (useEditorStore.getState().isInlineEditing) return
-            void handleSave({ showToast: false, refreshPreview: true })
-        }, autoSaveIntervalMs)
-
-        return () => window.clearTimeout(timer)
-    }, [autoSaveEnabled, autoSaveIntervalMs, handleSave, hasUnsavedChanges, siteId, templateApplied])
+        setAutoSaveEnabled(!templateApplied)
+    }, [templateApplied, setAutoSaveEnabled])
 
     // Warn user before leaving page with unsaved changes
     useEffect(() => {
@@ -480,7 +480,9 @@ export default function EditorPage() {
             }
 
             setSaveSuccess(true)
-            setIframeKey(key => key + 1)
+            // Only reload iframe when visual fields change (branding, header/footer block)
+            const needsReload = !!(changes.branding || changes.headerBlock || changes.footerBlock)
+            if (needsReload) setIframeKey(key => key + 1)
             window.setTimeout(() => setSaveSuccess(false), 1800)
         } catch (error) {
             console.error('Failed to update site settings', error)
@@ -517,13 +519,17 @@ export default function EditorPage() {
 
     const handleBlockFieldChange = useCallback((index: number, field: string, value: string) => {
         updateBlock(index, { [field]: value })
-        // Save + reload preview to show changes
-        void saveWithRetry({ showToast: false, refreshPreview: true })
+        // Partial live update — no iframe reload needed
+        const updatedBlock = useEditorStore.getState().blocks[index]
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: updatedBlock })
+        void saveWithRetry({ showToast: false, refreshPreview: false })
     }, [updateBlock, saveWithRetry])
 
     const handleBlockUpdate = useCallback((index: number, changes: Record<string, unknown>) => {
         updateBlock(index, changes)
-        void saveWithRetry({ showToast: false, refreshPreview: true })
+        const updatedBlock = useEditorStore.getState().blocks[index]
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: updatedBlock })
+        void saveWithRetry({ showToast: false, refreshPreview: false })
     }, [updateBlock, saveWithRetry])
 
     const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
@@ -1159,8 +1165,11 @@ export default function EditorPage() {
                             }}
                             onPageNavigate={handlePageSelected}
                             onInlineEditSave={async () => {
-                                await handleSave({ showToast: false, refreshPreview: true })
+                                // Inline edit already updated text in iframe — no reload needed.
+                                // Reloading here causes visible jank while user is still editing.
+                                await handleSave({ showToast: false, refreshPreview: false })
                             }}
+                            onHandleReady={(handle) => { previewFrameSendRef.current = handle }}
                         />
                     </div>
 
