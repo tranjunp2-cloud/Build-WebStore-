@@ -117,10 +117,10 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             const siteFooterBlock = site.footerBlock as Record<string, unknown> | null
 
             let navBlock: PreviewLayoutBlock | null = siteHeaderBlock
-                ? { ...siteHeaderBlock, blockType: siteHeaderBlock.blockType || 'navigation', __editorBlockIndex: -1 }
+                ? { ...siteHeaderBlock, blockType: (siteHeaderBlock.blockType as string) || 'navigation', __editorBlockIndex: -1 }
                 : null
             let footerBlock: PreviewLayoutBlock | null = siteFooterBlock
-                ? { ...siteFooterBlock, blockType: siteFooterBlock.blockType || 'footer', __editorBlockIndex: -1 }
+                ? { ...siteFooterBlock, blockType: (siteFooterBlock.blockType as string) || 'footer', __editorBlockIndex: -1 }
                 : null
 
             // Fallback: extract from homepage layout if current page is not homepage
@@ -156,7 +156,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                         { label: 'Products', url: '/products' },
                         { label: 'Contact', url: '/contact' },
                     ],
-                } as Record<string, unknown>
+                } as PreviewLayoutBlock
             }
             if (!footerBlock && !hasFooter) {
                 const siteName = (site.name as string) || 'My Website'
@@ -167,7 +167,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     logoText: siteName,
                     description: `© ${new Date().getFullYear()} ${siteName}. All rights reserved.`,
                     columns: [],
-                } as Record<string, unknown>
+                } as PreviewLayoutBlock
             }
 
             // Strip broken nav/footer blocks (exist but empty) before injecting working ones
