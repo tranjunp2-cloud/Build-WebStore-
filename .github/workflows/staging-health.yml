@@ -10,6 +10,12 @@ on:
         type: boolean
         default: true
 
+  # Auto-trigger after staging deploy completes
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [staging]
+
 jobs:
   health-check:
     name: 'Check Staging Health'
