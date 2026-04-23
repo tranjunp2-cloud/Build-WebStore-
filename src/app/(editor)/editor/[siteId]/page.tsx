@@ -101,7 +101,7 @@ export default function EditorPage() {
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
-    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number } | null>(null)
+    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string } | null>(null)
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
     const [showSaveGuard, setShowSaveGuard] = useState(false)
@@ -909,10 +909,10 @@ export default function EditorPage() {
 
     // BUG-F05-032/046: context-sensitive tab switching when blocks are clicked
     const handleBlockSelectWithContext = useCallback((blockIndex: number | null, blockType?: string) => {
-        if (blockType === 'navigation' || blockType === 'footer') {
+        if (blockType === 'navigation' || blockType === 'footer' || blockType === 'breadcrumb') {
             setSelectedBlock(null)
             // Use unique key to force re-trigger even on repeated clicks
-            setSettingsRequestedTab({ tab: 'menu', key: Date.now() })
+            setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: blockType === 'breadcrumb' ? 'breadcrumb' : undefined })
         } else {
             setSelectedBlock(blockIndex)
             setSettingsRequestedTab(null)

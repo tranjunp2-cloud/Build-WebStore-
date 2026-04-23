@@ -69,7 +69,7 @@ type DragFinishPayload = {
 
 function getEditableBlockLayouts(layouts: BlockLayoutRect[]) {
     return layouts
-        .filter(layout => !['navigation', 'footer'].includes(layout.blockType))
+        .filter(layout => !['navigation', 'footer', 'breadcrumb'].includes(layout.blockType))
         .sort((a, b) => a.top - b.top)
 }
 
@@ -478,6 +478,9 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'PREVIEW_CANVAS_CLICKED') {
                 onBlockSelect?.(null)
             } else if (e.data?.type === 'TEXT_EDITING_STARTED') {
+                // Global blocks (nav, footer, breadcrumb) are not inline-editable — ignore
+                const globalBlockTypes = ['navigation', 'footer', 'breadcrumb']
+                if (globalBlockTypes.includes(e.data.blockType)) return
                 // Cancel any pending STOPPED cleanup (race: stop fires before start on re-click)
                 if (textEditStopTimerRef.current) {
                     clearTimeout(textEditStopTimerRef.current)
@@ -538,6 +541,7 @@ function PreviewFrameInner({
                     }
                 }, 100)
             } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
+                if (['navigation', 'footer', 'breadcrumb'].includes(e.data.blockType)) return
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType, imageIndex: e.data.imageIndex, totalImagesInBlock: e.data.totalImagesInBlock })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
@@ -1143,6 +1147,7 @@ function PreviewFrameInner({
                     {(() => {
                         if (!blockHover || dragState || !overlayOffset) return null
                         if (blockHover.blockIndex === selectedBlock) return null
+                        if (blockHover.blockType === 'breadcrumb' || blockHover.blockType === 'navigation' || blockHover.blockType === 'footer') return null
                         const label = blockHover.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
                         return (
                             <div
