@@ -846,7 +846,7 @@ web-store/
 | **F12** | SEO Dashboard | 4 | P0 🌟 | 📝 `F12-seo-dashboard.md` | ✅ | ✅ Basic | ⚠️ Needs rebuild |
 | **F13** | Analytics Dashboard | 5 | P1 | 📝 `F13-analytics-dashboard.md` | — | ✅ Basic | ⚠️ Needs polish |
 | **F14** | Undo/Redo System | 3 | P0 | 📝 `F14-undo-redo.md` | — | ❌ Not built | 🔴 Needs build |
-| **F15** | Auto-Save & Draft | 3 | P0 | 📝 `F15-auto-save-draft.md` | — | ❌ Not built | 🔴 Needs build |
+| **F15** | Admin Management & SaaS Ops | 5 | P1 | 📝 `F15-admin-management.md` | — | ⚠️ Partial | ⚠️ Broadcast only |
 | — | i18n EN/MY (Bilingual) | 3.5 | P0 | — | — | ⚠️ Partial | In progress |
 | — | Payment Gateway (FPX) | 6 | P0 🌟 | ⬜ | — | ❌ | Future wave |
 | — | WhatsApp Integration | 6+ | P1 | ⬜ | — | ❌ | Future wave |
