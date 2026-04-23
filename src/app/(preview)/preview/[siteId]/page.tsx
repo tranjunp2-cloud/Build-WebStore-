@@ -10,6 +10,11 @@ import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
 
+type PreviewLayoutBlock = Record<string, unknown> & {
+    blockType: string
+    __editorBlockIndex?: number
+}
+
 interface PreviewPageProps {
     params: Promise<{ siteId: string }>
     searchParams: Promise<{ pageId?: string; v?: string }>
@@ -99,7 +104,8 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         // 4b. Ensure nav/footer on EVERY page (including homepage).
         // BUG-F01-26: Check for WORKING nav (with links), not just block presence.
         // A nav block with empty links renders as invisible thin bar.
-        const pageLayout = (page.layout as Array<{ blockType: string; links?: unknown[]; columns?: unknown[]; [k: string]: unknown }>) || []
+        const pageLayout = ((page.layout as Array<{ blockType: string; links?: unknown[]; columns?: unknown[]; [k: string]: unknown }>) || [])
+            .map((block, index) => ({ ...block, __editorBlockIndex: index })) as PreviewLayoutBlock[]
         const existingNav = pageLayout.find((b) => b.blockType === 'navigation')
         const hasNav = Boolean(existingNav && Array.isArray(existingNav.links) && existingNav.links.length > 0)
         const existingFooter = pageLayout.find((b) => b.blockType === 'footer')
@@ -110,8 +116,12 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             const siteHeaderBlock = site.headerBlock as Record<string, unknown> | null
             const siteFooterBlock = site.footerBlock as Record<string, unknown> | null
 
-            let navBlock: Record<string, unknown> | null = siteHeaderBlock ? { ...siteHeaderBlock, blockType: siteHeaderBlock.blockType || 'navigation' } : null
-            let footerBlock: Record<string, unknown> | null = siteFooterBlock ? { ...siteFooterBlock, blockType: siteFooterBlock.blockType || 'footer' } : null
+            let navBlock: PreviewLayoutBlock | null = siteHeaderBlock
+                ? { ...siteHeaderBlock, blockType: (siteHeaderBlock.blockType as string) || 'navigation', __editorBlockIndex: -1 }
+                : null
+            let footerBlock: PreviewLayoutBlock | null = siteFooterBlock
+                ? { ...siteFooterBlock, blockType: (siteFooterBlock.blockType as string) || 'footer', __editorBlockIndex: -1 }
+                : null
 
             // Fallback: extract from homepage layout if current page is not homepage
             if ((!navBlock || !footerBlock) && !page.isHomepage) {
@@ -127,6 +137,8 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     const homeLayout = homepage.layout as Array<{ blockType: string; [key: string]: unknown }>
                     if (!navBlock) navBlock = homeLayout.find(b => b.blockType === 'navigation') || null
                     if (!footerBlock) footerBlock = homeLayout.find(b => b.blockType === 'footer') || null
+                    if (navBlock) navBlock = { ...navBlock, __editorBlockIndex: -1 }
+                    if (footerBlock) footerBlock = { ...footerBlock, __editorBlockIndex: -1 }
                 }
             }
 
@@ -135,6 +147,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 const siteName = (site.name as string) || 'My Website'
                 navBlock = {
                     blockType: 'navigation',
+                    __editorBlockIndex: -1,
                     variant: 'simple',
                     logoText: siteName,
                     links: [
@@ -143,17 +156,18 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                         { label: 'Products', url: '/products' },
                         { label: 'Contact', url: '/contact' },
                     ],
-                } as Record<string, unknown>
+                } as PreviewLayoutBlock
             }
             if (!footerBlock && !hasFooter) {
                 const siteName = (site.name as string) || 'My Website'
                 footerBlock = {
                     blockType: 'footer',
+                    __editorBlockIndex: -1,
                     variant: 'simple',
                     logoText: siteName,
                     description: `© ${new Date().getFullYear()} ${siteName}. All rights reserved.`,
                     columns: [],
-                } as Record<string, unknown>
+                } as PreviewLayoutBlock
             }
 
             // Strip broken nav/footer blocks (exist but empty) before injecting working ones
