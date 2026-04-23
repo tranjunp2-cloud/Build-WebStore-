@@ -96,7 +96,7 @@ function LivePreview({
             // rewrites links correctly. During streaming, blocks render directly in
             // DOM without URL rewriting, so internal hrefs would hit the app router
             // → CMS 404 (GH #770). External, mailto, tel, and #hash pass through.
-            onClick={(e) => {
+            onClick={(e: React.MouseEvent) => {
                 const anchor = (e.target as Element).closest('a')
                 if (!anchor) return
                 const href = anchor.getAttribute('href') ?? ''
