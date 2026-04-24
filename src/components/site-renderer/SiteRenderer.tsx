@@ -387,8 +387,17 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     )
                 }
 
-                // Public site: no extra wrapper div to avoid breaking CSS selectors.
-                // Spacing is applied via the global CSS variable on block root elements.
+                // Public site: wrap non-global blocks with spacing style so
+                // user-customized blockSpacing (paddingTop/paddingBottom) is
+                // preserved on the live published site. Global blocks (nav,
+                // footer, breadcrumb) get empty spacingStyle {} so no wrapper needed.
+                if (!isGlobalBlock) {
+                    return (
+                        <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                            {blockContent}
+                        </div>
+                    )
+                }
                 return blockContent
             })}
         </OwnerProvider>
