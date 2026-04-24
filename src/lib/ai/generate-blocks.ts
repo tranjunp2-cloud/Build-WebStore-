@@ -512,6 +512,7 @@ function buildNavigation(name: string, variant: string): GeneratedBlock {
             { label: 'Contact', url: '#contact' },
         ],
         ctaButton: { show: true, label: 'Get in Touch', url: '#contact' },
+        breadcrumbConfig: { showOnAllPages: true, homeLabel: 'Home', separator: '/' },
     }
 }
 
