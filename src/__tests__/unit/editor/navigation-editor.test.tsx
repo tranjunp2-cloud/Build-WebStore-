@@ -91,6 +91,33 @@ describe('NavigationEditor', () => {
         expect(screen.queryByDisplayValue('//about')).not.toBeInTheDocument()
     })
 
+    it('hides the system 404 page from internal link choices', () => {
+        render(
+            <I18nProvider defaultLocale="en">
+                <NavigationEditor
+                    links={[
+                        {
+                            id: 'nav-1',
+                            label: 'Home',
+                            url: '/',
+                            type: 'page',
+                            children: [],
+                        },
+                    ]}
+                    onUpdate={() => {}}
+                    pages={[
+                        { id: 'page-1', title: 'Home', slug: '' },
+                        { id: 'page-404', title: '404 Not Found', slug: '404' },
+                    ]}
+                />
+            </I18nProvider>
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+
+        expect(screen.queryByRole('option', { name: '404 Not Found' })).not.toBeInTheDocument()
+    })
+
     it('shows a toast and keeps previous external URL when blurred empty', () => {
         const onUpdate = vi.fn()
 

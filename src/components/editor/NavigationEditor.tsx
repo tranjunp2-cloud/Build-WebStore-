@@ -43,6 +43,8 @@ const LINK_TYPE_OPTIONS = [
     { value: 'external', icon: ExternalLink },
 ] as const
 
+const SYSTEM_PAGE_SLUGS = new Set(['404', '/404'])
+
 function generateId() {
     return `nav_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 }
@@ -421,6 +423,10 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     const { t } = useI18n()
     const nav = t.editor.navigation
     const [openPanelId, setOpenPanelId] = useState<string | null>(null)
+    const linkablePages = useMemo(
+        () => pages?.filter(page => !SYSTEM_PAGE_SLUGS.has(page.slug)),
+        [pages],
+    )
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -535,7 +541,7 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                                     onOutdent={handleOutdent}
                                     isFirst={idx === 0}
                                     isLast={idx === links.length - 1}
-                                    pages={pages}
+                                    pages={linkablePages}
                                     nav={nav}
                                     openPanelId={openPanelId}
                                     onSetOpenPanelId={setOpenPanelId}

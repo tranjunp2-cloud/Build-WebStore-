@@ -470,7 +470,7 @@ export function PageManagerPanel({
                                                 className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-[4px] border border-[rgba(59,130,246,0.04)] bg-[#253046] text-[12px] font-medium text-[#F8FAFC] transition-colors hover:border-cyan-500/20 hover:bg-[#2A3750]"
                                             >
                                                 <span aria-hidden="true">✏️</span>
-                                                {pm.editWithAI}
+                                                {pm.edit404Page}
                                             </button>
                                         </div>
                                     ) : null}

@@ -33,13 +33,7 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
             formData.append('file', compressed)
             formData.append('alt', altText || 'Block image')
 
-            // Timeout after 30s to prevent frozen button on S3/network issues
-            const uploaded = await Promise.race([
-                uploadMediaAction(formData),
-                new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('Upload timeout — check your connection')), 30000)
-                ),
-            ])
+            const uploaded = await uploadMediaAction(formData)
             onImageChange(uploaded.url)
             toast.success('Image updated')
         } catch (err) {
