@@ -50,9 +50,9 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
     if (variant === 'grid') {
         return (
             <AnimatedSection>
-                <SectionWrapper as="div" padding="compact" container="default" background="transparent">
+                <SectionWrapper as="div" padding="compact" container="default" background="alternate">
                     <LogoHeadline text={headline} />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
                         {logos.map((item, i) => (
                             <div
                                 key={i}
@@ -78,9 +78,9 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
     // ── Default: row variant ─────────────────────────────────────────────
     return (
         <AnimatedSection>
-            <SectionWrapper as="div" padding="compact" container="default" background="transparent">
+            <SectionWrapper as="div" padding="compact" container="default" background="alternate">
                 <LogoHeadline text={headline} />
-                <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
+                <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 max-w-5xl mx-auto">
                     {logos.map((item, i) => (
                         item.logo?.url ? (
                             <img key={i} src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" data-image-index={i} />
