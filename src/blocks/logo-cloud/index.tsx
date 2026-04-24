@@ -56,7 +56,7 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
                         {logos.map((item, i) => (
                             <div
                                 key={i}
-                                className={`flex items-center justify-center ${CARD_PADDING.sm} rounded-xl transition-all duration-200 hover:shadow-md min-w-[120px]`}
+                                className={`flex items-center justify-center ${CARD_PADDING.sm} rounded-xl transition-all duration-200 hover:shadow-md w-36`}
                                 style={{
                                     border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
                                     background: `rgba(var(--brand-primary-rgb), 0.02)`,
