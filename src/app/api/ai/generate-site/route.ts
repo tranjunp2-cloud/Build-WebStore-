@@ -871,11 +871,17 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        // Mark generation completed
+        // Mark generation completed and persist headerBlock so SiteRenderer
+        // can read breadcrumbConfig on the public site without requiring a
+        // manual editor save first.
+        const generatedHeaderBlock = sanitizedBlocks.find(b => b.blockType === 'navigation') ?? null
         await payload.update({
             collection: 'sites',
             id: site.id as string | number,
-            data: { generationStatus: 'completed' },
+            data: {
+                generationStatus: 'completed',
+                ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
+            },
         })
 
         const timeMs = Date.now() - startTime
