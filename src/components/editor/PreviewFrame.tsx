@@ -185,7 +185,7 @@ function updateValueAtPath(
     }
 
     const finalKey = path[path.length - 1]
-    ;(cursor as Record<string, unknown>)[finalKey as string] = nextValue
+        ; (cursor as Record<string, unknown>)[finalKey as string] = nextValue
 
     return clone
 }
@@ -280,6 +280,7 @@ function PreviewFrameInner({
             }
         })
         return () => onHandleReady(null)
+        // onHandleReady is a stable callback ref from parent — only run on mount/unmount
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -367,7 +368,7 @@ function PreviewFrameInner({
 
     const syncDragPosition = useCallback((clientY: number, sourceIndex?: number) => {
         if (!frameElement) return
-        
+
         const safeSourceIndex = sourceIndex
         if (safeSourceIndex === undefined) return
 
@@ -376,7 +377,7 @@ function PreviewFrameInner({
         const frameRect = frameElement.getBoundingClientRect()
         const nextY = clientY - frameRect.top
         dragPointerClientYRef.current = clientY
-        
+
         setDragState(prev => prev ? { ...prev, currentY: nextY } : prev)
 
         const editableLayouts = getEditableBlockLayouts(latestBlockLayoutsRef.current)
@@ -569,8 +570,8 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'REQUEST_STOP_EDITING') {
                 setTimeout(() => {
                     const activeEl = document.activeElement
-                    const isToolbarClicked = activeEl?.hasAttribute('data-wysiwyg-toolbar') || 
-                                           activeEl?.closest('[data-wysiwyg-toolbar]')
+                    const isToolbarClicked = activeEl?.hasAttribute('data-wysiwyg-toolbar') ||
+                        activeEl?.closest('[data-wysiwyg-toolbar]')
                     if (!isToolbarClicked) {
                         const iframe = document.querySelector('iframe') as HTMLIFrameElement
                         iframe?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, window.location.origin)
@@ -627,7 +628,7 @@ function PreviewFrameInner({
             cancelPendingHoverClear()
             window.removeEventListener('message', handleMessage)
         }
-    // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
+        // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
     }, [applyInlineEditPayload, cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, setIsEditing, updateBlock])
 
     useEffect(() => {
@@ -643,7 +644,7 @@ function PreviewFrameInner({
             if (target.closest('[data-inline-edit-popover]')) return
             if (target.closest('[data-inline-edit-trigger]')) return
             if (target.closest('[data-wysiwyg-toolbar]')) return // Don't close if clicking toolbar!
-            
+
             setIsEditing(false)
             setTextEditingData(null) // Clean up WYSIWYG if clicking outside
             // Tell iframe to stop editing too
@@ -695,7 +696,7 @@ function PreviewFrameInner({
     const handleImageReplace = useCallback(async (file: File) => {
         if (!imageClickData) return
         setIsImageProcessing(true)
-        
+
         try {
             const formData = new FormData()
             formData.append('file', file)
@@ -743,96 +744,96 @@ function PreviewFrameInner({
 
                 if (!hasArrayIndex) {
 
-                // Try matching: non-null fields first (ID or populated object with matching URL)
-                for (const fieldName of IMAGE_FIELD_NAMES) {
-                    const val = blockData[fieldName]
-                    if (val !== undefined && val !== null) {
-                        const isMatch = typeof val === 'number' ||
-                            (typeof val === 'object' && 'url' in (val as Record<string, unknown>) &&
-                                src.includes(String((val as Record<string, unknown>).url)))
-                        if (isMatch) {
-                            updateBlock(blockIndex, { [fieldName]: newMediaId })
-                            matched = true
-                            break
-                        }
-                    }
-                }
-
-                // Strategy 3: field exists but is null (save may have stripped the ID)
-                // — set it to the new media ID
-                if (!matched) {
+                    // Try matching: non-null fields first (ID or populated object with matching URL)
                     for (const fieldName of IMAGE_FIELD_NAMES) {
-                        if (fieldName in blockData && (blockData[fieldName] === null || typeof blockData[fieldName] === 'number')) {
-                            updateBlock(blockIndex, { [fieldName]: newMediaId })
-                            matched = true
-                            break
+                        const val = blockData[fieldName]
+                        if (val !== undefined && val !== null) {
+                            const isMatch = typeof val === 'number' ||
+                                (typeof val === 'object' && 'url' in (val as Record<string, unknown>) &&
+                                    src.includes(String((val as Record<string, unknown>).url)))
+                            if (isMatch) {
+                                updateBlock(blockIndex, { [fieldName]: newMediaId })
+                                matched = true
+                                break
+                            }
                         }
                     }
-                }
 
-                // Strategy 4: Deep search nested arrays for image fields with URL match
-                // Only matches populated objects where URL matches clicked src (safe for arrays)
-                if (!matched) {
-                    const NESTED_IMAGE_KEYS = new Set(['image', 'avatar', 'logo', 'backgroundImage', 'posterImage', 'thumbnail'])
-                    const srcPathname = new URL(src, window.location.origin).pathname
-                    const findNestedImageByUrl = (obj: unknown, path: Array<string | number> = []): Array<string | number> | null => {
-                        if (Array.isArray(obj)) {
-                            for (let i = 0; i < obj.length; i++) {
-                                const p = findNestedImageByUrl(obj[i], [...path, i])
-                                if (p) return p
+                    // Strategy 3: field exists but is null (save may have stripped the ID)
+                    // — set it to the new media ID
+                    if (!matched) {
+                        for (const fieldName of IMAGE_FIELD_NAMES) {
+                            if (fieldName in blockData && (blockData[fieldName] === null || typeof blockData[fieldName] === 'number')) {
+                                updateBlock(blockIndex, { [fieldName]: newMediaId })
+                                matched = true
+                                break
                             }
-                        } else if (obj && typeof obj === 'object') {
-                            for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-                                if (NESTED_IMAGE_KEYS.has(k) && v && typeof v === 'object' && 'url' in (v as Record<string, unknown>)) {
-                                    const url = String((v as Record<string, unknown>).url)
-                                    if (src.includes(url) || url.includes(srcPathname)) {
-                                        return [...path, k]
+                        }
+                    }
+
+                    // Strategy 4: Deep search nested arrays for image fields with URL match
+                    // Only matches populated objects where URL matches clicked src (safe for arrays)
+                    if (!matched) {
+                        const NESTED_IMAGE_KEYS = new Set(['image', 'avatar', 'logo', 'backgroundImage', 'posterImage', 'thumbnail'])
+                        const srcPathname = new URL(src, window.location.origin).pathname
+                        const findNestedImageByUrl = (obj: unknown, path: Array<string | number> = []): Array<string | number> | null => {
+                            if (Array.isArray(obj)) {
+                                for (let i = 0; i < obj.length; i++) {
+                                    const p = findNestedImageByUrl(obj[i], [...path, i])
+                                    if (p) return p
+                                }
+                            } else if (obj && typeof obj === 'object') {
+                                for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+                                    if (NESTED_IMAGE_KEYS.has(k) && v && typeof v === 'object' && 'url' in (v as Record<string, unknown>)) {
+                                        const url = String((v as Record<string, unknown>).url)
+                                        if (src.includes(url) || url.includes(srcPathname)) {
+                                            return [...path, k]
+                                        }
+                                    }
+                                    if (typeof v === 'object' && v !== null) {
+                                        const p = findNestedImageByUrl(v, [...path, k])
+                                        if (p) return p
                                     }
                                 }
-                                if (typeof v === 'object' && v !== null) {
-                                    const p = findNestedImageByUrl(v, [...path, k])
+                            }
+                            return null
+                        }
+                        const clone = JSON.parse(JSON.stringify(blocks))
+                        const nestedPath = findNestedImageByUrl(clone[blockIndex])
+                        if (nestedPath) {
+                            const nextBlock = updateValueAtPath(clone[blockIndex], nestedPath, newMediaId)
+                            updateBlock(blockIndex, nextBlock)
+                            matched = true
+                        }
+                    }
+
+                    // Strategy 5: Partial URL match in nested strings
+                    // Skip for gallery with imageIndex — Strategy 6 handles that case exclusively
+                    // to avoid empty-string caption fields matching any URL (target.includes('') === true).
+                    if (!matched && !(imageClickData.blockType === 'gallery' && imageClickData.imageIndex !== undefined)) {
+                        const findPartialPath = (obj: unknown, target: string, path: Array<string | number> = []): Array<string | number> | null => {
+                            if (typeof obj === 'string' && obj.length > 0 && (target.includes(obj) || obj.includes(target))) return path
+                            if (Array.isArray(obj)) {
+                                for (let i = 0; i < obj.length; i++) {
+                                    const p = findPartialPath(obj[i], target, [...path, i])
+                                    if (p) return p
+                                }
+                            } else if (obj && typeof obj === 'object') {
+                                for (const k in obj) {
+                                    const p = findPartialPath((obj as Record<string, unknown>)[k], target, [...path, k])
                                     if (p) return p
                                 }
                             }
+                            return null
                         }
-                        return null
-                    }
-                    const clone = JSON.parse(JSON.stringify(blocks))
-                    const nestedPath = findNestedImageByUrl(clone[blockIndex])
-                    if (nestedPath) {
-                        const nextBlock = updateValueAtPath(clone[blockIndex], nestedPath, newMediaId)
-                        updateBlock(blockIndex, nextBlock)
-                        matched = true
-                    }
-                }
-
-                // Strategy 5: Partial URL match in nested strings
-                // Skip for gallery with imageIndex — Strategy 6 handles that case exclusively
-                // to avoid empty-string caption fields matching any URL (target.includes('') === true).
-                if (!matched && !(imageClickData.blockType === 'gallery' && imageClickData.imageIndex !== undefined)) {
-                    const findPartialPath = (obj: unknown, target: string, path: Array<string | number> = []): Array<string | number> | null => {
-                        if (typeof obj === 'string' && obj.length > 0 && (target.includes(obj) || obj.includes(target))) return path
-                        if (Array.isArray(obj)) {
-                            for (let i = 0; i < obj.length; i++) {
-                                const p = findPartialPath(obj[i], target, [...path, i])
-                                if (p) return p
-                            }
-                        } else if (obj && typeof obj === 'object') {
-                            for (const k in obj) {
-                                const p = findPartialPath((obj as Record<string, unknown>)[k], target, [...path, k])
-                                if (p) return p
-                            }
+                        const clone = JSON.parse(JSON.stringify(blocks))
+                        const partialPath = findPartialPath(clone[blockIndex], new URL(src, window.location.origin).pathname)
+                        if (partialPath) {
+                            const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
+                            updateBlock(blockIndex, nextBlock)
+                            matched = true
                         }
-                        return null
                     }
-                    const clone = JSON.parse(JSON.stringify(blocks))
-                    const partialPath = findPartialPath(clone[blockIndex], new URL(src, window.location.origin).pathname)
-                    if (partialPath) {
-                        const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
-                        updateBlock(blockIndex, nextBlock)
-                        matched = true
-                    }
-                }
                 } // end !hasArrayIndex (Strategies 2–5)
 
                 // Strategy 6: Gallery fallback — use data-image-index to target array slot directly
@@ -865,12 +866,12 @@ function PreviewFrameInner({
                 // vs Pages.ts schema which defines image: upload for carousel and portfolio-grid items.
                 if (!matched && imageClickData.imageIndex !== undefined) {
                     const ARRAY_IMAGE_CONFIG: Record<string, { arrayField: string; imageSubField: string }> = {
-                        carousel:         { arrayField: 'items',        imageSubField: 'image' },
-                        'portfolio-grid': { arrayField: 'projects',     imageSubField: 'image' },
-                        team:             { arrayField: 'members',      imageSubField: 'image' },
-                        testimonials:     { arrayField: 'testimonials', imageSubField: 'avatar' },
-                        'social-proof':   { arrayField: 'reviews',      imageSubField: 'avatar' },
-                        'logo-cloud':     { arrayField: 'logos',        imageSubField: 'logo'   },
+                        carousel: { arrayField: 'items', imageSubField: 'image' },
+                        'portfolio-grid': { arrayField: 'projects', imageSubField: 'image' },
+                        team: { arrayField: 'members', imageSubField: 'image' },
+                        testimonials: { arrayField: 'testimonials', imageSubField: 'avatar' },
+                        'social-proof': { arrayField: 'reviews', imageSubField: 'avatar' },
+                        'logo-cloud': { arrayField: 'logos', imageSubField: 'logo' },
                     }
                     const arrayConfig = ARRAY_IMAGE_CONFIG[imageClickData.blockType]
                     if (arrayConfig) {
@@ -1100,7 +1101,7 @@ function PreviewFrameInner({
         if (pageId) {
             url.searchParams.set('pageId', pageId)
         }
-        
+
         // Add scroll parameters to avoid relying on native iframe onLoad which can be flaky.
         // NOTE: This runs only when iframeKey/pageId changes (when we INTEND to reload).
         url.searchParams.set('scroll', String(savedScrollYRef.current || 0))
@@ -1108,9 +1109,9 @@ function PreviewFrameInner({
             url.searchParams.set('scrollToBlock', String(scrollToBlockIndexRef.current))
             scrollToBlockIndexRef.current = null // Clear it so it only runs once
         }
-        
+
         return url.pathname + url.search
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [siteId, effectiveIframeKey, pageId]) // DO NOT depend on savedScrollYRef to prevent constant reloads
 
 
@@ -1148,379 +1149,389 @@ function PreviewFrameInner({
 
     return (
         <>
-        <div
-            ref={setContainerElement}
-            className="relative flex-1 overflow-hidden bg-[#111827] p-6"
-        >
             <div
-                ref={setScrollContainerElement}
-                className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4"
+                ref={setContainerElement}
+                className="relative flex-1 overflow-hidden bg-[#111827] p-6"
             >
                 <div
-                    className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
-                    style={{
-                        width: viewport === 'mobile' ? 'min(390px, 100%)' : '100%',
-                        maxWidth: viewport === 'mobile' ? 390 : 1280,
-                    }}
+                    ref={setScrollContainerElement}
+                    className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4"
                 >
-                    <iframe
-                        ref={(el) => { setFrameElement(el); frameElementRef.current = el }}
-                        key={effectiveIframeKey}
-                        src={iframeSrc}
-                        className="h-full w-full border-0"
-                        title={t.editor.toolbar.sitePreview}
-                        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                    />
+                    <div
+                        className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
+                        style={{
+                            width: viewport === 'mobile' ? 'min(390px, 100%)' : '100%',
+                            maxWidth: viewport === 'mobile' ? 390 : 1280,
+                        }}
+                    >
+                        <iframe
+                            ref={(el) => { setFrameElement(el); frameElementRef.current = el }}
+                            key={effectiveIframeKey}
+                            src={iframeSrc}
+                            className="h-full w-full border-0"
+                            title={t.editor.toolbar.sitePreview}
+                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                        />
+                    </div>
                 </div>
-            </div>
 
-            {((blockHover && !dragState) || (selectedBlock !== null && overlayOffset)) ? (
-                <>
-                    {/* Hover overlay — dashed border + block name label */}
-                    {(() => {
-                        if (!blockHover || dragState || !overlayOffset) return null
-                        if (blockHover.blockIndex === selectedBlock) return null
-                        if (blockHover.blockType === 'breadcrumb' || blockHover.blockType === 'navigation' || blockHover.blockType === 'footer') return null
-                        const label = blockHover.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-                        return (
-                            <div
-                                className="pointer-events-none absolute border-2 border-dashed border-blue-400 transition-all duration-100"
-                                style={{
-                                    top: overlayOffset.top + blockHover.top,
-                                    left: overlayOffset.left + blockHover.left,
-                                    width: blockHover.width,
-                                    height: blockHover.height,
-                                    zIndex: 30,
-                                }}
-                            >
-                                <span className="absolute left-0 top-0 -translate-y-full max-w-[160px] truncate rounded-t-sm bg-blue-400 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
-                                    {label}
-                                </span>
-                            </div>
-                        )
-                    })()}
-                    {/* Selected border injected via CSS into iframe; label rendered here */}
-                    {(() => {
-                        if (selectedBlock === null || !overlayOffset || dragState) return null
-                        const layout = editableLayouts.find(l => l.blockIndex === selectedBlock) ?? null
-                        if (!layout) return null
-                        const label = layout.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-                        return (
-                            <div
-                                className="pointer-events-none absolute transition-all duration-100"
-                                style={{
-                                    top: overlayOffset.top + layout.top,
-                                    left: overlayOffset.left + layout.left,
-                                    width: layout.width,
-                                    height: layout.height,
-                                    zIndex: 31,
-                                }}
-                            >
-                                <span className="absolute left-0 top-0 -translate-y-full rounded-t-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
-                                    {label}
-                                </span>
-                            </div>
-                        )
-                    })()}
-                    {/* Block Action Bar — shows on selected block */}
-                    {(() => {
-                        const selectedLayout = selectedBlock !== null
-                            ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
-                            : null
-                        if (!selectedLayout || !overlayOffset || dragState || textEditingData) return null
-
-                        return (
-                            <>
-                                <BlockActionBar
-                                    blockIndex={selectedLayout.blockIndex}
-                                    blockType={selectedLayout.blockType}
-                                    blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
-                                    totalBlocks={editableLayouts.length}
-                                    isMobile={viewport === 'mobile'}
-                                    onMoveUp={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex - 1)}
-                                    onMoveDown={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex + 1)}
-                                    onDuplicate={() => {
-                                        onDuplicateBlock?.(selectedLayout.blockIndex)
+                {((blockHover && !dragState) || (selectedBlock !== null && overlayOffset)) ? (
+                    <>
+                        {/* Hover overlay — dashed border + block name label */}
+                        {(() => {
+                            if (!blockHover || dragState || !overlayOffset) return null
+                            if (blockHover.blockIndex === selectedBlock) return null
+                            if (blockHover.blockType === 'breadcrumb' || blockHover.blockType === 'navigation' || blockHover.blockType === 'footer') return null
+                            const label = blockHover.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+                            return (
+                                <div
+                                    className="pointer-events-none absolute border-2 border-dashed border-blue-400 transition-all duration-100"
+                                    style={{
+                                        top: overlayOffset.top + blockHover.top,
+                                        left: overlayOffset.left + blockHover.left,
+                                        width: blockHover.width,
+                                        height: blockHover.height,
+                                        zIndex: 30,
                                     }}
-                                    onAIEdit={() => {
-                                        onBlockSelect?.(selectedLayout.blockIndex)
-                                        onBlockAIEdit?.(selectedLayout.blockIndex, selectedLayout.blockType)
+                                >
+                                    <span className="absolute left-0 top-0 -translate-y-full max-w-[160px] truncate rounded-t-sm bg-blue-400 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
+                                        {label}
+                                    </span>
+                                </div>
+                            )
+                        })()}
+                        {/* Selected border injected via CSS into iframe; label rendered here */}
+                        {(() => {
+                            if (selectedBlock === null || !overlayOffset || dragState) return null
+                            const layout = editableLayouts.find(l => l.blockIndex === selectedBlock) ?? null
+                            if (!layout) return null
+                            const label = layout.blockType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+                            return (
+                                <div
+                                    className="pointer-events-none absolute transition-all duration-100"
+                                    style={{
+                                        top: overlayOffset.top + layout.top,
+                                        left: overlayOffset.left + layout.left,
+                                        width: layout.width,
+                                        height: layout.height,
+                                        zIndex: 31,
                                     }}
-                                    onDelete={() => setDeleteConfirmIndex(selectedLayout.blockIndex)}
-                                    onDragStart={disableDragDrop ? undefined : (event) => {
-                                        const frameRect = frameElement?.getBoundingClientRect()
-                                        if (!frameRect) return
+                                >
+                                    <span className="absolute left-0 top-0 -translate-y-full rounded-t-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
+                                        {label}
+                                    </span>
+                                </div>
+                            )
+                        })()}
+                        {/* Block Action Bar — shows on selected block */}
+                        {(() => {
+                            const selectedLayout = selectedBlock !== null
+                                ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
+                                : null
+                            if (!selectedLayout || !overlayOffset || dragState || textEditingData) return null
 
-                                        event.preventDefault()
-                                        event.stopPropagation()
-                                        event.currentTarget.setPointerCapture(event.pointerId)
-                                        cancelPendingHoverClear()
-                                        dragPointerClientYRef.current = event.clientY
-                                        dragPointerStartYRef.current = event.clientY
-                                        dragPointerOffsetYRef.current = event.clientY - frameRect.top - selectedLayout.top
-                                        setHoverData(null)
-                                        setIsEditing(false)
-                                        setDragState({
-                                            sourceIndex: selectedLayout.blockIndex,
-                                            sourceRect: { ...selectedLayout, blockType: selectedLayout.blockType },
-                                            pointerOffsetY:
-                                                event.clientY - frameRect.top - selectedLayout.top,
-                                            currentY: selectedLayout.top,
-                                        })
-                                        setDropIndex(
-                                            editableLayouts.findIndex(
-                                                layout => layout.blockIndex === selectedLayout.blockIndex,
-                                            ),
-                                        )
-                                        frameElement?.contentWindow?.postMessage(
-                                            { type: 'DRAG_BLOCK_START', blockIndex: selectedLayout.blockIndex },
-                                            window.location.origin,
-                                        )
-                                        syncDragPosition(event.clientY, selectedLayout.blockIndex)
-                                    }}
-                                    position={{
-                                        top: overlayOffset.top + selectedLayout.top,
-                                        left: overlayOffset.left + selectedLayout.left,
-                                        width: selectedLayout.width,
-                                    }}
-                                />
-                            </>
-                        )
-                    })()}
-                </>
-            ) : null}
+                            return (
+                                <>
+                                    <BlockActionBar
+                                        blockIndex={selectedLayout.blockIndex}
+                                        blockType={selectedLayout.blockType}
+                                        blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
+                                        totalBlocks={editableLayouts.length}
+                                        isMobile={viewport === 'mobile'}
+                                        onMoveUp={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex - 1)}
+                                        onMoveDown={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex + 1)}
+                                        onDuplicate={() => {
+                                            onDuplicateBlock?.(selectedLayout.blockIndex)
+                                        }}
+                                        onAIEdit={() => {
+                                            onBlockSelect?.(selectedLayout.blockIndex)
+                                            onBlockAIEdit?.(selectedLayout.blockIndex, selectedLayout.blockType)
+                                        }}
+                                        onDelete={() => setDeleteConfirmIndex(selectedLayout.blockIndex)}
+                                        onDragStart={disableDragDrop ? undefined : (event) => {
+                                            const frameRect = frameElement?.getBoundingClientRect()
+                                            if (!frameRect) return
 
-            {/* Selection frame for global blocks (nav/footer/breadcrumb) — solid blue border */}
-            {selectedGlobalBlockLayout && overlayOffset && !dragState ? (
-                <div
-                    className="pointer-events-none absolute border-2 border-blue-500 bg-blue-500/10 transition-all duration-100"
-                    style={{
-                        top: overlayOffset.top + selectedGlobalBlockLayout.top,
-                        left: overlayOffset.left + selectedGlobalBlockLayout.left,
-                        width: selectedGlobalBlockLayout.width,
-                        height: selectedGlobalBlockLayout.height,
-                        zIndex: 31,
-                    }}
-                >
-                    <span className="absolute left-0 top-0 -translate-y-full rounded-t-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white capitalize">
-                        {selectedGlobalBlockLayout.blockType?.replace(/-/g, ' ')}
-                    </span>
-                </div>
-            ) : null}
+                                            event.preventDefault()
+                                            event.stopPropagation()
+                                            event.currentTarget.setPointerCapture(event.pointerId)
+                                            cancelPendingHoverClear()
+                                            dragPointerClientYRef.current = event.clientY
+                                            dragPointerStartYRef.current = event.clientY
+                                            dragPointerOffsetYRef.current = event.clientY - frameRect.top - selectedLayout.top
+                                            setHoverData(null)
+                                            setIsEditing(false)
+                                            setDragState({
+                                                sourceIndex: selectedLayout.blockIndex,
+                                                sourceRect: { ...selectedLayout, blockType: selectedLayout.blockType },
+                                                pointerOffsetY:
+                                                    event.clientY - frameRect.top - selectedLayout.top,
+                                                currentY: selectedLayout.top,
+                                            })
+                                            setDropIndex(
+                                                editableLayouts.findIndex(
+                                                    layout => layout.blockIndex === selectedLayout.blockIndex,
+                                                ),
+                                            )
+                                            frameElement?.contentWindow?.postMessage(
+                                                { type: 'DRAG_BLOCK_START', blockIndex: selectedLayout.blockIndex },
+                                                window.location.origin,
+                                            )
+                                            syncDragPosition(event.clientY, selectedLayout.blockIndex)
+                                        }}
+                                        position={{
+                                            top: overlayOffset.top + selectedLayout.top,
+                                            left: overlayOffset.left + selectedLayout.left,
+                                            width: selectedLayout.width,
+                                        }}
+                                    />
+                                </>
+                            )
+                        })()}
+                    </>
+                ) : null}
 
-            <AnimatePresence>
-            {dragState && overlayOffset ? (
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
-                    transition={{ duration: 0.12 }}
-                    className="pointer-events-none absolute rounded-xl border-2 border-blue-500/60 bg-blue-500/10 shadow-[0_24px_64px_rgba(59,130,246,0.25)]"
-                    style={{
-                        top: overlayOffset.top + dragState.currentY - dragState.pointerOffsetY,
-                        left: overlayOffset.left + dragState.sourceRect.left,
-                        width: dragState.sourceRect.width,
-                        height: Math.min(dragState.sourceRect.height, 120),
-                        zIndex: 60,
-                    }}
-                >
-                    <div className="absolute inset-0 rounded-xl border border-dashed border-blue-400/40" />
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 rounded-lg bg-blue-600/90 px-3 py-1.5 shadow-lg">
-                        <GripVertical className="h-3.5 w-3.5 text-white/80" />
-                        <span className="text-xs font-semibold text-white capitalize">
-                            {dragState.sourceRect.blockType?.replace(/-/g, ' ') || 'Block'}
+                {/* Selection frame for global blocks (nav/footer/breadcrumb) — solid blue border */}
+                {selectedGlobalBlockLayout && overlayOffset && !dragState ? (
+                    <div
+                        className="pointer-events-none absolute border-2 border-blue-500 bg-blue-500/10 transition-all duration-100"
+                        style={{
+                            top: overlayOffset.top + selectedGlobalBlockLayout.top,
+                            left: overlayOffset.left + selectedGlobalBlockLayout.left,
+                            width: selectedGlobalBlockLayout.width,
+                            height: selectedGlobalBlockLayout.height,
+                            zIndex: 31,
+                        }}
+                    >
+                        <span className="absolute left-0 top-0 -translate-y-full rounded-t-sm bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white capitalize">
+                            {selectedGlobalBlockLayout.blockType?.replace(/-/g, ' ')}
                         </span>
                     </div>
-                </motion.div>
-            ) : null}
-            </AnimatePresence>
+                ) : null}
 
-            <AnimatePresence>
-            {dropIndicatorTop !== null && overlayOffset ? (
-                <motion.div
-                    initial={{ opacity: 0, scaleX: 0.5 }}
-                    animate={{ 
-                        opacity: 1, 
-                        scaleX: 1,
-                        top: overlayOffset.top + dropIndicatorTop - 2,
-                    }}
-                    exit={{ opacity: 0, scaleX: 0.5 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    className="pointer-events-none absolute z-50 h-1 rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] shadow-[0_0_0_4px_rgba(45,212,191,0.12)]"
-                    style={{
-                        left: overlayOffset.left + 20,
-                        width: Math.max(160, overlayOffset.width - 40),
-                        transformOrigin: 'left center'
-                    }}
-                />
-            ) : null}
-            </AnimatePresence>
+                <AnimatePresence>
+                    {dragState && overlayOffset ? (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.97 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.97 }}
+                            transition={{ duration: 0.12 }}
+                            className="pointer-events-none absolute rounded-xl border-2 border-blue-500/60 bg-blue-500/10 shadow-[0_24px_64px_rgba(59,130,246,0.25)]"
+                            style={{
+                                top: overlayOffset.top + dragState.currentY - dragState.pointerOffsetY,
+                                left: overlayOffset.left + dragState.sourceRect.left,
+                                width: dragState.sourceRect.width,
+                                height: Math.min(dragState.sourceRect.height, 120),
+                                zIndex: 60,
+                            }}
+                        >
+                            <div className="absolute inset-0 rounded-xl border border-dashed border-blue-400/40" />
+                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 rounded-lg bg-blue-600/90 px-3 py-1.5 shadow-lg">
+                                <GripVertical className="h-3.5 w-3.5 text-white/80" />
+                                <span className="text-xs font-semibold text-white capitalize">
+                                    {dragState.sourceRect.blockType?.replace(/-/g, ' ') || 'Block'}
+                                </span>
+                            </div>
+                        </motion.div>
+                    ) : null}
+                </AnimatePresence>
 
-            {hoverData && hoverData.rect && overlayOffset && !dragState ? (
-                <div
-                    className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 rounded transition-opacity duration-200"
-                    onMouseEnter={() => {
-                        isHoveringControlsRef.current = true
-                        cancelPendingHoverClear()
-                    }}
-                    onMouseLeave={() => {
-                        isHoveringControlsRef.current = false
-                        // Keep hoverData while text-editing so AI sparkles can still use it
-                        if (!isEditing && !textEditingData) {
-                            setHoverData(null)
+                <AnimatePresence>
+                    {dropIndicatorTop !== null && overlayOffset ? (
+                        <motion.div
+                            initial={{ opacity: 0, scaleX: 0.5 }}
+                            animate={{
+                                opacity: 1,
+                                scaleX: 1,
+                                top: overlayOffset.top + dropIndicatorTop - 2,
+                            }}
+                            exit={{ opacity: 0, scaleX: 0.5 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                            className="pointer-events-none absolute z-50 h-1 rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] shadow-[0_0_0_4px_rgba(45,212,191,0.12)]"
+                            style={{
+                                left: overlayOffset.left + 20,
+                                width: Math.max(160, overlayOffset.width - 40),
+                                transformOrigin: 'left center'
+                            }}
+                        />
+                    ) : null}
+                </AnimatePresence>
+
+                {hoverData && hoverData.rect && overlayOffset && !dragState ? (
+                    <div
+                        className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 rounded transition-opacity duration-200"
+                        onMouseEnter={() => {
+                            isHoveringControlsRef.current = true
+                            cancelPendingHoverClear()
+                        }}
+                        onMouseLeave={() => {
+                            isHoveringControlsRef.current = false
+                            // Keep hoverData while text-editing so AI sparkles can still use it
+                            if (!isEditing && !textEditingData) {
+                                setHoverData(null)
+                            }
+                        }}
+                        style={{
+                            top: overlayOffset.top + hoverData.rect.top - 4,
+                            left: overlayOffset.left + hoverData.rect.left - 4,
+                            width: hoverData.rect.width + 8,
+                            height: hoverData.rect.height + 8,
+                            zIndex: 100,
+                        }}
+                    >
+                    </div>
+                ) : null}
+
+                {/* AI popover unified — position:fixed to escape overflow-hidden */}
+                {isEditing && overlayOffset && (hoverData || textEditingData) && (() => {
+                    const targetData = textEditingData || hoverData!
+                    if (!targetData.rect) return null
+                    const currentScrollOffset = textEditingData ? scrollOffset : 0
+                    const adjustedTop = targetData.rect.top - currentScrollOffset
+
+                    const POPOVER_EST_HEIGHT = 200
+                    const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
+                    const canvasWidth = (cRect.right ?? window.innerWidth) - cRect.left
+
+                    const absTop = cRect.top + overlayOffset.top + adjustedTop
+                    const absLeft = cRect.left + overlayOffset.left + targetData.rect.left
+
+                    // Determine layout space
+                    const toolbarHeight = textEditingData ? 48 : 0
+                    const neededSpaceBelow = POPOVER_EST_HEIGHT + 8 + (textEditingData && ((absTop - 12) < 48) ? 48 : 0)
+                    const availableSpaceBelow = window.innerHeight - (absTop + targetData.rect.height)
+
+                    // Prefer showing BELOW unless there is no space below AND there is enough space above
+                    let showBelow = true
+                    if (availableSpaceBelow < neededSpaceBelow) {
+                        const neededSpaceAbove = POPOVER_EST_HEIGHT + toolbarHeight
+                        if (absTop - 12 >= neededSpaceAbove) {
+                            showBelow = false
                         }
-                    }}
-                    style={{
-                        top: overlayOffset.top + hoverData.rect.top - 4,
-                        left: overlayOffset.left + hoverData.rect.left - 4,
-                        width: hoverData.rect.width + 8,
-                        height: hoverData.rect.height + 8,
-                        zIndex: 100,
-                    }}
-                >
-                    {isEditing && (
+                    }
+
+                    // Center horizontally within canvas, but don't spill off screen
+                    const popoverWidth = 320
+                    let popoverLeft = absLeft + (targetData.rect.width / 2) - (popoverWidth / 2)
+                    const minLeft = cRect.left + 8
+                    const maxLeft = cRect.left + canvasWidth - popoverWidth - 8
+                    popoverLeft = Math.max(minLeft, Math.min(popoverLeft, maxLeft))
+
+                    return (
                         <div
                             data-inline-edit-popover
-                            className="absolute left-0 top-0 z-50 pointer-events-auto -translate-y-[calc(100%+12px)]"
+                            className="z-[210] pointer-events-auto"
+                            style={showBelow ? {
+                                position: 'fixed',
+                                top: absTop + targetData.rect.height + 8 + (textEditingData && absTop - 12 < 48 ? 48 : 0), // Push down further if toolbar shifted below
+                                left: popoverLeft,
+                            } : {
+                                position: 'fixed',
+                                top: absTop - 12 - (textEditingData ? 48 : 0), // Push up above the toolbar if text editing
+                                left: popoverLeft,
+                                transform: 'translateY(-100%)',
+                            }}
                             onMouseDown={(e) => e.stopPropagation()}
                         >
                             <InlineEditPopover
-                                blockType={hoverData.blockType}
-                                currentText={hoverData.text}
+                                blockType={targetData.blockType}
+                                currentText={textEditingData ? textEditingData.originalText : hoverData?.text || ''}
                                 isSubmitting={isSubmitting}
                                 isMobile={viewport === 'mobile'}
                                 onClose={() => setIsEditing(false)}
                                 onSubmit={handleInlineRewrite}
                             />
                         </div>
-                    )}
-                </div>
-            ) : null}
+                    )
+                })()}
 
-            {/* AI popover triggered from toolbar sparkles — position:fixed to escape overflow-hidden */}
-            {isEditing && !hoverData && textEditingData && overlayOffset && (() => {
-                const POPOVER_EST_HEIGHT = 200
-                const adjustedTop = textEditingData.rect.top - scrollOffset
-                const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
-                const absTop = cRect.top + overlayOffset.top + adjustedTop
-                const absLeft = cRect.left + overlayOffset.left + textEditingData.rect.left
-                const showBelow = absTop - 12 < POPOVER_EST_HEIGHT
-                const popoverLeft = Math.max(cRect.left + 8, Math.min(absLeft, (cRect.right ?? window.innerWidth) - 320 - 8))
-                return (
-                <div
-                    data-inline-edit-popover
-                    className="z-[210] pointer-events-auto"
-                    style={showBelow ? {
-                        position: 'fixed',
-                        top: absTop + textEditingData.rect.height + 8,
-                        left: popoverLeft,
-                    } : {
-                        position: 'fixed',
-                        top: absTop - 12,
-                        left: popoverLeft,
-                        transform: 'translateY(-100%)',
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <InlineEditPopover
-                        blockType={textEditingData.blockType}
-                        currentText={textEditingData.originalText}
-                        isSubmitting={isSubmitting}
-                        isMobile={viewport === 'mobile'}
-                        onClose={() => setIsEditing(false)}
-                        onSubmit={handleInlineRewrite}
-                    />
-                </div>
-                )
-            })()}
+                {/* US-F05-06 AC-1: Rich Text Toolbar — position:fixed to escape overflow-hidden parents */}
+                {textEditingData && overlayOffset && (() => {
+                    const TOOLBAR_HEIGHT = 48;
+                    const adjustedRectTop = textEditingData.rect.top - scrollOffset
+                    // getBoundingClientRect gives viewport-relative coords → use with position:fixed
+                    const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
+                    const canvasWidth = (cRect.right ?? window.innerWidth) - cRect.left
+                    // Clamp toolbar width to canvas width so it never spills into the sidebar on mobile
+                    const TOOLBAR_WIDTH = Math.min(560, canvasWidth - 16)
+                    let topPos = cRect.top + overlayOffset.top + adjustedRectTop - TOOLBAR_HEIGHT;
+                    let leftPos = cRect.left + overlayOffset.left + textEditingData.rect.left + (textEditingData.rect.width / 2) - (TOOLBAR_WIDTH / 2);
 
-            {/* US-F05-06 AC-1: Rich Text Toolbar — position:fixed to escape overflow-hidden parents */}
-            {textEditingData && overlayOffset && (() => {
-                const TOOLBAR_HEIGHT = 48;
-                const adjustedRectTop = textEditingData.rect.top - scrollOffset
-                // getBoundingClientRect gives viewport-relative coords → use with position:fixed
-                const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
-                const canvasWidth = (cRect.right ?? window.innerWidth) - cRect.left
-                // Clamp toolbar width to canvas width so it never spills into the sidebar on mobile
-                const TOOLBAR_WIDTH = Math.min(560, canvasWidth - 16)
-                let topPos = cRect.top + overlayOffset.top + adjustedRectTop - TOOLBAR_HEIGHT;
-                let leftPos = cRect.left + overlayOffset.left + textEditingData.rect.left + (textEditingData.rect.width / 2) - (TOOLBAR_WIDTH / 2);
+                    // Clamp within canvas bounds (cRect), not full window — prevents spilling into sidebar
+                    const minLeft = cRect.left + 8
+                    const maxLeft = cRect.left + canvasWidth - TOOLBAR_WIDTH - 8
+                    leftPos = Math.max(minLeft, Math.min(leftPos, maxLeft));
 
-                // Clamp within canvas bounds (cRect), not full window — prevents spilling into sidebar
-                const minLeft = cRect.left + 8
-                const maxLeft = cRect.left + canvasWidth - TOOLBAR_WIDTH - 8
-                leftPos = Math.max(minLeft, Math.min(leftPos, maxLeft));
+                    // If no room above, flip below the element
+                    if (topPos < 8) {
+                        topPos = cRect.top + overlayOffset.top + adjustedRectTop + textEditingData.rect.height + 8;
+                    }
 
-                // If no room above, flip below the element
-                if (topPos < 8) {
-                    topPos = cRect.top + overlayOffset.top + adjustedRectTop + textEditingData.rect.height + 8;
-                }
+                    return (
+                        <div
+                            className="z-[200]"
+                            data-wysiwyg-toolbar
+                            style={{
+                                position: 'fixed',
+                                top: topPos,
+                                left: leftPos,
+                            }}
+                        >
+                            <RichTextToolbar onCommand={handleExecCommand} activeState={wysiwygState} />
+                        </div>
+                    )
+                })()}
 
-                return (
-                    <div
-                        className="z-[200]"
-                        data-wysiwyg-toolbar
-                        style={{
-                            position: 'fixed',
-                            top: topPos,
-                            left: leftPos,
-                        }}
-                    >
-                        <RichTextToolbar onCommand={handleExecCommand} activeState={wysiwygState} />
-                    </div>
-                )
-            })()}
+                {/* US-F05-06 AC-2: Image Toolbar */}
+                {imageClickData && overlayOffset && (() => {
+                    const TOOLBAR_WIDTH = 250;
+                    let topPos = overlayOffset.top + imageClickData.rect.top + 8;
+                    let leftPos = overlayOffset.left + imageClickData.rect.left + 8;
 
-            {/* US-F05-06 AC-2: Image Toolbar */}
-            {imageClickData && overlayOffset && (() => {
-                const TOOLBAR_WIDTH = 250;
-                let topPos = overlayOffset.top + imageClickData.rect.top + 8;
-                let leftPos = overlayOffset.left + imageClickData.rect.left + 8;
+                    const maxLeft = (containerElement?.clientWidth || typeof window !== 'undefined' ? window.innerWidth : 1000) - TOOLBAR_WIDTH - 16;
+                    leftPos = Math.max(16, Math.min(leftPos, maxLeft));
 
-                const maxLeft = (containerElement?.clientWidth || typeof window !== 'undefined' ? window.innerWidth : 1000) - TOOLBAR_WIDTH - 16;
-                leftPos = Math.max(16, Math.min(leftPos, maxLeft));
+                    return (
+                        <div
+                            className="absolute z-[100]"
+                            style={{
+                                top: topPos,
+                                left: leftPos,
+                            }}
+                        >
+                            <ImageToolbar
+                                onImageSelect={handleImageReplace}
+                                isProcessing={isImageProcessing}
 
-                return (
-                    <div
-                        className="absolute z-[100]"
-                        style={{
-                            top: topPos,
-                            left: leftPos,
-                        }}
-                    >
-                        <ImageToolbar 
-                            onImageSelect={handleImageReplace} 
-                            isProcessing={isImageProcessing}
-                             
-                        />
-                    </div>
-                )
-            })()}
-        </div>
+                            />
+                        </div>
+                    )
+                })()}
+            </div>
 
-        {/* Delete block confirmation modal */}
-        <DeleteBlockConfirm
-            open={deleteConfirmIndex !== null}
-            blockName={deleteConfirmIndex !== null ? (blocks[deleteConfirmIndex]?.blockType || 'block') : ''}
-            onConfirm={() => {
-                if (deleteConfirmIndex === null) return
-                const blockName = blocks[deleteConfirmIndex]?.blockType || 'block'
-                onDeleteBlock?.(deleteConfirmIndex)
-                onBlockSelect?.(null)
-                setDeleteConfirmIndex(null)
-                toast.success(`Deleted ${blockName.replace(/-/g, ' ')}`, {
-                    duration: 5000,
-                    action: {
-                        label: 'Undo',
-                        onClick: () => {
-                            const { undo: storeUndo } = useEditorStore.getState()
-                            storeUndo()
+            {/* Delete block confirmation modal */}
+            <DeleteBlockConfirm
+                open={deleteConfirmIndex !== null}
+                blockName={deleteConfirmIndex !== null ? (blocks[deleteConfirmIndex]?.blockType || 'block') : ''}
+                onConfirm={() => {
+                    if (deleteConfirmIndex === null) return
+                    const blockName = blocks[deleteConfirmIndex]?.blockType || 'block'
+                    onDeleteBlock?.(deleteConfirmIndex)
+                    onBlockSelect?.(null)
+                    setDeleteConfirmIndex(null)
+                    toast.success(`Deleted ${blockName.replace(/-/g, ' ')}`, {
+                        duration: 5000,
+                        action: {
+                            label: 'Undo',
+                            onClick: () => {
+                                const { undo: storeUndo } = useEditorStore.getState()
+                                storeUndo()
+                            },
                         },
-                    },
-                })
-            }}
-            onCancel={() => setDeleteConfirmIndex(null)}
-        />
+                    })
+                }}
+                onCancel={() => setDeleteConfirmIndex(null)}
+            />
         </>
     )
 }
