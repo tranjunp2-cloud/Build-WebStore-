@@ -2214,6 +2214,7 @@
             "deleteConfirmDesc": "Anda boleh buat asal dalam beberapa saat selepas pemadaman.",
             "confirmDelete": "Padam",
             "customPage": "Halaman 404 Tersuai",
+            "edit404Page": "Sunting Halaman 404",
             "emptyTitle": "Tiada halaman lagi",
             "emptyDesc": "Cipta halaman pertama anda untuk bermula.",
             "slugLocked": "Slug dikunci selepas diterbitkan untuk melindungi SEO dan pautan luaran.",

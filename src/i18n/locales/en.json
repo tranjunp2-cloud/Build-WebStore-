@@ -2214,6 +2214,7 @@
             "deleteConfirmDesc": "You can undo within a few seconds after deletion.",
             "confirmDelete": "Delete",
             "customPage": "Custom 404 Page",
+            "edit404Page": "Edit 404 Page",
             "emptyTitle": "No pages yet",
             "emptyDesc": "Create your first page to get started.",
             "slugLocked": "Slug is locked after publishing to protect SEO and external links.",

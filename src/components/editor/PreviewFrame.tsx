@@ -691,13 +691,7 @@ function PreviewFrameInner({
             formData.append('file', file)
             formData.append('alt', t.editor.preview.altUploadedImage)
 
-            // Timeout after 30s to prevent frozen button on S3/network issues
-            const uploadedMedia = await Promise.race([
-                uploadMediaAction(formData),
-                new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('Upload timeout')), 30000)
-                ),
-            ])
+            const uploadedMedia = await uploadMediaAction(formData)
             const newUrl = uploadedMedia.url
 
             const { blockIndex, src } = imageClickData

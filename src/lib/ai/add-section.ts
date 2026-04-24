@@ -309,6 +309,15 @@ export function createAddSectionBlock({
             }
 
         case 'newsletter':
+            return {
+                blockType: 'newsletter',
+                variant: 'inline',
+                headline: `Stay in the loop with ${brandName}`,
+                subheadline: 'Get updates, offers, and useful tips delivered straight to your inbox.',
+                buttonLabel: 'Subscribe',
+                placeholder: 'Enter your email',
+            }
+
         case 'banner':
         case 'cta':
             return {
@@ -963,8 +972,18 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return normalizeSocialWidgetConfig(mergedBlock)
     }
 
-    // CTA / Newsletter / Banner fallbacks are already mapped to Hero by createAddSectionBlock
-    if (['newsletter', 'banner', 'cta'].includes(mergedBlock.blockType as string)) {
+    if (mergedBlock.blockType === 'newsletter') {
+        const variant = String(mergedBlock.variant || fallbackBlock.variant || 'inline')
+        return {
+            ...mergedBlock,
+            variant: ['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid'].includes(variant)
+                ? variant
+                : 'inline',
+        }
+    }
+
+    // CTA / Banner fallbacks are intentionally mapped to Hero by createAddSectionBlock
+    if (['banner', 'cta'].includes(mergedBlock.blockType as string)) {
         mergedBlock.blockType = 'hero'
         mergedBlock.variant = 'centered'
     }

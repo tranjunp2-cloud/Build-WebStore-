@@ -397,10 +397,11 @@ describe('createAddSectionBlock — team [TC-F05.13]', () => {
     })
 })
 
-describe('createAddSectionBlock — newsletter / banner / cta map to hero [TC-F05.13]', () => {
-    it('newsletter maps to hero blockType', () => {
+describe('createAddSectionBlock — newsletter / banner / cta [TC-F05.13]', () => {
+    it('newsletter keeps newsletter blockType', () => {
         const block = createAddSectionBlock({ instruction: 'add newsletter' })
-        expect(block?.blockType).toBe('hero')
+        expect(block?.blockType).toBe('newsletter')
+        expect(block?.variant).toBe('inline')
     })
 
     it('banner maps to hero blockType', () => {
@@ -413,10 +414,10 @@ describe('createAddSectionBlock — newsletter / banner / cta map to hero [TC-F0
         expect(block?.blockType).toBe('hero')
     })
 
-    it('hero block has ctaButtons array', () => {
+    it('newsletter block has subscription copy', () => {
         const block = createAddSectionBlock({ instruction: 'add newsletter' }) as Record<string, unknown>
-        expect(Array.isArray(block?.ctaButtons)).toBe(true)
-        expect((block?.ctaButtons as unknown[]).length).toBeGreaterThan(0)
+        expect(block?.buttonLabel).toBe('Subscribe')
+        expect(block?.placeholder).toBe('Enter your email')
     })
 })
 
@@ -653,11 +654,11 @@ describe('normalizeAddSectionBlock — team normalization [TC-F05.13]', () => {
 })
 
 describe('normalizeAddSectionBlock — newsletter/banner/cta remapping [TC-F05.13]', () => {
-    it('remaps newsletter blockType to "hero"', () => {
+    it('keeps newsletter blockType', () => {
         const aiBlock = { blockType: 'newsletter', headline: 'Subscribe' }
         const result = normalizeAddSectionBlock({ instruction: 'add newsletter' }, aiBlock) as Record<string, unknown>
-        expect(result?.blockType).toBe('hero')
-        expect(result?.variant).toBe('centered')
+        expect(result?.blockType).toBe('newsletter')
+        expect(result?.variant).toBe('inline')
     })
 
     it('remaps banner blockType to "hero"', () => {
