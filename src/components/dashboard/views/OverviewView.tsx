@@ -83,20 +83,11 @@ export async function OverviewView({ searchParams }: Props) {
             const hasFailed = allSites.docs.some(
                 (s) => (s as Record<string, unknown>).generationStatus === 'failed',
             )
-            const hasIncompleteSite = allSites.docs.length > 0 && usable.length === 0
             const aiStatusFailed = typeof resolvedParams.ai_status === 'string' && resolvedParams.ai_status === 'failed'
 
             return (
                 <div className="space-y-8">
-                    {hasFailed ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
-                    {(hasIncompleteSite || aiStatusFailed) && (
-                        <DashboardOnboarding
-                            hasWebsite={false}
-                            hasPublishedSite={false}
-                            hasIncompleteSite={hasIncompleteSite}
-                            aiStatusFailed={aiStatusFailed}
-                        />
-                    )}
+                    {(hasFailed || aiStatusFailed) ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
                 </div>
             )
         }
@@ -397,6 +388,7 @@ export async function OverviewView({ searchParams }: Props) {
                 <DashboardOnboarding
                     hasWebsite={true}
                     hasPublishedSite={false}
+                    siteId={siteId as string}
                 />
             )}
 

@@ -50,13 +50,13 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
     if (variant === 'grid') {
         return (
             <AnimatedSection>
-                <SectionWrapper as="div" padding="compact" container="default" background="transparent">
+                <SectionWrapper as="div" padding="compact" container="default" background="alternate">
                     <LogoHeadline text={headline} />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <div className="flex flex-wrap justify-center gap-6 max-w-5xl mx-auto">
                         {logos.map((item, i) => (
                             <div
                                 key={i}
-                                className={`flex items-center justify-center ${CARD_PADDING.sm} rounded-xl transition-all duration-200 hover:shadow-md`}
+                                className={`flex items-center justify-center ${CARD_PADDING.sm} rounded-xl transition-all duration-200 hover:shadow-md w-36`}
                                 style={{
                                     border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
                                     background: `rgba(var(--brand-primary-rgb), 0.02)`,
@@ -78,9 +78,9 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
     // ── Default: row variant ─────────────────────────────────────────────
     return (
         <AnimatedSection>
-            <SectionWrapper as="div" padding="compact" container="default" background="transparent">
+            <SectionWrapper as="div" padding="compact" container="default" background="alternate">
                 <LogoHeadline text={headline} />
-                <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
+                <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 max-w-5xl mx-auto">
                     {logos.map((item, i) => (
                         item.logo?.url ? (
                             <img key={i} src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" data-image-index={i} />

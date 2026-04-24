@@ -574,7 +574,7 @@ export function buildBlockFromLibrary(
                 headline: 'Trusted By',
                 logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
                     .slice(0, 6)
-                    .map((l) => ({ name: l.name, ...(l.url ? { url: l.url } : {}) })),
+                    .map((l) => ({ name: l.name, logo: { url: l.url ?? '', alt: l.name } })),
             }
 
         case 'client-logos':

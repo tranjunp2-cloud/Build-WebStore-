@@ -16,6 +16,7 @@ interface DashboardOnboardingProps {
     hasPublishedSite: boolean
     hasIncompleteSite?: boolean
     aiStatusFailed?: boolean
+    siteId?: string | number | null
 }
 
 export function DashboardOnboarding({
@@ -23,6 +24,7 @@ export function DashboardOnboarding({
     hasPublishedSite,
     hasIncompleteSite = false,
     aiStatusFailed = false,
+    siteId,
 }: DashboardOnboardingProps) {
     const steps: OnboardingStep[] = [
         {
@@ -37,7 +39,7 @@ export function DashboardOnboarding({
             label: 'Publish your site',
             icon: <Rocket className="h-4 w-4" />,
             done: hasPublishedSite,
-            href: hasWebsite ? '/dashboard/my-website' : '/builder/new',
+            href: hasWebsite ? (siteId ? `/editor/${siteId}` : '#') : '/builder/new',
         },
     ]
 

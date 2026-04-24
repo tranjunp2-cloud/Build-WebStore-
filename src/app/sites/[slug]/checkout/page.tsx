@@ -61,33 +61,30 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         params.then(p => setSlug(p.slug))
     }, [params])
 
-    // Get siteId from slug (slug = tenant slug)
+    // Get siteId from slug using public storefront endpoint (avoids auth-gated /api/tenants)
     useEffect(() => {
         if (!slug) return
         async function fetchSite() {
             try {
-                // Step 1: Find tenant by slug
-                const tenantRes = await fetch(`/api/tenants?where[slug][equals]=${slug}&limit=1`)
-                if (!tenantRes.ok) return
-                const tenantData = await tenantRes.json()
-                const tenant = tenantData.docs?.[0]
-                if (!tenant) return
-
-                // Step 2: Find site belonging to this tenant
-                const siteRes = await fetch(`/api/sites?where[tenant][equals]=${tenant.id}&limit=1`)
-                if (!siteRes.ok) return
-                const siteData = await siteRes.json()
-                if (siteData.docs?.[0]) setSiteId(String(siteData.docs[0].id))
-
-                // Step 3: Check if current user is tenant member (skip tracking for owners)
-                const meRes = await fetch('/api/users/me')
-                if (meRes.ok) {
-                    const meData = await meRes.json()
-                    const userTenantIds = (meData.user?.tenants ?? []).map((t: { tenant: string | { id: string } }) =>
-                        typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
-                    )
-                    setIsOwner(userTenantIds.includes(String(tenant.id)))
+                const res = await fetch(`/api/storefront/site-by-slug?slug=${encodeURIComponent(slug)}`)
+                if (!res.ok) {
+                    setError('Unable to load store. Please refresh.')
+                    return
                 }
+                const data = await res.json()
+                if (data.siteId) setSiteId(String(data.siteId))
+
+                // Check if current user is tenant member (skip tracking for owners) — best-effort
+                try {
+                    const meRes = await fetch('/api/users/me')
+                    if (meRes.ok) {
+                        const meData = await meRes.json()
+                        const userTenantIds = (meData.user?.tenants ?? []).map((t: { tenant: string | { id: string } }) =>
+                            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+                        )
+                        setIsOwner(userTenantIds.includes(String(data.tenantId)))
+                    }
+                } catch { }
             } catch { }
         }
         fetchSite()
