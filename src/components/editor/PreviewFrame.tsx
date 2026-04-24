@@ -915,10 +915,15 @@ function PreviewFrameInner({
         latestDropIndexRef.current = dropIndex
     }, [dropIndex])
 
+    const lastDragTimeRef = useRef(0)
+
     useEffect(() => {
         if (!isDragging || dragSourceIndex === undefined || !containerElement || !frameElement) return
 
         const handlePointerMove = (event: PointerEvent) => {
+            const now = Date.now()
+            if (now - lastDragTimeRef.current < 16) return
+            lastDragTimeRef.current = now
             syncDragPosition(event.clientY, dragSourceIndex)
         }
 

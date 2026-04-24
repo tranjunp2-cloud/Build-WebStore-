@@ -83,6 +83,10 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             ? extractTextContent(page.layout).join('. ')
             : ''
 
+        const contentWarning = textContext.length === 0
+            ? 'Page has no content. SEO result may be inaccurate.'
+            : undefined
+
         // Fetch tracked keywords from site (AC-15)
         const trackedKeywords = ((site as any)?.seo?.trackedKeywords as Array<{ keyword: string }> | undefined)
             ?.map(k => k.keyword).filter(Boolean) || []
@@ -117,6 +121,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             proposed: { title, description, ...(newSlug ? { slug: newSlug } : {}) },
             existing,
             hasExisting,
+            ...(contentWarning ? { warning: contentWarning } : {}),
             // Backward compat — flat fields for consumers not yet updated
             title,
             description,

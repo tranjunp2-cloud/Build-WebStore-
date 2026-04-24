@@ -1,7 +1,14 @@
+import type { Viewport } from 'next'
 import { AppShell } from '@/components/AppShell'
 import { Toaster } from '@/components/ui/sonner'
 import { I18nProvider } from '@/i18n'
 import { NotificationProvider } from '@/providers/NotificationProvider'
+
+// Editor uses 100dvh — needs viewport-fit=cover so env(safe-area-inset-bottom)
+// returns the actual iOS home indicator height instead of 0.
+export const viewport: Viewport = {
+    viewportFit: 'cover',
+}
 
 export default function EditorLayout({
     children,
