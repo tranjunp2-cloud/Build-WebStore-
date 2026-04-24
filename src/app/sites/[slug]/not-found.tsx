@@ -88,9 +88,11 @@ export default async function NotFound() {
 
     // If 404 page exists WITH actual layout content, render it via SiteRenderer
     const layout = (page404 as Record<string, unknown> | undefined)?.layout as unknown[] | undefined
+    const siteWithSlug = { ...site, tenantSlug } as SiteRendererProps['site']
+
     if (page404 && Array.isArray(layout) && layout.length > 0) {
         return <SiteRenderer
-            site={site as SiteRendererProps['site']}
+            site={siteWithSlug}
             page={page404 as SiteRendererProps['page']}
             pages={navigationPages.docs as unknown as NavPage[]}
         />
@@ -100,7 +102,7 @@ export default async function NotFound() {
     // This covers: empty 404 page layout, missing 404 page, or any other fallback
     return (
         <SiteRenderer
-            site={site as SiteRendererProps['site']}
+            site={siteWithSlug}
             page={{
                 id: 0,
                 title: '404 — Page Not Found',

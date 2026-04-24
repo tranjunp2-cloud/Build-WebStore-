@@ -284,12 +284,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             }
 
             const foundPath = searchTree(navTree, [])
-            console.log('--- DEBUG BREADCRUMB ---')
-            console.log('pageSlug:', pageSlug)
-            console.log('target:', target)
-            console.log('navTree:', JSON.stringify(navTree, null, 2))
-            console.log('foundPath:', JSON.stringify(foundPath))
-            console.log('-------------------------')
             if (foundPath !== null) {
                 const firstLabel = foundPath[0]?.label.toLowerCase().trim() || ''
                 const targetHomeLabel = homeLabel.toLowerCase().trim()
