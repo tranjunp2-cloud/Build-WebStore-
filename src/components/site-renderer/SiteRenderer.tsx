@@ -351,12 +351,12 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
                 // Block spacing — navigation/footer default to 0, others use custom or default
                 const isGlobalBlock = block.blockType === 'navigation' || block.blockType === 'footer' || block.blockType === 'breadcrumb'
-                const blockStyle = (block as Record<string, unknown>).style as { paddingTop?: number; paddingBottom?: number } | undefined
+                const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
                 const spacingStyle = isGlobalBlock
                     ? {}
                     : {
-                        paddingTop: blockStyle?.paddingTop !== undefined ? `${blockStyle.paddingTop}px` : 'var(--block-spacing-default)',
-                        paddingBottom: blockStyle?.paddingBottom !== undefined ? `${blockStyle.paddingBottom}px` : 'var(--block-spacing-default)',
+                        paddingTop: blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
+                        paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
                     }
 
                 const callbackValue = onBlockFieldChange
@@ -387,8 +387,17 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     )
                 }
 
-                // Public site: no extra wrapper div to avoid breaking CSS selectors.
-                // Spacing is applied via the global CSS variable on block root elements.
+                // Public site: wrap non-global blocks with spacing style so
+                // user-customized blockSpacing (paddingTop/paddingBottom) is
+                // preserved on the live published site. Global blocks (nav,
+                // footer, breadcrumb) get empty spacingStyle {} so no wrapper needed.
+                if (!isGlobalBlock) {
+                    return (
+                        <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                            {blockContent}
+                        </div>
+                    )
+                }
                 return blockContent
             })}
         </OwnerProvider>
