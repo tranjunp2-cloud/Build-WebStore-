@@ -76,7 +76,6 @@ Bộ kiểm thử bao gồm **25 kịch bản chi tiết** bao quát: Happy path
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F04.15** | `Responsive` | `UI` | **[Positive]** Tất cả blocks responsive trên mobile 375px | 1. Render page với 10 block types.<br>2. Resize viewport xuống 375px. | - Không có horizontal scrollbar.<br>- Text không bị cắt.<br>- Images scale đúng tỷ lệ.<br>- Grid chuyển về 1-2 cột.<br>- Touch targets >= 44px. | Blocker | [ ] |
 | **TC-F04.16** | `Responsive` | `UI` | **[Positive]** Testimonials block responsive 3-col → 1-col | 1. Config testimonials với 6 items.<br>2. Lần lượt kiểm tra ở Desktop, Tablet, Mobile. | - Desktop (≥1024px): 3 cột.<br>- Tablet (768px): 2 cột.<br>- Mobile (375px): 1 cột full-width, scroll dọc.<br>- Cards không overlap, spacing đều. | High | [ ] |
-| **TC-BUG-TEST-019** | `Carousel` | `UI` | **[Regression]** Testimonials carousel scroll hoạt động trên GYM template (mobile + desktop) | 1. Tạo website template GYM (fitness category).<br>2. AI generate xong, vào section Testimonials (variant: carousel).<br>3. **Mobile**: Vuốt trái/phải qua các testimonial cards.<br>4. **Desktop**: Click nút prev/next arrows.<br>5. Click dot indicators.<br>6. Kiểm tra arrows visible ở viewport 768px. | - Mobile swipe trái/phải navigate đúng card (threshold 50px).<br>- Sau khi swipe/tap arrow, auto-rotate dừng 5s rồi tiếp tục.<br>- Arrows (←/→) hiển thị đầy đủ ở mọi viewport ≥ 320px, không bị clip.<br>- Dot indicators navigate đúng.<br>- Không bị double-transition (giật) khi navigate nhanh. | High | [ ] |
 
 ---
 
