@@ -388,11 +388,12 @@ function HorizontalScrollVariant({
         <TeamSection decorative={<GridLines color={CSS_VARS.primary} spacing={48} opacity={0.05} />}>
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
             <div
-                className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4"
+                className="overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4"
                 style={{ scrollbarWidth: 'thin' }}
                 role="region"
                 aria-label="Team members carousel"
             >
+                <div className="flex gap-6 w-fit mx-auto">
                 {members.map((m, i) => (
                     <article
                         key={`${m.name}-${i}`}
@@ -412,6 +413,7 @@ function HorizontalScrollVariant({
                         <SocialLinks socials={m.socials} name={m.name} />
                     </article>
                 ))}
+                </div>
             </div>
         </TeamSection>
     )
@@ -446,9 +448,9 @@ function BioModalVariant({
     return (
         <TeamSection decorative={<NoiseTexture opacity={0.05} />}>
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
-            <StaggerGrid className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <StaggerGrid className="flex flex-wrap justify-center gap-4">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`} className="h-full">
+                    <StaggerItem key={`${m.name}-${i}`} className="h-full w-[calc(50%-8px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(16.666%-14px)]">
                         <button
                             type="button"
                             onClick={() => setActive(m)}
