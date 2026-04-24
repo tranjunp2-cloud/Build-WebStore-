@@ -201,6 +201,13 @@ function SettingsPanelInner({
     const bk = `${blockIndex}-${blockDataVersion.length}` // short block key for input keys
     const fbk = `footer-${((footerBlock?.columns as unknown[]) || []).length}-${footerBlock?.variant || ''}` // footer block key
 
+    const [localPaddingTop, setLocalPaddingTop] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? 32))
+    const [localPaddingBottom, setLocalPaddingBottom] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? 32))
+    useEffect(() => {
+        setLocalPaddingTop(Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? 32))
+        setLocalPaddingBottom(Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? 32))
+    }, [block?.blockSpacing])
+
     // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
     const storeBlocks = useEditorStore(state => state.blocks)
     // Breadcrumb config stored globally in headerBlock.breadcrumbConfig
@@ -1141,16 +1148,17 @@ function SettingsPanelInner({
                                         <div>
                                             <div className="flex items-center justify-between">
                                                 <span className={labelCls}>Top Spacing</span>
-                                                <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingTop ?? 32))}px</span>
+                                                <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
                                             </div>
                                             <input
                                                 type="range"
                                                 min={0} max={120} step={4}
-                                                defaultValue={Number((block.style as Record<string, unknown>)?.paddingTop ?? 32)}
-                                                onChange={(e) => {
-                                                    const val = Number(e.target.value)
-                                                    const prevStyle = (block.style as Record<string, unknown>) || {}
-                                                    onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingTop: val } })
+                                                value={localPaddingTop}
+                                                onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
+                                                onPointerUp={(e) => {
+                                                    const val = Number((e.target as HTMLInputElement).value)
+                                                    const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                    onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
                                                 }}
                                                 className="mt-1 w-full accent-blue-500"
                                             />
@@ -1158,16 +1166,17 @@ function SettingsPanelInner({
                                         <div>
                                             <div className="flex items-center justify-between">
                                                 <span className={labelCls}>Bottom Spacing</span>
-                                                <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32))}px</span>
+                                                <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
                                             </div>
                                             <input
                                                 type="range"
                                                 min={0} max={120} step={4}
-                                                defaultValue={Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32)}
-                                                onChange={(e) => {
-                                                    const val = Number(e.target.value)
-                                                    const prevStyle = (block.style as Record<string, unknown>) || {}
-                                                    onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingBottom: val } })
+                                                value={localPaddingBottom}
+                                                onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
+                                                onPointerUp={(e) => {
+                                                    const val = Number((e.target as HTMLInputElement).value)
+                                                    const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                    onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
                                                 }}
                                                 className="mt-1 w-full accent-blue-500"
                                             />

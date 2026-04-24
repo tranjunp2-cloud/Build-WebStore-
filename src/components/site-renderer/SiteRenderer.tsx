@@ -20,7 +20,7 @@ import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 
 export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
 
-export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
+export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null; children?: NavLinkItem[] };
 type PreviewBlock = {
     blockType: string
     links?: NavLinkItem[]
@@ -105,13 +105,14 @@ function applyGlobalSystemBlocks(
     if (showBreadcrumb) {
         const navIdx = nextBlocks.findIndex(b => b.blockType === 'navigation')
         const breadcrumbBlock: PreviewBlock = {
+            ...breadcrumbCfg,
             blockType: 'breadcrumb',
             homeLabel: breadcrumbCfg?.homeLabel || 'Home',
             separator: breadcrumbCfg?.separator || '/',
-            showIcon: false,
             showOnAllPages: true,
             items: [],
             __editorBlockIndex: -1,
+            _navTree: siteHeaderBlock?.links || [], // Vital for mapping custom sub-menu labels
         }
         nextBlocks.splice(navIdx >= 0 ? navIdx + 1 : 0, 0, breadcrumbBlock)
     }
@@ -227,12 +228,24 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             }
         })
     }
+    const rewriteNavLinks = (links: unknown): unknown => {
+        if (!Array.isArray(links)) return links
+        return links.map((l) => {
+            if (!l || typeof l !== 'object') return l
+            const link = l as { url?: string; children?: unknown; [k: string]: unknown }
+            return {
+                ...link,
+                url: rewriteUrl(link.url),
+                children: link.children ? rewriteNavLinks(link.children) : undefined,
+            }
+        })
+    }
 
     const blocks = rawBlocks.map((b) => {
         if (b.blockType === 'navigation') {
             return {
                 ...b,
-                links: b.links?.map((l) => ({ ...l, url: rewriteUrl(l.url) })),
+                links: rewriteNavLinks(b.links) as typeof b.links,
                 ctaButton: b.ctaButton
                     ? { ...b.ctaButton, url: rewriteUrl(b.ctaButton.url) }
                     : b.ctaButton,
@@ -245,6 +258,68 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     ...btn,
                     url: rewriteUrl(btn?.url),
                 })),
+            }
+        }
+        if (b.blockType === 'breadcrumb') {
+            const pageSlug = (page as Record<string, unknown>)?.slug as string || ''
+            const navTree = b._navTree as NavLinkItem[] || []
+            const homeLabel = (b.homeLabel as string) || 'Home'
+
+            const normalize = (s: string) => s.startsWith('/') ? s : `/${s}`
+            const target = normalize(pageSlug)
+
+            let computedItems: { label: string; url: string }[] = []
+
+            function searchTree(links: NavLinkItem[], currentPath: { label: string; url: string }[]): { label: string; url: string }[] | null {
+                for (const link of links) {
+                    const linkUrl = link.url || ''
+                    const newPath = [...currentPath, { label: link.label, url: linkUrl }]
+                    if (normalize(linkUrl) === target) return newPath
+                    if (link.children && link.children.length > 0) {
+                        const found = searchTree(link.children, newPath)
+                        if (found) return found
+                    }
+                }
+                return null
+            }
+
+            const foundPath = searchTree(navTree, [])
+            console.log('--- DEBUG BREADCRUMB ---')
+            console.log('pageSlug:', pageSlug)
+            console.log('target:', target)
+            console.log('navTree:', JSON.stringify(navTree, null, 2))
+            console.log('foundPath:', JSON.stringify(foundPath))
+            console.log('-------------------------')
+            if (foundPath !== null) {
+                const firstLabel = foundPath[0]?.label.toLowerCase().trim() || ''
+                const targetHomeLabel = homeLabel.toLowerCase().trim()
+                
+                // Only skip prepending Home if the first item in nav path is literally named Home/Trang chủ
+                const isHomeAlreadyFirst = firstLabel === targetHomeLabel || firstLabel === 'home' || firstLabel === 'trang chủ'
+                
+                if (foundPath.length > 0 && !isHomeAlreadyFirst) {
+                    computedItems = [{ label: homeLabel, url: '/' }, ...foundPath]
+                } else {
+                    computedItems = foundPath
+                }
+            } else {
+                // Fallback to legacy slug split
+                const fallbackItems: { label: string; url: string }[] = [{ label: homeLabel, url: '/' }]
+                const HOMEPAGE_SLUGS = new Set(['/', '', 'home', 'index'])
+                const segments = HOMEPAGE_SLUGS.has(pageSlug.replace(/^\//, '')) ? [] : target.split('/').filter(Boolean)
+                const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')
+                const safeDecodeSegment = (seg: string) => { try { return decodeURIComponent(seg) } catch { return seg } }
+                let accumulated = ''
+                for (const seg of segments) {
+                    accumulated += '/' + seg
+                    fallbackItems.push({ label: capitalize(safeDecodeSegment(seg)), url: accumulated })
+                }
+                computedItems = fallbackItems
+            }
+
+            return {
+                ...b,
+                items: computedItems.map(item => ({ ...item, url: rewriteUrl(item.url) })),
             }
         }
         if (b.blockType === 'footer') {
@@ -260,12 +335,8 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 ctaButton: { ...ctaBtn, url: rewriteUrl(ctaBtn.url) },
             }
         }
-        if (b.blockType === 'breadcrumb') {
-            // Rewrite the home URL so clicking "Home" in editor preview navigates correctly
-            return { ...b, _homeUrl: rewriteUrl('/') }
-        }
-        return b
-    })
+        return b as PreviewBlock
+    }) as PreviewBlock[]
 
     // JSON-LD schemas — auto-detect from blocks present
     const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
@@ -350,13 +421,13 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
 
                 // Block spacing — navigation/footer default to 0, others use custom or default
-                const isGlobalBlock = block.blockType === 'navigation' || block.blockType === 'footer' || block.blockType === 'breadcrumb'
-                const blockStyle = (block as Record<string, unknown>).style as { paddingTop?: number; paddingBottom?: number } | undefined
+                const isGlobalBlock = ['header', 'navigation', 'footer', 'breadcrumb'].includes(block.blockType)
+                const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
                 const spacingStyle = isGlobalBlock
                     ? {}
                     : {
-                        paddingTop: blockStyle?.paddingTop !== undefined ? `${blockStyle.paddingTop}px` : 'var(--block-spacing-default)',
-                        paddingBottom: blockStyle?.paddingBottom !== undefined ? `${blockStyle.paddingBottom}px` : 'var(--block-spacing-default)',
+                        paddingTop: blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
+                        paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
                     }
 
                 const callbackValue = onBlockFieldChange
@@ -387,8 +458,17 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     )
                 }
 
-                // Public site: no extra wrapper div to avoid breaking CSS selectors.
-                // Spacing is applied via the global CSS variable on block root elements.
+                // Public site: wrap non-global blocks with spacing style so
+                // user-customized blockSpacing (paddingTop/paddingBottom) is
+                // preserved on the live published site. Global blocks (nav,
+                // footer, breadcrumb) get empty spacingStyle {} so no wrapper needed.
+                if (!isGlobalBlock) {
+                    return (
+                        <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                            {blockContent}
+                        </div>
+                    )
+                }
                 return blockContent
             })}
         </OwnerProvider>

@@ -200,6 +200,7 @@ function buildNavigation(
     links,
     ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: resolveNavCtaUrl(pages) },
     ariaLabel: `${biz.name} main navigation`,
+    breadcrumbConfig: { showOnAllPages: true, homeLabel: 'Home', separator: '/' },
   }
 }
 

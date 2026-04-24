@@ -475,6 +475,7 @@ export async function fulfillImageNeeds(
                 language: ctx.language,
                 products: ctx.products,
                 mood: ctx.mood,
+                englishKeywords: ctx.englishKeywords,
             })
 
             try {

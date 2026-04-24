@@ -24,6 +24,8 @@ import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood, hashBusinessName } from '@/lib/ai/category-theme-picker'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool } from '@/lib/ai/image-pool'
+import { translateProductTerm } from '@/lib/ai/product-translator'
+import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, type PageShape } from '@/lib/ai/ensure-navigation'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
@@ -446,11 +448,31 @@ export async function POST(req: NextRequest) {
                     // Plan 07 — pass top-3 products so two restaurants whose
                     // first product collides still produce different queries.
                     const topProduct = parsedProducts[0]
+
+                    // Plan 260424: Dynamic LLM Translation with Tier 2 Fallback
+                    let englishKeywords: string[] = []
+                    try {
+                        const aiTranslation = await translateToEnglishKeywords({
+                            industry: businessInfo.industry,
+                            products: businessInfo.products
+                        })
+                        if (aiTranslation && aiTranslation.length > 0) {
+                            englishKeywords = aiTranslation
+                        }
+                    } catch (e) {
+                        console.warn('[AI Translation] LLM failed, falling back to dictionary', e)
+                    }
+
+                    if (englishKeywords.length === 0) {
+                        const dictKeyword = translateProductTerm(topProduct || '') 
+                        if (dictKeyword) englishKeywords.push(dictKeyword)
+                    }
+
                     const imagePool = await buildImagePool({
                         category: presetCategory,
                         mood: themeMood,
-                        topProduct,
-                        products: parsedProducts.slice(0, 3),
+                        topProduct: englishKeywords[0] || translateProductTerm(topProduct || ''),
+                        products: englishKeywords.length > 0 ? englishKeywords : parsedProducts.slice(0, 3).map(p => translateProductTerm(p)),
                         seed: themeSeed,
                     })
                     console.info(
@@ -468,6 +490,7 @@ export async function POST(req: NextRequest) {
                                 products: parsedProducts.length > 0 ? parsedProducts : undefined,
                                 mood: themeMood,
                                 pool: imagePool,
+                                englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                         ),
