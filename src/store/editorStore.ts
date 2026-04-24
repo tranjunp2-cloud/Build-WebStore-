@@ -274,8 +274,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     addBlock: (afterIndex, block, label) => {
         const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        // Footer must always be last — clamp insert position to just before it
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        const safeAfterIndex = footerIdx >= 0 ? Math.min(afterIndex, footerIdx - 1) : afterIndex
         const newBlocks = [...blocks]
-        newBlocks.splice(afterIndex + 1, 0, block)
+        newBlocks.splice(safeAfterIndex + 1, 0, block)
 
         const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
@@ -306,9 +309,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     duplicateBlock: (index) => {
         const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        if (index === footerIdx) return // never duplicate footer
         const blockCopy = JSON.parse(JSON.stringify(blocks[index]))
+        const insertAt = footerIdx >= 0 ? Math.min(index + 1, footerIdx) : index + 1
         const newBlocks = [...blocks]
-        newBlocks.splice(index + 1, 0, blockCopy)
+        newBlocks.splice(insertAt, 0, blockCopy)
 
         const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Duplicated ${blocks[index]?.blockType}`, 'manual')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
@@ -323,6 +329,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     reorderBlocks: (fromIndex, toIndex) => {
         const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        // Footer must always be last — block any move that violates this
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        if (footerIdx >= 0) {
+            if (fromIndex === footerIdx) return // footer itself cannot move
+            if (toIndex >= footerIdx) return // nothing can land after footer
+        }
         const newBlocks = [...blocks]
         const [moved] = newBlocks.splice(fromIndex, 1)
         newBlocks.splice(toIndex, 0, moved)
@@ -364,11 +376,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     pushBatch: (blocks, theme, label) => {
         const { headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
-        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, label, 'ai_chat')
+        // Enforce footer-last invariant on AI-generated blocks — dedupe and sort
+        const footerBlocks = blocks.filter(b => b.blockType === 'footer')
+        const nonFooter = blocks.filter(b => b.blockType !== 'footer')
+        const sanitized = footerBlocks.length > 0 ? [...nonFooter, footerBlocks[0]] : nonFooter
+        const snapshot = createSnapshot(sanitized, theme, headerBlock, footerBlock, label, 'ai_chat')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
-            blocks: JSON.parse(JSON.stringify(blocks)),
+            blocks: JSON.parse(JSON.stringify(sanitized)),
             theme: JSON.parse(JSON.stringify(theme)),
             history: newHistory,
             historyIndex: newHistory.length - 1,
