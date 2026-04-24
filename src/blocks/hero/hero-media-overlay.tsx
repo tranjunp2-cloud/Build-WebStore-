@@ -100,12 +100,7 @@ export function HeroMediaOverlay({
             formData.append('file', compressed)
             formData.append('alt', altText)
             const { uploadMediaAction } = await import('@/app/(dashboard)/actions/media')
-            const uploaded = await Promise.race([
-                uploadMediaAction(formData),
-                new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('Upload timeout')), 30000)
-                ),
-            ])
+            const uploaded = await uploadMediaAction(formData)
             // Strip ".url" suffix to get the Payload upload field root (e.g. "image.url" → "image").
             // Send a hydrated object {id, url} so the block renders immediately AND the save route
             // can extract the integer Media ID via normalizeUploadField.
@@ -134,12 +129,7 @@ export function HeroMediaOverlay({
             formData.append('file', file)
             formData.append('alt', 'Hero video')
             const { uploadMediaAction } = await import('@/app/(dashboard)/actions/media')
-            const uploaded = await Promise.race([
-                uploadMediaAction(formData),
-                new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('Upload timeout')), 30000)
-                ),
-            ])
+            const uploaded = await uploadMediaAction(formData)
             const video = containerRef.current?.querySelector('video')
             if (video) {
                 // Subsequent upload: update src in-place — no React re-render, no flicker
