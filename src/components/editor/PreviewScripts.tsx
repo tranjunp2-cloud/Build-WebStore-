@@ -771,6 +771,16 @@ export function PreviewScripts() {
                     }
                 }
             }
+            if (e.data?.type === 'SCROLL_TO_BLOCK') {
+                const idx = e.data.index
+                if (idx !== undefined && idx !== null) {
+                    const el = document.querySelector(`[data-block-index="${idx}"]`) as HTMLElement
+                    if (el) {
+                        const top = el.getBoundingClientRect().top + window.scrollY
+                        window.scrollTo({ top: top - 80, behavior: 'smooth' })
+                    }
+                }
+            }
         }
 
         document.addEventListener('mouseover', onMouseOver)

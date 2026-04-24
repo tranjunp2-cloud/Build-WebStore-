@@ -17,6 +17,8 @@ import { useI18n } from '@/i18n'
 export interface PreviewFrameHandle {
     /** Send a postMessage to the preview iframe without triggering a full reload. */
     sendToIframe: (message: object) => void
+    /** Tell the preview iframe to scroll to a specific block index without reloading. */
+    setScrollToBlock?: (index: number) => void
 }
 
 interface PreviewFrameProps {
@@ -262,15 +264,23 @@ function PreviewFrameInner({
     const frameElementRef = useRef<HTMLIFrameElement | null>(null)
     const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null)
 
-    // Expose imperative handle so parent can send postMessages without a full reload
+    // Expose handle to parent
     useEffect(() => {
         if (!onHandleReady) return
         onHandleReady({
             sendToIframe: (msg) => frameElementRef.current?.contentWindow?.postMessage(msg, window.location.origin),
+            setScrollToBlock: (index: number) => {
+                // Instantly tell the iframe to scroll if it's already loaded
+                frameElementRef.current?.contentWindow?.postMessage(
+                    { type: 'SCROLL_TO_BLOCK', index },
+                    window.location.origin
+                )
+                // Also save it for the next reload just in case
+                scrollToBlockIndexRef.current = index
+            }
         })
         return () => onHandleReady(null)
-    // onHandleReady is a stable callback ref from parent — only run on mount/unmount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Live theme update — send CSS variables to iframe without reload

@@ -109,6 +109,8 @@ export default function EditorPage() {
     const reorderSaveTimerRef = useRef<number | null>(null)
     // Imperative handle to send postMessages to iframe without full reload (Gap B)
     const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
+    const isSavingRef = useRef(false)
+    const pendingSaveRef = useRef<SaveOptions | null>(null)
 
     const { isOnline, isSyncing } = useConnectivity()
     const { isMaster, reclaimAuthority } = useTabAuthority(siteId)
@@ -275,6 +277,22 @@ export default function EditorPage() {
     const handleSave = useCallback(async (options: SaveOptions = {}) => {
         if (!siteId) return false
 
+        if (isSavingRef.current) {
+            // A save is already in progress. Mutex lock.
+            // Queue this save request as "dirty" to fire after the current one completes.
+            pendingSaveRef.current = {
+                ...pendingSaveRef.current,
+                ...options,
+                showToast: options.showToast || pendingSaveRef.current?.showToast,
+                refreshPreview: options.refreshPreview || pendingSaveRef.current?.refreshPreview
+            }
+            return true
+        }
+
+        isSavingRef.current = true
+        pendingSaveRef.current = null
+        setIsSaving(true)
+
         // Cancel any pending reorder-triggered save to prevent double-fire
         if (reorderSaveTimerRef.current !== null) {
             window.clearTimeout(reorderSaveTimerRef.current)
@@ -348,7 +366,16 @@ export default function EditorPage() {
             toast.error(t.editor.toast.saveFailed)
             return false
         } finally {
-            setIsSaving(false)
+            isSavingRef.current = false
+            if (pendingSaveRef.current) {
+                // There were unsaved changes queued while we were saving.
+                // Fetch the latest state and save again.
+                const nextOptions = pendingSaveRef.current
+                pendingSaveRef.current = null
+                void handleSave(nextOptions)
+            } else {
+                setIsSaving(false)
+            }
         }
     }, [markSaved, page, setIsSaving, siteId])
 
@@ -498,13 +525,26 @@ export default function EditorPage() {
             if (index === prev) return null
             return prev
         })
-        void handleSave({ showToast: false, refreshPreview: true })
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+        }, 0)
+        void handleSave({ showToast: false, refreshPreview: false })
     }, [deleteBlock, handleSave])
 
     const handleDuplicateBlock = useCallback((index: number) => {
         duplicateBlock(index)
         setSelectedBlock(index + 1)
-        void handleSave({ showToast: false, refreshPreview: true })
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+            previewFrameSendRef.current?.setScrollToBlock?.(index + 1)
+        }, 0)
+        void handleSave({ showToast: false, refreshPreview: false })
     }, [duplicateBlock, handleSave])
 
     // BUG-F05-01: retry save once on failure to handle transient Payload errors
@@ -540,6 +580,14 @@ export default function EditorPage() {
             id: `reorder-${Date.now()}`,
             content: `Moved block #${fromIndex + 1} to position #${toIndex + 1}`,
         })
+        
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+            previewFrameSendRef.current?.setScrollToBlock?.(toIndex)
+        }, 0)
 
         // Coalesce consecutive reorders — save once after 500ms idle
         if (reorderSaveTimerRef.current !== null) {
@@ -547,7 +595,7 @@ export default function EditorPage() {
         }
         reorderSaveTimerRef.current = window.setTimeout(() => {
             reorderSaveTimerRef.current = null
-            void handleSave({ showToast: false, refreshPreview: true })
+            void handleSave({ showToast: false, refreshPreview: false })
         }, 500)
     }, [reorderBlocks, handleSave])
 
@@ -566,13 +614,25 @@ export default function EditorPage() {
 
         addBlock(index - 1, safeBlock)
         setSelectedBlock(index)
-        setIframeKey(key => key + 1)
+        
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+        }, 0)
+        
+        // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave, 
+        // which causes a race condition where the iframe fetches stale db state.
+        
         setChatActivity({
             id: `drop-${Date.now()}`,
             content: `Added ${blockData.blockType} block`,
         })
+        
+        void handleSave({ showToast: false, refreshPreview: false })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [addBlock, theme])
+    }, [addBlock, theme, handleSave])
 
     const handleAIAction = useCallback(async (action: AIAction) => {
         // Cancel any pending debounced auto-save to prevent race conditions
@@ -642,7 +702,13 @@ export default function EditorPage() {
             case 'undo': {
                 if (canUndo()) {
                     undo()
-                    setIframeKey(key => key + 1)
+                    // Replaced setIframeKey with seamless update
+                    setTimeout(() => {
+                        previewFrameSendRef.current?.sendToIframe({ 
+                            type: 'UPDATE_FULL_LAYOUT', 
+                            bodyBlocks: useEditorStore.getState().blocks 
+                        })
+                    }, 0)
                 } else {
                     toast.error('Nothing to undo')
                     return // Nothing changed, skip save
@@ -656,14 +722,30 @@ export default function EditorPage() {
         // otherwise a page reload would lose the undo.
         // setTimeout lets Zustand state settle before reading snapshot.
         setTimeout(() => {
-            void handleSave({ showToast: false, refreshPreview: true })
+            const currentBlocks = useEditorStore.getState().blocks
+            // Perform a seamless update for layout modifications
+            if (['add_block', 'delete_block', 'reorder_blocks', 'update_multiple_blocks', 'undo'].includes(action.action)) {
+                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: currentBlocks })
+                if (action.action === 'add_block') {
+                    const afterIndex = action.afterIndex ?? (blocks.length - 1)
+                    previewFrameSendRef.current?.setScrollToBlock?.(Math.max(0, afterIndex + 1))
+                }
+                void handleSave({ showToast: false, refreshPreview: false })
+            } else {
+                void handleSave({ showToast: false, refreshPreview: true })
+            }
         }, 300)
     }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo])
 
     const handleUndo = useCallback(() => {
         if (!canUndo()) return
         undo()
-        setIframeKey(key => key + 1)
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+        }, 0)
         // If user undoes the template apply, clear the save guard
         setTemplateApplied(false)
     }, [canUndo, undo])
@@ -671,7 +753,12 @@ export default function EditorPage() {
     const handleRedo = useCallback(() => {
         if (!canRedo()) return
         redo()
-        setIframeKey(key => key + 1)
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+        }, 0)
     }, [canRedo, redo])
 
     const handlePublish = useCallback(async () => {
