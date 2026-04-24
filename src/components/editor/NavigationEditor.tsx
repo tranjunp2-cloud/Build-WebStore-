@@ -284,7 +284,7 @@ function NavLinkRow({
                         />
                     )}
                     <div className="flex items-center gap-0.5 pt-0.5">
-                        {depth < 2 && (
+                        {depth < 1 && (
                             <button type="button" onClick={(e) => { e.stopPropagation(); onAddChild(link.id) }} title={nav.addSubLink} className="p-1 text-slate-500 hover:text-cyan-400 rounded transition-colors">
                                 <Plus className="w-3.5 h-3.5" />
                             </button>
@@ -292,7 +292,7 @@ function NavLinkRow({
                         {!isFirst && <button type="button" onClick={() => onMoveUp(link.id)} title={nav.moveUp} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">↑</button>}
                         {!isLast && <button type="button" onClick={() => onMoveDown(link.id)} title={nav.moveDown} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">↓</button>}
                         {depth > 0 && <button type="button" onClick={() => onOutdent(link.id)} title={nav.moveLeft} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">←</button>}
-                        {depth < 2 && !isFirst && <button type="button" onClick={() => onIndent(link.id)} title={nav.makeSubItem} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">→</button>}
+                        {depth < 1 && !isFirst && <button type="button" onClick={() => onIndent(link.id)} title={nav.makeSubItem} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">→</button>}
                         <div className="flex-1" />
                         <button type="button" onClick={() => onDelete(link.id)} className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors">
                             <Trash2 className="w-3.5 h-3.5" />

@@ -678,6 +678,7 @@ function SettingsPanelInner({
                                     }
                                     await applyChanges()
                                     toast.success(s.seoGenerated, { id: loadingToastId })
+                                    if (data.warning) toast.warning(data.warning)
                                 } else {
                                     toast.error(s.seoFailed, { id: loadingToastId })
                                 }
