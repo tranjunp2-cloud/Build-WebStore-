@@ -476,22 +476,6 @@ function SettingsPanelInner({
             ))}
 
             {renderGlobalAccordion('theme', s.themeColors, renderThemeContent())}
-
-            {renderGlobalAccordion('seo', s.seoSettings, (
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.socialImage}</label>
-                        <div className="mt-2">
-                            <OgImageEditor
-                                currentOgImage={typeof site?.seo?.ogImage === 'string' ? site.seo.ogImage : null}
-                                onOgImageChange={(url) => {
-                                    void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: url } })
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-            ))}
         </div>
     )
 
@@ -636,6 +620,18 @@ function SettingsPanelInner({
                             {seoDescriptionValue || 'Provide a meta description to help users know what this page is about before they click on the search result.'}
                         </div>
                     </div>
+                </div>
+
+                <div>
+                    <div className="mb-3 border-t border-white/10 pt-4">
+                        <label className={labelCls}>{s.socialImage}</label>
+                    </div>
+                    <OgImageEditor
+                        currentOgImage={typeof site?.seo?.ogImage === 'string' ? site.seo.ogImage : null}
+                        onOgImageChange={(url) => {
+                            void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: url } })
+                        }}
+                    />
                 </div>
 
                 <div className="pt-2">
