@@ -162,7 +162,7 @@ describe('AIDiscoveryWizard', () => {
         expect(screen.getByTestId('dashboard-content')).toBeVisible()
     })
 
-    it('[TC-F06.13] X button chỉ đóng UI, không gọi API dismiss', () => {
+    it('[TC-F06.13] X button gọi API dismiss và đóng Wizard', async () => {
         render(<AIDiscoveryWizard userId="u-123" />)
 
         // Find the X close button (aria-label="Close")
@@ -172,27 +172,32 @@ describe('AIDiscoveryWizard', () => {
         // Assert: Wizard closed
         expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
 
-        // Assert: API was NOT called (close ≠ dismiss)
-        expect(global.fetch).not.toHaveBeenCalled()
+        // Assert: API WAS called — X button now persists dismissal (fixes #755)
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith('/api/user/dismiss-wizard', expect.objectContaining({
+                method: 'POST',
+                credentials: 'include',
+            }))
+        })
     })
 
-    it('[TC-F06.14] X button close → wizard reappears on re-mount', () => {
-        const { unmount } = render(<AIDiscoveryWizard userId="u-123" />)
+    it('[TC-F06.14] X button close → has_seen_ai_wizard persisted (wizard will not reappear)', async () => {
+        render(<AIDiscoveryWizard userId="u-123" />)
 
         // Close via X
         fireEvent.click(screen.getByLabelText('Close'))
         expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
-        expect(global.fetch).not.toHaveBeenCalled()
 
-        // Re-mount simulates next page visit
-        unmount()
-        render(<AIDiscoveryWizard userId="u-123" />)
-
-        // Wizard should reappear since flag was not persisted
-        expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+        // Assert: dismiss API called — DB flag set, layout.tsx will NOT re-render wizard
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith('/api/user/dismiss-wizard', expect.objectContaining({
+                method: 'POST',
+                credentials: 'include',
+            }))
+        })
     })
 
-    it('[TC-F06.17] Security Integrity - Unauthorized Patch Fallback', async () => {
+    it('[TC-F06.19] Security Integrity - Unauthorized Patch Fallback', async () => {
         // Arrange
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
         

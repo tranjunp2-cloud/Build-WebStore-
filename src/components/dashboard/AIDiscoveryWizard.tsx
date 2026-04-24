@@ -70,11 +70,6 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   const stepData = WIZARD_STEPS[currentStep]
   const isLastStep = currentStep === WIZARD_STEPS.length - 1
 
-  // Close wizard UI only — does NOT persist to DB, wizard will reappear next visit
-  const closeWizard = () => {
-    setIsOpen(false)
-  }
-
   // Dismiss wizard permanently — close UI + persist has_seen_ai_wizard=true to DB
   const dismissWizard = () => {
     setIsOpen(false)
@@ -149,7 +144,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
             {t.onboarding.wizard.title}
           </h2>
           <button
-            onClick={closeWizard}
+            onClick={dismissWizard}
             className="flex-shrink-0 text-white/40 hover:text-white transition-colors bg-transparent border-none p-1 m-0 cursor-pointer flex items-center justify-center mt-1"
             aria-label="Close"
           >
