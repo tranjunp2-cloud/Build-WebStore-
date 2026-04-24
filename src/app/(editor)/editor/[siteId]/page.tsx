@@ -284,7 +284,7 @@ export default function EditorPage() {
                 ...pendingSaveRef.current,
                 ...options,
                 showToast: options.showToast || pendingSaveRef.current?.showToast,
-                refreshPreview: options.refreshPreview || pendingSaveRef.current?.refreshPreview
+                refreshPreview: options.refreshPreview ?? pendingSaveRef.current?.refreshPreview
             }
             return true
         }
