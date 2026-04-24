@@ -196,7 +196,14 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 <div className="min-h-screen">
                     {/* Render with true SiteRenderer in Editor Mode */}
                     <PreviewSiteRenderer
-                        site={site}
+                        site={{
+                            ...site,
+                            // Inject tenantSlug so CartWidgetBlock can build the checkout URL.
+                            // site.tenant is populated (depth:2) so slug is accessible here.
+                            tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
+                                ? (site.tenant as { slug?: string }).slug || ''
+                                : '',
+                        }}
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
                         isBuilderPreview={!!builder}
