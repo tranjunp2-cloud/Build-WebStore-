@@ -28,23 +28,13 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
             if (e.data?.type === 'UPDATE_FULL_LAYOUT') {
                 const { bodyBlocks } = e.data as { bodyBlocks: unknown[] }
                 if (Array.isArray(bodyBlocks)) {
-                    setPage(prev => {
-                        const layout = prev.layout || []
-                        const navBlock = layout.find((b: any) => b.blockType === 'navigation')
-                        const footerBlock = layout.find((b: any) => b.blockType === 'footer')
-                        
-                        const newBodyBlocks = bodyBlocks.map((b: any, index: number) => ({
+                    setPage(prev => ({
+                        ...prev,
+                        layout: bodyBlocks.map((b: any, index: number) => ({
                             ...b,
-                            __editorBlockIndex: index
-                        }))
-
-                        const nextLayout = [
-                            ...(navBlock ? [navBlock] : []),
-                            ...newBodyBlocks,
-                            ...(footerBlock ? [footerBlock] : [])
-                        ]
-                        return { ...prev, layout: nextLayout }
-                    })
+                            __editorBlockIndex: index,
+                        })),
+                    }))
                 }
                 return
             }
