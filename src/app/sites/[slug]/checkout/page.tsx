@@ -136,6 +136,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
     // Can place order?
     const canPlaceOrder =
+        siteId !== '' &&
         form.name.trim() && form.email.trim() &&
         items.length > 0 &&
         (paymentMethod === 'cod' || (paymentMethod === 'qr_banking' && proofFile))
