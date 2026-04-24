@@ -24,6 +24,7 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
     const isActive = (cmd: string) => Boolean(activeState[cmd])
     const currentAlign = String(activeState.textAlign || 'left')
     const isAlign = (align: string) => currentAlign === align
+    const activeList = String(activeState.activeList || '')
 
     const [showLinkInput, setShowLinkInput] = useState(false)
     const [linkUrl, setLinkUrl] = useState('')
@@ -168,7 +169,13 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
             <div className="relative">
                 <button
                     className={btnCls(showLinkInput)}
-                    onClick={(e) => { e.preventDefault(); setShowLinkInput(!showLinkInput); setShowColorPicker(false); setShowListMenu(false) }}
+                    onClick={(e) => {
+                        e.preventDefault()
+                        if (!showLinkInput) setLinkUrl(String(activeState.linkHref || ''))
+                        setShowLinkInput(!showLinkInput)
+                        setShowColorPicker(false)
+                        setShowListMenu(false)
+                    }}
                     title="Insert link"
                 >
                     <Link2 className="w-4 h-4" />
@@ -283,7 +290,7 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
             {/* List */}
             <div className="relative">
                 <button
-                    className={btnCls(showListMenu)}
+                    className={btnCls(showListMenu || activeList === 'ul' || activeList === 'ol')}
                     onClick={(e) => { e.preventDefault(); setShowListMenu(!showListMenu); setShowLinkInput(false); setShowColorPicker(false) }}
                     title="List"
                 >
@@ -291,10 +298,10 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
                 </button>
                 {showListMenu && (
                     <div className="absolute left-0 top-full mt-2 z-10 flex flex-col rounded-lg border border-gray-700 bg-gray-900 p-1 shadow-lg" onMouseDown={(e) => e.stopPropagation()}>
-                        <button className="flex items-center gap-2 rounded px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800" onClick={(e) => { e.preventDefault(); onCommand('insertUnorderedList'); setShowListMenu(false) }}>
+                        <button className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs hover:bg-gray-800 ${activeList === 'ul' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-300'}`} onClick={(e) => { e.preventDefault(); onCommand('insertUnorderedList'); setShowListMenu(false) }}>
                             <List className="h-3.5 w-3.5" /> Bullet
                         </button>
-                        <button className="flex items-center gap-2 rounded px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800" onClick={(e) => { e.preventDefault(); onCommand('insertOrderedList'); setShowListMenu(false) }}>
+                        <button className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs hover:bg-gray-800 ${activeList === 'ol' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-300'}`} onClick={(e) => { e.preventDefault(); onCommand('insertOrderedList'); setShowListMenu(false) }}>
                             <ListOrdered className="h-3.5 w-3.5" /> Numbered
                         </button>
                     </div>
