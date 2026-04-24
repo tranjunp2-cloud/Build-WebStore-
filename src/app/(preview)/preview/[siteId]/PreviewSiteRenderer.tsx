@@ -24,6 +24,29 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
     useEffect(() => {
         const onMessage = (e: MessageEvent) => {
             if (e.origin !== window.location.origin) return
+            if (e.data?.type === 'UPDATE_FULL_LAYOUT') {
+                const { bodyBlocks } = e.data as { bodyBlocks: unknown[] }
+                if (Array.isArray(bodyBlocks)) {
+                    setPage(prev => {
+                        const layout = prev.layout || []
+                        const navBlock = layout.find((b: any) => b.blockType === 'navigation')
+                        const footerBlock = layout.find((b: any) => b.blockType === 'footer')
+                        
+                        const newBodyBlocks = bodyBlocks.map((b: any, index: number) => ({
+                            ...b,
+                            __editorBlockIndex: index
+                        }))
+
+                        const nextLayout = [
+                            ...(navBlock ? [navBlock] : []),
+                            ...newBodyBlocks,
+                            ...(footerBlock ? [footerBlock] : [])
+                        ]
+                        return { ...prev, layout: nextLayout }
+                    })
+                }
+                return
+            }
             if (e.data?.type !== 'UPDATE_BLOCK_DATA') return
             const { blockIndex, blockData } = e.data as { blockIndex: number; blockData: unknown }
             if (typeof blockIndex !== 'number' || typeof blockData !== 'object' || blockData === null) return
