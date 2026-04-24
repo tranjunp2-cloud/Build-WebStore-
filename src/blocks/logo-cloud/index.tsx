@@ -52,11 +52,11 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
             <AnimatedSection>
                 <SectionWrapper as="div" padding="compact" container="default" background="alternate">
                     <LogoHeadline text={headline} />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
+                    <div className="flex flex-wrap justify-center gap-6 max-w-5xl mx-auto">
                         {logos.map((item, i) => (
                             <div
                                 key={i}
-                                className={`flex items-center justify-center ${CARD_PADDING.sm} rounded-xl transition-all duration-200 hover:shadow-md`}
+                                className={`flex items-center justify-center ${CARD_PADDING.sm} rounded-xl transition-all duration-200 hover:shadow-md min-w-[120px]`}
                                 style={{
                                     border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
                                     background: `rgba(var(--brand-primary-rgb), 0.02)`,
