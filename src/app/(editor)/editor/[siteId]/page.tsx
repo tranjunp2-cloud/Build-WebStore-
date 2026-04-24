@@ -1097,8 +1097,18 @@ export default function EditorPage() {
                                     onThemeChange={handleThemeChange}
                                     onBlockFieldChange={handleBlockFieldChange}
                                     onBlockUpdate={handleBlockUpdate}
-                                    onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
-                                    onFooterUpdate={(changes) => updateFooterBlock(changes)}
+                                    onHeaderUpdate={(changes) => {
+                                        updateHeaderBlock(changes)
+                                        const updatedHeader = useEditorStore.getState().headerBlock
+                                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
+                                        void saveWithRetry({ showToast: false, refreshPreview: false })
+                                    }}
+                                    onFooterUpdate={(changes) => {
+                                        updateFooterBlock(changes)
+                                        const updatedFooter = useEditorStore.getState().footerBlock
+                                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                                        void saveWithRetry({ showToast: false, refreshPreview: false })
+                                    }}
                                     onSiteSettingsChange={handleSiteSettingsChange}
                                     onPageUpdate={handlePageUpdate}
                                     requestedTab={settingsRequestedTab}
@@ -1187,8 +1197,18 @@ export default function EditorPage() {
                         onThemeChange={handleThemeChange}
                         onBlockFieldChange={handleBlockFieldChange}
                         onBlockUpdate={handleBlockUpdate}
-                        onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
-                        onFooterUpdate={(changes) => updateFooterBlock(changes)}
+                        onHeaderUpdate={(changes) => {
+                            updateHeaderBlock(changes)
+                            const updatedHeader = useEditorStore.getState().headerBlock
+                            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
+                            void saveWithRetry({ showToast: false, refreshPreview: false })
+                        }}
+                        onFooterUpdate={(changes) => {
+                            updateFooterBlock(changes)
+                            const updatedFooter = useEditorStore.getState().footerBlock
+                            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                            void saveWithRetry({ showToast: false, refreshPreview: false })
+                        }}
                         onSiteSettingsChange={handleSiteSettingsChange}
                         onPageUpdate={handlePageUpdate}
                         requestedTab={settingsRequestedTab}
