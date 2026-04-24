@@ -23,6 +23,8 @@ export interface KeywordContext {
     // Plan 260414-2249 phase-02: mood appends 1-2 imagery adjectives to the
     // query for coherent visual style (warm/candlelit/minimalist/...).
     mood?: ThemeMood
+    // Plan 260424: LLM-translated English keywords to override hardcoded dictionaries
+    englishKeywords?: string[]
 }
 
 /** Category → 3-5 specific English base terms. Covers all 14 CATEGORY_SIGNATURE_BLOCKS keys. */
@@ -200,21 +202,28 @@ export function deriveKeywords(
     const modifier = pickRandom(modifiers)
     const industryBoost = translateIndustryToEn(ctx.industry, ctx.language)
 
-    // Product-primary path: user's top product → translated term → primary
-    // keyword. Fall back to category base for downstream variety.
-    const topProduct = ctx.products && ctx.products.length > 0 ? ctx.products[0] : undefined
     const keywords: string[] = []
 
-    if (topProduct) {
-        const productTerm = translateProductTerm(topProduct)
-        keywords.push(productTerm)
+    // Plan 260424: If dynamic LLM keywords exist, prioritize them over hardcoded dictionaries.
+    if (ctx.englishKeywords && ctx.englishKeywords.length > 0) {
+        keywords.push(...ctx.englishKeywords)
         if (modifier) keywords.push(modifier)
-        if (industryBoost && industryBoost !== productTerm) keywords.push(industryBoost)
-        else if (base && base !== productTerm) keywords.push(base)
     } else {
-        keywords.push(base)
-        if (modifier) keywords.push(modifier)
-        if (industryBoost && industryBoost !== base) keywords.push(industryBoost)
+        // Product-primary path: user's top product → translated term → primary
+        // keyword. Fall back to category base for downstream variety.
+        const topProduct = ctx.products && ctx.products.length > 0 ? ctx.products[0] : undefined
+
+        if (topProduct) {
+            const productTerm = translateProductTerm(topProduct)
+            keywords.push(productTerm)
+            if (modifier) keywords.push(modifier)
+            if (industryBoost && industryBoost !== productTerm) keywords.push(industryBoost)
+            else if (base && base !== productTerm) keywords.push(base)
+        } else {
+            keywords.push(base)
+            if (modifier) keywords.push(modifier)
+            if (industryBoost && industryBoost !== base) keywords.push(industryBoost)
+        }
     }
 
     // Plan 260414-2249 phase-02: append top 1-2 mood imagery adjectives.

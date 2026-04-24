@@ -42,6 +42,8 @@ export interface MediaPipelineContext {
     // before fulfillment runs). When present, block needs pick from pool
     // instead of calling searchPhotos per block → visual cohesion by design.
     pool?: ImagePool
+    // Plan 260424: LLM-translated English keywords to override hardcoded dictionaries
+    englishKeywords?: string[]
 }
 
 export interface BatchFetchResult {
