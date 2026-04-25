@@ -205,6 +205,8 @@ type InlineEditPayload = {
     searchKey: string
     oldHtml?: string
     newHtml: string
+    originalTag?: string
+    newTag?: string
 }
 
 function PreviewFrameInner({
@@ -337,7 +339,7 @@ function PreviewFrameInner({
     const applyInlineEditPayload = useCallback((payload: InlineEditPayload | null) => {
         if (!payload) return false
 
-        const { blockIndex, searchKey, oldHtml, newHtml } = payload
+        const { blockIndex, searchKey, oldHtml, newHtml, originalTag, newTag } = payload
         if (newHtml === undefined || Number.isNaN(blockIndex)) return false
 
         const currentBlocks = blocksRef.current
@@ -348,14 +350,29 @@ function PreviewFrameInner({
 
         const originalValue = String(getValueAtPath(block, fieldPath) ?? '')
         const originalHasHeadingWrapper = /^<h[1-6][\s>]/i.test(originalValue.trim())
-        const originalWrapsPlainText = originalHasHeadingWrapper &&
-            /^<h[1-6](?:\s[^>]*)?>([^<]*)<\/h[1-6]>$/i.test(originalValue.trim())
+
+        // Detect if the user intentionally changed the element tag (e.g. P → H2)
+        const tagChanged = !!(originalTag && newTag && originalTag !== newTag)
 
         currentLiveTextRef.current = newHtml
         let valueToSave = newHtml
-        if (!originalHasHeadingWrapper || originalWrapsPlainText) {
-            const headingMatch = newHtml.match(/^<(h[1-6])(?:\s[^>]*)?>([\s\S]+?)<\/\1>$/i)
-            if (headingMatch) valueToSave = headingMatch[2]
+
+        // Only strip heading wrapper if the original field value had no heading wrapper
+        // AND the user did NOT intentionally change the tag via formatBlock
+        if (!originalHasHeadingWrapper && !tagChanged) {
+            const headingMatch = newHtml.match(/^<(h[1-6])(\s[^>]*)?>([\s\S]+?)<\/\1>$/i)
+            if (headingMatch) {
+                const attrs = headingMatch[2] || ''
+                const styleMatch = attrs.match(/style="([^"]*)"/)
+                const innerContent = headingMatch[3]
+                // If the stripped heading had inline styles (font-size, color, etc.),
+                // wrap inner content in a <span> to preserve those user-applied styles
+                if (styleMatch && styleMatch[1].trim()) {
+                    valueToSave = `<span style="${styleMatch[1]}">${innerContent}</span>`
+                } else {
+                    valueToSave = innerContent
+                }
+            }
         }
 
         if (originalValue === valueToSave) return true
@@ -559,7 +576,11 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'TEXT_EDITED') {
                 const { searchKey, oldHtml, newHtml, blockIndex } = e.data
                 if (newHtml !== undefined) {
-                    const payload: InlineEditPayload = { blockIndex, searchKey, oldHtml, newHtml }
+                    const payload: InlineEditPayload = {
+                        blockIndex, searchKey, oldHtml, newHtml,
+                        originalTag: e.data.originalTag,
+                        newTag: e.data.newTag,
+                    }
                     pendingInlineEditRef.current = payload
                     applyInlineEditPayload(payload)
                 }
@@ -592,6 +613,12 @@ function PreviewFrameInner({
                 onBlockDrop?.(index, blockData)
             } else if (e.data?.type === 'PAGE_NAVIGATE') {
                 onPageNavigate?.(String(e.data.pageId))
+            } else if (e.data?.type === 'OPEN_LINK') {
+                const href = String(e.data.href || '')
+                const safeProtocols = new Set(['http:', 'https:', 'mailto:', 'tel:'])
+                try { if (href && safeProtocols.has(new URL(href).protocol)) window.open(href, '_blank', 'noopener,noreferrer') } catch { /* invalid URL */ }
+            } else if (e.data?.type === 'SAVE_CHECKPOINT') {
+                void (onInlineEditSaveRef.current?.() ?? performSave(false))
             } else if (e.data?.type === 'BLOCK_FIELD_CHANGED') {
                 const { blockIndex, field, value } = e.data as { blockIndex: number; field: string; value: unknown }
                 const currentBlocks = blocksRef.current

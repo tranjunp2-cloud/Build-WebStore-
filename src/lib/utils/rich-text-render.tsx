@@ -14,7 +14,17 @@ const SAFE_STYLE_RULES: Array<RegExp> = [
     /font-size:\s*\d+(?:\.\d+)?px/,
     /font-family:\s*[A-Za-z0-9 ,'\-]+/,
     /display:\s*block/,
+    /list-style-type:\s*(disc|circle|square|decimal|lower-alpha|upper-alpha|lower-roman|upper-roman|none)/,
+    /padding-left:\s*\d+(?:\.\d+)?(?:px|em|rem)/,
 ]
+
+const SAFE_HREF_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:'])
+const SAFE_TARGETS = new Set(['_blank', '_self', '_parent', '_top'])
+
+function isSafeHref(href: string): boolean {
+    try { return SAFE_HREF_PROTOCOLS.has(new URL(href, 'https://x').protocol) }
+    catch { return false }
+}
 
 function sanitizeStyleAttr(styleStr: string): string {
     const parts: string[] = []
@@ -34,19 +44,23 @@ export function sanitizeInlineHtml(html: string): string {
         const attrStr = attrs as string
         const styleMatch = attrStr.match(/style="([^"]*)"/)
         const hrefMatch = t === 'a' ? attrStr.match(/href="([^"]*)"/) : null
+        const targetMatch = t === 'a' ? attrStr.match(/target="([^"]*)"/) : null
+        const relMatch = t === 'a' ? attrStr.match(/rel="([^"]*)"/) : null
         const safeParts: string[] = []
         if (styleMatch) {
             const safe = sanitizeStyleAttr(styleMatch[1])
             if (safe) safeParts.push(`style="${safe}"`)
         }
-        if (hrefMatch) safeParts.push(`href="${hrefMatch[1]}"`)
+        if (hrefMatch && isSafeHref(hrefMatch[1])) safeParts.push(`href="${hrefMatch[1]}"`)
+        if (targetMatch && SAFE_TARGETS.has(targetMatch[1])) safeParts.push(`target="${targetMatch[1]}"`)
+        if (relMatch) safeParts.push(`rel="${relMatch[1]}"`)
         return safeParts.length > 0 ? `<${t} ${safeParts.join(' ')}>` : `<${t}>`
     })
 }
 
 export function hasInlineFormatting(text: string): boolean {
     if (!text) return false
-    return /<\/?(?:b|i|u|strong|em|span|h[1-6])\b/i.test(text)
+    return /<\/?(?:b|i|u|strong|em|span|h[1-6]|ul|ol|li|a|s|del|br)\b/i.test(text)
 }
 
 export interface HeadingWrapper {

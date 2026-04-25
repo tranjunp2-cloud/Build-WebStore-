@@ -42,6 +42,7 @@ vi.mock('@/components/AppShell', () => ({
 
 vi.mock('@/components/editor/PreviewScripts', () => ({
     PreviewScripts: () => <div data-testid="preview-scripts">Scripts</div>,
+    BuilderLinkScripts: () => null,
 }))
 
 vi.mock('@/app/(preview)/preview/[siteId]/PreviewErrors', () => ({
