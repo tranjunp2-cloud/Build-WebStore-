@@ -45,7 +45,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
 
     // Fallback to industry images when mock/real product images lack URLs
     const hasAnyImage = MOCK_FEATURED.some((p) => p.image)
-    const fallbackUrls = hasAnyImage ? [] : getGalleryImages(category, MOCK_FEATURED.length)
+    const fallbackUrls = hasAnyImage ? [] : getGalleryImages(category, MOCK_FEATURED.length, site?.imageLibraryS3 as Record<string, string> | undefined)
     const products = hasAnyImage
         ? MOCK_FEATURED
         : MOCK_FEATURED.map((p, i) => ({ ...p, image: fallbackUrls[i] || fallbackUrls[0] }))

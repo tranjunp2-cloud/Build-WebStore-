@@ -13,6 +13,7 @@ import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogLis
 import DOMPurify from 'isomorphic-dompurify'
 import { getServerI18n } from '@/i18n/server'
 import { getSiteBasePath } from '@/lib/site-base-path'
+import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 // Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
 export const dynamic = 'force-dynamic'
@@ -334,9 +335,14 @@ export default async function TenantSitePage({ params }: Props) {
 
     const { site, page, pages, isOwner } = data
 
+    // GH-727 Phase 03: resolve seeded IMAGE_LIBRARY → S3 mappings (best-effort, never throws).
+    const payload = await getPayload({ config })
+    const tenantId = data.tenant?.id
+    const imageLibraryS3 = tenantId ? await resolveImageLibraryS3Map(payload, tenantId) : {}
+
     return (
         <SiteRenderer
-            site={{ ...site, tenantSlug: slug, siteBasePath: base } as unknown as SiteData}
+            site={{ ...site, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
             page={page as unknown as PageData}
             pages={pages as unknown as NavPage[]}
             siteId={String(site.id)}

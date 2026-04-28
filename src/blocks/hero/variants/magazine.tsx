@@ -19,7 +19,7 @@ export function MagazineHero({ block, site }: BlockProps<HeroConfig>) {
     // Parallax: image shifts up 40px as it scrolls out of view
     const imageY = useTransform(scrollYProgress, [0, 1], [0, -40])
     const category = (site?.siteType as string) || 'business'
-    const fallbackHeroUrl = getHeroImage(category)
+    const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">

@@ -938,6 +938,20 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
+        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category (fire-and-forget)
+        // Use safeSiteType (same key used by storefront blocks) so seeder alt keys match resolver lookups.
+        if (resolvedTenantId) {
+            const _seedCategory = safeSiteType
+            import('@/lib/images/image-library-seeder')
+                .then(({ seedImageLibraryForSite }) =>
+                    seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
+                )
+                .catch(err =>
+                    console.error('[generate-site] image-library seed failed',
+                        err instanceof Error ? err.message : err),
+                )
+        }
+
         phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
 
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]

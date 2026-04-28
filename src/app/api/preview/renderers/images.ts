@@ -19,14 +19,14 @@ function u(id: string, w = 800, h = 600): string {
     return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&h=${h}&q=80`
 }
 
-const IMAGE_LIBRARY: Record<string, IndustryImages> = {
+export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
     restaurant: {
         hero: [
             u('photo-1517248135467-4c7edcad34c4', 1400, 800),
             u('photo-1414235077428-338989a2e8c0', 1400, 800),
             u('photo-1559339352-11d035aa65de', 1400, 800),
             u('photo-1552566626-52f8b828add9', 1400, 800), // outdoor dining
-            u('photo-1600891964599-f94d51f842de', 1400, 800), // nasi lemak closeup
+            u('photo-1565299507177-b0ac66763828', 1400, 800), // nasi lemak closeup
         ],
         gallery: [
             u('photo-1504674900247-0877df9cc836', 600, 600),
@@ -62,7 +62,7 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1523381210434-271e8be1f52b', 600, 600),
             u('photo-1445205170230-053b83016050', 600, 600),
             u('photo-1469334031218-e382a71b716b', 600, 600),
-            u('photo-1558618666-fcd25c85f82e', 600, 600),
+            u('photo-1491553895911-0055eca6402d', 600, 600),
             u('photo-1556905055-8f358a7a47b2', 600, 600),
             u('photo-1490481651871-ab68de25d43d', 600, 600),
         ],
@@ -91,10 +91,10 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
         gallery: [
             u('photo-1487412912498-0447578fcca8', 600, 600),
             u('photo-1596755389378-c31d21fd1273', 600, 600),
-            u('photo-1519415943484-9fa1ff481d38', 600, 600),
+            u('photo-1598440947619-2c35fc9aa908', 600, 600),
             u('photo-1560750588-73207b1ef5b8', 600, 600),
             u('photo-1507003211169-0a1dd7228f2d', 600, 600),
-            u('photo-1540555700478-4be289fbec6e', 600, 600),
+            u('photo-1519823551278-64ac92734fb1', 600, 600),
         ],
         about: u('photo-1600334129128-685c5582fd35', 800, 600),
         team: [
@@ -151,7 +151,7 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
         gallery: [
             u('photo-1631217868264-e5b90bb7e133', 600, 600),
             u('photo-1579684385127-1ef15d508118', 600, 600),
-            u('photo-1551190822-a9ce113d0d25', 600, 600),
+            u('photo-1576765608535-5f04d1e3f289', 600, 600),
             u('photo-1559757175-5700dde675bc', 600, 600),
             u('photo-1516549655169-df83a0774514', 600, 600),
             u('photo-1584820927498-cfe5211fd8bf', 600, 600),
@@ -172,7 +172,7 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
 
     education: {
         hero: [
-            u('photo-1523050854058-8df90110c9f1', 1400, 800),
+            u('photo-1546410531-bb4caa6b424d', 1400, 800),
             u('photo-1427504494785-3a9ca7044f45', 1400, 800),
             u('photo-1503676260728-1c00da094a0b', 1400, 800),
             u('photo-1523580846011-d3a5bc25702b', 1400, 800), // graduation
@@ -180,7 +180,7 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
         ],
         gallery: [
             u('photo-1524178232363-1fb2b075b655', 600, 600),
-            u('photo-1523050854058-8df90110c9f1', 600, 600),
+            u('photo-1546410531-bb4caa6b424d', 600, 600),
             u('photo-1509062522246-3755977927d7', 600, 600),
             u('photo-1497633762265-9d179a990aa6', 600, 600),
             u('photo-1580582932707-520aed937b7b', 600, 600),
@@ -208,8 +208,8 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1600596542815-ffad4c1539a9', 600, 600),
             u('photo-1600585154340-be6161a56a0c', 600, 600),
             u('photo-1600607687939-ce8a6c25118c', 600, 600),
-            u('photo-1600566753376-12c8ab7c5a97', 600, 600),
-            u('photo-1600573472591-ee6e79bc1e8b', 600, 600),
+            u('photo-1556909114-f6e7ad7d3136', 600, 600),
+            u('photo-1560448204-e02f11c3d0e2', 600, 600),
             u('photo-1600585154526-990dced4db0d', 600, 600),
         ],
         about: u('photo-1600607687939-ce8a6c25118c', 800, 600),
@@ -335,7 +335,7 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
     events: {
         hero: [
             u('photo-1519167758481-83f550bb49b3', 1400, 800), // wedding venue
-            u('photo-1540575467063-178a50e2fd60', 1400, 800), // corporate event
+            u('photo-1475721027785-f74eccf877e2', 1400, 800), // corporate event
             u('photo-1530103862676-de8c9debad1d', 1400, 800), // birthday party
             u('photo-1519741497674-611481863552', 1400, 800), // ballroom
             u('photo-1464366400600-7168b8af9bc3', 1400, 800), // outdoor ceremony
@@ -357,7 +357,7 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
         ],
         features: [
             u('photo-1519167758481-83f550bb49b3', 400, 300),
-            u('photo-1540575467063-178a50e2fd60', 400, 300),
+            u('photo-1475721027785-f74eccf877e2', 400, 300),
             u('photo-1530103862676-de8c9debad1d', 400, 300),
         ],
     },

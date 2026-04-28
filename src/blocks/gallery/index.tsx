@@ -133,7 +133,7 @@ export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) 
 
     // Per-slot fallback: slots with a real image show it; null slots show the Unsplash fallback
     // for that index. This way, replacing one stock image doesn't wipe fallbacks for other slots.
-    const fallbackUrls = getGalleryImages(category, 6)
+    const fallbackUrls = getGalleryImages(category, 6, site?.imageLibraryS3 as Record<string, string> | undefined)
     const slotCount = Math.max(rawImages.length, fallbackUrls.length)
     const images = Array.from({ length: slotCount }, (_, i) => {
         const item = rawImages[i] as Record<string, unknown> | undefined

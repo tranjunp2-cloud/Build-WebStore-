@@ -87,10 +87,11 @@ export function SocialProofBlock({ block, theme: _theme, site }: BlockProps<Soci
     const { variant = 'cards', headline, reviews: rawReviews = [] } = block
     const category = (site?.siteType as string) || 'business'
 
+    const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
     // Fallback: add avatar from industry images for reviews missing avatars (per-item)
     const reviews = rawReviews.map((review, i) => ({
         ...review,
-        avatar: review.avatar?.url ? review.avatar : { url: getTeamAvatar(category, i) },
+        avatar: review.avatar?.url ? review.avatar : { url: getTeamAvatar(category, i, s3Map) },
     }))
 
     return (
