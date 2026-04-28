@@ -1621,6 +1621,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             sanitized.logos = []
         }
 
+        // ── Google Maps: fix invalid variant + ensure embedUrl present ──
+        if (sanitized.blockType === 'google-maps') {
+            if (!['full-width', 'card'].includes(String(sanitized.variant ?? ''))) {
+                sanitized.variant = 'full-width'
+            }
+            if (!sanitized.embedUrl) sanitized.embedUrl = ''
+            delete sanitized.zoom
+        }
+
         // ── Remove non-schema fields that AI might add ──
         delete sanitized.id
         delete sanitized.order

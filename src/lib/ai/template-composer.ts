@@ -1525,9 +1525,9 @@ function buildContactPage(biz: BusinessSample, category: string, pages: string[]
       buildContact(biz),
       {
         blockType: 'google-maps',
-        variant: 'embed',
+        variant: 'full-width',
         address: biz.address || '',
-        zoom: 15,
+        embedUrl: '',
       },
       {
         blockType: 'faq',
@@ -1996,9 +1996,9 @@ function enrichSubPages(
     if (!hasMaps) {
       contactPage.layout.splice(insertAt, 0, {
         blockType: 'google-maps',
-        variant: 'embed',
+        variant: 'full-width',
         address: biz.address || '',
-        zoom: 15,
+        embedUrl: '',
       } as unknown as Record<string, unknown>)
     }
     if (!hasFaq) {
