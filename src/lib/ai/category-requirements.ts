@@ -126,25 +126,26 @@ export function getCategoryRequirement(category: string | undefined): CategoryRe
  * AI's default choice (which often picks bland "simple" or "transparent").
  * Seed-picked in structure-enforcer so businesses within the same category
  * rotate through the pool instead of locking to one variant.
- * All variants: simple | centered | mega-menu | transparent | sidebar | pill
+ * All variants: default | centered | mega | transparent | sidebar | floating
  *
  * Plan 2253 Phase 01 — fixes R9 (single nav variant per category).
+ * Renamed in nav refactor plan 260424: simple→default, mega-menu→mega, pill→floating.
  */
 export const NAV_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
-    beauty: ['pill', 'centered', 'transparent'],
-    restaurant: ['centered', 'pill', 'mega-menu'],
-    fnb: ['pill', 'centered', 'transparent'],
-    tech: ['centered', 'pill', 'mega-menu'],
-    health: ['centered', 'pill', 'transparent'],
-    education: ['centered', 'mega-menu', 'pill'],
-    realestate: ['centered', 'mega-menu', 'transparent'],
-    fitness: ['pill', 'centered', 'transparent'],
-    creative: ['pill', 'transparent', 'centered'],
-    business: ['centered', 'mega-menu', 'pill'],
-    ecommerce: ['mega-menu', 'pill', 'centered'],
-    events: ['centered', 'transparent', 'pill'],
-    blog: ['centered', 'pill', 'transparent'],
-    travel: ['pill', 'transparent', 'centered'],
+    beauty: ['floating', 'centered', 'transparent'],
+    restaurant: ['centered', 'floating', 'mega'],
+    fnb: ['floating', 'centered', 'transparent'],
+    tech: ['centered', 'floating', 'mega'],
+    health: ['centered', 'floating', 'transparent'],
+    education: ['centered', 'mega', 'floating'],
+    realestate: ['centered', 'mega', 'transparent'],
+    fitness: ['floating', 'centered', 'transparent'],
+    creative: ['floating', 'transparent', 'centered'],
+    business: ['centered', 'mega', 'floating'],
+    ecommerce: ['mega', 'floating', 'centered'],
+    events: ['centered', 'transparent', 'floating'],
+    blog: ['centered', 'floating', 'transparent'],
+    travel: ['floating', 'transparent', 'centered'],
 }
 
 /**

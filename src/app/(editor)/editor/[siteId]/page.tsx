@@ -454,8 +454,14 @@ export default function EditorPage() {
     const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
         if (!siteId) return
 
+        // Business name is required — silently ignore blank submissions
+        if ('name' in changes && !changes.name) return
+
         if (changes.name) {
             updateSiteName(changes.name)
+            // Sync business name into navigation logoText so the nav header
+            // reflects the new name without a separate block edit.
+            updateHeaderBlock({ logoText: changes.name })
         }
 
         setSite(prev => {
@@ -494,12 +500,15 @@ export default function EditorPage() {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    siteName: changes.name,
+                    ...(changes.name ? { siteName: changes.name } : {}),
                     contactInfo: changes.contactInfo,
                     socialLinks: changes.socialLinks,
                     branding: changes.branding,
                     seo: changes.seo,
-                    headerBlock: changes.headerBlock,
+                    // When name changes, persist updated headerBlock (logoText synced above)
+                    headerBlock: changes.name
+                        ? useEditorStore.getState().headerBlock
+                        : changes.headerBlock,
                     footerBlock: changes.footerBlock,
                 }),
             })
@@ -517,7 +526,7 @@ export default function EditorPage() {
             console.error('Failed to update site settings', error)
             toast.error('Failed to update site settings', { description: 'Please try again later.' })
         }
-    }, [currentPageId, siteId, updateSiteName])
+    }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
 
     const handleDeleteBlock = useCallback((index: number) => {
         deleteBlock(index)

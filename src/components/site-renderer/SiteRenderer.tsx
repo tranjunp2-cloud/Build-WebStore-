@@ -1,4 +1,5 @@
 import { blockRegistry } from '@/blocks/registry'
+import { FIXED_NAV_VARIANTS, isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import {
@@ -284,12 +285,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             }
 
             const foundPath = searchTree(navTree, [])
-            console.log('--- DEBUG BREADCRUMB ---')
-            console.log('pageSlug:', pageSlug)
-            console.log('target:', target)
-            console.log('navTree:', JSON.stringify(navTree, null, 2))
-            console.log('foundPath:', JSON.stringify(foundPath))
-            console.log('-------------------------')
             if (foundPath !== null) {
                 const firstLabel = foundPath[0]?.label.toLowerCase().trim() || ''
                 const targetHomeLabel = homeLabel.toLowerCase().trim()
@@ -344,6 +339,27 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
     // Heading hierarchy — compute levels for all blocks
     const allBlockTypes = blocks.map(b => b.blockType).filter(Boolean)
+
+    // Nav offset: if first block is a fixed/sticky nav variant, the first content block
+    // needs paddingTop = var(--nav-height) to avoid being hidden behind the nav.
+    // Uses isNavBlock (case-insensitive) consistent with ensure-navigation.ts detection.
+    // Undefined variant defaults to 'default' (matches FIXED_NAV_VARIANTS membership +
+    // shouldOffsetFirstBlock fallback in ensure-navigation.ts).
+    const GLOBAL_BLOCK_TYPES = ['header', 'navigation', 'footer', 'breadcrumb']
+    const navForOffset = blocks.find(b => isNavBlock(b))
+    const firstContentBlockIdx = blocks.findIndex(b => !GLOBAL_BLOCK_TYPES.includes(b.blockType))
+    const navVariant = ((navForOffset as Record<string, unknown> | undefined)?.variant as string) ?? 'default'
+    // transparent + floating overlay the hero intentionally — adding paddingTop to the
+    // block wrapper creates a white gap above the hero background. Skip for these variants.
+    // Both ARE in FIXED_NAV_VARIANTS (src/lib/ai/ensure-navigation.ts) — this exclusion
+    // is intentional, not a contradiction. FIXED_NAV_VARIANTS governs membership;
+    // OVERLAY_NAV_VARIANTS narrows it for the paddingTop offset only.
+    const OVERLAY_NAV_VARIANTS = new Set(['transparent', 'floating'])
+    const applyNavOffset =
+        navForOffset != null &&
+        FIXED_NAV_VARIANTS.has(navVariant) &&
+        !OVERLAY_NAV_VARIANTS.has(navVariant) &&
+        firstContentBlockIdx >= 0
 
     return (
         <OwnerProvider value={!!isOwner}>
@@ -426,7 +442,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 const spacingStyle = isGlobalBlock
                     ? {}
                     : {
-                        paddingTop: blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
+                        paddingTop: applyNavOffset && index === firstContentBlockIdx
+                            ? 'var(--nav-height, 64px)'
+                            : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
                         paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
                     }
 

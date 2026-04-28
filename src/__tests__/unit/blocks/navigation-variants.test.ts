@@ -4,7 +4,7 @@ import { NavigationConfigSchema, navigationMeta } from '@/blocks/navigation/conf
 // ── TC-S2-011: Navigation Block Variants ────────────────────────────────────
 
 const NAVIGATION_VARIANTS = [
-    'simple', 'centered', 'mega-menu', 'transparent', 'sidebar', 'pill',
+    'default', 'centered', 'mega', 'transparent', 'sidebar', 'floating',
 ] as const
 
 const minimalNavConfig = (overrides: Record<string, unknown> = {}) => ({
@@ -31,9 +31,9 @@ describe('[TC-S2-011] Navigation Block Variants', () => {
             expect(result.success).toBe(false)
         })
 
-        it('defaults to "simple" when variant not specified', () => {
+        it('defaults to "default" when variant not specified', () => {
             const result = NavigationConfigSchema.parse(minimalNavConfig())
-            expect(result.variant).toBe('simple')
+            expect(result.variant).toBe('default')
         })
 
         it('accepts nav with CTA button', () => {
@@ -74,8 +74,8 @@ describe('[TC-S2-011] Navigation Block Variants', () => {
             expect(navigationMeta.type).toBe('navigation')
         })
 
-        it('defaultVariant is "simple"', () => {
-            expect(navigationMeta.defaultVariant).toBe('simple')
+        it('defaultVariant is "default"', () => {
+            expect(navigationMeta.defaultVariant).toBe('default')
         })
     })
 })
