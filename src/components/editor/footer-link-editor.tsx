@@ -167,6 +167,7 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
         ))
     }
 
+
     return (
         <div className="space-y-2 mb-4">
             {columns.map((col, ci) => {
