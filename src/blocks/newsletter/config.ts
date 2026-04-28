@@ -5,7 +5,7 @@ export type NewsletterVariant = 'inline' | 'popup' | 'banner' | 'stacked-card' |
 
 export const NEWSLETTER_VARIANTS: NewsletterVariant[] = [
     'inline',
-    'popup',
+    // 'popup', // Temporarily disabled: F05-UI Bug #791
     'banner',
     'stacked-card',
     'minimal',
