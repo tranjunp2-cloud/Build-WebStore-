@@ -637,7 +637,7 @@ const NewsletterBlock = {
             name: 'variant', type: 'select', defaultValue: 'inline',
             options: [
                 { label: 'Inline', value: 'inline' },
-                { label: 'Popup', value: 'popup' },
+                // { label: 'Popup', value: 'popup' }, // Temporarily disabled: Bug #791
                 { label: 'Banner', value: 'banner' },
                 { label: 'Stacked Card', value: 'stacked-card' },
                 { label: 'Minimal', value: 'minimal' },

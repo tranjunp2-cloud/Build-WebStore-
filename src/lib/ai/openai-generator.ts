@@ -817,7 +817,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         about: ['simple', 'split', 'centered-large'],
         cta: ['banner', 'floating-sticky', 'dark-card', 'image-bg'],
         navigation: ['default', 'mega', 'floating'],
-        newsletter: ['inline', 'popup', 'minimal'],
+        newsletter: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'minimal'],
         team: ['grid', 'compact-row'],
     },
     beauty: {
@@ -833,7 +833,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         about: ['split', 'story', 'founder-quote', 'centered-large'],
         cta: ['card', 'mesh-gradient-hero', 'image-bg', 'floating-sticky'],
         navigation: ['transparent', 'default', 'floating'],
-        newsletter: ['inline', 'popup', 'incentive-grid', 'stacked-card'],
+        newsletter: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'incentive-grid', 'stacked-card'],
         team: ['cards-hover-reveal', 'grid', 'bio-modal'],
     },
     tech: {
@@ -897,7 +897,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         about: ['simple', 'story', 'two-column', 'founder-quote'],
         cta: ['inline', 'card', 'split-testimonial'],
         navigation: ['default', 'centered'],
-        newsletter: ['inline', 'banner', 'popup', 'minimal'],
+        newsletter: ['inline', 'banner', /* 'popup', // Temporarily disabled: Bug #791 */ 'minimal'],
         team: ['list', 'compact-row'],
     },
     health: {
@@ -977,7 +977,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         about: ['story', 'split', 'image-overlay', 'founder-quote'],
         cta: ['dark-card', 'mesh-gradient-hero', 'image-bg', 'inline'],
         navigation: ['transparent', 'floating', 'sidebar'],
-        newsletter: ['popup', 'inline', 'minimal'],
+        newsletter: [/* 'popup', // Temporarily disabled: Bug #791 */ 'inline', 'minimal'],
         team: ['horizontal-scroll', 'cards-hover-reveal', 'bio-modal', 'list'],
     },
     fnb: {
@@ -1009,7 +1009,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         about: ['story', 'split', 'image-overlay', 'centered-large'],
         cta: ['banner', 'image-bg', 'mesh-gradient-hero', 'floating-sticky'],
         navigation: ['default', 'transparent', 'centered'],
-        newsletter: ['banner', 'inline', 'stacked-card', 'popup'],
+        newsletter: ['banner', 'inline', 'stacked-card', /* 'popup', // Temporarily disabled: Bug #791 */],
         team: ['grid', 'cards-hover-reveal', 'horizontal-scroll'],
     },
     travel: {

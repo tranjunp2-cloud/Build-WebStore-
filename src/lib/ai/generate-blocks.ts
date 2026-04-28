@@ -194,7 +194,7 @@ const VARIANT_OPTIONS: Record<string, string[]> = {
     gallery: ['grid', 'masonry', 'carousel', 'lightbox'],
     navigation: ['simple', 'centered', 'transparent', 'pill'],
     about: ['simple', 'split', 'story', 'two-column', 'founder-quote', 'centered-large', 'image-overlay'],
-    newsletter: ['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid'],
+    newsletter: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'banner', 'stacked-card', 'minimal', 'incentive-grid'],
     team: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'],
     pricing: ['cards', 'table', 'horizontal', 'toggle'],
 }
