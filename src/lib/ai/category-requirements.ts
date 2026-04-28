@@ -287,21 +287,22 @@ export const STATS_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
 }
 
 export const NEWSLETTER_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
-    beauty: ['popup', 'inline', 'banner'],
-    restaurant: ['inline', 'banner', 'popup'],
-    fnb: ['inline', 'popup', 'banner'],
-    tech: ['banner', 'inline', 'popup'],
-    health: ['inline', 'banner', 'popup'],
-    education: ['inline', 'popup', 'banner'],
-    realestate: ['banner', 'inline', 'popup'],
-    fitness: ['inline', 'banner', 'popup'],
-    creative: ['popup', 'banner', 'inline'],
-    business: ['banner', 'inline', 'popup'],
-    ecommerce: ['popup', 'banner', 'inline'],
-    events: ['inline', 'popup', 'banner'],
-    blog: ['banner', 'inline', 'popup'],
-    travel: ['inline', 'banner', 'popup'],
+    beauty: [/* 'popup', // Temporarily disabled: Bug #791 */ 'inline', 'banner'],
+    restaurant: ['inline', 'banner', /* 'popup', // Temporarily disabled: Bug #791 */],
+    fnb: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'banner'],
+    tech: ['banner', 'inline', /* 'popup', // Temporarily disabled: Bug #791 */],
+    health: ['inline', 'banner', /* 'popup', // Temporarily disabled: Bug #791 */],
+    education: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'banner'],
+    realestate: ['banner', 'inline', /* 'popup', // Temporarily disabled: Bug #791 */],
+    fitness: ['inline', 'banner', /* 'popup', // Temporarily disabled: Bug #791 */],
+    creative: [/* 'popup', // Temporarily disabled: Bug #791 */ 'banner', 'inline'],
+    business: ['banner', 'inline', /* 'popup', // Temporarily disabled: Bug #791 */],
+    ecommerce: [/* 'popup', // Temporarily disabled: Bug #791 */ 'banner', 'inline'],
+    events: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'banner'],
+    blog: ['banner', 'inline', /* 'popup', // Temporarily disabled: Bug #791 */],
+    travel: ['inline', 'banner', /* 'popup', // Temporarily disabled: Bug #791 */],
 }
+
 
 export const TEAM_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
     beauty: ['list', 'grid'],
