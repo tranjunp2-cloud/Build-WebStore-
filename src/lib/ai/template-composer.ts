@@ -1523,12 +1523,13 @@ function buildContactPage(biz: BusinessSample, category: string, pages: string[]
       buildNavigation(biz, pages, category),
       { blockType: 'hero', variant: 'minimal', headline: `Contact ${biz.name}`, subheadline: 'We\'d love to hear from you.', height: '40vh' },
       buildContact(biz),
-      {
-        blockType: 'google-maps',
-        variant: 'full-width',
-        address: biz.address || '',
-        embedUrl: '',
-      },
+      // google-maps disabled — embedUrl cannot be auto-generated; owner fills in via builder
+      // {
+      //   blockType: 'google-maps',
+      //   variant: 'full-width',
+      //   address: biz.address || '',
+      //   embedUrl: '',
+      // },
       {
         blockType: 'faq',
         variant: 'accordion',
@@ -1993,14 +1994,15 @@ function enrichSubPages(
     )
     const insertAt = footerIdx >= 0 ? footerIdx : contactPage.layout.length
 
-    if (!hasMaps) {
-      contactPage.layout.splice(insertAt, 0, {
-        blockType: 'google-maps',
-        variant: 'full-width',
-        address: biz.address || '',
-        embedUrl: '',
-      } as unknown as Record<string, unknown>)
-    }
+    // google-maps disabled — embedUrl cannot be auto-generated
+    // if (!hasMaps) {
+    //   contactPage.layout.splice(insertAt, 0, {
+    //     blockType: 'google-maps',
+    //     variant: 'full-width',
+    //     address: biz.address || '',
+    //     embedUrl: '',
+    //   } as unknown as Record<string, unknown>)
+    // }
     if (!hasFaq) {
       const insertIdx = contactPage.layout.findIndex(
         (b) => (b as Record<string, unknown>).blockType === 'footer',
