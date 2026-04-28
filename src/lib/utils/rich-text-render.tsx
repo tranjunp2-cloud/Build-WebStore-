@@ -11,7 +11,7 @@ const ALLOWED_TAGS = new Set(['b', 'i', 'u', 'strong', 'em', 'br', 'span', 'h1',
 const SAFE_STYLE_RULES: Array<RegExp> = [
     /text-align:\s*(left|center|right|justify)/,
     /color:\s*(#[0-9a-fA-F]{3,8}|rgb\(\d+,\s*\d+,\s*\d+\))/,
-    /font-size:\s*\d+(?:\.\d+)?px/,
+    /font-size:\s*(?:\d+(?:\.\d+)?(?:px|em|rem|%)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|smaller|larger)/,
     /font-family:\s*[A-Za-z0-9 ,'\-]+/,
     /display:\s*block/,
     /list-style-type:\s*(disc|circle|square|decimal|lower-alpha|upper-alpha|lower-roman|upper-roman|none)/,
@@ -37,6 +37,11 @@ function sanitizeStyleAttr(styleStr: string): string {
 
 export function sanitizeInlineHtml(html: string): string {
     if (!html || !html.includes('<')) return html
+    // Normalize block-level wrappers that may appear in stored data (backward compat with older saves)
+    html = html
+        .replace(/<(?:div|p)[^>]*>/gi, '<br>')
+        .replace(/<\/(?:div|p)>/gi, '')
+        .replace(/^<br>/, '')
     return html.replace(/<\/?([a-z][a-z0-9]*)\b([^>]*)>/gi, (match, tag, attrs) => {
         const t = tag.toLowerCase()
         if (!ALLOWED_TAGS.has(t)) return ''
@@ -60,7 +65,7 @@ export function sanitizeInlineHtml(html: string): string {
 
 export function hasInlineFormatting(text: string): boolean {
     if (!text) return false
-    return /<\/?(?:b|i|u|strong|em|span|h[1-6]|ul|ol|li|a|s|del|br)\b/i.test(text)
+    return /<\/?(?:b|i|u|strong|em|span|h[1-6]|ul|ol|li|a|s|del|br|p|div)\b/i.test(text)
 }
 
 export interface HeadingWrapper {

@@ -120,18 +120,18 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                         className="max-w-3xl mx-auto"
                     >
                         {activeCategory.description && (
-                            <p className="text-center opacity-50 mb-8">{activeCategory.description}</p>
+                            <RichText text={activeCategory.description} as="p" className="text-center opacity-50 mb-8" />
                         )}
                         <div className="divide-y" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                             {activeCategory.items.map((item, i) => (
                                 <div key={i} className="flex items-start gap-4 py-5">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <h4 className="text-base font-bold font-heading">{item.name}</h4>
+                                            <RichText text={item.name} as="h4" className="text-base font-bold font-heading" />
                                             {item.isPopular && <PopularBadge />}
                                             {item.isNew && <NewBadge />}
                                         </div>
-                                        {item.description && <p className="text-sm opacity-50 mb-2">{item.description}</p>}
+                                        {item.description && <RichText text={item.description} as="p" className="text-sm opacity-50 mb-2" />}
                                         <DietaryBadges tags={item.dietaryTags} />
                                     </div>
                                     <PriceDisplay item={item} />
@@ -151,9 +151,9 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                 <div key={ci}>
                     <h3 className="text-2xl font-bold font-heading mb-2 text-center" style={{ color: 'var(--brand-primary)' }}>
                         {cat.icon && <span className="mr-2">{cat.icon}</span>}
-                        {cat.name}
+                        <RichText text={cat.name} as="span" />
                     </h3>
-                    {cat.description && <p className="text-center opacity-50 mb-8">{cat.description}</p>}
+                    {cat.description && <RichText text={cat.description} as="p" className="text-center opacity-50 mb-8" />}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {cat.items.map((item, i) => (
                             <motion.div
@@ -178,10 +178,10 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                                 )}
                                 <div className="p-5">
                                     <div className="flex items-center justify-between gap-2 mb-2">
-                                        <h4 className="text-base font-bold font-heading">{item.name}</h4>
+                                        <RichText text={item.name} as="h4" className="text-base font-bold font-heading" />
                                         <PriceDisplay item={item} />
                                     </div>
-                                    {item.description && <p className="text-sm opacity-50 mb-3">{item.description}</p>}
+                                    {item.description && <RichText text={item.description} as="p" className="text-sm opacity-50 mb-3" />}
                                     <DietaryBadges tags={item.dietaryTags} />
                                 </div>
                             </motion.div>
@@ -212,8 +212,8 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                             <div className="flex items-center gap-3">
                                 {cat.icon && <span className="text-xl">{cat.icon}</span>}
                                 <div>
-                                    <h3 className="text-lg font-bold font-heading">{cat.name}</h3>
-                                    {cat.description && <p className="text-sm opacity-50">{cat.description}</p>}
+                                    <RichText text={cat.name} as="h3" className="text-lg font-bold font-heading" />
+                                    {cat.description && <RichText text={cat.description} as="p" className="text-sm opacity-50" />}
                                 </div>
                             </div>
                             <span className="text-sm opacity-50 shrink-0 ml-4">
@@ -240,11 +240,11 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                                             <div key={i} className="flex items-start gap-4 py-4">
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                        <h4 className="text-base font-bold font-heading">{item.name}</h4>
+                                                        <RichText text={item.name} as="h4" className="text-base font-bold font-heading" />
                                                         {item.isPopular && <PopularBadge />}
                                                         {item.isNew && <NewBadge />}
                                                     </div>
-                                                    {item.description && <p className="text-sm opacity-50 mb-2">{item.description}</p>}
+                                                    {item.description && <RichText text={item.description} as="p" className="text-sm opacity-50 mb-2" />}
                                                     <DietaryBadges tags={item.dietaryTags} />
                                                 </div>
                                                 <PriceDisplay item={item} />

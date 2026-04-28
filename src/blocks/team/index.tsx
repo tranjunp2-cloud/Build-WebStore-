@@ -349,7 +349,7 @@ function CardsHoverRevealVariant({
                                     color: '#ffffff',
                                 }}
                             >
-                                <p className="font-bold text-base">{m.name}</p>
+                                <RichText text={m.name} as="p" className="font-bold text-base" />
                                 <p className="text-sm opacity-90 mb-1">{m.role}</p>
                                 {m.bio && (
                                     <p className="text-xs opacity-85 line-clamp-3">{m.bio}</p>
@@ -357,7 +357,7 @@ function CardsHoverRevealVariant({
                                 <SocialLinks socials={m.socials} name={m.name} />
                             </div>
                             <div className="absolute inset-x-0 bottom-0 py-3 text-center transition-opacity duration-300 group-hover:opacity-0">
-                                <p className="font-semibold text-sm" style={{ color: CSS_VARS.text }}>{m.name}</p>
+                                <RichText text={m.name} as="p" className="font-semibold text-sm" style={{ color: CSS_VARS.text }} />
                                 <p className="text-xs" style={{ color: CSS_VARS.muted }}>{m.role}</p>
                             </div>
                         </article>
@@ -463,7 +463,7 @@ function BioModalVariant({
                         >
                             <MemberAvatar member={m} imageIndex={i} />
                             <div className="w-full min-w-0">
-                                <p className="font-semibold text-sm truncate" style={{ color: CSS_VARS.text }}>{m.name}</p>
+                                <RichText text={m.name} as="p" className="font-semibold text-sm truncate" style={{ color: CSS_VARS.text }} />
                                 <p className="text-xs truncate" style={{ color: CSS_VARS.muted }}>{m.role}</p>
                             </div>
                         </button>
@@ -553,7 +553,7 @@ function CompactRowVariant({
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-baseline gap-x-2">
-                                <p className="font-semibold text-sm" style={{ color: CSS_VARS.text }}>{m.name}</p>
+                                <RichText text={m.name} as="p" className="font-semibold text-sm" style={{ color: CSS_VARS.text }} />
                                 <p className="text-xs" style={{ color: CSS_VARS.primary }}>{m.role}</p>
                             </div>
                             {m.bio && (

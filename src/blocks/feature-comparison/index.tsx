@@ -67,7 +67,7 @@ export function FeatureComparisonBlock({ block }: BlockProps<FeatureComparisonCo
                                     return (
                                         <li key={fIdx} className="flex items-center gap-3">
                                             {has ? <CheckIcon color={CSS_VARS.primary} /> : <CrossIcon />}
-                                            <span className={has ? '' : 'opacity-40 line-through'}>{feature.name}</span>
+                                            <RichText text={feature.name} as="span" className={has ? '' : 'opacity-40 line-through'} />
                                         </li>
                                     )
                                 })}
@@ -98,7 +98,7 @@ export function FeatureComparisonBlock({ block }: BlockProps<FeatureComparisonCo
                                     className="p-4 md:p-6 text-center font-heading font-bold"
                                     style={product.highlighted ? { color: 'var(--brand-primary)', background: `rgba(var(--brand-primary-rgb), 0.071)` } : undefined}
                                 >
-                                    {product.name}
+                                    <RichText text={product.name} as="span" />
                                 </th>
                             ))}
                         </tr>
@@ -106,7 +106,7 @@ export function FeatureComparisonBlock({ block }: BlockProps<FeatureComparisonCo
                     <tbody>
                         {features.map((feature, fIdx) => (
                             <tr key={fIdx} className="border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.071)` }}>
-                                <td className="p-4 md:p-6 font-medium">{feature.name}</td>
+                                <td className="p-4 md:p-6 font-medium"><RichText text={feature.name} as="span" /></td>
                                 {products.map((product, pIdx) => {
                                     const has = feature.values[pIdx] ?? false
                                     return (

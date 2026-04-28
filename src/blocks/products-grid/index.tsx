@@ -81,7 +81,7 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
 
                             <div className={variant === 'list' ? 'flex-1 py-2' : `${CARD_PADDING.md} flex flex-col flex-1`}>
                                 <Heading level={4} className="font-body mb-2">{product.name}</Heading>
-                                <p className="text-xl font-heading mb-4" style={{ color: 'var(--brand-primary)' }}>{product.price}</p>
+                                <RichText text={product.price} as="p" className="text-xl font-heading mb-4" style={{ color: 'var(--brand-primary)' }} />
 
                                 {variant !== 'list' && <div className="mt-auto" />}
 
