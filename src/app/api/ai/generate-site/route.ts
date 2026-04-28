@@ -27,7 +27,7 @@ import { buildImagePool } from '@/lib/ai/image-pool'
 import { translateProductTerm } from '@/lib/ai/product-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
-import { ensureNavigationBlocks, stripNavOffset, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
+import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
@@ -1034,20 +1034,13 @@ function normalizeInternalUrl(url: unknown): string {
     return url
 }
 
-const FALLBACK_NAV_LINKS = [
-    { label: 'Home', url: '/' },
-    { label: 'About', url: '/about' },
-    { label: 'Products', url: '/products' },
-    { label: 'Contact', url: '/contact' },
-] as const
-
 function applyGeneratedSiteNavigation(
     blocks: AIBlock[],
     businessName: string,
     pageLinks?: readonly { label: string; url: string }[] | null,
 ): AIBlock[] {
     const normalizedBlocks = cloneBlockData(blocks)
-    const links = pageLinks ?? FALLBACK_NAV_LINKS
+    const links = pageLinks ?? DEFAULT_NAV_LINKS
 
     return normalizedBlocks.map((block) => {
         if (block.blockType === 'navigation') {
