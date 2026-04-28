@@ -74,8 +74,8 @@ describe('TC-F01-W.22 — About page weaves biz.description', () => {
   })
 })
 
-describe('TC-F01-W.23 — Contact page user fields + map + FAQ', () => {
-  it('Contact page has ≥5 blocks (nav + hero + contact + maps + faq + footer)', () => {
+describe('TC-F01-W.23 — Contact page user fields + FAQ (GH-820: google-maps temporarily disabled)', () => {
+  it('Contact page has ≥5 blocks (nav + hero + contact + faq + footer)', () => {
     const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
     const contact = getPage(result, 'Contact')
     expect(contact).toBeDefined()
@@ -95,13 +95,12 @@ describe('TC-F01-W.23 — Contact page user fields + map + FAQ', () => {
     expect(contactBlock!.address).toBe('123 Jalan Bukit Bintang, 55100 KL')
   })
 
-  it('Google Maps block includes user address', () => {
+  it('Google Maps block absent — temporarily disabled per GH-820 (embedUrl cannot be auto-generated)', () => {
     const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
     const contact = getPage(result, 'Contact')
     const blocks = getBlocks(contact)
     const maps = blocks.find((b) => b.blockType === 'google-maps')
-    expect(maps).toBeDefined()
-    expect(maps!.address).toBe('123 Jalan Bukit Bintang, 55100 KL')
+    expect(maps).toBeUndefined()
   })
 
   it('FAQ block present with opening hours question', () => {
