@@ -1269,8 +1269,12 @@ export default function EditorPage() {
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
                             onImageReplaced={async () => {
-                                await handleSave({ showToast: false, refreshPreview: false })
-                                setIframeKey(key => key + 1)
+                                // Let handleSave own the iframe reload via refreshPreview: true
+                                // so the iframe only reloads after the save *actually* completes.
+                                // Previously: await handleSave(...refreshPreview:false) + manual setIframeKey
+                                // caused the iframe to reload immediately even when handleSave was
+                                // only queued (isSavingRef=true), showing stale DB data to the server component.
+                                await handleSave({ showToast: false, refreshPreview: true })
                             }}
                             onPageNavigate={handlePageSelected}
                             onInlineEditSave={async () => {

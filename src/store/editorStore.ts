@@ -480,8 +480,18 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const { siteId, autoSaveTimer, isSaving } = get()
         if (!siteId) return false
 
-        // Anti-spam backpressure for manual save
-        if (isManual && isSaving) return false
+        // If a save is already in-flight, schedule a retry instead of dropping.
+        // Retry passes isManual=true so the guard still applies if the prior save
+        // hasn't finished by the 1.5s mark (slow network / large payload).
+        // Without this, rapid uploads (hero-media-overlay → BLOCK_FIELD_CHANGED) could lose
+        // the second save when the first is still in-flight.
+        if (isManual && isSaving) {
+            if (!autoSaveTimer) {
+                const timer = setTimeout(() => { get().performSave(true) }, 1500)
+                set({ autoSaveTimer: timer })
+            }
+            return false
+        }
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
         set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
