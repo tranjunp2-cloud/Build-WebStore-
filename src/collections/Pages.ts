@@ -65,14 +65,14 @@ const NavigationBlock = {
         {
             name: 'variant',
             type: 'select',
-            defaultValue: 'simple',
+            defaultValue: 'default',
             options: [
-                { label: 'Simple', value: 'simple' },
+                { label: 'Default', value: 'default' },
                 { label: 'Centered', value: 'centered' },
-                { label: 'Mega Menu', value: 'mega-menu' },
+                { label: 'Mega', value: 'mega' },
                 { label: 'Transparent', value: 'transparent' },
                 { label: 'Sidebar', value: 'sidebar' },
-                { label: 'Pill', value: 'pill' },
+                { label: 'Floating', value: 'floating' },
             ],
         },
         {

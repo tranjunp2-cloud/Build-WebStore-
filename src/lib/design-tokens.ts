@@ -164,3 +164,32 @@ export type FontWeightToken = keyof typeof FONT_WEIGHT
 // ── Max Prose Width (readability) ───────────────────────────────────────────
 // ~65ch — optimal measure for body reading (45-75 chars per line).
 export const MAX_PROSE = 'max-w-prose'
+
+// ── Navigation Z-Index Stacking ─────────────────────────────────────────────
+// Tiered hierarchy prevents z-50 collisions between nav bar, dropdowns,
+// mobile backdrop, and mobile sidebar.
+export const NAV_Z_INDEX = {
+    base: 50,           // nav bar itself (sticky/fixed)
+    dropdown: 51,       // desktop link dropdowns, mega-menu panel
+    mobileBackdrop: 52, // mobile menu backdrop overlay
+    mobileSidebar: 53,  // mobile sidebar drawer (topmost)
+} as const
+
+export const NAV_Z_CLASS = {
+    base: 'z-[50]',
+    dropdown: 'z-[51]',
+    mobileBackdrop: 'z-[52]',
+    mobileSidebar: 'z-[53]',
+} as const
+
+export type NavZIndexToken = keyof typeof NAV_Z_INDEX
+
+// ── Navigation Height ───────────────────────────────────────────────────────
+// Single source of truth for nav bar height. Consumed by ensure-navigation
+// injector (adds NAV_HEIGHT_PT_CLASS to first block under fixed/sticky nav).
+// Keep in sync with --nav-height in src/app/globals.css.
+export const NAV_HEIGHT = 64
+export const NAV_HEIGHT_PX = '64px'
+export const NAV_HEIGHT_CLASS = 'h-16'      // Tailwind — nav bar itself
+export const NAV_HEIGHT_PT_CLASS = 'pt-16'  // Tailwind — first-block offset
+export const NAV_HEIGHT_VAR = 'var(--nav-height, 64px)'

@@ -34,6 +34,9 @@
      AppShell div overrides these with the real self-hosted font names. */
   --font-inter: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-outfit: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Navigation height — synced with src/lib/design-tokens.ts NAV_HEIGHT */
+  --nav-height: 64px;
 }
 
 /* ── Base Styles ──────────────────────────────────────────────────────────── */

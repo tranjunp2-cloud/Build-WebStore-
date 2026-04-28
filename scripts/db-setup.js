@@ -35,7 +35,7 @@ function createPool() {
   const sslmode = sslmodeMatch ? sslmodeMatch[1].toLowerCase() : null;
   const hostMatch = connStr.match(/@([^:/?]+)/);
   const host = hostMatch ? hostMatch[1].toLowerCase() : '';
-  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal';
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal' || host === 'postgres';
   const useSsl = sslmode === 'disable' ? false : (isLocal ? false : { rejectUnauthorized: false });
 
   const cleanStr = connStr
@@ -3568,6 +3568,40 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_video_showcase.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_video_showcase" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_product_quick_view.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_product_quick_view" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_feature_comparison.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_feature_comparison" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+
+  // ── Navigation variant rename (Phase 01 — 2026-04-24) ───────────────────────
+  // Renames: simple→default, mega-menu→mega, pill→floating in sites.header_block JSONB.
+  // Idempotent: WHERE clause skips already-migrated rows.
+  {
+    name: 'sites.header_block_variant_simple_to_default',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('default'::text)) WHERE header_block->>'variant' = 'simple';`,
+  },
+  {
+    name: 'sites.header_block_variant_mega_menu_to_mega',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('mega'::text)) WHERE header_block->>'variant' = 'mega-menu';`,
+  },
+  {
+    name: 'sites.header_block_variant_pill_to_floating',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('floating'::text)) WHERE header_block->>'variant' = 'pill';`,
+  },
+
+  // ── Navigation variant enum expansion (Phase 01 — 2026-04-24) ───────────────
+  // Postgres native enums for navigation variant in pages/versioned-pages blocks.
+  // ADD VALUE IF NOT EXISTS is idempotent. Old values kept (can't drop from enum).
+  // Then update any existing rows that still use old names.
+  { name: 'enum_pages_blocks_navigation_variant.add_default',     sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'default';` },
+  { name: 'enum_pages_blocks_navigation_variant.add_mega',        sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'mega';` },
+  { name: 'enum_pages_blocks_navigation_variant.add_floating',    sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'floating';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_default',  sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'default';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_mega',     sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'mega';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_floating', sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'floating';` },
+  // Update existing rows in block tables (idempotent — WHERE filters already-migrated)
+  { name: 'pages_blocks_navigation.variant_simple_to_default',    sql: `UPDATE pages_blocks_navigation SET variant = 'default' WHERE variant = 'simple';` },
+  { name: 'pages_blocks_navigation.variant_mega_menu_to_mega',    sql: `UPDATE pages_blocks_navigation SET variant = 'mega' WHERE variant = 'mega-menu';` },
+  { name: 'pages_blocks_navigation.variant_pill_to_floating',     sql: `UPDATE pages_blocks_navigation SET variant = 'floating' WHERE variant = 'pill';` },
+  { name: '_pages_v_blocks_navigation.variant_simple_to_default', sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'default' WHERE variant = 'simple';` },
+  { name: '_pages_v_blocks_navigation.variant_mega_menu_to_mega', sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'mega' WHERE variant = 'mega-menu';` },
+  { name: '_pages_v_blocks_navigation.variant_pill_to_floating',  sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'floating' WHERE variant = 'pill';` },
 ];
 
 async function runMigrations(pool) {

@@ -27,7 +27,7 @@ import { buildImagePool } from '@/lib/ai/image-pool'
 import { translateProductTerm } from '@/lib/ai/product-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
-import { ensureNavigationBlocks, type PageShape } from '@/lib/ai/ensure-navigation'
+import { ensureNavigationBlocks, stripNavOffset, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
@@ -729,7 +729,9 @@ export async function POST(req: NextRequest) {
                 })
                 : pageDefinition.layout
             const sanitizedLayout = Array.isArray(variantFixed)
-                ? sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b)))
+                ? stripNavOffset(
+                    sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                  ) as AIBlock[]
                 : variantFixed
 
             // Plan 260415 fix-500 — per-page try/catch so one bad page (FK
