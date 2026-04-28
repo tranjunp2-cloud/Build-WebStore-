@@ -77,7 +77,7 @@ export function AccordionBlock({ block, theme: _theme }: BlockProps<AccordionCon
                                     className={`w-full px-6 py-4 flex items-center justify-between text-left font-medium hover:bg-white/5 transition-colors ${TOUCH_TARGET.min}`}
                                     aria-expanded={isOpen}
                                 >
-                                    <span className="font-heading">{item.title}</span>
+                                    <RichText text={item.title} as="span" className="font-heading" />
                                     <span
                                         className="transition-transform duration-300 flex-shrink-0 ml-4"
                                         style={{ transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)', color: 'var(--brand-primary)' }}
@@ -95,7 +95,7 @@ export function AccordionBlock({ block, theme: _theme }: BlockProps<AccordionCon
                                     }}
                                 >
                                     <div className="px-6 pb-5 text-sm opacity-70 leading-relaxed">
-                                        {item.content}
+                                        <RichText text={item.content} as="span" />
                                     </div>
                                 </div>
                             </div>
