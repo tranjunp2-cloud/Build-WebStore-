@@ -1924,7 +1924,7 @@ function buildBlockFromSpec(
     case 'map':
     case 'map-embed':
     case 'google-maps':
-      return { blockType: 'google-maps', variant: resolvedVariant ?? 'default', address: biz.address, height: '400px' }
+      return { blockType: 'google-maps', variant: resolvedVariant ?? 'full-width', address: biz.address, height: 400 }
     case 'content':
     case 'content-block':
       return { ...buildAbout(biz), blockType: 'about', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }

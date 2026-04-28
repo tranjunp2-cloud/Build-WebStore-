@@ -1630,12 +1630,16 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             sanitized.logos = []
         }
 
-        // ── Google Maps: fix invalid variant + ensure embedUrl present ──
+        // ── Google Maps: fix invalid variant + ensure embedUrl present + height as number ──
         if (sanitized.blockType === 'google-maps') {
             if (!['full-width', 'card'].includes(String(sanitized.variant ?? ''))) {
                 sanitized.variant = 'full-width'
             }
             if (!sanitized.embedUrl) sanitized.embedUrl = ''
+            if (sanitized.height !== undefined && typeof sanitized.height !== 'number') {
+                const parsed = parseInt(String(sanitized.height), 10)
+                sanitized.height = isNaN(parsed) ? 400 : parsed
+            }
             delete sanitized.zoom
         }
 
