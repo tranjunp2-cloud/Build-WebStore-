@@ -288,7 +288,7 @@ const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1521737711867-e3b97375f902', 600, 600),
             u('photo-1556761175-4b46a572b786', 600, 600),
             u('photo-1522202176988-66273c2fd55f', 600, 600),
-            u('photo-1542744173-8e7e91415657', 600, 600),
+            u('photo-1454165804606-c3d57bc86b40', 600, 600),
         ],
         about: u('photo-1497366216548-37526070297c', 800, 600),
         team: [
