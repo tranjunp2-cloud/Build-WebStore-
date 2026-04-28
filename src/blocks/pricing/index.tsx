@@ -73,9 +73,10 @@ const PRICE_SIZE = {
 function PriceDisplay({ price, period, size = 'lg', className = '' }: PriceDisplayProps) {
     return (
         <div className={className}>
-            <span className={`${PRICE_SIZE[size]} font-bold`}>
-                {typeof price === 'string' ? <RichText text={price} as="span" /> : price}
-            </span>
+            {typeof price === 'string'
+                ? <RichText text={price} as="span" className={`${PRICE_SIZE[size]} font-bold`} />
+                : <span className={`${PRICE_SIZE[size]} font-bold`}>{price}</span>
+            }
             {period && <span className="opacity-50 text-sm">/{period}</span>}
         </div>
     )
@@ -305,7 +306,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                         >
                                             <div className="font-bold font-heading text-lg"><RichText text={plan.name} as="span" /></div>
                                             <div className="mt-1">
-                                                <span className="text-2xl font-bold"><RichText text={plan.price} as="span" /></span>
+                                                <RichText text={plan.price} as="span" className="text-2xl font-bold" />
                                                 {plan.period && <span className="opacity-50 text-xs">/{plan.period}</span>}
                                             </div>
                                         </th>
@@ -407,7 +408,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                         )}
                                         <h3 className="text-lg font-bold font-heading"><RichText text={plan.name} as="span" /></h3>
                                         <div className="mt-1">
-                                            <span className="text-2xl font-bold"><RichText text={plan.price} as="span" /></span>
+                                            <RichText text={plan.price} as="span" className="text-2xl font-bold" />
                                             {plan.period && (
                                                 <span className={`text-xs ${plan.highlighted ? 'opacity-70' : 'opacity-50'}`}>/{plan.period}</span>
                                             )}
