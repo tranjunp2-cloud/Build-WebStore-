@@ -95,6 +95,6 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }] }))
         const body = await res.json()
 
-        expect(body.data.total).toBe(106) // 100 + 6% tax
+        expect(body.data.total).toBe(116) // 100 subtotal + 10 shipping + 6 SST
     })
 })
