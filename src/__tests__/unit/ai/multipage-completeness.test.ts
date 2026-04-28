@@ -228,3 +228,37 @@ describe('TC-F01-W.26 — Empty-input regression', () => {
     expect(items.length).toBeGreaterThanOrEqual(3)
   })
 })
+
+describe('TC-F01-W.27 — Footer ghost links absent in centered-stack/dark-gradient (GH-820)', () => {
+  const GHOST_URLS = ['/careers', '/help', '/faq', '/privacy', '/terms', '/cookies']
+
+  function getFooterColumns(result: GenerationResult): Array<{ title: string; links: { url: string }[] }> {
+    const pages = (result.pages ?? []) as unknown as Page[]
+    const home = pages.find((p) => p.title?.toLowerCase() === 'home')
+    const blocks = getBlocks(home)
+    const footer = blocks.find((b) => b.blockType === 'footer')
+    return (footer?.columns as Array<{ title: string; links: { url: string }[] }>) ?? []
+  }
+
+  it('footer columns contain no links to non-existent pages', () => {
+    const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
+    const columns = getFooterColumns(result)
+    const allLinks = columns.flatMap((c) => c.links.map((l) => l.url))
+    for (const ghostUrl of GHOST_URLS) {
+      expect(allLinks, `ghost link "${ghostUrl}" found in footer`).not.toContain(ghostUrl)
+    }
+  })
+
+  it('footer Explore column only contains links to actually-generated pages', () => {
+    const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
+    const columns = getFooterColumns(result)
+    const explore = columns.find((c) => c.title === 'Explore')
+    expect(explore).toBeDefined()
+    const pages = (result.pages ?? []) as unknown as Page[]
+    const pageSlugs = new Set(pages.map((p) => p.title?.toLowerCase()))
+    for (const link of explore!.links) {
+      const slug = link.url === '/' ? 'home' : link.url.replace(/^\//, '').toLowerCase()
+      expect(pageSlugs.has(slug), `Explore link "${link.url}" has no backing page`).toBe(true)
+    }
+  })
+})

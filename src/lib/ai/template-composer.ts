@@ -502,36 +502,40 @@ function buildContact(biz: BusinessSample): Record<string, unknown> {
 function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unknown> {
   // Next-wins plan 260419-0034 phase-03: upgrade default to mega variant với 4 columns
   // (Explore / Company / Support / Legal) to meet Wix-pro footer expectations.
+  // GH-820: build known-url set so secondary columns only include links to real pages.
+  const knownUrls = new Set(pages.map((p) => (p === '/' ? '/' : `/${p.replace(/^\/+/, '')}`)))
+  // External links (mailto:, http, #) are always safe; internal links only if page exists.
+  const isLiveLink = (url: string) =>
+    url.startsWith('mailto:') || url.startsWith('http') || url === '#' || knownUrls.has(url)
+
   const exploreLinks = pages.map((p) => ({
     label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
     url: p === '/' ? '/' : `/${p}`,
   }))
+
+  const companyLinks = [
+    { label: 'About Us', url: '/about' },
+    { label: 'Contact', url: '/contact' },
+    { label: 'Careers', url: '/careers' },
+  ].filter((l) => isLiveLink(l.url))
+
+  const supportLinks = [
+    { label: 'Help Center', url: '/help' },
+    { label: 'FAQ', url: '/faq' },
+    { label: 'Get in Touch', url: `mailto:${biz.email}` },
+  ].filter((l) => isLiveLink(l.url))
+
+  const legalLinks = [
+    { label: 'Privacy Policy', url: '/privacy' },
+    { label: 'Terms of Service', url: '/terms' },
+    { label: 'Cookie Policy', url: '/cookies' },
+  ].filter((l) => isLiveLink(l.url))
+
   const linkColumns = [
     { title: 'Explore', links: exploreLinks },
-    {
-      title: 'Company',
-      links: [
-        { label: 'About Us', url: '/about' },
-        { label: 'Contact', url: '/contact' },
-        { label: 'Careers', url: '/careers' },
-      ],
-    },
-    {
-      title: 'Support',
-      links: [
-        { label: 'Help Center', url: '/help' },
-        { label: 'FAQ', url: '/faq' },
-        { label: 'Get in Touch', url: `mailto:${biz.email}` },
-      ],
-    },
-    {
-      title: 'Legal',
-      links: [
-        { label: 'Privacy Policy', url: '/privacy' },
-        { label: 'Terms of Service', url: '/terms' },
-        { label: 'Cookie Policy', url: '/cookies' },
-      ],
-    },
+    ...(companyLinks.length > 0 ? [{ title: 'Company', links: companyLinks }] : []),
+    ...(supportLinks.length > 0 ? [{ title: 'Support', links: supportLinks }] : []),
+    ...(legalLinks.length > 0 ? [{ title: 'Legal', links: legalLinks }] : []),
   ]
   return {
     blockType: 'footer',
