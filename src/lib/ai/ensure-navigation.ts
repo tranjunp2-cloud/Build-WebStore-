@@ -60,7 +60,13 @@ function patchHollowNav(
 ): PageBlockShape {
     const links = Array.isArray(block.links) ? block.links : []
     if (links.length > 0 && !forceReplace) return block
-    return { ...block, links: fallbackLinks.map((link) => ({ ...link })) }
+    const patched: PageBlockShape = { ...block, links: fallbackLinks.map((link) => ({ ...link })) }
+    // Also sync ctaButton URL when force-replacing so it points to a real page.
+    // Without this, ctaButton stays hardcoded to /contact even if no Contact page exists.
+    if (forceReplace && patched.ctaButton && typeof patched.ctaButton === 'object') {
+        patched.ctaButton = { ...(patched.ctaButton as Record<string, unknown>), url: resolveCtaUrl(fallbackLinks) }
+    }
+    return patched
 }
 
 // Variants that occupy fixed top position — first content block needs padding-top offset.
@@ -96,6 +102,16 @@ export function stripNavOffset(layout: PageBlockShape[]): PageBlockShape[] {
 
 type NavLink = { label: string; url: string }
 
+// Find a contact-type page from the link list, or fall back to the last page.
+// Used to resolve ctaButton URL so it always points to a real generated page.
+// Exported for reuse in applyGeneratedSiteNavigation (route.ts).
+export function resolveCtaUrl(links: readonly NavLink[]): string {
+    const contact = links.find(l =>
+        /contact/i.test(l.label) || /contact/i.test(l.url)
+    )
+    return contact?.url ?? links[links.length - 1]?.url ?? '/contact'
+}
+
 function buildDefaultNavigation(businessName: string, pageLinks?: readonly NavLink[]): PageBlockShape {
     const links = (pageLinks ?? DEFAULT_NAV_LINKS).map((link) => ({ ...link }))
     return {
@@ -105,7 +121,7 @@ function buildDefaultNavigation(businessName: string, pageLinks?: readonly NavLi
         links,
         ctaButton: {
             label: 'Get in touch',
-            url: '/contact',
+            url: resolveCtaUrl(links),
             style: 'primary',
         },
     }

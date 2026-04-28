@@ -1,11 +1,11 @@
 /**
  * Unit Tests: ensureNavigationBlocks — dynamic pageLinks param (GH-817)
- * TC-ID: TC-NAV-DYN-06, TC-NAV-DYN-07, TC-NAV-DYN-08, TC-NAV-DYN-11, TC-NAV-DYN-12
+ * TC-ID: TC-NAV-DYN-06..08, TC-NAV-DYN-11..16
  * Convention: docs/TEST_CONVENTION.md
  */
 
 import { describe, it, expect } from 'vitest'
-import { ensureNavigationBlocks, DEFAULT_NAV_LINKS, type PageShape } from '@/lib/ai/ensure-navigation'
+import { ensureNavigationBlocks, resolveCtaUrl, DEFAULT_NAV_LINKS, type PageShape } from '@/lib/ai/ensure-navigation'
 
 const seoStub = { title: 't', description: 'd' }
 
@@ -105,5 +105,72 @@ describe('ensureNavigationBlocks — dynamic pageLinks param', () => {
         const links = nav.links as Array<{ label: string; url: string }>
         expect(links).toHaveLength(2)
         expect(links[1]).toEqual({ label: 'About', url: '/about' })
+    })
+})
+
+describe('resolveCtaUrl', () => {
+    it('TC-NAV-DYN-13: returns contact page URL when contact-type page exists', () => {
+        // Arrange
+        const links = [
+            { label: 'Home', url: '/' },
+            { label: 'Gallery', url: '/gallery' },
+            { label: 'Contact', url: '/contact' },
+        ] as const
+        // Act + Assert
+        expect(resolveCtaUrl(links)).toBe('/contact')
+    })
+
+    it('TC-NAV-DYN-14: falls back to last page URL when no contact-type page', () => {
+        // Arrange — AI generated [Home, Portfolio, Blog] with no Contact
+        const links = [
+            { label: 'Home', url: '/' },
+            { label: 'Portfolio', url: '/portfolio' },
+            { label: 'Blog', url: '/blog' },
+        ] as const
+        // Act + Assert — should point to last real page, not dead /contact
+        expect(resolveCtaUrl(links)).toBe('/blog')
+    })
+
+    it('TC-NAV-DYN-15: force-replace updates ctaButton URL alongside nav links', () => {
+        // Arrange — nav with Contact in aiPageLinks
+        const navWithCta = {
+            blockType: 'navigation',
+            links: [{ label: 'Home', url: '/' }, { label: 'Old', url: '/old' }],
+            ctaButton: { label: 'Get in touch', url: '/contact', show: true },
+        }
+        const AI_WITH_CONTACT = [
+            { label: 'Home', url: '/' },
+            { label: 'Services', url: '/services' },
+            { label: 'Contact', url: '/contact' },
+        ] as const
+        const pages = [{ title: 'Home', slug: '/', isHomepage: true, layout: [navWithCta], seo: { title: 't', description: 'd' } }]
+        // Act
+        const result = ensureNavigationBlocks(pages, 'Acme', AI_WITH_CONTACT)
+        // Assert — ctaButton.url stays /contact (contact page exists)
+        const nav = result[0].layout[0] as Record<string, unknown>
+        const cta = nav.ctaButton as Record<string, unknown>
+        expect(cta.url).toBe('/contact')
+    })
+
+    it('TC-NAV-DYN-16: force-replace updates ctaButton to last page when no contact page', () => {
+        // Arrange — AI generated [Home, Portfolio, Blog] with NO Contact
+        const navWithCta = {
+            blockType: 'navigation',
+            links: [{ label: 'Home', url: '/' }],
+            ctaButton: { label: 'Contact Us', url: '/contact', show: true },
+        }
+        const AI_NO_CONTACT = [
+            { label: 'Home', url: '/' },
+            { label: 'Portfolio', url: '/portfolio' },
+            { label: 'Blog', url: '/blog' },
+        ] as const
+        const pages = [{ title: 'Home', slug: '/', isHomepage: true, layout: [navWithCta], seo: { title: 't', description: 'd' } }]
+        // Act
+        const result = ensureNavigationBlocks(pages, 'Acme', AI_NO_CONTACT)
+        // Assert — ctaButton.url updated to last page, NOT dead /contact
+        const nav = result[0].layout[0] as Record<string, unknown>
+        const cta = nav.ctaButton as Record<string, unknown>
+        expect(cta.url).toBe('/blog')
+        expect(cta.url).not.toBe('/contact')
     })
 })

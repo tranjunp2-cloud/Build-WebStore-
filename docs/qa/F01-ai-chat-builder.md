@@ -269,6 +269,10 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-NAV-DYN-10 | GH-817 | Unit | Fallback `Page N` khi title bị thiếu | Page không có title | `label: 'Page 2'` | Medium | [x] |
 | TC-NAV-DYN-11 | GH-817 | Unit | Non-hollow nav (hardcoded từ enforcer) bị force-replace bằng aiPageLinks | Nav có 4 hardcoded links [Home/About/Services/Contact], truyền aiPageLinks [Home/Gallery/Blog/Contact] | Nav links = aiPageLinks, không phải hardcoded links | Blocker | [x] |
 | TC-NAV-DYN-12 | GH-817 | Unit | Non-hollow nav giữ nguyên khi không có pageLinks (back-compat) | Nav có links, không truyền pageLinks | Links giữ nguyên như cũ | High | [x] |
+| TC-NAV-DYN-13 | GH-817 | Unit | `resolveCtaUrl` trả URL contact page khi có trong aiPageLinks | aiPageLinks có `{label:'Contact', url:'/contact'}` | Trả `/contact` | Blocker | [x] |
+| TC-NAV-DYN-14 | GH-817 | Unit | `resolveCtaUrl` fallback về last page khi không có contact | aiPageLinks: [Home, Portfolio, Blog] (không có Contact) | Trả `/blog` (last page), không phải `/contact` chết | Blocker | [x] |
+| TC-NAV-DYN-15 | GH-817 | Unit | force-replace cũng cập nhật ctaButton URL khi Contact tồn tại | Nav có ctaButton `/contact`, aiPageLinks có Contact | ctaButton.url = `/contact` | Blocker | [x] |
+| TC-NAV-DYN-16 | GH-817 | Unit | force-replace cập nhật ctaButton về last page khi không có Contact | Nav có ctaButton `/contact`, aiPageLinks không có Contact | ctaButton.url = last page, không phải `/contact` | Blocker | [x] |
 
 ---
 

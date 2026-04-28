@@ -27,7 +27,7 @@ import { buildImagePool } from '@/lib/ai/image-pool'
 import { translateProductTerm } from '@/lib/ai/product-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
-import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
+import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
 import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
@@ -1051,7 +1051,8 @@ function applyGeneratedSiteNavigation(
                 ctaButton: block.ctaButton
                     ? {
                         ...block.ctaButton,
-                        url: normalizeInternalUrl(block.ctaButton.url),
+                        // Resolve to a real generated page — avoids /contact 404 when no Contact page exists.
+                        url: resolveCtaUrl(links),
                     }
                     : block.ctaButton,
             }
