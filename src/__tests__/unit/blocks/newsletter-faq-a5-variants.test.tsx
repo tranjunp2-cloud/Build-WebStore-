@@ -51,10 +51,10 @@ const faqItems = [
 ]
 
 describe('TC-F01D-A5.N01: Newsletter variant enum + meta sync', () => {
-    it('exports 6 variants', () => {
-        expect(NEWSLETTER_VARIANTS).toHaveLength(6)
+    it('exports 5 variants (popup temporarily disabled: Bug #791)', () => {
+        expect(NEWSLETTER_VARIANTS).toHaveLength(5)
         expect(NEWSLETTER_VARIANTS).toEqual(
-            expect.arrayContaining(['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid']),
+            expect.arrayContaining(['inline', 'banner', 'stacked-card', 'minimal', 'incentive-grid']),
         )
     })
 

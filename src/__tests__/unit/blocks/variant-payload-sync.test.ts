@@ -65,7 +65,7 @@ const PAGES_VARIANTS: Record<string, string[]> = {
     faq: ['accordion', 'grid', 'simple', 'two-column-accordion', 'chat-bubbles', 'numbered'],
     team: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'],
     cta: ['banner', 'inline', 'card', 'floating-sticky', 'image-bg', 'split-testimonial', 'dark-card', 'mesh-gradient-hero'],
-    newsletter: ['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid'],
+    newsletter: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'banner', 'stacked-card', 'minimal', 'incentive-grid'],
     'logo-cloud': ['row', 'grid'],
     'service-cards': ['grid', 'list', 'featured'],
 }

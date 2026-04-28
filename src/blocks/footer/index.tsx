@@ -1,12 +1,11 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+
 import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
 import { GradientLine } from '../shared/decorative'
 import { getSocialIcon } from '../shared/social-icons'
-import { FooterNewsletterForm } from './FooterNewsletterForm'
 import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Heading, Body, Caption } from '../shared/Typography'
@@ -32,7 +31,7 @@ function SocialIcon({ platform }: { platform: string }) {
 // vars). Brand identity vars (`--brand-primary`, `--brand-primary-rgb`) stay
 // untouched per Option C additive strategy.
 
-// Shared opacity + brand-tint tokens — dedupe magic numbers across 6 variants.
+// Shared opacity + brand-tint tokens — dedupe magic numbers across variants.
 const FOOTER_OPACITY = {
     title: 0.9,
     body: 0.7,
@@ -45,75 +44,6 @@ const FOOTER_BRAND_GRADIENT_STOP = 0.502
 
 // Progressive gap: tight mobile → comfortable desktop. Applied to all grid variants.
 const FOOTER_RESPONSIVE_GAP = 'gap-6 sm:gap-8 md:gap-10'
-// Tailwind JIT-safe lookup — dynamic class strings are not detected at build time.
-// md:grid-cols-1 md:grid-cols-2 md:grid-cols-3 md:grid-cols-4 md:grid-cols-5 md:grid-cols-6
-const FOOTER_MD_COLS: Record<number, string> = { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4', 5: 'md:grid-cols-5', 6: 'md:grid-cols-6' }
-
-type FooterSectionProps = {
-    paddingClass: string
-    showGradientLine?: boolean
-    style?: React.CSSProperties
-    children: ReactNode
-}
-
-/**
- * Wrapper: <footer> + relative + GradientLine + token container.
- * Replaces inline `container mx-auto px-6` (used in 6 variants).
- *
- * Note: SectionWrapper not used here — footer GradientLine needs absolute
- * positioning relative to the OUTER footer (full width), not the inner
- * max-w-6xl container. Local wrapper keeps `relative` on the footer tag.
- */
-/**
- * Plan 260415 Lỗi C — wrap footer trong motion.footer để scroll reveal.
- * Fade-in y: 30 → 0 khi scroll vào viewport. Respect prefers-reduced-motion →
- * skip animation entirely (render static <footer>).
- */
-const FOOTER_VARIANTS = {
-    hidden: { opacity: 0, y: 30 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
-    },
-}
-
-function FooterSection({ paddingClass, showGradientLine = true, style, children }: FooterSectionProps) {
-    const shouldReduce = useReducedMotion()
-
-    const innerContent = (
-        <>
-            {showGradientLine && (
-                <GradientLine
-                    from={CSS_VARS.primary}
-                    to={`rgba(var(--brand-primary-rgb), 0)`}
-                    className="absolute top-0 left-0"
-                    height={1}
-                />
-            )}
-            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
-                {children}
-            </div>
-        </>
-    )
-
-    if (shouldReduce) {
-        return <footer className={`${paddingClass} relative`} style={style}>{innerContent}</footer>
-    }
-
-    return (
-        <motion.footer
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-80px' }}
-            variants={FOOTER_VARIANTS}
-            className={`${paddingClass} relative`}
-            style={style}
-        >
-            {innerContent}
-        </motion.footer>
-    )
-}
 
 type BrandLogoProps = {
     logoText?: string
@@ -253,18 +183,6 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
     const { logoText, tagline, columns = [], copyrightText, backgroundColor, variant = 'simple' } = mergedBlock
     const footerStyle: React.CSSProperties = backgroundColor ? { backgroundColor } : {}
-    // Plan 260415 Lỗi G-pattern — safe String cast cho siteId (dùng trong newsletter form POST)
-    const siteId = site?.id != null ? String(site.id) : undefined
-
-    /**
-     * Plan 260415 Lỗi F — legal links (privacy/terms/cookies). Config optional,
-     * fallback về /privacy /terms (default site pages). Admin có thể override
-     * qua `block.legalLinks.privacy` nếu có.
-     */
-    const legalLinks = {
-        privacy: (block as unknown as { legalLinks?: { privacy?: string } })?.legalLinks?.privacy || '/privacy',
-        terms: (block as unknown as { legalLinks?: { terms?: string } })?.legalLinks?.terms || '/terms',
-    }
 
     const copyrightLine = copyrightText
         ? copyrightText.replace(/\d{4}/, String(new Date().getFullYear()))
@@ -273,47 +191,57 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     const socialsArr = (mergedBlock.socials && Array.isArray(mergedBlock.socials) ? mergedBlock.socials : []) as { url?: string; platform?: string; label?: string }[]
 
     // ── Centered Stack variant ────────────────────────────────────────────
+    // BUG-F05-792: plain <footer> — same fix as simple/minimal to avoid motion.footer
+    // staying invisible when already in viewport inside the editor iframe.
     if (variant === 'centered-stack') {
         return (
-            <FooterSection paddingClass={SECTION_PADDING.compact} style={footerStyle}>
-                <div className="text-center">
-                    <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4 mx-auto" />
-                    {tagline && (
-                        <Body size="small" className="opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
-                    )}
+            <footer className={`${SECTION_PADDING.compact} relative`} style={footerStyle}>
+                <GradientLine
+                    from={CSS_VARS.primary}
+                    to={`rgba(var(--brand-primary-rgb), 0)`}
+                    className="absolute top-0 left-0"
+                    height={1}
+                />
+                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+                    <div className="text-center">
+                        <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4 flex justify-center" />
+                        {tagline && (
+                            <Body size="small" className="opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
+                        )}
 
-                    {/* Link columns as horizontal lists */}
-                    {columns.length > 0 && (
-                        <div className="mb-8 space-y-4">
-                            {columns.map((col, i) => (
-                                <div key={`${col.title}-${i}`}>
-                                    <Heading
-                                        level={4}
-                                        className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-2"
-                                    >
-                                        {col.title}
-                                    </Heading>
-                                    <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
-                                        {(col.links || []).map((link, j) => (
-                                            <a
-                                                key={`${link?.label || 'link'}-${j}`}
-                                                href={link?.url}
-                                                className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
-                                            >
-                                                <Body size="small" as="span">{link.label}</Body>
-                                            </a>
-                                        ))}
+                        {/* Link columns as horizontal lists */}
+                        {columns.length > 0 && (
+                            <div className="mb-8 space-y-4">
+                                {columns.map((col, i) => (
+                                    <div key={`${col.title}-${i}`}>
+                                        <Heading
+                                            level={4}
+                                            className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-2"
+                                        >
+                                            {col.title}
+                                        </Heading>
+                                        <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
+                                            {(col.links || []).map((link, j) => (
+                                                <a
+                                                    key={`${link?.label || 'link'}-${j}`}
+                                                    href={link?.url}
+                                                    className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                                >
+                                                    <Body size="small" as="span">{link.label}</Body>
+                                                </a>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                ))}
+                            </div>
+                        )}
 
-                    <SocialIconList socials={socialsArr} className="justify-center mb-8" />
+                        <SocialIconList socials={socialsArr} className="justify-center mb-8" />
 
-                    <Caption className="opacity-60">{copyrightLine}</Caption>
+                        <Caption className="opacity-60">{copyrightLine}</Caption>
+                    </div>
                 </div>
-            </FooterSection>
+            </footer>
         )
     }
 
@@ -369,65 +297,60 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
 
 
     // ── Minimal variant ──────────────────────────────────────────────────
-    // Plan 260415 Lỗi 14F — minimal variant không show GradientLine (visual noise unnecessary).
+    // BUG-F05-792: plain <footer> — no motion.footer/whileInView to avoid
+    // staying invisible when already in viewport (e.g. short iframe preview).
+    // Mirror nav header links so minimal footer stays in sync with navigation.
+    // Falls back to columns[0] if no header links configured.
     if (variant === 'minimal') {
-        // All flat links from all columns
-        const allLinks = columns.flatMap(col => col.links || [])
+        const navHeaderLinks = ((site?.headerBlock as Record<string, unknown> | undefined)?.links as { label?: string; url?: string }[] | undefined)?.filter(l => l?.url)
+        const firstColLinks = (navHeaderLinks?.length ? navHeaderLinks : columns[0]?.links) || []
 
         return (
-            <FooterSection paddingClass="py-6" showGradientLine={false} style={footerStyle}>
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                    {/* Logo / brand text — left */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="sm" />
-                    </div>
-
-                    {/* Links — center */}
-                    {allLinks.length > 0 && (
-                        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
-                            {allLinks.slice(0, 6).map((link, i) => (
-                                <a
-                                    key={`${link?.label || 'link'}-${i}`}
-                                    href={link?.url}
-                                    className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
-                                >
-                                    <Body size="small" as="span">{link.label}</Body>
-                                </a>
-                            ))}
+            <footer className="py-6 relative" style={footerStyle}>
+                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                        {/* Logo / brand text — left */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="sm" />
                         </div>
-                    )}
 
-                    {/* Copyright — right */}
-                    <Caption className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
+                        {/* First-column links — center */}
+                        {firstColLinks.length > 0 && (
+                            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
+                                {firstColLinks.slice(0, 6).map((link, i) => (
+                                    <a
+                                        key={`${link?.label || 'link'}-${i}`}
+                                        href={link?.url}
+                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                    >
+                                        <Body size="small" as="span">{link.label}</Body>
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Copyright — right */}
+                        <Caption className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
+                    </div>
                 </div>
-            </FooterSection>
+            </footer>
         )
     }
 
     // ── Default: simple ──────────────────────────────────────────────────
-    const mdColsCls = FOOTER_MD_COLS[Math.min(Math.max(columns.length + 1, 1), 6)] ?? 'md:grid-cols-1'
+    // BUG-F05-792: single-line bar — plain <footer> (no motion/whileInView) so it never
+    // stays invisible when already in viewport (same fix as minimal above).
     return (
-        <FooterSection paddingClass="pt-16 md:pt-20 pb-8" style={footerStyle}>
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${mdColsCls} ${FOOTER_RESPONSIVE_GAP} mb-16`}>
-                {/* Brand Column */}
-                <div>
-                    <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4" />
-                    {tagline && (
-                        <Body size="small" className="opacity-70 leading-relaxed max-w-xs">{tagline}</Body>
+        <footer className="py-5 relative" style={footerStyle}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="sm" />
+                    {socialsArr.length > 0 && (
+                        <SocialIconList socials={socialsArr} iconSize="sm" />
                     )}
-                    <SocialIconList socials={socialsArr} className="mt-6" />
+                    <Caption className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
                 </div>
-
-                {/* Link Columns */}
-                {columns.map((col, i) => (
-                    <LinkColumn key={`${col.title}-${i}`} title={col.title} links={col.links || []} />
-                ))}
             </div>
-
-            {/* Bottom bar */}
-            <div className="pt-8 text-center" style={FOOTER_DIVIDER_STYLE}>
-                <Caption className="opacity-60">{copyrightLine}</Caption>
-            </div>
-        </FooterSection>
+        </footer>
     )
 }

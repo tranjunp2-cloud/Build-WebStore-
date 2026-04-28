@@ -517,7 +517,8 @@ export function NewsletterBlock({ block, site }: BlockProps<NewsletterConfig>) {
 
     switch (variant) {
         case 'popup':
-            return <PopupVariant block={block} siteId={siteId} />
+            // return <PopupVariant block={block} siteId={siteId} /> // Temporarily disabled: Bug #791
+            return <InlineVariant block={block} siteId={siteId} />
         case 'banner':
             return <BannerVariant block={block} siteId={siteId} />
         case 'stacked-card':

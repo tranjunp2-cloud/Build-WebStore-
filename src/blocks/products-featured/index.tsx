@@ -171,11 +171,9 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                         </div>
                     )}
 
-                    <h2 className="text-5xl lg:text-7xl font-bold font-heading mb-6 leading-tight">{product.name}</h2>
+                    <RichText text={product.name} as="h2" className="text-5xl lg:text-7xl font-bold font-heading mb-6 leading-tight" />
 
-                    {product.price && (
-                        <p className="text-4xl font-heading mb-6" style={{ color: 'var(--brand-primary)' }}>{product.price}</p>
-                    )}
+                    <RichText text={product.price} as="p" className="text-4xl font-heading mb-6" style={{ color: 'var(--brand-primary)' }} />
 
                     {product.description && (
                         <Body size="lg" className="opacity-70 mb-10 max-w-lg">

@@ -253,6 +253,31 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 
 ---
 
+### 3.15 Navigation Dynamic Mapping (GH-817)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-NAV-DYN-01 | GH-817 | Unit | `extractPageLinks(undefined)` trả null | Call `extractPageLinks(undefined)` | Trả về `null` | Blocker | [x] |
+| TC-NAV-DYN-02 | GH-817 | Unit | `extractPageLinks([])` trả null | Call `extractPageLinks([])` | Trả về `null` | Blocker | [x] |
+| TC-NAV-DYN-03 | GH-817 | Unit | Map multi-page list sang label/url đúng | `extractPageLinks([{title:'Home',slug:'/',isHomepage:true},{title:'Services',slug:'services'}])` | `[{label:'Home',url:'/'},{label:'Services',url:'/services'}]` | Blocker | [x] |
+| TC-NAV-DYN-04 | GH-817 | Unit | Page đầu tiên luôn có url "/" | Page đầu không có `isHomepage`, slug là "/" | `url` = `"/"` | High | [x] |
+| TC-NAV-DYN-05 | GH-817 | Unit | Non-homepage page thêm leading slash cho bare slug | `slug: 'gallery'` | `url: '/gallery'` | High | [x] |
+| TC-NAV-DYN-06 | GH-817 | Unit | Nav bị thiếu → inject nav dùng pageLinks | `ensureNavigationBlocks(pages, 'Acme', AI_PAGE_LINKS)`, page không có nav block | Nav injected có links === AI_PAGE_LINKS | Blocker | [x] |
+| TC-NAV-DYN-07 | GH-817 | Unit | Không truyền pageLinks → dùng DEFAULT_NAV_LINKS (back-compat) | `ensureNavigationBlocks(pages, 'Acme')` không có pageLinks | Links = DEFAULT_NAV_LINKS | Blocker | [x] |
+| TC-NAV-DYN-08 | GH-817 | Unit | Hollow nav (links rỗng) được patch bằng pageLinks | Nav block có `links: []`, truyền AI_PAGE_LINKS | Nav links = AI_PAGE_LINKS | Blocker | [x] |
+| TC-NAV-DYN-09 | GH-817 | Unit | Strip double leading slash khỏi slug | `slug: '/about'` | `url: '/about'` (không phải `'//about'`) | High | [x] |
+| TC-NAV-DYN-10 | GH-817 | Unit | Fallback `Page N` khi title bị thiếu | Page không có title | `label: 'Page 2'` | Medium | [x] |
+| TC-NAV-DYN-11 | GH-817 | Unit | Non-hollow nav (hardcoded từ enforcer) bị force-replace bằng aiPageLinks | Nav có 4 hardcoded links [Home/About/Services/Contact], truyền aiPageLinks [Home/Gallery/Blog/Contact] | Nav links = aiPageLinks, không phải hardcoded links | Blocker | [x] |
+| TC-NAV-DYN-12 | GH-817 | Unit | Non-hollow nav giữ nguyên khi không có pageLinks (back-compat) | Nav có links, không truyền pageLinks | Links giữ nguyên như cũ | High | [x] |
+| TC-NAV-DYN-13 | GH-817 | Unit | `resolveCtaUrl` trả URL contact page khi có trong aiPageLinks | aiPageLinks có `{label:'Contact', url:'/contact'}` | Trả `/contact` | Blocker | [x] |
+| TC-NAV-DYN-14 | GH-817 | Unit | `resolveCtaUrl` fallback về last page khi không có contact | aiPageLinks: [Home, Portfolio, Blog] (không có Contact) | Trả `/blog` (last page), không phải `/contact` chết | Blocker | [x] |
+| TC-NAV-DYN-15 | GH-817 | Unit | force-replace cũng cập nhật ctaButton URL khi Contact tồn tại | Nav có ctaButton `/contact`, aiPageLinks có Contact | ctaButton.url = `/contact` | Blocker | [x] |
+| TC-NAV-DYN-16 | GH-817 | Unit | force-replace cập nhật ctaButton về last page khi không có Contact | Nav có ctaButton `/contact`, aiPageLinks không có Contact | ctaButton.url = last page, không phải `/contact` | Blocker | [x] |
+| TC-NAV-SYNC-17 | GH-817 | Integration | Post-creation nav sync: link của page bị lỗi bị xoá khỏi nav | AI gen [Home, Services, Contact], Contact page create fail → pageFailures = [{slug:'contact'}] | Nav links của Home, Services chỉ còn [Home, Services], không còn Contact | Blocker | [ ] |
+| TC-NAV-SYNC-18 | GH-817 | Integration | Post-creation nav sync: ctaButton được cập nhật theo surviving links | Tương tự TC-17 + nav có ctaButton.url='/contact' | ctaButton.url = last surviving page (e.g. '/services') | Blocker | [ ] |
+
+---
+
 ### 3.14 Luồng Phụ — Template Flow (US-F01-02)
 
 | ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |

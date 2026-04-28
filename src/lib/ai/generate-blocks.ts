@@ -194,7 +194,7 @@ const VARIANT_OPTIONS: Record<string, string[]> = {
     gallery: ['grid', 'masonry', 'carousel', 'lightbox'],
     navigation: ['simple', 'centered', 'transparent', 'pill'],
     about: ['simple', 'split', 'story', 'two-column', 'founder-quote', 'centered-large', 'image-overlay'],
-    newsletter: ['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid'],
+    newsletter: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'banner', 'stacked-card', 'minimal', 'incentive-grid'],
     team: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'],
     pricing: ['cards', 'table', 'horizontal', 'toggle'],
 }
@@ -745,6 +745,45 @@ function buildContact(name: string, content: ContentSet, variant: string): Gener
 }
 
 function buildFooter(name: string, heroSub: string, variant: string): GeneratedBlock {
+    // simple = 1-line bar (logo + socials + copyright), no columns/tagline
+    if (variant === 'simple') {
+        return {
+            blockType: 'footer',
+            variant,
+            logoText: name,
+            columns: [],
+            copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`,
+            socials: [
+                { platform: 'facebook', url: '#' },
+                { platform: 'instagram', url: '#' },
+                { platform: 'whatsapp', url: '#' },
+            ],
+        }
+    }
+
+    // minimal = compact bar with first-column links only
+    if (variant === 'minimal') {
+        return {
+            blockType: 'footer',
+            variant,
+            logoText: name,
+            columns: [
+                {
+                    title: 'Links',
+                    links: [
+                        { label: 'Home', url: '#' },
+                        { label: 'About', url: '#about' },
+                        { label: 'Services', url: '#features' },
+                        { label: 'Contact', url: '#contact' },
+                    ],
+                },
+            ],
+            copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`,
+            socials: [],
+        }
+    }
+
+    // centered-stack / dark-gradient — full columns + tagline
     return {
         blockType: 'footer',
         variant,

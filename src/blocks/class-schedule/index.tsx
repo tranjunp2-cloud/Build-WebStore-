@@ -130,7 +130,7 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                                                     className="p-2 rounded-lg text-xs mb-1 overflow-hidden"
                                                     style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, borderLeft: `3px solid var(--brand-primary)` }}
                                                 >
-                                                    <p className="font-bold leading-tight truncate">{c.name}</p>
+                                                    <RichText text={c.name} as="p" className="font-bold leading-tight truncate" />
                                                     <p className="opacity-60 truncate">{c.startTime} - {c.endTime}</p>
                                                     <p className="opacity-50 truncate">{c.instructor}</p>
                                                 </div>
@@ -191,7 +191,7 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="font-bold font-heading">{c.name}</h4>
+                                <RichText text={c.name} as="h4" className="font-bold font-heading" />
                                 {c.level && (
                                     <span
                                         className="px-2 py-0.5 rounded-full text-xs"
@@ -242,7 +242,7 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                         </span>
                         {c.level && <span className="text-xs opacity-40">{c.level}</span>}
                     </div>
-                    <h4 className="text-lg font-bold font-heading mb-1">{c.name}</h4>
+                    <RichText text={c.name} as="h4" className="text-lg font-bold font-heading mb-1" />
                     <p className="text-sm opacity-50 mb-3">{c.instructor}{c.category ? ` \u2022 ${c.category}` : ''}</p>
                     <div className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--brand-primary)' }}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

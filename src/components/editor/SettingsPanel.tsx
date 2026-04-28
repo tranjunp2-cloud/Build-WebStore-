@@ -200,6 +200,10 @@ function SettingsPanelInner({
     }, [block])
     const bk = `${blockIndex}-${blockDataVersion.length}` // short block key for input keys
     const fbk = `footer-${((footerBlock?.columns as unknown[]) || []).length}-${footerBlock?.variant || ''}` // footer block key
+    const footerVariant = (footerBlock?.variant as string) || 'simple'
+    const footerShowColumns = footerVariant !== 'simple' && footerVariant !== 'minimal'
+    const footerShowSocials = footerVariant !== 'minimal'
+    const footerShowTagline = footerVariant === 'centered-stack' || footerVariant === 'dark-gradient'
 
     const [localPaddingTop, setLocalPaddingTop] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? 32))
     const [localPaddingBottom, setLocalPaddingBottom] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? 32))
@@ -955,7 +959,8 @@ function SettingsPanelInner({
                                             className="mt-1 h-8 text-[12px]"
                                         />
                                     </div>
-                                    {/* Company Description */}
+                                    {/* Company Description — only for variants that render tagline */}
+                                    {footerShowTagline && (
                                     <div>
                                         <label className={labelCls}>{s.companyDescription}</label>
                                         <Textarea
@@ -966,19 +971,22 @@ function SettingsPanelInner({
                                             className="mt-1 min-h-[66px] resize-none rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#0b1120] px-3 py-2 text-[12px] text-white placeholder:text-slate-400 outline-none focus:border-blue-500/30"
                                         />
                                     </div>
+                                    )}
                                 </div>
                                 )
                             })()}
                         </div>
 
-                        {/* Column Link Editor — rendered directly, no extra wrapper label */}
-                        <FooterLinkEditor
-                            columns={(footerBlock?.columns as FooterColumn[]) || []}
-                            onUpdate={(cols) => onFooterUpdate?.({ columns: cols })}
-                        />
+                        {/* Column Link Editor — hidden for simple; minimal uses single-column mode */}
+                        {footerShowColumns && (
+                            <FooterLinkEditor
+                                columns={(footerBlock?.columns as FooterColumn[]) || []}
+                                onUpdate={(cols) => onFooterUpdate?.({ columns: cols })}
+                            />
+                        )}
 
-                        {/* Social Media */}
-                        <div className="mb-4">
+                        {/* Social Media — hidden for minimal (no socials rendered) */}
+                        {footerShowSocials && <div className="mb-4">
                             <button
                                 type="button"
                                 onClick={() => setIsFooterSocialOpen(v => !v)}
@@ -1023,7 +1031,7 @@ function SettingsPanelInner({
                                     })}
                                 </div>
                             )}
-                        </div>
+                        </div>}
 
                         {/* Copyright Text */}
                         <div className="mb-4">
