@@ -843,6 +843,75 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // GH-817 post-creation nav sync: if any pages failed to create, their links are
+        // still present in nav blocks of successfully saved pages (because aiPageLinks
+        // was computed BEFORE the for-loop). Patch nav on all created pages so only
+        // links whose corresponding page was actually persisted remain in the menu.
+        if (pageFailures.length > 0 && aiPageLinks && createdPages.length > 0) {
+            const succeededSlugs = new Set(
+                createdPages.map(p => {
+                    const s = String(p.slug ?? '')
+                    return s === '/' ? '/' : s.replace(/^\/+/, '')
+                }),
+            )
+            const survivingLinks = aiPageLinks.filter(l => {
+                const normalized = l.url === '/' ? '/' : l.url.replace(/^\/+/, '')
+                return succeededSlugs.has(normalized)
+            })
+
+            if (survivingLinks.length < aiPageLinks.length) {
+                const survivingCtaUrl = resolveCtaUrl(survivingLinks)
+                for (const createdPage of createdPages) {
+                    const rawLayout = Array.isArray(createdPage.layout)
+                        ? (createdPage.layout as Record<string, unknown>[])
+                        : []
+                    const navIdx = rawLayout.findIndex(
+                        b => typeof b?.blockType === 'string' &&
+                            ['navigation', 'header', 'navbar'].includes((b.blockType as string).toLowerCase()),
+                    )
+                    if (navIdx === -1) continue
+
+                    const navBlock = rawLayout[navIdx]!
+                    const patchedNav: Record<string, unknown> = {
+                        ...navBlock,
+                        links: survivingLinks.map(l => ({ ...l })),
+                        ...(navBlock.ctaButton && typeof navBlock.ctaButton === 'object'
+                            ? { ctaButton: { ...(navBlock.ctaButton as Record<string, unknown>), url: survivingCtaUrl } }
+                            : {}),
+                    }
+                    const patchedLayout = [
+                        ...rawLayout.slice(0, navIdx),
+                        patchedNav,
+                        ...rawLayout.slice(navIdx + 1),
+                    ]
+                    try {
+                        await payload.update({
+                            collection: 'pages',
+                            id: createdPage.id as string | number,
+                            data: { layout: patchedLayout },
+                        })
+                    } catch (navSyncErr) {
+                        console.warn(
+                            '[generate-site] nav-sync patch failed page=%s: %s',
+                            createdPage.slug,
+                            navSyncErr instanceof Error ? navSyncErr.message : navSyncErr,
+                        )
+                    }
+                }
+                // Patch sanitizedBlocks nav so headerBlock persistence below also reflects surviving pages
+                const navInSanitized = sanitizedBlocks.find(b => b.blockType === 'navigation')
+                if (navInSanitized) {
+                    navInSanitized.links = survivingLinks.map(l => ({ ...l }))
+                    if (navInSanitized.ctaButton && typeof navInSanitized.ctaButton === 'object') {
+                        ;(navInSanitized.ctaButton as Record<string, unknown>).url = survivingCtaUrl
+                    }
+                }
+                console.info(
+                    `[generate-site] nav-sync: removed ${aiPageLinks.length - survivingLinks.length} ghost link(s), patched ${createdPages.length} page(s)`,
+                )
+            }
+        }
+
         // BUG-F05-005: Auto-create 404 page for every new site
         try {
             await payload.create({

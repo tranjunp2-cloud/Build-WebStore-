@@ -273,6 +273,8 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-NAV-DYN-14 | GH-817 | Unit | `resolveCtaUrl` fallback về last page khi không có contact | aiPageLinks: [Home, Portfolio, Blog] (không có Contact) | Trả `/blog` (last page), không phải `/contact` chết | Blocker | [x] |
 | TC-NAV-DYN-15 | GH-817 | Unit | force-replace cũng cập nhật ctaButton URL khi Contact tồn tại | Nav có ctaButton `/contact`, aiPageLinks có Contact | ctaButton.url = `/contact` | Blocker | [x] |
 | TC-NAV-DYN-16 | GH-817 | Unit | force-replace cập nhật ctaButton về last page khi không có Contact | Nav có ctaButton `/contact`, aiPageLinks không có Contact | ctaButton.url = last page, không phải `/contact` | Blocker | [x] |
+| TC-NAV-SYNC-17 | GH-817 | Integration | Post-creation nav sync: link của page bị lỗi bị xoá khỏi nav | AI gen [Home, Services, Contact], Contact page create fail → pageFailures = [{slug:'contact'}] | Nav links của Home, Services chỉ còn [Home, Services], không còn Contact | Blocker | [ ] |
+| TC-NAV-SYNC-18 | GH-817 | Integration | Post-creation nav sync: ctaButton được cập nhật theo surviving links | Tương tự TC-17 + nav có ctaButton.url='/contact' | ctaButton.url = last surviving page (e.g. '/services') | Blocker | [ ] |
 
 ---
 
