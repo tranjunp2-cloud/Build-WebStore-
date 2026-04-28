@@ -493,7 +493,7 @@ function buildContact(biz: BusinessSample): Record<string, unknown> {
     formFields: [
       { label: 'Name', fieldName: 'name', fieldType: 'text', placeholder: 'Your full name', required: true },
       { label: 'Email', fieldName: 'email', fieldType: 'email', placeholder: 'your@email.com', required: true },
-      { label: 'Phone', fieldName: 'phone', fieldType: 'tel', placeholder: '+60 12-345 6789', required: false },
+      { label: 'Phone', fieldName: 'phone', fieldType: 'phone', placeholder: '+60 12-345 6789', required: false },
       { label: 'Message', fieldName: 'message', fieldType: 'textarea', placeholder: 'How can we help you?', required: true },
     ],
   }

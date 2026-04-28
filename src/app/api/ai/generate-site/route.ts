@@ -1449,10 +1449,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                     else if (name.includes('message') || name.includes('content') || name.includes('mesej')) fieldType = 'textarea'
                     return { fieldName: field, label: field, fieldType, required: true }
                 }
+                const VALID_FIELD_TYPES = ['text', 'email', 'phone', 'textarea', 'select']
+                let ft = String(field.fieldType || field.type || 'text')
+                if (ft === 'tel' || ft === 'telephone') ft = 'phone'
+                if (ft === 'number') ft = 'text'
+                if (!VALID_FIELD_TYPES.includes(ft)) ft = 'text'
                 return {
                     fieldName: String(field.fieldName || field.name || field.id || 'field'),
                     label: String(field.label || field.fieldName || field.name || 'Field'),
-                    fieldType: field.fieldType || field.type || 'text',
+                    fieldType: ft,
                     required: field.required !== undefined ? field.required : true,
                     placeholder: field.placeholder || '',
                 }
@@ -1602,18 +1607,22 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             })
         }
 
-        // ── FAQ: items[] normalization ──
-        if (sanitized.blockType === 'faq' && Array.isArray(sanitized.items)) {
-            sanitized.items = sanitized.items.map((itemRaw: unknown) => {
-                if (typeof itemRaw === 'string') {
-                    return { question: itemRaw, answer: '...' }
-                }
-                const item = (typeof itemRaw === 'object' && itemRaw !== null) ? itemRaw as Record<string, unknown> : {};
-                return {
-                    question: String(item.question || item.title || item.q || 'Question?'),
-                    answer: String(item.answer || item.description || item.a || 'Answer.'),
-                }
-            })
+        // ── FAQ: normalize items/faqs array — Payload schema uses 'faqs' not 'items' ──
+        if (sanitized.blockType === 'faq') {
+            const rawFaqs = sanitized.faqs || sanitized.items
+            if (Array.isArray(rawFaqs)) {
+                sanitized.faqs = rawFaqs.map((itemRaw: unknown) => {
+                    if (typeof itemRaw === 'string') {
+                        return { question: itemRaw, answer: '...' }
+                    }
+                    const item = (typeof itemRaw === 'object' && itemRaw !== null) ? itemRaw as Record<string, unknown> : {}
+                    return {
+                        question: String(item.question || item.title || item.q || 'Question?'),
+                        answer: String(item.answer || item.description || item.a || 'Answer.'),
+                    }
+                })
+                delete sanitized.items
+            }
         }
 
         // ── Logo Cloud: strip logos (needs real media) ──
