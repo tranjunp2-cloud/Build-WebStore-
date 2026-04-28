@@ -279,6 +279,150 @@ describe('EditorStore', () => {
         })
     })
 
+    describe('footer-last invariant (US-792)', () => {
+        const blocksWithFooter = [
+            { blockType: 'hero', heading: 'Hero' },
+            { blockType: 'features', items: [] },
+            { blockType: 'about', content: 'About' },
+            { blockType: 'footer', variant: 'simple' },
+        ]
+
+        beforeEach(() => {
+            useEditorStore.getState().init('site-1', blocksWithFooter, mockTheme, 'Test Site')
+        })
+
+        describe('addBlock', () => {
+            it('should clamp insert position to before footer when afterIndex >= footerIdx', () => {
+                // footer is at index 3; trying to insert after index 3 should land before it
+                useEditorStore.getState().addBlock(3, { blockType: 'cta', text: 'CTA' })
+                const blocks = useEditorStore.getState().blocks
+                expect(blocks[blocks.length - 1].blockType).toBe('footer')
+                const ctaIdx = blocks.findIndex(b => b.blockType === 'cta')
+                const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+                expect(ctaIdx).toBeLessThan(footerIdx)
+            })
+
+            it('should allow normal insert before footer position', () => {
+                useEditorStore.getState().addBlock(0, { blockType: 'cta', text: 'CTA' })
+                const blocks = useEditorStore.getState().blocks
+                expect(blocks[1].blockType).toBe('cta')
+                expect(blocks[blocks.length - 1].blockType).toBe('footer')
+            })
+
+            it('should place block before footer when no footer exists', () => {
+                useEditorStore.getState().init('site-1', [{ blockType: 'hero', heading: 'H' }], mockTheme, 'Test')
+                useEditorStore.getState().addBlock(0, { blockType: 'features', items: [] })
+                const blocks = useEditorStore.getState().blocks
+                expect(blocks[1].blockType).toBe('features')
+            })
+        })
+
+        describe('duplicateBlock', () => {
+            it('should be a no-op when duplicating footer', () => {
+                const footerIdx = useEditorStore.getState().blocks.findIndex(b => b.blockType === 'footer')
+                const countBefore = useEditorStore.getState().blocks.length
+                useEditorStore.getState().duplicateBlock(footerIdx)
+                expect(useEditorStore.getState().blocks).toHaveLength(countBefore)
+                expect(useEditorStore.getState().blocks[footerIdx].blockType).toBe('footer')
+            })
+
+            it('should insert duplicate before footer when block is directly before footer', () => {
+                // block at index 2 (about) is directly before footer (3)
+                useEditorStore.getState().duplicateBlock(2)
+                const blocks = useEditorStore.getState().blocks
+                // duplicate lands at index 3, original footer bumped to 4
+                expect(blocks[3].blockType).toBe('about')
+                expect(blocks[4].blockType).toBe('footer')
+            })
+
+            it('should not create a second footer after duplicate', () => {
+                const footerIdx = useEditorStore.getState().blocks.findIndex(b => b.blockType === 'footer')
+                useEditorStore.getState().duplicateBlock(footerIdx)
+                const footerCount = useEditorStore.getState().blocks.filter(b => b.blockType === 'footer').length
+                expect(footerCount).toBe(1)
+            })
+        })
+
+        describe('reorderBlocks', () => {
+            it('should be a no-op when attempting to move footer', () => {
+                const blocksBefore = [...useEditorStore.getState().blocks.map(b => b.blockType)]
+                const footerIdx = blocksBefore.indexOf('footer')
+                useEditorStore.getState().reorderBlocks(footerIdx, 0)
+                const blocksAfter = useEditorStore.getState().blocks.map(b => b.blockType)
+                expect(blocksAfter).toEqual(blocksBefore)
+            })
+
+            it('should be a no-op when moving a block to footer position', () => {
+                const blocksBefore = [...useEditorStore.getState().blocks.map(b => b.blockType)]
+                const footerIdx = blocksBefore.indexOf('footer')
+                useEditorStore.getState().reorderBlocks(0, footerIdx)
+                const blocksAfter = useEditorStore.getState().blocks.map(b => b.blockType)
+                expect(blocksAfter).toEqual(blocksBefore)
+            })
+
+            it('should be a no-op when moving a block past footer position', () => {
+                const blocksBefore = [...useEditorStore.getState().blocks.map(b => b.blockType)]
+                const footerIdx = blocksBefore.indexOf('footer')
+                useEditorStore.getState().reorderBlocks(0, footerIdx + 1)
+                const blocksAfter = useEditorStore.getState().blocks.map(b => b.blockType)
+                expect(blocksAfter).toEqual(blocksBefore)
+            })
+
+            it('should reorder blocks normally when footer is not involved', () => {
+                // [hero(0), features(1), about(2), footer(3)] — move hero to index 2
+                useEditorStore.getState().reorderBlocks(0, 2)
+                const blocks = useEditorStore.getState().blocks
+                expect(blocks[0].blockType).toBe('features')
+                expect(blocks[2].blockType).toBe('hero')
+                expect(blocks[3].blockType).toBe('footer')
+            })
+        })
+
+        describe('pushBatch', () => {
+            it('should deduplicate multiple footers and keep the first one last', () => {
+                const incoming = [
+                    { blockType: 'hero', heading: 'H' },
+                    { blockType: 'footer', variant: 'minimal' },
+                    { blockType: 'features', items: [] },
+                    { blockType: 'footer', variant: 'simple' },
+                ]
+                useEditorStore.getState().pushBatch(incoming, mockTheme, 'AI batch')
+                const blocks = useEditorStore.getState().blocks
+                const footerBlocks = blocks.filter(b => b.blockType === 'footer')
+                expect(footerBlocks).toHaveLength(1)
+                // keeps the first footer encountered (minimal)
+                expect(footerBlocks[0].variant).toBe('minimal')
+                expect(blocks[blocks.length - 1].blockType).toBe('footer')
+            })
+
+            it('should place footer last when AI returns it mid-array', () => {
+                const incoming = [
+                    { blockType: 'hero', heading: 'H' },
+                    { blockType: 'footer', variant: 'simple' },
+                    { blockType: 'features', items: [] },
+                ]
+                useEditorStore.getState().pushBatch(incoming, mockTheme, 'AI batch')
+                const blocks = useEditorStore.getState().blocks
+                expect(blocks[blocks.length - 1].blockType).toBe('footer')
+                expect(blocks.findIndex(b => b.blockType === 'features')).toBeLessThan(
+                    blocks.findIndex(b => b.blockType === 'footer')
+                )
+            })
+
+            it('should pass through blocks unchanged when no footer present', () => {
+                const incoming = [
+                    { blockType: 'hero', heading: 'H' },
+                    { blockType: 'features', items: [] },
+                ]
+                useEditorStore.getState().pushBatch(incoming, mockTheme, 'AI batch')
+                const blocks = useEditorStore.getState().blocks
+                expect(blocks).toHaveLength(2)
+                expect(blocks[0].blockType).toBe('hero')
+                expect(blocks[1].blockType).toBe('features')
+            })
+        })
+    })
+
     describe('cross-page save safety', () => {
         beforeEach(() => {
             vi.useFakeTimers()

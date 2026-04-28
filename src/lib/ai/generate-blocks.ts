@@ -745,6 +745,45 @@ function buildContact(name: string, content: ContentSet, variant: string): Gener
 }
 
 function buildFooter(name: string, heroSub: string, variant: string): GeneratedBlock {
+    // simple = 1-line bar (logo + socials + copyright), no columns/tagline
+    if (variant === 'simple') {
+        return {
+            blockType: 'footer',
+            variant,
+            logoText: name,
+            columns: [],
+            copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`,
+            socials: [
+                { platform: 'facebook', url: '#' },
+                { platform: 'instagram', url: '#' },
+                { platform: 'whatsapp', url: '#' },
+            ],
+        }
+    }
+
+    // minimal = compact bar with first-column links only
+    if (variant === 'minimal') {
+        return {
+            blockType: 'footer',
+            variant,
+            logoText: name,
+            columns: [
+                {
+                    title: 'Links',
+                    links: [
+                        { label: 'Home', url: '#' },
+                        { label: 'About', url: '#about' },
+                        { label: 'Services', url: '#features' },
+                        { label: 'Contact', url: '#contact' },
+                    ],
+                },
+            ],
+            copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`,
+            socials: [],
+        }
+    }
+
+    // centered-stack / dark-gradient — full columns + tagline
     return {
         blockType: 'footer',
         variant,
