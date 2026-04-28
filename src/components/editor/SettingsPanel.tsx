@@ -376,7 +376,13 @@ function SettingsPanelInner({
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.uploadLogo}</label>
                         <div className="mt-2">
                             <LogoEditor
-                                currentLogo={(siteBranding.logo as string) || ((headerBlock as Record<string, unknown>)?.logo as string) || null}
+                                currentLogo={
+                                    (siteBranding.logo as string | undefined) ||
+                                    (typeof (headerBlock as Record<string, unknown>)?.logo === 'string'
+                                        ? ((headerBlock as Record<string, unknown>)?.logo as string)
+                                        : ((headerBlock as Record<string, unknown>)?.logo as { url?: string } | undefined)?.url) ||
+                                    null
+                                }
                                 onLogoChange={(logoUrl, faviconUrl) => {
                                     const siteBrandingChanges: Record<string, unknown> = { logo: logoUrl }
                                     if (faviconUrl) {
@@ -384,8 +390,11 @@ function SettingsPanelInner({
                                     } else if (!logoUrl) {
                                         siteBrandingChanges.favicon = ''
                                     }
-                                    onHeaderUpdate?.(siteBrandingChanges)
-                                    onFooterUpdate?.(siteBrandingChanges)
+                                    // Pass logo as { url, alt } object so NavigationBlock/FooterBlock
+                                    // can render it immediately via block.logo?.url
+                                    const logoObj = logoUrl ? { url: logoUrl, alt: '' } : null
+                                    onHeaderUpdate?.({ ...siteBrandingChanges, logo: logoObj })
+                                    onFooterUpdate?.({ ...siteBrandingChanges, logo: logoObj })
                                     void onSiteSettingsChange?.({ branding: siteBrandingChanges })
                                     if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
                                 }}
@@ -480,22 +489,6 @@ function SettingsPanelInner({
             ))}
 
             {renderGlobalAccordion('theme', s.themeColors, renderThemeContent())}
-
-            {renderGlobalAccordion('seo', s.seoSettings, (
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.socialImage}</label>
-                        <div className="mt-2">
-                            <OgImageEditor
-                                currentOgImage={typeof site?.seo?.ogImage === 'string' ? site.seo.ogImage : null}
-                                onOgImageChange={(url) => {
-                                    void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: url } })
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-            ))}
         </div>
     )
 
@@ -642,6 +635,18 @@ function SettingsPanelInner({
                     </div>
                 </div>
 
+                <div>
+                    <div className="mb-3 border-t border-white/10 pt-4">
+                        <label className={labelCls}>{s.socialImage}</label>
+                    </div>
+                    <OgImageEditor
+                        currentOgImage={typeof site?.seo?.ogImage === 'string' ? site.seo.ogImage : null}
+                        onOgImageChange={(url) => {
+                            void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: url } })
+                        }}
+                    />
+                </div>
+
                 <div className="pt-2">
                     <button
                         type="button"
@@ -682,6 +687,7 @@ function SettingsPanelInner({
                                     }
                                     await applyChanges()
                                     toast.success(s.seoGenerated, { id: loadingToastId })
+                                    if (data.warning) toast.warning(data.warning)
                                 } else {
                                     toast.error(s.seoFailed, { id: loadingToastId })
                                 }
@@ -725,13 +731,20 @@ function SettingsPanelInner({
     }
 
     const renderMenuContent = () => {
+        const menuHeaderLogoRaw = (headerBlock as Record<string, unknown>)?.logo
+        const menuHeaderLogo =
+            (typeof menuHeaderLogoRaw === 'string'
+                ? menuHeaderLogoRaw
+                : (menuHeaderLogoRaw as { url?: string } | undefined)?.url) || null
         return (
             <div className="space-y-5">
                 {/* Logo Editor (AC-2) */}
                 <LogoEditor
-                    currentLogo={((headerBlock as Record<string, unknown>)?.logo as string) || null}
+                    currentLogo={menuHeaderLogo}
                     onLogoChange={(logoUrl, faviconUrl) => {
-                        const changes: Record<string, unknown> = { logo: logoUrl }
+                        const changes: Record<string, unknown> = {
+                            logo: logoUrl ? { url: logoUrl, alt: '' } : null,
+                        }
                         if (faviconUrl) {
                             changes.favicon = faviconUrl
                         } else if (!logoUrl) {
@@ -743,23 +756,79 @@ function SettingsPanelInner({
                 />
 
                 <div className={sectionCls}>
-                    <label className={labelCls}>{s.navStyle}</label>
+                    <label className={labelCls}>{s.navVariant}</label>
                     <div className="mt-2 grid grid-cols-2 gap-2">
-                        {(['standard', 'centered'] as const).map(style => (
-                            <button
-                                key={style}
-                                type="button"
-                                onClick={() => onHeaderUpdate?.({ navStyle: style })}
-                                className={cn(
-                                    'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                    (headerBlock as Record<string, unknown>)?.navStyle === style || (!((headerBlock as Record<string, unknown>)?.navStyle) && style === 'standard')
-                                        ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                        : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                                )}
-                            >
-                                {style === 'standard' ? s.navStyleStandard : s.navStyleCentered}
-                            </button>
-                        ))}
+                        {([
+                            { key: 'default', label: s.navVariantDefault },
+                            { key: 'centered', label: s.navVariantCentered },
+                            { key: 'mega', label: s.navVariantMega },
+                            { key: 'transparent', label: s.navVariantTransparent },
+                            { key: 'sidebar', label: s.navVariantSidebar },
+                            { key: 'floating', label: s.navVariantFloating },
+                        ] as { key: string; label: string }[]).map(({ key, label }) => {
+                            const current = (headerBlock as Record<string, unknown>)?.variant as string | undefined
+                            const active = current === key || (!current && key === 'default')
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => onHeaderUpdate?.({ variant: key })}
+                                    className={cn(
+                                        'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                                        active
+                                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                            : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                                    )}
+                                >
+                                    {label}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* ─── Nav CTA Button ──────────────────────────────────── */}
+                <div className={sectionCls}>
+                    <label className={labelCls}>{s.navCta}</label>
+                    <div className="mt-2 space-y-2">
+                        <label className="flex items-center gap-2 text-xs text-slate-400">
+                            <input
+                                type="checkbox"
+                                checked={Boolean((headerBlock?.ctaButton as Record<string, unknown>)?.show)}
+                                onChange={(e) => {
+                                    const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: false, label: 'Get started', url: '/contact' }
+                                    onHeaderUpdate?.({ ctaButton: { ...current, show: e.target.checked } })
+                                }}
+                            />
+                            {s.navCtaShow}
+                        </label>
+                        <Input
+                            key={`nav-cta-label-${((headerBlock?.ctaButton as Record<string, unknown>)?.label as string) || ''}`}
+                            defaultValue={((headerBlock?.ctaButton as Record<string, unknown>)?.label as string) || ''}
+                            placeholder={s.navCtaLabel}
+                            variant="editor"
+                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: true, label: '', url: '' }
+                                onHeaderUpdate?.({ ctaButton: { ...current, label: e.target.value } })
+                            }}
+                        />
+                        <Input
+                            key={`nav-cta-url-${((headerBlock?.ctaButton as Record<string, unknown>)?.url as string) || ''}`}
+                            defaultValue={((headerBlock?.ctaButton as Record<string, unknown>)?.url as string) || ''}
+                            placeholder={s.navCtaUrl}
+                            variant="editor"
+                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                const raw = e.target.value.trim()
+                                const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: true, label: '', url: '' }
+                                // Block javascript:/data:/vbscript: URIs — relative paths (/contact, #section) are allowed.
+                                if (raw && /^(javascript|data|vbscript):/i.test(raw)) {
+                                    toast.error(s.invalidSocialUrl)
+                                    e.target.value = (current.url as string) || ''
+                                    return
+                                }
+                                onHeaderUpdate?.({ ctaButton: { ...current, url: raw } })
+                            }}
+                        />
                     </div>
                 </div>
 

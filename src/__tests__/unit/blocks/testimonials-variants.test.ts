@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { TestimonialsConfigSchema, testimonialsMeta } from '@/blocks/testimonials/config'
+import { enforceMinContent } from '@/lib/ai/variant-validation'
 
 // ── TC-S2-006: Testimonials Block Variants ──────────────────────────────────
 
@@ -94,5 +95,111 @@ describe('[TC-S2-006] Testimonials Block Variants', () => {
         it('defaultVariant is "cards"', () => {
             expect(testimonialsMeta.defaultVariant).toBe('cards')
         })
+    })
+})
+
+// ── TC-BUG-TEST-019: Testimonials Carousel Scroll (GYM template) ────────────
+describe('[TC-BUG-TEST-019] Carousel variant — scroll regression', () => {
+    it('carousel variant is valid in schema', () => {
+        const result = TestimonialsConfigSchema.safeParse({
+            blockType: 'testimonials',
+            variant: 'carousel',
+            testimonials: [
+                { quote: 'Great gym!', name: 'Ali', rating: 5 },
+                { quote: 'Best coach!', name: 'Siti', rating: 5 },
+                { quote: 'Changed my life!', name: 'Kumar', rating: 5 },
+            ],
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('enforceMinContent keeps carousel when testimonials.length >= 3', () => {
+        expect(enforceMinContent('testimonials', 'carousel', 3)).toBe('carousel')
+        expect(enforceMinContent('testimonials', 'carousel', 5)).toBe('carousel')
+    })
+
+    it('enforceMinContent falls back from carousel when testimonials.length < 3', () => {
+        const fallback = enforceMinContent('testimonials', 'carousel', 2)
+        expect(fallback).not.toBe('carousel')
+        // fallback must still be a valid testimonials variant
+        const result = TestimonialsConfigSchema.safeParse({
+            blockType: 'testimonials',
+            variant: fallback,
+            testimonials: [{ quote: 'Test', name: 'User' }],
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('enforceMinContent falls back from carousel when testimonials.length is 1', () => {
+        const fallback = enforceMinContent('testimonials', 'carousel', 1)
+        expect(fallback).not.toBe('carousel')
+    })
+})
+
+// ── TC-BUG-TEST-019: goTo boundary wrapping logic ────────────────────────────
+describe('[TC-BUG-TEST-019] goTo boundary wrapping', () => {
+    // Pure logic extracted from TestimonialsCarousel.goTo — mirrors the implementation.
+    // Any change to boundary logic in the component MUST be reflected here.
+    function makeGoTo(length: number) {
+        return (idx: number): number => {
+            if (idx < 0) return length - 1
+            if (idx >= length) return 0
+            return idx
+        }
+    }
+
+    it('wraps backward past 0 to last index', () => {
+        expect(makeGoTo(3)(-1)).toBe(2)
+        expect(makeGoTo(5)(-1)).toBe(4)
+    })
+
+    it('wraps forward past last to 0', () => {
+        expect(makeGoTo(3)(3)).toBe(0)
+        expect(makeGoTo(5)(5)).toBe(0)
+    })
+
+    it('does not wrap within valid range', () => {
+        expect(makeGoTo(3)(0)).toBe(0)
+        expect(makeGoTo(3)(1)).toBe(1)
+        expect(makeGoTo(3)(2)).toBe(2)
+    })
+})
+
+// ── TC-BUG-TEST-019: auto-rotate pause timer ─────────────────────────────────
+describe('[TC-BUG-TEST-019] resumeTimer — auto-rotate pause on manual nav', () => {
+    beforeEach(() => { vi.useFakeTimers() })
+    afterEach(() => { vi.useRealTimers() })
+
+    it('setTimeout is called with 5000ms on manual navigation', () => {
+        const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+        // Simulate goTo pause pattern: setIsPaused(true) then setTimeout 5000
+        let isPaused = false
+        const resumeTimer = { current: null as ReturnType<typeof setTimeout> | null }
+        const goTo = () => {
+            isPaused = true
+            if (resumeTimer.current) clearTimeout(resumeTimer.current)
+            resumeTimer.current = setTimeout(() => { isPaused = false }, 5000)
+        }
+
+        goTo()
+        expect(isPaused).toBe(true)
+        expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000)
+
+        vi.advanceTimersByTime(5000)
+        expect(isPaused).toBe(false)
+    })
+
+    it('rapid calls reset the 5s timer (debounce)', () => {
+        const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout')
+        const resumeTimer = { current: null as ReturnType<typeof setTimeout> | null }
+        const goTo = () => {
+            if (resumeTimer.current) clearTimeout(resumeTimer.current)
+            resumeTimer.current = setTimeout(() => {}, 5000)
+        }
+
+        goTo()
+        const firstTimer = resumeTimer.current
+        goTo()
+        expect(clearTimeoutSpy).toHaveBeenCalledWith(firstTimer)
     })
 })

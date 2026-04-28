@@ -50,7 +50,7 @@ const PAGES_VARIANTS: Record<string, string[]> = {
         'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax',
         'slideshow', 'split-video',
     ],
-    navigation: ['simple', 'centered', 'mega-menu', 'transparent', 'sidebar', 'pill'],
+    navigation: ['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'],
     about: ['simple', 'split', 'story', 'two-column', 'founder-quote', 'centered-large', 'image-overlay'],
     contact: ['form', 'info-only', 'split', 'card-float', 'map-split', 'minimal-inline'],
     footer: ['simple', 'minimal', 'centered-stack', 'dark-gradient'],

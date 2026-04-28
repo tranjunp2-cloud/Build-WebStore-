@@ -284,7 +284,9 @@ export default function EditorPage() {
                 ...pendingSaveRef.current,
                 ...options,
                 showToast: options.showToast || pendingSaveRef.current?.showToast,
-                refreshPreview: options.refreshPreview || pendingSaveRef.current?.refreshPreview
+                refreshPreview: options.refreshPreview === true || pendingSaveRef.current?.refreshPreview === true
+                    ? true
+                    : options.refreshPreview ?? pendingSaveRef.current?.refreshPreview
             }
             return true
         }
@@ -452,8 +454,14 @@ export default function EditorPage() {
     const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
         if (!siteId) return
 
+        // Business name is required — silently ignore blank submissions
+        if ('name' in changes && !changes.name) return
+
         if (changes.name) {
             updateSiteName(changes.name)
+            // Sync business name into navigation logoText so the nav header
+            // reflects the new name without a separate block edit.
+            updateHeaderBlock({ logoText: changes.name })
         }
 
         setSite(prev => {
@@ -492,12 +500,15 @@ export default function EditorPage() {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    siteName: changes.name,
+                    ...(changes.name ? { siteName: changes.name } : {}),
                     contactInfo: changes.contactInfo,
                     socialLinks: changes.socialLinks,
                     branding: changes.branding,
                     seo: changes.seo,
-                    headerBlock: changes.headerBlock,
+                    // When name changes, persist updated headerBlock (logoText synced above)
+                    headerBlock: changes.name
+                        ? useEditorStore.getState().headerBlock
+                        : changes.headerBlock,
                     footerBlock: changes.footerBlock,
                 }),
             })
@@ -515,7 +526,7 @@ export default function EditorPage() {
             console.error('Failed to update site settings', error)
             toast.error('Failed to update site settings', { description: 'Please try again later.' })
         }
-    }, [currentPageId, siteId, updateSiteName])
+    }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
 
     const handleDeleteBlock = useCallback((index: number) => {
         deleteBlock(index)
@@ -1141,7 +1152,8 @@ export default function EditorPage() {
                         <button
                             type="button"
                             onClick={() => setActiveSidebarTab('chat')}
-                            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/25 transition-transform active:scale-95"
+                            className="fixed right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/25 transition-transform active:scale-95"
+                            style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
                             aria-label="Open AI Chat"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1159,7 +1171,7 @@ export default function EditorPage() {
                                 tabIndex={0}
                                 aria-label="Close settings"
                             />
-                            <div className="relative max-h-[70vh] overflow-y-auto rounded-t-2xl border-t border-white/10 bg-[#0F172A]">
+                            <div className="relative max-h-[70vh] landscape:max-h-[90vh] overflow-y-auto rounded-t-2xl border-t border-white/10 bg-[#0F172A]">
                                 <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-[#0F172A] px-4 py-3">
                                     <span className="text-sm font-medium text-white">Block Settings</span>
                                     <button

@@ -74,32 +74,32 @@ describe('PreviewScripts', () => {
         expect(stopPropagationSpy).toHaveBeenCalled()
     })
 
-    it('should allow default click on anchors when outside iframe (standalone view)', () => {
+    it('should open external links in new tab when outside iframe (standalone view)', () => {
         // Arrange
         document.body.innerHTML = `
             <a href="https://example.com" id="test-link">Link</a>
         `
-        
+
         // Mock window === window.parent (standalone scenario)
         Object.defineProperty(window, 'parent', {
             value: window,
             writable: true,
         })
-        
+
         render(<PreviewScripts />)
         const link = document.getElementById('test-link')
 
         const preventDefaultSpy = vi.fn()
         const stopPropagationSpy = vi.fn()
-        
+
         const mockEvent = new MouseEvent('click', { bubbles: true, cancelable: true })
         Object.assign(mockEvent, { preventDefault: preventDefaultSpy, stopPropagation: stopPropagationSpy })
 
         // Act
         link?.dispatchEvent(mockEvent)
 
-        // Assert
-        expect(preventDefaultSpy).not.toHaveBeenCalled()
+        // Assert — external links call preventDefault to open in new tab (not navigate away from preview)
+        expect(preventDefaultSpy).toHaveBeenCalled()
         expect(stopPropagationSpy).not.toHaveBeenCalled()
     })
 

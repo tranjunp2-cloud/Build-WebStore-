@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
 import { Caption } from '../shared/Typography'
-import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
 
 // Token shortcut: nav containers consume CONTAINER.default + INNER_PADDING.
@@ -105,7 +105,7 @@ function DropdownLink({ link, i }: { link: NavLink; i: number }) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 8 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-xl p-1.5 shadow-xl backdrop-blur-lg"
+                        className={`absolute left-0 top-full ${NAV_Z_CLASS.dropdown} mt-1 min-w-[180px] rounded-xl p-1.5 shadow-xl backdrop-blur-lg`}
                         style={{
                             // Plan 260415 nav fix: theme-adaptive dropdown panel.
                             // Reads --surface from resolved theme so light themes
@@ -337,9 +337,18 @@ function NavMobileMenuDrawer({
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
+// Dual-read: accept old DB variant names → normalize to new canonical names.
+// Permanent alias layer — safe to pass unknown strings (falls through to 'default').
+const VARIANT_ALIASES: Record<string, NavigationConfig['variant']> = {
+    simple: 'default',
+    'mega-menu': 'mega',
+    pill: 'floating',
+}
+
 export function NavigationBlock({ block, theme, site }: BlockProps<NavigationConfig>) {
     const mergedBlock = mergeNavigationBrandingWithSite(block, site)
-    const { logoText, links = [], ctaButton, variant = 'simple' } = mergedBlock
+    const { logoText, links = [], ctaButton, variant: rawVariant = 'default' } = mergedBlock
+    const variant = VARIANT_ALIASES[rawVariant as string] ?? rawVariant
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const scrolled = useScrollShrink(50)
 
@@ -353,8 +362,8 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
         return <SidebarNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
     }
 
-    // ── Pill variant ──────────────────────────────────────────────────────
-    if (variant === 'pill') {
+    // ── Floating (pill) variant ───────────────────────────────────────────
+    if (variant === 'floating') {
         return <PillNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
     }
 
@@ -363,19 +372,19 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
         return <CenteredNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
     }
 
-    // ── Mega-menu variant ────────────────────────────────────────────────
-    if (variant === 'mega-menu') {
+    // ── Mega variant ─────────────────────────────────────────────────────
+    if (variant === 'mega') {
         return <MegaMenuNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
     }
 
-    // ── Default: simple ──────────────────────────────────────────────────
+    // ── Default: 'default' (was 'simple') ────────────────────────────────
     return (
         <motion.nav
             initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             aria-label={mergedBlock.ariaLabel || 'Main navigation'}
-            className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
+            className={`sticky top-0 ${NAV_Z_CLASS.base} transition-[height,box-shadow] duration-300`}
             style={{
                 borderBottom: NAV_SURFACE_BORDER,
                 background: NAV_SURFACE_BG,
@@ -448,7 +457,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             aria-label={mergedBlock.ariaLabel || 'Main navigation'}
-            className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+            className={`fixed top-0 left-0 right-0 ${NAV_Z_CLASS.base} transition-all duration-300`}
             style={{
                 // Plan 260415 — TransparentNav giờ LUÔN có nền mờ nhẹ (25%
                 // khi chưa scroll, 95% khi scroll) + text theo `--text` CSS var,
@@ -522,7 +531,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
             {/* Hamburger trigger — always visible */}
             <button
                 type="button"
-                className={`fixed top-4 left-4 z-50 p-2.5 rounded-xl transition-all duration-200 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
+                className={`fixed top-4 left-4 ${NAV_Z_CLASS.base} p-2.5 rounded-xl transition-all duration-200 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                 onClick={() => setIsOpen(true)}
                 aria-label="Open navigation"
                 style={{
@@ -546,7 +555,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className="fixed inset-0 bg-black/50 z-50"
+                            className={`fixed inset-0 bg-black/50 ${NAV_Z_CLASS.mobileBackdrop}`}
                             onClick={() => setIsOpen(false)}
                         />
 
@@ -556,7 +565,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                             animate={{ x: 0 }}
                             exit={{ x: '-100%' }}
                             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                            className="fixed top-0 left-0 bottom-0 w-72 z-50 flex flex-col"
+                            className={`fixed top-0 left-0 bottom-0 w-72 ${NAV_Z_CLASS.mobileSidebar} flex flex-col`}
                             style={{
                                 background: NAV_SURFACE_BG_SOLID,
                                 borderRight: NAV_SURFACE_BORDER,
@@ -574,7 +583,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                     className={`p-1.5 rounded-lg hover:bg-white/10 transition-colors ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                                     aria-label="Close navigation"
                                 >
-                                    <X size={18} />
+                                    <X size={20} />
                                 </button>
                             </div>
 
@@ -633,7 +642,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             aria-label={mergedBlock.ariaLabel || 'Main navigation'}
-            className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
+            className={`sticky top-0 ${NAV_Z_CLASS.base} transition-[height,box-shadow] duration-300`}
             style={{
                 borderBottom: NAV_SURFACE_BORDER,
                 background: NAV_SURFACE_BG,
@@ -730,7 +739,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             aria-label={mergedBlock.ariaLabel || 'Main navigation'}
-            className="sticky top-0 z-50 transition-[height,box-shadow] duration-300"
+            className={`sticky top-0 ${NAV_Z_CLASS.base} transition-[height,box-shadow] duration-300`}
             style={{
                 borderBottom: NAV_SURFACE_BORDER,
                 background: NAV_SURFACE_BG,
@@ -803,7 +812,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
                         transition={{ duration: 0.2, ease: 'easeOut' }}
-                        className="hidden md:block absolute left-0 right-0 z-40"
+                        className={`hidden md:block absolute left-0 right-0 ${NAV_Z_CLASS.dropdown}`}
                         style={{
                             background: NAV_SURFACE_BG_SOLID,
                             borderBottom: NAV_SURFACE_BORDER,
@@ -863,22 +872,24 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
 
     return (
         <motion.nav
-            initial={{ opacity: 0, y: -20 }}
+            initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl"
+            className={`fixed top-4 left-1/2 -translate-x-1/2 ${NAV_Z_CLASS.base} w-[calc(100%-2rem)] max-w-3xl`}
         >
             <div
-                className="rounded-full px-6 py-3 flex items-center justify-between"
+                className="rounded-full px-6 py-3 flex items-center justify-between min-h-[56px]"
                 style={{
                     // Plan 260415 — pill variant was hardcoded white which
                     // flipped against dark-theme sites. Read --background so
                     // light sites get a white pill, dark sites get a dark pill.
-                    background: `color-mix(in srgb, var(--background, #ffffff) 90%, transparent)`,
+                    // 96% opacity (was 90%) improves visibility on mobile where
+                    // only logo + hamburger remain — prevents pill blending into hero.
+                    background: `color-mix(in srgb, var(--background, #ffffff) 96%, transparent)`,
                     color: NAV_SURFACE_TEXT,
                     backdropFilter: 'blur(20px) saturate(1.8)',
                     WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                    boxShadow: '0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.08)',
                     border: NAV_SURFACE_BORDER,
                 }}
             >
@@ -907,13 +918,13 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                     )}
                     <button
                         type="button"
-                        className={`md:hidden p-1.5 rounded-full opacity-70 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
+                        className={`md:hidden p-1.5 rounded-full opacity-90 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                         aria-expanded={mobileMenuOpen}
                         style={{ color: 'inherit' }}
                     >
-                        {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+                        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
                     </button>
                 </div>
             </div>

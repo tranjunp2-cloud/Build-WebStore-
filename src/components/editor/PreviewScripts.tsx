@@ -2,6 +2,14 @@
 
 import { useEffect } from 'react'
 
+const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:'])
+
+/** Returns true if the URL uses a safe protocol (blocks javascript:, data:, etc.) */
+export function isSafeUrl(url: string): boolean {
+    try { return SAFE_URL_PROTOCOLS.has(new URL(url, window.location.href).protocol) }
+    catch { return false }
+}
+
 /** Replace drop-hint CSS content text. Exported for testing. */
 export function replaceDropHintCSS(css: string, text: string): string {
     return css.replace(
@@ -164,6 +172,7 @@ export function PreviewScripts() {
         let originalTag = ''
 
         const HEADING_TAGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6']
+        const LIST_TAGS = ['UL', 'OL']
 
         /**
          * Build clean HTML from the current editing element.
@@ -204,6 +213,9 @@ export function PreviewScripts() {
             if (HEADING_TAGS.includes(el.tagName)) {
                 const styleAttr = inlineStyles.length ? ` style="${inlineStyles.join(';')}"` : ''
                 return `<${el.tagName.toLowerCase()}${styleAttr}>${innerHTML}</${el.tagName.toLowerCase()}>`
+            } else if (LIST_TAGS.includes(el.tagName)) {
+                // Preserve <ul>/<ol> wrapper so list structure is saved correctly
+                return `<${el.tagName.toLowerCase()}>${innerHTML}</${el.tagName.toLowerCase()}>`
             } else if (inlineStyles.length) {
                 const needsBlock = inlineStyles.some(s => s.startsWith('text-align:'))
                 const displayPart = needsBlock ? ';display:block' : ''
@@ -227,6 +239,8 @@ export function PreviewScripts() {
                 searchKey: originalText,
                 oldHtml: originalHtml,
                 newHtml: buildCleanHtml(currentEditingEl),
+                originalTag,
+                newTag: currentEditingEl.tagName,
             }, parentOrigin)
         }
 
@@ -260,6 +274,8 @@ export function PreviewScripts() {
                 searchKey,
                 oldHtml: oldHtmlFull,
                 newHtml: cleanHtml,
+                originalTag,
+                newTag: currentEditingEl?.tagName || originalTag,
             }, parentOrigin)
 
             currentEditingEl = null
@@ -353,10 +369,30 @@ export function PreviewScripts() {
         }
 
         const onKeyDown = (e: KeyboardEvent) => {
-            if (currentEditingEl && (e.key === 'Enter' || e.key === 'Escape')) {
+            if (!currentEditingEl) return
+            if (e.key === 'Escape') {
                 e.preventDefault()
                 cleanUpEditing()
                 window.getSelection()?.removeAllRanges()
+                return
+            }
+            if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                    // Shift+Enter: insert <br> at cursor (soft line break)
+                    e.preventDefault()
+                    document.execCommand('insertLineBreak')
+                    return
+                }
+                // Plain Enter: if cursor is inside a list item, let browser add new <li>
+                // Otherwise exit editing mode
+                const sel = window.getSelection()
+                const inList = sel && sel.rangeCount > 0 &&
+                    !!(sel.getRangeAt(0).commonAncestorContainer.parentElement?.closest('li'))
+                if (!inList) {
+                    e.preventDefault()
+                    cleanUpEditing()
+                    window.getSelection()?.removeAllRanges()
+                }
             }
         }
 
@@ -387,26 +423,30 @@ export function PreviewScripts() {
             }
 
             let anchor = target.closest('a')
-            if (anchor && window !== window.parent) {
+            if (anchor) {
                 const anchorBlock = anchor.closest('[data-block-index]')
                 const anchorBlockType = anchorBlock?.getAttribute('data-block-type')
-                if (anchorBlockType === 'breadcrumb') {
-                    // Always block raw iframe navigation for breadcrumb anchors in editor preview.
-                    // Extract pageId and notify parent so page selector stays in sync.
+                const href = anchor.getAttribute('href') || ''
+
+                if (window !== window.parent) {
+                    // Inside editor iframe — route everything through parent
                     e.preventDefault()
                     e.stopPropagation()
-                    const href = anchor.getAttribute('href') || ''
-                    if (href && href !== '#') {
-                        try {
-                            const pageId = new URL(href, window.location.href).searchParams.get('pageId')
-                            if (pageId) {
-                                window.parent.postMessage({ type: 'PAGE_NAVIGATE', pageId }, parentOrigin)
-                            }
-                        } catch (_) { /* invalid href — swallow */ }
+                    if (anchorBlockType === 'breadcrumb') {
+                        // Breadcrumb: notify parent to switch page, don't open as external link
+                        if (href && href !== '#') {
+                            try {
+                                const pageId = new URL(href, window.location.href).searchParams.get('pageId')
+                                if (pageId) window.parent.postMessage({ type: 'PAGE_NAVIGATE', pageId }, parentOrigin)
+                            } catch (_) { /* invalid href */ }
+                        }
+                    } else if (href && isSafeUrl(href)) {
+                        window.parent.postMessage({ type: 'OPEN_LINK', href }, parentOrigin)
                     }
-                } else {
+                } else if (isSafeUrl(href)) {
+                    // Standalone preview — open external links in new tab
                     e.preventDefault()
-                    e.stopPropagation()
+                    window.open(href, '_blank', 'noopener,noreferrer')
                 }
             }
             // Also detect non-img placeholder elements (InitialsAvatar, LogoPlaceholder) via data-image-index
@@ -547,17 +587,54 @@ export function PreviewScripts() {
             const rawColor = currentEditingEl?.style.color ||
                 (currentEditingEl ? window.getComputedStyle(currentEditingEl).color : '')
             const color = rawColor ? rgbToHex(rawColor) : '#000000'
+            // Detect if cursor is inside an <a> tag to pre-populate link input
+            let linkHref = ''
+            if (currentEditingEl) {
+                if (currentEditingEl.tagName === 'A') {
+                    // The editable element itself is the anchor
+                    linkHref = currentEditingEl.getAttribute('href') || ''
+                } else {
+                    const sel = window.getSelection()
+                    if (sel && sel.rangeCount > 0) {
+                        let node: Node | null = sel.getRangeAt(0).commonAncestorContainer
+                        if (node.nodeType === Node.TEXT_NODE) node = node.parentNode
+                        while (node && node !== currentEditingEl) {
+                            if ((node as HTMLElement).tagName === 'A') {
+                                linkHref = (node as HTMLAnchorElement).getAttribute('href') || ''
+                                break
+                            }
+                            node = (node as HTMLElement).parentNode
+                        }
+                    }
+                }
+            }
+            // Detect active list type for toolbar active indicator
+            let activeList = ''
+            if (currentEditingEl) {
+                if (currentEditingEl.tagName === 'LI') {
+                    const parentList = currentEditingEl.closest('ul, ol') as HTMLElement | null
+                    if (parentList) activeList = parentList.tagName.toLowerCase()
+                } else {
+                    const firstListEl = currentEditingEl.firstElementChild
+                    if (firstListEl && (firstListEl.tagName === 'UL' || firstListEl.tagName === 'OL')) {
+                        activeList = firstListEl.tagName.toLowerCase()
+                    }
+                }
+            }
             window.parent.postMessage({
                 type: 'SELECTION_STATE',
                 state: {
                     bold: /<b\b|<strong\b/i.test(html),
                     italic: /<i\b|<em\b/i.test(html),
                     underline: /<u\b/i.test(html),
+                    strikeThrough: /<s\b|<del\b/i.test(html),
                     formatBlock: currentEditingEl?.tagName || 'P',
                     textAlign: align,
                     fontSize: Math.round(fontSize),
                     fontFamily,
                     color,
+                    linkHref,
+                    activeList,
                 }
             }, parentOrigin)
         }
@@ -610,7 +687,14 @@ export function PreviewScripts() {
                         const cleanedClass = oldClass.replace(SIZE_RE, '').replace(/\s+/g, ' ').trim()
                         newEl.setAttribute('class', `${cleanedClass} ${sizeClasses}`.trim())
                         const oldStyle = currentEditingEl.getAttribute('style')
-                        if (oldStyle) newEl.setAttribute('style', oldStyle)
+                        if (oldStyle) {
+                            // Strip font-size: heading-level classes (text-3xl etc.) define the natural
+                            // size. User can re-apply custom font-size after selecting heading format.
+                            const stripped = oldStyle.split(';').map(s => s.trim())
+                                .filter(s => s && !s.toLowerCase().startsWith('font-size'))
+                                .join(';')
+                            if (stripped) newEl.setAttribute('style', stripped)
+                        }
                         newEl.setAttribute('contenteditable', 'true')
                         currentEditingEl.replaceWith(newEl)
                         currentEditingEl = newEl
@@ -707,6 +791,94 @@ export function PreviewScripts() {
                         currentEditingEl.style.color = val
                     }
 
+                // ── createLink: wrap selected text (or whole element) in <a> tag ──
+                } else if (cmd === 'createLink' && val) {
+                    if (!isSafeUrl(val)) return
+                    const sel = window.getSelection()
+                    const hasSelection = sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed
+
+                    if (hasSelection) {
+                        const range = sel.getRangeAt(0)
+                        const anchor = document.createElement('a')
+                        anchor.href = val
+                        anchor.target = '_blank'
+                        anchor.rel = 'noopener noreferrer'
+                        try {
+                            range.surroundContents(anchor)
+                        } catch {
+                            // Selection spans multiple nodes — extract and rewrap
+                            const fragment = range.extractContents()
+                            anchor.appendChild(fragment)
+                            range.insertNode(anchor)
+                        }
+                        sel.removeAllRanges()
+                    } else {
+                        // No selection: wrap entire element content in a link
+                        const anchor = document.createElement('a')
+                        anchor.href = val
+                        anchor.target = '_blank'
+                        anchor.rel = 'noopener noreferrer'
+                        anchor.innerHTML = currentEditingEl.innerHTML
+                        currentEditingEl.innerHTML = ''
+                        currentEditingEl.appendChild(anchor)
+                    }
+                    saveSelection()
+
+                // ── insertUnorderedList / insertOrderedList: manual implementation ──
+                // execCommand('insertUnorderedList') doesn't work when contenteditable is set
+                // directly on a block element (<p>, <h2>, etc.) because <ul> can't be a child
+                // of <p>. Manual implementation: split content by <br> and wrap in list items.
+                } else if (cmd === 'insertUnorderedList' || cmd === 'insertOrderedList') {
+                    const listTag = cmd === 'insertUnorderedList' ? 'ul' : 'ol'
+                    const otherTag = listTag === 'ul' ? 'ol' : 'ul'
+                    const listStyle = listTag === 'ul'
+                        ? 'list-style-type:disc;padding-left:1.5em'
+                        : 'list-style-type:decimal;padding-left:1.5em'
+
+                    if (currentEditingEl.tagName === 'LI') {
+                        // User re-clicked a list item — operate on ancestor list + its container
+                        const ancestorList = currentEditingEl.closest('ul, ol') as HTMLElement | null
+                        const containerEl = ancestorList?.parentElement as HTMLElement | null
+                        if (ancestorList && containerEl) {
+                            currentEditingEl.removeAttribute('contenteditable')
+                            if (ancestorList.tagName.toLowerCase() === listTag) {
+                                // Same type → toggle off: unwrap items to br-separated text
+                                const items = Array.from(ancestorList.children).filter(el => el.tagName === 'LI')
+                                containerEl.innerHTML = items.map(li => (li as HTMLElement).innerHTML).join('<br>')
+                            } else {
+                                // Different type → convert ul ↔ ol
+                                const newList = document.createElement(listTag)
+                                newList.setAttribute('style', listStyle)
+                                newList.innerHTML = ancestorList.innerHTML
+                                ancestorList.replaceWith(newList)
+                            }
+                            currentEditingEl = containerEl
+                            originalTag = containerEl.tagName
+                            currentEditingEl.setAttribute('contenteditable', 'true')
+                            currentEditingEl.focus()
+                        }
+                    } else {
+                        const currentHtml = currentEditingEl.innerHTML
+                        const existingSame = currentEditingEl.querySelector(listTag) as HTMLElement | null
+                        const existingOther = currentEditingEl.querySelector(otherTag) as HTMLElement | null
+                        if (existingSame && currentHtml.trim().toLowerCase().startsWith(`<${listTag}`)) {
+                            // Same type → toggle off: unwrap items to br-separated text
+                            const items = Array.from(existingSame.querySelectorAll('li'))
+                            currentEditingEl.innerHTML = items.map(li => li.innerHTML).join('<br>')
+                        } else if (existingOther && currentHtml.trim().toLowerCase().startsWith(`<${otherTag}`)) {
+                            // Convert: change list type ul ↔ ol
+                            const newList = document.createElement(listTag)
+                            newList.setAttribute('style', listStyle)
+                            newList.innerHTML = existingOther.innerHTML
+                            existingOther.replaceWith(newList)
+                        } else {
+                            // Create new list: split by <br> → individual <li> items
+                            const lines = currentHtml.split(/<br\s*\/?>/i).map(l => l.trim()).filter(Boolean)
+                            const listItems = (lines.length > 0 ? lines : [currentHtml]).map(l => `<li>${l}</li>`).join('')
+                            currentEditingEl.innerHTML = `<${listTag} style="${listStyle}">${listItems}</${listTag}>`
+                        }
+                    }
+
                 // ── other commands: fallback to execCommand ──
                 } else {
                     document.execCommand(cmd, false, val)
@@ -725,7 +897,14 @@ export function PreviewScripts() {
                             searchKey: originalText,
                             oldHtml: originalHtml,
                             newHtml: buildCleanHtml(currentEditingEl),
+                            originalTag,
+                            newTag: currentEditingEl.tagName,
                         }, parentOrigin)
+                        // For createLink, trigger an immediate save so the link persists
+                        // even if the user reloads before blurring the element
+                        if (cmd === 'createLink') {
+                            window.parent.postMessage({ type: 'SAVE_CHECKPOINT' }, parentOrigin)
+                        }
                     }
                 }
             }
@@ -847,10 +1026,13 @@ export function PreviewScripts() {
 
         // Inject the drag-over styles into document head
         const styleId = 'editor-preview-styles'
-        if (!document.getElementById(styleId)) {
-            const style = document.createElement('style')
-            style.id = styleId
-            style.innerHTML = `
+        let editorStyle = document.getElementById(styleId) as HTMLStyleElement | null
+        if (!editorStyle) {
+            editorStyle = document.createElement('style')
+            editorStyle.id = styleId
+            document.head.appendChild(editorStyle)
+        }
+        editorStyle.innerHTML = `
                 .insert-marker {
                   position: relative;
                 }
@@ -898,9 +1080,16 @@ export function PreviewScripts() {
                   display: block;
                   bottom: -14px;
                 }
-            `
-            document.head.appendChild(style)
-        }
+                p a[href], h1 a[href], h2 a[href], h3 a[href],
+                h4 a[href], h5 a[href], h6 a[href], span a[href] {
+                  text-decoration: underline !important;
+                  text-decoration-color: currentColor !important;
+                  text-underline-offset: 2px;
+                }
+                [contenteditable="true"] a {
+                  cursor: text;
+                }
+        `
 
         // Cleanup
         return () => {
@@ -929,5 +1118,30 @@ export function PreviewScripts() {
         }
     }, [])
 
+    return null
+}
+
+/**
+ * Lightweight click handler for builder preview mode (builder=1).
+ * Opens external links in a new tab; lets internal nav links navigate normally.
+ */
+export function BuilderLinkScripts() {
+    useEffect(() => {
+        const onClick = (e: MouseEvent) => {
+            const anchor = (e.target as HTMLElement).closest('a')
+            if (!anchor) return
+            const href = anchor.getAttribute('href') || ''
+            if (!href) return
+            try {
+                const url = new URL(href, window.location.href)
+                if (url.origin !== window.location.origin && SAFE_URL_PROTOCOLS.has(url.protocol)) {
+                    e.preventDefault()
+                    window.open(href, '_blank', 'noopener,noreferrer')
+                }
+            } catch { /* invalid URL — let browser handle */ }
+        }
+        document.addEventListener('click', onClick)
+        return () => document.removeEventListener('click', onClick)
+    }, [])
     return null
 }

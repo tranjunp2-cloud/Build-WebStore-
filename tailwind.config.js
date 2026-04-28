@@ -131,6 +131,11 @@ module.exports = {
             },
         },
     },
+    // Safelist: arbitrary z-index classes from NAV_Z_CLASS design tokens.
+    // JIT may not scan src/lib/design-tokens.ts string values; explicit safelist guarantees generation.
+    safelist: [
+        'z-[50]', 'z-[51]', 'z-[52]', 'z-[53]',
+    ],
     // Disable Preflight — its CSS reset overrides Payload admin styles
     // (globals.css has custom resets in @layer base instead)
     corePlugins: {

@@ -3,7 +3,7 @@ import type { Viewport } from 'next'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
 import { PreviewSiteRenderer } from './PreviewSiteRenderer'
-import { PreviewScripts } from '@/components/editor/PreviewScripts'
+import { PreviewScripts, BuilderLinkScripts } from '@/components/editor/PreviewScripts'
 import { AppShell } from '@/components/AppShell'
 import { getCurrentUser } from '@/lib/auth'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
@@ -196,14 +196,21 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 <div className="min-h-screen">
                     {/* Render with true SiteRenderer in Editor Mode */}
                     <PreviewSiteRenderer
-                        site={site}
+                        site={{
+                            ...site,
+                            // Inject tenantSlug so CartWidgetBlock can build the checkout URL.
+                            // site.tenant is populated (depth:2) so slug is accessible here.
+                            tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
+                                ? (site.tenant as { slug?: string }).slug || ''
+                                : '',
+                        }}
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
                         isBuilderPreview={!!builder}
                     />
 
-                    {/* Editor-specific listeners — skip in builder preview to allow nav link clicks */}
-                    {!builder && <PreviewScripts />}
+                    {/* Editor listeners (full) or builder-preview link handler (lightweight) */}
+                    {builder ? <BuilderLinkScripts /> : <PreviewScripts />}
                 </div>
             </AppShell>
         )

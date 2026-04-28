@@ -422,7 +422,7 @@ describe('[TC-S2-010] Gallery — Sprint 2 lightbox variant schema validation', 
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TC-S2: Navigation — Sprint 2 new variants (transparent, pill)
+// TC-S2: Navigation — Sprint 2 new variants (transparent, floating)
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('[TC-S2-011..012] Navigation — Sprint 2 variant schema validation', () => {
@@ -430,8 +430,8 @@ describe('[TC-S2-011..012] Navigation — Sprint 2 variant schema validation', (
         expect(navigationMeta.variants).toContain('transparent')
     })
 
-    it('navigationMeta lists pill variant', () => {
-        expect(navigationMeta.variants).toContain('pill')
+    it('navigationMeta lists floating variant', () => {
+        expect(navigationMeta.variants).toContain('floating')
     })
 
     it('NavigationConfigSchema accepts variant=transparent with links', () => {
@@ -459,11 +459,11 @@ describe('[TC-S2-011..012] Navigation — Sprint 2 variant schema validation', (
         }
     })
 
-    it('NavigationConfigSchema accepts variant=pill with logo, links and CTA', () => {
+    it('NavigationConfigSchema accepts variant=floating with logo, links and CTA', () => {
         // Arrange
         const input = {
             blockType: 'navigation' as const,
-            variant: 'pill',
+            variant: 'floating',
             logoText: 'FloatNav',
             links: [
                 { label: 'Features', url: '#features' },
@@ -480,7 +480,7 @@ describe('[TC-S2-011..012] Navigation — Sprint 2 variant schema validation', (
         // Assert
         expect(result.success).toBe(true)
         if (result.success) {
-            expect(result.data.variant).toBe('pill')
+            expect(result.data.variant).toBe('floating')
             expect(result.data.links).toHaveLength(4)
             expect(result.data.ctaButton?.show).toBe(true)
         }
