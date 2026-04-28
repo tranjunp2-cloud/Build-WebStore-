@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import type { BlockProps } from '../types'
 import type { ProductsGridConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -11,28 +11,85 @@ import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
-// Mock Data
-const MOCK_PRODUCTS = [
-    { id: 1, name: 'Premium Leather Bag', price: '$120', image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=500&q=80' },
-    { id: 2, name: 'Minimalist Watch', price: '$85', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=80' },
-    { id: 3, name: 'Wireless Headphones', price: '$250', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80' },
-    { id: 4, name: 'Classic Sunglasses', price: '$95', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=500&q=80' },
-    { id: 5, name: 'Ceramic Coffee Mug', price: '$24', image: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=500&q=80' },
-    { id: 6, name: 'Smart Home Speaker', price: '$150', image: 'https://images.unsplash.com/photo-1543512214-318c7553f230?w=500&q=80' },
-    { id: 7, name: 'Ergonomic Chair', price: '$350', image: 'https://images.unsplash.com/photo-1505843490538-5133c6c7d0e1?w=500&q=80' },
-    { id: 8, name: 'Mechanical Keyboard', price: '$130', image: 'https://images.unsplash.com/photo-1595225476474-87563907a212?w=500&q=80' },
-]
+const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
 
-export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfig>) {
+interface ProductItem {
+    id: string
+    name: string
+    price: string
+    image: string | null
+}
+
+export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGridConfig>) {
     const { headline = 'Featured Products', subheadline, limit = 6, variant = 'grid-3' } = block
+    const [products, setProducts] = useState<ProductItem[]>([])
+    const [loading, setLoading] = useState(true)
 
-    const products = MOCK_PRODUCTS.slice(0, limit)
+    useEffect(() => {
+        const siteId = site?.id ? String(site.id) : null
+        if (!siteId) {
+            setLoading(false)
+            return
+        }
+
+        const controller = new AbortController()
+
+        fetch(`/api/storefront/products?site=${siteId}&limit=${limit}&sort=-createdAt`, { signal: controller.signal })
+            .then(res => res.ok ? res.json() : Promise.reject(res))
+            .then(json => {
+                const docs = json.docs || []
+                const mapped: ProductItem[] = docs.map((doc: Record<string, unknown>) => {
+                    const images = doc.images as Array<{ image?: { url?: string } }> | undefined
+                    const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
+                    const currency = CURRENCY_DISPLAY[currencyCode] ?? currencyCode
+                    const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
+                    return {
+                        id: String(doc.id),
+                        name: String(doc.name || ''),
+                        price: `${currency} ${price.toFixed(2)}`,
+                        image: images?.[0]?.image?.url ?? null,
+                    }
+                })
+                setProducts(mapped)
+            })
+            .catch(err => {
+                if (err.name !== 'AbortError') console.error('[ProductsGridBlock] Failed to fetch products:', err)
+            })
+            .finally(() => setLoading(false))
+
+        return () => controller.abort()
+    }, [limit, site])
 
     const gridCols = {
         'grid-3': 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
         'grid-4': 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
         'list': 'grid-cols-1 max-w-3xl mx-auto',
     }[variant] || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+
+    if (loading) {
+        return (
+            <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent">
+                <div className="text-center">
+                    <div className="animate-pulse flex flex-col items-center gap-4">
+                        <div className="h-8 w-64 bg-white/10 rounded" />
+                        <div className="h-4 w-48 bg-white/5 rounded" />
+                    </div>
+                </div>
+            </SectionWrapper>
+        )
+    }
+
+    if (products.length === 0) {
+        return (
+            <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent">
+                <div className="text-center">
+                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
+                    <p className="opacity-60 text-lg">No products yet. Check back soon!</p>
+                </div>
+            </SectionWrapper>
+        )
+    }
 
     return (
         <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
@@ -53,7 +110,7 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
 
             {/* Grid */}
             <StaggerGrid className={`grid gap-8 ${gridCols}`}>
-                {products.map((product, i) => (
+                {products.map((product) => (
                     <StaggerItem key={product.id}>
                         <HoverCard
                             className={`group overflow-hidden rounded-2xl h-full flex ${variant === 'list' ? 'flex-row items-center gap-6 p-4' : 'flex-col'}`}
@@ -63,12 +120,16 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
                             }}
                         >
                             <div className={`relative overflow-hidden bg-black/5 dark:bg-white/5 ${variant === 'list' ? 'w-32 h-32 rounded-xl flex-shrink-0' : 'aspect-square'}`}>
-                                <img
-                                    src={product.image}
-                                    alt={product.name}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 mix-blend-multiply dark:mix-blend-normal"
-                                    loading="lazy"
-                                />
+                                {product.image ? (
+                                    <img
+                                        src={product.image}
+                                        alt={product.name}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 mix-blend-multiply dark:mix-blend-normal"
+                                        loading="lazy"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">🛍️</div>
+                                )}
                                 {/* Quick View Overlay */}
                                 {variant !== 'list' && (
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
@@ -95,14 +156,14 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
                                     }}
                                     onMouseEnter={(e) => {
                                         if (variant !== 'list') {
-                                            e.currentTarget.style.backgroundColor = CSS_VARS.primary;
-                                            e.currentTarget.style.color = theme.colorMode === 'dark' ? '#000' : '#fff';
+                                            e.currentTarget.style.backgroundColor = CSS_VARS.primary
+                                            e.currentTarget.style.color = theme.colorMode === 'dark' ? '#000' : '#fff'
                                         }
                                     }}
                                     onMouseLeave={(e) => {
                                         if (variant !== 'list') {
-                                            e.currentTarget.style.backgroundColor = 'transparent';
-                                            e.currentTarget.style.color = CSS_VARS.primary;
+                                            e.currentTarget.style.backgroundColor = 'transparent'
+                                            e.currentTarget.style.color = CSS_VARS.primary
                                         }
                                     }}
                                 >

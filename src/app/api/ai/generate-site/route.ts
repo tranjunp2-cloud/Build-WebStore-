@@ -31,6 +31,7 @@ import { ensureNavigationBlocks, stripNavOffset, type PageShape, type PageBlockS
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
+import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -351,6 +352,14 @@ export async function POST(req: NextRequest) {
                 console.warn('[generate-site] blockPromptOverrides fetch failed (non-fatal):', err instanceof Error ? err.message : err)
             }
         }
+
+        // Start sample product generation in parallel with site AI generation (non-blocking)
+        const sampleProductsPromise = generateSampleProducts(
+            businessInfo,
+            (language as 'en' | 'ms' | 'auto'),
+            String(resolvedTenantId),
+            payload,
+        )
 
         // Generate with AI (or fallback)
         const { result, events } = await trackPhase('ai', () =>
@@ -886,6 +895,41 @@ export async function POST(req: NextRequest) {
             },
         })
 
+        // Write sample products to DB (non-fatal — awaits the parallel promise started above)
+        let productsCreatedCount = 0
+        try {
+            const sampleProducts = await sampleProductsPromise
+            for (const product of sampleProducts) {
+                // Guard: name must be at least 3 chars (Products schema minLength)
+                const name = product.name?.trim()
+                if (!name || name.length < 3) {
+                    console.warn('[generate-site] sample product skipped — name too short:', JSON.stringify(name))
+                    continue
+                }
+                try {
+                    await payload.create({
+                        collection: 'products',
+                        data: {
+                            tenant: resolvedTenantId,
+                            site: site.id,
+                            name,
+                            shortDescription: product.shortDescription,
+                            description: product.description,
+                            ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
+                            price: product.price,
+                            ...(product.imageId ? { images: [{ image: product.imageId }] } : {}),
+                            status: 'active',
+                        },
+                    })
+                    productsCreatedCount++
+                } catch (err) {
+                    console.warn('[generate-site] sample product write failed (non-fatal):', (err as Error).message)
+                }
+            }
+        } catch (err) {
+            console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
+        }
+
         const timeMs = Date.now() - startTime
 
         // Plan 260415 F01-gen-audit — single summary line per gen so ops can
@@ -912,6 +956,12 @@ export async function POST(req: NextRequest) {
                             controller.enqueue(encoder.encode(sseData))
                             // Small delay between events for visual effect
                             await new Promise(resolve => setTimeout(resolve, 100))
+                        }
+
+                        // Emit products_generated event if any sample products were created
+                        if (productsCreatedCount > 0) {
+                            const productEventData = `event: products_generated\ndata: ${JSON.stringify({ count: productsCreatedCount })}\n\n`
+                            controller.enqueue(encoder.encode(productEventData))
                         }
 
                         // Final done event with siteId

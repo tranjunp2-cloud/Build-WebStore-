@@ -275,8 +275,6 @@ export const Products: CollectionConfig = {
             type: 'relationship',
             relationTo: 'categories',
             hasMany: true,
-            required: true,
-            minRows: 1,
             admin: { description: 'Danh mục sản phẩm (Hỗ trợ Multi-select)' },
         },
         {
