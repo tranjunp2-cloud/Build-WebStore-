@@ -28,6 +28,7 @@ import { translateProductTerm } from '@/lib/ai/product-translator'
 import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
 import { ensureNavigationBlocks, stripNavOffset, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
+import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
@@ -630,10 +631,16 @@ export async function POST(req: NextRequest) {
         }
         _site = site
 
+        // Derive nav links from AI multi-page output so menu reflects actual generated pages
+        const aiPageLinks = extractPageLinks(
+            (result as { pages?: Array<{ title?: string; slug?: string; isHomepage?: boolean }> }).pages,
+        )
+
         // Sanitize blocks for Payload CMS compatibility
         const sanitizedBlocks = applyGeneratedSiteNavigation(
             sanitizeBlocksForPayload(result.blocks),
             result.siteName,
+            aiPageLinks,
         )
 
         // B4 fix: detect duplicate hero blocks — take first, log warning
@@ -696,10 +703,12 @@ export async function POST(req: NextRequest) {
 
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
+        // GH-817: pass aiPageLinks so injected/hollow nav reflects actual AI-generated pages
         const pageDefinitions = enforcePageVariety(
             ensureNavigationBlocks(
                 rawPageDefinitions as unknown as PageShape[],
                 businessInfo.businessName,
+                aiPageLinks ?? undefined,
             ),
         )
 
@@ -1025,21 +1034,27 @@ function normalizeInternalUrl(url: unknown): string {
     return url
 }
 
-function applyGeneratedSiteNavigation(blocks: AIBlock[], businessName: string): AIBlock[] {
+const FALLBACK_NAV_LINKS = [
+    { label: 'Home', url: '/' },
+    { label: 'About', url: '/about' },
+    { label: 'Products', url: '/products' },
+    { label: 'Contact', url: '/contact' },
+] as const
+
+function applyGeneratedSiteNavigation(
+    blocks: AIBlock[],
+    businessName: string,
+    pageLinks?: readonly { label: string; url: string }[] | null,
+): AIBlock[] {
     const normalizedBlocks = cloneBlockData(blocks)
-    const pageLinks = [
-        { label: 'Home', url: '/' },
-        { label: 'About', url: '/about' },
-        { label: 'Products', url: '/products' },
-        { label: 'Contact', url: '/contact' },
-    ]
+    const links = pageLinks ?? FALLBACK_NAV_LINKS
 
     return normalizedBlocks.map((block) => {
         if (block.blockType === 'navigation') {
             return {
                 ...block,
                 logoText: block.logoText || businessName,
-                links: pageLinks,
+                links: links.map((l) => ({ ...l })),
                 ctaButton: block.ctaButton
                     ? {
                         ...block.ctaButton,

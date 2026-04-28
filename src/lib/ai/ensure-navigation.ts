@@ -56,9 +56,10 @@ function isFooterBlock(block: PageBlockShape): boolean {
 function patchHollowNav(
     block: PageBlockShape,
     fallbackLinks: readonly { label: string; url: string }[],
+    forceReplace?: boolean,
 ): PageBlockShape {
     const links = Array.isArray(block.links) ? block.links : []
-    if (links.length > 0) return block
+    if (links.length > 0 && !forceReplace) return block
     return { ...block, links: fallbackLinks.map((link) => ({ ...link })) }
 }
 
@@ -93,12 +94,15 @@ export function stripNavOffset(layout: PageBlockShape[]): PageBlockShape[] {
     return layout.map(({ _navOffset: _, ...block }) => block)
 }
 
-function buildDefaultNavigation(businessName: string): PageBlockShape {
+type NavLink = { label: string; url: string }
+
+function buildDefaultNavigation(businessName: string, pageLinks?: readonly NavLink[]): PageBlockShape {
+    const links = (pageLinks ?? DEFAULT_NAV_LINKS).map((link) => ({ ...link }))
     return {
         blockType: 'navigation',
         variant: 'default',
         logoText: businessName,
-        links: DEFAULT_NAV_LINKS.map((link) => ({ ...link })),
+        links,
         ctaButton: {
             label: 'Get in touch',
             url: '/contact',
@@ -107,7 +111,8 @@ function buildDefaultNavigation(businessName: string): PageBlockShape {
     }
 }
 
-function buildDefaultFooter(businessName: string): PageBlockShape {
+function buildDefaultFooter(businessName: string, pageLinks?: readonly NavLink[]): PageBlockShape {
+    const links = (pageLinks ?? DEFAULT_NAV_LINKS).map((link) => ({ ...link }))
     return {
         blockType: 'footer',
         variant: 'simple',
@@ -116,7 +121,7 @@ function buildDefaultFooter(businessName: string): PageBlockShape {
         columns: [
             {
                 title: 'Pages',
-                links: DEFAULT_NAV_LINKS.map((link) => ({ ...link })),
+                links,
             },
             {
                 title: 'Contact',
@@ -130,12 +135,17 @@ function buildDefaultFooter(businessName: string): PageBlockShape {
 /**
  * Ensure every page in the array has a navigation block at start
  * and a footer block at end. Mutates input array in place.
+ *
+ * @param pageLinks - Dynamic links derived from AI-generated pages. When provided,
+ *   injected/patched nav blocks use these links instead of DEFAULT_NAV_LINKS.
  */
 export function ensureNavigationBlocks(
     pages: PageShape[],
     businessName: string,
+    pageLinks?: readonly NavLink[],
 ): PageShape[] {
     const safeName = businessName?.trim() || 'My Website'
+    const fallbackLinks = pageLinks ?? DEFAULT_NAV_LINKS
 
     return pages.map((page) => {
         let layout = Array.isArray(page.layout) ? [...page.layout] : []
@@ -144,14 +154,18 @@ export function ensureNavigationBlocks(
         const hasFooter = layout.some(isFooterBlock)
 
         if (!hasNavigation) {
-            layout.unshift(buildDefaultNavigation(safeName))
+            layout.unshift(buildDefaultNavigation(safeName, fallbackLinks))
         } else {
-            // Nav exists but may be hollow (empty links) — patch with defaults
-            layout = layout.map((b) => isNavBlock(b) ? patchHollowNav(b, DEFAULT_NAV_LINKS) : b)
+            // When aiPageLinks provided (pageLinks arg is defined), force-replace nav links
+            // so hardcoded links injected by enforceMinimumStructure get overwritten.
+            // Without forceReplace, patchHollowNav skips non-hollow navs — leaving
+            // enforcer-injected [Home/About/Services/Contact] instead of actual AI pages.
+            const forceReplace = pageLinks !== undefined
+            layout = layout.map((b) => isNavBlock(b) ? patchHollowNav(b, fallbackLinks, forceReplace) : b)
         }
 
         if (!hasFooter) {
-            layout.push(buildDefaultFooter(safeName))
+            layout.push(buildDefaultFooter(safeName, fallbackLinks))
         }
 
         return { ...page, layout: injectFirstBlockOffset(layout) }
