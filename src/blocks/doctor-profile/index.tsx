@@ -82,7 +82,7 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
                     <div className="flex justify-center mb-4">
                         <DoctorAvatar doctor={doc} size="lg" />
                     </div>
-                    <h3 className="text-lg font-bold font-heading mb-1">{doc.name}</h3>
+                    <RichText text={doc.name} as="h3" className="text-lg font-bold font-heading mb-1" />
                     <p className="text-sm mb-3" style={{ color: 'var(--brand-primary)' }}>{doc.specialisation}</p>
 
                     {doc.qualifications.length > 0 && (
@@ -133,7 +133,7 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
                     <div className="flex flex-col md:flex-row gap-6 items-start">
                         <DoctorAvatar doctor={doc} size="lg" />
                         <div className="flex-1">
-                            <h3 className="text-2xl font-bold font-heading mb-1">{doc.name}</h3>
+                            <RichText text={doc.name} as="h3" className="text-2xl font-bold font-heading mb-1" />
                             <p className="text-base mb-4" style={{ color: 'var(--brand-primary)' }}>{doc.specialisation}</p>
 
                             {doc.qualifications.length > 0 && (
@@ -208,7 +208,7 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
                 >
                     <DoctorAvatar doctor={doc} size="sm" />
                     <div className="flex-1 min-w-0">
-                        <h4 className="font-bold font-heading">{doc.name}</h4>
+                        <RichText text={doc.name} as="h4" className="font-bold font-heading" />
                         <p className="text-sm" style={{ color: 'var(--brand-primary)' }}>{doc.specialisation}</p>
                         {doc.languages && <p className="text-xs opacity-40">{doc.languages}</p>}
                     </div>

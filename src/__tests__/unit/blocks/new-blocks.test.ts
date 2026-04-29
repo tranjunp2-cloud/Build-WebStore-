@@ -198,9 +198,12 @@ describe('New Block Configs [TC-F04-NEW]', () => {
             }
         })
 
-        it('TC-F04-NEW-14: schema rejects missing embedUrl', () => {
+        it('TC-F04-NEW-14: schema accepts missing embedUrl — defaults to empty string (GH-820 fix)', () => {
+            // embedUrl is optional — template-composer cannot auto-generate a real embed URL.
+            // Payload creates the page with embedUrl='' so owner can fill in later via builder.
             const result = GoogleMapsConfigSchema.safeParse({ blockType: 'google-maps' })
-            expect(result.success).toBe(false)
+            expect(result.success).toBe(true)
+            if (result.success) expect(result.data.embedUrl).toBe('')
         })
 
         it('TC-F04-NEW-15: meta has required fields', () => {

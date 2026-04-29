@@ -14,11 +14,10 @@ import {
 } from '../shared/decorative'
 import { getTeamAvatar } from '@/lib/images/industry-images'
 import { CSS_VARS } from '@/lib/theme/resolve'
-import { RichText as _RichText } from '../shared/RichText'
+import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 
-void _RichText
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 // Extract structural duplication across 8 variants. Brand identity vars
@@ -131,7 +130,7 @@ function AuthorMeta({
     if (layout === 'stacked') {
         return (
             <div className={className}>
-                <p className={nameClass}>{name}</p>
+                <RichText text={name} as="p" className={nameClass} />
                 {subtitle && (
                     <Caption className="opacity-45 mt-1">{subtitle}</Caption>
                 )}
@@ -145,7 +144,7 @@ function AuthorMeta({
                 <AvatarRing color={CSS_VARS.primary} src={avatar?.url || fallbackSrc} name={name} size={avatarSize} imageIndex={imageIndex} />
             )}
             <div>
-                <p className={nameClass}>{name}</p>
+                <RichText text={name} as="p" className={nameClass} />
                 {subtitle && (
                     <Caption className="opacity-45 block">{subtitle}</Caption>
                 )}
@@ -497,7 +496,7 @@ function TestimonialsSpotlight({
                         <Body size="lg" className="opacity-70 mb-6 italic">
                             &ldquo;{center.quote}&rdquo;
                         </Body>
-                        <p className="font-bold">{center.name}</p>
+                        <RichText text={center.name} as="p" className="font-bold" />
                         {(center.title || center.company) && (
                             <Body size="small" className="opacity-45 mt-1">{[center.title, center.company].filter(Boolean).join(' \u2022 ')}</Body>
                         )}
@@ -764,7 +763,7 @@ function TestimonialsCarousel({
                         <Body size="lg" className="italic opacity-70 mb-6">
                             &ldquo;{t.quote}&rdquo;
                         </Body>
-                        <p className="font-bold">{t.name}</p>
+                        <RichText text={t.name} as="p" className="font-bold" />
                         {(t.title || t.company) && (
                             <Body size="small" className="opacity-45 mt-1">{[t.title, t.company].filter(Boolean).join(' \u2022 ')}</Body>
                         )}
@@ -853,7 +852,7 @@ function TestimonialsAvatarRow({
                     <Body size="lg" className="opacity-70 mb-6 italic">
                         &ldquo;{selected.quote}&rdquo;
                     </Body>
-                    <p className="font-bold">{selected.name}</p>
+                    <RichText text={selected.name} as="p" className="font-bold" />
                     {(selected.title || selected.company) && (
                         <Body size="small" className="opacity-45 mt-1">{[selected.title, selected.company].filter(Boolean).join(' \u2022 ')}</Body>
                     )}

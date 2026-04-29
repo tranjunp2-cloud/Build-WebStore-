@@ -876,7 +876,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
             initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className={`fixed top-4 left-1/2 -translate-x-1/2 ${NAV_Z_CLASS.base} w-[calc(100%-2rem)] max-w-3xl`}
+            className={`fixed top-4 left-4 ${NAV_Z_CLASS.base} w-[calc(100%-2rem)] max-w-3xl`}
         >
             <div
                 className="rounded-full px-6 py-3 flex items-center justify-between min-h-[56px]"

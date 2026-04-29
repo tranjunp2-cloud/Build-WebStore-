@@ -73,7 +73,10 @@ const PRICE_SIZE = {
 function PriceDisplay({ price, period, size = 'lg', className = '' }: PriceDisplayProps) {
     return (
         <div className={className}>
-            <span className={`${PRICE_SIZE[size]} font-bold`}>{price}</span>
+            {typeof price === 'string'
+                ? <RichText text={price} as="span" className={`${PRICE_SIZE[size]} font-bold`} />
+                : <span className={`${PRICE_SIZE[size]} font-bold`}>{price}</span>
+            }
             {period && <span className="opacity-50 text-sm">/{period}</span>}
         </div>
     )
@@ -119,7 +122,7 @@ function FeatureList({ features, className = 'space-y-3' }: FeatureListProps) {
             {features.map((f, j) => (
                 <li key={j} className="flex items-center gap-2 text-sm">
                     <span style={{ color: 'var(--brand-primary)' }} aria-hidden="true">&#10003;</span>
-                    {typeof f === 'string' ? f : f.text}
+                    <RichText text={typeof f === 'string' ? f : f.text} as="span" />
                 </li>
             ))}
         </ul>
@@ -180,7 +183,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                             color: 'var(--brand-primary)',
                                         }}
                                     >
-                                        {typeof f === 'string' ? f : f.text}
+                                        <RichText text={typeof f === 'string' ? f : f.text} as="span" />
                                     </span>
                                 ))}
                                 {plan.features.length > 4 && (
@@ -301,9 +304,9 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                                 borderTopRightRadius: 12,
                                             } : {}}
                                         >
-                                            <div className="font-bold font-heading text-lg">{plan.name}</div>
+                                            <div className="font-bold font-heading text-lg"><RichText text={plan.name} as="span" /></div>
                                             <div className="mt-1">
-                                                <span className="text-2xl font-bold">{plan.price}</span>
+                                                <RichText text={plan.price} as="span" className="text-2xl font-bold" />
                                                 {plan.period && <span className="opacity-50 text-xs">/{plan.period}</span>}
                                             </div>
                                         </th>
@@ -317,7 +320,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                         className="border-t"
                                         style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.06)' }}
                                     >
-                                        <td className="p-4 text-sm">{feature}</td>
+                                        <td className="p-4 text-sm"><RichText text={feature} as="span" /></td>
                                         {plans.map((plan, pi) => {
                                             // Plan 260415 Lỗi F — compare bằng text string thay vì reference
                                             const hasFeature = plan.features.some(
@@ -403,9 +406,9 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                                 Popular
                                             </span>
                                         )}
-                                        <h3 className="text-lg font-bold font-heading">{plan.name}</h3>
+                                        <h3 className="text-lg font-bold font-heading"><RichText text={plan.name} as="span" /></h3>
                                         <div className="mt-1">
-                                            <span className="text-2xl font-bold">{plan.price}</span>
+                                            <RichText text={plan.price} as="span" className="text-2xl font-bold" />
                                             {plan.period && (
                                                 <span className={`text-xs ${plan.highlighted ? 'opacity-70' : 'opacity-50'}`}>/{plan.period}</span>
                                             )}
@@ -424,7 +427,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                         borderTop: '1px solid rgba(var(--brand-primary-rgb), 0.06)',
                                     }}
                                 >
-                                    <div className="p-4 text-sm opacity-80">{featureText}</div>
+                                    <div className="p-4 text-sm opacity-80"><RichText text={featureText} as="span" /></div>
                                     {plans.map((plan, pi) => (
                                         <div
                                             key={pi}
@@ -616,7 +619,7 @@ function PricingToggle({ block, theme: _theme }: { block: BlockProps<PricingConf
                                     transition={{ duration: 0.2 }}
                                     className="text-4xl font-bold inline-block"
                                 >
-                                    {getPrice(plan.price)}
+                                    <RichText text={getPrice(plan.price)} as="span" />
                                 </motion.span>
                             </AnimatePresence>
                             <span className="opacity-60 text-sm">/{isYearly ? 'year' : plan.period || 'month'}</span>

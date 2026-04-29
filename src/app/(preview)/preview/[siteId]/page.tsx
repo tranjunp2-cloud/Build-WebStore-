@@ -220,6 +220,20 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         )
 
     } catch (error) {
+        // Re-throw Next.js special errors (notFound, redirect) so the runtime handles them.
+        // Catching NEXT_NOT_FOUND here turns a proper 404 into a Server Component render error.
+        if (
+            error !== null &&
+            typeof error === 'object' &&
+            'digest' in error &&
+            typeof (error as Record<string, string>).digest === 'string' &&
+            (
+                (error as Record<string, string>).digest === 'NEXT_NOT_FOUND' ||
+                (error as Record<string, string>).digest.startsWith('NEXT_REDIRECT')
+            )
+        ) {
+            throw error
+        }
         console.error('[Preview] Error:', error)
         return <PreviewLoadError />
     }

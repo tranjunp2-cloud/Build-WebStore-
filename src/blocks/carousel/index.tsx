@@ -219,7 +219,7 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                                     </blockquote>
                                 )}
                                 {item.title && (
-                                    <p className="font-bold font-heading" style={{ color: 'var(--brand-primary)' }}>{item.title}</p>
+                                    <RichText text={item.title} as="p" className="font-bold font-heading" style={{ color: 'var(--brand-primary)' }} />
                                 )}
                             </div>
                         </div>

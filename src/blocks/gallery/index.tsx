@@ -648,7 +648,7 @@ function JustifiedGallery({ headline, images, theme: _theme }: { headline?: stri
                                     />
                                     {item.caption && (
                                         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                            <p className="text-white text-xs font-medium">{item.caption}</p>
+                                            <RichText text={item.caption} as="p" className="text-white text-xs font-medium" />
                                         </div>
                                     )}
                                 </>

@@ -139,8 +139,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                     >
                         <VideoCard video={video} index={i} />
                         <div className="mt-3">
-                            <h4 className="font-bold font-heading">{video.title}</h4>
-                            {video.description && <p className="text-sm opacity-50 mt-1">{video.description}</p>}
+                            <RichText text={video.title} as="h4" className="font-bold font-heading" />
+                            {video.description && <RichText text={video.description} as="p" className="text-sm opacity-50 mt-1" />}
                             {video.category && <span className="text-xs opacity-40">{video.category}</span>}
                         </div>
                     </motion.div>
@@ -158,8 +158,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                 <div className="lg:col-span-2">
                     <VideoCard video={featured} index={featuredIndex} aspectClass="aspect-video" />
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold font-heading">{featured.title}</h3>
-                        {featured.description && <p className="text-sm opacity-50 mt-2">{featured.description}</p>}
+                        <RichText text={featured.title} as="h3" className="text-xl font-bold font-heading" />
+                        {featured.description && <RichText text={featured.description} as="p" className="text-sm opacity-50 mt-2" />}
                     </div>
                 </div>
                 <div className="space-y-3 max-h-[500px] overflow-y-auto">
@@ -211,8 +211,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                 >
                     <VideoCard video={video} index={i} aspectClass="aspect-[21/9]" />
                     <div className="mt-4 max-w-2xl">
-                        <h3 className="text-2xl font-bold font-heading">{video.title}</h3>
-                        {video.description && <p className="text-base opacity-50 mt-2">{video.description}</p>}
+                        <RichText text={video.title} as="h3" className="text-2xl font-bold font-heading" />
+                        {video.description && <RichText text={video.description} as="p" className="text-base opacity-50 mt-2" />}
                     </div>
                 </motion.div>
             ))}
