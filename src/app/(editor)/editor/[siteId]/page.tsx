@@ -623,13 +623,22 @@ export default function EditorPage() {
         }, 500)
     }, [reorderBlocks, handleSave])
 
-    // Seed gallery images from Unsplash → S3 in the background (fire-and-forget).
-    // Gallery renders immediately with CDN category fallback; S3 images appear on next session.
+    // Seed gallery images from Unsplash → S3, then push the S3 map into the iframe
+    // via postMessage so the gallery re-renders with correct images without a reload.
     // Idempotent — if already seeded (e.g. via AI gen) the endpoint returns immediately.
-    const triggerImageSeed = useCallback(() => {
+    const triggerImageSeed = useCallback(async () => {
         if (!siteId) return
-        fetch(`/api/sites/${siteId}/seed-images`, { method: 'POST', credentials: 'include' })
-            .catch(() => { /* non-fatal */ })
+        try {
+            const res = await fetch(`/api/sites/${siteId}/seed-images`, { method: 'POST', credentials: 'include' })
+            if (res.ok) {
+                const data = await res.json()
+                if (data.imageLibraryS3 && Object.keys(data.imageLibraryS3).length > 0) {
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_IMAGE_LIBRARY_S3', imageLibraryS3: data.imageLibraryS3 })
+                }
+            }
+        } catch {
+            // non-fatal
+        }
     }, [siteId])
 
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {

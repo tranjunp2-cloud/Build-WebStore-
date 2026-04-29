@@ -1,8 +1,8 @@
 /**
  * POST /api/sites/[siteId]/seed-images
  * Seed gallery images from Unsplash → S3 for a site the current user owns.
- * Returns 202 immediately; seeder runs in background (fire-and-forget).
- * Gallery renders with CDN category fallback right away; S3 images appear on next session load.
+ * Awaits seed completion then returns the imageLibraryS3 map so the editor
+ * can push it into the iframe via postMessage (no iframe reload needed).
  * Idempotent: if gallery slots are already seeded the seeder skips after one DB query.
  */
 export const dynamic = 'force-dynamic'
@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { seedImageLibraryForSite } from '@/lib/images/image-library-seeder'
+import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 type TenantRef = string | number | { id: string | number } | null | undefined
 const resolveTenantId = (t: TenantRef): string | null =>
@@ -37,16 +39,13 @@ export async function POST(
 
     const category = (site.siteType as string) || 'business'
 
-    // Fire-and-forget: seed only gallery slots (~6 images) so it's lightweight
-    import('@/lib/images/image-library-seeder')
-        .then(({ seedImageLibraryForSite }) =>
-            seedImageLibraryForSite(payload, siteTenantId, siteId, category,
-                (slot) => slot.startsWith('gallery'),
-            ),
-        )
-        .catch(err =>
-            console.error('[seed-images] seeder failed', err instanceof Error ? err.message : err),
-        )
+    // Await seed so we can return the S3 map immediately for postMessage live-update.
+    // Only gallery slots (~6 images, ~5–10s). Never throws.
+    await seedImageLibraryForSite(payload, siteTenantId, siteId, category,
+        (slot) => slot.startsWith('gallery'),
+    )
 
-    return NextResponse.json({ ok: true, queued: true }, { status: 202 })
+    const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
+
+    return NextResponse.json({ ok: true, imageLibraryS3 })
 }
