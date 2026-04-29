@@ -144,6 +144,28 @@ function ScoreBar({ score }: { score?: FixtureScore }) {
   )
 }
 
+/** Category pass-rate mini progress bar */
+function CategoryHealthBar({ pass, total, warn, fail }: { pass: number; total: number; warn: number; fail: number }) {
+  if (total === 0) return null
+  const passPct = (pass / total) * 100
+  const warnPct = (warn / total) * 100
+  const failPct = (fail / total) * 100
+  const passRate = Math.round(passPct)
+  const rateColor = failPct > 0 ? DK.fail : warnPct > 0 ? DK.warn : DK.pass
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ flex: 1, height: 5, background: '#1a1a1a', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
+        <div style={{ height: '100%', width: `${passPct}%`, background: DK.pass }} />
+        <div style={{ height: '100%', width: `${warnPct}%`, background: DK.warn }} />
+        <div style={{ height: '100%', width: `${failPct}%`, background: DK.fail }} />
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, color: rateColor, fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 32, textAlign: 'right' }}>
+        {passRate}%
+      </span>
+    </div>
+  )
+}
+
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 export default function HarnessIndexPage() {
@@ -170,7 +192,17 @@ export default function HarnessIndexPage() {
   const aiCacheMap = readAiCachedMap()
   const aiCached = new Set(aiCacheMap.keys())
   const blueprints = pickUniqueBlueprints(matrix, scoreMap)
-  const categories = Array.from(new Set(blueprints.map((b) => b.category))).sort()
+
+  // Sort categories: fail first, then warn, then clean
+  const categories = Array.from(new Set(blueprints.map((b) => b.category))).sort((a, b) => {
+    const aFail = blueprints.filter((bp) => bp.category === a && bp.score?.status === 'fail').length
+    const bFail = blueprints.filter((bp) => bp.category === b && bp.score?.status === 'fail').length
+    const aWarn = blueprints.filter((bp) => bp.category === a && bp.score?.status === 'warn').length
+    const bWarn = blueprints.filter((bp) => bp.category === b && bp.score?.status === 'warn').length
+    if (bFail !== aFail) return bFail - aFail
+    if (bWarn !== aWarn) return bWarn - aWarn
+    return a.localeCompare(b)
+  })
 
   const rubric = (() => { try { return loadRubric() } catch { return null } })()
   const dimDescriptions = new Map<string, string>()
@@ -183,6 +215,12 @@ export default function HarnessIndexPage() {
   const rubricPass = report?.summary.pass ?? 0
   const rubricWarn = report?.summary.warn ?? 0
   const rubricFail = report?.summary.fail ?? 0
+  const needsFix = rubricWarn + rubricFail
+
+  // Fixtures needing attention (fail or warn)
+  const attentionFixtures = blueprints
+    .filter((b) => b.score && b.score.status !== 'pass')
+    .sort((a, b) => (a.score?.weighted ?? 10) - (b.score?.weighted ?? 10))
 
   return (
     <div style={{ background: DK.bg, color: DK.text, minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -197,13 +235,28 @@ export default function HarnessIndexPage() {
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
-              <span style={{ color: DK.pass, fontWeight: 600 }}>{rubricPass} pass</span>
-              <span style={{ color: DK.border, margin: '0 6px' }}>·</span>
-              <span style={{ color: rubricWarn > 0 ? DK.warn : DK.textMuted, fontWeight: rubricWarn > 0 ? 600 : 400 }}>{rubricWarn} warn</span>
-              <span style={{ color: DK.border, margin: '0 6px' }}>·</span>
-              <span style={{ color: rubricFail > 0 ? DK.fail : DK.textMuted, fontWeight: rubricFail > 0 ? 700 : 400 }}>{rubricFail} fail</span>
-            </span>
+            {/* Enlarged pass/warn/fail counts */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#052e16', border: '1px solid #166534', borderRadius: 6, padding: '4px 10px' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: DK.pass, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{rubricPass}</span>
+                <span style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 0.5 }}>pass</span>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: rubricWarn > 0 ? '#451a03' : '#1a1a1a', border: `1px solid ${rubricWarn > 0 ? '#92400e' : DK.border}`, borderRadius: 6, padding: '4px 10px' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: rubricWarn > 0 ? DK.warn : DK.textMuted, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{rubricWarn}</span>
+                <span style={{ fontSize: 10, color: rubricWarn > 0 ? '#fcd34d' : DK.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>warn</span>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: rubricFail > 0 ? '#450a0a' : '#1a1a1a', border: `1px solid ${rubricFail > 0 ? '#991b1b' : DK.border}`, borderRadius: 6, padding: '4px 10px' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: rubricFail > 0 ? DK.fail : DK.textMuted, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{rubricFail}</span>
+                <span style={{ fontSize: 10, color: rubricFail > 0 ? '#fca5a5' : DK.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>fail</span>
+              </span>
+            </div>
+            {/* "X cần fix" badge */}
+            {rubricFail > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#7f1d1d', border: '1px solid #dc2626', borderRadius: 6, padding: '5px 12px', fontWeight: 700 }}>
+                <span style={{ fontSize: 16, color: '#fca5a5', fontVariantNumeric: 'tabular-nums' }}>{rubricFail}</span>
+                <span style={{ fontSize: 11, color: '#fca5a5' }}>cần fix</span>
+              </span>
+            )}
             {rubricAvg !== null && (
               <span style={{ fontSize: 15, fontWeight: 700, color: DK.accent, fontVariantNumeric: 'tabular-nums' }}>{rubricAvg.toFixed(2)}/10</span>
             )}
@@ -220,15 +273,21 @@ export default function HarnessIndexPage() {
         {/* ── KPI cards ── */}
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
           {([
-            { label: 'Rubric Avg', value: rubricAvg !== null ? `${rubricAvg.toFixed(2)}/10` : '—', sub: report ? `rubric ${report.rubric?.name ?? ''}` : 'run harness:score', color: DK.accent },
-            { label: 'Pass ≥ 7.0', value: rubricPass, sub: 'score distribution', color: DK.pass },
-            { label: 'Warn 5–6.9', value: rubricWarn, sub: 'score distribution', color: DK.warn },
-            { label: 'Fail < 5.0', value: rubricFail, sub: rubricFail === 0 ? 'none — clean' : 'needs fix!', color: rubricFail > 0 ? DK.fail : DK.textMuted },
-            { label: 'Harness Errors', value: matrix.summary.composerErrors, sub: matrix.summary.composerErrors === 0 ? '0 compose failures' : 'needs fix', color: matrix.summary.composerErrors > 0 ? DK.fail : DK.pass },
+            { label: 'Rubric Avg', value: rubricAvg !== null ? `${rubricAvg.toFixed(2)}/10` : '—', sub: report ? `rubric ${report.rubric?.name ?? ''}` : 'run harness:score', color: DK.accent, highlight: false },
+            { label: 'Pass ≥ 7.0', value: rubricPass, sub: 'score distribution', color: DK.pass, highlight: false },
+            { label: 'Warn 5–6.9', value: rubricWarn, sub: 'score distribution', color: DK.warn, highlight: rubricWarn > 0 },
+            { label: 'Fail < 5.0', value: rubricFail, sub: rubricFail === 0 ? 'none — clean' : 'needs fix!', color: rubricFail > 0 ? DK.fail : DK.textMuted, highlight: rubricFail > 0 },
+            { label: 'Needs Fix', value: needsFix, sub: 'warn + fail total', color: needsFix > 0 ? '#fb923c' : DK.textMuted, highlight: needsFix > 0 },
           ] as const).map((s) => (
-            <div key={s.label} style={{ background: DK.surface, border: `1px solid ${DK.border}`, borderTop: `3px solid ${s.color}`, borderRadius: 8, padding: '14px 16px' }}>
+            <div key={s.label} style={{
+              background: s.highlight && s.label === 'Fail < 5.0' ? '#1a0808' : DK.surface,
+              border: `1px solid ${s.highlight ? (s.label === 'Fail < 5.0' ? '#7f1d1d' : '#78350f') : DK.border}`,
+              borderTop: `3px solid ${s.color}`,
+              borderRadius: 8,
+              padding: '14px 16px',
+            }}>
               <div style={{ fontSize: 10, color: DK.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{s.label}</div>
-              <div style={{ fontSize: 26, fontWeight: 700, color: s.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+              <div style={{ fontSize: s.highlight ? 32 : 26, fontWeight: 700, color: s.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
               <div style={{ fontSize: 11, color: DK.textMuted, marginTop: 4 }}>{s.sub}</div>
             </div>
           ))}
@@ -239,7 +298,10 @@ export default function HarnessIndexPage() {
           <span style={{ fontSize: 11, color: DK.textMuted, marginRight: 4 }}>Jump to:</span>
           {categories.map((c) => {
             const catBps = blueprints.filter((b) => b.category === c)
-            const hasIssues = catBps.some((b) => b.score && b.score.status !== 'pass')
+            const catFail = catBps.filter((b) => b.score?.status === 'fail').length
+            const catWarn = catBps.filter((b) => b.score?.status === 'warn').length
+            const hasFail = catFail > 0
+            const hasWarn = catWarn > 0
             const cached = aiCached.has(c)
             return (
               <a
@@ -247,16 +309,20 @@ export default function HarnessIndexPage() {
                 href={`#cat-${c}`}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '4px 10px', borderRadius: 20, fontSize: 11,
+                  padding: hasFail ? '5px 12px' : '4px 10px',
+                  borderRadius: 20, fontSize: hasFail ? 12 : 11,
                   textDecoration: 'none', transition: 'opacity 0.15s',
-                  background: hasIssues ? '#1f1008' : '#1a1a1a',
-                  border: `1px solid ${hasIssues ? '#5c3010' : DK.border}`,
-                  color: hasIssues ? '#fcd34d' : DK.textSub,
-                  fontWeight: hasIssues ? 600 : 400,
+                  background: hasFail ? '#2d0a0a' : hasWarn ? '#1f1008' : '#1a1a1a',
+                  border: `1px solid ${hasFail ? '#991b1b' : hasWarn ? '#5c3010' : DK.border}`,
+                  color: hasFail ? '#fca5a5' : hasWarn ? '#fcd34d' : DK.textSub,
+                  fontWeight: hasFail ? 700 : hasWarn ? 600 : 400,
                 }}
               >
-                {hasIssues && <span style={{ width: 5, height: 5, borderRadius: '50%', background: DK.warn, display: 'inline-block', flexShrink: 0 }} />}
+                {hasFail && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DK.fail, display: 'inline-block', flexShrink: 0 }} />}
+                {!hasFail && hasWarn && <span style={{ width: 5, height: 5, borderRadius: '50%', background: DK.warn, display: 'inline-block', flexShrink: 0 }} />}
                 {c} ({catBps.length})
+                {hasFail && <span style={{ fontSize: 9, background: '#7f1d1d', color: '#fca5a5', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{catFail}F</span>}
+                {hasWarn && <span style={{ fontSize: 9, background: '#78350f', color: '#fcd34d', padding: '1px 5px', borderRadius: 3 }}>{catWarn}W</span>}
                 {cached && <span style={{ fontSize: 9, background: DK.accent, color: '#fff', padding: '1px 5px', borderRadius: 3 }}>AI</span>}
               </a>
             )
@@ -335,6 +401,11 @@ export default function HarnessIndexPage() {
           <span style={{ fontSize: 12, color: DK.textMuted }}>— composer output, no GPT, click card to render</span>
         </div>
 
+        {/* ── Needs Attention section ── */}
+        {attentionFixtures.length > 0 && (
+          <NeedsAttentionSection fixtures={attentionFixtures} dimDescriptions={dimDescriptions} />
+        )}
+
         {/* ── Category sections ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           {categories.map((cat) => {
@@ -346,11 +417,16 @@ export default function HarnessIndexPage() {
             const catAvg = catScored.length ? catScored.reduce((s, x) => s + x.weighted, 0) / catScored.length : null
             const cached = aiCached.has(cat)
             const hasIssues = catWarn + catFail > 0
+            const hasFail = catFail > 0
 
             return (
               <section key={cat} id={`cat-${cat}`} style={{ scrollMarginTop: 60 }}>
                 {/* category header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${hasIssues ? '#3d2010' : DK.border}`, paddingBottom: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  borderBottom: `1px solid ${hasFail ? '#7f1d1d' : hasIssues ? '#3d2010' : DK.border}`,
+                  paddingBottom: 10, marginBottom: 14, flexWrap: 'wrap',
+                }}>
                   <h3 style={{ fontSize: 14, fontWeight: 600, textTransform: 'capitalize', color: '#fff', margin: 0 }}>{cat}</h3>
                   <span style={{ fontSize: 11, color: DK.textMuted }}>{catBps.length} presets</span>
                   {catAvg !== null && (
@@ -362,6 +438,12 @@ export default function HarnessIndexPage() {
                     {catWarn > 0 && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: '#451a03', color: DK.warn, fontWeight: 700 }}>{catWarn} warn</span>}
                     {catFail > 0 && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: '#450a0a', color: DK.fail, fontWeight: 700 }}>{catFail} fail</span>}
                   </div>
+                  {/* Category health progress bar */}
+                  {catScored.length > 0 && (
+                    <div style={{ flex: 1, maxWidth: 160, minWidth: 80 }}>
+                      <CategoryHealthBar pass={catPass} total={catScored.length} warn={catWarn} fail={catFail} />
+                    </div>
+                  )}
                   {/* AI gen link */}
                   <Link
                     href={`/test-harness/ai/${cat}`}
@@ -380,14 +462,18 @@ export default function HarnessIndexPage() {
                     const statusColor = bp.score
                       ? bp.score.status === 'pass' ? DK.pass : bp.score.status === 'warn' ? DK.warn : DK.fail
                       : '#404040'
+                    const isFail = bp.score?.status === 'fail'
+                    const issueCount = bp.score?.dimensions.reduce(
+                      (sum, d) => sum + d.criteria.filter((c) => c.status !== 'pass').length, 0
+                    ) ?? 0
 
                     return (
                       <div
                         key={bp.fixtureId}
                         style={{
-                          background: DK.surface,
-                          border: `1px solid ${DK.border}`,
-                          borderLeft: `3px solid ${statusColor}`,
+                          background: isFail ? '#1a0808' : DK.surface,
+                          border: `1px solid ${isFail ? '#7f1d1d' : DK.border}`,
+                          borderLeft: `4px solid ${statusColor}`,
                           borderRadius: 8,
                           padding: '12px 14px',
                         }}
@@ -401,8 +487,19 @@ export default function HarnessIndexPage() {
                             </span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {issueCount > 0 && (
+                              <span style={{
+                                fontSize: 11, fontWeight: 700,
+                                background: isFail ? '#7f1d1d' : '#451a03',
+                                color: isFail ? '#fca5a5' : '#fcd34d',
+                                border: `1px solid ${isFail ? '#991b1b' : '#92400e'}`,
+                                padding: '2px 7px', borderRadius: 4,
+                              }}>
+                                {issueCount} issue{issueCount > 1 ? 's' : ''}
+                              </span>
+                            )}
                             {bp.score && (
-                              <span style={{ fontSize: 17, fontWeight: 700, color: statusColor, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                              <span style={{ fontSize: 32, fontWeight: 700, color: statusColor, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
                                 {bp.score.weighted.toFixed(1)}
                               </span>
                             )}
@@ -414,14 +511,26 @@ export default function HarnessIndexPage() {
 
                         <ScoreBar score={bp.score} />
 
-                        {/* block list */}
-                        <div style={{ fontSize: 10, color: DK.textMuted, marginBottom: 8, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {bp.blockTypes.slice(0, 8).join(' › ')}
-                          {bp.blockTypes.length > 8 ? ` › +${bp.blockTypes.length - 8}` : ''}
+                        {/* block list — wrap tags instead of truncated string */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+                          {bp.blockTypes.slice(0, 10).map((bt, i) => (
+                            <span key={`${bt}-${i}`} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: '#1a1a1a', border: `1px solid ${DK.border}`, color: DK.textMuted, fontFamily: 'ui-monospace, monospace' }}>
+                              {bt}
+                            </span>
+                          ))}
+                          {bp.blockTypes.length > 10 && (
+                            <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: '#1a1a1a', color: DK.textMuted }}>
+                              +{bp.blockTypes.length - 10}
+                            </span>
+                          )}
                         </div>
 
                         {weakest && (
-                          <WeakestDrawer dim={weakest} description={dimDescriptions.get(weakest.id) ?? ''} />
+                          <WeakestDrawer
+                            dim={weakest}
+                            description={dimDescriptions.get(weakest.id) ?? ''}
+                            defaultOpen={!bp.score || bp.score.weighted < 8}
+                          />
                         )}
 
                         {/* actions */}
@@ -451,12 +560,114 @@ export default function HarnessIndexPage() {
   )
 }
 
+// ─── NeedsAttentionSection ────────────────────────────────────────────────────
+/**
+ * Collapsed section showing all fail/warn fixtures sorted worst-first.
+ * Uses native <details> so no JS needed (Server Component compatible).
+ */
+function NeedsAttentionSection({
+  fixtures,
+  dimDescriptions,
+}: {
+  fixtures: BlueprintCard[]
+  dimDescriptions: Map<string, string>
+}) {
+  const failCount = fixtures.filter((f) => f.score?.status === 'fail').length
+  const warnCount = fixtures.filter((f) => f.score?.status === 'warn').length
+
+  return (
+    <details open style={{ marginBottom: 28 }}>
+      <summary
+        style={{
+          cursor: 'pointer', listStyle: 'none', outline: 'none',
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: '#1a0808',
+          border: '1px solid #7f1d1d',
+          borderRadius: 8, padding: '10px 16px', marginBottom: 0,
+          userSelect: 'none',
+        }}
+      >
+        <span style={{ fontSize: 18 }}>⚠</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#fca5a5' }}>Needs Attention</span>
+        {failCount > 0 && (
+          <span style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #dc2626', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+            {failCount} fail
+          </span>
+        )}
+        {warnCount > 0 && (
+          <span style={{ background: '#451a03', color: '#fcd34d', border: '1px solid #92400e', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+            {warnCount} warn
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: '#ef4444', marginLeft: 4 }}>sorted worst-first</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#a1a1aa' }}>click to collapse</span>
+      </summary>
+      <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
+        {fixtures.map((bp) => {
+          const weakest = weakestDim(bp.score)
+          const statusColor = bp.score?.status === 'fail' ? DK.fail : DK.warn
+          const isFail = bp.score?.status === 'fail'
+          const issueCount = bp.score?.dimensions.reduce(
+            (sum, d) => sum + d.criteria.filter((c) => c.status !== 'pass').length, 0
+          ) ?? 0
+          return (
+            <div
+              key={`att-${bp.fixtureId}`}
+              style={{
+                background: isFail ? '#1a0808' : '#1a1000',
+                border: `1px solid ${isFail ? '#7f1d1d' : '#78350f'}`,
+                borderLeft: `4px solid ${statusColor}`,
+                borderRadius: 8,
+                padding: '12px 14px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Link
+                    href={`/test-harness/${bp.fixtureId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', color: '#60a5fa', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {bp.fixtureId}
+                  </Link>
+                  <span style={{ fontSize: 11, color: '#d4d4d8', marginTop: 2, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {bp.presetName}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {issueCount > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 700, background: isFail ? '#7f1d1d' : '#451a03', color: isFail ? '#fca5a5' : '#fcd34d', padding: '2px 7px', borderRadius: 4 }}>
+                      {issueCount}i
+                    </span>
+                  )}
+                  <span style={{ fontSize: 28, fontWeight: 700, color: statusColor, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                    {bp.score?.weighted.toFixed(1) ?? '—'}
+                  </span>
+                </div>
+              </div>
+              {weakest && (
+                <WeakestDrawer
+                  dim={weakest}
+                  description={dimDescriptions.get(weakest.id) ?? ''}
+                  defaultOpen
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </details>
+  )
+}
+
 // ─── WeakestDrawer ────────────────────────────────────────────────────────────
 /**
  * Expandable weakest-dimension breakdown — uses native <details> so no JS.
  * Dark mode version: shows issue count badge in summary; full criteria list in body.
+ * defaultOpen: true when score < 8 or in attention section.
  */
-function WeakestDrawer({ dim, description }: { dim: DimensionScore; description: string }) {
+function WeakestDrawer({ dim, description, defaultOpen = false }: { dim: DimensionScore; description: string; defaultOpen?: boolean }) {
   const weakColor = dim.score < 6 ? DK.fail : dim.score < 7.5 ? DK.warn : '#71717a'
   const failed = [...dim.criteria]
     .filter((c) => c.points < c.maxPoints)
@@ -466,6 +677,7 @@ function WeakestDrawer({ dim, description }: { dim: DimensionScore; description:
 
   return (
     <details
+      open={defaultOpen}
       style={{ borderRadius: 5, border: `1px solid ${weakColor}40`, background: weakColor + '12', fontSize: 10, marginBottom: 8 }}
     >
       <summary

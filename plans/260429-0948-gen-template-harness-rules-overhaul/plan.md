@@ -8,13 +8,13 @@
 
 | # | Phase | Status | ETA |
 |---|-------|--------|-----|
-| 1 | Variant whitelist sync (rubric JSON + nav pool) | ⬜ todo | 4h |
-| 2 | Fix contentDepth500 evaluator (full visible text) | ⬜ todo | 3h |
-| 3 | Single source of truth `template-rules.ts` | ⬜ todo | 1.5d |
-| 4 | Fix aiVisible:false paradox (6 blocks) | ⬜ todo | 3h |
-| 5 | CTA suggestion per category | ⬜ todo | 4h |
-| 6 | Harness evaluation rule guide doc | ⬜ todo | 4h |
-| 7 | Validation & ship | ⬜ todo | 4h |
+| 1 | Variant whitelist sync (rubric JSON + nav pool) | ✅ done | 4h |
+| 2 | Fix contentDepth500 evaluator (full visible text) | ✅ done | 3h |
+| 3 | Single source of truth `template-rules.ts` | ✅ done | 1.5d |
+| 4 | Fix aiVisible:false paradox (6 blocks) | ✅ done | 3h |
+| 5 | CTA suggestion per category | ✅ done | 4h |
+| 6 | Harness evaluation rule guide doc | ✅ done | 4h |
+| 7 | Validation & ship | ✅ done — 280/280 pass, avg 9.48/10, 6340 tests green | 4h |
 
 ## Key files
 
