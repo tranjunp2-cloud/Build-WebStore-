@@ -10,6 +10,7 @@ import type { HarnessResult, GuardReport } from '../types'
 // Update both places when marking a new variant broken.
 const BROKEN_VARIANTS: Record<string, string[]> = {
   hero: ['animated-gradient'],
+  testimonials: ['grid', 'single'],
 }
 
 export function variantWhitelistGuard(r: HarnessResult): GuardReport {

@@ -59,12 +59,10 @@ export function buildSystemPrompt(
   // like divider/breadcrumb/whatsapp-button/cart-widget are still available in
   // the editor library UI for manual user drag-drop, just hidden from AI.
   //
-  // Plan 260415 F01-gen-audit — also drop blocks on the unsupported list
-  // (menu-display, booking-widget, before-after, review-cards). Every prior
-  // prompt included them, AI dutifully emitted them, then validateBlocks()
-  // silently dropped them. Result: wasted input+output tokens, fewer good
-  // blocks per response, slower gen. Filter at prompt-build time so GPT
-  // never sees them in the first place.
+  // Plan 260415 F01-gen-audit — also drop blocks on the unsupported list.
+  // (Plan 260422-1900: booking-widget, before-after re-enabled; now only
+  // menu-display and review-cards remain on unsupported list.)
+  // Filter at prompt-build time so GPT never sees unsupported blocks.
   const blockMetas = blockRegistry
     .getAllMeta()
     .filter((m) => m.aiVisible !== false && !isUnsupportedBlock(m.type))
@@ -275,6 +273,7 @@ export type BusinessInfoInput = {
 
 import type { ThemeMood } from './theme-moods'
 import type { CategoryRecipe } from './category-recipes'
+import { SUGGESTED_CTA_BY_CATEGORY } from './suggested-cta-by-category'
 
 export type BuildUserPromptOptions = {
   extraInstructions?: string
@@ -297,6 +296,12 @@ export type BuildUserPromptOptions = {
    * Shape: { [blockSlug]: { prompt: string } }
    */
   blockPromptOverrides?: Record<string, { prompt: string }>
+  /**
+   * Plan 260429-1032 Phase 5 — resolved composer category (e.g. "restaurant",
+   * "education"). When provided, injects preferred CTA labels for this category
+   * so GPT avoids generic fallbacks like "Xem thêm" or "Learn More".
+   */
+  category?: string
 }
 
 export function buildUserPrompt(
@@ -311,6 +316,7 @@ export function buildUserPrompt(
   let mood: ThemeMood | undefined
   let recipe: CategoryRecipe | undefined
   let blockPromptOverrides: Record<string, { prompt: string }> | undefined
+  let category: string | undefined
   if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
     extraInstructions = extraInstructionsOrOptions
   } else {
@@ -318,6 +324,7 @@ export function buildUserPrompt(
     mood = extraInstructionsOrOptions.mood
     recipe = extraInstructionsOrOptions.recipe
     blockPromptOverrides = extraInstructionsOrOptions.blockPromptOverrides
+    category = extraInstructionsOrOptions.category
     if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
     if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
   }
@@ -382,6 +389,18 @@ export function buildUserPrompt(
       const lines = overrideEntries.map(([slug, v]) => `  - **${slug}**: ${v.prompt.trim()}`)
       parts.push(
         `\nBLOCK OVERRIDES (apply these specific instructions when generating each named block):\n${lines.join('\n')}`,
+      )
+    }
+  }
+
+  // Plan 260429-1032 Phase 5 — inject per-category CTA hint so GPT picks
+  // industry-specific CTAs instead of generic "Xem thêm" / "Learn More".
+  // Skipped for reference-prompt path (recreation mode uses source content).
+  if (!referencePrompt && category) {
+    const suggestedCtaList = SUGGESTED_CTA_BY_CATEGORY[category]
+    if (suggestedCtaList && suggestedCtaList.length > 0) {
+      parts.push(
+        `\nPREFERRED CTA LABELS for ${category} (use these in hero, navigation, and CTA blocks):\n${suggestedCtaList.map((c) => `  - "${c}"`).join('\n')}\nAvoid generic labels like: learn more, read more, click here, xem thêm, tìm hiểu thêm, đọc thêm`,
       )
     }
   }

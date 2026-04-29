@@ -8,7 +8,7 @@
       "id": "visual-richness", "name": "Visual Richness", "weight": 12,
       "description": "Visual variety — decorative blocks, imagery, variant diversity, icon usage.",
       "criteria": [
-        { "id": "hero-variant-diverse", "label": "Hero non-default variant", "check": { "type": "enum", "blockType": "hero", "field": "variant", "in": ["split-image", "fullscreen", "video-bg", "overlay", "centered", "split-text-image", "gradient-bg"] }, "passPoints": 3 },
+        { "id": "hero-variant-diverse", "label": "Hero non-default variant", "check": { "type": "enum", "blockType": "hero", "field": "variant", "in": ["split-left", "split-right", "fullscreen", "video", "magazine", "minimal", "cards-overlay", "gradient", "parallax", "slideshow", "split-video"] }, "passPoints": 3 },
         { "id": "gallery-present", "label": "Gallery / portfolio present", "check": { "type": "presence", "blockType": "gallery,gallery-masonry,portfolio-grid" }, "passPoints": 2 },
         { "id": "stats-present", "label": "Stats block present", "check": { "type": "presence", "blockType": "stats" }, "passPoints": 2 },
         { "id": "logo-cloud-present", "label": "Logo Cloud present", "check": { "type": "presence", "blockType": "client-logos,logo-cloud" }, "passPoints": 2 },
@@ -46,7 +46,7 @@
       "id": "micro-interactions", "name": "Micro-Interactions", "weight": 9,
       "description": "Nav variant, CTA blocks, forms, diversity.",
       "criteria": [
-        { "id": "nav-variant-rich", "label": "Nav non-basic variant", "check": { "type": "enum", "blockType": "navigation", "field": "variant", "in": ["centered", "mega-menu", "transparent", "sidebar"] }, "passPoints": 2 },
+        { "id": "nav-variant-rich", "label": "Nav non-basic variant", "check": { "type": "enum", "blockType": "navigation", "field": "variant", "in": ["centered", "mega", "transparent", "sidebar", "floating"] }, "passPoints": 2 },
         { "id": "cta-block-present", "label": "CTA block present", "check": { "type": "presence", "blockType": "cta" }, "passPoints": 2 },
         { "id": "interactive-form", "label": "Newsletter or contact form", "check": { "type": "presence", "blockType": "newsletter,contact" }, "passPoints": 2 },
         { "id": "block-variety-8plus", "label": "≥8 distinct types", "check": { "type": "custom", "evaluator": "distinctBlockTypes8" }, "passPoints": 2 },

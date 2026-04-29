@@ -3,6 +3,7 @@ import type { CategoryContent, BusinessSample } from '@/lib/ai/content/types'
 import type { ThemePreset } from '@/lib/ai/theme-presets'
 import { DEFAULT_FOCUS_STYLE } from '@/lib/ai/theme-presets'
 import { FONT_PAIRINGS } from '@/lib/fonts/pairings'
+import { TEMPLATE_RULES } from '@/lib/ai/template-rules'
 
 /** Resolve explicit heading + body font names from a pairing id. Returns nulls if id unknown. */
 function resolveFontNames(pairingId: string | undefined): { heading?: string; body?: string } {
@@ -131,25 +132,6 @@ const CATEGORY_HERO_VARIANTS: Record<string, string[]> = {
   events: ['fullscreen', 'gradient', 'split-left', 'centered', 'parallax'],
   blog: ['minimal', 'split-left', 'fullscreen', 'centered', 'magazine'],
   travel: ['fullscreen', 'parallax', 'split-left', 'gradient', 'slideshow'],
-}
-
-// ── Industry block mapping per category ─────────────────────────────────────
-
-const CATEGORY_INDUSTRY_BLOCKS: Record<string, string[]> = {
-  restaurant: ['menu-display', 'booking-widget', 'review-cards'],
-  ecommerce: ['product-quick-view', 'review-cards'],
-  beauty: ['booking-widget', 'review-cards', 'before-after'],
-  tech: ['feature-comparison', 'pricing-table', 'video-showcase'],
-  health: ['doctor-profile', 'booking-widget', 'review-cards'],
-  education: ['class-schedule', 'video-showcase', 'review-cards'],
-  realestate: ['property-card', 'review-cards'],
-  fitness: ['class-schedule', 'booking-widget', 'review-cards'],
-  creative: ['portfolio-grid', 'video-showcase', 'review-cards'],
-  business: ['service-cards', 'review-cards', 'client-logos'],
-  fnb: ['menu-display', 'review-cards'],
-  events: ['countdown-timer', 'booking-widget', 'review-cards'],
-  blog: ['blog-list', 'social-proof', 'review-cards'],
-  travel: ['booking-widget', 'review-cards', 'video-showcase'],
 }
 
 // ── Block builders ──────────────────────────────────────────────────────────
@@ -1406,7 +1388,7 @@ function buildHomePage(
   // to avoid the hero → generic → footer empty-hole symptom.
   // Inject up to 2 category-specific industry blocks + universal stats + gallery.
   if (variant === 'starter') {
-    const industryBlockTypes = CATEGORY_INDUSTRY_BLOCKS[category] ?? []
+    const industryBlockTypes = TEMPLATE_RULES[category]?.industryBlocks ?? []
     const maxIndustry = Math.min(2, industryBlockTypes.length)
     for (let i = 0; i < maxIndustry; i++) {
       const block = buildIndustryBlock(industryBlockTypes[i]!, content, biz, category)
@@ -1422,7 +1404,7 @@ function buildHomePage(
     middleBlocks.push({ ...buildGallery(biz), variant: getVariant('gallery', 'grid') })
 
     // Industry blocks
-    const industryBlockTypes = CATEGORY_INDUSTRY_BLOCKS[category] ?? []
+    const industryBlockTypes = TEMPLATE_RULES[category]?.industryBlocks ?? []
     const maxIndustry = variant === 'premium' ? industryBlockTypes.length : Math.min(2, industryBlockTypes.length)
     for (let i = 0; i < maxIndustry; i++) {
       const block = buildIndustryBlock(industryBlockTypes[i]!, content, biz, category)
@@ -1552,7 +1534,7 @@ function buildServicesPage(biz: BusinessSample, content: CategoryContent, catego
   ]
 
   // Add relevant industry blocks
-  const industryBlockTypes = CATEGORY_INDUSTRY_BLOCKS[category] ?? []
+  const industryBlockTypes = TEMPLATE_RULES[category]?.industryBlocks ?? []
   for (const bt of industryBlockTypes) {
     if (bt !== 'review-cards') {
       const block = buildIndustryBlock(bt, content, biz, category)

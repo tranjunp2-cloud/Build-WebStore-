@@ -150,7 +150,7 @@ describe('pages-schema sanitizer', () => {
         it('drops unknown block types entirely', () => {
             const blocks = [
                 { blockType: 'team', headline: 'Team', members: [] },
-                { blockType: 'before-after', headline: 'Dropped' },
+                { blockType: 'menu-display', headline: 'Dropped' },
                 { blockType: 'nonexistent-widget', headline: 'Also dropped' },
             ]
             const result = sanitizeBlocksForPayload(blocks)

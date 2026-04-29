@@ -28,6 +28,8 @@ export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
     // Industry blocks (Plan 260417-0837 Phase 1.1)
     'doctor-profile', 'property-card', 'class-schedule',
     'video-showcase', 'product-quick-view', 'feature-comparison',
+    // Industry blocks enabled for AI gen (Plan 260422-1900-block-aivisible-audit-fix)
+    'before-after', 'booking-widget', 'gallery-masonry',
 ])
 
 /**
@@ -62,6 +64,10 @@ export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fal
     'video-showcase': { field: 'variant', values: ['grid', 'featured', 'fullwidth'], fallback: 'grid' },
     'product-quick-view': { field: 'variant', values: ['grid', 'carousel', 'minimal'], fallback: 'grid' },
     'feature-comparison': { field: 'variant', values: ['table', 'cards'], fallback: 'table' },
+    // Industry blocks enabled for AI gen (Plan 260422-1900-block-aivisible-audit-fix)
+    'before-after': { field: 'variant', values: ['slider', 'side-by-side'], fallback: 'slider' },
+    'booking-widget': { field: 'variant', values: ['inline', 'sidebar', 'modal-trigger'], fallback: 'inline' },
+    'gallery-masonry': { field: 'variant', values: ['masonry', 'grid-3', 'grid-4'], fallback: 'masonry' },
 }
 
 /** Map blueprint variant names → Pages.ts valid values. */
@@ -76,7 +82,7 @@ export const VARIANT_ALIASES: Record<string, Record<string, string>> = {
     features: { 'grid': 'grid-3', 'list': 'centered-list', 'icon-grid': 'grid-3', 'card-grid': 'grid-3', 'cards': 'grid-3', 'detailed': 'centered-list', 'detailed-list': 'centered-list', 'icon-top': 'grid-3', 'icon-left': 'grid-2', 'zigzag': 'alternating', 'carousel': 'grid-3', 'minimal-list': 'centered-list' },
     testimonials: { 'cards': 'grid', 'simple': 'carousel', 'spotlight': 'single', 'minimal-quote': 'single', 'avatar-row': 'carousel', 'video-text': 'carousel', 'featured': 'single', 'marquee': 'carousel', 'quote': 'single', 'single-highlight': 'single', 'slider': 'carousel' },
     gallery: { 'filmstrip': 'carousel', 'justified': 'grid', 'fullscreen-grid': 'grid', 'slider': 'carousel', 'spotlight': 'lightbox' },
-    navigation: { 'default': 'fixed', 'centered': 'fixed', 'mega': 'fixed', 'sidebar': 'fixed', 'floating': 'fixed' },
+    navigation: { 'default': 'fixed', 'centered': 'fixed', 'mega': 'fixed', 'transparent': 'transparent', 'sidebar': 'fixed', 'floating': 'fixed' },
     footer: { 'expanded': 'simple', 'mega-footer': 'dark-gradient' },
 }
 
@@ -133,6 +139,10 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     'video-showcase': ['variant', 'headline', 'subheadline', 'showCategories', 'autoplay', 'videos'],
     'product-quick-view': ['variant', 'headline', 'subheadline', 'columns', 'showQuickView', 'currency', 'products'],
     'feature-comparison': ['variant', 'headline', 'products', 'features'],
+    // Industry blocks enabled for AI gen (Plan 260422-1900-block-aivisible-audit-fix)
+    'before-after': ['variant', 'headline', 'beforeImage', 'afterImage'],
+    'booking-widget': ['variant', 'headline', 'subheadline', 'services', 'availableDays', 'timeSlotInterval', 'startTime', 'endTime', 'bookingUrl', 'showPrice'],
+    'gallery-masonry': ['variant', 'headline', 'images'],
 }
 
 const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])

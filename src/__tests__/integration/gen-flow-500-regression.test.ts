@@ -467,7 +467,7 @@ describe('Gen Flow 500 Regression Tests', () => {
         it('blocks with no matching type are dropped', () => {
             const blocks = [
                 { blockType: 'hero', variant: 'centered', headline: 'Hi' },
-                { blockType: 'before-after', headline: 'Dropped' },
+                { blockType: 'menu-display', headline: 'Dropped' },
                 { blockType: 'nonexistent-widget', headline: 'Also dropped' },
             ]
             const result = sanitizeBlocksForPayload(blocks)

@@ -1290,6 +1290,97 @@ const FeatureComparisonBlock = {
     ],
 }
 
+// ── Industry blocks enabled for AI gen (Plan 260422-1900-block-aivisible-audit-fix) ──
+// before-after, booking-widget, gallery-masonry: aiVisible flipped to true so
+// Category DNA rubric requirements can be satisfied by AI happy path.
+
+const BeforeAfterBlock = {
+    slug: 'before-after',
+    labels: { singular: 'Before / After', plural: 'Before / After Blocks' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'slider',
+            options: [
+                { label: 'Slider', value: 'slider' },
+                { label: 'Side by Side', value: 'side-by-side' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        {
+            name: 'beforeImage', type: 'group',
+            fields: [
+                { name: 'url', type: 'text' },
+                { name: 'alt', type: 'text' },
+                { name: 'label', type: 'text' },
+            ],
+        },
+        {
+            name: 'afterImage', type: 'group',
+            fields: [
+                { name: 'url', type: 'text' },
+                { name: 'alt', type: 'text' },
+                { name: 'label', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const BookingWidgetBlock = {
+    slug: 'booking-widget',
+    labels: { singular: 'Booking Widget', plural: 'Booking Widgets' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'inline',
+            options: [
+                { label: 'Inline', value: 'inline' },
+                { label: 'Sidebar', value: 'sidebar' },
+                { label: 'Modal Trigger', value: 'modal-trigger' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        {
+            name: 'services', type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'duration', type: 'number' },
+                { name: 'price', type: 'number' },
+                { name: 'description', type: 'textarea' },
+            ],
+        },
+        { name: 'availableDays', type: 'json' },
+        { name: 'timeSlotInterval', type: 'number', defaultValue: 30 },
+        { name: 'startTime', type: 'text', defaultValue: '09:00' },
+        { name: 'endTime', type: 'text', defaultValue: '18:00' },
+        { name: 'bookingUrl', type: 'text' },
+        { name: 'showPrice', type: 'checkbox', defaultValue: true },
+    ],
+}
+
+const GalleryMasonryBlock = {
+    slug: 'gallery-masonry',
+    labels: { singular: 'Gallery Masonry', plural: 'Gallery Masonry Blocks' },
+    fields: [
+        {
+            name: 'variant', type: 'select', defaultValue: 'masonry',
+            options: [
+                { label: 'Masonry', value: 'masonry' },
+                { label: '3-Column Grid', value: 'grid-3' },
+                { label: '4-Column Grid', value: 'grid-4' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        {
+            name: 'images', type: 'array',
+            fields: [
+                { name: 'url', type: 'text' },
+                { name: 'alt', type: 'text' },
+                { name: 'caption', type: 'text' },
+            ],
+        },
+    ],
+}
+
 export const Pages: CollectionConfig = {
     slug: 'pages',
     hooks: {
@@ -1380,13 +1471,17 @@ export const Pages: CollectionConfig = {
                 ClientLogosBlock,
                 MenuFoodBlock,
                 PortfolioGridBlock,
-                // Industry-specific (composer-driven, aiVisible=false in block meta)
+                // Industry-specific (composer-driven)
                 DoctorProfileBlock,
                 PropertyCardBlock,
                 ClassScheduleBlock,
                 VideoShowcaseBlock,
                 ProductQuickViewBlock,
                 FeatureComparisonBlock,
+                // Industry blocks enabled for AI gen (Plan 260422-1900-block-aivisible-audit-fix)
+                BeforeAfterBlock,
+                BookingWidgetBlock,
+                GalleryMasonryBlock,
             ].map(b => ({
                 ...b,
                 fields: [

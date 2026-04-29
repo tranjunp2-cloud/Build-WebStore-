@@ -3602,6 +3602,118 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_navigation.variant_simple_to_default', sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'default' WHERE variant = 'simple';` },
   { name: '_pages_v_blocks_navigation.variant_mega_menu_to_mega', sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'mega' WHERE variant = 'mega-menu';` },
   { name: '_pages_v_blocks_navigation.variant_pill_to_floating',  sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'floating' WHERE variant = 'pill';` },
+
+  // ── Industry blocks enabled for AI gen (Plan 260422-1900-block-aivisible-audit-fix) ──
+  // before-after, booking-widget, gallery-masonry: aiVisible flipped true → must exist in DB.
+
+  // before-after ────────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_before_after.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_before_after" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar,
+      before_image_url varchar, before_image_alt varchar, before_image_label varchar,
+      after_image_url varchar, after_image_alt varchar, after_image_label varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_before_after.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_before_after" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar,
+      before_image_url varchar, before_image_alt varchar, before_image_label varchar,
+      after_image_url varchar, after_image_alt varchar, after_image_label varchar
+    );`,
+  },
+
+  // booking-widget ──────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_booking_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_booking_widget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      available_days jsonb, time_slot_interval integer DEFAULT 30,
+      start_time varchar DEFAULT '09:00', end_time varchar DEFAULT '18:00',
+      booking_url varchar, show_price boolean DEFAULT true
+    );`,
+  },
+  {
+    name: 'pages_blocks_booking_widget_services.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_booking_widget_services" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, duration integer, price numeric, description varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_booking_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_booking_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      available_days jsonb, time_slot_interval integer,
+      start_time varchar, end_time varchar,
+      booking_url varchar, show_price boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_booking_widget_services.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_booking_widget_services" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, duration integer, price numeric, description varchar
+    );`,
+  },
+
+  // gallery-masonry ─────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_gallery_masonry.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_gallery_masonry" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_gallery_masonry_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_gallery_masonry_images" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      url varchar, alt varchar, caption varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_gallery_masonry.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery_masonry" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_gallery_masonry_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery_masonry_images" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      url varchar, alt varchar, caption varchar
+    );`,
+  },
 ];
 
 async function runMigrations(pool) {
