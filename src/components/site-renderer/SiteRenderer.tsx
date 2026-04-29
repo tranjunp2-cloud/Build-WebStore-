@@ -456,8 +456,15 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     isBreadcrumb && navForOffset != null && BREADCRUMB_OFFSET_VARIANTS.has(navVariant)
                         ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
                         : undefined
+                // Floating widget blocks (social-widget, whatsapp-button, cart-widget) render as
+                // position:fixed — they are out of normal document flow. Applying paddingTop/
+                // paddingBottom creates visible whitespace at the block's layout position.
+                // Treat them like global blocks (zero spacing) when they use the floating variant.
+                const FLOATING_BLOCK_TYPES = new Set(['social-widget', 'whatsapp-button', 'cart-widget'])
+                const blockVariant = (block as Record<string, unknown>).variant as string | undefined
+                const isFloatingBlock = FLOATING_BLOCK_TYPES.has(block.blockType) && blockVariant !== 'inline'
                 const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
-                const spacingStyle = isGlobalBlock
+                const spacingStyle = (isGlobalBlock || isFloatingBlock)
                     ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
                     : {
                         paddingTop: applyNavOffset && index === firstContentBlockIdx
