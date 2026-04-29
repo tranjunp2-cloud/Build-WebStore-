@@ -33,6 +33,7 @@ import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -355,6 +356,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Start sample product generation in parallel with site AI generation (non-blocking)
+        // Note: siteId intentionally omitted — products run before site row is created so site.id
+        // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
+        // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
+        // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
         const sampleProductsPromise = generateSampleProducts(
             businessInfo,
             (language as 'en' | 'ms' | 'auto'),
@@ -572,7 +577,14 @@ export async function POST(req: NextRequest) {
         // fallback-adapter creative→portfolio mapping) which Payload rejected
         // → "The following field is invalid: Site Type" → 500. Logs showed
         // this was the dominant 500 source (~7 hits / 6h window).
-        const safeSiteType = resolveSiteType(result.siteType)
+        // GH-727: if AI output maps to generic 'business' fallback, use the
+        // composer category (which has broader VN keyword matching) as backup
+        // so the seeder seeds industry-correct images (e.g. fitness vs business).
+        const safeSiteType = (() => {
+            const fromAI = resolveSiteType(result.siteType)
+            if (fromAI !== 'business') return fromAI
+            return resolveSiteType(resolveComposerCategory(businessInfo.industry))
+        })()
 
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
@@ -710,14 +722,22 @@ export async function POST(req: NextRequest) {
             result,
         })
 
+        // GH-820: build nav links from normalized definitions so URLs match canonical page slugs.
+        // aiPageLinks (derived above from result.pages) still carries raw AI slugs like /book-trial;
+        // rawPageDefinitions has already run canonicalizePageSlug so slugs are /contact, /about, etc.
+        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions.map((p) => ({
+            label: p.title,
+            url: p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`,
+        }))
+
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
-        // GH-817: pass aiPageLinks so injected/hollow nav reflects actual AI-generated pages
+        // GH-817: pass page links so injected/hollow nav reflects actual generated pages
         const pageDefinitions = enforcePageVariety(
             ensureNavigationBlocks(
                 rawPageDefinitions as unknown as PageShape[],
                 businessInfo.businessName,
-                aiPageLinks ?? undefined,
+                normalizedPageLinks,
             ),
         )
 
@@ -747,8 +767,10 @@ export async function POST(req: NextRequest) {
                 })
                 : pageDefinition.layout
             const sanitizedLayout = Array.isArray(variantFixed)
-                ? stripNavOffset(
-                    sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                ? stripArrayItemIds(
+                    stripNavOffset(
+                        sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                    ) as Record<string, unknown>[]
                   ) as AIBlock[]
                 : variantFixed
 
@@ -853,16 +875,16 @@ export async function POST(req: NextRequest) {
         }
 
         // GH-817 post-creation layout sync: if any pages failed to create, their links are
-        // still present in nav AND footer blocks of successfully saved pages (aiPageLinks
+        // still present in nav AND footer blocks of successfully saved pages (normalizedPageLinks
         // was computed BEFORE the for-loop). Patch both blocks in a single update per page.
-        if (pageFailures.length > 0 && aiPageLinks && createdPages.length > 0) {
+        if (pageFailures.length > 0 && normalizedPageLinks.length > 0 && createdPages.length > 0) {
             const succeededSlugs = new Set(
                 createdPages.map(p => {
                     const s = String(p.slug ?? '')
                     return s === '/' ? '/' : s.replace(/^\/+/, '')
                 }),
             )
-            const survivingLinks = aiPageLinks.filter(l => {
+            const survivingLinks = normalizedPageLinks.filter(l => {
                 const normalized = l.url === '/' ? '/' : l.url.replace(/^\/+/, '')
                 return succeededSlugs.has(normalized)
             })
@@ -871,7 +893,7 @@ export async function POST(req: NextRequest) {
                 pageFailures.map(f => f.slug === '/' ? '/' : `/${f.slug.replace(/^\/+/, '')}`)
             )
 
-            if (survivingLinks.length < aiPageLinks.length) {
+            if (survivingLinks.length < normalizedPageLinks.length) {
                 const survivingCtaUrl = resolveCtaUrl(survivingLinks)
                 for (const createdPage of createdPages) {
                     const rawLayout = Array.isArray(createdPage.layout)
@@ -914,11 +936,12 @@ export async function POST(req: NextRequest) {
 
                     if (!layoutChanged) continue
 
+                    const cleanedPatchedLayout = stripArrayItemIds(patchedLayout) as Record<string, unknown>[]
                     try {
                         await payload.update({
                             collection: 'pages',
                             id: createdPage.id as string | number,
-                            data: { layout: patchedLayout },
+                            data: { layout: cleanedPatchedLayout },
                         })
                     } catch (syncErr) {
                         console.warn(
@@ -937,7 +960,7 @@ export async function POST(req: NextRequest) {
                     }
                 }
                 console.info(
-                    `[generate-site] layout-sync: removed ${aiPageLinks.length - survivingLinks.length} ghost link(s), patched ${createdPages.length} page(s) (nav+footer)`,
+                    `[generate-site] layout-sync: removed ${normalizedPageLinks.length - survivingLinks.length} ghost link(s), patched ${createdPages.length} page(s) (nav+footer)`,
                 )
             }
         }
@@ -968,6 +991,20 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
+        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category (fire-and-forget)
+        // Use safeSiteType (same key used by storefront blocks) so seeder alt keys match resolver lookups.
+        if (resolvedTenantId) {
+            const _seedCategory = safeSiteType
+            import('@/lib/images/image-library-seeder')
+                .then(({ seedImageLibraryForSite }) =>
+                    seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
+                )
+                .catch(err =>
+                    console.error('[generate-site] image-library seed failed',
+                        err instanceof Error ? err.message : err),
+                )
+        }
+
         phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
 
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
@@ -984,7 +1021,10 @@ export async function POST(req: NextRequest) {
         // Mark generation completed and persist headerBlock so SiteRenderer
         // can read breadcrumbConfig on the public site without requiring a
         // manual editor save first.
-        const generatedHeaderBlock = sanitizedBlocks.find(b => b.blockType === 'navigation') ?? null
+        // GH-820: read nav from pageDefinitions (links already normalized) instead of
+        // sanitizedBlocks which still has raw AI slugs (/book-trial, /the-lab, etc.)
+        const homepageLayout = (pageDefinitions[0]?.layout ?? []) as Array<{ blockType?: unknown }>
+        const generatedHeaderBlock = homepageLayout.find(b => b.blockType === 'navigation') ?? null
         await payload.update({
             collection: 'sites',
             id: site.id as string | number,
@@ -995,6 +1035,16 @@ export async function POST(req: NextRequest) {
         })
 
         // Write sample products to DB (non-fatal — awaits the parallel promise started above)
+        // Matches constraint name from Drizzle: <table>_<col>_<reftable>_<refcol>_fk
+        // Combines constraint-name regex with PG code for cases where Payload wraps the
+        // error and the constraint name appears in .cause.constraint rather than .message.
+        const isStaleMediaFk = (e: unknown): boolean => {
+            const msg = e instanceof Error ? e.message : String(e ?? '')
+            const code = (e as { code?: string })?.code ?? ((e as { cause?: { code?: string } })?.cause?.code ?? '')
+            const constraint = (e as { constraint?: string })?.constraint ?? ((e as { cause?: { constraint?: string } })?.cause?.constraint ?? '')
+            return /products_images_image_id_media_id_fk/i.test(msg)
+                || (code === '23503' && /products_images_image_id_media_id_fk|image_id/i.test(constraint + msg))
+        }
         let productsCreatedCount = 0
         try {
             const sampleProducts = await sampleProductsPromise
@@ -1005,24 +1055,52 @@ export async function POST(req: NextRequest) {
                     console.warn('[generate-site] sample product skipped — name too short:', JSON.stringify(name))
                     continue
                 }
+                // Pre-create media check: shrink TOCTOU window between fetchProductImage verify
+                // and payload.create. Media row can be deleted by orphan stripper / afterChange
+                // hook between those two points. Drop imageId early if no longer exists.
+                let safeImageId = product.imageId
+                if (safeImageId != null) {
+                    const exists = await payload.findByID({ collection: 'media', id: safeImageId, depth: 0 }).catch(() => null)
+                    if (!exists) {
+                        console.warn(`[generate-site] STALE_MEDIA_PRECHECK product="${name}" imageId=${safeImageId} dropped`)
+                        safeImageId = undefined
+                    }
+                }
+                const baseData = {
+                    tenant: resolvedTenantId,
+                    site: site.id,
+                    name,
+                    shortDescription: product.shortDescription,
+                    description: product.description,
+                    ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
+                    price: product.price,
+                    status: 'active' as const,
+                }
                 try {
                     await payload.create({
                         collection: 'products',
                         data: {
-                            tenant: resolvedTenantId,
-                            site: site.id,
-                            name,
-                            shortDescription: product.shortDescription,
-                            description: product.description,
-                            ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
-                            price: product.price,
-                            ...(product.imageId ? { images: [{ image: product.imageId }] } : {}),
-                            status: 'active',
+                            ...baseData,
+                            ...(safeImageId ? { images: [{ image: safeImageId }] } : {}),
                         },
                     })
                     productsCreatedCount++
                 } catch (err) {
-                    console.warn('[generate-site] sample product write failed (non-fatal):', (err as Error).message)
+                    if (safeImageId != null && isStaleMediaFk(err)) {
+                        // FK violation on products_images_image_id_media_id_fk — media row
+                        // was deleted between pre-check and create. Retry without image.
+                        try {
+                            await payload.create({ collection: 'products', data: baseData })
+                            productsCreatedCount++
+                            console.warn(`[generate-site] STALE_MEDIA_FK product="${name}" imageId=${safeImageId} created without image`)
+                        } catch (retryErr) {
+                            console.warn('[generate-site] sample product write failed after FK-strip retry (non-fatal):', (retryErr as Error).message)
+                        }
+                    } else {
+                        // Non-FK error or no image attached — do NOT silently retry without image
+                        const e = err as Error
+                        console.warn(`[generate-site] sample product write failed (non-fatal): name="${name}" imageId=${safeImageId ?? 'none'} ${e.name}: ${e.message}`)
+                    }
                 }
             }
         } catch (err) {
@@ -1304,17 +1382,19 @@ function canonicalizePageSlug(
     // avoid misclassifying pages that include secondary structural blocks (e.g. a
     // Services page with a contact form at the bottom must not become slug 'contact').
     const title = (page.title || '').toLowerCase()
-    if (/\babout\b/.test(title)) return 'about'
-    if (/\bcontact\b|\bget[\s-]started\b|\bfree[\s-]trial\b|\btrial\b/.test(title)) return 'contact'
-    if (/\bblog\b|\bnews\b|\barticles\b/.test(title)) return 'blog'
+    if (/\babout\b/.test(title)) return '/about'
+    if (/\bcontact\b|\bget[\s-]started\b|\bfree[\s-]trial\b|\btrial\b/.test(title)) return '/contact'
+    if (/\bblog\b|\bnews\b|\barticles\b/.test(title)) return '/blog'
     // Block-based fallback: use the FIRST non-structural content block only.
     // Set-membership would misclassify pages where contact/about appear as secondary sections.
     const STRUCTURAL = new Set(['navigation', 'footer', 'hero'])
     const firstContent = (page.blocks || []).find((b) => !STRUCTURAL.has(b.blockType ?? ''))
-    if (firstContent?.blockType === 'contact') return 'contact'
-    if (firstContent?.blockType === 'about') return 'about'
-    if (firstContent?.blockType === 'blog-list') return 'blog'
-    return page.slug || `page-${index}`
+    if (firstContent?.blockType === 'contact') return '/contact'
+    if (firstContent?.blockType === 'about') return '/about'
+    if (firstContent?.blockType === 'blog-list') return '/blog'
+    // Ensure leading slash to match builder convention (routing queries slug with '/' prefix)
+    const raw = page.slug || `page-${index}`
+    return raw.startsWith('/') ? raw : `/${raw}`
 }
 
 function buildGeneratedPages({
@@ -1360,7 +1440,7 @@ function buildGeneratedPages({
 
     return [
         {
-            title: 'Homepage',
+            title: 'Home',
             slug: '/',
             isHomepage: true,
             layout: cloneBlockData(blocks),
@@ -1371,7 +1451,7 @@ function buildGeneratedPages({
         },
         {
             title: 'About',
-            slug: 'about',
+            slug: '/about',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -1395,7 +1475,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Products',
-            slug: 'products',
+            slug: '/products',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -1419,7 +1499,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Contact',
-            slug: 'contact',
+            slug: '/contact',
             isHomepage: false,
             layout: compact([
                 navigation,

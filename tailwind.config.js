@@ -33,6 +33,8 @@ module.exports = {
                 //   3. System fallback
                 sans: ['var(--font-body, var(--font-inter))', 'system-ui', 'sans-serif'],
                 heading: ['var(--font-heading, var(--font-outfit))', 'system-ui', 'sans-serif'],
+                // Keep identical to 'sans' — AppShell uses font-sans, Typography blocks use font-body; both must track --font-body
+                body: ['var(--font-body, var(--font-inter))', 'system-ui', 'sans-serif'],
             },
             colors: {
                 // Studio admin CSS-var bridge tokens (scoped via .studio-shell)

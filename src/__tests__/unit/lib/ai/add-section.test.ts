@@ -116,16 +116,17 @@ describe('inferAddSectionType [TC-F05.13]', () => {
         expect(inferAddSectionType('show instagram link')).toBe('socialWidget')
     })
 
-    it('returns "cartWidget" for "cart" keyword [TC-F05.27]', () => {
-        expect(inferAddSectionType('add a cart widget')).toBe('cartWidget')
+    // gh-839: cartWidget matcher disabled until checkout ships — these must return null
+    it('returns null for "cart" keyword [TC-F05.27]', () => {
+        expect(inferAddSectionType('add a cart widget')).toBeNull()
     })
 
-    it('returns "cartWidget" for "shopping cart" keyword', () => {
-        expect(inferAddSectionType('add shopping cart')).toBe('cartWidget')
+    it('returns null for "shopping cart" keyword', () => {
+        expect(inferAddSectionType('add shopping cart')).toBeNull()
     })
 
-    it('returns "cartWidget" for "checkout" keyword', () => {
-        expect(inferAddSectionType('show checkout button')).toBe('cartWidget')
+    it('returns null for "checkout" keyword', () => {
+        expect(inferAddSectionType('show checkout button')).toBeNull()
     })
 
     // requestedType is prepended to haystack — whichever SECTION_TYPE_MATCHERS entry
@@ -439,15 +440,16 @@ describe('createAddSectionBlock — socialWidget [TC-F05.26]', () => {
     })
 })
 
+// gh-839: cartWidget disabled — createAddSectionBlock returns null for cart instructions
 describe('createAddSectionBlock — cartWidget [TC-F05.27]', () => {
-    it('returns cartWidget blockType', () => {
+    it('returns null for cart widget instruction (gh-839: hidden until checkout ships)', () => {
         const block = createAddSectionBlock({ instruction: 'add cart widget' })
-        expect(block?.blockType).toBe('cartWidget')
+        expect(block).toBeNull()
     })
 
-    it('sets variant to "floating"', () => {
-        const block = createAddSectionBlock({ instruction: 'add cart' }) as Record<string, unknown>
-        expect(block?.variant).toBe('floating')
+    it('returns null for "add cart" instruction', () => {
+        const block = createAddSectionBlock({ instruction: 'add cart' })
+        expect(block).toBeNull()
     })
 })
 
@@ -710,8 +712,9 @@ describe('BUG-F05-04: Gallery placeholder images', () => {
         expect(images[0]).toHaveProperty('caption')
         const img = images[0].image as Record<string, unknown>
         expect(img).toHaveProperty('url')
+        // url is intentionally empty so the gallery block's render-time fallback
+        // picks the correct category + S3 images (GH-727 fix)
         expect(typeof img.url).toBe('string')
-        expect((img.url as string).length).toBeGreaterThan(0)
     })
 
     it('normalizeAddSectionBlock preserves gallery image structure', () => {

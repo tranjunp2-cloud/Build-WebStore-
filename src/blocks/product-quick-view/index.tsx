@@ -17,6 +17,8 @@ import {
 } from '@/lib/design-tokens'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
+// gh-839: Hide CTA/Add to Cart until checkout is implemented. Flip to true to re-enable.
+const CART_ENABLED = false
 type QuickViewProductWithCurrency = QuickViewProduct & { _currency?: string }
 
 const PRODUCT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -183,7 +185,7 @@ function QuickViewModal({
                             </div>
                         )}
 
-                        {product.ctaUrl ? (
+                        {CART_ENABLED && (product.ctaUrl ? (
                             <a
                                 href={product.ctaUrl}
                                 className={`block w-full py-3 rounded-xl font-semibold text-center text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
@@ -199,7 +201,7 @@ function QuickViewModal({
                             >
                                 {product.ctaLabel || 'Add to Cart'}
                             </button>
-                        )}
+                        ))}
                     </div>
                 </div>
             </motion.div>

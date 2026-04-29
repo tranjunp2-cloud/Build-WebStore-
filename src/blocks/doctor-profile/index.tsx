@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { DoctorProfileConfig, DoctorItem } from './config'
@@ -39,10 +40,11 @@ function AvailabilityBadges({ days }: { days: number[] }) {
 
 function DoctorAvatar({ doctor, size = 'md' }: { doctor: DoctorItem; size?: 'sm' | 'md' | 'lg' }) {
     const sizeClass = size === 'sm' ? 'w-12 h-12' : size === 'lg' ? 'w-32 h-32' : 'w-20 h-20'
+    const sizePx = size === 'sm' ? 48 : size === 'lg' ? 128 : 80
     const textSize = size === 'sm' ? 'text-lg' : size === 'lg' ? 'text-4xl' : 'text-2xl'
 
     if (doctor.photoUrl) {
-        return <img src={doctor.photoUrl} alt={doctor.name} className={`${sizeClass} rounded-2xl object-cover`} />
+        return <Image src={doctor.photoUrl} alt={doctor.name} width={sizePx} height={sizePx} className={`${sizeClass} rounded-2xl object-cover`} />
     }
     return (
         <div

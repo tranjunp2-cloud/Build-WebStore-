@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
+import { sql } from 'drizzle-orm'
 import config from '@payload-config'
 import { assertStaging } from '@/lib/env'
 import { getCurrentUser } from '@/lib/auth'
 
-type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'pages' | 'sites'
+type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'sites'
 
 interface ClearResult {
     [collection: string]: number
@@ -118,9 +119,16 @@ export async function POST() {
                 depth: 0,
             })
             for (const site of sites) {
-                results.pages = (results.pages || 0) + await clearCollection(
-                    payload, 'pages', { site: { equals: site.id } },
-                )
+                // Use direct SQL to avoid payload.find() which generates aggregate query
+                // expecting a "data" column that doesn't exist in pages_blocks_* tables
+                const db = payload.db.drizzle
+                const pageRows = await db.execute(sql`
+                    SELECT id FROM pages WHERE site_id = ${site.id}
+                `) as { rows: Array<{ id: number }> }
+                for (const row of pageRows.rows) {
+                    await payload.delete({ collection: 'pages', id: row.id })
+                }
+                results.pages = (results.pages || 0) + pageRows.rows.length
             }
 
             // Step 6: Sites

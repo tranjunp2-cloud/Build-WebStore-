@@ -144,7 +144,6 @@ export async function uploadBufferToMedia(
         collection: 'media',
         data: {
             alt: args.alt,
-            tenant: args.tenantId,
             aiGenerated: true,
         },
         file: {

@@ -70,7 +70,7 @@ export function PortfolioGridBlock({ block, site }: BlockProps<PortfolioGridConf
     const category = (site?.siteType as string) || 'business'
 
     // Per-slot fallback: prefer project.image.url (Payload upload), fallback to imageUrl (AI gen string), then Unsplash
-    const fallbackUrls = getGalleryImages(category, 6)
+    const fallbackUrls = getGalleryImages(category, 6, site?.imageLibraryS3 as Record<string, string> | undefined)
     const projects = Array.from({ length: Math.max(rawProjects.length, fallbackUrls.length) }, (_, i) => {
         const p = rawProjects[i]
         const imgSrc = (p?.image as { url?: string } | undefined)?.url || p?.imageUrl

@@ -255,7 +255,16 @@ export default function EditorPage() {
                     // Set directly — don't use handleContentChange which also sets hasUnsavedChanges.
                     const siteIsPublished = data.site?.status === 'published'
                     const hasDraftPages = loadedPages.some((p: { status: string }) => p.status === 'draft')
-                    if (siteIsPublished && hasDraftPages) {
+
+                    // GH-843: also detect pending draft from current page _status returned by
+                    // editor-data (fetched with draft:true — returns draft version when it exists).
+                    // The pages API _status reflects the live document and misses auto-saved draft
+                    // versions. Timestamp comparison is intentionally omitted: seo-queue runs
+                    // payload.update() after publish (no draft:true), bumping page.updatedAt past
+                    // site.publishedAt and causing a false positive Update button.
+                    const currentPageIsDraft = data.page?._status === 'draft'
+
+                    if (siteIsPublished && (hasDraftPages || currentPageIsDraft)) {
                         useEditorStore.setState({ hasUnpublishedChanges: true })
                     }
                 }
@@ -420,14 +429,20 @@ export default function EditorPage() {
                 if (e.shiftKey) {
                     if (canRedo()) {
                         redo()
-                        setIframeKey(key => key + 1)
+                        const redoState = useEditorStore.getState()
+                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: redoState.blocks })
+                        if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.headerBlock })
+                        if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.footerBlock })
                     }
                     return
                 }
 
                 if (canUndo()) {
                     undo()
-                    setIframeKey(key => key + 1)
+                    const undoState = useEditorStore.getState()
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: undoState.blocks })
+                    if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.headerBlock })
+                    if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.footerBlock })
                 }
             }
 
@@ -518,9 +533,16 @@ export default function EditorPage() {
             }
 
             setSaveSuccess(true)
-            // Reload iframe when visually-impacting fields change
-            const needsReload = !!(changes.name || changes.branding || changes.headerBlock || changes.footerBlock)
-            if (needsReload) setIframeKey(key => key + 1)
+            // header/footer update in-place; branding (CSS vars) still needs full reload
+            if (changes.headerBlock || changes.name) {
+                const latestHeader = useEditorStore.getState().headerBlock
+                if (latestHeader) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: latestHeader })
+            }
+            if (changes.footerBlock) {
+                const latestFooter = useEditorStore.getState().footerBlock
+                if (latestFooter) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: latestFooter })
+            }
+            if (changes.branding) setIframeKey(key => key + 1)
             window.setTimeout(() => setSaveSuccess(false), 1800)
         } catch (error) {
             console.error('Failed to update site settings', error)
@@ -610,6 +632,24 @@ export default function EditorPage() {
         }, 500)
     }, [reorderBlocks, handleSave])
 
+    // Seed gallery images from Unsplash → S3, then push the S3 map into the iframe
+    // via postMessage so the gallery re-renders with correct images without a reload.
+    // Idempotent — if already seeded (e.g. via AI gen) the endpoint returns immediately.
+    const triggerImageSeed = useCallback(async () => {
+        if (!siteId) return
+        try {
+            const res = await fetch(`/api/sites/${siteId}/seed-images`, { method: 'POST', credentials: 'include' })
+            if (res.ok) {
+                const data = await res.json()
+                if (data.imageLibraryS3 && Object.keys(data.imageLibraryS3).length > 0) {
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_IMAGE_LIBRARY_S3', imageLibraryS3: data.imageLibraryS3 })
+                }
+            }
+        } catch {
+            // non-fatal
+        }
+    }, [siteId])
+
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
         const nextBlock = normalizeAddSectionBlock(
             {
@@ -620,30 +660,32 @@ export default function EditorPage() {
             },
             blockData as Record<string, unknown>
         )
-        
+
         const safeBlock: BlockData = nextBlock || { blockType: blockData.blockType || 'hero', variant: blockData.variant || 'default' }
 
         addBlock(index - 1, safeBlock)
         setSelectedBlock(index)
-        
+
         setTimeout(() => {
-            previewFrameSendRef.current?.sendToIframe({ 
-                type: 'UPDATE_FULL_LAYOUT', 
-                bodyBlocks: useEditorStore.getState().blocks 
+            previewFrameSendRef.current?.sendToIframe({
+                type: 'UPDATE_FULL_LAYOUT',
+                bodyBlocks: useEditorStore.getState().blocks
             })
         }, 0)
-        
-        // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave, 
+
+        // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave,
         // which causes a race condition where the iframe fetches stale db state.
-        
+
         setChatActivity({
             id: `drop-${Date.now()}`,
             content: `Added ${blockData.blockType} block`,
         })
-        
+
+        if (blockData.blockType === 'gallery') void triggerImageSeed()
+
         void handleSave({ showToast: false, refreshPreview: false })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [addBlock, theme, handleSave])
+    }, [addBlock, theme, handleSave, triggerImageSeed])
 
     const handleAIAction = useCallback(async (action: AIAction) => {
         // Cancel any pending debounced auto-save to prevent race conditions
@@ -677,6 +719,7 @@ export default function EditorPage() {
                 if (nextBlock) {
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
+                    if (nextBlock.blockType === 'gallery') void triggerImageSeed()
                 } else {
                     toast.error('Unable to add this section yet')
                 }
@@ -746,7 +789,7 @@ export default function EditorPage() {
                 void handleSave({ showToast: false, refreshPreview: true })
             }
         }, 300)
-    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo])
+    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo, triggerImageSeed])
 
     const handleUndo = useCallback(() => {
         if (!canUndo()) return
@@ -1262,15 +1305,18 @@ export default function EditorPage() {
                                         content,
                                     })
                                 }
-                                // BUG-F05-13: await save BEFORE iframe reload
+                                // Inline edit already pushed UPDATE_BLOCK_DATA during editing session
+                                // — no iframe reload needed, just persist to DB.
                                 await handleSave({ showToast: false, refreshPreview: false })
-                                setIframeKey(key => key + 1)
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
                             onImageReplaced={async () => {
+                                // UPDATE_BLOCK_DATA (sent by PreviewFrame after updateBlock) already
+                                // updates the iframe preview in-place — no full reload needed.
+                                // refreshPreview: false prevents setIframeKey from firing and avoids
+                                // the stale-DB-data race when a prior save is still in-flight.
                                 await handleSave({ showToast: false, refreshPreview: false })
-                                setIframeKey(key => key + 1)
                             }}
                             onPageNavigate={handlePageSelected}
                             onInlineEditSave={async () => {
@@ -1379,8 +1425,11 @@ export default function EditorPage() {
                         // Mark template as just applied (for save guard)
                         setTemplateApplied(true)
 
-                        // Refresh preview iframe
-                        setIframeKey(prev => prev + 1)
+                        // Update preview in-place — pushBatch already updated blocks/theme in store
+                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: useEditorStore.getState().blocks })
+                        if (data.site?.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: data.site.headerBlock })
+                        if (data.site?.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: data.site.footerBlock })
+                        if (data.site?.theme) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_SITE_THEME', theme: data.site.theme })
 
                         // Show unmatched block notification (Phase 3)
                         if (unmatchedBlocks && unmatchedBlocks.length > 0) {

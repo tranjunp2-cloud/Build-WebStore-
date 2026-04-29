@@ -220,6 +220,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     const { headline, testimonials = [] } = block
     const variant = block.variant || 'cards'
     const category = (site?.siteType as string) || 'business'
+    const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
 
     /* Plan 260415 Lỗi G — empty state dev console.warn + early return */
     if (!testimonials.length) {
@@ -257,7 +258,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                 title={t.title}
                                 company={t.company}
                                 avatar={t.avatar}
-                                fallbackSrc={getTeamAvatar(category, i)}
+                                fallbackSrc={getTeamAvatar(category, i, s3Map)}
                                 avatarSize={40}
                                 imageIndex={i}
                             />
@@ -270,17 +271,17 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
 
     // ── spotlight variant ─────────────────────────────────────────────────
     if (variant === 'spotlight') {
-        return <TestimonialsSpotlight headline={headline} testimonials={testimonials} theme={theme} category={category} />
+        return <TestimonialsSpotlight headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── minimal-quote variant ─────────────────────────────────────────────
     if (variant === 'minimal-quote') {
-        return <TestimonialsMinimalQuote headline={headline} testimonials={testimonials} theme={theme} category={category} />
+        return <TestimonialsMinimalQuote headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── avatar-row variant ────────────────────────────────────────────────
     if (variant === 'avatar-row') {
-        return <TestimonialsAvatarRow headline={headline} testimonials={testimonials} theme={theme} category={category} />
+        return <TestimonialsAvatarRow headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── video-text variant ────────────────────────────────────────────────
@@ -313,7 +314,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                                 </div>
                                             </>
                                         ) : (
-                                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={120} imageIndex={i} />
+                                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i, s3Map)} name={t.name} size={120} imageIndex={i} />
                                         )}
                                     </div>
                                     {/* Text side */}
@@ -327,7 +328,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                             title={t.title}
                                             company={t.company}
                                             avatar={t.avatar}
-                                            fallbackSrc={getTeamAvatar(category, i)}
+                                            fallbackSrc={getTeamAvatar(category, i, s3Map)}
                                             avatarSize={44}
                                             imageIndex={i}
                                         />
@@ -343,7 +344,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
 
     // ── carousel variant ───────────────────────────────────────────────
     if (variant === 'carousel') {
-        return <TestimonialsCarousel headline={headline} testimonials={testimonials} theme={theme} category={category} />
+        return <TestimonialsCarousel headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── simple variant ───────────────────────────────────────────────────
@@ -410,7 +411,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                 title={t.title}
                                 company={t.company}
                                 avatar={t.avatar}
-                                fallbackSrc={getTeamAvatar(category, i)}
+                                fallbackSrc={getTeamAvatar(category, i, s3Map)}
                                 avatarSize={44}
                                 imageIndex={i}
                                 className="mt-auto"
@@ -428,11 +429,13 @@ function TestimonialsSpotlight({
     headline,
     testimonials,
     category,
+    s3Map,
 }: {
     headline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
+    s3Map?: Record<string, string>
 }) {
     const [centerIdx, setCenterIdx] = useState(0)
 
@@ -487,7 +490,7 @@ function TestimonialsSpotlight({
                         }}
                     >
                         <div className="flex justify-center mb-6">
-                            <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx)} name={center.name} size={72} imageIndex={centerIdx} />
+                            <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx, s3Map)} name={center.name} size={72} imageIndex={centerIdx} />
                         </div>
                         <StarRating count={center.rating || 5} size="lg" className="flex justify-center gap-0.5 mb-4" />
                         <Body size="lg" className="opacity-70 mb-6 italic">
@@ -525,11 +528,13 @@ function TestimonialsMinimalQuote({
     headline,
     testimonials,
     category,
+    s3Map,
 }: {
     headline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
+    s3Map?: Record<string, string>
 }) {
     const [currentIndex, setCurrentIndex] = useState(0)
     /* Plan 260415 Lỗi E — pause on hover/focus */
@@ -588,7 +593,7 @@ function TestimonialsMinimalQuote({
                             &ldquo;{t.quote}&rdquo;
                         </blockquote>
                         <div className="flex items-center justify-center gap-3">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={48} imageIndex={currentIndex} />
+                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex, s3Map)} name={t.name} size={48} imageIndex={currentIndex} />
                             <AuthorMeta
                                 name={t.name}
                                 title={t.title}
@@ -621,11 +626,13 @@ function TestimonialsCarousel({
     headline,
     testimonials,
     category,
+    s3Map,
 }: {
     headline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
+    s3Map?: Record<string, string>
 }) {
     const [currentIndex, setCurrentIndex] = useState(0)
     /* Plan 260415 Lỗi E — pause on hover: state paused, clear timer khi hover */
@@ -750,7 +757,7 @@ function TestimonialsCarousel({
                         aria-atomic="true"
                     >
                         <div className="flex justify-center mb-6">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={72} imageIndex={currentIndex} />
+                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex, s3Map)} name={t.name} size={72} imageIndex={currentIndex} />
                         </div>
                         <StarRating count={t.rating || 5} size="lg" className="flex justify-center gap-0.5 mb-5" />
                         <Body size="lg" className="italic opacity-70 mb-6">
@@ -782,11 +789,13 @@ function TestimonialsAvatarRow({
     headline,
     testimonials,
     category,
+    s3Map,
 }: {
     headline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
+    s3Map?: Record<string, string>
 }) {
     const [selectedIndex, setSelectedIndex] = useState(0)
 
@@ -816,7 +825,7 @@ function TestimonialsAvatarRow({
                     >
                         <AvatarRing
                             color={CSS_VARS.primary}
-                            src={t.avatar?.url || getTeamAvatar(category, i)}
+                            src={t.avatar?.url || getTeamAvatar(category, i, s3Map)}
                             name={t.name}
                             size={56}
                             imageIndex={i}

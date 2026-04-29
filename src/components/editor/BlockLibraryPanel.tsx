@@ -33,6 +33,7 @@ const HIDDEN_BLOCKS = new Set([
     'download-cta',      // missing: no file hosting
     'google-maps',       // missing: requires API key config
     'countdown-timer',   // missing: client-side only, no persist
+    'cartWidget',        // missing: checkout not yet implemented (gh-839)
 ])
 
 const categoryConfig: Omit<CategoryConfig, 'label'>[] = [

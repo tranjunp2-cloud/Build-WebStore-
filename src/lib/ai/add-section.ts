@@ -1,6 +1,6 @@
 import type { BlockData, ThemeData } from '@/types/editor'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
-import { getGalleryImages, getTeamAvatar } from '@/lib/images/industry-images'
+import { getTeamAvatar } from '@/lib/images/industry-images'
 import { dedupSectionLabel } from './dedup-section-label'
 
 export type SupportedAddSectionType =
@@ -75,7 +75,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['banner', [/\bbanner\b/i, /\bpromo\b/i, /\bpromotion\b/i]],
     ['cta', [/\bcta\b/i, /\bcall to action\b/i]],
     ['socialWidget', [/\bsocial\s*widget\b/i, /\bsocial\s*media\b/i, /\bsocial\s*links?\b/i, /\bfacebook\b/i, /\binstagram\b/i, /\blinkedin\b/i, /\byoutube\b/i]],
-    ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]],
+    // ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]], // gh-839: hidden until checkout ships
     // v1.1 new blocks
     ['pricing-table', [/\bpricing\s*table\b/i, /\bprice\s*comparison\b/i, /\bplan\s*comparison\b/i]],
     ['gallery-masonry', [/\bmasonry\b/i, /\bmosaic\b/i]],
@@ -128,7 +128,7 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     banner: 'banner',
     cta: 'CTA',
     socialWidget: 'social media',
-    cartWidget: 'cart',
+    cartWidget: 'cart', // gh-839: label kept for type completeness; block is unreachable (matcher disabled)
     'pricing-table': 'pricing table',
     'gallery-masonry': 'masonry gallery',
     'whatsapp-button': 'WhatsApp button',
@@ -171,10 +171,12 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'product-quick-view': 'product quick view',
 }
 
-function getPlaceholderImage(index: number, category = 'business') {
-    const galleryUrls = getGalleryImages(category, 6)
+function getPlaceholderImage(index: number) {
+    // Leave url empty so the gallery block's render-time fallback picks the correct
+    // category + S3 images based on site.siteType and site.imageLibraryS3.
+    // Storing a real CDN URL here bypasses the siteType/S3 logic entirely.
     return {
-        image: { url: galleryUrls[index % galleryUrls.length] || '', alt: `Gallery image ${index + 1}` },
+        image: { url: '', alt: `Gallery image ${index + 1}` },
         caption: `Highlight ${index + 1}`,
     }
 }
@@ -336,13 +338,8 @@ export function createAddSectionBlock({
                 links: getDefaultSocialWidgetLinks(),
             })
 
-        case 'cartWidget':
-            return {
-                blockType: 'cartWidget',
-                variant: 'floating',
-                label: 'Cart',
-                showLabel: false,
-            }
+        // case 'cartWidget': // gh-839: hidden until checkout ships
+        //     return { blockType: 'cartWidget', variant: 'floating', label: 'Cart', showLabel: false }
 
         // ── v1.1 New Blocks ─────────────────────────────────────────
 

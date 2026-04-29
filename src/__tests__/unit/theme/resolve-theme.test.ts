@@ -423,13 +423,36 @@ describe('generateThemeCSS — additional edge cases', () => {
     })
 
     it('font CSS vars reference next/font scoped variables (post-F01D fix)', () => {
-        // Phase 02 fix: generateThemeCSS now outputs var(--font-<pairing>)
-        // references instead of raw family name strings, so next/font-hosted
-        // fonts actually render. Editorial pairing = Playfair Display + Lora.
+        // GH-737 fix: fontNameToCSSVar now puts literal name FIRST (doc-wide @font-face
+        // registration wins over var() chain which is scope-limited to AppShell div).
+        // Editorial pairing = Playfair Display (multi-word, quoted) + Lora (single-word).
         const theme = resolveTheme({ fontPairingId: 'editorial' })
         const css = generateThemeCSS(theme)
-        expect(css).toContain('--font-heading: var(--font-playfair-display)')
-        expect(css).toContain('--font-body: var(--font-lora)')
+        expect(css).toContain("--font-heading: 'Playfair Display',")
+        expect(css).toContain('var(--font-playfair-display)')
+        expect(css).toContain('--font-body: Lora,')
+        expect(css).toContain('var(--font-lora)')
+    })
+
+    it('emits font CSS vars directly on :root for heading/body fonts (GH-737 root-cause fix)', () => {
+        // Root cause: var(--font-lato) inside --font-body fails at <body>/<html> level
+        // because --font-lato is only defined on AppShell div (descendant of body, not ancestor).
+        // Fix: generateThemeCSS emits these vars on :root so they resolve everywhere.
+        // Without this, font-family: var(--font-body) on <body> is invalid-at-computed-value-time
+        // → browser shows Inter fallback regardless of saved fontBody.
+        const css = generateThemeCSS(
+            resolveTheme({
+                primaryColor: '#0ea5e9',
+                fontHeading: 'Poppins',
+                fontBody: 'Lato',
+            }),
+        )
+        // Heading + body specific vars
+        expect(css).toContain('--font-poppins: "Poppins", "Poppins Fallback";')
+        expect(css).toContain('--font-lato: "Lato", "Lato Fallback";')
+        // Default fallback vars — always included (used in the var() chain)
+        expect(css).toContain('--font-inter: "Inter", "Inter Fallback";')
+        expect(css).toContain('--font-outfit: "Outfit", "Outfit Fallback";')
     })
 
     it('emits semantic color layer alongside legacy brand vars (Phase 03)', () => {

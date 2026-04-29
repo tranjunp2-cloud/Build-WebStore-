@@ -12,6 +12,8 @@ import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
+// gh-839: Hide Add to Cart until checkout is implemented. Flip to true to re-enable.
+const CART_ENABLED = false
 
 interface ProductItem {
     id: string
@@ -146,6 +148,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
 
                                 {variant !== 'list' && <div className="mt-auto" />}
 
+                                {CART_ENABLED && (
                                 <button
                                     type="button"
                                     className={`px-4 py-2 font-medium transition-all duration-300 ${TOUCH_TARGET.min} ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
@@ -169,6 +172,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                                 >
                                     Add to Cart
                                 </button>
+                                )}
                             </div>
                         </HoverCard>
                     </StaggerItem>

@@ -324,10 +324,26 @@ describe('fontNameToCSSVar helper (Phase 02 bug fix)', () => {
         const result = fontNameToCSSVar('Monaco', 'body')
         expect(result).toMatch(/^Monaco, var\(--font-inter\)/)
     })
+
+    it('puts quoted literal name FIRST for known multi-word heading font', () => {
+        const result = fontNameToCSSVar('Playfair Display', 'heading')
+        expect(result).toMatch(/^'Playfair Display',\s+var\(/)
+    })
+
+    it('puts unquoted literal name FIRST for known single-word body font', () => {
+        const result = fontNameToCSSVar('Lora', 'body')
+        expect(result).toMatch(/^Lora,\s+var\(/)
+    })
+
+    it('puts unquoted literal name FIRST for default heading font (Outfit)', () => {
+        const result = fontNameToCSSVar('Outfit', 'heading')
+        expect(result).toMatch(/^Outfit,/)
+        expect(result).toContain('var(--font-outfit)')
+    })
 })
 
 describe('generateThemeCSS font output (Phase 02 bug fix)', () => {
-    it('outputs --font-heading with var() reference for a known font', () => {
+    it('outputs --font-heading with literal name first, then var() for a known font', () => {
         const css = generateThemeCSS(
             resolveTheme({
                 primaryColor: '#0ea5e9',
@@ -335,29 +351,37 @@ describe('generateThemeCSS font output (Phase 02 bug fix)', () => {
                 fontBody: 'Lora',
             }),
         )
-        expect(css).toContain('--font-heading: var(--font-playfair-display)')
-        expect(css).toContain('--font-body: var(--font-lora)')
+        // Playfair Display: multi-word → quoted literal first
+        expect(css).toContain("--font-heading: 'Playfair Display',")
+        expect(css).toContain('var(--font-playfair-display)')
+        // Lora: single-word → unquoted literal first
+        expect(css).toContain('--font-body: Lora,')
+        expect(css).toContain('var(--font-lora)')
     })
 
-    it('outputs var() fallback chain for default Outfit + Inter', () => {
+    it('outputs literal name first, then var() fallback for default Outfit + Inter', () => {
         const css = generateThemeCSS(
             resolveTheme({ primaryColor: '#0ea5e9' }),
         )
-        expect(css).toContain('--font-heading: var(--font-outfit)')
-        expect(css).toContain('--font-body: var(--font-inter)')
+        // Outfit: single-word → unquoted literal first
+        expect(css).toContain('--font-heading: Outfit,')
+        expect(css).toContain('var(--font-outfit)')
+        // Inter: single-word → unquoted literal first
+        expect(css).toContain('--font-body: Inter,')
+        expect(css).toContain('var(--font-inter)')
     })
 
-    it('never outputs raw font-family string like "Playfair Display", sans-serif (without var)', () => {
+    it('outputs --font-heading starting with quoted literal font name (known font)', () => {
         const css = generateThemeCSS(
             resolveTheme({
                 primaryColor: '#0ea5e9',
                 fontPairingId: 'editorial',
             }),
         )
-        // --font-heading line should START with var(
+        // Literal first ensures global @font-face resolves before var() fallback chain
         const headingLine = css.split('\n').find((l) => l.includes('--font-heading:'))
         expect(headingLine).toBeDefined()
-        expect(headingLine).toMatch(/--font-heading:\s+var\(/)
+        expect(headingLine).toMatch(/--font-heading:\s+'[^']+',\s+var\(/)
     })
 })
 

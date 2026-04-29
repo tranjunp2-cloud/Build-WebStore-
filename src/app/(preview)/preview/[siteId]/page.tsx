@@ -9,6 +9,7 @@ import { getCurrentUser } from '@/lib/auth'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
+import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 type PreviewLayoutBlock = Record<string, unknown> & {
     blockType: string
@@ -191,6 +192,8 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             limit: 100,
         })
 
+        const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
+
         return (
             <AppShell>
                 <div className="min-h-screen">
@@ -203,6 +206,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                             tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
                                 ? (site.tenant as { slug?: string }).slug || ''
                                 : '',
+                            imageLibraryS3,
                         }}
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
@@ -216,6 +220,20 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         )
 
     } catch (error) {
+        // Re-throw Next.js special errors (notFound, redirect) so the runtime handles them.
+        // Catching NEXT_NOT_FOUND here turns a proper 404 into a Server Component render error.
+        if (
+            error !== null &&
+            typeof error === 'object' &&
+            'digest' in error &&
+            typeof (error as Record<string, string>).digest === 'string' &&
+            (
+                (error as Record<string, string>).digest === 'NEXT_NOT_FOUND' ||
+                (error as Record<string, string>).digest.startsWith('NEXT_REDIRECT')
+            )
+        ) {
+            throw error
+        }
         console.error('[Preview] Error:', error)
         return <PreviewLoadError />
     }

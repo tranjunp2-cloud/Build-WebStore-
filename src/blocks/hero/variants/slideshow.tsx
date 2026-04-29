@@ -16,7 +16,7 @@ import { RichText } from '../../shared/RichText'
 export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], badge, image, images = [] } = block
     const category = (site?.siteType as string) || 'business'
-    const fallbackHeroUrl = getHeroImage(category)
+    const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
     // Build slides array: use images[] if available, fall back to single image
     const slides = (images && images.length > 0)
