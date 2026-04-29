@@ -1,6 +1,6 @@
 import type { BlockData, ThemeData } from '@/types/editor'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
-import { getGalleryImages, getTeamAvatar } from '@/lib/images/industry-images'
+import { getTeamAvatar } from '@/lib/images/industry-images'
 import { dedupSectionLabel } from './dedup-section-label'
 
 export type SupportedAddSectionType =
@@ -171,10 +171,12 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'product-quick-view': 'product quick view',
 }
 
-function getPlaceholderImage(index: number, category = 'business') {
-    const galleryUrls = getGalleryImages(category, 6)
+function getPlaceholderImage(index: number) {
+    // Leave url empty so the gallery block's render-time fallback picks the correct
+    // category + S3 images based on site.siteType and site.imageLibraryS3.
+    // Storing a real CDN URL here bypasses the siteType/S3 logic entirely.
     return {
-        image: { url: galleryUrls[index % galleryUrls.length] || '', alt: `Gallery image ${index + 1}` },
+        image: { url: '', alt: `Gallery image ${index + 1}` },
         caption: `Highlight ${index + 1}`,
     }
 }

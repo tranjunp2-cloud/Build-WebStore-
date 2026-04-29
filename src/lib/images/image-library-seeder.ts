@@ -124,26 +124,43 @@ export async function seedImageLibraryForSite(
     tenantId: number | string,
     siteId: number | string,
     category: string,
+    slotFilter?: (slot: string) => boolean,
 ): Promise<SeededImageMapping> {
     const start = Date.now()
     const mapping: SeededImageMapping = { hero: [], gallery: [], about: null, team: [], features: [] }
 
     try {
-        // Idempotency: skip if this site already has any seeded images
         const prefix = siteAltKeyPrefix(siteId)
-        const existing = await payload.find({
-            collection: 'media',
-            where: { alt: { like: prefix } },
-            limit: 1,
-            depth: 0,
-        })
-        if (existing.docs.length > 0) {
-            console.info(`[seeder] site=${siteId} already seeded (${existing.totalDocs} slots) — skipping`)
-            // Build mapping from existing docs for caller convenience
-            return mapping
+
+        if (slotFilter) {
+            // Partial seed: check if the first gallery slot already exists to prevent duplicates
+            const firstKey = buildSiteAltKey(siteId, 'gallery[0]')
+            const galCheck = await payload.find({
+                collection: 'media',
+                where: { alt: { equals: firstKey } },
+                limit: 1,
+                depth: 0,
+            })
+            if (galCheck.docs.length > 0) {
+                console.info(`[seeder] site=${siteId} gallery already seeded — skipping`)
+                return mapping
+            }
+        } else {
+            // Full seed: skip if any slot for this site already exists
+            const existing = await payload.find({
+                collection: 'media',
+                where: { alt: { like: prefix } },
+                limit: 1,
+                depth: 0,
+            })
+            if (existing.docs.length > 0) {
+                console.info(`[seeder] site=${siteId} already seeded (${existing.totalDocs} slots) — skipping`)
+                return mapping
+            }
         }
 
-        const slots = buildSlots(category)
+        const allSlots = buildSlots(category)
+        const slots = slotFilter ? allSlots.filter(s => slotFilter(s.slot)) : allSlots
         const sem = new Semaphore(CONCURRENCY)
         let uploaded = 0
         let failed = 0

@@ -623,6 +623,15 @@ export default function EditorPage() {
         }, 500)
     }, [reorderBlocks, handleSave])
 
+    // Seed gallery images from Unsplash → S3 in the background (fire-and-forget).
+    // Gallery renders immediately with CDN category fallback; S3 images appear on next session.
+    // Idempotent — if already seeded (e.g. via AI gen) the endpoint returns immediately.
+    const triggerImageSeed = useCallback(() => {
+        if (!siteId) return
+        fetch(`/api/sites/${siteId}/seed-images`, { method: 'POST', credentials: 'include' })
+            .catch(() => { /* non-fatal */ })
+    }, [siteId])
+
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
         const nextBlock = normalizeAddSectionBlock(
             {
@@ -633,30 +642,32 @@ export default function EditorPage() {
             },
             blockData as Record<string, unknown>
         )
-        
+
         const safeBlock: BlockData = nextBlock || { blockType: blockData.blockType || 'hero', variant: blockData.variant || 'default' }
 
         addBlock(index - 1, safeBlock)
         setSelectedBlock(index)
-        
+
         setTimeout(() => {
-            previewFrameSendRef.current?.sendToIframe({ 
-                type: 'UPDATE_FULL_LAYOUT', 
-                bodyBlocks: useEditorStore.getState().blocks 
+            previewFrameSendRef.current?.sendToIframe({
+                type: 'UPDATE_FULL_LAYOUT',
+                bodyBlocks: useEditorStore.getState().blocks
             })
         }, 0)
-        
-        // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave, 
+
+        // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave,
         // which causes a race condition where the iframe fetches stale db state.
-        
+
         setChatActivity({
             id: `drop-${Date.now()}`,
             content: `Added ${blockData.blockType} block`,
         })
-        
+
+        if (blockData.blockType === 'gallery') void triggerImageSeed()
+
         void handleSave({ showToast: false, refreshPreview: false })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [addBlock, theme, handleSave])
+    }, [addBlock, theme, handleSave, triggerImageSeed])
 
     const handleAIAction = useCallback(async (action: AIAction) => {
         // Cancel any pending debounced auto-save to prevent race conditions
@@ -690,6 +701,7 @@ export default function EditorPage() {
                 if (nextBlock) {
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
+                    if (nextBlock.blockType === 'gallery') void triggerImageSeed()
                 } else {
                     toast.error('Unable to add this section yet')
                 }
@@ -759,7 +771,7 @@ export default function EditorPage() {
                 void handleSave({ showToast: false, refreshPreview: true })
             }
         }, 300)
-    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo])
+    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo, triggerImageSeed])
 
     const handleUndo = useCallback(() => {
         if (!canUndo()) return
