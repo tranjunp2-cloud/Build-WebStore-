@@ -30,6 +30,7 @@ export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
     'review-cards',
     'booking-widget',
     'google-maps',
+    'class-schedule', // not production-ready — hidden from editor and AI generation
 ])
 
 /** Blocks missing from Payload Pages.ts layout.blocks — silently dropped on save. */
