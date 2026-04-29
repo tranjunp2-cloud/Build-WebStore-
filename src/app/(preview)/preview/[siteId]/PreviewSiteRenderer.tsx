@@ -68,6 +68,10 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
                 const { blockData } = e.data
                 if (typeof blockData !== 'object' || blockData === null) return
                 setSiteState(prev => ({ ...prev, footerBlock: blockData as Record<string, unknown> }))
+            } else if (e.data?.type === 'UPDATE_SITE_THEME') {
+                const { theme } = e.data
+                if (typeof theme !== 'object' || theme === null) return
+                setSiteState(prev => ({ ...prev, theme: theme as Record<string, unknown> }))
             }
         }
         window.addEventListener('message', onMessage)
