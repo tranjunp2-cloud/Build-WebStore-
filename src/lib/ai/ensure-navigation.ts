@@ -135,7 +135,7 @@ function buildDefaultFooter(businessName: string, pageLinks?: readonly NavLink[]
             },
             {
                 title: 'Contact',
-                links: [{ label: 'Get in touch', url: '/contact' }],
+                links: [{ label: 'Get in touch', url: resolveCtaUrl(links) }],
             },
         ],
         socialLinks: [],
