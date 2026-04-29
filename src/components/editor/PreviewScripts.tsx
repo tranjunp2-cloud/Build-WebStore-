@@ -449,9 +449,15 @@ export function PreviewScripts() {
                         window.parent.postMessage({ type: 'OPEN_LINK', href }, parentOrigin)
                     }
                 } else if (isSafeUrl(href)) {
-                    // Standalone preview — open external links in new tab
-                    e.preventDefault()
-                    window.open(href, '_blank', 'noopener,noreferrer')
+                    // Standalone preview — only open truly external links in new tab.
+                    // Internal preview links (/preview/{siteId}?pageId=X) must navigate normally.
+                    try {
+                        const url = new URL(href, window.location.href)
+                        if (url.origin !== window.location.origin) {
+                            e.preventDefault()
+                            window.open(href, '_blank', 'noopener,noreferrer')
+                        }
+                    } catch { /* invalid URL — let browser handle */ }
                 }
             }
             // Also detect non-img placeholder elements (InitialsAvatar, LogoPlaceholder) via data-image-index
