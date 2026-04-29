@@ -420,14 +420,14 @@ export default function EditorPage() {
                 if (e.shiftKey) {
                     if (canRedo()) {
                         redo()
-                        setIframeKey(key => key + 1)
+                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: useEditorStore.getState().blocks })
                     }
                     return
                 }
 
                 if (canUndo()) {
                     undo()
-                    setIframeKey(key => key + 1)
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: useEditorStore.getState().blocks })
                 }
             }
 
@@ -518,9 +518,16 @@ export default function EditorPage() {
             }
 
             setSaveSuccess(true)
-            // Reload iframe when visually-impacting fields change
-            const needsReload = !!(changes.name || changes.branding || changes.headerBlock || changes.footerBlock)
-            if (needsReload) setIframeKey(key => key + 1)
+            // header/footer update in-place; branding (CSS vars) still needs full reload
+            if (changes.headerBlock || changes.name) {
+                const latestHeader = useEditorStore.getState().headerBlock
+                if (latestHeader) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: latestHeader })
+            }
+            if (changes.footerBlock) {
+                const latestFooter = useEditorStore.getState().footerBlock
+                if (latestFooter) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: latestFooter })
+            }
+            if (changes.branding) setIframeKey(key => key + 1)
             window.setTimeout(() => setSaveSuccess(false), 1800)
         } catch (error) {
             console.error('Failed to update site settings', error)
@@ -1262,9 +1269,9 @@ export default function EditorPage() {
                                         content,
                                     })
                                 }
-                                // BUG-F05-13: await save BEFORE iframe reload
+                                // Inline edit already pushed UPDATE_BLOCK_DATA during editing session
+                                // — no iframe reload needed, just persist to DB.
                                 await handleSave({ showToast: false, refreshPreview: false })
-                                setIframeKey(key => key + 1)
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
@@ -1382,8 +1389,10 @@ export default function EditorPage() {
                         // Mark template as just applied (for save guard)
                         setTemplateApplied(true)
 
-                        // Refresh preview iframe
-                        setIframeKey(prev => prev + 1)
+                        // Update preview in-place — pushBatch already updated blocks/theme in store
+                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: useEditorStore.getState().blocks })
+                        if (data.site?.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: data.site.headerBlock })
+                        if (data.site?.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: data.site.footerBlock })
 
                         // Show unmatched block notification (Phase 3)
                         if (unmatchedBlocks && unmatchedBlocks.length > 0) {
