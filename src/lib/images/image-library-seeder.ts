@@ -143,10 +143,14 @@ export async function seedImageLibraryForSite(
             })
             if (galCheck.docs.length > 0) {
                 console.info(`[seeder] site=${siteId} gallery already seeded — skipping`)
+                // Returns empty SeededImageMapping — callers must re-query resolveImageLibraryS3Map for the live slot→url map.
                 return mapping
             }
         } else {
-            // Full seed: skip if any slot for this site already exists
+            // Full seed: skip if any slot for this site already exists.
+            // NOTE: Payload `like` performs substring match (ILIKE '%value%'), not prefix match.
+            // Safe here because alt keys start with 'imglib:s{N}:' — the prefix cannot appear mid-value.
+            // The resolver adds a secondary startsWith guard for extra safety.
             const existing = await payload.find({
                 collection: 'media',
                 where: { alt: { like: prefix } },
@@ -155,6 +159,7 @@ export async function seedImageLibraryForSite(
             })
             if (existing.docs.length > 0) {
                 console.info(`[seeder] site=${siteId} already seeded (${existing.totalDocs} slots) — skipping`)
+                // Returns empty SeededImageMapping — callers must re-query resolveImageLibraryS3Map for the live slot→url map.
                 return mapping
             }
         }
