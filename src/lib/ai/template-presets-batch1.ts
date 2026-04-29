@@ -17,7 +17,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'menu-display', variant: 'grid' },
           { blockType: 'gallery', variant: 'carousel' },
@@ -53,8 +53,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'split-left' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'team', variant: 'grid' },
           { blockType: 'testimonials', variant: 'single' },
           { blockType: 'footer', variant: 'mega' },
@@ -86,7 +86,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-video' },
+          { blockType: 'hero', variant: 'split-video' },
           { blockType: 'logo-cloud' },
           { blockType: 'gallery', variant: 'spotlight' },
           { blockType: 'menu-display', variant: 'featured' },
@@ -102,7 +102,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Menu', slug: '/menu',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
+          { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'menu-display', variant: 'luxury-list', count: 5 },
           { blockType: 'gallery', variant: 'slider' },
           { blockType: 'footer', variant: 'mega' },
@@ -121,7 +121,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-video' },
+          { blockType: 'hero', variant: 'split-video' },
           { blockType: 'content', variant: 'timeline' },
           { blockType: 'stats', variant: 'counters' },
           { blockType: 'team', variant: 'spotlight' },
@@ -223,7 +223,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'booking-widget' },
           { blockType: 'menu-display', variant: 'cards' },
@@ -240,7 +240,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Menu', slug: '/menu',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'menu-display', variant: 'photo-grid', count: 8 },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'footer', variant: 'mega' },
@@ -259,8 +259,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'gallery', variant: 'grid' },
           { blockType: 'stats', variant: 'counters' },
           { blockType: 'cta', variant: 'banner' },
@@ -271,7 +271,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Contact', slug: '/contact',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
+          { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'contact-form', variant: 'bold' },
           { blockType: 'map', variant: 'fullwidth' },
           { blockType: 'newsletter', variant: 'inline' },
@@ -296,10 +296,11 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'products-grid', variant: 'featured', count: 8 },
           { blockType: 'features', variant: 'icon-grid' },
+          { blockType: 'gallery', variant: 'masonry', count: 6 },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'product-quick-view' },
           { blockType: 'testimonials', variant: 'cards' },
@@ -365,7 +366,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-video' },
+          { blockType: 'hero', variant: 'split-video' },
           { blockType: 'logo-cloud' },
           { blockType: 'product-quick-view' },
           { blockType: 'products-grid', variant: 'spotlight', count: 6 },
@@ -391,8 +392,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'gallery', variant: 'masonry' },
           { blockType: 'stats', variant: 'inline' },
           { blockType: 'footer', variant: 'mega' },
@@ -402,8 +403,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Blog', slug: '/blog',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
-          { blockType: 'blog-list', variant: 'editorial', count: 4 },
+          { blockType: 'hero', variant: 'cards-overlay' },
+          { blockType: 'blog-list', variant: 'magazine', count: 4 },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'footer', variant: 'mega' },
         ],
@@ -449,7 +450,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Products', slug: '/products',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'products-grid', variant: 'categorized', count: 12 },
           { blockType: 'testimonials', variant: 'cards' },
           { blockType: 'footer', variant: 'mega' },
@@ -459,7 +460,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'content', variant: 'timeline' },
           { blockType: 'team', variant: 'cards' },
           { blockType: 'gallery', variant: 'grid' },
@@ -502,7 +503,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'pricing', variant: 'tiers' },
           { blockType: 'products-grid', variant: 'featured', count: 4 },
@@ -519,7 +520,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Products', slug: '/products',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
+          { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'products-grid', variant: 'filterable', count: 16 },
           { blockType: 'pricing', variant: 'comparison' },
           { blockType: 'footer', variant: 'mega' },
@@ -529,8 +530,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'cards-overlay' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'stats', variant: 'inline' },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'footer', variant: 'mega' },
@@ -540,7 +541,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Blog', slug: '/blog',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'blog-list', variant: 'featured-hero', count: 5 },
+          { blockType: 'blog-list', variant: 'magazine', count: 5 },
           { blockType: 'newsletter', variant: 'inline' },
           { blockType: 'footer', variant: 'mega' },
         ],
@@ -573,7 +574,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'icon-grid' },
           { blockType: 'gallery', variant: 'masonry', count: 6 },
@@ -610,8 +611,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'split-left' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'team', variant: 'cards' },
           { blockType: 'testimonials', variant: 'single' },
           { blockType: 'footer', variant: 'mega' },
@@ -643,7 +644,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-video' },
+          { blockType: 'hero', variant: 'split-video' },
           { blockType: 'logo-cloud' },
           { blockType: 'gallery', variant: 'masonry', count: 4 },
           { blockType: 'before-after', count: 2 },
@@ -659,7 +660,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Services', slug: '/services',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
+          { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'features', variant: 'list' },
           { blockType: 'before-after', count: 4 },
           { blockType: 'cta', variant: 'banner' },
@@ -679,7 +680,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'content', variant: 'timeline' },
           { blockType: 'stats', variant: 'counters' },
           { blockType: 'gallery', variant: 'slider' },
@@ -784,7 +785,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'before-after', count: 3 },
           { blockType: 'gallery', variant: 'masonry', count: 8 },
@@ -801,7 +802,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Services', slug: '/services',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'features', variant: 'cards' },
           { blockType: 'gallery', variant: 'carousel' },
           { blockType: 'booking-widget' },
@@ -812,7 +813,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Gallery', slug: '/gallery',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
+          { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'before-after', count: 4 },
           { blockType: 'gallery', variant: 'masonry', count: 12 },
           { blockType: 'cta', variant: 'banner' },
@@ -823,8 +824,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'team', variant: 'spotlight' },
           { blockType: 'stats', variant: 'inline' },
           { blockType: 'testimonials', variant: 'marquee' },
@@ -876,7 +877,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Features', slug: '/features',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'features', variant: 'detailed' },
           { blockType: 'feature-comparison' },
           { blockType: 'video-showcase' },
@@ -901,7 +902,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         blocks: [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'centered' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'stats', variant: 'counters' },
           { blockType: 'team', variant: 'grid' },
           { blockType: 'footer', variant: 'mega' },
@@ -933,7 +934,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'stats', variant: 'inline' },
           { blockType: 'features', variant: 'cards' },
@@ -949,7 +950,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Features', slug: '/features',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
+          { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'features', variant: 'list' },
           { blockType: 'video-showcase' },
           { blockType: 'stats', variant: 'counters' },
@@ -971,7 +972,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'content', variant: 'timeline' },
           { blockType: 'team', variant: 'spotlight' },
           { blockType: 'stats', variant: 'inline' },
@@ -1003,7 +1004,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'video-showcase' },
           { blockType: 'features', variant: 'icon-grid' },
@@ -1115,8 +1116,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'split-left' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'team', variant: 'cards' },
           { blockType: 'gallery', variant: 'grid' },
           { blockType: 'footer', variant: 'mega' },
@@ -1150,7 +1151,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'menu-display', variant: 'classic' },
           { blockType: 'gallery', variant: 'carousel' },
@@ -1176,7 +1177,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'content', variant: 'timeline' },
           { blockType: 'gallery', variant: 'grid' },
           { blockType: 'testimonials', variant: 'cards' },
@@ -1219,7 +1220,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'gallery', variant: 'carousel' },
           { blockType: 'menu-display', variant: 'cards' },
@@ -1236,7 +1237,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Menu', slug: '/menu',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'split-image' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'menu-display', variant: 'photo-grid', count: 8 },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'footer', variant: 'mega' },
@@ -1246,8 +1247,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-image' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'fullscreen' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'stats', variant: 'inline' },
           { blockType: 'gallery', variant: 'grid' },
           { blockType: 'footer', variant: 'mega' },
@@ -1266,7 +1267,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Contact', slug: '/contact',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
+          { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'contact-form', variant: 'bold' },
           { blockType: 'map', variant: 'fullwidth' },
           { blockType: 'footer', variant: 'mega' },
@@ -1288,7 +1289,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-video' },
+          { blockType: 'hero', variant: 'split-video' },
           { blockType: 'logo-cloud' },
           { blockType: 'menu-display', variant: 'featured' },
           { blockType: 'gallery', variant: 'spotlight' },
@@ -1304,7 +1305,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Menu', slug: '/menu',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'overlay' },
+          { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'menu-display', variant: 'luxury-list', count: 4 },
           { blockType: 'gallery', variant: 'slider' },
           { blockType: 'footer', variant: 'mega' },
@@ -1314,8 +1315,8 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'About', slug: '/about',
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'fullscreen-video' },
-          { blockType: 'content', variant: 'story' },
+          { blockType: 'hero', variant: 'split-video' },
+          { blockType: 'content', variant: 'magazine' },
           { blockType: 'team', variant: 'spotlight' },
           { blockType: 'gallery', variant: 'masonry' },
           { blockType: 'footer', variant: 'mega' },
