@@ -69,6 +69,28 @@ function patchHollowNav(
     return patched
 }
 
+// Replace the footer's pages column with normalized page links so footer mirrors the nav menu.
+// Detects the pages column by title keyword; falls back to column[0] if none matches.
+// Only the pages column is replaced — support/legal/contact columns kept intact.
+function patchFooterPageLinks(
+    block: PageBlockShape,
+    pageLinks: readonly { label: string; url: string }[],
+): PageBlockShape {
+    if (!Array.isArray(block.columns)) return block
+    const cols = block.columns as Array<Record<string, unknown>>
+    if (cols.length === 0) {
+        return { ...block, columns: [{ title: 'Pages', links: pageLinks.map((l) => ({ ...l })) }] }
+    }
+    const pagesIdx = cols.findIndex(
+        (c) => typeof c.title === 'string' && /pages?|links?|nav|menu/i.test(c.title),
+    )
+    const targetIdx = pagesIdx >= 0 ? pagesIdx : 0
+    const columns = cols.map((col, i) =>
+        i === targetIdx ? { ...col, links: pageLinks.map((l) => ({ ...l })) } : col,
+    )
+    return { ...block, columns }
+}
+
 // Variants that occupy a fixed/sticky top position. Used by ensure-navigation pipeline only.
 // SiteRenderer computes its own paddingTop offset logic — see OVERLAY_NAV_VARIANTS there.
 // GH-725: transparent/floating get paddingTop in editor only (isEditor=true); live site lets
@@ -176,6 +198,10 @@ export function ensureNavigationBlocks(
 
         if (!hasFooter) {
             layout.push(buildDefaultFooter(safeName, fallbackLinks))
+        } else if (pageLinks !== undefined) {
+            // Force-replace footer pages column with normalized links so footer
+            // mirrors the nav menu (same fix as navigation forceReplace above).
+            layout = layout.map((b) => isFooterBlock(b) ? patchFooterPageLinks(b, fallbackLinks) : b)
         }
 
         return { ...page, layout: injectFirstBlockOffset(layout) }
