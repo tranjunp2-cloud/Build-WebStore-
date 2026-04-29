@@ -80,7 +80,7 @@ export function CountdownTimerBlock({ block, theme: _theme }: BlockProps<Countdo
                             <span key={u.label}>
                                 {i > 0 && <span className="opacity-30 mx-1">:</span>}
                                 <span className="font-bold">{String(u.value).padStart(2, '0')}</span>
-                                <span className="text-sm opacity-50 ml-1">{u.label}</span>
+                                <RichText text={u.label} as="span" className="text-sm opacity-50 ml-1" />
                             </span>
                         ))}
                     </p>

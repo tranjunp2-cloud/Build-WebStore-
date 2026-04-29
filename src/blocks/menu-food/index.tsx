@@ -79,7 +79,7 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
             style={{ borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}
         >
             <div className="flex items-center gap-3">
-                <span className="font-medium">{item.name}</span>
+                <RichText text={item.name} as="span" className="font-medium" />
                 {item.tag && <TagBadge tag={item.tag} />}
             </div>
             <span className="font-bold text-sm" style={{ color: 'var(--brand-primary)' }}>

@@ -724,9 +724,9 @@ describe('POST /api/ai/apply-template', () => {
             expect(formFields.map(f => f.fieldName)).toEqual(['name', 'email', 'message'])
         })
 
-        // ── TC-F07.047: google-maps embedUrl sanitization ─────────────────────
+        // ── TC-F07.047: google-maps dropped — temporarily disabled per GH-820 ──
 
-        it('TC-F07.047: empty google-maps embedUrl gets default placeholder', async () => {
+        it('TC-F07.047: google-maps block is dropped (embedUrl cannot be auto-generated, GH-820)', async () => {
             mockHomepage = {
                 ...DEFAULT_HOMEPAGE,
                 layout: [
@@ -743,9 +743,8 @@ describe('POST /api/ai/apply-template', () => {
                 (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
             )
             const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
-            const mapsBlock = layout.find(b => b.blockType === 'google-maps')!
-            expect(typeof mapsBlock.embedUrl).toBe('string')
-            expect((mapsBlock.embedUrl as string).length).toBeGreaterThan(0)
+            const mapsBlock = layout.find(b => b.blockType === 'google-maps')
+            expect(mapsBlock).toBeUndefined()
         })
 
         // ── TC-F07.048: usageCount failure doesn't crash apply ────────────────

@@ -32,6 +32,7 @@ import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
+import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -352,6 +353,14 @@ export async function POST(req: NextRequest) {
                 console.warn('[generate-site] blockPromptOverrides fetch failed (non-fatal):', err instanceof Error ? err.message : err)
             }
         }
+
+        // Start sample product generation in parallel with site AI generation (non-blocking)
+        const sampleProductsPromise = generateSampleProducts(
+            businessInfo,
+            (language as 'en' | 'ms' | 'auto'),
+            String(resolvedTenantId),
+            payload,
+        )
 
         // Generate with AI (or fallback)
         const { result, events } = await trackPhase('ai', () =>
@@ -843,10 +852,9 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // GH-817 post-creation nav sync: if any pages failed to create, their links are
-        // still present in nav blocks of successfully saved pages (because aiPageLinks
-        // was computed BEFORE the for-loop). Patch nav on all created pages so only
-        // links whose corresponding page was actually persisted remain in the menu.
+        // GH-817 post-creation layout sync: if any pages failed to create, their links are
+        // still present in nav AND footer blocks of successfully saved pages (aiPageLinks
+        // was computed BEFORE the for-loop). Patch both blocks in a single update per page.
         if (pageFailures.length > 0 && aiPageLinks && createdPages.length > 0) {
             const succeededSlugs = new Set(
                 createdPages.map(p => {
@@ -858,6 +866,10 @@ export async function POST(req: NextRequest) {
                 const normalized = l.url === '/' ? '/' : l.url.replace(/^\/+/, '')
                 return succeededSlugs.has(normalized)
             })
+            // URLs that no longer have a backing page — used to filter footer column links
+            const failedUrls = new Set(
+                pageFailures.map(f => f.slug === '/' ? '/' : `/${f.slug.replace(/^\/+/, '')}`)
+            )
 
             if (survivingLinks.length < aiPageLinks.length) {
                 const survivingCtaUrl = resolveCtaUrl(survivingLinks)
@@ -865,40 +877,58 @@ export async function POST(req: NextRequest) {
                     const rawLayout = Array.isArray(createdPage.layout)
                         ? (createdPage.layout as Record<string, unknown>[])
                         : []
-                    const navIdx = rawLayout.findIndex(
-                        b => typeof b?.blockType === 'string' &&
-                            ['navigation', 'header', 'navbar'].includes((b.blockType as string).toLowerCase()),
-                    )
-                    if (navIdx === -1) continue
+                    let layoutChanged = false
 
-                    const navBlock = rawLayout[navIdx]!
-                    const patchedNav: Record<string, unknown> = {
-                        ...navBlock,
-                        links: survivingLinks.map(l => ({ ...l })),
-                        ...(navBlock.ctaButton && typeof navBlock.ctaButton === 'object'
-                            ? { ctaButton: { ...(navBlock.ctaButton as Record<string, unknown>), url: survivingCtaUrl } }
-                            : {}),
-                    }
-                    const patchedLayout = [
-                        ...rawLayout.slice(0, navIdx),
-                        patchedNav,
-                        ...rawLayout.slice(navIdx + 1),
-                    ]
+                    const patchedLayout = rawLayout.map(block => {
+                        const bt = typeof block?.blockType === 'string'
+                            ? (block.blockType as string).toLowerCase() : ''
+
+                        // Patch nav — replace links with survivingLinks
+                        if (['navigation', 'header', 'navbar'].includes(bt)) {
+                            layoutChanged = true
+                            return {
+                                ...block,
+                                links: survivingLinks.map(l => ({ ...l })),
+                                ...(block.ctaButton && typeof block.ctaButton === 'object'
+                                    ? { ctaButton: { ...(block.ctaButton as Record<string, unknown>), url: survivingCtaUrl } }
+                                    : {}),
+                            }
+                        }
+
+                        // Patch footer — remove links pointing to failed pages from every column
+                        if (bt === 'footer' && Array.isArray(block.columns)) {
+                            const patchedColumns = (block.columns as Record<string, unknown>[]).map(col => {
+                                if (!Array.isArray(col.links)) return col
+                                const filtered = (col.links as Record<string, unknown>[]).filter(
+                                    l => !failedUrls.has(String(l.url ?? ''))
+                                )
+                                if (filtered.length === (col.links as unknown[]).length) return col
+                                layoutChanged = true
+                                return { ...col, links: filtered }
+                            })
+                            return { ...block, columns: patchedColumns }
+                        }
+
+                        return block
+                    })
+
+                    if (!layoutChanged) continue
+
                     try {
                         await payload.update({
                             collection: 'pages',
                             id: createdPage.id as string | number,
                             data: { layout: patchedLayout },
                         })
-                    } catch (navSyncErr) {
+                    } catch (syncErr) {
                         console.warn(
-                            '[generate-site] nav-sync patch failed page=%s: %s',
+                            '[generate-site] layout-sync patch failed page=%s: %s',
                             createdPage.slug,
-                            navSyncErr instanceof Error ? navSyncErr.message : navSyncErr,
+                            syncErr instanceof Error ? syncErr.message : syncErr,
                         )
                     }
                 }
-                // Patch sanitizedBlocks nav so headerBlock persistence below also reflects surviving pages
+                // Patch sanitizedBlocks nav so headerBlock persistence also reflects surviving pages
                 const navInSanitized = sanitizedBlocks.find(b => b.blockType === 'navigation')
                 if (navInSanitized) {
                     navInSanitized.links = survivingLinks.map(l => ({ ...l }))
@@ -907,7 +937,7 @@ export async function POST(req: NextRequest) {
                     }
                 }
                 console.info(
-                    `[generate-site] nav-sync: removed ${aiPageLinks.length - survivingLinks.length} ghost link(s), patched ${createdPages.length} page(s)`,
+                    `[generate-site] layout-sync: removed ${aiPageLinks.length - survivingLinks.length} ghost link(s), patched ${createdPages.length} page(s) (nav+footer)`,
                 )
             }
         }
@@ -964,6 +994,41 @@ export async function POST(req: NextRequest) {
             },
         })
 
+        // Write sample products to DB (non-fatal — awaits the parallel promise started above)
+        let productsCreatedCount = 0
+        try {
+            const sampleProducts = await sampleProductsPromise
+            for (const product of sampleProducts) {
+                // Guard: name must be at least 3 chars (Products schema minLength)
+                const name = product.name?.trim()
+                if (!name || name.length < 3) {
+                    console.warn('[generate-site] sample product skipped — name too short:', JSON.stringify(name))
+                    continue
+                }
+                try {
+                    await payload.create({
+                        collection: 'products',
+                        data: {
+                            tenant: resolvedTenantId,
+                            site: site.id,
+                            name,
+                            shortDescription: product.shortDescription,
+                            description: product.description,
+                            ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
+                            price: product.price,
+                            ...(product.imageId ? { images: [{ image: product.imageId }] } : {}),
+                            status: 'active',
+                        },
+                    })
+                    productsCreatedCount++
+                } catch (err) {
+                    console.warn('[generate-site] sample product write failed (non-fatal):', (err as Error).message)
+                }
+            }
+        } catch (err) {
+            console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
+        }
+
         const timeMs = Date.now() - startTime
 
         // Plan 260415 F01-gen-audit — single summary line per gen so ops can
@@ -990,6 +1055,12 @@ export async function POST(req: NextRequest) {
                             controller.enqueue(encoder.encode(sseData))
                             // Small delay between events for visual effect
                             await new Promise(resolve => setTimeout(resolve, 100))
+                        }
+
+                        // Emit products_generated event if any sample products were created
+                        if (productsCreatedCount > 0) {
+                            const productEventData = `event: products_generated\ndata: ${JSON.stringify({ count: productsCreatedCount })}\n\n`
+                            controller.enqueue(encoder.encode(productEventData))
                         }
 
                         // Final done event with siteId
@@ -1144,18 +1215,26 @@ function applyGeneratedSiteNavigation(
             return {
                 ...block,
                 logoText: block.logoText || businessName,
-                columns: block.columns.map((column: AIBlock | string) => {
+                columns: block.columns.map((column: AIBlock | string, colIdx: number) => {
                     if (typeof column === 'string') return { title: column, links: [] }
+
+                    // When aiPageLinks provided, replace the first (pages) column with actual page links
+                    // so footer mirrors the nav menu — same fix as navigation block above.
+                    if (pageLinks != null && colIdx === 0) {
+                        return { ...column, links: links.map(l => ({ ...l })) }
+                    }
 
                     return {
                         ...column,
                         links: Array.isArray(column.links)
                             ? column.links.map((link: AIBlock | string) => {
                                 if (typeof link === 'string') return { label: link, url: '#' }
-                                return {
-                                    ...link,
-                                    url: normalizeInternalUrl(link.url),
+                                const url = String(link.url || '#')
+                                // Update contact-type links in non-pages columns to a real page
+                                if (pageLinks != null && /^(\/|#)?contact\b/i.test(url)) {
+                                    return { ...link, url: resolveCtaUrl(links) }
                                 }
+                                return { ...link, url: normalizeInternalUrl(url) }
                             })
                             : column.links,
                     }
@@ -1213,6 +1292,31 @@ function createPageHero(baseHero: AIBlock | null, options: {
     return hero
 }
 
+// GH-820: normalize canonical page slugs so AI cannot invent arbitrary slugs
+// for well-known pages (e.g. slug "free-trial" instead of "contact").
+// Detection priority: block content (structural) > title keyword match.
+function canonicalizePageSlug(
+    page: { title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[] },
+    index: number,
+): string {
+    if (page.isHomepage === true || index === 0) return '/'
+    // Title is authoritative — AI titles are reliable signals and checked first to
+    // avoid misclassifying pages that include secondary structural blocks (e.g. a
+    // Services page with a contact form at the bottom must not become slug 'contact').
+    const title = (page.title || '').toLowerCase()
+    if (/\babout\b/.test(title)) return 'about'
+    if (/\bcontact\b|\bget[\s-]started\b|\bfree[\s-]trial\b|\btrial\b/.test(title)) return 'contact'
+    if (/\bblog\b|\bnews\b|\barticles\b/.test(title)) return 'blog'
+    // Block-based fallback: use the FIRST non-structural content block only.
+    // Set-membership would misclassify pages where contact/about appear as secondary sections.
+    const STRUCTURAL = new Set(['navigation', 'footer', 'hero'])
+    const firstContent = (page.blocks || []).find((b) => !STRUCTURAL.has(b.blockType ?? ''))
+    if (firstContent?.blockType === 'contact') return 'contact'
+    if (firstContent?.blockType === 'about') return 'about'
+    if (firstContent?.blockType === 'blog-list') return 'blog'
+    return page.slug || `page-${index}`
+}
+
 function buildGeneratedPages({
     blocks,
     businessInfo,
@@ -1227,7 +1331,7 @@ function buildGeneratedPages({
     if (aiPages && aiPages.length > 0) {
         return aiPages.map((page, index) => ({
             title: page.title || `Page ${index + 1}`,
-            slug: page.slug || (index === 0 ? '/' : `page-${index}`),
+            slug: canonicalizePageSlug(page, index),
             isHomepage: page.isHomepage === true || index === 0,
             layout: cloneBlockData(page.blocks || []),
             seo: {
@@ -1420,10 +1524,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                     else if (name.includes('message') || name.includes('content') || name.includes('mesej')) fieldType = 'textarea'
                     return { fieldName: field, label: field, fieldType, required: true }
                 }
+                const VALID_FIELD_TYPES = ['text', 'email', 'phone', 'textarea', 'select']
+                let ft = String(field.fieldType || field.type || 'text')
+                if (ft === 'tel' || ft === 'telephone') ft = 'phone'
+                if (ft === 'number') ft = 'text'
+                if (!VALID_FIELD_TYPES.includes(ft)) ft = 'text'
                 return {
                     fieldName: String(field.fieldName || field.name || field.id || 'field'),
                     label: String(field.label || field.fieldName || field.name || 'Field'),
-                    fieldType: field.fieldType || field.type || 'text',
+                    fieldType: ft,
                     required: field.required !== undefined ? field.required : true,
                     placeholder: field.placeholder || '',
                 }
@@ -1573,23 +1682,40 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             })
         }
 
-        // ── FAQ: items[] normalization ──
-        if (sanitized.blockType === 'faq' && Array.isArray(sanitized.items)) {
-            sanitized.items = sanitized.items.map((itemRaw: unknown) => {
-                if (typeof itemRaw === 'string') {
-                    return { question: itemRaw, answer: '...' }
-                }
-                const item = (typeof itemRaw === 'object' && itemRaw !== null) ? itemRaw as Record<string, unknown> : {};
-                return {
-                    question: String(item.question || item.title || item.q || 'Question?'),
-                    answer: String(item.answer || item.description || item.a || 'Answer.'),
-                }
-            })
+        // ── FAQ: normalize items/faqs array — Payload schema uses 'faqs' not 'items' ──
+        if (sanitized.blockType === 'faq') {
+            const rawFaqs = sanitized.faqs || sanitized.items
+            if (Array.isArray(rawFaqs)) {
+                sanitized.faqs = rawFaqs.map((itemRaw: unknown) => {
+                    if (typeof itemRaw === 'string') {
+                        return { question: itemRaw, answer: '...' }
+                    }
+                    const item = (typeof itemRaw === 'object' && itemRaw !== null) ? itemRaw as Record<string, unknown> : {}
+                    return {
+                        question: String(item.question || item.title || item.q || 'Question?'),
+                        answer: String(item.answer || item.description || item.a || 'Answer.'),
+                    }
+                })
+                delete sanitized.items
+            }
         }
 
         // ── Logo Cloud: strip logos (needs real media) ──
         if (sanitized.blockType === 'logo-cloud') {
             sanitized.logos = []
+        }
+
+        // ── Google Maps: fix invalid variant + ensure embedUrl present + height as number ──
+        if (sanitized.blockType === 'google-maps') {
+            if (!['full-width', 'card'].includes(String(sanitized.variant ?? ''))) {
+                sanitized.variant = 'full-width'
+            }
+            if (!sanitized.embedUrl) sanitized.embedUrl = ''
+            if (sanitized.height !== undefined && typeof sanitized.height !== 'number') {
+                const parsed = parseInt(String(sanitized.height), 10)
+                sanitized.height = isNaN(parsed) ? 400 : parsed
+            }
+            delete sanitized.zoom
         }
 
         // ── Remove non-schema fields that AI might add ──
