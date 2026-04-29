@@ -32,6 +32,7 @@ import {
     Work_Sans,
     Raleway,
     Poppins,
+    Lato,
     Open_Sans,
     Karla,
     Archivo_Black,
@@ -78,6 +79,7 @@ const sora = Sora({ subsets: ['latin'], variable: '--font-sora', display: 'swap'
 const workSans = Work_Sans({ subsets: ['latin', 'vietnamese'], variable: '--font-work-sans', display: 'swap' })
 const raleway = Raleway({ subsets: ['latin', 'vietnamese'], variable: '--font-raleway', display: 'swap' })
 const poppins = Poppins({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-poppins', display: 'swap' })
+const lato = Lato({ subsets: ['latin', 'latin-ext'], weight: ['400', '700'], variable: '--font-lato', display: 'swap' })
 const openSans = Open_Sans({ subsets: ['latin', 'vietnamese'], variable: '--font-open-sans', display: 'swap' })
 const karla = Karla({ subsets: ['latin'], variable: '--font-karla', display: 'swap' })
 const archivoBlack = Archivo_Black({ subsets: ['latin', 'latin-ext'], weight: ['400'], variable: '--font-archivo-black', display: 'swap' })
@@ -113,6 +115,7 @@ const FONT_VARIABLES = [
     workSans.variable,
     raleway.variable,
     poppins.variable,
+    lato.variable,
     openSans.variable,
     karla.variable,
     archivoBlack.variable,

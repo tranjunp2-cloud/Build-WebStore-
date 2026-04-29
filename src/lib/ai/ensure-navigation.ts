@@ -69,17 +69,33 @@ function patchHollowNav(
     return patched
 }
 
-// Variants that occupy fixed top position — first content block needs padding-top offset.
-// 'transparent' IS included: fixed top-0, out of flow → hero text still needs offset so it
-// isn't hidden behind the semi-transparent nav bar. The transparency affects only the nav
-// background (see-through to hero image), NOT the content offset requirement.
-// 'floating' IS included: fixed top-4, out of viewport top area (see plan validation 2026-04-24).
-// 'default', 'centered', 'mega' are sticky (stay in document flow) — offset still added
-// as breathing room between nav and first section.
-// NOTE: 'transparent' and 'floating' are intentionally excluded from the paddingTop offset in
-// SiteRenderer (via OVERLAY_NAV_VARIANTS) because they overlay the hero. This set is the
-// source of truth for fixed/sticky membership; SiteRenderer adds a narrowing exclusion on top.
-// See: src/components/site-renderer/SiteRenderer.tsx → OVERLAY_NAV_VARIANTS
+// Replace the footer's pages column with normalized page links so footer mirrors the nav menu.
+// Detects the pages column by title keyword; falls back to column[0] if none matches.
+// Only the pages column is replaced — support/legal/contact columns kept intact.
+function patchFooterPageLinks(
+    block: PageBlockShape,
+    pageLinks: readonly { label: string; url: string }[],
+): PageBlockShape {
+    if (!Array.isArray(block.columns)) return block
+    const cols = block.columns as Array<Record<string, unknown>>
+    if (cols.length === 0) {
+        return { ...block, columns: [{ title: 'Pages', links: pageLinks.map((l) => ({ ...l })) }] }
+    }
+    const pagesIdx = cols.findIndex(
+        (c) => typeof c.title === 'string' && /pages?|links?|nav|menu/i.test(c.title),
+    )
+    const targetIdx = pagesIdx >= 0 ? pagesIdx : 0
+    const columns = cols.map((col, i) =>
+        i === targetIdx ? { ...col, links: pageLinks.map((l) => ({ ...l })) } : col,
+    )
+    return { ...block, columns }
+}
+
+// Variants that occupy a fixed/sticky top position. Used by ensure-navigation pipeline only.
+// SiteRenderer computes its own paddingTop offset logic — see OVERLAY_NAV_VARIANTS there.
+// GH-725: transparent/floating get paddingTop in editor only (isEditor=true); live site lets
+// them overlay the hero intentionally. Sticky variants (default/centered/mega/sidebar) never
+// get the offset — they are in document flow and push content down naturally.
 export const FIXED_NAV_VARIANTS = new Set(['default', 'centered', 'mega', 'transparent', 'floating', 'sidebar'])
 
 function shouldOffsetFirstBlock(navBlock: PageBlockShape): boolean {
@@ -141,7 +157,7 @@ function buildDefaultFooter(businessName: string, pageLinks?: readonly NavLink[]
             },
             {
                 title: 'Contact',
-                links: [{ label: 'Get in touch', url: '/contact' }],
+                links: [{ label: 'Get in touch', url: resolveCtaUrl(links) }],
             },
         ],
         socialLinks: [],
@@ -182,6 +198,10 @@ export function ensureNavigationBlocks(
 
         if (!hasFooter) {
             layout.push(buildDefaultFooter(safeName, fallbackLinks))
+        } else if (pageLinks !== undefined) {
+            // Force-replace footer pages column with normalized links so footer
+            // mirrors the nav menu (same fix as navigation forceReplace above).
+            layout = layout.map((b) => isFooterBlock(b) ? patchFooterPageLinks(b, fallbackLinks) : b)
         }
 
         return { ...page, layout: injectFirstBlockOffset(layout) }

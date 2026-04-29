@@ -16,6 +16,7 @@ import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
+import { THEME_ENUMS } from '@/lib/theme/enums'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
@@ -70,7 +71,8 @@ const FOOTER_SOCIAL_PLATFORMS = [
 ] as const
 
 // ─── Constants ──────────────────────────────────────────────────────────
-const FONT_OPTIONS = ['Outfit', 'Inter', 'DM Sans', 'Playfair Display', 'Roboto', 'Poppins', 'Plus Jakarta Sans']
+const HEADING_FONT_OPTIONS = [...THEME_ENUMS.fontHeading]
+const BODY_FONT_OPTIONS = [...THEME_ENUMS.fontBody]
 const labelCls = "text-[11px] font-medium text-slate-400"
 const sectionCls = "border-t border-white/10 pt-4"
 // Hide newsletter variants from footer UI — feature not ready for users
@@ -327,14 +329,14 @@ function SettingsPanelInner({
                 <label className="text-xs text-gray-400">{s.headingFont}</label>
                 <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
                     className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
-                    {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                    {HEADING_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.bodyFont}</label>
                 <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
                     className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
-                    {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                    {BODY_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
             <div>

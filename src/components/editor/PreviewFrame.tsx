@@ -923,9 +923,18 @@ function PreviewFrameInner({
                 }
             }
 
+            // Push updated block to iframe for in-place preview — mirrors BLOCK_FIELD_CHANGED path.
+            // updateBlock calls above are synchronous so getState() reflects the latest value.
+            // This lets onImageReplaced use refreshPreview:false (no full iframe reload needed).
+            const latestBlock = useEditorStore.getState().blocks[blockIndex]
+            if (latestBlock) {
+                frameElementRef.current?.contentWindow?.postMessage(
+                    { type: 'UPDATE_BLOCK_DATA', blockIndex, blockData: latestBlock },
+                    window.location.origin,
+                )
+            }
             toast.success(t.editor.preview.imageReplaceSuccess)
             setImageClickData(null)
-            // Trigger save + iframe refresh so preview shows the new image
             onImageReplaced?.()
         } catch (error) {
             console.error('Image replace error:', error)

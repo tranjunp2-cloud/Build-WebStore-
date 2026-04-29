@@ -70,6 +70,7 @@ type EditorState = {
     hasUnpublishedChanges: boolean
     lastSavedAt: number | null
     isSaving: boolean
+    pendingManualSave: boolean
     saveStatus: 'idle' | 'saving' | 'saved' | 'error'
     autoSaveTimer: NodeJS.Timeout | null
     autoSaveEnabled: boolean
@@ -205,6 +206,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     hasUnpublishedChanges: false,
     lastSavedAt: null,
     isSaving: false,
+    pendingManualSave: false,
     autoSaveEnabled: true,
     autoSaveIntervalMs: 3000,
     saveStatus: 'idle',
@@ -480,8 +482,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const { siteId, autoSaveTimer, isSaving } = get()
         if (!siteId) return false
 
-        // Anti-spam backpressure for manual save
-        if (isManual && isSaving) return false
+        // If a save is already in-flight, mark as pending and return.
+        // The in-flight save's success path reads this flag and fires a retry immediately
+        // after it completes — deterministic, no magic timeout.
+        if (isManual && isSaving) {
+            set({ pendingManualSave: true })
+            return false
+        }
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
         set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
@@ -504,17 +511,22 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                 })
 
                 if (res.ok) {
+                    const hasPending = get().pendingManualSave
                     set({
                         hasUnsavedChanges: false,
                         hasUnpublishedChanges: true,
                         saveStatus: 'saved',
                         lastSavedAt: Date.now(),
                         isSaving: false,
+                        pendingManualSave: false,
                     })
+                    // Fire the queued manual save immediately now that the slot is free.
+                    // Uses latest store blocks — no stale-closure risk.
+                    if (hasPending) void get().performSave(true)
                     return true
                 } else {
                     if (res.status === 401) {
-                        set({ saveStatus: 'error', isSaving: false })
+                        set({ saveStatus: 'error', isSaving: false, pendingManualSave: false })
                         return false
                     }
                     throw new Error('Save failed')
@@ -527,6 +539,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                         attemptSave(retryCount + 1)
                     }, RETRY_DELAYS[retryCount])
                     set({ autoSaveTimer: timer })
+                } else {
+                    set({ pendingManualSave: false })
                 }
                 return false
             }
@@ -588,7 +602,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             history: [], historyIndex: -1,
             isAIStreaming: false,
             isInlineEditing: false,
-            hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
+            hasUnsavedChanges: false, lastSavedAt: null, isSaving: false, pendingManualSave: false,
             autoSaveEnabled: true, autoSaveIntervalMs: 3000,
             saveStatus: 'idle', autoSaveTimer: null,
         })

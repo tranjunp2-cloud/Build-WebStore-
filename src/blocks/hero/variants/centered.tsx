@@ -80,14 +80,13 @@ export function CenteredHero({ block, site }: BlockProps<HeroConfig>) {
                         <HeroMediaOverlay
                             field="image.url"
                             altText={safeAltText(image?.alt, headline)}
-                            className="mt-16 max-w-4xl mx-auto"
                         >
                             <motion.div
                                 initial={{ opacity: 0, y: 40 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
                                 transition={{ duration: 0.8, delay: 0.3 }}
-                                className="relative max-w-4xl mx-auto group"
+                                className="relative mt-16 max-w-4xl mx-auto group"
                             >
                                 <img
                                     src={image?.url}
