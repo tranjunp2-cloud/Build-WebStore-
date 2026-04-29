@@ -1262,17 +1262,19 @@ function canonicalizePageSlug(
     // avoid misclassifying pages that include secondary structural blocks (e.g. a
     // Services page with a contact form at the bottom must not become slug 'contact').
     const title = (page.title || '').toLowerCase()
-    if (/\babout\b/.test(title)) return 'about'
-    if (/\bcontact\b|\bget[\s-]started\b|\bfree[\s-]trial\b|\btrial\b/.test(title)) return 'contact'
-    if (/\bblog\b|\bnews\b|\barticles\b/.test(title)) return 'blog'
+    if (/\babout\b/.test(title)) return '/about'
+    if (/\bcontact\b|\bget[\s-]started\b|\bfree[\s-]trial\b|\btrial\b/.test(title)) return '/contact'
+    if (/\bblog\b|\bnews\b|\barticles\b/.test(title)) return '/blog'
     // Block-based fallback: use the FIRST non-structural content block only.
     // Set-membership would misclassify pages where contact/about appear as secondary sections.
     const STRUCTURAL = new Set(['navigation', 'footer', 'hero'])
     const firstContent = (page.blocks || []).find((b) => !STRUCTURAL.has(b.blockType ?? ''))
-    if (firstContent?.blockType === 'contact') return 'contact'
-    if (firstContent?.blockType === 'about') return 'about'
-    if (firstContent?.blockType === 'blog-list') return 'blog'
-    return page.slug || `page-${index}`
+    if (firstContent?.blockType === 'contact') return '/contact'
+    if (firstContent?.blockType === 'about') return '/about'
+    if (firstContent?.blockType === 'blog-list') return '/blog'
+    // Ensure leading slash to match builder convention (routing queries slug with '/' prefix)
+    const raw = page.slug || `page-${index}`
+    return raw.startsWith('/') ? raw : `/${raw}`
 }
 
 function buildGeneratedPages({
@@ -1329,7 +1331,7 @@ function buildGeneratedPages({
         },
         {
             title: 'About',
-            slug: 'about',
+            slug: '/about',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -1353,7 +1355,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Products',
-            slug: 'products',
+            slug: '/products',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -1377,7 +1379,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Contact',
-            slug: 'contact',
+            slug: '/contact',
             isHomepage: false,
             layout: compact([
                 navigation,

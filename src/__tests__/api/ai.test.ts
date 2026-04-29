@@ -135,7 +135,7 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB.length).toBe(1) // A site was created
              expect(mockPageDB.length).toBe(5) // Homepage, About, Products, Contact + 404
              expect(result.totalPages).toBe(4) // totalPages excludes system 404 page
-             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', 'about', 'products', 'contact', '404'])
+             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact', '404'])
         })
 
         // TC-F01.SLUG.01 — GH-820: AI multi-page path normalizes canonical slugs
@@ -169,12 +169,14 @@ describe('AI Streaming APIs', () => {
              await GenerateSitePOST(req)
 
              const slugs = mockPageDB.map((p: any) => p.slug)
-             // contact block-based detection → must resolve to "contact", not "free-trial"
-             expect(slugs).toContain('contact')
+             // contact block-based detection → must resolve to "/contact", not "free-trial"
+             expect(slugs).toContain('/contact')
              expect(slugs).not.toContain('free-trial')
-             // about block-based detection
-             expect(slugs).toContain('about')
+             expect(slugs).not.toContain('/free-trial')
+             // about title detection → must resolve to "/about", not "our-story"
+             expect(slugs).toContain('/about')
              expect(slugs).not.toContain('our-story')
+             expect(slugs).not.toContain('/our-story')
         })
 
         it('returns text/event-stream response for SSE mode when stream=true', async () => {
