@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { SocialProofConfig, SocialProofReview } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -33,7 +34,7 @@ function Avatar({ src, name, color, imageIndex }: { src?: string; name: string; 
 
     if (src) {
         return (
-            <img src={src} alt={name} className="w-10 h-10 rounded-full object-cover" data-image-index={imageIndex} />
+            <Image src={src} alt={name} width={40} height={40} className="rounded-full object-cover" data-image-index={imageIndex} />
         )
     }
 

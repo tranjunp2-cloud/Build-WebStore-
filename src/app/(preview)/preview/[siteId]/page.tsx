@@ -9,6 +9,7 @@ import { getCurrentUser } from '@/lib/auth'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
+import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 type PreviewLayoutBlock = Record<string, unknown> & {
     blockType: string
@@ -191,6 +192,8 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             limit: 100,
         })
 
+        const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
+
         return (
             <AppShell>
                 <div className="min-h-screen">
@@ -203,6 +206,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                             tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
                                 ? (site.tenant as { slug?: string }).slug || ''
                                 : '',
+                            imageLibraryS3,
                         }}
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { BeforeAfterConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
@@ -61,7 +62,7 @@ export function BeforeAfterBlock({ block, theme: _theme }: BlockProps<BeforeAfte
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
-                            <img src={beforeImage?.url} alt={beforeImage?.alt || 'Before'} className="w-full h-auto object-cover" />
+                            <Image src={beforeImage?.url || '/placeholder.png'} alt={beforeImage?.alt || 'Before'} width={0} height={0} sizes="100vw" className="w-full h-auto block" />
                             {beforeImage.label && (
                                 <span
                                     className="absolute top-4 left-4 px-3 py-1 rounded-full text-sm font-medium text-white"
@@ -72,7 +73,7 @@ export function BeforeAfterBlock({ block, theme: _theme }: BlockProps<BeforeAfte
                             )}
                         </div>
                         <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
-                            <img src={afterImage?.url} alt={afterImage?.alt || 'After'} className="w-full h-auto object-cover" />
+                            <Image src={afterImage?.url || '/placeholder.png'} alt={afterImage?.alt || 'After'} width={0} height={0} sizes="100vw" className="w-full h-auto block" />
                             {afterImage.label && (
                                 <span
                                     className="absolute top-4 left-4 px-3 py-1 rounded-full text-sm font-medium text-white"
@@ -105,16 +106,16 @@ export function BeforeAfterBlock({ block, theme: _theme }: BlockProps<BeforeAfte
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
                 >
-                    {/* After image (full) */}
-                    <img src={afterImage?.url} alt={afterImage?.alt || 'After'} className="w-full h-auto block" draggable={false} />
+                    {/* After image (full) — drives container height */}
+                    <Image src={afterImage?.url || '/placeholder.png'} alt={afterImage?.alt || 'After'} width={0} height={0} sizes="100vw" className="w-full h-auto block" draggable={false} />
 
                     {/* Before image (clipped) */}
                     <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
-                        <img
-                            src={beforeImage?.url}
+                        <Image
+                            src={beforeImage?.url || '/placeholder.png'}
                             alt={beforeImage?.alt || 'Before'}
-                            className="h-full object-cover"
-                            style={{ width: containerRef.current ? `${containerRef.current.offsetWidth}px` : '100vw' }}
+                            fill
+                            className="object-cover"
                             draggable={false}
                         />
                     </div>

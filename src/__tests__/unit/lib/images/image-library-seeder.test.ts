@@ -1,6 +1,7 @@
 /**
  * TC-GH-727-01 — image-library-seeder unit tests
- * GH-727: Seed IMAGE_LIBRARY photos to S3 via Payload media collection.
+ * GH-727 Phase 04: seeder searches Unsplash per category, uploads 17 fixed slots per site.
+ * Alt keys: imglib:s{siteId}:{slot} — no category or photoId in the key.
  *
  * Coverage: happy path, idempotency, partial failure, unknown category fallback.
  */
@@ -10,7 +11,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── Top-level mocks ──────────────────────────────────────────────────────────
 
 vi.mock('@/lib/ai/unsplash-client', () => ({
+    searchPhotos: vi.fn(),
     downloadPhotoBuffer: vi.fn(),
+    trackDownload: vi.fn(),
+    buildImgixUrl: vi.fn((url: string) => url), // identity — keep URLs inspectable in tests
 }))
 
 vi.mock('@/lib/ai/media-pipeline', () => ({
@@ -20,19 +24,27 @@ vi.mock('@/lib/ai/media-pipeline', () => ({
 // ── Imports (after mocks) ────────────────────────────────────────────────────
 
 import { seedImageLibraryForSite } from '@/lib/images/image-library-seeder'
-import { IMAGE_LIBRARY } from '@/app/api/preview/renderers/images'
-import { downloadPhotoBuffer } from '@/lib/ai/unsplash-client'
+import { searchPhotos, downloadPhotoBuffer, trackDownload } from '@/lib/ai/unsplash-client'
 import { uploadBufferToMedia } from '@/lib/ai/media-pipeline'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+const mockSearch = searchPhotos as ReturnType<typeof vi.fn>
 const mockDownload = downloadPhotoBuffer as ReturnType<typeof vi.fn>
 const mockUpload = uploadBufferToMedia as ReturnType<typeof vi.fn>
 
-/** Build a minimal Payload mock whose find always returns empty (no existing). */
-function buildPayload(findOverride?: (args: unknown) => { docs: unknown[] }) {
+/** Return N fake Unsplash photo objects with unique, stable URLs. */
+function makePhotos(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+        urls: { raw: `https://unsplash.com/photo-${i}` },
+        links: { download_location: `https://api.unsplash.com/photos/${i}/download` },
+    }))
+}
+
+/** Payload mock whose idempotency find returns empty (site not yet seeded). */
+function buildPayload(findOverride?: () => { docs: unknown[]; totalDocs?: number }) {
     return {
-        find: vi.fn().mockImplementation(findOverride ?? (() => ({ docs: [] }))),
+        find: vi.fn().mockImplementation(findOverride ?? (() => ({ docs: [], totalDocs: 0 }))),
         create: vi.fn().mockResolvedValue({ id: 999 }),
         logger: { error: vi.fn(), warn: vi.fn() },
     }
@@ -41,6 +53,10 @@ function buildPayload(findOverride?: (args: unknown) => { docs: unknown[] }) {
 const FAKE_BUFFER = Buffer.from('fake-image-data')
 const FAKE_MIMETYPE = 'image/jpeg'
 
+// Phase 04: seeder always uploads exactly 17 slots per site
+// 6 gallery + 3 hero + 1 about + 4 team + 3 features = 17
+const TOTAL_SLOTS = 17
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('seedImageLibraryForSite [TC-GH-727-01]', () => {
@@ -48,109 +64,103 @@ describe('seedImageLibraryForSite [TC-GH-727-01]', () => {
         vi.clearAllMocks()
     })
 
-    // TC-GH-727-01a: Happy path — all slots upload successfully
-    it('TC-GH-727-01a: happy path — uploads every slot for restaurant, returns correct mapping shape', async () => {
-        const payload = buildPayload()
+    it('TC-GH-727-01a: happy path — uploads 17 slots, returns correct mapping shape', async () => {
+        // Arrange
+        const payload = buildPayload() // idempotency check returns empty → proceed
+        mockSearch.mockResolvedValue(makePhotos(10))
         mockDownload.mockResolvedValue({ buffer: FAKE_BUFFER, mimetype: FAKE_MIMETYPE, size: FAKE_BUFFER.length })
-        let callCount = 0
-        mockUpload.mockImplementation(async () => ++callCount)
+        let id = 0
+        mockUpload.mockImplementation(async () => ++id)
 
+        // Act
         const result = await seedImageLibraryForSite(payload as never, 1, 10, 'restaurant')
 
-        const images = IMAGE_LIBRARY['restaurant']!
-        expect(result.hero.length).toBe(images.hero.length)
-        expect(result.gallery.length).toBe(images.gallery.length)
+        // Assert — fixed slot counts regardless of IMAGE_LIBRARY shape
+        expect(result.hero).toHaveLength(3)
+        expect(result.gallery).toHaveLength(6)
         expect(result.about).not.toBeNull()
-        expect(result.team.length).toBe(images.team.length)
-        expect(result.features.length).toBe(images.features.length)
+        expect(result.team).toHaveLength(4)
+        expect(result.features).toHaveLength(3)
 
-        // uploadBufferToMedia called for every slot (no existing docs)
-        const totalSlots =
-            images.hero.length +
-            images.gallery.length +
-            1 + // about
-            images.team.length +
-            images.features.length
-        expect(mockUpload).toHaveBeenCalledTimes(totalSlots)
+        expect(mockUpload).toHaveBeenCalledTimes(TOTAL_SLOTS)
 
-        // All returned IDs are numbers
-        for (const id of result.hero) expect(typeof id).toBe('number')
-        for (const id of result.gallery) expect(typeof id).toBe('number')
-        expect(typeof result.about).toBe('number')
+        // Alt keys must use per-site format: imglib:s{siteId}:{slot}
+        const altKeys = (mockUpload.mock.calls as Array<[unknown, { alt?: string }]>)
+            .map(([, args]) => args?.alt ?? '')
+        expect(altKeys.every(k => k.startsWith('imglib:s10:'))).toBe(true)
+        // Verify one concrete key
+        expect(altKeys).toContain('imglib:s10:gallery[0]')
+        expect(altKeys).toContain('imglib:s10:hero[0]')
+        expect(altKeys).toContain('imglib:s10:about')
     })
 
-    // TC-GH-727-01b: Idempotency — existing docs are reused, no download triggered
-    it('TC-GH-727-01b: idempotency — returns existing media IDs, skips download', async () => {
-        const existingId = 42
-        // payload.find returns an existing doc for every query
-        const payload = buildPayload(() => ({
-            docs: [{ id: existingId }],
-        }))
+    it('TC-GH-727-01b: idempotency — site already seeded, returns empty mapping, skips all work', async () => {
+        // Arrange — idempotency check finds an existing doc
+        const payload = buildPayload(() => ({ docs: [{ id: 42 }], totalDocs: 17 }))
 
+        // Act
         const result = await seedImageLibraryForSite(payload as never, 1, 10, 'restaurant')
 
-        // downloadPhotoBuffer must NOT be called for any slot
+        // Assert — no network calls or uploads triggered
+        expect(mockSearch).not.toHaveBeenCalled()
         expect(mockDownload).not.toHaveBeenCalled()
         expect(mockUpload).not.toHaveBeenCalled()
 
-        // But mapping should still be populated with the existing IDs
-        expect(result.hero.every(id => id === existingId)).toBe(true)
-        expect(result.gallery.every(id => id === existingId)).toBe(true)
-        expect(result.about).toBe(existingId)
+        // Returns empty mapping — caller is fire-and-forget; resolveImageLibraryS3Map fetches fresh
+        expect(result).toEqual({ hero: [], gallery: [], about: null, team: [], features: [] })
     })
 
-    // TC-GH-727-01c: Partial failure — one slot throws, seeder resolves (not rejects)
-    it('TC-GH-727-01c: partial failure — gallery slot error does not reject, missing from mapping', async () => {
+    it('TC-GH-727-01c: partial failure — one slot download fails, seeder resolves (no throw)', async () => {
+        // Arrange
         const payload = buildPayload()
-        // Fail specifically on the URL of gallery[2] for restaurant
-        const failUrl = IMAGE_LIBRARY['restaurant']!.gallery[2]!
+        const photos = makePhotos(10)
+        mockSearch.mockResolvedValue(photos)
+
+        // gallery[2] is assigned photo-2 (3rd slot in gallery query group, index 2)
+        const failUrl = photos[2]!.urls.raw
         mockDownload.mockImplementation(async (url: string) => {
-            if (url === failUrl) {
-                throw new Error('Simulated download failure for gallery[2]')
-            }
+            if (url === failUrl) throw new Error('Simulated download failure')
             return { buffer: FAKE_BUFFER, mimetype: FAKE_MIMETYPE, size: FAKE_BUFFER.length }
         })
         let uploadId = 0
         mockUpload.mockImplementation(async () => ++uploadId)
 
-        // Should resolve, not reject
+        // Act — must resolve, not reject
         const result = await seedImageLibraryForSite(payload as never, 1, 10, 'restaurant')
 
-        // gallery should be shorter than full (one slot failed)
-        expect(result.gallery.length).toBeLessThan(IMAGE_LIBRARY['restaurant']!.gallery.length)
+        // Assert — gallery is shorter by 1 (slot that failed is excluded from mapping)
+        expect(result.gallery.length).toBeLessThan(6)
+        // All returned IDs are numbers (no nulls)
+        for (const id of result.gallery) expect(typeof id).toBe('number')
+        for (const id of result.hero) expect(typeof id).toBe('number')
     })
 
-    // TC-GH-727-01d: Unknown category — falls back to IMAGE_LIBRARY.business entries
-    it('TC-GH-727-01d: unknown category falls back to business images', async () => {
+    it('TC-GH-727-01d: unknown category falls back to business queries, uploads 17 slots with slot-based alt keys', async () => {
+        // Arrange
         const payload = buildPayload()
+        mockSearch.mockResolvedValue(makePhotos(10))
         mockDownload.mockResolvedValue({ buffer: FAKE_BUFFER, mimetype: FAKE_MIMETYPE, size: FAKE_BUFFER.length })
         let id = 0
         mockUpload.mockImplementation(async () => ++id)
 
+        // Act — 'nonsense-category' unknown → GALLERY_QUERIES falls back to 'business'
         const result = await seedImageLibraryForSite(payload as never, 1, 10, 'nonsense-category')
 
-        // Fallback uses IMAGE_LIBRARY.business — verify slot count matches business category
-        const businessImages = IMAGE_LIBRARY['business']!
-        const expectedTotalSlots =
-            businessImages.hero.length +
-            businessImages.gallery.length +
-            (businessImages.about ? 1 : 0) +
-            businessImages.team.length +
-            businessImages.features.length
+        // Assert — same 17 slots regardless of category
+        expect(mockUpload).toHaveBeenCalledTimes(TOTAL_SLOTS)
 
-        expect(mockUpload).toHaveBeenCalledTimes(expectedTotalSlots)
-
-        // Alt keys use the input category string (not 'business') — verify format
-        const uploadCalls = mockUpload.mock.calls
-        const altTexts = uploadCalls.map((call: unknown[]) => {
-            const args = call[1] as { alt?: string }
-            return args?.alt ?? ''
-        })
-        // All alt keys should use the input category (not 'business') per seeder design
-        expect(altTexts.every((alt: string) => alt.startsWith('imglib:nonsense-category:'))).toBe(true)
+        // Alt keys are site-based (imglib:s10:slot), NOT category-based
+        const altKeys = (mockUpload.mock.calls as Array<[unknown, { alt?: string }]>)
+            .map(([, args]) => args?.alt ?? '')
+        expect(altKeys.every(k => k.startsWith('imglib:s10:'))).toBe(true)
+        // No category name in keys
+        expect(altKeys.every(k => !k.includes('nonsense-category'))).toBe(true)
 
         // Mapping shape is valid
-        expect(result.hero.length).toBe(businessImages.hero.length)
-        expect(result.gallery.length).toBe(businessImages.gallery.length)
+        expect(result.hero).toHaveLength(3)
+        expect(result.gallery).toHaveLength(6)
+
+        // trackDownload called for photos that were successfully assigned (before upload)
+        expect(trackDownload).toHaveBeenCalled()
     })
 })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { ProductQuickViewConfig, QuickViewProduct } from './config'
@@ -98,7 +99,7 @@ function QuickViewModal({
                     {/* Images */}
                     <div className="relative aspect-square overflow-hidden">
                         {images.length > 0 ? (
-                            <img src={images[selectedImage]} alt={product.name} className="w-full h-full object-cover" />
+                            <Image src={images[selectedImage]!} alt={product.name} fill className="object-cover" />
                         ) : (
                             <ImagePlaceholder size="lg" />
                         )}
@@ -232,7 +233,7 @@ export function ProductQuickViewBlock({ block }: BlockProps<ProductQuickViewConf
         >
             <div className="relative aspect-square overflow-hidden">
                 {product.imageUrls[0] ? (
-                    <img src={product.imageUrls[0]} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <Image src={product.imageUrls[0]} alt={product.name} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
                 ) : (
                     <ImagePlaceholder size="md" />
                 )}

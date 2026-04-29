@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { PropertyCardConfig, PropertyItem } from './config'
@@ -81,7 +82,7 @@ function PropertyImage({ property, className = '' }: { property: PropertyItem; c
 
     return (
         <div className={`${className} relative group`}>
-            <img src={images[imgIndex]} alt={property.title} className="w-full h-full object-cover" />
+            <Image src={images[imgIndex]!} alt={property.title} fill className="object-cover" />
             {images.length > 1 && (
                 <>
                     <button

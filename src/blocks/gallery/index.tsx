@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { GalleryConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -70,13 +71,36 @@ function GalleryImageCard({ item, index, aspect = 'square', className = '', over
     const aspectCls = ASPECT_CLASS[aspect]
 
     if (item.image?.url) {
+        // aspect='auto' means preserve intrinsic ratio — fill won't work without a defined height,
+        // so use w-full h-auto with explicit 0/0 sizing instead.
+        if (aspect === 'auto') {
+            return (
+                <div className={`relative overflow-hidden rounded-2xl ${className}`.trim()}>
+                    <Image
+                        src={item.image.url}
+                        alt={item.caption || item.image.alt || ''}
+                        data-image-index={index}
+                        width={0}
+                        height={0}
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                        className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
+                    />
+                    {item.caption && (
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <Body size="small" className="text-white font-medium">{item.caption}</Body>
+                        </div>
+                    )}
+                </div>
+            )
+        }
         return (
             <div className={`relative overflow-hidden rounded-2xl ${aspectCls} ${className}`.trim()}>
-                <img
+                <Image
                     src={item.image.url}
                     alt={item.caption || item.image.alt || ''}
                     data-image-index={index}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 {item.caption && (
                     <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -176,9 +200,10 @@ export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) 
     return (
         <GallerySection>
             <GalleryHeader headline={headline} />
-            <StaggerGrid className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {/* flex+justify-center so the last incomplete row is centered, not left-aligned */}
+            <StaggerGrid className="flex flex-wrap justify-center gap-4">
                 {images.map((item, i) => (
-                    <StaggerItem key={i} className="group">
+                    <StaggerItem key={i} className="group shrink-0 w-[calc(50%-8px)] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]">
                         <GalleryImageCard item={item} index={i} aspect="square" />
                     </StaggerItem>
                 ))}
@@ -194,80 +219,88 @@ function MasonryGallery({ headline, images, theme: _theme }: { headline?: string
     return (
         <GallerySection>
             <GalleryHeader headline={headline} />
-            <StaggerGrid className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
+            {/* True masonry: CSS columns fill vertically — images have natural heights creating the brick-wall effect */}
+            <div className="max-w-5xl mx-auto columns-2 md:columns-3 gap-4">
                 {images.map((item, i) => (
-                    <StaggerItem key={i} className="break-inside-avoid group">
-                        <GalleryImageCard item={item} index={i} aspect={item.image?.url ? 'auto' : 'video'} />
-                    </StaggerItem>
+                    <div key={i} className="group break-inside-avoid mb-4">
+                        <GalleryImageCard item={item} index={i} aspect="auto" />
+                    </div>
                 ))}
-            </StaggerGrid>
+            </div>
         </GallerySection>
     )
 }
 
 // ── Carousel Gallery ────────────────────────────────────────────────────────
 
+const CAROUSEL_ITEMS_PER_SLIDE = 3
+
 function CarouselGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     void _theme
-    const [currentIndex, setCurrentIndex] = useState(0)
+    const [currentSlide, setCurrentSlide] = useState(0)
     const [isAutoPlaying, setIsAutoPlaying] = useState(true)
-    const totalImages = images.length
 
-    // Auto-scroll every 4 seconds
+    // Group images into pages of 3 — dots = pages, not individual images
+    const slides = Array.from(
+        { length: Math.ceil(images.length / CAROUSEL_ITEMS_PER_SLIDE) },
+        (_, i) => images.slice(i * CAROUSEL_ITEMS_PER_SLIDE, (i + 1) * CAROUSEL_ITEMS_PER_SLIDE),
+    )
+    const totalSlides = slides.length
+
     useEffect(() => {
-        if (!isAutoPlaying || totalImages <= 1) return
+        if (!isAutoPlaying || totalSlides <= 1) return
         const timer = setInterval(() => {
-            setCurrentIndex(prev => (prev + 1) % totalImages)
+            setCurrentSlide(prev => (prev + 1) % totalSlides)
         }, 4000)
         return () => clearInterval(timer)
-    }, [isAutoPlaying, totalImages])
+    }, [isAutoPlaying, totalSlides])
 
     const handlePrev = useCallback(() => {
         setIsAutoPlaying(false)
-        setCurrentIndex(prev => (prev - 1 + totalImages) % totalImages)
-    }, [totalImages])
+        setCurrentSlide(prev => (prev - 1 + totalSlides) % totalSlides)
+    }, [totalSlides])
 
     const handleNext = useCallback(() => {
         setIsAutoPlaying(false)
-        setCurrentIndex(prev => (prev + 1) % totalImages)
-    }, [totalImages])
-
-    const handleDot = useCallback((index: number) => {
-        setIsAutoPlaying(false)
-        setCurrentIndex(index)
-    }, [])
+        setCurrentSlide(prev => (prev + 1) % totalSlides)
+    }, [totalSlides])
 
     return (
         <GallerySection>
             <GalleryHeader headline={headline} />
 
             <div className="relative max-w-6xl mx-auto">
-                {/* Carousel track */}
+                {/* Track: each slide is full-width, shows 3 images side by side */}
                 <div className="overflow-hidden rounded-2xl">
                     <motion.div
                         className="flex"
-                        animate={{ x: `-${currentIndex * 100}%` }}
+                        animate={{ x: `-${currentSlide * 100}%` }}
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                     >
-                        {images.map((item, i) => (
-                            <div
-                                key={i}
-                                className="w-full flex-shrink-0 md:w-1/2 lg:w-1/3 px-2 group"
-                            >
-                                <GalleryImageCard item={item} index={i} aspect="4/3" />
+                        {slides.map((slideImages, slideIdx) => (
+                            <div key={slideIdx} className="w-full flex-shrink-0 flex gap-2">
+                                {slideImages.map((item, itemIdx) => (
+                                    <div key={itemIdx} className="basis-1/3 shrink-0 min-w-0 group">
+                                        <GalleryImageCard
+                                            item={item}
+                                            index={slideIdx * CAROUSEL_ITEMS_PER_SLIDE + itemIdx}
+                                            aspect="4/3"
+                                        />
+                                    </div>
+                                ))}
                             </div>
                         ))}
                     </motion.div>
                 </div>
 
-                {/* Prev/Next arrows — was w-10 h-10 (40px ❌), now 44px ✅ */}
-                {totalImages > 1 && (
+                {/* Prev/Next arrows */}
+                {totalSlides > 1 && (
                     <>
                         <button
                             type="button"
                             onClick={handlePrev}
                             className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 ${TOUCH_TARGET.min} min-w-[44px] rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10`}
-                            aria-label="Previous image"
+                            aria-label="Previous slide"
                         >
                             <ChevronLeft size={20} className="text-gray-700" />
                         </button>
@@ -275,32 +308,32 @@ function CarouselGallery({ headline, images, theme: _theme }: { headline?: strin
                             type="button"
                             onClick={handleNext}
                             className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 ${TOUCH_TARGET.min} min-w-[44px] rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10`}
-                            aria-label="Next image"
+                            aria-label="Next slide"
                         >
                             <ChevronRight size={20} className="text-gray-700" />
                         </button>
                     </>
                 )}
 
-                {/* Dot indicators — 10px visual in 44px hit area */}
-                {totalImages > 1 && (
+                {/* Dots = number of slides (2 dots for 6 images with 3/slide) */}
+                {totalSlides > 1 && (
                     <div className="flex justify-center gap-2 mt-6">
-                        {images.map((_, i) => (
+                        {slides.map((_, i) => (
                             <button
                                 key={i}
                                 type="button"
-                                onClick={() => handleDot(i)}
+                                onClick={() => { setIsAutoPlaying(false); setCurrentSlide(i) }}
                                 className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full transition-all duration-300`}
-                                aria-label={`Go to image ${i + 1}`}
-                                aria-current={i === currentIndex}
+                                aria-label={`Go to slide ${i + 1}`}
+                                aria-current={i === currentSlide}
                             >
                                 <span
                                     className="w-2.5 h-2.5 rounded-full transition-all duration-300"
                                     style={{
-                                        background: i === currentIndex
+                                        background: i === currentSlide
                                             ? 'var(--brand-primary)'
                                             : 'rgba(var(--brand-primary-rgb), 0.2)',
-                                        transform: i === currentIndex ? 'scale(1.3)' : 'scale(1)',
+                                        transform: i === currentSlide ? 'scale(1.3)' : 'scale(1)',
                                     }}
                                 />
                             </button>
@@ -398,9 +431,9 @@ function LightboxGallery({ headline, images, theme: _theme }: { headline?: strin
         <>
             <GallerySection>
                 <GalleryHeader headline={headline} />
-                <StaggerGrid className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <StaggerGrid className="flex flex-wrap justify-center gap-4">
                     {images.map((item, i) => (
-                        <StaggerItem key={i} className="group cursor-pointer" onClick={() => setSelectedIndex(i)}>
+                        <StaggerItem key={i} className="group cursor-pointer shrink-0 w-[calc(50%-8px)] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]" onClick={() => setSelectedIndex(i)}>
                             <GalleryImageCard item={item} index={i} aspect="square" overlayClickable />
                         </StaggerItem>
                     ))}
@@ -464,11 +497,14 @@ function LightboxGallery({ headline, images, theme: _theme }: { headline?: strin
                             onClick={(e) => e.stopPropagation()}
                         >
                             {images[selectedIndex]?.image?.url && (
-                                <img
-                                    src={images[selectedIndex]?.image?.url}
+                                <Image
+                                    src={images[selectedIndex].image.url}
                                     alt={images[selectedIndex].caption || images[selectedIndex].image.alt || ''}
                                     data-image-index={selectedIndex}
-                                    className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                                    width={0}
+                                    height={0}
+                                    sizes="90vw"
+                                    className="max-w-full max-h-[80vh] w-auto h-auto object-contain rounded-lg"
                                 />
                             )}
                             {images[selectedIndex]?.caption && (
@@ -504,11 +540,12 @@ function FilmstripGallery({ headline, images, theme: _theme }: { headline?: stri
                         className="absolute inset-0"
                     >
                         {images[activeIndex]?.image?.url ? (
-                            <img
+                            <Image
                                 src={images[activeIndex].image.url}
                                 alt={images[activeIndex].caption || images[activeIndex].image.alt || ''}
                                 data-image-index={activeIndex}
-                                className="w-full h-full object-cover"
+                                fill
+                                className="object-cover"
                             />
                         ) : (
                             <div
@@ -548,10 +585,12 @@ function FilmstripGallery({ headline, images, theme: _theme }: { headline?: stri
                             aria-current={i === activeIndex}
                         >
                             {item.image?.url ? (
-                                <img
-                                    src={item.image?.url}
+                                <Image
+                                    src={item.image.url}
                                     alt={item.caption || item.image.alt || ''}
                                     data-image-index={i}
+                                    width={80}
+                                    height={80}
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
@@ -596,11 +635,12 @@ function JustifiedGallery({ headline, images, theme: _theme }: { headline?: stri
                         >
                             {item.image?.url ? (
                                 <>
-                                    <img
-                                        src={item.image?.url}
+                                    <Image
+                                        src={item.image.url}
                                         alt={item.caption || item.image.alt || ''}
                                         data-image-index={i}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                        fill
+                                        className="object-cover transition-transform duration-500 group-hover:scale-105"
                                     />
                                     <div
                                         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"

@@ -337,8 +337,7 @@ export default async function TenantSitePage({ params }: Props) {
 
     // GH-727 Phase 03: resolve seeded IMAGE_LIBRARY → S3 mappings (best-effort, never throws).
     const payload = await getPayload({ config })
-    const tenantId = data.tenant?.id
-    const imageLibraryS3 = tenantId ? await resolveImageLibraryS3Map(payload, tenantId) : {}
+    const imageLibraryS3 = await resolveImageLibraryS3Map(payload, site.id)
 
     return (
         <SiteRenderer

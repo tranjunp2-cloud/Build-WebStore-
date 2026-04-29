@@ -1,32 +1,20 @@
 /**
  * TC-GH-727-03e..03i — industry-images wrapper unit tests
- * GH-727 Phase 03: getters prefer s3Map URL when key matches; fall back to CDN otherwise.
+ * GH-727 Phase 04: s3Map is keyed by slot name ('hero[0]', 'gallery[0]', etc.)
+ * — no category or photoId in the key. Getters fall back to CDN when key absent.
  */
 
 import { describe, it, expect } from 'vitest'
 import { getHeroImage, getGalleryImages, IMAGE_LIBRARY } from '@/lib/images/industry-images'
-import { buildAltKey, extractPhotoId } from '@/lib/images/image-library-keys'
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-// restaurant hero[0] CDN URL — derived from IMAGE_LIBRARY to avoid hardcoding.
-const RESTAURANT_HERO_0_CDN = IMAGE_LIBRARY['restaurant']!.hero[0]!
-const RESTAURANT_HERO_0_PHOTO_ID = extractPhotoId(RESTAURANT_HERO_0_CDN)
-const RESTAURANT_HERO_0_KEY = buildAltKey('restaurant', 'hero[0]', RESTAURANT_HERO_0_PHOTO_ID)
-
-const RESTAURANT_GALLERY_0_CDN = IMAGE_LIBRARY['restaurant']!.gallery[0]!
-const RESTAURANT_GALLERY_0_KEY = buildAltKey('restaurant', 'gallery[0]', extractPhotoId(RESTAURANT_GALLERY_0_CDN))
-
-const RESTAURANT_GALLERY_2_CDN = IMAGE_LIBRARY['restaurant']!.gallery[2]!
-const RESTAURANT_GALLERY_2_KEY = buildAltKey('restaurant', 'gallery[2]', extractPhotoId(RESTAURANT_GALLERY_2_CDN))
+import { buildSiteAltKey } from '@/lib/images/image-library-keys'
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('getHeroImage — S3 preference', () => {
-    it('TC-GH-727-03e: returns S3 URL when s3Map has matching altKey', () => {
-        // Arrange
+    it('TC-GH-727-03e: returns S3 URL when s3Map has matching slot key', () => {
+        // Arrange — Phase 04: key is slot name, not full altKey
         const s3Url = 'https://s3.example.com/imglib-restaurant-hero-0.jpg'
-        const s3Map = { [RESTAURANT_HERO_0_KEY]: s3Url }
+        const s3Map = { 'hero[0]': s3Url }
 
         // Act
         const result = getHeroImage('restaurant', 0, s3Map)
@@ -43,26 +31,26 @@ describe('getHeroImage — S3 preference', () => {
         const result = getHeroImage('restaurant', 0, s3Map)
 
         // Assert
-        expect(result).toBe(RESTAURANT_HERO_0_CDN)
+        expect(result).toBe(IMAGE_LIBRARY['restaurant']!.hero[0]!)
     })
 
     it('TC-GH-727-03g: returns CDN URL when s3Map is undefined (backward compat)', () => {
-        // Act — no s3Map arg (zero-arg compat)
+        // Act — no s3Map arg
         const result = getHeroImage('restaurant', 0)
 
         // Assert
-        expect(result).toBe(RESTAURANT_HERO_0_CDN)
+        expect(result).toBe(IMAGE_LIBRARY['restaurant']!.hero[0]!)
     })
 })
 
 describe('getGalleryImages — partial s3Map', () => {
-    it('TC-GH-727-03h: slots with matching key return S3; unmatched slots return CDN', () => {
+    it('TC-GH-727-03h: slots with matching slot key return S3; unmatched slots return CDN', () => {
         // Arrange — only slots 0 and 2 have S3 copies
         const s3Url0 = 'https://s3.example.com/gallery-0.jpg'
         const s3Url2 = 'https://s3.example.com/gallery-2.jpg'
         const s3Map = {
-            [RESTAURANT_GALLERY_0_KEY]: s3Url0,
-            [RESTAURANT_GALLERY_2_KEY]: s3Url2,
+            'gallery[0]': s3Url0,
+            'gallery[2]': s3Url2,
         }
 
         // Act
@@ -78,17 +66,24 @@ describe('getGalleryImages — partial s3Map', () => {
     })
 })
 
-describe('key format sanity — seeder/resolver contract', () => {
-    it('TC-GH-727-03i: buildAltKey(extractPhotoId(cdnUrl)) matches expected seeder altKey format for restaurant hero[0]', () => {
-        // Arrange — replicate exactly what the seeder writes for restaurant hero[0]
-        const cdnUrl = IMAGE_LIBRARY['restaurant']!.hero[0]!
-        const photoId = extractPhotoId(cdnUrl)
-        const altKey = buildAltKey('restaurant', 'hero[0]', photoId)
+describe('seeder/resolver/consumer contract (Phase 04)', () => {
+    it('TC-GH-727-03i: buildSiteAltKey → resolver strips prefix → slot name → consumer lookup round-trips correctly', () => {
+        const siteId = 42
+        const slot = 'hero[0]'
 
-        // Assert — key must start with imglib: and contain all three segments
-        expect(altKey).toMatch(/^imglib:restaurant:hero\[0\]:[a-zA-Z0-9-]+$/)
-        // Photo ID extracted must match the known ID from the CDN URL
-        expect(photoId).toBe('1517248135467-4c7edcad34c4')
-        expect(altKey).toBe('imglib:restaurant:hero[0]:1517248135467-4c7edcad34c4')
+        // Seeder writes: buildSiteAltKey(siteId, slot)
+        const altKey = buildSiteAltKey(siteId, slot)
+        expect(altKey).toBe('imglib:s42:hero[0]')
+        expect(altKey).toMatch(/^imglib:s\d+:/)
+
+        // Resolver strips prefix → slot name
+        const prefix = `imglib:s${siteId}:`
+        const resolvedSlot = altKey.slice(prefix.length)
+        expect(resolvedSlot).toBe(slot)
+
+        // Consumer (industry-images) looks up by slot name
+        const s3Map = { [resolvedSlot]: 'https://s3.example.com/hero.jpg' }
+        const result = getHeroImage('restaurant', 0, s3Map)
+        expect(result).toBe('https://s3.example.com/hero.jpg')
     })
 })

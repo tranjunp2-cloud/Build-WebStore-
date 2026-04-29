@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { ProductsFeaturedConfig } from './config'
 import { GradientBlob, SectionLabel } from '../shared/decorative'
@@ -65,7 +66,9 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                     {products.map((p) => (
                         <div key={p.id} className="snap-center w-[85vw] sm:w-[500px] flex-shrink-0 relative rounded-3xl overflow-hidden group">
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
-                            <img src={p.image} alt={p.name} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
+                            <div className="relative h-[500px]">
+                                <Image src={p.image} alt={p.name} fill className="object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
+                            </div>
                             <div className="absolute bottom-0 left-0 p-8 z-20 w-full text-white">
                                 <Heading level={3} className="mb-2">{p.name}</Heading>
                                 <Body size="lg" className="font-medium" style={{ color: 'var(--brand-primary)' }}>{p.price}</Body>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { VideoShowcaseConfig, VideoItem } from './config'
@@ -86,7 +87,7 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
             ) : (
                 <>
                     {video.thumbnailUrl ? (
-                        <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+                        <Image src={video.thumbnailUrl} alt={video.title} fill className="object-cover" />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                             <PlayIcon />
@@ -174,7 +175,7 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                         >
                             <div className="w-24 aspect-video rounded-lg overflow-hidden shrink-0 relative">
                                 {video.thumbnailUrl ? (
-                                    <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+                                    <Image src={video.thumbnailUrl} alt={video.title} fill className="object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                                         <PlayIcon size={20} />

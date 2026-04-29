@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type CSSProperties, type ReactNode } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -53,7 +54,7 @@ function NavLogo({
     scrolled = false,
 }: NavLogoProps) {
     if (logo?.url) {
-        return <img src={logo?.url} alt={logoText || 'Logo'} className={className || 'h-6 sm:h-8 w-auto'} />
+        return <Image src={logo.url} alt={logoText || 'Logo'} width={0} height={0} sizes="(max-width: 768px) 128px, 256px" className={className || 'h-6 sm:h-8 w-auto'} />
     }
     const shouldShowGradient =
         gradientMode === 'always' || (gradientMode === 'when-scrolled' && scrolled)

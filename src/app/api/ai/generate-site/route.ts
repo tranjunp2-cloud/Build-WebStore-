@@ -563,7 +563,14 @@ export async function POST(req: NextRequest) {
         // fallback-adapter creative→portfolio mapping) which Payload rejected
         // → "The following field is invalid: Site Type" → 500. Logs showed
         // this was the dominant 500 source (~7 hits / 6h window).
-        const safeSiteType = resolveSiteType(result.siteType)
+        // GH-727: if AI output maps to generic 'business' fallback, use the
+        // composer category (which has broader VN keyword matching) as backup
+        // so the seeder seeds industry-correct images (e.g. fitness vs business).
+        const safeSiteType = (() => {
+            const fromAI = resolveSiteType(result.siteType)
+            if (fromAI !== 'business') return fromAI
+            return resolveSiteType(resolveComposerCategory(businessInfo.industry))
+        })()
 
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
