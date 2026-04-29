@@ -1250,15 +1250,20 @@ function canonicalizePageSlug(
     index: number,
 ): string {
     if (page.isHomepage === true || index === 0) return '/'
-    const blockTypes = new Set((page.blocks || []).map((b) => b.blockType))
-    if (blockTypes.has('contact')) return 'contact'
-    if (blockTypes.has('about')) return 'about'
-    if (blockTypes.has('blog-list')) return 'blog'
-    // Title-based fallback for pages without a unique structural block
+    // Title is authoritative — AI titles are reliable signals and checked first to
+    // avoid misclassifying pages that include secondary structural blocks (e.g. a
+    // Services page with a contact form at the bottom must not become slug 'contact').
     const title = (page.title || '').toLowerCase()
     if (/\babout\b/.test(title)) return 'about'
-    if (/\bcontact\b|\bget.started\b|\bfree.trial\b|\btrial\b/.test(title)) return 'contact'
+    if (/\bcontact\b|\bget[\s-]started\b|\bfree[\s-]trial\b|\btrial\b/.test(title)) return 'contact'
     if (/\bblog\b|\bnews\b|\barticles\b/.test(title)) return 'blog'
+    // Block-based fallback: use the FIRST non-structural content block only.
+    // Set-membership would misclassify pages where contact/about appear as secondary sections.
+    const STRUCTURAL = new Set(['navigation', 'footer', 'hero'])
+    const firstContent = (page.blocks || []).find((b) => !STRUCTURAL.has(b.blockType ?? ''))
+    if (firstContent?.blockType === 'contact') return 'contact'
+    if (firstContent?.blockType === 'about') return 'about'
+    if (firstContent?.blockType === 'blog-list') return 'blog'
     return page.slug || `page-${index}`
 }
 

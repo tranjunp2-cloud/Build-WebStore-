@@ -30,7 +30,14 @@ export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
     'review-cards',
     'booking-widget',
     'google-maps',
-    'class-schedule', // not production-ready — hidden from editor and AI generation
+])
+
+/** Blocks registered in Payload schema but not yet production-ready.
+ *  Dropped from all generation paths until implementation is complete.
+ *  Remove entry here + from EDITOR_HIDDEN_BLOCKS in block-registry-reader when ready.
+ */
+export const BLOCKS_NOT_READY: ReadonlySet<string> = new Set([
+    'class-schedule',
 ])
 
 /** Blocks missing from Payload Pages.ts layout.blocks — silently dropped on save. */
@@ -46,7 +53,9 @@ export const BLOCKS_NOT_IN_PAYLOAD: ReadonlySet<string> = new Set([
  * Both lists OR'd together — the union is what ends up being rejected.
  */
 export function isUnsupportedBlock(blockType: string): boolean {
-    return BLOCKS_REQUIRE_MEDIA_PIPELINE.has(blockType) || BLOCKS_NOT_IN_PAYLOAD.has(blockType)
+    return BLOCKS_REQUIRE_MEDIA_PIPELINE.has(blockType)
+        || BLOCKS_NOT_IN_PAYLOAD.has(blockType)
+        || BLOCKS_NOT_READY.has(blockType)
 }
 
 /**
