@@ -78,6 +78,9 @@ function patchFooterPageLinks(
 ): PageBlockShape {
     if (!Array.isArray(block.columns)) return block
     const cols = block.columns as Array<Record<string, unknown>>
+    if (cols.length === 0) {
+        return { ...block, columns: [{ title: 'Pages', links: pageLinks.map((l) => ({ ...l })) }] }
+    }
     const pagesIdx = cols.findIndex(
         (c) => typeof c.title === 'string' && /pages?|links?|nav|menu/i.test(c.title),
     )
