@@ -369,6 +369,7 @@ export const POST = withAuth(async (user, req) => {
 
                     // Sanitize blocks with required fields that may be empty/invalid
                     const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
+                    const VALID_NAV_VARIANTS = new Set(['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'])
                     for (const block of cleanLayout) {
                         // Contact: formFields array items need fieldName + label + fieldType
                         if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
@@ -383,6 +384,12 @@ export const POST = withAuth(async (user, req) => {
                                     { fieldName: 'email', fieldType: 'email', label: 'Email Address', required: true },
                                     { fieldName: 'message', fieldType: 'textarea', label: 'Message', required: true },
                                 ]
+                            }
+                        }
+                        // Navigation: variant must be one of the valid enum values
+                        if (block.blockType === 'navigation') {
+                            if (!block.variant || !VALID_NAV_VARIANTS.has(block.variant as string)) {
+                                block.variant = 'default'
                             }
                         }
                     }
