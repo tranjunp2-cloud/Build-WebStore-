@@ -255,7 +255,18 @@ export default function EditorPage() {
                     // Set directly — don't use handleContentChange which also sets hasUnsavedChanges.
                     const siteIsPublished = data.site?.status === 'published'
                     const hasDraftPages = loadedPages.some((p: { status: string }) => p.status === 'draft')
-                    if (siteIsPublished && hasDraftPages) {
+
+                    // GH-843: also detect pending draft from current page fields returned by
+                    // editor-data (fetched with draft:true). The pages API _status field reflects
+                    // the live document and misses auto-saved draft versions; compare timestamps
+                    // as a reliable fallback so the Update button survives page reload.
+                    const currentPageIsDraft = data.page?._status === 'draft'
+                    const pageUpdatedAt = data.page?.updatedAt ? new Date(data.page.updatedAt).getTime() : null
+                    const sitePublishedAt = data.site?.publishedAt ? new Date(data.site.publishedAt).getTime() : null
+                    const hasPendingDraft = currentPageIsDraft ||
+                        (pageUpdatedAt != null && sitePublishedAt != null && pageUpdatedAt > sitePublishedAt)
+
+                    if (siteIsPublished && (hasDraftPages || hasPendingDraft)) {
                         useEditorStore.setState({ hasUnpublishedChanges: true })
                     }
                 }
