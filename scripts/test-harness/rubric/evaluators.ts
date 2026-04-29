@@ -8,6 +8,15 @@
 import type { HarnessBlock } from '../types'
 import { TEMPLATE_RULES } from '../../../src/lib/ai/template-rules'
 
+/** Structural chrome blocks — exclude from "content block" coverage checks (content-depth, section-headlines, etc.). */
+const STRUCTURAL_BLOCKS_NON_CONTENT = new Set([
+    'navigation', 'footer', 'announcement-bar', 'breadcrumb',
+])
+/** Blocks valid before hero position — exclude from heading-order scan (they have no section headings). */
+const STRUCTURAL_BLOCKS_PRE_HERO = new Set([
+    'navigation', 'announcement-bar', 'breadcrumb',
+])
+
 export interface EvalContext {
     /** Homepage blocks (primary scope). */
     blocks: HarnessBlock[]
@@ -146,8 +155,7 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         ({ pass: Boolean(theme?.spacingPreset) }),
     sectionHeadlinesCoverage70: ({ blocks }) => {
         // Count content blocks that have headline OR sectionLabel
-        const SKIP = new Set(['navigation', 'footer', 'announcement-bar', 'breadcrumb'])
-        const content = blocks.filter((b) => !SKIP.has(b.blockType))
+        const content = blocks.filter((b) => !STRUCTURAL_BLOCKS_NON_CONTENT.has(b.blockType))
         if (content.length === 0) return { pass: false, reason: 'no content blocks' }
         const withHeadline = content.filter((b) =>
             Boolean(b.data?.headline || b.data?.sectionLabel || b.data?.title),
@@ -216,8 +224,7 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         return { pass, reason: pass ? `${h} / ${b}` : `same font (${h})` }
     },
     sectionHeadlinesCoverage85: ({ blocks }) => {
-        const SKIP = new Set(['navigation', 'footer', 'announcement-bar', 'breadcrumb'])
-        const content = blocks.filter((b) => !SKIP.has(b.blockType))
+        const content = blocks.filter((b) => !STRUCTURAL_BLOCKS_NON_CONTENT.has(b.blockType))
         if (content.length === 0) return { pass: false, reason: 'no content blocks' }
         const withHeadline = content.filter((b) => Boolean(b.data?.headline || b.data?.sectionLabel || b.data?.title)).length
         const ratio = withHeadline / content.length
@@ -515,10 +522,9 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         const heroIdx = blocks.findIndex((b) => b.blockType === 'hero')
         if (heroIdx === -1) return { pass: false, reason: 'no hero (missing H1)' }
         // Check: no non-skip blocks with headline BEFORE hero (would imply H2 before H1)
-        const SKIP = new Set(['navigation', 'announcement-bar', 'breadcrumb'])
         for (let i = 0; i < heroIdx; i++) {
             const b = blocks[i]!
-            if (SKIP.has(b.blockType)) continue
+            if (STRUCTURAL_BLOCKS_PRE_HERO.has(b.blockType)) continue
             if (b.data?.headline || b.data?.title) return { pass: false, reason: `${b.blockType} at index ${i} has headline before hero` }
         }
         // Multiple heroes = multiple H1s = violates
@@ -583,29 +589,15 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         if (present.length === 1) return { pass: false, partial: true, reason: `1 signature block: ${present[0]}` }
         return { pass: false, reason: `0 signature blocks (expected: ${rule.signatureBlocks.join(', ')})` }
     },
-    spacingRhythmTokenOnly: ({ blocks }) => {
-        const TOKEN_SCALE = new Set([4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128])
-        let total = 0
-        let compliant = 0
-        for (const b of blocks) {
-            for (const field of ['padding', 'margin', 'paddingTop', 'paddingBottom', 'marginTop', 'marginBottom', 'gap']) {
-                const v = b.data?.[field]
-                if (typeof v === 'number') {
-                    total++
-                    if (TOKEN_SCALE.has(v)) compliant++
-                } else if (typeof v === 'string') {
-                    const m = v.match(/^(\d+)(px)?$/)
-                    if (m) {
-                        total++
-                        if (TOKEN_SCALE.has(Number(m[1]))) compliant++
-                    }
-                }
-            }
-        }
-        if (total === 0) return { pass: true, reason: 'no explicit spacing values (theme-driven)' }
-        const ratio = compliant / total
-        return { pass: ratio >= 0.9, reason: `${compliant}/${total} compliant (${Math.round(ratio * 100)}%)` }
+    themeSpacingPresetValid: ({ theme }) => {
+        const VALID = new Set(['compact', 'default', 'relaxed'])
+        const v = theme?.spacingPreset as string | undefined
+        if (!v) return { pass: false, reason: 'no spacingPreset on theme' }
+        if (!VALID.has(v)) return { pass: false, reason: `invalid spacingPreset: "${v}"` }
+        return { pass: true, reason: v }
     },
+    // Backward-compat alias — rubric v1.0/v1.1/v1.2 reference old name
+    spacingRhythmTokenOnly: (ctx) => CUSTOM_EVALUATORS.themeSpacingPresetValid(ctx),
     heroCtaVariety: ({ blocks }) => {
         const hero = blocks.find((b) => b.blockType === 'hero')
         const arr = (hero?.data?.ctaButtons ?? hero?.data?.buttons) as Array<{ variant?: unknown; style?: unknown; type?: unknown }> | undefined

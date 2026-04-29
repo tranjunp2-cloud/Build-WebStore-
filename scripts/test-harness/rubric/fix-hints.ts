@@ -11,11 +11,11 @@
 export const FIX_HINTS: Record<string, string> = {
     // ─── Visual Richness ────────────────────────────────────────────────────
     'hero-variant-diverse':
-        'Đổi hero.variant trong preset (template-presets-batch*.ts) sang split-image / fullscreen / video-bg / overlay. Tránh default "centered".',
+        'Đổi hero.variant trong preset (template-presets-batch*.ts) sang split-left / split-right / fullscreen / video / minimal / cards-overlay / magazine. Tránh default "centered".',
     'gallery-present':
         'Thêm block gallery / gallery-masonry / portfolio-grid vào preset.blocks[] — category nào cũng nên có visual proof.',
     'stats-present':
-        'Thêm block stats vào preset (3+ stat items) — show numeric credibility.',
+        'Thêm block stats vào preset (3+ stat items) — show numeric credibility (years experience, clients served, rating, v.v.).',
     'logo-cloud-present':
         'Thêm block client-logos / logo-cloud (4+ logos) — social proof B2B. Fix: curate 6 logos realistic cho cat đó.',
     'image-coverage':

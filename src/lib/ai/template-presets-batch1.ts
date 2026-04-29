@@ -712,10 +712,11 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'minimal' },
           { blockType: 'logo-cloud' },
           { blockType: 'booking-widget' },
           { blockType: 'features', variant: 'list' },
+          { blockType: 'stats', count: 3 },
           { blockType: 'gallery', variant: 'masonry', count: 6 },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'testimonials', variant: 'single' },

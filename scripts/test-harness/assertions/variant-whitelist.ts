@@ -1,17 +1,11 @@
 /**
  * Guard: zero blocks use variants in BROKEN_VARIANTS.
- * Mirrors src/lib/ai/template-composer.ts BROKEN_VARIANTS const.
  * If composer picks a broken variant, the render will be wrong/missing.
  */
 
 import type { HarnessResult, GuardReport } from '../types'
-
-// Mirror of BROKEN_VARIANTS from src/lib/ai/template-composer.ts
-// Update both places when marking a new variant broken.
-const BROKEN_VARIANTS: Record<string, string[]> = {
-  hero: ['animated-gradient'],
-  testimonials: ['grid', 'single'],
-}
+// Single source of truth: src/lib/ai/template-composer.ts
+import { BROKEN_VARIANTS } from '../../../src/lib/ai/template-composer'
 
 export function variantWhitelistGuard(r: HarnessResult): GuardReport {
   const offenders: Array<{ blockType: string; variant: string; index: number }> = []

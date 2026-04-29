@@ -57,7 +57,7 @@ function shuffleArray<T>(arr: T[], rand: () => number): T[] {
 // Plan 260417 Wave 1 A3 — variants declared in Zod enum but NOT implemented
 // in the block's render switch. AI gen would silently fall through to the
 // block's default variant, hiding the mismatch from QA.
-const BROKEN_VARIANTS: Record<string, string[]> = {
+export const BROKEN_VARIANTS: Record<string, string[]> = {
   hero: ['animated-gradient'],
   testimonials: ['grid', 'single'],
 }
