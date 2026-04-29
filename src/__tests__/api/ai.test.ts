@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { generateSiteWithAI } from '@/lib/ai/openai-generator'
 import { POST as GenerateSitePOST } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
 import { POST as RewriteTextPOST } from '@/app/api/ai/rewrite-text/route'
@@ -135,6 +136,45 @@ describe('AI Streaming APIs', () => {
              expect(mockPageDB.length).toBe(5) // Homepage, About, Products, Contact + 404
              expect(result.totalPages).toBe(4) // totalPages excludes system 404 page
              expect(mockPageDB.map((page) => page.slug)).toEqual(['/', 'about', 'products', 'contact', '404'])
+        })
+
+        // TC-F01.SLUG.01 — GH-820: AI multi-page path normalizes canonical slugs
+        // Regression: AI was generating "free-trial" slug for contact page on SaaS businesses.
+        it('normalizes canonical page slugs when AI returns non-standard slugs (GH-820)', async () => {
+             vi.mocked(generateSiteWithAI).mockResolvedValueOnce({
+                 result: {
+                     siteName: 'SaaS Startup',
+                     siteType: 'business',
+                     theme: { primaryColor: '#000' },
+                     seo: { title: 'SaaS Startup', description: 'Desc' },
+                     language: 'en',
+                     blocks: [],
+                     pages: [
+                         { title: 'Homepage', slug: '/', isHomepage: true, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Hello', subheadline: 'World', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'Home', description: 'Home page' } },
+                         { title: 'Our Story', slug: 'our-story', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'About', subheadline: 'Us', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'about', variant: 'image-right', headline: 'About Us', body: 'About us' }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'About', description: 'About page' } },
+                         { title: 'Features', slug: 'features', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Features', subheadline: 'Features', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'features', variant: 'grid-3', headline: 'Features', items: [] }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'Features', description: 'Features page' } },
+                         { title: 'Start Free Trial', slug: 'free-trial', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Contact', subheadline: 'Contact', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'contact', variant: 'form', headline: 'Contact Us', email: 'a@b.com' }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'Contact', description: 'Contact page' } },
+                         { title: 'Blog', slug: 'blog', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Blog', subheadline: 'Blog', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'blog-list', variant: 'grid', items: [] }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'Blog', description: 'Blog page' } },
+                     ],
+                 },
+                 events: [],
+             } as any)
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'SaaS Startup', industry: 'Technology', products: 'Free trial SaaS', shortDescription: 'A SaaS product' }
+                 })
+             })
+             await GenerateSitePOST(req)
+
+             const slugs = mockPageDB.map((p: any) => p.slug)
+             // contact block-based detection → must resolve to "contact", not "free-trial"
+             expect(slugs).toContain('contact')
+             expect(slugs).not.toContain('free-trial')
+             // about block-based detection
+             expect(slugs).toContain('about')
+             expect(slugs).not.toContain('our-story')
         })
 
         it('returns text/event-stream response for SSE mode when stream=true', async () => {

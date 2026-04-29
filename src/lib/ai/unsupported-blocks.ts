@@ -16,7 +16,9 @@
  * filter must apply there. Extracted here to avoid drift.
  */
 
-/** Blocks needing a media pipeline that does not exist yet.
+/** Catch-all drop list for blocks that should not be generated.
+ *  Covers: blocks needing a media pipeline, blocks not yet production-ready,
+ *  and blocks not fully integrated into the Payload schema.
  *  Re-enabled via plan 260414-1400-ai-gen-unsplash-pipeline phase-04:
  *    - gallery, portfolio-grid → now filled by media-pipeline.ts (Unsplash)
  *  Re-enabled via plan 260422-1900-block-aivisible-audit-fix:
@@ -24,11 +26,13 @@
  *  Still dropped (separate followup):
  *    - menu-display, review-cards (not in Payload schema, not image-related)
  *  GH-820: google-maps temporarily disabled — embedUrl cannot be auto-generated
+ *  GH-820: class-schedule not production-ready — also hidden from editor UI
  */
 export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
     'menu-display',
     'review-cards',
     'google-maps',
+    'class-schedule',
 ])
 
 /** Blocks missing from Payload Pages.ts layout.blocks — silently dropped on save. */

@@ -167,6 +167,7 @@ ${blockList}
 6. variant MUST be one of the listed variants for that block type
 7. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
 8. Blog page MUST include blog-list block with ≥3 posts (title + excerpt + slug + readTime)
+9. PAGE SLUGS ARE FIXED — use EXACTLY these slugs regardless of business type: Homepage → "/", About page → "about", Contact page → "contact", Blog page → "blog". NEVER invent slugs like "free-trial", "get-started", "sign-up" for these canonical pages.
 
 ## LANGUAGE DETECTION
 - Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)

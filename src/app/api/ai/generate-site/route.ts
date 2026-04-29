@@ -1292,6 +1292,31 @@ function createPageHero(baseHero: AIBlock | null, options: {
     return hero
 }
 
+// GH-820: normalize canonical page slugs so AI cannot invent arbitrary slugs
+// for well-known pages (e.g. slug "free-trial" instead of "contact").
+// Detection priority: block content (structural) > title keyword match.
+function canonicalizePageSlug(
+    page: { title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[] },
+    index: number,
+): string {
+    if (page.isHomepage === true || index === 0) return '/'
+    // Title is authoritative — AI titles are reliable signals and checked first to
+    // avoid misclassifying pages that include secondary structural blocks (e.g. a
+    // Services page with a contact form at the bottom must not become slug 'contact').
+    const title = (page.title || '').toLowerCase()
+    if (/\babout\b/.test(title)) return 'about'
+    if (/\bcontact\b|\bget[\s-]started\b|\bfree[\s-]trial\b|\btrial\b/.test(title)) return 'contact'
+    if (/\bblog\b|\bnews\b|\barticles\b/.test(title)) return 'blog'
+    // Block-based fallback: use the FIRST non-structural content block only.
+    // Set-membership would misclassify pages where contact/about appear as secondary sections.
+    const STRUCTURAL = new Set(['navigation', 'footer', 'hero'])
+    const firstContent = (page.blocks || []).find((b) => !STRUCTURAL.has(b.blockType ?? ''))
+    if (firstContent?.blockType === 'contact') return 'contact'
+    if (firstContent?.blockType === 'about') return 'about'
+    if (firstContent?.blockType === 'blog-list') return 'blog'
+    return page.slug || `page-${index}`
+}
+
 function buildGeneratedPages({
     blocks,
     businessInfo,
@@ -1306,7 +1331,7 @@ function buildGeneratedPages({
     if (aiPages && aiPages.length > 0) {
         return aiPages.map((page, index) => ({
             title: page.title || `Page ${index + 1}`,
-            slug: page.slug || (index === 0 ? '/' : `page-${index}`),
+            slug: canonicalizePageSlug(page, index),
             isHomepage: page.isHomepage === true || index === 0,
             layout: cloneBlockData(page.blocks || []),
             seo: {
