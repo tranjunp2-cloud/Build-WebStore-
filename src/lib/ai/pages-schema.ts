@@ -41,6 +41,10 @@ export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
  */
 export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fallback: string } | null> = {
     hero:         { field: 'variant', values: ['centered', 'split-left', 'split-right', 'fullscreen', 'video', 'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax', 'slideshow', 'split-video'], fallback: 'centered' },
+    // navigation has TWO select columns: `style` (validated here) and `variant`.
+    // `variant` is intentionally NOT validated here because schema.field='style' means
+    // the delete-cleanup (lines 231-232) never runs for variant — so variant passes through
+    // as-is to Payload. It is sanitized downstream in apply-template/route.ts instead.
     navigation:   { field: 'style',   values: ['fixed', 'sticky', 'static', 'transparent'], fallback: 'fixed' },
     about:        { field: 'layout',  values: ['image-right', 'image-left', 'centered', 'cards'], fallback: 'image-right' },
     features:     { field: 'layout',  values: ['grid-3', 'grid-2', 'alternating', 'centered-list'], fallback: 'grid-3' },
@@ -54,7 +58,8 @@ export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fal
     team:         { field: 'variant', values: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'], fallback: 'grid' },
     socialWidget: { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
     cartWidget:   { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
-    pricing: null, faq: null,
+    pricing:      { field: 'variant', values: ['cards', 'table', 'horizontal', 'toggle', 'tiered', 'comparison', 'minimal', 'slider'], fallback: 'cards' },
+    faq:          { field: 'variant', values: ['accordion', 'grid', 'simple', 'two-column-accordion', 'chat-bubbles', 'numbered'], fallback: 'accordion' },
     // Industry blocks (Plan 260417-0837 Phase 1.1)
     'doctor-profile': { field: 'variant', values: ['cards', 'detailed', 'list'], fallback: 'cards' },
     'property-card': { field: 'variant', values: ['grid', 'list', 'featured'], fallback: 'grid' },
@@ -106,7 +111,7 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     // AI-generated / Block Library blocks (must be here for content merge during template switch)
     cta: ['variant', 'headline', 'subheadline', 'ctaLabel', 'ctaUrl', 'ctaStyle'],
     newsletter: ['variant', 'headline', 'subheadline', 'buttonLabel', 'placeholder'],
-    video: ['variant', 'headline', 'subheadline', 'videoUrl', 'posterImage'],
+    video: ['variant', 'headline', 'subheadline', 'videoUrl'],
     'logo-cloud': ['variant', 'headline', 'logos'],
     'products-grid': ['variant', 'headline', 'subheadline', 'limit', 'category'],
     'products-featured': ['variant', 'headline', 'subheadline'],
@@ -155,6 +160,7 @@ export const USER_PRESERVE_MEDIA_FIELDS: Record<string, string[]> = {
     navigation: ['logo'],
     about: ['image'],
     footer: ['logo'],
+    video: ['posterImage'], // upload field — excluded from PAGES_FIELDS to prevent template string URLs failing Payload validation
 }
 
 /** PAGES_FIELDS minus structural fields — used by mergeUserContent to preserve user copy. */

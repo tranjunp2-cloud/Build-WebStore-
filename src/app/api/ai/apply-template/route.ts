@@ -311,6 +311,10 @@ export const POST = withAuth(async (user, req) => {
                     templateHomepageLayout.length ? templateHomepageLayout : blocks,
                 )
 
+                // Hoisted outside page loop — same values for every page
+                const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
+                const VALID_NAV_VARIANTS = new Set(['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'])
+
                 // 2. Smart Mapping: replace layout with template blocks, map user content
                 //    PRD F07 US-F07-05: "mapping nội dung hiện tại sang block tương ứng của template mới"
                 for (const page of existingPages.docs) {
@@ -368,8 +372,6 @@ export const POST = withAuth(async (user, req) => {
                         .filter(b => b.blockType !== 'google-maps')
 
                     // Sanitize blocks with required fields that may be empty/invalid
-                    const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
-                    const VALID_NAV_VARIANTS = new Set(['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'])
                     for (const block of cleanLayout) {
                         // Contact: formFields array items need fieldName + label + fieldType
                         if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
