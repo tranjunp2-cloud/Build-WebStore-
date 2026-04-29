@@ -1,13 +1,12 @@
 /**
- * Unit Tests: POST /api/account/reset — rate limit behavior
- * TC-ID: TC-F01.RL.RESET — BUG-F01-05 rate limit verification
+ * Unit Tests: POST /api/account/reset — auth & staging guard behavior
+ * TC-ID: TC-F01.RL.RESET — BUG-F01-05 (rate limit removed per GH-820 — staging-only endpoint)
  * Convention: docs/TEST_CONVENTION.md
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { POST } from '@/app/api/account/reset/route'
 import { getCurrentUser } from '@/lib/auth'
-import { checkRateLimit } from '@/lib/rateLimit'
 
 // ── Mocks ───────────────────────────────────────────────────────────────────
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -34,11 +33,7 @@ vi.mock('payload', () => ({
     }),
 }))
 
-vi.mock('@/lib/rateLimit', () => ({
-    checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 2, resetAt: Date.now() + 3600000 }),
-}))
-
-describe('POST /api/account/reset — rate limiting', () => {
+describe('POST /api/account/reset — auth & staging guard', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockAuthUser = {
@@ -48,33 +43,9 @@ describe('POST /api/account/reset — rate limiting', () => {
         }
     })
 
-    it('TC-F01.RL.RESET.01 — allows request when rate limit not exceeded', async () => {
-        vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 2, resetAt: Date.now() + 3600000 })
-
+    it('TC-F01.RL.RESET.01 — allows authenticated reset (no rate limit — staging only endpoint)', async () => {
         const res = await POST()
         expect(res.status).toBe(200)
-    })
-
-    it('TC-F01.RL.RESET.02 — returns 429 when rate limit exceeded', async () => {
-        const resetAt = Date.now() + 1800000 // 30 min from now
-        vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, remaining: 0, resetAt })
-
-        const res = await POST()
-        const body = await res.json()
-
-        expect(res.status).toBe(429)
-        expect(body.success).toBe(false)
-        expect(body.error.code).toBe('RATE_LIMITED')
-        expect(body.retryAfter).toBeGreaterThan(0)
-        expect(res.headers.get('Retry-After')).toBeTruthy()
-    })
-
-    it('TC-F01.RL.RESET.03 — rate limit key includes user id', async () => {
-        vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true, remaining: 2, resetAt: Date.now() + 3600000 })
-
-        await POST()
-
-        expect(checkRateLimit).toHaveBeenCalledWith('account-reset:user-1', 3, 3_600_000)
     })
 
     it('TC-F01.RL.RESET.04 — returns 401 when not authenticated', async () => {
@@ -85,7 +56,5 @@ describe('POST /api/account/reset — rate limiting', () => {
 
         expect(res.status).toBe(401)
         expect(body.error.code).toBe('AUTH_REQUIRED')
-        // Rate limiter should NOT be called for unauthenticated requests
-        expect(checkRateLimit).not.toHaveBeenCalled()
     })
 })

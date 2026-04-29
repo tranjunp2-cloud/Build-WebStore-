@@ -322,6 +322,7 @@ function PreviewFrameInner({
     }, [frameElement, t.editor.blockLibrary.dropToAdd])
 
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
+    const [canvasElement, setCanvasElement] = useState<HTMLDivElement | null>(null)
     const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null)
     const clearHoverTimerRef = useRef<number | null>(null)
     const dragPointerClientYRef = useRef<number | null>(null)
@@ -1190,6 +1191,7 @@ function PreviewFrameInner({
                     className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4"
                 >
                     <div
+                        ref={setCanvasElement}
                         className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
                         style={{
                             width: viewport === 'mobile' ? 'min(390px, 100%)' : '100%',
@@ -1443,7 +1445,7 @@ function PreviewFrameInner({
                     }
 
                     // Center horizontally within canvas, but don't spill off screen
-                    const popoverWidth = 320
+                    const popoverWidth = Math.min(360, canvasWidth - 16)
                     let popoverLeft = absLeft + (targetData.rect.width / 2) - (popoverWidth / 2)
                     const minLeft = cRect.left + 8
                     const maxLeft = cRect.left + canvasWidth - popoverWidth - 8
@@ -1457,11 +1459,13 @@ function PreviewFrameInner({
                                 position: 'fixed',
                                 top: absTop + targetData.rect.height + 8 + (textEditingData && absTop - 12 < 48 ? 48 : 0), // Push down further if toolbar shifted below
                                 left: popoverLeft,
+                                width: popoverWidth,
                             } : {
                                 position: 'fixed',
                                 top: absTop - 12 - (textEditingData ? 48 : 0), // Push up above the toolbar if text editing
                                 left: popoverLeft,
                                 transform: 'translateY(-100%)',
+                                width: popoverWidth,
                             }}
                             onMouseDown={(e) => e.stopPropagation()}
                         >
@@ -1479,19 +1483,22 @@ function PreviewFrameInner({
 
                 {/* US-F05-06 AC-1: Rich Text Toolbar — position:fixed to escape overflow-hidden parents */}
                 {textEditingData && overlayOffset && (() => {
-                    const TOOLBAR_HEIGHT = 48;
+                    // On mobile the toolbar wraps to 2 rows (~96px); on desktop it fits in 1 row (48px)
+                    const TOOLBAR_HEIGHT = viewport === 'mobile' ? 96 : 48;
                     const adjustedRectTop = textEditingData.rect.top - scrollOffset
                     // getBoundingClientRect gives viewport-relative coords → use with position:fixed
                     const cRect = containerElement?.getBoundingClientRect() ?? { top: 0, left: 0, right: window.innerWidth }
-                    const canvasWidth = (cRect.right ?? window.innerWidth) - cRect.left
-                    // Clamp toolbar width to canvas width so it never spills into the sidebar on mobile
+                    // Use canvas element bounds for accurate width (containerElement is the outer panel, not the 390px canvas)
+                    const canvasRect = canvasElement?.getBoundingClientRect() ?? { ...cRect, width: (cRect.right ?? window.innerWidth) - cRect.left, left: cRect.left }
+                    const canvasWidth = canvasRect.width
+                    // Clamp toolbar width to canvas width so it never spills outside the canvas on mobile
                     const TOOLBAR_WIDTH = Math.min(560, canvasWidth - 16)
                     let topPos = cRect.top + overlayOffset.top + adjustedRectTop - TOOLBAR_HEIGHT;
                     let leftPos = cRect.left + overlayOffset.left + textEditingData.rect.left + (textEditingData.rect.width / 2) - (TOOLBAR_WIDTH / 2);
 
-                    // Clamp within canvas bounds (cRect), not full window — prevents spilling into sidebar
-                    const minLeft = cRect.left + 8
-                    const maxLeft = cRect.left + canvasWidth - TOOLBAR_WIDTH - 8
+                    // Clamp within canvas bounds, not full window — prevents spilling outside canvas
+                    const minLeft = canvasRect.left + 8
+                    const maxLeft = canvasRect.left + canvasWidth - TOOLBAR_WIDTH - 8
                     leftPos = Math.max(minLeft, Math.min(leftPos, maxLeft));
 
                     // If no room above, flip below the element
@@ -1507,6 +1514,7 @@ function PreviewFrameInner({
                                 position: 'fixed',
                                 top: topPos,
                                 left: leftPos,
+                                ...(viewport === 'mobile' ? { width: TOOLBAR_WIDTH } : {}),
                             }}
                         >
                             <RichTextToolbar onCommand={handleExecCommand} activeState={wysiwygState} />

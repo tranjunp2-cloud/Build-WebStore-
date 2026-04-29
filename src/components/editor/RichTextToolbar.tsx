@@ -79,7 +79,7 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
     return (
         <div
             data-wysiwyg-toolbar
-            className="relative flex items-center gap-1 bg-gray-900 border border-gray-700 shadow-2xl rounded-lg p-1.5 pointer-events-auto"
+            className="relative flex flex-wrap items-center gap-1 bg-gray-900 border border-gray-700 shadow-2xl rounded-lg p-1.5 pointer-events-auto"
             onMouseDown={(e) => e.preventDefault()}
         >
             {/* Format Tag Selection */}

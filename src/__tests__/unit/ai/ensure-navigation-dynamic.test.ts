@@ -1,6 +1,6 @@
 /**
  * Unit Tests: ensureNavigationBlocks — dynamic pageLinks param (GH-817)
- * TC-ID: TC-NAV-DYN-06..08, TC-NAV-DYN-11..16
+ * TC-ID: TC-NAV-DYN-06..08, TC-NAV-DYN-11..16, TC-FOOTER-DYN-01..03
  * Convention: docs/TEST_CONVENTION.md
  */
 
@@ -172,5 +172,56 @@ describe('resolveCtaUrl', () => {
         const cta = nav.ctaButton as Record<string, unknown>
         expect(cta.url).toBe('/blog')
         expect(cta.url).not.toBe('/contact')
+    })
+})
+
+describe('ensureNavigationBlocks — footer ghost links (GH-817)', () => {
+    it('TC-FOOTER-DYN-01: injected footer Pages column uses pageLinks, not DEFAULT_NAV_LINKS', () => {
+        // Arrange — no footer block, AI pages have no Contact
+        const NO_CONTACT_LINKS = [
+            { label: 'Home', url: '/' },
+            { label: 'Gallery', url: '/gallery' },
+            { label: 'Blog', url: '/blog' },
+        ] as const
+        const pages = [makePage([{ blockType: 'hero' }])]
+        // Act
+        const result = ensureNavigationBlocks(pages, 'Acme', NO_CONTACT_LINKS)
+        // Assert — footer is last block; its Pages column should use NO_CONTACT_LINKS
+        const layout = result[0].layout
+        const footer = layout[layout.length - 1] as Record<string, unknown>
+        expect(footer.blockType).toBe('footer')
+        const columns = footer.columns as Array<{ title: string; links: Array<{ label: string; url: string }> }>
+        expect(columns[0]!.links).toHaveLength(NO_CONTACT_LINKS.length)
+        expect(columns[0]!.links[1]!.url).toBe('/gallery')
+    })
+
+    it('TC-FOOTER-DYN-02: injected footer Contact column uses resolveCtaUrl — falls back to last page when no Contact', () => {
+        // Arrange — pageLinks has no Contact page
+        const NO_CONTACT_LINKS = [
+            { label: 'Home', url: '/' },
+            { label: 'Portfolio', url: '/portfolio' },
+            { label: 'Blog', url: '/blog' },
+        ] as const
+        const pages = [makePage([{ blockType: 'hero' }])]
+        // Act
+        const result = ensureNavigationBlocks(pages, 'Acme', NO_CONTACT_LINKS)
+        // Assert — Contact column link should NOT be dead /contact
+        const layout = result[0].layout
+        const footer = layout[layout.length - 1] as Record<string, unknown>
+        const columns = footer.columns as Array<{ title: string; links: Array<{ label: string; url: string }> }>
+        expect(columns[1]!.links[0]!.url).toBe('/blog')
+        expect(columns[1]!.links[0]!.url).not.toBe('/contact')
+    })
+
+    it('TC-FOOTER-DYN-03: injected footer Contact column uses /contact when Contact page exists in pageLinks', () => {
+        // Arrange — pageLinks includes Contact
+        const pages = [makePage([{ blockType: 'hero' }])]
+        // Act
+        const result = ensureNavigationBlocks(pages, 'Acme', AI_PAGE_LINKS)
+        // Assert — Contact column link should be /contact (real page exists)
+        const layout = result[0].layout
+        const footer = layout[layout.length - 1] as Record<string, unknown>
+        const columns = footer.columns as Array<{ title: string; links: Array<{ label: string; url: string }> }>
+        expect(columns[1]!.links[0]!.url).toBe('/contact')
     })
 })

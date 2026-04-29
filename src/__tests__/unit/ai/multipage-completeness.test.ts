@@ -74,8 +74,8 @@ describe('TC-F01-W.22 — About page weaves biz.description', () => {
   })
 })
 
-describe('TC-F01-W.23 — Contact page user fields + map + FAQ', () => {
-  it('Contact page has ≥5 blocks (nav + hero + contact + maps + faq + footer)', () => {
+describe('TC-F01-W.23 — Contact page user fields + FAQ (GH-820: google-maps temporarily disabled)', () => {
+  it('Contact page has ≥5 blocks (nav + hero + contact + faq + footer)', () => {
     const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
     const contact = getPage(result, 'Contact')
     expect(contact).toBeDefined()
@@ -95,13 +95,12 @@ describe('TC-F01-W.23 — Contact page user fields + map + FAQ', () => {
     expect(contactBlock!.address).toBe('123 Jalan Bukit Bintang, 55100 KL')
   })
 
-  it('Google Maps block includes user address', () => {
+  it('Google Maps block absent — temporarily disabled per GH-820 (embedUrl cannot be auto-generated)', () => {
     const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
     const contact = getPage(result, 'Contact')
     const blocks = getBlocks(contact)
     const maps = blocks.find((b) => b.blockType === 'google-maps')
-    expect(maps).toBeDefined()
-    expect(maps!.address).toBe('123 Jalan Bukit Bintang, 55100 KL')
+    expect(maps).toBeUndefined()
   })
 
   it('FAQ block present with opening hours question', () => {
@@ -227,5 +226,39 @@ describe('TC-F01-W.26 — Empty-input regression', () => {
     expect(blogList).toBeDefined()
     const items = (blogList!.items as Array<{ title: string }>) ?? []
     expect(items.length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('TC-F01-W.27 — Footer ghost links absent in centered-stack/dark-gradient (GH-820)', () => {
+  const GHOST_URLS = ['/careers', '/help', '/faq', '/privacy', '/terms', '/cookies']
+
+  function getFooterColumns(result: GenerationResult): Array<{ title: string; links: { url: string }[] }> {
+    const pages = (result.pages ?? []) as unknown as Page[]
+    const home = pages.find((p) => p.title?.toLowerCase() === 'home')
+    const blocks = getBlocks(home)
+    const footer = blocks.find((b) => b.blockType === 'footer')
+    return (footer?.columns as Array<{ title: string; links: { url: string }[] }>) ?? []
+  }
+
+  it('footer columns contain no links to non-existent pages', () => {
+    const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
+    const columns = getFooterColumns(result)
+    const allLinks = columns.flatMap((c) => c.links.map((l) => l.url))
+    for (const ghostUrl of GHOST_URLS) {
+      expect(allLinks, `ghost link "${ghostUrl}" found in footer`).not.toContain(ghostUrl)
+    }
+  })
+
+  it('footer Explore column only contains links to actually-generated pages', () => {
+    const result = composeFallbackResult('ramen restaurant', 42, 'en', ramenInfo())
+    const columns = getFooterColumns(result)
+    const explore = columns.find((c) => c.title === 'Explore')
+    expect(explore).toBeDefined()
+    const pages = (result.pages ?? []) as unknown as Page[]
+    const pageSlugs = new Set(pages.map((p) => p.title?.toLowerCase()))
+    for (const link of explore!.links) {
+      const slug = link.url === '/' ? 'home' : link.url.replace(/^\//, '').toLowerCase()
+      expect(pageSlugs.has(slug), `Explore link "${link.url}" has no backing page`).toBe(true)
+    }
   })
 })

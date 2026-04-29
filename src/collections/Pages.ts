@@ -904,7 +904,7 @@ const GoogleMapsBlock = {
             ],
         },
         { name: 'headline', type: 'text' },
-        { name: 'embedUrl', type: 'text', required: true },
+        { name: 'embedUrl', type: 'text' },
         { name: 'address', type: 'textarea' },
         { name: 'height', type: 'number', defaultValue: 400 },
     ],

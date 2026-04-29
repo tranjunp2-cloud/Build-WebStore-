@@ -475,7 +475,7 @@ function buildContact(biz: BusinessSample): Record<string, unknown> {
     formFields: [
       { label: 'Name', fieldName: 'name', fieldType: 'text', placeholder: 'Your full name', required: true },
       { label: 'Email', fieldName: 'email', fieldType: 'email', placeholder: 'your@email.com', required: true },
-      { label: 'Phone', fieldName: 'phone', fieldType: 'tel', placeholder: '+60 12-345 6789', required: false },
+      { label: 'Phone', fieldName: 'phone', fieldType: 'phone', placeholder: '+60 12-345 6789', required: false },
       { label: 'Message', fieldName: 'message', fieldType: 'textarea', placeholder: 'How can we help you?', required: true },
     ],
   }
@@ -484,36 +484,44 @@ function buildContact(biz: BusinessSample): Record<string, unknown> {
 function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unknown> {
   // Next-wins plan 260419-0034 phase-03: upgrade default to mega variant với 4 columns
   // (Explore / Company / Support / Legal) to meet Wix-pro footer expectations.
+  // GH-820: build known-url set so secondary columns only include links to real pages.
+  // Normalize to lowercase — pages may be passed as capitalized titles ('About', 'Contact')
+  // or lowercase slugs ('about', 'contact') depending on call site.
+  const knownUrls = new Set(
+    pages.map((p) => (p === '/' ? '/' : `/${p.replace(/^\/+/, '').toLowerCase()}`)),
+  )
+  // External links (mailto:, http, #) are always safe; internal links only if page exists.
+  const isLiveLink = (url: string) =>
+    url.startsWith('mailto:') || url.startsWith('http') || url === '#' || knownUrls.has(url.toLowerCase())
+
   const exploreLinks = pages.map((p) => ({
     label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
     url: p === '/' ? '/' : `/${p}`,
   }))
+
+  const companyLinks = [
+    { label: 'About Us', url: '/about' },
+    { label: 'Contact', url: '/contact' },
+    { label: 'Careers', url: '/careers' },
+  ].filter((l) => isLiveLink(l.url))
+
+  const supportLinks = [
+    { label: 'Help Center', url: '/help' },
+    { label: 'FAQ', url: '/faq' },
+    { label: 'Get in Touch', url: `mailto:${biz.email}` },
+  ].filter((l) => isLiveLink(l.url))
+
+  const legalLinks = [
+    { label: 'Privacy Policy', url: '/privacy' },
+    { label: 'Terms of Service', url: '/terms' },
+    { label: 'Cookie Policy', url: '/cookies' },
+  ].filter((l) => isLiveLink(l.url))
+
   const linkColumns = [
     { title: 'Explore', links: exploreLinks },
-    {
-      title: 'Company',
-      links: [
-        { label: 'About Us', url: '/about' },
-        { label: 'Contact', url: '/contact' },
-        { label: 'Careers', url: '/careers' },
-      ],
-    },
-    {
-      title: 'Support',
-      links: [
-        { label: 'Help Center', url: '/help' },
-        { label: 'FAQ', url: '/faq' },
-        { label: 'Get in Touch', url: `mailto:${biz.email}` },
-      ],
-    },
-    {
-      title: 'Legal',
-      links: [
-        { label: 'Privacy Policy', url: '/privacy' },
-        { label: 'Terms of Service', url: '/terms' },
-        { label: 'Cookie Policy', url: '/cookies' },
-      ],
-    },
+    ...(companyLinks.length > 0 ? [{ title: 'Company', links: companyLinks }] : []),
+    ...(supportLinks.length > 0 ? [{ title: 'Support', links: supportLinks }] : []),
+    ...(legalLinks.length > 0 ? [{ title: 'Legal', links: legalLinks }] : []),
   ]
   return {
     blockType: 'footer',
@@ -1505,12 +1513,7 @@ function buildContactPage(biz: BusinessSample, category: string, pages: string[]
       buildNavigation(biz, pages, category),
       { blockType: 'hero', variant: 'minimal', headline: `Contact ${biz.name}`, subheadline: 'We\'d love to hear from you.', height: '40vh' },
       buildContact(biz),
-      {
-        blockType: 'google-maps',
-        variant: 'embed',
-        address: biz.address || '',
-        zoom: 15,
-      },
+      // TODO(GH-820): re-enable google-maps when embedUrl pipeline lands (owner fills in via builder for now)
       {
         blockType: 'faq',
         variant: 'accordion',
@@ -1905,7 +1908,7 @@ function buildBlockFromSpec(
     case 'map':
     case 'map-embed':
     case 'google-maps':
-      return { blockType: 'google-maps', variant: resolvedVariant ?? 'default', address: biz.address, height: '400px' }
+      return { blockType: 'google-maps', variant: resolvedVariant ?? 'full-width', address: biz.address, height: 400 }
     case 'content':
     case 'content-block':
       return { ...buildAbout(biz), blockType: 'about', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
@@ -1975,14 +1978,7 @@ function enrichSubPages(
     )
     const insertAt = footerIdx >= 0 ? footerIdx : contactPage.layout.length
 
-    if (!hasMaps) {
-      contactPage.layout.splice(insertAt, 0, {
-        blockType: 'google-maps',
-        variant: 'embed',
-        address: biz.address || '',
-        zoom: 15,
-      } as unknown as Record<string, unknown>)
-    }
+    // TODO(GH-820): re-enable google-maps injection when embedUrl pipeline lands
     if (!hasFaq) {
       const insertIdx = contactPage.layout.findIndex(
         (b) => (b as Record<string, unknown>).blockType === 'footer',

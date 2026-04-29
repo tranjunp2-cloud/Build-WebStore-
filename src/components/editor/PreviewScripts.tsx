@@ -209,6 +209,11 @@ export function PreviewScripts() {
             let innerHTML = el.innerHTML
                 .replace(/<font[^>]*color="([^"]+)"[^>]*>([<\s\S]*?)<\/font>/gi,
                     (_m, color, inner) => `<span style="color:${color}">${inner}</span>`)
+                // Normalize browser-injected <p>/<div> wrappers from contenteditable (e.g. on Enter key).
+                // Replace opening block tags with <br> to preserve line breaks, then strip closing tags.
+                .replace(/<(?:div|p)[^>]*>/gi, '<br>')
+                .replace(/<\/(?:div|p)>/gi, '')
+                .replace(/^<br>/, '')
 
             if (HEADING_TAGS.includes(el.tagName)) {
                 const styleAttr = inlineStyles.length ? ` style="${inlineStyles.join(';')}"` : ''

@@ -152,7 +152,7 @@ function AccordionVariant({ headline, subheadline, items, allowMultiple = false,
                                     className={`w-full px-6 py-4 ${TOUCH_TARGET.min} flex items-center justify-between text-left font-medium transition-colors hover:bg-[rgba(var(--brand-primary-rgb),0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)]`}
                                     style={{ color: CSS_VARS.text, fontFamily: CSS_VARS.fontHeading }}
                                 >
-                                    <span className="flex-1 pr-4">{item.question}</span>
+                                    <RichText text={item.question} as="span" className="flex-1 pr-4" />
                                     <svg
                                         width="20"
                                         height="20"
@@ -280,7 +280,7 @@ function TwoColumnAccordionVariant({
                     className={`flex items-center justify-between cursor-pointer font-semibold ${TOUCH_TARGET.min} list-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.4)] rounded`}
                     style={{ color: CSS_VARS.text }}
                 >
-                    <span>{item.question}</span>
+                    <RichText text={item.question} as="span" />
                     <span className="ml-2 text-xl transition-transform group-open:rotate-45" aria-hidden="true">+</span>
                 </summary>
                 <div className="mt-3 pt-3 border-t" style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.1)' }}>

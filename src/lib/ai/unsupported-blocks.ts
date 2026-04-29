@@ -23,10 +23,12 @@
  *    - before-after, booking-widget → added to Payload Pages.ts + pages-schema.ts
  *  Still dropped (separate followup):
  *    - menu-display, review-cards (not in Payload schema, not image-related)
+ *  GH-820: google-maps temporarily disabled — embedUrl cannot be auto-generated
  */
 export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
     'menu-display',
     'review-cards',
+    'google-maps',
 ])
 
 /** Blocks missing from Payload Pages.ts layout.blocks — silently dropped on save. */

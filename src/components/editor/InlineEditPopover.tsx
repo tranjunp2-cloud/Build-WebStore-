@@ -75,7 +75,7 @@ export function InlineEditPopover({
     return (
         <div className={isMobile
             ? "fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40"
-            : "w-[360px] rounded-2xl border border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40"
+            : "w-full rounded-2xl border border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40"
         }>
             <div className="flex items-start justify-between gap-3">
                 <div>
