@@ -256,17 +256,15 @@ export default function EditorPage() {
                     const siteIsPublished = data.site?.status === 'published'
                     const hasDraftPages = loadedPages.some((p: { status: string }) => p.status === 'draft')
 
-                    // GH-843: also detect pending draft from current page fields returned by
-                    // editor-data (fetched with draft:true). The pages API _status field reflects
-                    // the live document and misses auto-saved draft versions; compare timestamps
-                    // as a reliable fallback so the Update button survives page reload.
+                    // GH-843: also detect pending draft from current page _status returned by
+                    // editor-data (fetched with draft:true — returns draft version when it exists).
+                    // The pages API _status reflects the live document and misses auto-saved draft
+                    // versions. Timestamp comparison is intentionally omitted: seo-queue runs
+                    // payload.update() after publish (no draft:true), bumping page.updatedAt past
+                    // site.publishedAt and causing a false positive Update button.
                     const currentPageIsDraft = data.page?._status === 'draft'
-                    const pageUpdatedAt = data.page?.updatedAt ? new Date(data.page.updatedAt).getTime() : null
-                    const sitePublishedAt = data.site?.publishedAt ? new Date(data.site.publishedAt).getTime() : null
-                    const hasPendingDraft = currentPageIsDraft ||
-                        (pageUpdatedAt != null && sitePublishedAt != null && pageUpdatedAt > sitePublishedAt)
 
-                    if (siteIsPublished && (hasDraftPages || hasPendingDraft)) {
+                    if (siteIsPublished && (hasDraftPages || currentPageIsDraft)) {
                         useEditorStore.setState({ hasUnpublishedChanges: true })
                     }
                 }
