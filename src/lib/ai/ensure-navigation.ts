@@ -69,6 +69,19 @@ function patchHollowNav(
     return patched
 }
 
+// Replace footer's first column (pages column) with normalized page links so footer
+// mirrors the nav menu. Only column[0] is replaced — support/legal/contact columns kept.
+function patchFooterPageLinks(
+    block: PageBlockShape,
+    pageLinks: readonly { label: string; url: string }[],
+): PageBlockShape {
+    if (!Array.isArray(block.columns)) return block
+    const columns = (block.columns as Array<Record<string, unknown>>).map((col, i) =>
+        i === 0 ? { ...col, links: pageLinks.map((l) => ({ ...l })) } : col,
+    )
+    return { ...block, columns }
+}
+
 // Variants that occupy fixed top position — first content block needs padding-top offset.
 // 'transparent' IS included: fixed top-0, out of flow → hero text still needs offset so it
 // isn't hidden behind the semi-transparent nav bar. The transparency affects only the nav
@@ -182,6 +195,10 @@ export function ensureNavigationBlocks(
 
         if (!hasFooter) {
             layout.push(buildDefaultFooter(safeName, fallbackLinks))
+        } else if (pageLinks !== undefined) {
+            // Force-replace footer pages column with normalized links so footer
+            // mirrors the nav menu (same fix as navigation forceReplace above).
+            layout = layout.map((b) => isFooterBlock(b) ? patchFooterPageLinks(b, fallbackLinks) : b)
         }
 
         return { ...page, layout: injectFirstBlockOffset(layout) }
