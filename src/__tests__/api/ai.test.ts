@@ -95,6 +95,19 @@ vi.mock('@/lib/ai/openai-generator', () => ({
     })
 }))
 
+// Top-level openai mock — vi.mock() must never be inside it() per testing.md
+vi.mock('openai', () => {
+    const OpenAI = vi.fn()
+    OpenAI.prototype.chat = {
+        completions: {
+            create: vi.fn().mockResolvedValue({
+                choices: [{ message: { content: JSON.stringify({ action: 'update_theme', changes: { colorMode: 'dark' } }) } }]
+            })
+        }
+    }
+    return { default: OpenAI }
+})
+
 
 describe('AI Streaming APIs', () => {
 
@@ -135,7 +148,7 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB.length).toBe(1) // A site was created
              expect(mockPageDB.length).toBe(5) // Homepage, About, Products, Contact + 404
              expect(result.totalPages).toBe(4) // totalPages excludes system 404 page
-             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', 'about', 'products', 'contact', '404'])
+             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact', '404'])
         })
 
         // TC-F01.SLUG.01 — GH-820: AI multi-page path normalizes canonical slugs
@@ -150,10 +163,10 @@ describe('AI Streaming APIs', () => {
                      language: 'en',
                      blocks: [],
                      pages: [
-                         { title: 'Homepage', slug: '/', isHomepage: true, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Hello', subheadline: 'World', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'Home', description: 'Home page' } },
-                         { title: 'Our Story', slug: 'our-story', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'About', subheadline: 'Us', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'about', variant: 'image-right', headline: 'About Us', body: 'About us' }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'About', description: 'About page' } },
-                         { title: 'Features', slug: 'features', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Features', subheadline: 'Features', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'features', variant: 'grid-3', headline: 'Features', items: [] }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'Features', description: 'Features page' } },
-                         { title: 'Start Free Trial', slug: 'free-trial', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Contact', subheadline: 'Contact', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'contact', variant: 'form', headline: 'Contact Us', email: 'a@b.com' }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'Contact', description: 'Contact page' } },
+                         { title: 'Homepage', slug: '/', isHomepage: true, blocks: [{ blockType: 'navigation', variant: 'simple', links: [{ label: 'Our Story', url: '/our-story' }, { label: 'Free Trial', url: '/free-trial' }] }, { blockType: 'hero', variant: 'centered', headline: 'Hello', subheadline: 'World', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'footer', variant: 'simple', columns: [{ title: 'Pages', links: [{ label: 'Our Story', url: '/our-story' }, { label: 'Free Trial', url: '/free-trial' }] }] }], seo: { title: 'Home', description: 'Home page' } },
+                         { title: 'Our Story', slug: 'our-story', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'About', subheadline: 'Us', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'about', variant: 'image-right', headline: 'About Us', body: 'About us' }, { blockType: 'footer', variant: 'simple', columns: [{ title: 'Pages', links: [] }] }], seo: { title: 'About', description: 'About page' } },
+                         { title: 'Features', slug: 'features', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Features', subheadline: 'Features', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'features', variant: 'grid-3', headline: 'Features', items: [] }, { blockType: 'footer', variant: 'simple', columns: [{ title: 'Pages', links: [] }] }], seo: { title: 'Features', description: 'Features page' } },
+                         { title: 'Start Free Trial', slug: 'free-trial', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Contact', subheadline: 'Contact', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'contact', variant: 'form', headline: 'Contact Us', email: 'a@b.com' }, { blockType: 'footer', variant: 'simple', columns: [{ title: 'Pages', links: [] }] }], seo: { title: 'Contact', description: 'Contact page' } },
                          { title: 'Blog', slug: 'blog', isHomepage: false, blocks: [{ blockType: 'navigation', variant: 'simple', links: [] }, { blockType: 'hero', variant: 'centered', headline: 'Blog', subheadline: 'Blog', primaryButtonLabel: 'CTA', primaryButtonUrl: '/' }, { blockType: 'blog-list', variant: 'grid', items: [] }, { blockType: 'footer', variant: 'simple', columns: [] }], seo: { title: 'Blog', description: 'Blog page' } },
                      ],
                  },
@@ -169,12 +182,38 @@ describe('AI Streaming APIs', () => {
              await GenerateSitePOST(req)
 
              const slugs = mockPageDB.map((p: any) => p.slug)
-             // contact block-based detection → must resolve to "contact", not "free-trial"
-             expect(slugs).toContain('contact')
+             // contact block-based detection → must resolve to "/contact", not "free-trial"
+             expect(slugs).toContain('/contact')
              expect(slugs).not.toContain('free-trial')
-             // about block-based detection
-             expect(slugs).toContain('about')
+             expect(slugs).not.toContain('/free-trial')
+             // about title detection → must resolve to "/about", not "our-story"
+             expect(slugs).toContain('/about')
              expect(slugs).not.toContain('our-story')
+             expect(slugs).not.toContain('/our-story')
+
+             // GH-820: verify nav/footer link URLs inside saved pages use normalized slugs
+             const homepageSaved = mockPageDB.find((p: any) => p.slug === '/')
+             expect(homepageSaved).toBeDefined()
+
+             const navBlock = homepageSaved?.layout?.find((b: any) => b.blockType === 'navigation')
+             expect(navBlock).toBeDefined()
+             const navUrls = (navBlock?.links ?? []).map((l: any) => l.url)
+             expect(navUrls).toContain('/about')
+             expect(navUrls).not.toContain('our-story')
+             expect(navUrls).not.toContain('/our-story')
+             expect(navUrls).toContain('/contact')
+             expect(navUrls).not.toContain('free-trial')
+             expect(navUrls).not.toContain('/free-trial')
+
+             const footerBlock = homepageSaved?.layout?.find((b: any) => b.blockType === 'footer')
+             expect(footerBlock).toBeDefined()
+             const pagesCol = footerBlock?.columns?.[0]
+             expect(pagesCol).toBeDefined()
+             const footerUrls = (pagesCol?.links ?? []).map((l: any) => l.url)
+             expect(footerUrls).toContain('/about')
+             expect(footerUrls).not.toContain('our-story')
+             expect(footerUrls).toContain('/contact')
+             expect(footerUrls).not.toContain('free-trial')
         })
 
         it('returns text/event-stream response for SSE mode when stream=true', async () => {
@@ -309,26 +348,10 @@ describe('AI Streaming APIs', () => {
         })
 
         it('returns 200 with AI generated JSON action', async () => {
-            // Mock OpenAI is already handled or we can just expect our mock config to take over
             const req = new NextRequest('http://localhost:3000/api/ai/edit-block', {
                 method: 'POST',
                 body: JSON.stringify({ instruction: 'Make to dark mode', blockIndex: 0 })
             })
-            // Temporary mock openai within this test file if necessary, but openai is not globally mocked in this file yet.
-            // Wait, we didn't mock openai in ai.test.ts globally?
-            // Ah, the route uses new OpenAI() inside. Let's mock it.
-            vi.mock('openai', () => {
-                const OpenAI = vi.fn()
-                OpenAI.prototype.chat = {
-                    completions: {
-                        create: vi.fn().mockResolvedValue({
-                            choices: [{ message: { content: JSON.stringify({ action: "update_theme", changes: { colorMode: "dark" } }) } }]
-                        })
-                    }
-                }
-                return { default: OpenAI }
-            })
-
             const res = await EditBlockPOST(req)
             expect(res.status).toBe(200)
         })
@@ -558,18 +581,11 @@ describe('AI Streaming APIs', () => {
         it('returns 200 with JSON format when parameters are valid', async () => {
             mockRateLimitAllowed = true
             vi.mocked(process).env.OPENAI_API_KEY = 'test-key'
-            
-            // Re-mock openai for SEO Generator locally
-            vi.mock('openai', () => {
-                const OpenAI = vi.fn()
-                OpenAI.prototype.chat = {
-                    completions: {
-                        create: vi.fn().mockResolvedValue({
-                            choices: [{ message: { content: JSON.stringify({ title: "Generated Title", description: "Generated Description", slug: "generated-slug" }) } }]
-                        })
-                    }
-                }
-                return { default: OpenAI }
+
+            const OpenAIMod = await import('openai')
+            const OpenAI = OpenAIMod.default as any
+            OpenAI.prototype.chat.completions.create.mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({ title: 'Generated Title', description: 'Generated Description', slug: 'generated-slug' }) } }]
             })
 
             const req = new NextRequest('http://localhost:3000/api/ai/seo-generate', {
