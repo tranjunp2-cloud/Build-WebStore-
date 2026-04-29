@@ -210,6 +210,18 @@ export async function seedImageLibraryForSite(
         const results = await Promise.all(
             slotPhotoAssignments.map(({ slotDef, photoUrl, downloadLocation }) =>
                 sem.run(async () => {
+                    const altKey = buildSiteAltKey(siteId, slotDef.slot)
+                    // Per-slot findOrCreate: if this slot was already uploaded by a concurrent
+                    // seeder call that raced past the top-level prefix check, reuse the existing doc.
+                    const existing = await payload.find({
+                        collection: 'media',
+                        where: { alt: { equals: altKey } },
+                        limit: 1,
+                        depth: 0,
+                    })
+                    if (existing.docs.length > 0) {
+                        return { slot: slotDef.slot, id: existing.docs[0]!.id as number }
+                    }
                     if (!photoUrl) { failed++; return { slot: slotDef.slot, id: null } }
                     try {
                         const { buffer, mimetype } = await downloadPhotoBuffer(photoUrl)
@@ -217,7 +229,6 @@ export async function seedImageLibraryForSite(
                         if (downloadLocation) trackDownload(downloadLocation)
                         const ext = mimetype.includes('png') ? 'png' : 'jpg'
                         const filename = `imglib-s${siteId}-${slotDef.slot.replace(/[[\].]/g, '-')}-${Date.now()}.${ext}`
-                        const altKey = buildSiteAltKey(siteId, slotDef.slot)
                         const id = await uploadBufferToMedia(
                             payload as unknown as Parameters<typeof uploadBufferToMedia>[0],
                             { buffer, filename, mimetype, alt: altKey, tenantId: String(tenantId) },
