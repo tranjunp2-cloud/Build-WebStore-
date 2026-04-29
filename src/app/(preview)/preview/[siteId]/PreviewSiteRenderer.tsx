@@ -44,7 +44,20 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
                 setPage(prev => {
                     if (!Array.isArray(prev.layout)) return prev
                     const layout = [...prev.layout]
-                    layout[blockIndex] = blockData
+                    // blockIndex is the STORE index. The iframe layout may have injected system
+                    // blocks (e.g. nav prepended at position 0) that shift content blocks so the
+                    // iframe slot != store index. Find the slot whose __editorBlockIndex matches
+                    // the incoming store index; fall back to direct blockIndex when the layout is
+                    // already in store order (after UPDATE_FULL_LAYOUT stamps __editorBlockIndex = i).
+                    const iframeSlot = layout.findIndex(
+                        b => (b as Record<string, unknown>).__editorBlockIndex === blockIndex
+                    )
+                    const targetIndex = iframeSlot >= 0 ? iframeSlot : blockIndex
+                    if (targetIndex < 0 || targetIndex >= layout.length) return prev
+                    layout[targetIndex] = {
+                        ...(blockData as object),
+                        __editorBlockIndex: blockIndex,
+                    }
                     return { ...prev, layout }
                 })
             } else if (e.data?.type === 'UPDATE_HEADER_BLOCK') {
@@ -55,6 +68,10 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
                 const { blockData } = e.data
                 if (typeof blockData !== 'object' || blockData === null) return
                 setSiteState(prev => ({ ...prev, footerBlock: blockData as Record<string, unknown> }))
+            } else if (e.data?.type === 'UPDATE_SITE_THEME') {
+                const { theme } = e.data
+                if (typeof theme !== 'object' || theme === null) return
+                setSiteState(prev => ({ ...prev, theme: theme as Record<string, unknown> }))
             }
         }
         window.addEventListener('message', onMessage)

@@ -1,5 +1,5 @@
 import { blockRegistry } from '@/blocks/registry'
-import { FIXED_NAV_VARIANTS, isNavBlock } from '@/lib/ai/ensure-navigation'
+import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import {
@@ -340,25 +340,35 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     // Heading hierarchy — compute levels for all blocks
     const allBlockTypes = blocks.map(b => b.blockType).filter(Boolean)
 
-    // Nav offset: if first block is a fixed/sticky nav variant, the first content block
-    // needs paddingTop = var(--nav-height) to avoid being hidden behind the nav.
-    // Uses isNavBlock (case-insensitive) consistent with ensure-navigation.ts detection.
-    // Undefined variant defaults to 'default' (matches FIXED_NAV_VARIANTS membership +
-    // shouldOffsetFirstBlock fallback in ensure-navigation.ts).
+    // Nav offset: overlay nav variants (transparent, floating) are fixed-position and out of
+    // document flow — in the editor their content can hide behind the nav without a paddingTop.
+    // On live sites the overlay is intentional (hero background fills behind nav), so no offset.
+    // Sticky variants (default, centered, mega) push content down naturally via document flow —
+    // adding paddingTop would create a double gap. Sidebar nav is off-canvas (no top bar).
     const GLOBAL_BLOCK_TYPES = ['header', 'navigation', 'footer', 'breadcrumb']
     const navForOffset = blocks.find(b => isNavBlock(b))
     const firstContentBlockIdx = blocks.findIndex(b => !GLOBAL_BLOCK_TYPES.includes(b.blockType))
-    const navVariant = ((navForOffset as Record<string, unknown> | undefined)?.variant as string) ?? 'default'
-    // transparent + floating overlay the hero intentionally — adding paddingTop to the
-    // block wrapper creates a white gap above the hero background. Skip for these variants.
-    // Both ARE in FIXED_NAV_VARIANTS (src/lib/ai/ensure-navigation.ts) — this exclusion
-    // is intentional, not a contradiction. FIXED_NAV_VARIANTS governs membership;
-    // OVERLAY_NAV_VARIANTS narrows it for the paddingTop offset only.
+    // Normalize raw DB variant through legacy aliases (mirrors NavigationBlock VARIANT_ALIASES).
+    // 'pill' is stored in legacy sites but resolves to 'floating' at render time.
+    const NAV_VARIANT_DB_ALIASES: Record<string, string> = { simple: 'default', 'mega-menu': 'mega', pill: 'floating' }
+    const rawNavVariant = ((navForOffset as Record<string, unknown> | undefined)?.variant as string) ?? 'default'
+    const navVariant = NAV_VARIANT_DB_ALIASES[rawNavVariant] ?? rawNavVariant
     const OVERLAY_NAV_VARIANTS = new Set(['transparent', 'floating'])
+    // Per-variant paddingTop for breadcrumb (always a thin strip directly under nav).
+    // Heights confirmed from src/blocks/navigation/index.tsx: transparent/sidebar = 64px,
+    // floating (pill, top-4) has ~80px footprint so 88px clears with margin.
+    const BREADCRUMB_NAV_OFFSET: Record<string, string> = {
+        transparent: '64px',
+        sidebar:     '64px',
+        floating:    '88px',
+        default:     'var(--nav-height, 64px)',
+        centered:    'var(--nav-height, 64px)',
+        mega:        'var(--nav-height, 64px)',
+    }
     const applyNavOffset =
         navForOffset != null &&
-        FIXED_NAV_VARIANTS.has(navVariant) &&
-        !OVERLAY_NAV_VARIANTS.has(navVariant) &&
+        OVERLAY_NAV_VARIANTS.has(navVariant) &&
+        isEditor &&
         firstContentBlockIdx >= 0
 
     return (
@@ -438,18 +448,34 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
                 // Block spacing — navigation/footer default to 0, others use custom or default
                 const isGlobalBlock = ['header', 'navigation', 'footer', 'breadcrumb'].includes(block.blockType)
+                const isBreadcrumb = block.blockType === 'breadcrumb'
+                // Only out-of-flow nav variants (fixed/off-canvas) need to offset the breadcrumb.
+                // Sticky variants (default/centered/mega) are in document flow — no extra offset needed.
+                const BREADCRUMB_OFFSET_VARIANTS = new Set(['transparent', 'floating', 'sidebar'])
+                const breadcrumbOffset =
+                    isBreadcrumb && navForOffset != null && BREADCRUMB_OFFSET_VARIANTS.has(navVariant)
+                        ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
+                        : undefined
                 const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
                 const spacingStyle = isGlobalBlock
-                    ? {}
+                    ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
                     : {
                         paddingTop: applyNavOffset && index === firstContentBlockIdx
-                            ? 'var(--nav-height, 64px)'
+                            ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
                             : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
                         paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
                     }
 
+                // Use __editorBlockIndex when available (set by PreviewSiteRenderer from store order).
+                // Falls back to loop index only for non-editor contexts or uninjected blocks.
+                // This prevents nav-injection offset mismatch: preview injects nav at position 0 which
+                // shifts all loop indices by +1, but the store has no injected nav, so hero is at
+                // store index 0 while its loop index would be 1.
+                const editorBlockIndex = typeof block.__editorBlockIndex === 'number' && block.__editorBlockIndex >= 0
+                    ? block.__editorBlockIndex
+                    : index
                 const callbackValue = onBlockFieldChange
-                    ? { blockIndex: index, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(index, field, value) }
+                    ? { blockIndex: editorBlockIndex, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorBlockIndex, field, value) }
                     : null
 
                 const blockContent = (
@@ -479,8 +505,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 // Public site: wrap non-global blocks with spacing style so
                 // user-customized blockSpacing (paddingTop/paddingBottom) is
                 // preserved on the live published site. Global blocks (nav,
-                // footer, breadcrumb) get empty spacingStyle {} so no wrapper needed.
-                if (!isGlobalBlock) {
+                // footer, breadcrumb) normally return unwrapped; breadcrumb gets
+                // wrapped when a fixed-nav offset applies.
+                if (!isGlobalBlock || (isBreadcrumb && breadcrumbOffset)) {
                     return (
                         <div key={`${block.blockType}-${index}`} style={spacingStyle}>
                             {blockContent}

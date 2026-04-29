@@ -153,7 +153,8 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
         expect(result.theme).toBeDefined()
     })
 
-    it('falls back when OpenAI throws error', async () => {
+    // TC-F01-AI-FALLBACK-SILENT-01 — OpenAI throws → fallback succeeds → no error event emitted
+    it('falls back silently when OpenAI throws error (no error event)', async () => {
         const OpenAI = (await import('openai')).default as any
         OpenAI.mockImplementation(() => ({
             chat: {
@@ -165,10 +166,11 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 
         const { result, events } = await generateSiteWithAI(businessInfo)
 
-        // Should still return valid result via fallback
+        // Site still created via smart templates fallback
         expect(result.blocks.length).toBeGreaterThan(0)
-        const errorEvent = events.find(e => e.event === 'error')
-        expect(errorEvent).toBeDefined()
+        // BUG FIX: fallback success must NOT emit 'error' event (causes false error UI despite successful generation)
+        const errorEvent = events.find(e => e.event === 'error' && (e.data as { code?: string }).code === 'ai_fallback')
+        expect(errorEvent).toBeUndefined()
     })
 
     it('overrides AI theme with curated category preset [TC-F01D-CP.60]', async () => {

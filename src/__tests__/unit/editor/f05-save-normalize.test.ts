@@ -550,4 +550,43 @@ describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 back
         // then coerces 'expanded' (invalid for hero) to hero's default 'centered'.
         expect(result[0].variant).toBe('centered')
     })
+
+    // TC-F05-save-18 — contact block email empty string → null
+    // Payload email-type field validates format even without required:true,
+    // so empty string '' causes ValidationError on publish. Must be coerced to null.
+    it('TC-F05-save-18: contact block with email="" → coerced to null (prevents Payload email ValidationError on publish)', () => {
+        // Arrange
+        const blocks = [{ blockType: 'contact', variant: 'form', email: '', phone: '+601111', headline: 'Contact Us' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — empty email stripped to null so Payload skips format validation
+        expect(result[0].email).toBeNull()
+        // Other fields must be untouched
+        expect(result[0].phone).toBe('+601111')
+        expect(result[0].headline).toBe('Contact Us')
+    })
+
+    it('TC-F05-save-18b: contact block with valid email → untouched', () => {
+        // Arrange — valid email must not be stripped
+        const blocks = [{ blockType: 'contact', variant: 'form', email: 'info@cafe.com', headline: 'Contact Us' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — valid email preserved
+        expect(result[0].email).toBe('info@cafe.com')
+    })
+
+    it('TC-F05-save-18c: non-contact block with email="" → NOT stripped (only applies to contact)', () => {
+        // Arrange — footer has no email field normally, but if it did, we don't strip it
+        const blocks = [{ blockType: 'footer', variant: 'simple', email: '' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — only contact block gets email coercion
+        expect(result[0].email).toBe('')
+    })
 })

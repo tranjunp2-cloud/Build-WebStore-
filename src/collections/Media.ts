@@ -68,10 +68,15 @@ const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> 
     return new Response('File not found', { status: 404 })
 }
 
-/** JPEG/PNG magic byte signatures for server-side validation (TC-F17-02-13) */
+/**
+ * Magic byte signatures for server-side image validation (TC-F17-02-13).
+ * offset: byte position where the signature starts (WebP = 'WEBP' at offset 8).
+ * compressImage() may convert PNG→WebP on the client, so WebP must be accepted.
+ */
 const IMAGE_SIGNATURES = [
-    { bytes: [0xFF, 0xD8, 0xFF], type: 'image/jpeg' },
-    { bytes: [0x89, 0x50, 0x4E, 0x47], type: 'image/png' },
+    { bytes: [0xFF, 0xD8, 0xFF], offset: 0 },                 // JPEG
+    { bytes: [0x89, 0x50, 0x4E, 0x47], offset: 0 },           // PNG
+    { bytes: [0x57, 0x45, 0x42, 0x50], offset: 8 },           // WebP (RIFF????WEBP)
 ]
 
 export const Media: CollectionConfig = {
@@ -84,15 +89,16 @@ export const Media: CollectionConfig = {
                 const mime = req.file.mimetype || ''
                 if (!mime.startsWith('image/')) return
                 try {
+                    // Read 12 bytes to cover WebP signature at offset 8–11
                     const raw = req.file.data instanceof Buffer
-                        ? req.file.data.subarray(0, 8)
-                        : new Uint8Array(req.file.data as unknown as ArrayBufferLike).slice(0, 8)
+                        ? req.file.data.subarray(0, 12)
+                        : new Uint8Array(req.file.data as unknown as ArrayBufferLike).slice(0, 12)
                     const head = new Uint8Array(raw)
                     const valid = IMAGE_SIGNATURES.some(sig =>
-                        sig.bytes.every((b, i) => head[i] === b),
+                        sig.bytes.every((b, i) => head[sig.offset + i] === b),
                     )
                     if (!valid) {
-                        throw new APIError('Invalid image file — only JPEG and PNG are accepted', 400)
+                        throw new APIError('Invalid image file — only JPEG, PNG, and WebP are accepted', 400)
                     }
                 } catch (e) {
                     if (e instanceof APIError) throw e

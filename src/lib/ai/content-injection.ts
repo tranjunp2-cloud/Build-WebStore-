@@ -339,7 +339,9 @@ export function buildBlockFromLibrary(
                 // Plan 07 — user-supplied contact fields win over canned pool.
                 address: userAddress ?? biz?.address ?? '',
                 phone: userPhone ?? biz?.phone ?? '',
-                email: userEmail ?? biz?.email ?? '',
+                // null not '' — Payload email-type field validates format even without required:true,
+                // so empty string causes ValidationError on publish.
+                email: userEmail ?? biz?.email ?? null,
                 formFields: [
                     { fieldName: 'name', label: 'Name', fieldType: 'text', required: true },
                     { fieldName: 'email', label: 'Email', fieldType: 'email', required: true },

@@ -64,7 +64,8 @@ export async function POST(req: NextRequest) {
         })
 
         return NextResponse.json({ success: true })
-    } catch {
+    } catch (err) {
+        console.error('[Subscribe Error]', err instanceof Error ? err.message : String(err))
         return NextResponse.json(
             { error: 'Something went wrong. Please try again.' },
             { status: 500 }
