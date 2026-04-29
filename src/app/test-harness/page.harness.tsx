@@ -333,9 +333,12 @@ export default function HarnessIndexPage() {
         <section style={{ marginBottom: 24, background: DK.ai.bg, border: `1px solid ${DK.ai.border}`, borderRadius: 10, padding: '14px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
             <div>
-              <h2 style={{ fontSize: 13, fontWeight: 700, color: DK.ai.text, margin: 0 }}>AI-First Gen · Real OpenAI per business</h2>
+              <h2 style={{ fontSize: 13, fontWeight: 700, color: DK.ai.text, margin: 0 }}>AI Gen · Real OpenAI per business (mirrors user flow)</h2>
               <p style={{ fontSize: 11, color: DK.ai.sub, margin: '4px 0 0', lineHeight: 1.5 }}>
-                GPT-4o personalizes hero + SEO per business sample. Cached = instant; Fresh = 5–15s, costs $.
+                Runs exact same <code style={{ background: '#1e1040', padding: '1px 4px', borderRadius: 3 }}>generateSiteWithAI()</code> as user flow.
+                Default (<code style={{ background: '#1e1040', padding: '1px 4px', borderRadius: 3 }}>template-first</code>): composer + GPT hero/SEO only (~3–8s).
+                Set <code style={{ background: '#1e1040', padding: '1px 4px', borderRadius: 3 }}>GEN_MODE=ai-first</code> to test full AI gen path.
+                Cached = instant; Fresh = costs $.
                 Each page has <strong style={{ color: DK.ai.text }}>Inspect Prompts + Output</strong> drawer bottom-right.
               </p>
             </div>
