@@ -22,21 +22,31 @@ export async function uploadMediaAction(formData: FormData) {
     const payload = await getPayload({ config: configPromise })
 
     // Magic byte validation handled by Media.ts beforeChange hook
-    const res = await payload.create({
-        collection: 'media',
-        data: {
-            alt,
-        },
-        file: {
-            data: buffer,
-            name: file.name,
-            mimetype: file.type,
-            size: file.size,
-        },
-        user: user as any,
-    })
+    try {
+        const res = await payload.create({
+            collection: 'media',
+            data: {
+                alt,
+            },
+            file: {
+                data: buffer,
+                name: file.name,
+                mimetype: file.type,
+                size: file.size,
+            },
+            user: user as any,
+        })
 
-    return JSON.parse(JSON.stringify(res))
+        return JSON.parse(JSON.stringify(res))
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        // Sharp throws "Input file is missing" or "Invalid image file" for unsupported formats.
+        if (/invalid image|input file|unsupported/i.test(msg)) {
+            throw new Error('Invalid image file. Please upload JPG, PNG, WebP, GIF, or AVIF.')
+        }
+        console.error('[uploadMediaAction] Failed to create media:', msg)
+        throw err
+    }
 }
 
 export async function getOrCreateCrateCartonIdAction() {

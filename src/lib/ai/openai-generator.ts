@@ -612,7 +612,10 @@ export async function generateSiteWithAI(
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
-        events.push({ event: 'error', data: { code: 'ai_fallback', message: 'Using smart templates', retryable: false } })
+        // Fallback succeeded — site will still be created via smart templates.
+        // Don't emit 'error' event (would show error UI even though generation succeeds).
+        // Keep warn log for ops visibility on fallback rate.
+        console.warn('[AI Generator] Falling back to smart templates (OpenAI unavailable)')
         const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
         const fallbackResult = await generateWithFallback(promptText, events, fallbackLang, businessInfo)
         const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
