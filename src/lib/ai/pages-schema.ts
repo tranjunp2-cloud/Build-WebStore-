@@ -137,6 +137,26 @@ export const PAGES_FIELDS: Record<string, string[]> = {
 
 const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
 
+/**
+ * Top-level upload/media fields to carry over from the USER'S existing blocks
+ * when switching templates on an existing site.
+ *
+ * Intentionally separate from PAGES_FIELDS so that sanitizeBlockForPayload
+ * (which runs on template DB blocks) never touches these — template blocks
+ * may have null/string-URL assets that Payload upload validators reject.
+ * mergeUserContent reads this map to copy only the user's valid media IDs.
+ *
+ * Nested array upload fields (team.members[].image, testimonials[].avatar,
+ * gallery.images[].image) are already preserved because their parent arrays
+ * are in CONTENT_FIELDS and copied wholesale.
+ */
+export const USER_PRESERVE_MEDIA_FIELDS: Record<string, string[]> = {
+    hero: ['image', 'backgroundImage'],
+    navigation: ['logo'],
+    about: ['image'],
+    footer: ['logo'],
+}
+
 /** PAGES_FIELDS minus structural fields — used by mergeUserContent to preserve user copy. */
 export const CONTENT_FIELDS: Record<string, string[]> = Object.fromEntries(
     Object.entries(PAGES_FIELDS).map(([bt, fields]) => [bt, fields.filter(f => !STRUCTURAL_FIELDS.has(f))])
