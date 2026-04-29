@@ -13,6 +13,8 @@ import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
+// gh-839: Hide Add to Cart until checkout is implemented. Flip to true to re-enable.
+const CART_ENABLED = false
 
 interface FeaturedProduct {
     id: string
@@ -182,6 +184,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                     )}
 
                     <div className="flex flex-col sm:flex-row gap-4">
+                        {CART_ENABLED && (
                         <button
                             type="button"
                             className={`px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 ${TOUCH_TARGET.min}`}
@@ -189,6 +192,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                         >
                             Add to Cart
                         </button>
+                        )}
                         <button
                             type="button"
                             className={`px-8 py-4 rounded-full font-bold text-lg transition-colors ${TOUCH_TARGET.min}`}
