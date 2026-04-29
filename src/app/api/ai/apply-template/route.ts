@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
+import { sql } from 'drizzle-orm'
 import config from '@payload-config'
 import { applyTemplateSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -265,14 +266,19 @@ export const POST = withAuth(async (user, req) => {
 
             // 2. Fetch existing pages + snapshot for rollback (BR-06)
             // MUST use draft: true — editor saves blocks as drafts,
-            // reading published version would miss user's latest edits
-            const existingPages = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: Number(siteId) } },
-                limit: 100,
-                depth: 0,
-                draft: true,
-            })
+            // reading published version would miss user's latest edits.
+            // payload.find() generates aggregate SQL expecting "data" column that
+            // doesn't exist in our pages_blocks_* tables — use SQL for IDs + findByID per page.
+            const db = payload.db.drizzle
+            const pageIdRows = await db.execute(sql`
+                SELECT id FROM pages WHERE site_id = ${Number(siteId)} AND deleted_at IS NULL LIMIT 100
+            `) as { rows: Array<{ id: number }> }
+            const pageDocs = await Promise.all(
+                pageIdRows.rows.map(row =>
+                    payload.findByID({ collection: 'pages', id: row.id, depth: 0, draft: true })
+                )
+            )
+            const existingPages = { docs: pageDocs }
 
             const rollbackData = {
                 theme: existingSite.theme,
