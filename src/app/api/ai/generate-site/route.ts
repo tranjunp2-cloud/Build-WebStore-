@@ -701,14 +701,22 @@ export async function POST(req: NextRequest) {
             result,
         })
 
+        // GH-820: build nav links from normalized definitions so URLs match canonical page slugs.
+        // aiPageLinks (derived above from result.pages) still carries raw AI slugs like /book-trial;
+        // rawPageDefinitions has already run canonicalizePageSlug so slugs are /contact, /about, etc.
+        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions.map((p) => ({
+            label: p.title,
+            url: p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`,
+        }))
+
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
-        // GH-817: pass aiPageLinks so injected/hollow nav reflects actual AI-generated pages
+        // GH-817: pass page links so injected/hollow nav reflects actual generated pages
         const pageDefinitions = enforcePageVariety(
             ensureNavigationBlocks(
                 rawPageDefinitions as unknown as PageShape[],
                 businessInfo.businessName,
-                aiPageLinks ?? undefined,
+                normalizedPageLinks,
             ),
         )
 
@@ -844,16 +852,16 @@ export async function POST(req: NextRequest) {
         }
 
         // GH-817 post-creation layout sync: if any pages failed to create, their links are
-        // still present in nav AND footer blocks of successfully saved pages (aiPageLinks
+        // still present in nav AND footer blocks of successfully saved pages (normalizedPageLinks
         // was computed BEFORE the for-loop). Patch both blocks in a single update per page.
-        if (pageFailures.length > 0 && aiPageLinks && createdPages.length > 0) {
+        if (pageFailures.length > 0 && normalizedPageLinks.length > 0 && createdPages.length > 0) {
             const succeededSlugs = new Set(
                 createdPages.map(p => {
                     const s = String(p.slug ?? '')
                     return s === '/' ? '/' : s.replace(/^\/+/, '')
                 }),
             )
-            const survivingLinks = aiPageLinks.filter(l => {
+            const survivingLinks = normalizedPageLinks.filter(l => {
                 const normalized = l.url === '/' ? '/' : l.url.replace(/^\/+/, '')
                 return succeededSlugs.has(normalized)
             })
@@ -862,7 +870,7 @@ export async function POST(req: NextRequest) {
                 pageFailures.map(f => f.slug === '/' ? '/' : `/${f.slug.replace(/^\/+/, '')}`)
             )
 
-            if (survivingLinks.length < aiPageLinks.length) {
+            if (survivingLinks.length < normalizedPageLinks.length) {
                 const survivingCtaUrl = resolveCtaUrl(survivingLinks)
                 for (const createdPage of createdPages) {
                     const rawLayout = Array.isArray(createdPage.layout)
@@ -928,7 +936,7 @@ export async function POST(req: NextRequest) {
                     }
                 }
                 console.info(
-                    `[generate-site] layout-sync: removed ${aiPageLinks.length - survivingLinks.length} ghost link(s), patched ${createdPages.length} page(s) (nav+footer)`,
+                    `[generate-site] layout-sync: removed ${normalizedPageLinks.length - survivingLinks.length} ghost link(s), patched ${createdPages.length} page(s) (nav+footer)`,
                 )
             }
         }
