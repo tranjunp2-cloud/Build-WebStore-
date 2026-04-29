@@ -250,7 +250,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'minimal' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'minimal-list', count: 3 },
           { blockType: 'stats', count: 3 },
@@ -544,7 +544,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'class-schedule' },
           { blockType: 'features', variant: 'minimal-list', count: 3 },
@@ -833,7 +833,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'split-right' },
           { blockType: 'logo-cloud' },
           { blockType: 'property-card', count: 4 },
           { blockType: 'features', variant: 'minimal-list', count: 3 },
@@ -1210,7 +1210,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'minimal' },
           { blockType: 'logo-cloud' },
           { blockType: 'portfolio-grid', count: 6 },
           { blockType: 'features', variant: 'minimal-list', count: 3 },

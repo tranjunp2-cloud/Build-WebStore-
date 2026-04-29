@@ -207,9 +207,9 @@ export default function HarnessIndexPage() {
             {rubricAvg !== null && (
               <span style={{ fontSize: 15, fontWeight: 700, color: DK.accent, fontVariantNumeric: 'tabular-nums' }}>{rubricAvg.toFixed(2)}/10</span>
             )}
-            <a href="/test-harness/admin" style={{ background: DK.accent, color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            <Link href="/test-harness/admin" style={{ background: DK.accent, color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
               Debug Console →
-            </a>
+            </Link>
             <TriagePanel totalCount={blueprints.length} fixtureIds={blueprints.map((b) => b.fixtureId)} />
           </div>
         </div>

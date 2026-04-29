@@ -169,7 +169,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'split-right' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'alternating', count: 3 },
           { blockType: 'cta', variant: 'banner' },
@@ -534,7 +534,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'magazine' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'detailed', count: 3 },
           { blockType: 'gallery', variant: 'grid', count: 6 },
@@ -824,7 +824,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'magazine' },
           { blockType: 'logo-cloud' },
           { blockType: 'blog-list', variant: 'headline', count: 5 },
           { blockType: 'cta', variant: 'banner' },
@@ -1120,7 +1120,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'booking-widget', variant: 'compact' },
           { blockType: 'gallery', variant: 'grid', count: 6 },

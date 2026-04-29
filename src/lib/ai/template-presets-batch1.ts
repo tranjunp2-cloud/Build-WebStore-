@@ -153,7 +153,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'icon-grid' },
           { blockType: 'menu-display', variant: 'minimal' },
@@ -434,9 +434,10 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'list' },
+          { blockType: 'stats', count: 3 },
           { blockType: 'products-grid', variant: 'masonry', count: 8 },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'gallery', variant: 'carousel' },
@@ -860,7 +861,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'split-right' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'icon-grid' },
           { blockType: 'video-showcase' },
@@ -1357,7 +1358,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
         name: 'Home', slug: '/', isHomepage: true,
         blocks: [
           { blockType: 'navigation' },
-          { blockType: 'hero', variant: 'centered' },
+          { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'icon-grid' },
           { blockType: 'menu-display', variant: 'grid' },
