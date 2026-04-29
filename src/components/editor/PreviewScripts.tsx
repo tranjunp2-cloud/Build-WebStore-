@@ -938,7 +938,7 @@ export function PreviewScripts() {
                 if (!themeStyle) {
                     themeStyle = document.createElement('style')
                     themeStyle.id = 'live-theme-override'
-                    document.head.appendChild(themeStyle)
+                    document.body.appendChild(themeStyle)
                 }
                 themeStyle.textContent = e.data.css
             }
