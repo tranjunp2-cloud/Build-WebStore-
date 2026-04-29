@@ -1373,7 +1373,7 @@ function buildGeneratedPages({
 
     return [
         {
-            title: 'Homepage',
+            title: 'Home',
             slug: '/',
             isHomepage: true,
             layout: cloneBlockData(blocks),

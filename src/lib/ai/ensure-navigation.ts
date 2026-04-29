@@ -69,15 +69,21 @@ function patchHollowNav(
     return patched
 }
 
-// Replace footer's first column (pages column) with normalized page links so footer
-// mirrors the nav menu. Only column[0] is replaced — support/legal/contact columns kept.
+// Replace the footer's pages column with normalized page links so footer mirrors the nav menu.
+// Detects the pages column by title keyword; falls back to column[0] if none matches.
+// Only the pages column is replaced — support/legal/contact columns kept intact.
 function patchFooterPageLinks(
     block: PageBlockShape,
     pageLinks: readonly { label: string; url: string }[],
 ): PageBlockShape {
     if (!Array.isArray(block.columns)) return block
-    const columns = (block.columns as Array<Record<string, unknown>>).map((col, i) =>
-        i === 0 ? { ...col, links: pageLinks.map((l) => ({ ...l })) } : col,
+    const cols = block.columns as Array<Record<string, unknown>>
+    const pagesIdx = cols.findIndex(
+        (c) => typeof c.title === 'string' && /pages?|links?|nav|menu/i.test(c.title),
+    )
+    const targetIdx = pagesIdx >= 0 ? pagesIdx : 0
+    const columns = cols.map((col, i) =>
+        i === targetIdx ? { ...col, links: pageLinks.map((l) => ({ ...l })) } : col,
     )
     return { ...block, columns }
 }
