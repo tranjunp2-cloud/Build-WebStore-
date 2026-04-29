@@ -550,9 +550,8 @@ describe('[TC-F04-SR-07] SiteRenderer renders GoogleFontsLoader with correct fon
     })
 
     it('CSS variables reference next/font scoped vars from theme (post-F01D fix)', () => {
-        // Arrange — Merriweather is mapped in FONT_CSS_VAR_MAP.
-        // Lato is NOT in the map (not loaded in AppShell) → helper falls back
-        // to default --font-inter, with the name as system hint. Both branches tested.
+        // Arrange — both Merriweather and Lato are mapped in FONT_CSS_VAR_MAP
+        // and loaded in AppShell. Both hit the known-font branch (literal first).
         const site = { theme: { fontHeading: 'Merriweather', fontBody: 'Lato' } }
 
         // Act
@@ -560,10 +559,12 @@ describe('[TC-F04-SR-07] SiteRenderer renders GoogleFontsLoader with correct fon
 
         // Assert
         const style = container.querySelector('style')
-        // Merriweather has var mapping → var(--font-merriweather) first in chain
-        expect(style?.textContent).toContain('--font-heading: var(--font-merriweather)')
-        // Lato unmapped → name first (no quotes, single word) + default --font-inter fallback
-        expect(style?.textContent).toContain('--font-body: Lato, var(--font-inter)')
+        // Merriweather: mapped, literal first (single-word, unquoted)
+        expect(style?.textContent).toContain('--font-heading: Merriweather,')
+        expect(style?.textContent).toContain('var(--font-merriweather)')
+        // Lato: mapped (GH-737 fix — now loaded in AppShell + in FONT_CSS_VAR_MAP)
+        expect(style?.textContent).toContain('--font-body: Lato,')
+        expect(style?.textContent).toContain('var(--font-lato)')
     })
 })
 

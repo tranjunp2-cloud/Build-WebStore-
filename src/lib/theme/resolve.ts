@@ -3,6 +3,7 @@ import {
     getFontPairing,
     validateFontPairing,
     fontNameToCSSVar,
+    FONT_CSS_VAR_MAP,
 } from '@/lib/fonts/pairings'
 import {
     generatePalette,
@@ -180,6 +181,17 @@ export function generateThemeCSS(theme: ThemeConfig): string {
             for (const w of warnings) console.warn(w)
         }
 
+        const headingFont = theme.fontHeading || 'Outfit'
+        const bodyFont = theme.fontBody || 'Inter'
+        // Emit font CSS vars on :root so nested var(--font-x) references inside
+        // --font-heading/body resolve correctly on <body> and <html>, not only on
+        // the AppShell <div> where next/font applies its scoped class.
+        // Value pattern "FontName", "FontName Fallback" mirrors next/font output.
+        const fontVarsOnRoot = Array.from(new Set([headingFont, bodyFont, 'Inter', 'Outfit']))
+            .filter((name) => FONT_CSS_VAR_MAP[name])
+            .map((name) => `  ${FONT_CSS_VAR_MAP[name]}: "${name}", "${name} Fallback";`)
+            .join('\n')
+
         return `:root {
   /* Colors (legacy brand vars — preserved for backward compat) */
   --brand-primary: ${theme.primaryColor || '#0ea5e9'};
@@ -212,9 +224,13 @@ export function generateThemeCSS(theme: ThemeConfig): string {
   --border-semantic: ${palette.border};
   --divider: ${palette.divider};
 
-  /* Typography — references next/font scoped vars from AppShell.tsx */
-  --font-heading: ${fontNameToCSSVar(theme.fontHeading || 'Outfit', 'heading')};
-  --font-body: ${fontNameToCSSVar(theme.fontBody || 'Inter', 'body')};
+  /* Font CSS vars on :root — makes var(--font-x) in --font-heading/body resolve
+     globally (body, html) not just on AppShell div descendants */
+${fontVarsOnRoot}
+
+  /* Typography */
+  --font-heading: ${fontNameToCSSVar(headingFont, 'heading')};
+  --font-body: ${fontNameToCSSVar(bodyFont, 'body')};
 
   /* Spacing */
   --space-xs: ${spacing.xs};
@@ -248,8 +264,9 @@ export function generateThemeCSS(theme: ThemeConfig): string {
   --surface-primary: ${palette.surface.primary}; --surface-secondary: ${palette.surface.secondary}; --surface-card: ${palette.surface.card};
   --text-primary: ${palette.text.primary}; --text-secondary: ${palette.text.secondary}; --text-inverse: ${palette.text.inverse}; --text-muted: ${palette.text.muted};
   --border-semantic: ${palette.border}; --divider: ${palette.divider};
-  --font-heading: var(--font-outfit), 'Outfit', sans-serif;
-  --font-body: var(--font-inter), 'Inter', sans-serif;
+  --font-outfit: "Outfit", "Outfit Fallback"; --font-inter: "Inter", "Inter Fallback";
+  --font-heading: Outfit, var(--font-outfit), 'Outfit', sans-serif;
+  --font-body: Inter, var(--font-inter), 'Inter', sans-serif;
   --space-xs: 0.25rem; --space-sm: 0.5rem; --space-md: 1rem; --space-lg: 1.5rem;
   --space-xl: 2.5rem; --space-2xl: 4rem; --section-padding: 5rem;
   --radius-sm: 4px; --radius-md: 8px; --radius-lg: 16px; --radius-full: 9999px;
