@@ -43,8 +43,8 @@ export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fal
     hero:         { field: 'variant', values: ['centered', 'split-left', 'split-right', 'fullscreen', 'video', 'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax', 'slideshow', 'split-video'], fallback: 'centered' },
     // navigation has TWO select columns: `style` (validated here) and `variant`.
     // `variant` is intentionally NOT validated here because schema.field='style' means
-    // the delete-cleanup (lines 231-232) never runs for variant — so variant passes through
-    // as-is to Payload. It is sanitized downstream in apply-template/route.ts instead.
+    // the delete-cleanup inside sanitizeBlockForPayload never runs for variant — so variant
+    // passes through as-is to Payload. It is sanitized downstream in apply-template/route.ts.
     navigation:   { field: 'style',   values: ['fixed', 'sticky', 'static', 'transparent'], fallback: 'fixed' },
     about:        { field: 'layout',  values: ['image-right', 'image-left', 'centered', 'cards'], fallback: 'image-right' },
     features:     { field: 'layout',  values: ['grid-3', 'grid-2', 'alternating', 'centered-list'], fallback: 'grid-3' },
@@ -103,8 +103,8 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     contact: ['variant', 'headline', 'subtext', 'email', 'phone', 'address', 'formFields', 'showMap', 'mapEmbedUrl'],
     footer: ['variant', 'logoText', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
     stats: ['variant', 'headline', 'stats'],
-    pricing: ['headline', 'subheadline', 'plans'],
-    faq: ['headline', 'faqs'],
+    pricing: ['variant', 'headline', 'subheadline', 'plans'],
+    faq: ['variant', 'headline', 'faqs'],
     team: ['variant', 'headline', 'members'],
     socialWidget: ['variant', 'headline', 'links'],
     cartWidget: ['variant', 'label', 'showLabel'],
@@ -151,9 +151,14 @@ const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
  * may have null/string-URL assets that Payload upload validators reject.
  * mergeUserContent reads this map to copy only the user's valid media IDs.
  *
- * Nested array upload fields (team.members[].image, testimonials[].avatar,
- * gallery.images[].image) are already preserved because their parent arrays
- * are in CONTENT_FIELDS and copied wholesale.
+ * Nested array upload fields (team.members[].image, testimonials[].avatar) are
+ * already preserved because their parent arrays (members, testimonials) are in
+ * CONTENT_FIELDS and copied wholesale.
+ *
+ * gallery.images is intentionally NOT in this map — gallery.images is also absent
+ * from PAGES_FIELDS, so it is neither sanitized from templates nor preserved from
+ * users. Wiring it up requires Payload upload-field validation (same class of risk
+ * as hero.image); defer to the Unsplash pipeline (Phase 05).
  */
 export const USER_PRESERVE_MEDIA_FIELDS: Record<string, string[]> = {
     hero: ['image', 'backgroundImage'],
