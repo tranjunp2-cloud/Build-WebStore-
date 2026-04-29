@@ -290,20 +290,32 @@ export async function saveBlogAction(data: {
         }
         body.slug = slug
 
-        const result = await payload.create({
-            collection: 'blogs',
-            data: body as Record<string, unknown>,
-            user: user as PayloadUser,
-        })
-        return JSON.parse(JSON.stringify(result))
+        try {
+            const result = await payload.create({
+                collection: 'blogs',
+                data: body as Record<string, unknown>,
+                user: user as PayloadUser,
+            })
+            return JSON.parse(JSON.stringify(result))
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            console.error('[saveBlogAction] create failed:', msg)
+            return { error: msg.includes('required') || msg.includes('invalid') ? msg : 'Failed to save blog' }
+        }
     } else {
-        const result = await payload.update({
-            collection: 'blogs',
-            id: data.id!,
-            data: body as Record<string, unknown>,
-            user: user as PayloadUser,
-        })
-        return JSON.parse(JSON.stringify(result))
+        try {
+            const result = await payload.update({
+                collection: 'blogs',
+                id: data.id!,
+                data: body as Record<string, unknown>,
+                user: user as PayloadUser,
+            })
+            return JSON.parse(JSON.stringify(result))
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            console.error('[saveBlogAction] update failed:', msg)
+            return { error: msg.includes('required') || msg.includes('invalid') ? msg : 'Failed to save blog' }
+        }
     }
 }
 
