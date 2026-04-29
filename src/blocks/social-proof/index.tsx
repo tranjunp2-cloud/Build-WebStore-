@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { SocialProofConfig, SocialProofReview } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -33,7 +34,7 @@ function Avatar({ src, name, color, imageIndex }: { src?: string; name: string; 
 
     if (src) {
         return (
-            <img src={src} alt={name} className="w-10 h-10 rounded-full object-cover" data-image-index={imageIndex} />
+            <Image src={src} alt={name} width={40} height={40} className="rounded-full object-cover" data-image-index={imageIndex} />
         )
     }
 
@@ -87,10 +88,11 @@ export function SocialProofBlock({ block, theme: _theme, site }: BlockProps<Soci
     const { variant = 'cards', headline, reviews: rawReviews = [] } = block
     const category = (site?.siteType as string) || 'business'
 
+    const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
     // Fallback: add avatar from industry images for reviews missing avatars (per-item)
     const reviews = rawReviews.map((review, i) => ({
         ...review,
-        avatar: review.avatar?.url ? review.avatar : { url: getTeamAvatar(category, i) },
+        avatar: review.avatar?.url ? review.avatar : { url: getTeamAvatar(category, i, s3Map) },
     }))
 
     return (

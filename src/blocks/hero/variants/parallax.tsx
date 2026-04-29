@@ -15,7 +15,7 @@ import { RichText } from '../../shared/RichText'
 export function ParallaxHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], image, badge } = block
     const category = (site?.siteType as string) || 'business'
-    const fallbackHeroUrl = getHeroImage(category)
+    const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">

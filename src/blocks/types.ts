@@ -91,12 +91,14 @@ export const BaseBlockSchema = z.object({
 })
 
 import type { SiteContactInfo, SiteSocialLinks, SiteBranding } from '@/lib/site-settings'
+import type { ImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 export type SiteData = {
     contactInfo?: SiteContactInfo | null
     socialLinks?: SiteSocialLinks | null
     name?: string | null
     branding?: SiteBranding | null
+    imageLibraryS3?: ImageLibraryS3Map // GH-727 Phase 03: seeded S3 URLs keyed by imglib altKey
     [key: string]: unknown
 }
 

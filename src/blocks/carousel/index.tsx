@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { CarouselConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -17,7 +18,7 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
     const category = (site?.siteType as string) || 'business'
 
     // Per-slot fallback: prefer item.image.url (Payload upload), fallback to imageUrl (AI gen string), then Unsplash
-    const fallbackUrls = getGalleryImages(category, 6)
+    const fallbackUrls = getGalleryImages(category, 6, site?.imageLibraryS3 as Record<string, string> | undefined)
     const items = Array.from({ length: Math.max(rawItems.length, fallbackUrls.length) }, (_, i) => {
         const item = rawItems[i]
         const imgSrc = (item?.image as { url?: string } | undefined)?.url || item?.imageUrl
@@ -158,8 +159,8 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                                         className="block rounded-2xl overflow-hidden transition-shadow hover:shadow-lg"
                                         style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                                     >
-                                        <div className="aspect-[16/10] overflow-hidden">
-                                            <img src={item.imageUrl} alt={item.title || ''} className="w-full h-full object-cover" data-image-index={i} />
+                                        <div className="relative aspect-[16/10] overflow-hidden">
+                                            <Image src={item.imageUrl} alt={item.title || ''} fill className="object-cover" data-image-index={i} />
                                         </div>
                                         <div className={CARD_PADDING.md}>
                                             {item.title && <Heading level={4} className="text-lg mb-2">{item.title}</Heading>}

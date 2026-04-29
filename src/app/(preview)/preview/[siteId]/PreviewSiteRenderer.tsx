@@ -72,6 +72,10 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
                 const { theme } = e.data
                 if (typeof theme !== 'object' || theme === null) return
                 setSiteState(prev => ({ ...prev, theme: theme as Record<string, unknown> }))
+            } else if (e.data?.type === 'UPDATE_IMAGE_LIBRARY_S3') {
+                const { imageLibraryS3 } = e.data
+                if (typeof imageLibraryS3 !== 'object' || imageLibraryS3 === null) return
+                setSiteState(prev => ({ ...prev, imageLibraryS3: imageLibraryS3 as Record<string, string> }))
             }
         }
         window.addEventListener('message', onMessage)

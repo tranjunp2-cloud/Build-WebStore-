@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { BlogListConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -132,7 +133,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                 <div className="relative overflow-hidden rounded-xl aspect-[4/3] md:aspect-video bg-black/5 dark:bg-white/5">
                                     <div className="absolute inset-0 bg-black/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity z-10" />
                                     {post.image ? (
-                                        <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                        <Image src={post.image} alt={post.title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">📝</div>
                                     )}
@@ -167,7 +168,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                     >
                                         <div className="relative overflow-hidden aspect-[4/3] bg-black/5 dark:bg-white/5">
                                             {post.image ? (
-                                                <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                <Image src={post.image} alt={post.title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">📝</div>
                                             )}

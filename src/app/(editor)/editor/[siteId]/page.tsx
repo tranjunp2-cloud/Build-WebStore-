@@ -632,6 +632,24 @@ export default function EditorPage() {
         }, 500)
     }, [reorderBlocks, handleSave])
 
+    // Seed gallery images from Unsplash → S3, then push the S3 map into the iframe
+    // via postMessage so the gallery re-renders with correct images without a reload.
+    // Idempotent — if already seeded (e.g. via AI gen) the endpoint returns immediately.
+    const triggerImageSeed = useCallback(async () => {
+        if (!siteId) return
+        try {
+            const res = await fetch(`/api/sites/${siteId}/seed-images`, { method: 'POST', credentials: 'include' })
+            if (res.ok) {
+                const data = await res.json()
+                if (data.imageLibraryS3 && Object.keys(data.imageLibraryS3).length > 0) {
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_IMAGE_LIBRARY_S3', imageLibraryS3: data.imageLibraryS3 })
+                }
+            }
+        } catch {
+            // non-fatal
+        }
+    }, [siteId])
+
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
         const nextBlock = normalizeAddSectionBlock(
             {
@@ -642,30 +660,32 @@ export default function EditorPage() {
             },
             blockData as Record<string, unknown>
         )
-        
+
         const safeBlock: BlockData = nextBlock || { blockType: blockData.blockType || 'hero', variant: blockData.variant || 'default' }
 
         addBlock(index - 1, safeBlock)
         setSelectedBlock(index)
-        
+
         setTimeout(() => {
-            previewFrameSendRef.current?.sendToIframe({ 
-                type: 'UPDATE_FULL_LAYOUT', 
-                bodyBlocks: useEditorStore.getState().blocks 
+            previewFrameSendRef.current?.sendToIframe({
+                type: 'UPDATE_FULL_LAYOUT',
+                bodyBlocks: useEditorStore.getState().blocks
             })
         }, 0)
-        
-        // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave, 
+
+        // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave,
         // which causes a race condition where the iframe fetches stale db state.
-        
+
         setChatActivity({
             id: `drop-${Date.now()}`,
             content: `Added ${blockData.blockType} block`,
         })
-        
+
+        if (blockData.blockType === 'gallery') void triggerImageSeed()
+
         void handleSave({ showToast: false, refreshPreview: false })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [addBlock, theme, handleSave])
+    }, [addBlock, theme, handleSave, triggerImageSeed])
 
     const handleAIAction = useCallback(async (action: AIAction) => {
         // Cancel any pending debounced auto-save to prevent race conditions
@@ -699,6 +719,7 @@ export default function EditorPage() {
                 if (nextBlock) {
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
+                    if (nextBlock.blockType === 'gallery') void triggerImageSeed()
                 } else {
                     toast.error('Unable to add this section yet')
                 }
@@ -768,7 +789,7 @@ export default function EditorPage() {
                 void handleSave({ showToast: false, refreshPreview: true })
             }
         }, 300)
-    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo])
+    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo, triggerImageSeed])
 
     const handleUndo = useCallback(() => {
         if (!canUndo()) return

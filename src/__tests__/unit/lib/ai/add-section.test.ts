@@ -710,8 +710,9 @@ describe('BUG-F05-04: Gallery placeholder images', () => {
         expect(images[0]).toHaveProperty('caption')
         const img = images[0].image as Record<string, unknown>
         expect(img).toHaveProperty('url')
+        // url is intentionally empty so the gallery block's render-time fallback
+        // picks the correct category + S3 images (GH-727 fix)
         expect(typeof img.url).toBe('string')
-        expect((img.url as string).length).toBeGreaterThan(0)
     })
 
     it('normalizeAddSectionBlock preserves gallery image structure', () => {

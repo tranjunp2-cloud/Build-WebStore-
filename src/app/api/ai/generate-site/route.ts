@@ -577,7 +577,14 @@ export async function POST(req: NextRequest) {
         // fallback-adapter creative→portfolio mapping) which Payload rejected
         // → "The following field is invalid: Site Type" → 500. Logs showed
         // this was the dominant 500 source (~7 hits / 6h window).
-        const safeSiteType = resolveSiteType(result.siteType)
+        // GH-727: if AI output maps to generic 'business' fallback, use the
+        // composer category (which has broader VN keyword matching) as backup
+        // so the seeder seeds industry-correct images (e.g. fitness vs business).
+        const safeSiteType = (() => {
+            const fromAI = resolveSiteType(result.siteType)
+            if (fromAI !== 'business') return fromAI
+            return resolveSiteType(resolveComposerCategory(businessInfo.industry))
+        })()
 
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
@@ -982,6 +989,20 @@ export async function POST(req: NextRequest) {
         } catch (err404) {
             // Non-fatal: 404 page may already exist (e.g. re-generation)
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
+        }
+
+        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category (fire-and-forget)
+        // Use safeSiteType (same key used by storefront blocks) so seeder alt keys match resolver lookups.
+        if (resolvedTenantId) {
+            const _seedCategory = safeSiteType
+            import('@/lib/images/image-library-seeder')
+                .then(({ seedImageLibraryForSite }) =>
+                    seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
+                )
+                .catch(err =>
+                    console.error('[generate-site] image-library seed failed',
+                        err instanceof Error ? err.message : err),
+                )
         }
 
         phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)

@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
@@ -40,7 +41,7 @@ function ReviewCard({ review }: { review: ReviewItem }) {
             <Body size="small" className="mt-4 mb-6 flex-1 leading-relaxed opacity-70">&ldquo;{review.text}&rdquo;</Body>
             <div className="flex items-center gap-3">
                 {review.avatar ? (
-                    <img src={review.avatar} alt={review.name} className="w-10 h-10 rounded-full object-cover" />
+                    <Image src={review.avatar} alt={review.name} width={40} height={40} className="rounded-full object-cover" />
                 ) : (
                     <div
                         className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
