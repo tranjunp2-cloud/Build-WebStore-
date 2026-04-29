@@ -18,6 +18,7 @@ import {
     LayoutDashboard,
     LayoutTemplate,
     LogOut,
+    Package,
     Settings,
     X,
 } from 'lucide-react'
@@ -82,6 +83,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                     { label: { en: 'Blog', ms: 'Blog' }, href: '/blog' },
                 ],
             },
+            { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
             {
                 label: { en: 'Site Settings', ms: 'Tetapan Laman' },
                 href: '/settings',

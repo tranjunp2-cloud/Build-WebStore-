@@ -363,7 +363,9 @@ export const POST = withAuth(async (user, req) => {
                     }
 
                     // Strip system fields — Payload rejects 'id' in layout block data
-                    const cleanLayout = stripSystemFields(newLayout) as Record<string, unknown>[]
+                    // GH-820: also drop google-maps — embedUrl cannot be auto-generated
+                    const cleanLayout = (stripSystemFields(newLayout) as Record<string, unknown>[])
+                        .filter(b => b.blockType !== 'google-maps')
 
                     // Sanitize blocks with required fields that may be empty/invalid
                     const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
@@ -381,12 +383,6 @@ export const POST = withAuth(async (user, req) => {
                                     { fieldName: 'email', fieldType: 'email', label: 'Email Address', required: true },
                                     { fieldName: 'message', fieldType: 'textarea', label: 'Message', required: true },
                                 ]
-                            }
-                        }
-                        // Google Maps: embedUrl is required
-                        if (block.blockType === 'google-maps') {
-                            if (!block.embedUrl || (typeof block.embedUrl === 'string' && block.embedUrl.trim().length === 0)) {
-                                block.embedUrl = 'https://www.google.com/maps/embed?pb=!1m18!1m12'
                             }
                         }
                     }

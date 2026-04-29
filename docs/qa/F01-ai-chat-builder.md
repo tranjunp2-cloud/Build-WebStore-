@@ -275,6 +275,11 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-NAV-DYN-16 | GH-817 | Unit | force-replace cập nhật ctaButton về last page khi không có Contact | Nav có ctaButton `/contact`, aiPageLinks không có Contact | ctaButton.url = last page, không phải `/contact` | Blocker | [x] |
 | TC-NAV-SYNC-17 | GH-817 | Integration | Post-creation nav sync: link của page bị lỗi bị xoá khỏi nav | AI gen [Home, Services, Contact], Contact page create fail → pageFailures = [{slug:'contact'}] | Nav links của Home, Services chỉ còn [Home, Services], không còn Contact | Blocker | [ ] |
 | TC-NAV-SYNC-18 | GH-817 | Integration | Post-creation nav sync: ctaButton được cập nhật theo surviving links | Tương tự TC-17 + nav có ctaButton.url='/contact' | ctaButton.url = last surviving page (e.g. '/services') | Blocker | [ ] |
+| TC-FOOTER-DYN-01 | GH-817 | Unit | Injected footer Pages column dùng pageLinks, không phải DEFAULT_NAV_LINKS | pageLinks = [Home, Gallery, Blog] (không có Contact), không có footer block | footer.columns[0].links = pageLinks | Blocker | [x] |
+| TC-FOOTER-DYN-02 | GH-817 | Unit | Injected footer Contact column fallback về last page khi không có Contact | pageLinks = [Home, Portfolio, Blog] | footer.columns[1].links[0].url = '/blog', không phải '/contact' | Blocker | [x] |
+| TC-FOOTER-DYN-03 | GH-817 | Unit | Injected footer Contact column dùng /contact khi Contact page tồn tại | pageLinks có Contact | footer.columns[1].links[0].url = '/contact' | High | [x] |
+| TC-FOOTER-SYNC-04 | GH-817 | Integration | Post-creation footer sync: link của page bị lỗi bị xoá khỏi footer columns | Contact page fail → pageFailures = [{slug:'contact'}] | footer.columns của các trang đã lưu không còn Contact link | Blocker | [ ] |
+| TC-FOOTER-SYNC-05 | GH-817 | Integration | Nav + footer patched trong cùng 1 payload.update per page | Tương tự TC-FOOTER-SYNC-04 | Chỉ 1 update call per page (không phải 2 calls riêng) | Medium | [ ] |
 
 ---
 
