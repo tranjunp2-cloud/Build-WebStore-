@@ -87,7 +87,8 @@ export function useContactForm({ siteId, requiredFieldNames = [] }: UseContactFo
                 return
             }
 
-            const formData = new FormData(e.currentTarget)
+            const form = e.currentTarget
+            const formData = new FormData(form)
             const values: ContactFormValues = {
                 name: String(formData.get('name') || ''),
                 email: String(formData.get('email') || ''),
@@ -116,7 +117,7 @@ export function useContactForm({ siteId, requiredFieldNames = [] }: UseContactFo
 
                 if (res.ok) {
                     setState('success')
-                    e.currentTarget.reset()
+                    form.reset()
                 } else {
                     const data = await res.json().catch(() => ({}))
                     setSubmitError(data.error || 'Something went wrong. Please try again.')

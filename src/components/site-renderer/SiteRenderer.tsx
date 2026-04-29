@@ -457,7 +457,13 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                         ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
                         : undefined
                 const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
-                const spacingStyle = isGlobalBlock
+                // Floating widget blocks (social-widget, whatsapp-button, cart-widget) render as
+                // position:fixed — they are out of document flow so the spacing wrapper must not add
+                // any padding (otherwise a blank 64px gap appears on the page). GH-821.
+                const FLOATING_WIDGET_TYPES = new Set(['social-widget', 'whatsapp-button', 'cart-widget'])
+                const isFloatingWidget = FLOATING_WIDGET_TYPES.has(block.blockType)
+                    && (block as Record<string, unknown>).variant !== 'inline'
+                const spacingStyle = isGlobalBlock || isFloatingWidget
                     ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
                     : {
                         paddingTop: applyNavOffset && index === firstContentBlockIdx
