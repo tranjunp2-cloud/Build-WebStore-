@@ -16,13 +16,16 @@
  * filter must apply there. Extracted here to avoid drift.
  */
 
-/** Blocks needing a media pipeline that does not exist yet.
+/** Catch-all drop list for blocks that should not be generated.
+ *  Covers: blocks needing a media pipeline, blocks not yet production-ready,
+ *  and blocks not fully integrated into the Payload schema.
  *  Re-enabled via plan 260414-1400-ai-gen-unsplash-pipeline phase-04:
  *    - gallery, portfolio-grid → now filled by media-pipeline.ts (Unsplash)
  *  Still dropped (separate followup):
  *    - before-after (needs Payload schema migration per validation Q3)
  *    - menu-display, review-cards, booking-widget (not image-related)
  *  GH-820: google-maps temporarily disabled — embedUrl cannot be auto-generated
+ *  GH-820: class-schedule not production-ready — also hidden from editor UI
  */
 export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
     'before-after',
@@ -30,13 +33,6 @@ export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
     'review-cards',
     'booking-widget',
     'google-maps',
-])
-
-/** Blocks registered in Payload schema but not yet production-ready.
- *  Dropped from all generation paths until implementation is complete.
- *  Remove entry here + from EDITOR_HIDDEN_BLOCKS in block-registry-reader when ready.
- */
-export const BLOCKS_NOT_READY: ReadonlySet<string> = new Set([
     'class-schedule',
 ])
 
@@ -53,9 +49,7 @@ export const BLOCKS_NOT_IN_PAYLOAD: ReadonlySet<string> = new Set([
  * Both lists OR'd together — the union is what ends up being rejected.
  */
 export function isUnsupportedBlock(blockType: string): boolean {
-    return BLOCKS_REQUIRE_MEDIA_PIPELINE.has(blockType)
-        || BLOCKS_NOT_IN_PAYLOAD.has(blockType)
-        || BLOCKS_NOT_READY.has(blockType)
+    return BLOCKS_REQUIRE_MEDIA_PIPELINE.has(blockType) || BLOCKS_NOT_IN_PAYLOAD.has(blockType)
 }
 
 /**
