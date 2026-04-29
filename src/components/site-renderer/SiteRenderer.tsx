@@ -466,8 +466,16 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                         paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
                     }
 
+                // Use __editorBlockIndex when available (set by PreviewSiteRenderer from store order).
+                // Falls back to loop index only for non-editor contexts or uninjected blocks.
+                // This prevents nav-injection offset mismatch: preview injects nav at position 0 which
+                // shifts all loop indices by +1, but the store has no injected nav, so hero is at
+                // store index 0 while its loop index would be 1.
+                const editorBlockIndex = typeof block.__editorBlockIndex === 'number' && block.__editorBlockIndex >= 0
+                    ? block.__editorBlockIndex
+                    : index
                 const callbackValue = onBlockFieldChange
-                    ? { blockIndex: index, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(index, field, value) }
+                    ? { blockIndex: editorBlockIndex, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorBlockIndex, field, value) }
                     : null
 
                 const blockContent = (
