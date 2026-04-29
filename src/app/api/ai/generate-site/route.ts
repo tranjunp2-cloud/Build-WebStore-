@@ -983,7 +983,10 @@ export async function POST(req: NextRequest) {
         // Mark generation completed and persist headerBlock so SiteRenderer
         // can read breadcrumbConfig on the public site without requiring a
         // manual editor save first.
-        const generatedHeaderBlock = sanitizedBlocks.find(b => b.blockType === 'navigation') ?? null
+        // GH-820: read nav from pageDefinitions (links already normalized) instead of
+        // sanitizedBlocks which still has raw AI slugs (/book-trial, /the-lab, etc.)
+        const homepageLayout = (pageDefinitions[0]?.layout ?? []) as Array<{ blockType?: unknown }>
+        const generatedHeaderBlock = homepageLayout.find(b => b.blockType === 'navigation') ?? null
         await payload.update({
             collection: 'sites',
             id: site.id as string | number,
