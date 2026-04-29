@@ -950,6 +950,13 @@ export function PreviewScripts() {
                 }
                 themeStyle.textContent = e.data.css
             }
+            // Toggle Tailwind dark class on <html> when colorMode changes in the editor.
+            // Tailwind dark: utilities require the `dark` class on the root element.
+            // UPDATE_SITE_THEME re-renders SiteRenderer but doesn't touch the html element.
+            if (e.data?.type === 'THEME_COLOR_MODE_UPDATE') {
+                const isDark = e.data.colorMode === 'dark'
+                document.documentElement.classList.toggle('dark', isDark)
+            }
             if (e.data?.type === 'SET_BLOCK_SELECTED') {
                 document.querySelectorAll('[data-block-index]').forEach((el) => {
                     ;(el as HTMLElement).style.boxShadow = ''

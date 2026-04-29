@@ -464,6 +464,15 @@ export default function EditorPage() {
         updateTheme({ [key]: value })
         // Save to DB but don't reload iframe — live CSS update handles preview
         void handleSave({ showToast: false, refreshPreview: false })
+        // colorMode (dark/light) requires toggling the Tailwind `dark` class on <html>
+        // inside the preview iframe — CSS variables alone don't flip dark: utility classes.
+        // Send UPDATE_SITE_THEME so PreviewSiteRenderer re-renders with new theme, and
+        // send THEME_COLOR_MODE_UPDATE so PreviewScripts toggles the html.dark class.
+        if (key === 'colorMode') {
+            const updatedTheme = useEditorStore.getState().theme
+            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_SITE_THEME', theme: updatedTheme })
+            previewFrameSendRef.current?.sendToIframe({ type: 'THEME_COLOR_MODE_UPDATE', colorMode: value })
+        }
     }, [updateTheme, handleSave])
 
     const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {

@@ -22,6 +22,15 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
         )
     }, [])
 
+    // Sync Tailwind `dark` class on <html> with the site colorMode.
+    // Tailwind dark: utilities require the `dark` class on the root element.
+    // This effect runs on initial mount (server colorMode) and on every theme
+    // update received via UPDATE_SITE_THEME postMessage.
+    useEffect(() => {
+        const colorMode = (siteState.theme as Record<string, unknown> | undefined)?.colorMode
+        document.documentElement.classList.toggle('dark', colorMode === 'dark')
+    }, [(siteState.theme as Record<string, unknown> | undefined)?.colorMode])
+
     useEffect(() => {
         const onMessage = (e: MessageEvent) => {
             if (e.origin !== window.location.origin) return
