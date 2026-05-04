@@ -1,18 +1,18 @@
 /**
- * Matrix builder — enumerates the cartesian product (category × variant × seed)
- * and pulls expected invariants from CATEGORY_REQUIREMENTS (single source of truth
- * since CATEGORY_DNA removal in commit bbbd0198 plan 2253 P3). Requirements carries
- * mandatoryBlocks + minBlocks the harness guards need.
+ * Matrix builder — enumerates blueprint fixtures only (category × preset × seed).
+ * Blueprint = the path real users hit: composeFromBlueprint(TEMPLATE_PRESETS).
+ * Legacy fixtures (starter/professional via TEMPLATE_DEFINITIONS) are excluded —
+ * users no longer reach that path (GEN_MODE=template-first default since 2026-04-16).
  */
 
 import {
   TEMPLATE_PRESETS,
-  TEMPLATE_DEFINITIONS,
 } from '@/lib/ai/template-definitions'
 import { CATEGORY_REQUIREMENTS } from '@/lib/ai/category-requirements'
 import type { Fixture, HarnessMode } from './types'
 
 export type BuildMatrixOpts = {
+  /** @deprecated variants no longer used — all fixtures are blueprint/premium */
   mode: HarnessMode
   categories?: string[]
   variants?: Array<'starter' | 'professional' | 'premium'>
@@ -20,11 +20,6 @@ export type BuildMatrixOpts = {
 }
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_REQUIREMENTS)
-const ALL_VARIANTS: Array<'starter' | 'professional' | 'premium'> = [
-  'starter',
-  'professional',
-  'premium',
-]
 
 /** Deterministic seed from string — same inputs always produce same seed. */
 function seedFromString(s: string): number {
@@ -36,14 +31,13 @@ function seedFromString(s: string): number {
 }
 
 /**
- * Build the fixture matrix.
+ * Build the fixture matrix — blueprint fixtures only.
  *
- * Default (mode=full): 14 categories × 3 variants × 5 seeds = 210 fixtures
- * Quick: restaurant + beauty + tech × premium × 1 seed = 3 fixtures
+ * Default (mode=full): 14 categories × N presets × 5 seeds
+ * Quick: restaurant + beauty + tech × 1 preset × 1 seed = 3 fixtures
  *
- * Mixes BLUEPRINT path (composeFromBlueprint with TEMPLATE_PRESETS) +
- * LEGACY path (composeTemplate with ComposerInput) — both produce TemplateSeed
- * with the same shape, but route through different code paths.
+ * Only runs BLUEPRINT path (composeFromBlueprint + TEMPLATE_PRESETS) —
+ * mirrors what real users hit via GEN_MODE=template-first (default since 2026-04-16).
  */
 export function buildMatrix(opts: BuildMatrixOpts): Fixture[] {
   const { mode } = opts
@@ -51,9 +45,6 @@ export function buildMatrix(opts: BuildMatrixOpts): Fixture[] {
   const categories =
     opts.categories ??
     (mode === 'quick' ? ['restaurant', 'beauty', 'tech'] : ALL_CATEGORIES)
-
-  const variants =
-    opts.variants ?? (mode === 'quick' ? ['premium'] : ALL_VARIANTS)
 
   const seedsPerCell =
     opts.seedsPerCell ?? (mode === 'quick' ? 1 : 5)
@@ -95,31 +86,6 @@ export function buildMatrix(opts: BuildMatrixOpts): Fixture[] {
       }
     }
 
-    // --- Legacy path: only when a TEMPLATE_DEFINITIONS entry actually exists ---
-    // Avoid generating fixtures that cannot compose (no false-positive failures).
-    for (const variant of variants) {
-      if (variant === 'premium' && presetsInCat.length > 0) continue // skip — blueprint already covers premium
-      const legacyDef = TEMPLATE_DEFINITIONS.find(
-        (d) => d.category === category && d.variant === variant,
-      )
-      if (!legacyDef) continue // no legacy coverage for this cell — skip cleanly
-
-      for (let s = 0; s < seedsPerCell; s++) {
-        const id = `${category}-legacy-${variant}-seed${s}`
-        const seed = seedFromString(id)
-        fixtures.push({
-          id,
-          category,
-          variant,
-          businessIndex: legacyDef.businessIndex,
-          compositionSeed: seed,
-          source: 'legacy',
-          expectedSignatureBlocks,
-          expectedMinBlocks,
-          expectedMaxBlocks,
-        })
-      }
-    }
   }
 
   return fixtures

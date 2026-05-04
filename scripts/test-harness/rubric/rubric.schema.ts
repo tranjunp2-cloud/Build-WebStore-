@@ -38,7 +38,8 @@ export interface EnumCheck {
     type: 'enum'
     blockType: string
     field: string
-    in: string[]
+    /** string[] = literal pool; string starting "@" = sentinel resolved at load time by variant-pools.ts */
+    in: string[] | string
 }
 
 /** Custom check — evaluator function by name (registered in evaluators/). */

@@ -16,7 +16,7 @@
         {
           "id": "hero-variant-diverse",
           "label": "Hero uses non-default variant",
-          "check": { "type": "enum", "blockType": "hero", "field": "variant", "in": ["split-image", "fullscreen", "video-bg", "overlay", "centered", "split-text-image", "gradient-bg"] },
+          "check": { "type": "enum", "blockType": "hero", "field": "variant", "in": ["split-left", "split-right", "fullscreen", "video", "magazine", "minimal", "cards-overlay", "gradient", "parallax", "slideshow", "split-video"] },
           "passPoints": 3
         },
         {
@@ -160,7 +160,7 @@
         {
           "id": "nav-variant-rich",
           "label": "Nav non-basic variant",
-          "check": { "type": "enum", "blockType": "navigation", "field": "variant", "in": ["centered", "mega-menu", "transparent", "sidebar"] },
+          "check": { "type": "enum", "blockType": "navigation", "field": "variant", "in": ["centered", "mega", "transparent", "sidebar", "floating"] },
           "passPoints": 2
         },
         {

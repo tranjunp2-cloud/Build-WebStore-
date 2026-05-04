@@ -8,6 +8,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CUSTOM_EVALUATORS, evaluatePresence, evaluateCount, evaluateEnum, normalizeForHash } from './evaluators'
+import { isVariantSentinel, resolveVariantSentinel } from './variant-pools'
 import type { UniquenessContext } from './evaluators'
 import type {
     Rubric,
@@ -51,6 +52,26 @@ void fileURLToPath
 
 const _rubricCache: Partial<Record<RubricVersion, Rubric>> = {}
 
+/**
+ * Walk all enum criteria in the rubric and resolve any sentinel strings
+ * (e.g. "@hero.nonDefault") to concrete string[] pools in-place.
+ * Called once per rubric version at load time before caching.
+ * Older rubric versions (v1/v1.1/v1.2) use literal string[] — isVariantSentinel
+ * returns false for them, so they pass through unchanged.
+ */
+function resolveSentinelsInRubric(rubric: Rubric): void {
+    for (const dim of rubric.dimensions) {
+        for (const crit of dim.criteria) {
+            if (crit.check.type === 'enum') {
+                const check = crit.check as { in: string[] | string }
+                if (isVariantSentinel(check.in)) {
+                    check.in = resolveVariantSentinel(check.in)
+                }
+            }
+        }
+    }
+}
+
 /** Read rubric JSON. Memoized per version per process. */
 export function loadRubric(version: RubricVersion = DEFAULT_RUBRIC_VERSION): Rubric {
     const cached = _rubricCache[version]
@@ -58,6 +79,7 @@ export function loadRubric(version: RubricVersion = DEFAULT_RUBRIC_VERSION): Rub
     const p = rubricPath(version)
     const raw = fs.readFileSync(p, 'utf8')
     const parsed = JSON.parse(raw) as Rubric
+    resolveSentinelsInRubric(parsed)
     _rubricCache[version] = parsed
     return parsed
 }
@@ -112,7 +134,8 @@ function evaluateCriterion(
             result = evaluateCount(blocks, criterion.check.blockType, criterion.check.field, criterion.check.min)
             break
         case 'enum':
-            result = evaluateEnum(blocks, criterion.check.blockType, criterion.check.field, criterion.check.in)
+            // By load time, any sentinel string has already been resolved to string[] by resolveSentinelsInRubric.
+            result = evaluateEnum(blocks, criterion.check.blockType, criterion.check.field, criterion.check.in as string[])
             break
         case 'custom': {
             const evaluator = CUSTOM_EVALUATORS[criterion.check.evaluator]

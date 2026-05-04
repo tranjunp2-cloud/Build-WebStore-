@@ -188,6 +188,9 @@ export async function generateSiteWithAI(
             mood: themeMood,
             recipe: layoutRecipe,
             blockPromptOverrides: aiFirstOverrides,
+            // Plan 260429-1032 Phase 5 — pass resolved category so buildUserPrompt
+            // can inject preferred CTA labels for this industry.
+            category: presetCategory,
         })
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
@@ -867,7 +870,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'table', 'toggle'],
         about: ['split', 'simple', 'two-column', 'centered-large'],
         cta: ['banner', 'inline', 'split-testimonial', 'card'],
-        navigation: ['default', 'centered', 'mega'],
+        navigation: ['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'],
         newsletter: ['inline', 'banner', 'stacked-card', 'incentive-grid'],
         team: ['grid', 'list', 'bio-modal', 'compact-row'],
     },
@@ -931,7 +934,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'table', 'toggle'],
         about: ['split', 'story', 'two-column', 'founder-quote'],
         cta: ['banner', 'card', 'mesh-gradient-hero', 'split-testimonial'],
-        navigation: ['default', 'centered', 'mega'],
+        navigation: ['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'],
         newsletter: ['inline', 'banner', 'incentive-grid'],
         team: ['grid', 'bio-modal', 'cards-hover-reveal'],
     },

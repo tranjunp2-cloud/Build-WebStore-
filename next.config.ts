@@ -85,8 +85,10 @@ const sentryWebpackOptions = {
     },
     tunnelRoute: '/sentry-tunnel',
     hideSourceMaps: true,
-    disableLogger: true,
-    automaticVercelMonitors: false,
+    webpack: {
+        treeshake: { removeDebugLogging: true },
+        automaticVercelMonitors: false,
+    },
 }
 
 export default withSentryConfig(withPayload(nextConfig), sentryWebpackOptions)
