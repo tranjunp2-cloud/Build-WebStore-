@@ -495,6 +495,32 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 )
 
                 if (isEditor) {
+                    // Floating widgets are position:fixed — no in-flow click target exists.
+                    // Render a compact dashed placeholder so the block is selectable in the
+                    // editor layout, plus the actual fixed-position widget for live preview.
+                    if (isFloatingWidget) {
+                        const FLOATING_WIDGET_META: Record<string, { icon: string; name: string }> = {
+                            'social-widget':    { icon: '📲', name: 'Social Media' },
+                            'whatsapp-button':  { icon: '💬', name: 'WhatsApp Button' },
+                            'cart-widget':      { icon: '🛒', name: 'Cart Button' },
+                        }
+                        const meta = FLOATING_WIDGET_META[block.blockType] ?? { icon: '📌', name: block.blockType }
+                        return (
+                            <div
+                                key={`${block.blockType}-${index}`}
+                                data-block-index={block.__editorBlockIndex ?? index}
+                                data-block-type={block.blockType}
+                                className="group/block relative w-full"
+                            >
+                                <div className="mx-4 my-2 flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white/60 px-4 py-2.5 text-xs text-slate-400">
+                                    <span className="text-base leading-none">{meta.icon}</span>
+                                    <span className="font-medium text-slate-500">{meta.name}</span>
+                                    <span>· Floating</span>
+                                </div>
+                                {blockContent}
+                            </div>
+                        )
+                    }
                     return (
                         <div
                             key={`${block.blockType}-${index}`}
