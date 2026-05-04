@@ -33,6 +33,8 @@ vi.mock('@/i18n', () => ({
                     morning: 'Morning',
                     afternoon: 'Afternoon',
                     evening: 'Evening',
+                    welcomeTitle: 'Welcome to PrimeWeb Dashboard',
+                    welcomeSubtitle: 'Monitor your store performance and manage your online business from one place.',
                     stats: {
                         views: 'Views',
                         leads: 'Leads',

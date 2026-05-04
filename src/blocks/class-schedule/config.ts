@@ -50,4 +50,8 @@ export const classScheduleMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'classes', 'showCapacity', 'highlightToday'],
     quickActions: ['Add class', 'Update schedule', 'Change instructor'],
+    aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = ClassScheduleConfigSchema

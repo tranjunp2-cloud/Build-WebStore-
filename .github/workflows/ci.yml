@@ -1,7 +1,13 @@
-# CI Pipeline — quality + test + CI-driven Vercel deploy
-# PR           → quality-check + test + metrics comment
-# Push staging → quality-check + test → deploy-staging   (via VERCEL_TOKEN)
-# Push main    → quality-check + test → deploy-production (via VERCEL_TOKEN)
+# CI Pipeline — quality + test on PRs, CI-driven Vercel deploy on push
+#
+# PR            → quality-check + test + metrics comment
+# Push staging  → deploy-staging                    (via VERCEL_TOKEN)
+# Push main     → deploy-production                 (via VERCEL_TOKEN)
+#
+# Quality/test DO NOT run on push — merge commits on staging/main are
+# already validated by the PR's own CI run. Branch protection blocks
+# direct push, so every commit passes through CI on its PR exactly once.
+# This removes the 5+ min duplicate-CI tax from deploy time.
 #
 # Why CI-driven deploy instead of Vercel git webhook:
 #   Vercel Pro blocks commits from non-team-members with
@@ -10,12 +16,12 @@
 #   See plans/260413-1126-vercel-deploy-blocked/ for full diagnosis.
 #
 # Architecture:
-#   quality-check (1.5m): lint + typecheck + migrations
-#   test (3.5m) — parallel (needs: quality-check)
+#   quality-check (1.5m, PR only): lint + typecheck + migrations
+#   test (3.5m, PR only, needs: quality-check)
 #   metrics (PR only, needs: test)
-#   deploy-staging    (push staging, needs: quality-check + test)
-#   deploy-production (push main,    needs: quality-check + test)
-#   notify-fail (if failure)
+#   deploy-staging    (push staging, no needs — CI already ran on PR)
+#   deploy-production (push main,    no needs — CI already ran on PR)
+#   notify-fail (PR only, if failure)
 name: CI
 
 on:
@@ -50,6 +56,11 @@ jobs:
   # ──────────────────────────────────────
   quality-check:
     name: "Quality: Lint + Typecheck"
+    # pull_request only — merge commits on staging/main are already
+    # validated by the PR's own CI run. GitHub branch protection blocks
+    # direct push, so every code change passes through this job at
+    # least once before it can land.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -62,6 +73,25 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Guard against stray lockfiles
+        # Repo uses npm only. A stray pnpm-lock.yaml / yarn.lock makes
+        # `vercel build` auto-detect pnpm/yarn and spawn a binary the
+        # runner does not have (ENOENT), breaking deploy. Seen twice:
+        # 83f91a75, then PR #555 (commit e4d0448c) reintroduced it and
+        # broke staging deploy run 24412315694. Fail fast here before
+        # npm install so dev gets the signal in ~1 second.
+        run: |
+          STRAY=$(ls pnpm-lock.yaml yarn.lock 2>/dev/null || true)
+          if [ -n "$STRAY" ]; then
+            echo "::error::Stray lockfile detected: $STRAY"
+            echo "::error::Repo uses npm only. Delete with: git rm $STRAY && git commit"
+            echo "::error::Background: vercel build auto-detects pnpm/yarn from lockfile"
+            echo "::error::and spawns a binary not installed on the CI runner (ENOENT)."
+            echo "::error::See plans/260413-1126-vercel-deploy-blocked/ for history."
+            exit 1
+          fi
+          echo "✓ no stray lockfiles"
 
       - name: Install dependencies
         run: npm ci
@@ -83,7 +113,9 @@ jobs:
   # ──────────────────────────────────────
   test:
     name: "Test"
+    # pull_request only — see quality-check rationale above.
     needs: quality-check
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -111,6 +143,16 @@ jobs:
           echo "test_total=$TOTAL" >> "$GITHUB_OUTPUT"
           echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
           echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Drift check (block registry ↔ templates)
+        # Plan 260419-2022 Phase 03 — fail PR if block variant/schema drift
+        # grows beyond baseline. Source-only scan (no DB), <30s.
+        run: npm run drift:check
+
+      - name: Harness quick gen
+        # Plan 260419-2022 Phase 03 — smoke test composer on 3 fixtures.
+        # Fails fast if composer blows up on real schemas.
+        run: npm run harness:quick
 
       - name: Upload coverage artifact
         if: always()
@@ -220,8 +262,10 @@ jobs:
   # ──────────────────────────────────────
   notify-fail:
     name: "Notify: CI Failed"
+    # pull_request only — deploy jobs have their own dedicated
+    # deploy_fail notification; this job catches quality/test failures.
     needs: [quality-check, test]
-    if: failure()
+    if: failure() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -252,8 +296,11 @@ jobs:
   # ──────────────────────────────────────
   deploy-staging:
     name: "Deploy: Vercel (staging)"
-    needs: [quality-check, test]
-    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    # No `needs` — quality-check and test only run on pull_request, and
+    # this job only runs on push, so a `needs` would make the job
+    # permanently skipped. GitHub branch protection guarantees every
+    # merge commit was already CI-validated on its source PR.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -286,6 +333,20 @@ jobs:
           SUBJECT=$(git log -1 --format='%s' | head -c 80)
           echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
           echo "commit subject: $SUBJECT"
+
+      - name: Cache Next.js build output
+        # Next.js incremental build reuses .next/cache between runs.
+        # First build after lockfile change is still cold (~5 min),
+        # subsequent builds drop to ~1-2 min.
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            node_modules/.cache
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ github.job }}-
 
       - name: Install Vercel CLI
         run: npm install --global vercel@50
@@ -371,6 +432,17 @@ jobs:
           echo "::error::alias web-v2.dev.ecommercehub.my did not roll over to $EXPECTED (still $ACTUAL)"
           exit 1
 
+      - name: Seed templates (post-deploy)
+        # Plan 260419-2022 Phase 03 — force replace-all reseed against the
+        # freshly aliased deploy. Keeps Payload Templates in sync with
+        # shipped block code. ADR: force strategy chosen because admin
+        # doesn't edit templates directly today; revisit when editing UI
+        # lands. SEED_TOKEN mirrored in Vercel env (staging scope).
+        env:
+          DEPLOY_URL: https://web-v2.dev.ecommercehub.my
+          SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+        run: bash .github/scripts/seed-templates-post-deploy.sh
+
       - name: Notify deploy success
         if: success()
         uses: ./.github/actions/smart-notify
@@ -404,8 +476,8 @@ jobs:
   # ──────────────────────────────────────
   deploy-production:
     name: "Deploy: Vercel (production)"
-    needs: [quality-check, test]
-    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # No `needs` — see deploy-staging rationale above.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -438,6 +510,20 @@ jobs:
           SUBJECT=$(git log -1 --format='%s' | head -c 80)
           echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
           echo "commit subject: $SUBJECT"
+
+      - name: Cache Next.js build output
+        # Next.js incremental build reuses .next/cache between runs.
+        # First build after lockfile change is still cold (~5 min),
+        # subsequent builds drop to ~1-2 min.
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            node_modules/.cache
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ github.job }}-
 
       - name: Install Vercel CLI
         run: npm install --global vercel@50
@@ -480,6 +566,15 @@ jobs:
           URL=$(vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN")
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Deployed: $URL"
+
+      - name: Seed templates (post-deploy)
+        # Plan 260419-2022 Phase 03 — mirror of staging seed step against prod
+        # alias. SEED_TOKEN must be mirrored in Vercel production env.
+        # NOTE: staging freshness gate deferred (see plan.md — nice-to-have).
+        env:
+          DEPLOY_URL: https://web-v2.ecommercehub.my
+          SEED_TOKEN: ${{ secrets.SEED_TOKEN }}
+        run: bash .github/scripts/seed-templates-post-deploy.sh
 
       - name: Notify deploy success
         if: success()

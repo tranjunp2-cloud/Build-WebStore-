@@ -120,12 +120,10 @@ export const fitnessContent: CategoryContent = {
   industryBlocks: [
     {
       blockType: 'class-schedule',
-      variant: 'weekly-grid',
-      title: 'Class Timetable',
-      showInstructor: true,
+      variant: 'grid',
+      headline: 'Class Timetable',
       showCapacity: true,
-      showDifficulty: true,
-      bookingEnabled: true,
+      highlightToday: true,
     },
     {
       blockType: 'pricing-table',

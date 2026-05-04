@@ -1,12 +1,17 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { VideoShowcaseConfig, VideoItem } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+
+void _CSS_VARS
 
 function PlayIcon({ size = 48 }: { size?: number }) {
     return (
@@ -82,7 +87,7 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
             ) : (
                 <>
                     {video.thumbnailUrl ? (
-                        <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+                        <Image src={video.thumbnailUrl} alt={video.title} fill className="object-cover" />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                             <PlayIcon />
@@ -134,8 +139,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                     >
                         <VideoCard video={video} index={i} />
                         <div className="mt-3">
-                            <h4 className="font-bold font-heading">{video.title}</h4>
-                            {video.description && <p className="text-sm opacity-50 mt-1">{video.description}</p>}
+                            <RichText text={video.title} as="h4" className="font-bold font-heading" />
+                            {video.description && <RichText text={video.description} as="p" className="text-sm opacity-50 mt-1" />}
                             {video.category && <span className="text-xs opacity-40">{video.category}</span>}
                         </div>
                     </motion.div>
@@ -153,8 +158,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                 <div className="lg:col-span-2">
                     <VideoCard video={featured} index={featuredIndex} aspectClass="aspect-video" />
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold font-heading">{featured.title}</h3>
-                        {featured.description && <p className="text-sm opacity-50 mt-2">{featured.description}</p>}
+                        <RichText text={featured.title} as="h3" className="text-xl font-bold font-heading" />
+                        {featured.description && <RichText text={featured.description} as="p" className="text-sm opacity-50 mt-2" />}
                     </div>
                 </div>
                 <div className="space-y-3 max-h-[500px] overflow-y-auto">
@@ -170,7 +175,7 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                         >
                             <div className="w-24 aspect-video rounded-lg overflow-hidden shrink-0 relative">
                                 {video.thumbnailUrl ? (
-                                    <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+                                    <Image src={video.thumbnailUrl} alt={video.title} fill className="object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                                         <PlayIcon size={20} />
@@ -206,8 +211,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                 >
                     <VideoCard video={video} index={i} aspectClass="aspect-[21/9]" />
                     <div className="mt-4 max-w-2xl">
-                        <h3 className="text-2xl font-bold font-heading">{video.title}</h3>
-                        {video.description && <p className="text-base opacity-50 mt-2">{video.description}</p>}
+                        <RichText text={video.title} as="h3" className="text-2xl font-bold font-heading" />
+                        {video.description && <RichText text={video.description} as="p" className="text-base opacity-50 mt-2" />}
                     </div>
                 </motion.div>
             ))}
@@ -215,11 +220,17 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
     )
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-50 leading-relaxed">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {variant === 'grid' && renderGrid()}

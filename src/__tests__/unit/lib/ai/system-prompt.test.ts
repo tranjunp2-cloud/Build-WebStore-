@@ -68,8 +68,8 @@ describe('buildSystemPrompt [TC-F01.08]', () => {
 
     it('contains content quality rules', () => {
         const prompt = buildSystemPrompt()
-        expect(prompt).toContain('CONTENT QUALITY')
-        expect(prompt).toContain('realistic')
+        expect(prompt).toContain('Content Quality')
+        expect(prompt).toContain('ACTUAL business name')
     })
 })
 

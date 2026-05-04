@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { SYSTEM_PROMPTS } from './config'
+import { startCapture, finishCapture } from './capture-generation'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -19,20 +20,24 @@ export async function generateAutoSEOMeta(
     context?: string,
     keywords?: string[],
 ): Promise<SEOMetaOutput> {
+    const promptSummary = `${type}:${itemName} | site:${siteName}`
+    const cap = await startCapture({ endpoint: 'generate-meta', prompt: promptSummary, category: type })
+
     const openai = getOpenAI()
     
     // Fallback if no API key is provided
     if (!openai) {
-        if (type === 'product') {
-            return {
+        const fallback: SEOMetaOutput = type === 'product'
+            ? {
                 title: `${itemName} | ${siteName} | Buy Online Malaysia`,
                 description: `Shop ${itemName} at ${siteName}. High quality and best prices in Malaysia. Buy online today!`,
             }
-        }
-        return {
-            title: `${itemName} | ${siteName} Online Malaysia`,
-            description: `Welcome to ${siteName}'s ${itemName} page. Discover our services and offerings in Malaysia.`,
-        }
+            : {
+                title: `${itemName} | ${siteName} Online Malaysia`,
+                description: `Welcome to ${siteName}'s ${itemName} page. Discover our services and offerings in Malaysia.`,
+            }
+        await finishCapture(cap, { status: 'success', outputSnapshot: { path: 'no-key-fallback', ...fallback } })
+        return fallback
     }
 
     const systemPrompt = SYSTEM_PROMPTS['seo-generation']
@@ -72,11 +77,13 @@ Rules:
         if (!content) throw new Error('Empty AI response')
 
         const parsed = JSON.parse(content)
-        
-        return {
+
+        const output: SEOMetaOutput = {
             title: (parsed.metaTitle || parsed.title || `${itemName} | ${siteName}`).substring(0, 60),
             description: (parsed.metaDescription || parsed.description || '').substring(0, 160),
         }
+        await finishCapture(cap, { status: 'success', outputSnapshot: { path: 'openai', ...output } })
+        return output
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('[AI] SEO Meta Generation failed:', message)
@@ -84,18 +91,20 @@ Rules:
         // Fallback to template if API quota exceeded or unavailable
         if (message.includes('429') || message.includes('quota') || message.includes('rate')) {
             console.warn('[AI] Using template fallback due to API quota limit')
-            if (type === 'product') {
-                return {
+            const rateFallback: SEOMetaOutput = type === 'product'
+                ? {
                     title: `${itemName} | ${siteName} | Buy Online Malaysia`.substring(0, 60),
                     description: `Shop ${itemName} at ${siteName}. High quality and best prices in Malaysia. Buy online today!`.substring(0, 160),
                 }
-            }
-            return {
-                title: `${itemName} | ${siteName} Online Malaysia`.substring(0, 60),
-                description: `Welcome to ${siteName}'s ${itemName} page. Discover our services and offerings in Malaysia.`.substring(0, 160),
-            }
+                : {
+                    title: `${itemName} | ${siteName} Online Malaysia`.substring(0, 60),
+                    description: `Welcome to ${siteName}'s ${itemName} page. Discover our services and offerings in Malaysia.`.substring(0, 160),
+                }
+            await finishCapture(cap, { status: 'success', outputSnapshot: { path: 'rate-limit-fallback', ...rateFallback } })
+            return rateFallback
         }
 
+        await finishCapture(cap, { status: 'failed', error: message })
         throw new Error(`OpenAI meta generation failed: ${message}`)
     }
 }

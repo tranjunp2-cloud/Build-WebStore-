@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server'
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url)
-        const limit = parseInt(searchParams.get('limit') || '50', 10)
+        const limit = parseInt(searchParams.get('limit') || '100', 10)
         const sort = searchParams.get('sort') || '-createdAt'
 
         const payload = await getPayload({ config })

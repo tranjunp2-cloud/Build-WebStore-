@@ -46,4 +46,8 @@ export const doctorProfileMeta = {
     defaultVariant: 'cards',
     editableFields: ['headline', 'subheadline', 'doctors'],
     quickActions: ['Add doctor', 'Update availability', 'Edit qualifications'],
+    aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = DoctorProfileConfigSchema

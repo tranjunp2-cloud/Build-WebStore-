@@ -1,12 +1,16 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { BlogListConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
 interface BlogPost {
     id: string
@@ -29,6 +33,15 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     const { headline = 'Latest Insights', subheadline, limit = 3, variant = 'cards' } = block
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
+
+    // BUG-F05-06: build blog links using site base path injected server-side.
+    // `siteBasePath` is '' on subdomain/custom-domain, '/sites/<slug>' on local
+    // direct access. Fallback to tenantSlug if siteBasePath not provided.
+    const siteRec = site as Record<string, unknown>
+    const siteBasePath = typeof siteRec?.siteBasePath === 'string'
+        ? (siteRec.siteBasePath as string)
+        : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
+    const blogBasePath = `${siteBasePath}/blogs`
 
     useEffect(() => {
         const tenantId = site?.tenant
@@ -69,48 +82,58 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
 
     if (loading) {
         return (
-            <AnimatedSection className="py-24 relative overflow-hidden">
-                <div className="container mx-auto px-6 text-center">
-                    <div className="animate-pulse flex flex-col items-center gap-4">
-                        <div className="h-8 w-64 bg-white/10 rounded" />
-                        <div className="h-4 w-48 bg-white/5 rounded" />
+            <AnimatedSection className="relative overflow-hidden">
+                <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                    <div className="text-center">
+                        <div className="animate-pulse flex flex-col items-center gap-4">
+                            <div className="h-8 w-64 bg-white/10 rounded" />
+                            <div className="h-4 w-48 bg-white/5 rounded" />
+                        </div>
                     </div>
-                </div>
+                </SectionWrapper>
             </AnimatedSection>
         )
     }
 
     if (posts.length === 0) {
         return (
-            <AnimatedSection className="py-24 relative overflow-hidden">
-                <div className="container mx-auto px-6 text-center">
-                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                    <p className="opacity-60 text-lg">No published posts yet. Check back soon!</p>
-                </div>
+            <AnimatedSection className="relative overflow-hidden">
+                <SectionWrapper as="div" padding="default" container="default" background="transparent">
+                    <div className="text-center">
+                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
+                        <p className="opacity-60 text-lg">No published posts yet. Check back soon!</p>
+                    </div>
+                </SectionWrapper>
             </AnimatedSection>
         )
     }
 
     return (
-        <AnimatedSection className="py-24 relative overflow-hidden">
+        <AnimatedSection className="relative overflow-hidden">
             <GradientBlob color={CSS_VARS.primary} className="bottom-0 left-1/4" size={400} opacity={0.05} />
 
-            <div className="container mx-auto px-6 relative z-10">
+            <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                    {subheadline && <RichText text={subheadline} as="p" className="opacity-60 text-lg" />}
+                    <Heading level={2} className="mb-4">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-60">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {variant === 'list' ? (
                     <div className="max-w-4xl mx-auto flex flex-col gap-10">
                         {posts.map((post) => (
-                            <a href={`/blogs/${post.slug}`} key={post.id} className="group grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-black/10 dark:border-white/10 pb-10">
+                            <a href={`${blogBasePath}/${post.slug}`} key={post.id} className="group grid grid-cols-1 md:grid-cols-3 gap-8 items-center border-b border-black/10 dark:border-white/10 pb-10">
                                 <div className="relative overflow-hidden rounded-xl aspect-[4/3] md:aspect-video bg-black/5 dark:bg-white/5">
                                     <div className="absolute inset-0 bg-black/10 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity z-10" />
                                     {post.image ? (
-                                        <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                        <Image src={post.image} alt={post.title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">📝</div>
                                     )}
@@ -120,13 +143,14 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                         <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--brand-primary)' }}>{post.category}</span>
                                         <span className="text-xs opacity-40">{post.date}</span>
                                     </div>
-                                    <h3 className="text-2xl md:text-3xl font-heading font-bold mb-3 transition-colors"
+                                    <Heading level={2}
+                                        className="mb-3 transition-colors"
                                         style={{ color: 'inherit' }}
                                         onMouseEnter={(e) => { e.currentTarget.style.color = CSS_VARS.primary }}
                                         onMouseLeave={(e) => { e.currentTarget.style.color = 'inherit' }}>
                                         {post.title}
-                                    </h3>
-                                    <p className="opacity-60 leading-relaxed">{post.excerpt}</p>
+                                    </Heading>
+                                    <Body className="opacity-60 leading-relaxed">{post.excerpt}</Body>
                                 </div>
                             </a>
                         ))}
@@ -135,7 +159,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                     <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {posts.map((post) => (
                             <StaggerItem key={post.id}>
-                                <a href={`/blogs/${post.slug}`} className="block h-full">
+                                <a href={`${blogBasePath}/${post.slug}`} className="block h-full">
                                     <HoverCard className="group flex flex-col h-full rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-500"
                                         style={{
                                             border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
@@ -144,7 +168,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                     >
                                         <div className="relative overflow-hidden aspect-[4/3] bg-black/5 dark:bg-white/5">
                                             {post.image ? (
-                                                <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                <Image src={post.image} alt={post.title} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">📝</div>
                                             )}
@@ -152,10 +176,10 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                                 {post.category}
                                             </div>
                                         </div>
-                                        <div className="p-8 flex flex-col flex-1">
-                                            <span className="text-sm opacity-50 mb-3">{post.date}</span>
-                                            <h3 className="text-xl font-heading font-bold mb-4">{post.title}</h3>
-                                            <p className="opacity-60 mb-6 flex-1 text-sm leading-relaxed">{post.excerpt}</p>
+                                        <div className={`${CARD_PADDING.lg} flex flex-col flex-1`}>
+                                            <Body size="small" className="opacity-50 mb-3">{post.date}</Body>
+                                            <Heading level={3} className="mb-4">{post.title}</Heading>
+                                            <Body size="small" className="opacity-60 mb-6 flex-1 leading-relaxed">{post.excerpt}</Body>
 
                                             <div className="mt-auto flex items-center text-sm font-semibold tracking-wide" style={{ color: 'var(--brand-primary)' }}>
                                                 Read Article
@@ -170,7 +194,7 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                         ))}
                     </StaggerGrid>
                 )}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

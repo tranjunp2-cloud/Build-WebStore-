@@ -1,4 +1,6 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
@@ -6,6 +8,10 @@ import Link from 'next/link'
 import { AddToCartButton } from '@/components/storefront/AddToCartButton'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { TrackingManager } from '@/components/site-renderer/TrackingManager'
+import { OwnerProvider } from '@/components/site-renderer/OwnerContext'
+import { getCurrentUser } from '@/lib/auth'
+import type { TenantMembership } from '@/lib/normalize-tenants'
+import { getServerI18n } from '@/i18n/server'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -14,7 +20,7 @@ type Props = {
     params: Promise<{ slug: string; productSlug: string }>
 }
 
-async function getProductData(slug: string, productSlug: string) {
+const getProductData = cache(async function getProductData(slug: string, productSlug: string) {
     const payload = await getPayload({ config })
 
     const tenantsResult = await payload.find({
@@ -54,7 +60,7 @@ async function getProductData(slug: string, productSlug: string) {
     if (!product) return null
 
     return { tenant, site, product }
-}
+})
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, productSlug } = await params
@@ -66,13 +72,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = (product as any).seo?.description || (product as any).shortDescription || `Buy ${product.name} from ${site.name}`
     const ogImage = (product as any).images?.[0]?.image?.url
 
+    // BUG-F05-020: Resolve canonical URL for product pages
+    const reqHeaders = await headers()
+    const tenantHostname = reqHeaders.get('x-tenant-hostname')
+    const tenantSlug = reqHeaders.get('x-tenant-slug')
+    const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+
+    let baseUrl: string
+    if (tenantHostname) {
+        baseUrl = `https://${tenantHostname}`
+    } else if (tenantSlug) {
+        baseUrl = `https://${tenantSlug}.${PLATFORM_DOMAIN}`
+    } else if (slug !== 'custom') {
+        baseUrl = `https://${slug}.${PLATFORM_DOMAIN}`
+    } else {
+        baseUrl = ''
+    }
+    const canonical = baseUrl ? `${baseUrl}/products/${productSlug}` : undefined
+
     return {
         title,
         description,
+        alternates: canonical ? { canonical } : undefined,
         openGraph: {
             title,
             description,
             type: 'website',
+            ...(canonical ? { url: canonical } : {}),
             ...(ogImage && { images: [{ url: ogImage }] }),
         },
     }
@@ -90,12 +116,41 @@ export default async function ProductDetailPage({ params }: Props) {
 
     if (!data) notFound()
 
-    const { site, product } = data
-    const p = product as any
-    const primaryColor = (site.theme as any)?.primaryColor || '#0ea5e9'
+    const { t } = await getServerI18n()
+    const { tenant, site, product } = data
+
+    interface ProductView {
+        id: string | number
+        slug: string
+        name: string
+        price: number
+        compareAtPrice?: number
+        currency?: string
+        inventory: number
+        sku?: string
+        shortDescription?: string
+        category?: { id: string; name: string; breadcrumbs?: string }
+        attributes?: Array<{ key: string; value: string }>
+        images?: Array<{ image?: { url: string }; alt?: string }>
+        seo?: { title?: string; description?: string }
+    }
+    interface SiteTheme {
+        primaryColor?: string
+        fontBody?: string
+        fontHeading?: string
+    }
+
+    const p = product as ProductView
+    const primaryColor = (site.theme as SiteTheme | undefined)?.primaryColor || '#0ea5e9'
+
+    // Check ownership to skip analytics tracking for tenant member visits
+    const user = await getCurrentUser()
+    const isOwner = !!user && (user.tenants?.map((t: TenantMembership) =>
+        typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+    ) ?? []).includes(String(tenant.id))
     const images = p.images || []
     const hasDiscount = p.compareAtPrice && p.compareAtPrice > p.price
-    const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice) * 100) : 0
+    const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice!) * 100) : 0
 
     // JSON-LD Product schema
     const attributes = p.attributes || []
@@ -124,11 +179,11 @@ export default async function ProductDetailPage({ params }: Props) {
     }
 
     return (
-        <>
-            <TrackingManager siteId={String(site.id)} />
+        <OwnerProvider value={isOwner}>
+            <TrackingManager siteId={String(site.id)} isOwner={isOwner} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-            <div style={{ fontFamily: `${(site.theme as any)?.fontBody || 'Inter'}, sans-serif` }}>
+            <div style={{ fontFamily: `${(site.theme as SiteTheme | undefined)?.fontBody || 'Inter'}, sans-serif` }}>
                 {/* Nav */}
                 <nav style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -136,13 +191,13 @@ export default async function ProductDetailPage({ params }: Props) {
                 }}>
                     <Link href={`/sites/${slug}`} style={{
                         fontSize: '20px', fontWeight: 700, textDecoration: 'none', color: '#111',
-                        fontFamily: `${(site.theme as any)?.fontHeading || 'Outfit'}, sans-serif`,
+                        fontFamily: `${(site.theme as SiteTheme | undefined)?.fontHeading || 'Outfit'}, sans-serif`,
                     }}>
                         {site.name}
                     </Link>
                     <div style={{ display: 'flex', gap: '24px', fontSize: '14px' }}>
-                        <Link href={`/sites/${slug}`} style={{ color: '#666', textDecoration: 'none' }}>Home</Link>
-                        <Link href={`/sites/${slug}/products`} style={{ color: '#666', textDecoration: 'none' }}>Products</Link>
+                        <Link href={`/sites/${slug}`} style={{ color: '#666', textDecoration: 'none' }}>{t.storefront.products.home}</Link>
+                        <Link href={`/sites/${slug}/products`} style={{ color: '#666', textDecoration: 'none' }}>{t.storefront.products.title}</Link>
                     </div>
                 </nav>
 
@@ -210,7 +265,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
                         <h1 style={{
                             fontSize: '32px', fontWeight: 700, margin: '0 0 16px', color: '#111',
-                            fontFamily: `${(site.theme as any)?.fontHeading || 'Outfit'}, sans-serif`,
+                            fontFamily: `${(site.theme as SiteTheme | undefined)?.fontHeading || 'Outfit'}, sans-serif`,
                         }}>
                             {p.name}
                         </h1>
@@ -223,7 +278,7 @@ export default async function ProductDetailPage({ params }: Props) {
                             {hasDiscount && (
                                 <>
                                     <span style={{ fontSize: '18px', color: '#999', textDecoration: 'line-through' }}>
-                                        {formatPrice(p.compareAtPrice, p.currency || 'MYR')}
+                                        {formatPrice(p.compareAtPrice!, p.currency || 'MYR')}
                                     </span>
                                     <span style={{
                                         background: '#fef2f2', color: '#ef4444', fontSize: '13px',
@@ -263,7 +318,7 @@ export default async function ProductDetailPage({ params }: Props) {
                         {/* Extended Attributes Grid (US-F08-06) */}
                         {attributes && attributes.length > 0 && (
                             <div style={{ marginTop: '32px' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '12px' }}>Specifications</h3>
+                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '12px' }}>{t.storefront.products.specifications}</h3>
                                 <div style={{ 
                                     display: 'grid', gridTemplateColumns: '1fr', gap: '1px', 
                                     background: '#eee', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' 
@@ -288,14 +343,14 @@ export default async function ProductDetailPage({ params }: Props) {
                         {/* Description */}
                         {p.shortDescription && (
                             <div style={{ borderTop: '1px solid #eee', paddingTop: '24px' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '8px' }}>Description</h3>
+                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '8px' }}>{t.storefront.products.description}</h3>
                                 <p style={{ fontSize: '14px', color: '#666', lineHeight: 1.7 }}>{p.shortDescription}</p>
                             </div>
                         )}
 
                         {/* SKU */}
                         {p.sku && (
-                            <p style={{ fontSize: '12px', color: '#bbb', marginTop: '24px' }}>SKU: {p.sku}</p>
+                            <p style={{ fontSize: '12px', color: '#bbb', marginTop: '24px' }}>{t.storefront.products.sku} {p.sku}</p>
                         )}
                     </div>
                 </div>
@@ -303,6 +358,6 @@ export default async function ProductDetailPage({ params }: Props) {
 
             {/* Cart Drawer */}
             <CartDrawer siteSlug={slug} siteId={String(site.id)} />
-        </>
+        </OwnerProvider>
     )
 }

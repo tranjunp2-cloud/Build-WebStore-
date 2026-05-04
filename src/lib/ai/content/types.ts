@@ -7,6 +7,9 @@ export type BusinessSample = {
   email: string
   heroHeadline: string
   heroSubheadline: string
+  // Ephemeral from BusinessInfoInput wire payload, NOT persisted to Payload.
+  // Populated via bizOverride in composeFromBlueprint when user supplies products.
+  products?: string[]
 }
 
 export type TestimonialSample = {
@@ -28,6 +31,30 @@ export type IndustryBlockSample = {
   [key: string]: unknown
 }
 
+/**
+ * Plan 260414-2249 phase-05: seeded blog post for the Blog sub-page.
+ * Rendered directly into blog-list block items — display-only, no CMS.
+ * Images assigned later from Phase 03 image pool when available.
+ */
+export type BlogPost = {
+  title: string
+  excerpt: string
+  slug: string
+  category?: string
+  readTime?: string
+}
+
+/**
+ * Plan 260417-0837 phase-01 item 1.4: real MY client-logo data.
+ * Replaces synthetic `Partner {i+1}` stubs. `url` optional — name-only
+ * render is fine until a logo media pipeline ships (see plan followup).
+ */
+export type ClientLogo = {
+  name: string
+  url?: string
+  industryTag?: string
+}
+
 export type CategoryContent = {
   category: string
   locale: 'en-MY'
@@ -35,4 +62,8 @@ export type CategoryContent = {
   testimonials: TestimonialSample[]
   faqItems: FAQSample[]
   industryBlocks: IndustryBlockSample[]
+  /** Plan 260414-2249 phase-05: 3-5 hand-curated posts per category. */
+  blogSeeds?: BlogPost[]
+  /** Plan 260417-0837 phase-01: 6-8 MY client logos per category. */
+  logos?: ClientLogo[]
 }

@@ -31,6 +31,21 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import type { PageData } from '@/store/editorStore'
 
+export type PublishState = 'draft' | 'publishing' | 'live' | 'live-dirty' | 'updating'
+
+export function derivePublishState(opts: {
+    isPublished: boolean
+    isPublishing: boolean
+    hasUnsavedChanges: boolean
+    hasUnpublishedChanges: boolean
+}): PublishState {
+    if (opts.isPublishing && opts.isPublished) return 'updating'
+    if (opts.isPublishing) return 'publishing'
+    if (opts.isPublished && (opts.hasUnsavedChanges || opts.hasUnpublishedChanges)) return 'live-dirty'
+    if (opts.isPublished) return 'live'
+    return 'draft'
+}
+
 interface EditorToolbarProps {
     siteId: string
     currentPageId: string | null
@@ -121,7 +136,7 @@ export function EditorToolbar({
                         type="button"
                         onClick={onOpenMenu}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-                        title="Menu"
+                        title={et.menu}
                     >
                         <Menu className="h-4 w-4" />
                     </button>
@@ -130,7 +145,7 @@ export function EditorToolbar({
                         type="button"
                         onClick={onOpenTemplates}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-amber-300/80 transition-colors hover:bg-white/[0.06]"
-                        title="Templates"
+                        title={et.templates}
                     >
                         <Palette className="h-4 w-4" />
                     </button>
@@ -139,7 +154,7 @@ export function EditorToolbar({
 
                     <div className="flex items-center gap-1">
                         <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                        <span className="text-[11px] text-slate-400">{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Unsaved' : 'Saved'}</span>
+                        <span className="text-[11px] text-slate-400">{isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
                     </div>
                 </div>
 
@@ -149,7 +164,7 @@ export function EditorToolbar({
                             href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            title="Preview"
+                            title={et.preview}
                         >
                             <SquareArrowOutUpRight className="h-3.5 w-3.5" />
                         </a>
@@ -212,10 +227,10 @@ export function EditorToolbar({
                     type="button"
                     onClick={onOpenMenu}
                     className="inline-flex h-8 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
-                    title="Open menu"
+                    title={et.openMenu}
                 >
                     <Menu className="h-4 w-4" />
-                    Menu
+                    {et.menu}
                 </button>
 
                 <div className="inline-flex h-8 items-center gap-2 rounded-lg bg-white/[0.04] px-3">
@@ -229,7 +244,7 @@ export function EditorToolbar({
                     className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
                 >
                     <span className="text-base leading-none">🎨</span>
-                    Templates
+                    {et.templates}
                 </button>
 
                 <div className="mx-1.5 h-4 w-px bg-white/[0.08]" />
@@ -239,10 +254,10 @@ export function EditorToolbar({
                     onClick={onUndo}
                     disabled={!canUndo}
                     className="inline-flex h-8 items-center gap-2 rounded-[10px] px-2.5 text-xs font-medium text-[#F8FAFC] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-                    title="Undo (Cmd/Ctrl+Z)"
+                    title={et.undoShortcut}
                 >
                     <Undo2 className="h-4 w-4" />
-                    Undo
+                    {et.undo}
                 </button>
 
                 <button
@@ -250,10 +265,10 @@ export function EditorToolbar({
                     onClick={onRedo}
                     disabled={!canRedo}
                     className="inline-flex h-8 items-center gap-2 rounded-[10px] px-2.5 text-xs font-medium text-[#F8FAFC] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-                    title="Redo (Cmd/Ctrl+Shift+Z)"
+                    title={et.redoShortcut}
                 >
                     <Redo2 className="h-4 w-4" />
-                    Redo
+                    {et.redo}
                 </button>
             </div>
 
@@ -270,7 +285,7 @@ export function EditorToolbar({
                         )}
                     >
                         <span className="text-[15px] leading-none">💻</span>
-                        Desktop
+                        {et.desktop}
                     </button>
                     <button
                         type="button"
@@ -283,7 +298,7 @@ export function EditorToolbar({
                         )}
                     >
                         <span className="text-[15px] leading-none">📱</span>
-                        Mobile
+                        {et.mobile}
                     </button>
                 </div>
             </div>
@@ -291,21 +306,28 @@ export function EditorToolbar({
             <div className="flex items-center gap-2.5">
                 <div className="inline-flex items-center gap-1.5 text-[11px]">
                     <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                    <span className="text-slate-400">{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Unsaved' : 'Saved'}</span>
+                    <span className="text-slate-400">{isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
                 </div>
 
                 <div className="h-4 w-px bg-white/[0.08]" />
 
-                <div className={cn(
-                    'inline-flex h-6 items-center rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider',
-                    isPublished
-                        ? hasUnpublishedChanges
-                            ? 'bg-amber-500/15 text-amber-400'
-                            : 'bg-emerald-500/15 text-emerald-400'
-                        : 'bg-white/[0.06] text-slate-400',
-                )}>
-                    {isPublished ? (hasUnpublishedChanges ? 'Changes pending' : et.live) : et.draft}
-                </div>
+                {(() => {
+                    const ps = derivePublishState({ isPublished, isPublishing, hasUnsavedChanges, hasUnpublishedChanges })
+                    const badgeConfig: Record<PublishState, { label: string; cls: string }> = {
+                        draft: { label: et.draft, cls: 'bg-white/[0.06] text-slate-400' },
+                        publishing: { label: et.publishing, cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
+                        live: { label: et.live, cls: 'bg-emerald-500/15 text-emerald-400' },
+                        'live-dirty': { label: et.changesPending, cls: 'bg-amber-500/15 text-amber-400' },
+                        updating: { label: et.updating || 'Updating...', cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
+                    }
+                    const { label, cls } = badgeConfig[ps]
+                    return (
+                        <div className={cn('inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider', cls)}>
+                            {ps === 'live' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
+                            {label}
+                        </div>
+                    )
+                })()}
 
                 <Button variant="ghost" size="sm" asChild className="h-8 rounded-lg border border-white/[0.08] px-3 text-[11px] font-medium text-slate-300 hover:bg-white/[0.06] hover:text-white">
                     <a
@@ -314,7 +336,7 @@ export function EditorToolbar({
                         rel="noopener noreferrer"
                     >
                         <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-                        Preview
+                        {et.preview}
                     </a>
                 </Button>
 

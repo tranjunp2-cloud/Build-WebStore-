@@ -95,6 +95,41 @@ describe('POST /api/seo/fix-all [TC-F03.33, TC-F03.34]', () => {
         expect(res.status).toBe(403)
     })
 
+    it('accepts blogs collection and generates proposals [TC-F03.40]', async () => {
+        // Arrange
+        mockFindByID.mockResolvedValue({
+            id: 'site-1',
+            name: 'My Store',
+            tenant: 'tenant-1',
+        })
+
+        // Act
+        const req = {
+            json: () => Promise.resolve({
+                siteId: 'site-1',
+                missingSeo: [{
+                    collection: 'blogs',
+                    id: 'blog-1',
+                    title: 'How to Cook Nasi Lemak',
+                    missingFields: ['title', 'description'],
+                }],
+            }),
+        } as unknown as Request
+
+        // Route context unused by handler — safe to stub as empty object
+        const res = await POST(req, {} as any)
+        const text = await res.text()
+        const dataLines = text.split('\n').filter(line => line.startsWith('data: '))
+        const parsedData = dataLines.map(line => JSON.parse(line.replace('data: ', '')))
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(parsedData).toHaveLength(1)
+        expect(parsedData[0].collection).toBe('blogs')
+        expect(parsedData[0].proposedTitle).toBe('Generated Title')
+        expect(parsedData[0].proposedDescription).toBeDefined()
+    })
+
     it('skips proposedTitle when not in missingFields', async () => {
         mockFindByID.mockResolvedValue({ id: 'site-1', name: 'Store', tenant: 'tenant-1' })
 

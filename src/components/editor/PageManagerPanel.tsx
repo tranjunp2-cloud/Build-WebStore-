@@ -13,6 +13,7 @@ import type { PageData } from '@/store/editorStore'
 interface PageManagerPanelProps {
     siteId: string
     currentPageId: string | null
+    siteStatus?: string
     onPageSelected: (pageId: string) => void
     onPageCreated?: (pageId: string) => void
     onPagesChanged?: () => void
@@ -35,17 +36,21 @@ function getPagePath(page: PageData) {
     return page.slug.startsWith('/') ? page.slug : `/${page.slug}`
 }
 
-function getStatusBadge(page: PageData) {
-    if (page.status === 'published') {
+function getStatusBadge(page: PageData, labels: { live: string; draft: string }, siteStatus?: string) {
+    // A page is only truly "Live" if BOTH the page is published AND the site is published.
+    // Pages generated with _status:'published' should show "Draft" if the site hasn't been published yet.
+    const isPageLive = page.status === 'published' && siteStatus === 'published'
+
+    if (isPageLive) {
         return {
-            label: 'Live',
+            label: labels.live,
             className: 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]',
             dotClassName: 'bg-[#00c950]',
         }
     }
 
     return {
-        label: 'Draft',
+        label: labels.draft,
         className: 'border border-[rgba(106,114,130,0.3)] bg-[rgba(106,114,130,0.2)] text-[#d1d5dc]',
         dotClassName: '',
     }
@@ -54,6 +59,7 @@ function getStatusBadge(page: PageData) {
 export function PageManagerPanel({
     siteId,
     currentPageId,
+    siteStatus,
     onPageSelected,
     onPageCreated,
     onPagesChanged,
@@ -111,8 +117,11 @@ export function PageManagerPanel({
             })
 
             if (!res.ok) {
-                const errorText = await res.text()
-                throw new Error(errorText || 'Failed to create page')
+                if (res.status === 409) {
+                    toast.error(t.editor.pageManagerPanel.slugConflict)
+                    return
+                }
+                throw new Error(`HTTP ${res.status}`)
             }
 
             const data = await res.json()
@@ -130,7 +139,8 @@ export function PageManagerPanel({
 
             onPagesChanged?.()
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Error creating page')
+            console.error('[PageManagerPanel] Create page failed:', err)
+            toast.error(t.editor.pageManagerPanel.createError)
         } finally {
             setIsSubmitting(false)
         }
@@ -231,9 +241,9 @@ export function PageManagerPanel({
             <div className="border-b border-white/10 px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <p className="text-sm font-semibold text-white">Page Manager</p>
+                        <p className="text-sm font-semibold text-white">{t.editor.pageManagerPanel.title}</p>
                         <p className="mt-1 text-xs text-gray-500">
-                            Create, select, hide, and soft-delete pages for this site.
+                            {t.editor.pageManagerPanel.description}
                         </p>
                     </div>
                     <FileText className="h-4 w-4 text-blue-400" />
@@ -298,9 +308,9 @@ export function PageManagerPanel({
                 {isEmptyState ? (
                     <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/5 px-6 text-center">
                         <FileText className="h-8 w-8 text-gray-600" />
-                        <p className="mt-4 text-sm font-medium text-white">No pages found</p>
+                        <p className="mt-4 text-sm font-medium text-white">{t.editor.pageManagerPanel.noPagesFound}</p>
                         <p className="mt-2 max-w-xs text-xs text-gray-500">
-                            Create a new page or try a different search keyword.
+                            {t.editor.pageManagerPanel.noPagesSuggestion}
                         </p>
                     </div>
                 ) : (
@@ -310,7 +320,7 @@ export function PageManagerPanel({
                         {regularPages.map(page => {
                             const isCurrent = page.id === currentPageId
                             const isProtectedPage = Boolean(page.isHomepage) || SYSTEM_PAGE_SLUGS.has(page.slug)
-                            const statusBadge = getStatusBadge(page)
+                            const statusBadge = getStatusBadge(page, { live: pm.statusLive, draft: pm.statusDraft }, siteStatus)
 
                             return (
                                 <div
@@ -460,7 +470,7 @@ export function PageManagerPanel({
                                                 className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-[4px] border border-[rgba(59,130,246,0.04)] bg-[#253046] text-[12px] font-medium text-[#F8FAFC] transition-colors hover:border-cyan-500/20 hover:bg-[#2A3750]"
                                             >
                                                 <span aria-hidden="true">✏️</span>
-                                                {pm.editWithAI}
+                                                {pm.edit404Page}
                                             </button>
                                         </div>
                                     ) : null}

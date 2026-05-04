@@ -43,9 +43,17 @@ export async function getCurrentUser(req?: Request) {
             return authResult.user
         }
 
-        // Fallback: decode custom JWT (from verify-otp endpoint)
+        // Fallback: decode custom JWT (from verify-otp endpoint OR cross-service SSO)
         // The verify-otp creates a jose-signed JWT with {id, email, collection, mfa_verified}
-        // which payload.auth() cannot verify — so we decode it manually
+        // which payload.auth() cannot verify — so we decode it manually.
+        //
+        // Cross-service SSO support: when a sibling Payload deployment (e.g.
+        // web-cms-v2) issues a token with its own secret, set
+        // `SSO_SHARED_SECRET` to that peer's secret. We try PAYLOAD_SECRET first,
+        // then fall back to SSO_SHARED_SECRET. Both projects can align PAYLOAD_SECRET
+        // to avoid needing this fallback — this exists for defense-in-depth when
+        // secrets are scoped separately per Vercel project. Fixes staging bug
+        // "signature verification failed at /api/v1/sso/provision".
         const payloadSecret = process.env.PAYLOAD_SECRET
         if (!payloadSecret) {
             console.error('getCurrentUser: PAYLOAD_SECRET is not defined. Cannot decode custom JWT.')
@@ -53,8 +61,28 @@ export async function getCurrentUser(req?: Request) {
         }
 
         const { jwtVerify } = await import('jose')
-        const secret = new TextEncoder().encode(payloadSecret)
-        const { payload: decoded } = await jwtVerify(token, secret)
+        const encoder = new TextEncoder()
+        const candidateSecrets = [encoder.encode(payloadSecret)]
+        const ssoSecret = process.env.SSO_SHARED_SECRET
+        if (ssoSecret && ssoSecret !== payloadSecret) {
+            candidateSecrets.push(encoder.encode(ssoSecret))
+        }
+
+        let decoded: Awaited<ReturnType<typeof jwtVerify>>['payload'] | null = null
+        let lastErr: unknown = null
+        for (const secret of candidateSecrets) {
+            try {
+                const result = await jwtVerify(token, secret)
+                decoded = result.payload
+                break
+            } catch (e) {
+                lastErr = e
+            }
+        }
+        if (!decoded) {
+            // Re-throw so outer catch logs a single structured error.
+            throw lastErr ?? new Error('JWT signature verification failed against all candidate secrets')
+        }
 
         const isIdValid =
             typeof decoded.id === 'number' ||
@@ -74,7 +102,18 @@ export async function getCurrentUser(req?: Request) {
 
         return null
     } catch (error) {
-        console.error('getCurrentUser error:', error)
+        // error == null catches both null and undefined thrown by payload.auth() for invalid/expired tokens
+        if (error == null) return null
+        const msg = error instanceof Error ? error.message : String(error)
+        if (msg.includes('signature verification failed')) {
+            console.error(
+                'getCurrentUser error: signature verification failed. ' +
+                'Hint: this Payload project received a JWT signed by a different secret. ' +
+                'Align PAYLOAD_SECRET across services, or set SSO_SHARED_SECRET to the issuing service\'s secret.',
+            )
+        } else {
+            console.error('getCurrentUser error:', error)
+        }
         return null
     }
 }

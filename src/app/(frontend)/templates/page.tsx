@@ -40,7 +40,7 @@ export default function TemplatesPage() {
     useEffect(() => {
         async function fetchTemplates() {
             try {
-                const res = await fetch('/api/templates/list?limit=50')
+                const res = await fetch('/api/templates/list?limit=100')
                 if (res.ok) {
                     const data = await res.json()
                     setTemplates(data.docs || [])

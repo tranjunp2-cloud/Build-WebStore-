@@ -1,9 +1,27 @@
 'use client'
 
+import Image from 'next/image'
+import { RichText } from './RichText'
+import { hasInlineFormatting } from '@/lib/utils/rich-text-render'
+
 /**
  * Shared decorative SVG components for block renderers.
  * Adds visual richness without requiring actual images.
+ *
+ * Phase A4 (260417) — 8 new primitives in ./decorative/* unlock per-variant
+ * "decorative vocabulary" so 10 sites in the same category no longer share
+ * the same gradient blob. Each block variant pins to a specific primitive
+ * (see docs/design/decorative-vocabulary.md).
  */
+
+export { MeshGradient } from './decorative/MeshGradient'
+export { NoiseTexture } from './decorative/NoiseTexture'
+export { LayeredShapes } from './decorative/LayeredShapes'
+export { AsymmetricGrid } from './decorative/AsymmetricGrid'
+export { DuotoneOverlay } from './decorative/DuotoneOverlay'
+export { TypographicMark } from './decorative/TypographicMark'
+export { GridLines } from './decorative/GridLines'
+export { DiagonalStripe } from './decorative/DiagonalStripe'
 
 // ── Gradient Blob — soft background accent ──────────────────────────────────
 
@@ -154,6 +172,10 @@ interface SectionLabelProps {
 }
 
 export function SectionLabel({ color, children }: SectionLabelProps) {
+    const content = typeof children === 'string' && hasInlineFormatting(children) 
+        ? <RichText text={children} as="span" /> 
+        : children
+
     return (
         <div
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6"
@@ -164,7 +186,7 @@ export function SectionLabel({ color, children }: SectionLabelProps) {
             }}
         >
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-            {children}
+            {content}
         </div>
     )
 }
@@ -197,14 +219,15 @@ interface AvatarRingProps {
     src?: string
     name: string
     size?: number
+    imageIndex?: number
 }
 
-export function AvatarRing({ color, src, name, size = 48 }: AvatarRingProps) {
+export function AvatarRing({ color, src, name, size = 48, imageIndex }: AvatarRingProps) {
     const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
     return (
         <div
-            className="rounded-full flex items-center justify-center font-bold text-sm"
+            className="relative rounded-full flex items-center justify-center font-bold text-sm overflow-hidden"
             style={{
                 width: size,
                 height: size,
@@ -215,7 +238,7 @@ export function AvatarRing({ color, src, name, size = 48 }: AvatarRingProps) {
             }}
         >
             {src ? (
-                <img src={src} alt={name} className="w-full h-full rounded-full object-cover" />
+                <Image src={src} alt={name} fill className="rounded-full object-cover" data-image-index={imageIndex} />
             ) : initials}
         </div>
     )

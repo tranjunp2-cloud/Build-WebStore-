@@ -3,11 +3,17 @@
 import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { AccordionConfig } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
 
-export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
+void _CSS_VARS
+
+export function AccordionBlock({ block, theme: _theme }: BlockProps<AccordionConfig>) {
+    void _theme
     const { headline, description, items = [], variant = 'bordered' } = block
     const [openIndexes, setOpenIndexes] = useState<Set<number>>(new Set())
 
@@ -46,13 +52,15 @@ export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
     })()
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6 max-w-3xl">
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="max-w-3xl">
                 {headline && (
-                    <RichText text={headline} as="h2" className="text-4xl font-bold font-heading text-center mb-4" />
+                    <Heading level={2} className="text-center mb-4">
+                        <RichText text={headline} as="span" />
+                    </Heading>
                 )}
                 {description && (
-                    <p className="text-center opacity-70 mb-12 max-w-2xl mx-auto">{description}</p>
+                    <Body size="lg" className="text-center opacity-70 mb-12 max-w-2xl mx-auto">{description}</Body>
                 )}
                 <div className={itemStyles.container}>
                     {items.map((item, i) => {
@@ -64,10 +72,12 @@ export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
                                 style={itemStyles.wrapperStyle}
                             >
                                 <button
+                                    type="button"
                                     onClick={() => toggle(i)}
-                                    className="w-full px-6 py-4 flex items-center justify-between text-left font-medium hover:bg-white/5 transition-colors"
+                                    className={`w-full px-6 py-4 flex items-center justify-between text-left font-medium hover:bg-white/5 transition-colors ${TOUCH_TARGET.min}`}
+                                    aria-expanded={isOpen}
                                 >
-                                    <span className="font-heading">{item.title}</span>
+                                    <RichText text={item.title} as="span" className="font-heading" />
                                     <span
                                         className="transition-transform duration-300 flex-shrink-0 ml-4"
                                         style={{ transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)', color: 'var(--brand-primary)' }}
@@ -85,14 +95,14 @@ export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
                                     }}
                                 >
                                     <div className="px-6 pb-5 text-sm opacity-70 leading-relaxed">
-                                        {item.content}
+                                        <RichText text={item.content} as="span" />
                                     </div>
                                 </div>
                             </div>
                         )
                     })}
                 </div>
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

@@ -196,8 +196,26 @@ describe('trackEvent', () => {
         expect(body.sessionId).toBe('')
     })
 
-    // TC-F03-EVT-13: Multiple calls fire independently (Scenario #40)
-    it('TC-F03-EVT-13: multiple calls fire independently — no dedup', () => {
+    // TC-F03-EVT-13: Skips tracking when isOwner=true
+    it('TC-F03-EVT-13: skips tracking when isOwner=true', () => {
+        trackEvent({ siteId: '1', event: 'click', isOwner: true })
+        expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    // TC-F03-EVT-14: Tracks normally when isOwner=false
+    it('TC-F03-EVT-14: tracks normally when isOwner=false', () => {
+        trackEvent({ siteId: '1', event: 'click', isOwner: false })
+        expect(mockFetch).toHaveBeenCalledOnce()
+    })
+
+    // TC-F03-EVT-15: Tracks normally when isOwner is undefined (default)
+    it('TC-F03-EVT-15: tracks normally when isOwner is undefined', () => {
+        trackEvent({ siteId: '1', event: 'add_to_cart' })
+        expect(mockFetch).toHaveBeenCalledOnce()
+    })
+
+    // TC-F03-EVT-16: Multiple calls fire independently (Scenario #40)
+    it('TC-F03-EVT-16: multiple calls fire independently — no dedup', () => {
         trackEvent({ siteId: '1', event: 'click' })
         trackEvent({ siteId: '1', event: 'add_to_cart' })
         trackEvent({ siteId: '1', event: 'checkout' })

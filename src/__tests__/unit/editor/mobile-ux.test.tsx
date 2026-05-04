@@ -32,6 +32,14 @@ vi.mock('@/i18n', () => ({
                     },
                 },
             },
+            editor: {
+                toolbar: { sitePreview: 'Site Preview', dragToReorder: 'Drag to reorder section', drag: 'Drag' },
+                preview: { altUploadedImage: 'Uploaded image', editWithAI: 'Edit with AI', mapImageError: 'Could not map image to block field', imageReplaceSuccess: 'Image replaced successfully', imageReplaceFailed: 'Failed to replace image', inlineEditFailed: 'Inline edit failed', aiContextLocked: 'AI Generation context locked to: {blockType}' },
+                blockLibrary: { dropToAdd: 'Drop to add block' },
+                inlineEditComponent: { clickToEdit: 'Click to edit', defaultPlaceholder: 'Click to edit...', save: 'Save', cancel: 'Cancel', aiRewrite: 'AI Rewrite', aiPlaceholder: 'e.g. Make it shorter, add emoji...', rewrite: 'Rewrite' },
+                richText: { heading1: 'Heading 1', heading2: 'Heading 2', heading3: 'Heading 3', heading4: 'Heading 4', paragraph: 'Paragraph', bold: 'Bold', italic: 'Italic', underline: 'Underline', alignLeft: 'Align Left', alignCenter: 'Align Center', alignRight: 'Align Right', justify: 'Justify' },
+                imageToolbar: { changeImage: 'Change Image', generateAI: 'Generate AI Image' },
+            },
         },
         locale: 'en',
     }),
@@ -68,53 +76,45 @@ const defaultPreviewProps: PreviewFrameProps = {
 // =============================================================================
 
 describe('DashboardStats — mobile grid layout', () => {
-    it('[TC-F03.18] renders with grid-cols-2 class for mobile 2x2 layout', () => {
+    it('[TC-F03.18] renders with CSS contents wrapper for grid passthrough', () => {
         const { container } = render(
             <DashboardStats views={100} leads={50} engagement={75} currency="MYR" />,
         )
-        const gridContainer = container.firstElementChild as HTMLElement
-        expect(gridContainer).toBeTruthy()
-        expect(gridContainer.className).toContain('grid-cols-2')
+        const wrapper = container.firstElementChild as HTMLElement
+        expect(wrapper).toBeTruthy()
+        expect(wrapper.className).toContain('contents')
     })
 
-    it('[TC-F03.27] grid container has md:grid-cols-4 for tablet+ breakpoint', () => {
-        const { container } = render(
-            <DashboardStats views={100} leads={50} engagement={75} currency="MYR" />,
-        )
-        const gridContainer = container.firstElementChild as HTMLElement
-        expect(gridContainer.className).toContain('md:grid-cols-4')
-    })
-
-    it('[TC-F03.18] renders exactly 4 stat cards by default', () => {
+    it('[TC-F03.18] renders exactly 3 stat cards by default (revenue disabled for F10)', () => {
         const { container } = render(
             <DashboardStats views={200} leads={80} engagement={90} currency="MYR" />,
         )
-        const gridContainer = container.firstElementChild as HTMLElement
-        expect(gridContainer.children.length).toBe(4)
+        const wrapper = container.firstElementChild as HTMLElement
+        expect(wrapper.children.length).toBe(3)
     })
 
     it('[TC-F03.18] stat cards use padding p-5', () => {
         const { container } = render(
             <DashboardStats views={100} leads={50} engagement={75} currency="MYR" />,
         )
-        const gridContainer = container.firstElementChild as HTMLElement
-        const cards = Array.from(gridContainer.children)
-        expect(cards.length).toBe(4)
+        const wrapper = container.firstElementChild as HTMLElement
+        const cards = Array.from(wrapper.children)
+        expect(cards.length).toBe(3)
         cards.forEach((card) => {
             expect(card.className).toContain('p-5')
         })
     })
 
-    it('[TC-F03.18] stat values use text-[24px]', () => {
+    it('[TC-F03.18] stat values use text-[48px]', () => {
         render(<DashboardStats views={1234} leads={567} engagement={89} currency="MYR" />)
         const viewsValue = screen.getByText('1,234')
-        expect(viewsValue.className).toContain('text-[24px]')
+        expect(viewsValue.className).toContain('text-[48px]')
     })
 
-    it('[TC-F03.18] stat labels use text-[14px]', () => {
+    it('[TC-F03.18] stat labels use text-[18px]', () => {
         render(<DashboardStats views={100} leads={50} engagement={75} currency="MYR" />)
         const viewsLabel = screen.getByText('Views')
-        expect(viewsLabel.className).toContain('text-[14px]')
+        expect(viewsLabel.className).toContain('text-[18px]')
     })
 
     it('[TC-F03.27] respects custom preferences order', () => {
@@ -142,8 +142,9 @@ describe('DashboardStats — mobile grid layout', () => {
                 preferences={['views', 'revenue', 'leads', 'engagement']}
             />,
         )
-        const gridContainer = container.firstElementChild as HTMLElement
-        expect(gridContainer.children.length).toBe(4)
+        const wrapper = container.firstElementChild as HTMLElement
+        // Revenue is filtered out (F10 not ready), so 3 cards rendered
+        expect(wrapper.children.length).toBe(3)
     })
 })
 
@@ -194,7 +195,7 @@ describe('PreviewFrame — disableDragDrop prop', () => {
         // The inner container div has style width: 390 for mobile
         const styledDiv = container.querySelector('[style*="width"]') as HTMLElement
         expect(styledDiv).toBeTruthy()
-        expect(styledDiv.style.width).toBe('390px')
+        expect(styledDiv.style.width).toBe('min(390px, 100%)')
     })
 })
 

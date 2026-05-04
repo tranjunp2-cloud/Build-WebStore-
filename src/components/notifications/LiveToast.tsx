@@ -86,7 +86,7 @@ export function LiveToast({ id, title, type, message, onDismiss }: LiveToastProp
 
             <button
                 onClick={dismiss}
-                aria-label={t.notifications.toast.dismiss ?? 'Dismiss'}
+                aria-label={t.notifications.toast.dismiss}
                 className="shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors text-[#64748B] hover:text-white"
             >
                 <X className="h-4 w-4" />

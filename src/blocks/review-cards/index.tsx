@@ -1,12 +1,17 @@
 'use client'
 
+import Image from 'next/image'
 import { useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { ReviewCardsConfig, ReviewItem } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body, Caption } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+
+void _CSS_VARS
 
 function StarRating({ rating, size = 'md' }: { rating: number; size?: 'sm' | 'md' | 'lg' }) {
     const sizeClass = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-6 h-6' : 'w-5 h-5'
@@ -29,14 +34,14 @@ function StarRating({ rating, size = 'md' }: { rating: number; size?: 'sm' | 'md
 function ReviewCard({ review }: { review: ReviewItem }) {
     return (
         <div
-            className="p-6 rounded-2xl h-full flex flex-col"
+            className={`${CARD_PADDING.md} rounded-2xl h-full flex flex-col`}
             style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
         >
             <StarRating rating={review.rating} size="sm" />
-            <p className="mt-4 mb-6 flex-1 text-sm leading-relaxed opacity-70">&ldquo;{review.text}&rdquo;</p>
+            <Body size="small" className="mt-4 mb-6 flex-1 leading-relaxed opacity-70">&ldquo;{review.text}&rdquo;</Body>
             <div className="flex items-center gap-3">
                 {review.avatar ? (
-                    <img src={review.avatar} alt={review.name} className="w-10 h-10 rounded-full object-cover" />
+                    <Image src={review.avatar} alt={review.name} width={40} height={40} className="rounded-full object-cover" />
                 ) : (
                     <div
                         className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
@@ -49,16 +54,16 @@ function ReviewCard({ review }: { review: ReviewItem }) {
                     <p className="font-bold text-sm font-heading">
                         {review.name}
                         {review.verified && (
-                            <svg className="w-4 h-4 inline ml-1" viewBox="0 0 20 20" fill="var(--brand-primary)">
+                            <svg className="w-4 h-4 inline ml-1" viewBox="0 0 20 20" fill="var(--brand-primary)" aria-label="Verified">
                                 <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                             </svg>
                         )}
                     </p>
-                    <p className="text-xs opacity-40">
+                    <Caption className="opacity-40 block">
                         {review.source && <span>{review.source}</span>}
                         {review.source && review.date && <span> &middot; </span>}
                         {review.date && <span>{review.date}</span>}
-                    </p>
+                    </Caption>
                 </div>
             </div>
         </div>
@@ -100,9 +105,9 @@ export function ReviewCardsBlock({ block }: BlockProps<ReviewCardsConfig>) {
                     {averageRating.toFixed(1)}
                 </span>
                 <StarRating rating={averageRating} size="lg" />
-                <p className="text-sm opacity-50">
+                <Body size="small" className="opacity-50">
                     from {totalReviewCount ?? reviews.length} review{(totalReviewCount ?? reviews.length) !== 1 ? 's' : ''}
-                </p>
+                </Body>
             </div>
         )
     }
@@ -140,22 +145,24 @@ export function ReviewCardsBlock({ block }: BlockProps<ReviewCardsConfig>) {
             {reviews.length > 3 && (
                 <div className="flex justify-center gap-3 mt-6">
                     <button
+                        type="button"
                         onClick={() => scrollCarousel('left')}
-                        className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
+                        className={`${TOUCH_TARGET.min} min-w-[44px] rounded-full flex items-center justify-center transition-opacity hover:opacity-80`}
                         style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
                         aria-label="Previous reviews"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
                     <button
+                        type="button"
                         onClick={() => scrollCarousel('right')}
-                        className="w-10 h-10 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
+                        className={`${TOUCH_TARGET.min} min-w-[44px] rounded-full flex items-center justify-center transition-opacity hover:opacity-80`}
                         style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
                         aria-label="Next reviews"
                     >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
@@ -183,11 +190,17 @@ export function ReviewCardsBlock({ block }: BlockProps<ReviewCardsConfig>) {
     )
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-50 leading-relaxed">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 <AverageHeader />

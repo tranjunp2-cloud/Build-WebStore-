@@ -198,6 +198,16 @@ export const Users: CollectionConfig = {
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!email || !name || !tenantId || !role) return Response.json({ errors: [{ message: 'Missing required fields' }] }, { status: 400 })
 
+                // BUG-F19.08: Validate email length (RFC 5321)
+                if (typeof email !== 'string' || email.length > 254) {
+                    return Response.json({ errors: [{ message: 'Email must not exceed 254 characters' }] }, { status: 400 })
+                }
+
+                // BUG-F19.10: Block self-invite
+                if (req.user.email && email.toLowerCase() === req.user.email.toLowerCase()) {
+                    return Response.json({ errors: [{ message: 'Cannot invite yourself' }] }, { status: 400 })
+                }
+
                 // Check permissions of requester
                 const requesterTenant = req.user.tenants?.find((t: any) =>
                     (t.tenant?.id === tenantId || t.tenant === tenantId)
@@ -890,6 +900,7 @@ export const Users: CollectionConfig = {
             type: 'select',
             hasMany: true,
             defaultValue: ['tenant-owner'],
+            saveToJWT: true, // edge middleware checks role via decoded JWT (no DB call in edge runtime)
             options: [
                 { label: 'Super Admin', value: 'super-admin' },
                 { label: 'Tenant Owner', value: 'tenant-owner' },

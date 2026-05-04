@@ -1,5 +1,7 @@
 import type { BlockData, ThemeData } from '@/types/editor'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { getTeamAvatar } from '@/lib/images/industry-images'
+import { dedupSectionLabel } from './dedup-section-label'
 
 export type SupportedAddSectionType =
     | 'testimonials'
@@ -44,6 +46,15 @@ export type SupportedAddSectionType =
     | 'logo-cloud'
     | 'custom-html'
     | 'products-featured'
+    // v2.0 industry blocks
+    | 'menu-display'
+    | 'booking-widget'
+    | 'class-schedule'
+    | 'review-cards'
+    | 'video-showcase'
+    | 'doctor-profile'
+    | 'property-card'
+    | 'product-quick-view'
 
 type AddSectionContext = {
     instruction: string
@@ -53,6 +64,8 @@ type AddSectionContext = {
 }
 
 const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
+    // v2.0 industry blocks — placed before conflicting entries (review-cards before testimonials, etc.)
+    ['review-cards', [/\breview-cards?\b/i]],
     ['testimonials', [/\btestimonial(s)?\b/i, /\breview(s)?\b/i, /\bcustomer review(s)?\b/i]],
     ['faq', [/\bfaq\b/i, /\bquestion(s)?\b/i, /\bq&a\b/i]],
     ['gallery', [/\bgallery\b/i, /\bphoto(s)?\b/i, /\bimage(s)?\b/i]],
@@ -62,7 +75,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['banner', [/\bbanner\b/i, /\bpromo\b/i, /\bpromotion\b/i]],
     ['cta', [/\bcta\b/i, /\bcall to action\b/i]],
     ['socialWidget', [/\bsocial\s*widget\b/i, /\bsocial\s*media\b/i, /\bsocial\s*links?\b/i, /\bfacebook\b/i, /\binstagram\b/i, /\blinkedin\b/i, /\byoutube\b/i]],
-    ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]],
+    // ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]], // gh-839: hidden until checkout ships
     // v1.1 new blocks
     ['pricing-table', [/\bpricing\s*table\b/i, /\bprice\s*comparison\b/i, /\bplan\s*comparison\b/i]],
     ['gallery-masonry', [/\bmasonry\b/i, /\bmosaic\b/i]],
@@ -81,6 +94,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['accordion', [/\baccordion\b/i, /\bcollapsible\b/i, /\bexpandable\b/i]],
     ['step-process', [/\bstep\b/i, /\bprocess\b/i, /\bhow\s*it\s*works\b/i, /\btimeline\b/i]],
     ['portfolio-grid', [/\bportfolio\b/i, /\bproject\b/i, /\bshowcase\b/i, /\bwork\b/i]],
+    ['menu-display', [/\bmenu-display\b/i, /\bmenu\s+display\b/i]],
     ['menu-food', [/\bmenu\b/i, /\bfood\b/i, /\brestaurant\b/i, /\bdish\b/i]],
     ['service-cards', [/\bservice\b/i, /\boffering\b/i]],
     ['carousel', [/\bcarousel\b/i, /\bslider\b/i, /\bslideshow\b/i]],
@@ -89,8 +103,14 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['contact', [/\bcontact\b/i, /\bform\b/i, /\breach\s*us\b/i]],
     ['pricing', [/\bpricing\b/i, /\bplan(s)?\b/i, /\bpackage\b/i]],
     ['stats', [/\bstat(s)?\b/i, /\bnumber(s)?\b/i, /\bcounter\b/i]],
+    ['video-showcase', [/\bvideo-showcase\b/i, /\bvideo\s+showcase\b/i]],
     ['video', [/\bvideo\b/i, /\byoutube\b/i, /\bembed\b/i]],
     ['blog-list', [/\bblog\b/i, /\barticle(s)?\b/i, /\bpost(s)?\b/i]],
+    ['product-quick-view', [/\bproduct-quick-view\b/i, /\bquick[-\s]view\b/i]],
+    ['booking-widget', [/\bbooking(-widget)?\b/i, /\bbook\s+appointment\b/i, /\bappointment\b/i]],
+    ['class-schedule', [/\bclass(-schedule)?\b/i, /\bclass\s+schedule\b/i, /\bschedule\b/i, /\btimetable\b/i]],
+    ['doctor-profile', [/\bdoctor(-profile)?\b/i, /\bphysician\b/i, /\bdentist\b/i]],
+    ['property-card', [/\bproperty(-card)?\b/i, /\breal[-\s]estate\b/i, /\blisting\b/i]],
     ['products-grid', [/\bproduct(s)?\b/i, /\bshop\b/i, /\bstore\b/i]],
     ['logo-cloud', [/\blogo\b/i, /\bpartner\b/i, /\btrusted\b/i]],
     ['custom-html', [/\bcustom\s*html\b/i, /\bembed\b/i, /\bhtml\b/i, /\bcode\b/i]],
@@ -108,7 +128,7 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     banner: 'banner',
     cta: 'CTA',
     socialWidget: 'social media',
-    cartWidget: 'cart',
+    cartWidget: 'cart', // gh-839: label kept for type completeness; block is unreachable (matcher disabled)
     'pricing-table': 'pricing table',
     'gallery-masonry': 'masonry gallery',
     'whatsapp-button': 'WhatsApp button',
@@ -140,11 +160,23 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'logo-cloud': 'logo cloud',
     'custom-html': 'custom HTML',
     'products-featured': 'featured products',
+    // v2.0 industry blocks
+    'menu-display': 'menu display',
+    'booking-widget': 'booking widget',
+    'class-schedule': 'class schedule',
+    'review-cards': 'review cards',
+    'video-showcase': 'video showcase',
+    'doctor-profile': 'doctor profile',
+    'property-card': 'property card',
+    'product-quick-view': 'product quick view',
 }
 
 function getPlaceholderImage(index: number) {
+    // Leave url empty so the gallery block's render-time fallback picks the correct
+    // category + S3 images based on site.siteType and site.imageLibraryS3.
+    // Storing a real CDN URL here bypasses the siteType/S3 logic entirely.
     return {
-        image: null,
+        image: { url: '', alt: `Gallery image ${index + 1}` },
         caption: `Highlight ${index + 1}`,
     }
 }
@@ -159,6 +191,11 @@ function getRequestedCount(instruction: string, fallback: number) {
 }
 
 export function inferAddSectionType(instruction: string, requestedType?: string): SupportedAddSectionType | null {
+    // Direct match: exact block type from drag-and-drop panel bypasses regex matching
+    if (requestedType && Object.prototype.hasOwnProperty.call(SECTION_TYPE_LABELS, requestedType)) {
+        return requestedType as SupportedAddSectionType
+    }
+
     const haystack = `${requestedType || ''} ${instruction}`.trim()
 
     for (const [sectionType, matchers] of SECTION_TYPE_MATCHERS) {
@@ -234,12 +271,13 @@ export function createAddSectionBlock({
                 ),
             }
 
-        case 'features':
+        case 'features': {
+            const headline = `Why customers choose ${brandName}`
             return {
                 blockType: 'features',
                 layout: 'grid-3',
-                sectionLabel: 'Why Choose Us',
-                headline: `Why customers choose ${brandName}`,
+                sectionLabel: dedupSectionLabel('Why Choose Us', headline),
+                headline,
                 subheadline: 'Three strong reasons to trust this offer.',
                 features: [
                     {
@@ -259,19 +297,29 @@ export function createAddSectionBlock({
                     },
                 ],
             }
+        }
 
         case 'team':
             return {
                 blockType: 'team',
                 headline: `Meet the team behind ${brandName}`,
                 members: [
-                    { name: 'Team Member 1', role: 'Founder', bio: 'Add a short founder introduction here.' },
-                    { name: 'Team Member 2', role: 'Operations Lead', bio: 'Highlight day-to-day operational excellence.' },
-                    { name: 'Team Member 3', role: 'Customer Success', bio: 'Show the human side of your brand experience.' },
+                    { name: 'Team Member 1', role: 'Founder', bio: 'Add a short founder introduction here.', avatar: { url: getTeamAvatar('business', 0), alt: 'Team Member 1' } },
+                    { name: 'Team Member 2', role: 'Operations Lead', bio: 'Highlight day-to-day operational excellence.', avatar: { url: getTeamAvatar('business', 1), alt: 'Team Member 2' } },
+                    { name: 'Team Member 3', role: 'Customer Success', bio: 'Show the human side of your brand experience.', avatar: { url: getTeamAvatar('business', 2), alt: 'Team Member 3' } },
                 ],
             }
 
         case 'newsletter':
+            return {
+                blockType: 'newsletter',
+                variant: 'inline',
+                headline: `Stay in the loop with ${brandName}`,
+                subheadline: 'Get updates, offers, and useful tips delivered straight to your inbox.',
+                buttonLabel: 'Subscribe',
+                placeholder: 'Enter your email',
+            }
+
         case 'banner':
         case 'cta':
             return {
@@ -290,13 +338,8 @@ export function createAddSectionBlock({
                 links: getDefaultSocialWidgetLinks(),
             })
 
-        case 'cartWidget':
-            return {
-                blockType: 'cartWidget',
-                variant: 'floating',
-                label: 'Cart',
-                showLabel: false,
-            }
+        // case 'cartWidget': // gh-839: hidden until checkout ships
+        //     return { blockType: 'cartWidget', variant: 'floating', label: 'Cart', showLabel: false }
 
         // ── v1.1 New Blocks ─────────────────────────────────────────
 
@@ -547,14 +590,16 @@ export function createAddSectionBlock({
                 ],
             }
 
-        case 'about':
+        case 'about': {
+            const aboutHeadline = 'Our Story'
             return {
                 blockType: 'about',
                 variant: 'simple',
-                sectionLabel: 'About Us',
-                headline: `Our Story`,
+                sectionLabel: dedupSectionLabel('About Us', aboutHeadline),
+                headline: aboutHeadline,
                 body: `${brandName} was founded with a simple mission: to deliver quality and value to every customer. With years of experience and a passionate team, we continue to grow and innovate.`,
             }
+        }
 
         case 'contact':
             return {
@@ -652,6 +697,133 @@ export function createAddSectionBlock({
                 subheadline: 'Hand-picked selections just for you.',
             }
 
+        case 'menu-display':
+            return {
+                blockType: 'menu-display',
+                variant: 'tabs',
+                headline: `${brandName} Menu`,
+                subheadline: 'Explore our selection',
+                currency: 'RM',
+                showDietaryIcons: true,
+                categories: [
+                    {
+                        name: 'Main Course',
+                        items: [
+                            { name: 'Signature Dish', description: 'Our most popular dish.', price: 25.00, dietaryTags: [] },
+                            { name: "Chef's Special", description: 'A seasonal favourite.', price: 30.00, dietaryTags: [] },
+                        ],
+                    },
+                    {
+                        name: 'Drinks',
+                        items: [
+                            { name: 'Fresh Juice', price: 8.00, dietaryTags: ['vegan'] },
+                            { name: 'Coffee', price: 6.00, dietaryTags: [] },
+                        ],
+                    },
+                ],
+            }
+
+        case 'booking-widget':
+            return {
+                blockType: 'booking-widget',
+                variant: 'inline',
+                headline: `Book a Session with ${brandName}`,
+                subheadline: 'Choose a service and pick a time that suits you.',
+                availableDays: [1, 2, 3, 4, 5],
+                timeSlotInterval: 30,
+                startTime: '09:00',
+                endTime: '18:00',
+                showPrice: true,
+                services: [
+                    { name: 'Consultation', duration: 60, price: 150, description: 'One-on-one consultation session.' },
+                    { name: 'Follow-up', duration: 30, price: 80, description: 'Review and next steps.' },
+                ],
+            }
+
+        case 'class-schedule':
+            return {
+                blockType: 'class-schedule',
+                variant: 'grid',
+                headline: `${brandName} Class Schedule`,
+                showCapacity: true,
+                highlightToday: true,
+                classes: [
+                    { name: 'Morning Session', instructor: 'Instructor A', day: 1, startTime: '07:00', endTime: '08:00', capacity: 15, enrolled: 8, level: 'Beginner' },
+                    { name: 'Afternoon Workshop', instructor: 'Instructor B', day: 3, startTime: '14:00', endTime: '15:30', capacity: 20, enrolled: 12, level: 'Intermediate' },
+                    { name: 'Evening Class', instructor: 'Instructor C', day: 5, startTime: '18:00', endTime: '19:00', capacity: 12, enrolled: 5, level: 'All Levels' },
+                ],
+            }
+
+        case 'review-cards':
+            return {
+                blockType: 'review-cards',
+                variant: 'grid',
+                headline: `What customers say about ${brandName}`,
+                showAverage: true,
+                reviews: [
+                    { name: 'Customer A', rating: 5, text: `Really impressed with ${brandName}. The quality and service exceeded my expectations.`, verified: true },
+                    { name: 'Customer B', rating: 5, text: 'Smooth experience from start to finish. Would highly recommend.', verified: true },
+                    { name: 'Customer C', rating: 4, text: 'Great product, fast delivery. Will be back for more.', verified: true },
+                ],
+            }
+
+        case 'video-showcase':
+            return {
+                blockType: 'video-showcase',
+                variant: 'grid',
+                headline: `${brandName} in Action`,
+                subheadline: 'Watch our latest content.',
+                showCategories: true,
+                autoplay: false,
+                videos: [
+                    { title: 'Our Story', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'About', duration: '2:30', description: `How ${brandName} started and where we're going.` },
+                    { title: 'Product Demo', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'Product', duration: '3:45', description: 'See our flagship product in action.' },
+                    { title: 'Customer Story', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'Testimonial', duration: '1:20', description: 'Hear from one of our happiest customers.' },
+                ],
+            }
+
+        case 'doctor-profile':
+            return {
+                blockType: 'doctor-profile',
+                variant: 'cards',
+                headline: 'Meet Our Specialists',
+                subheadline: `Trusted professionals at ${brandName}`,
+                doctors: [
+                    { name: 'Dr. Sarah Lee', specialisation: 'General Practice', qualifications: ['MBBS', 'MMed'], availableDays: [1, 2, 3, 4, 5], languages: 'English, Malay', consultationFee: 'RM 80' },
+                    { name: 'Dr. Ahmad Razif', specialisation: 'Internal Medicine', qualifications: ['MBBS', 'MRCP'], availableDays: [1, 3, 5], languages: 'English, Malay, Arabic', consultationFee: 'RM 120' },
+                ],
+            }
+
+        case 'property-card':
+            return {
+                blockType: 'property-card',
+                variant: 'grid',
+                headline: 'Featured Properties',
+                subheadline: `Explore available listings from ${brandName}`,
+                showMap: false,
+                currency: 'RM',
+                properties: [
+                    { title: '3-Bedroom Apartment', price: 450000, location: 'Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, imageUrls: [], type: 'sale' as const, description: 'Modern apartment in a prime location.' },
+                    { title: 'Studio Unit', price: 1800, location: 'Petaling Jaya', bedrooms: 1, bathrooms: 1, area: 550, imageUrls: [], type: 'rent' as const, description: 'Cozy studio ideal for working professionals.' },
+                ],
+            }
+
+        case 'product-quick-view':
+            return {
+                blockType: 'product-quick-view',
+                variant: 'grid',
+                headline: 'Shop Our Products',
+                subheadline: 'Quick-view and add to cart in seconds.',
+                columns: 4 as const,
+                showQuickView: true,
+                currency: 'RM',
+                products: [
+                    { name: 'Product One', price: 49.90, imageUrls: [], description: 'A top-selling item from our collection.', ctaLabel: 'View Details', variants: ['Option A', 'Option B'] },
+                    { name: 'Product Two', price: 89.90, originalPrice: 120.00, imageUrls: [], description: 'Premium quality at an unbeatable price.', badge: 'Sale', ctaLabel: 'View Details' },
+                    { name: 'Product Three', price: 29.90, imageUrls: [], description: 'Compact, reliable, and budget-friendly.', ctaLabel: 'View Details' },
+                ],
+            }
+
         default:
             return null
     }
@@ -739,11 +911,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return {
             ...mergedBlock,
             variant: safeVariant,
-            testimonials: rawTestimonials.map((t: Record<string, unknown>) => {
-                const newT = { ...t }
-                delete newT.avatar
-                return newT
-            }),
+            testimonials: rawTestimonials
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ quote, name, title, company, rating, avatar }) => ({
+                    quote, name, title, company, rating, ...(avatar ? { avatar } : {}),
+                })),
         }
     }
 
@@ -769,15 +941,14 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         if (!['masonry', 'grid', 'carousel', 'lightbox'].includes(String(safeLayout))) safeLayout = 'grid'
 
         const rawImages = (Array.isArray((block as Record<string, unknown>).images) ? (block as Record<string, unknown>).images : fallbackBlock.images) as Record<string, unknown>[]
-        const cleanedImages = rawImages.map((item: Record<string, unknown>) => {
-            const newItem = { ...item }
-            delete newItem.image
-            return newItem
-        })
         return {
             ...mergedBlock,
             layout: safeLayout,
-            images: cleanedImages,
+            images: rawImages
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ image, caption }) => ({
+                    ...(image ? { image } : {}), ...(caption !== undefined ? { caption } : {}),
+                })),
         }
     }
 
@@ -786,11 +957,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         const rawMembers = (Array.isArray((block as Record<string, unknown>).members) ? (block as Record<string, unknown>).members : fallbackBlock.members) as Record<string, unknown>[]
         return {
             ...mergedBlock,
-            members: rawMembers.map((m: Record<string, unknown>) => {
-                const newM = { ...m }
-                delete newM.image
-                return newM
-            }),
+            members: rawMembers
+                .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+                .map(({ name, role, bio, avatar, socials }) => ({
+                    name, role, ...(bio ? { bio } : {}), ...(avatar ? { avatar } : {}), ...(socials ? { socials } : {}),
+                })),
         }
     }
 
@@ -798,8 +969,18 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return normalizeSocialWidgetConfig(mergedBlock)
     }
 
-    // CTA / Newsletter / Banner fallbacks are already mapped to Hero by createAddSectionBlock
-    if (['newsletter', 'banner', 'cta'].includes(mergedBlock.blockType as string)) {
+    if (mergedBlock.blockType === 'newsletter') {
+        const variant = String(mergedBlock.variant || fallbackBlock.variant || 'inline')
+        return {
+            ...mergedBlock,
+            variant: ['inline', 'popup', 'banner', 'stacked-card', 'minimal', 'incentive-grid'].includes(variant)
+                ? variant
+                : 'inline',
+        }
+    }
+
+    // CTA / Banner fallbacks are intentionally mapped to Hero by createAddSectionBlock
+    if (['banner', 'cta'].includes(mergedBlock.blockType as string)) {
         mergedBlock.blockType = 'hero'
         mergedBlock.variant = 'centered'
     }

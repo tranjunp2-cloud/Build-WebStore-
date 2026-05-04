@@ -22,7 +22,7 @@ export function DashboardActionList({ pendingOrders }: { pendingOrders: PendingO
         <div className="rounded-[16px] border border-white/10 bg-[#1E293B] flex flex-col p-6 h-full min-h-[400px]">
             <div className="flex items-center justify-between mb-[40px]">
                 <h2 className="text-[18px] font-semibold text-[#F8FAFC] tracking-tight leading-[1.55]">
-                    Action Required (Pending)
+                    {t.dashboard.overview.actions.title}
                 </h2>
             </div>
 
@@ -50,7 +50,7 @@ export function DashboardActionList({ pendingOrders }: { pendingOrders: PendingO
                                         {orderNum} — {order.customerName}
                                     </div>
                                     <div className="text-[12px] text-[#9CA3AF] leading-[1.83] truncate">
-                                        Pending · {totalItems} items · {formatDistanceToNowStrict(new Date(order.createdAt), { addSuffix: true })}
+                                        {t.dashboard.overview.pendingLabel} · {totalItems} {t.dashboard.overview.itemsLabel} · {formatDistanceToNowStrict(new Date(order.createdAt), { addSuffix: true })}
                                     </div>
                                 </div>
                                 
@@ -66,7 +66,7 @@ export function DashboardActionList({ pendingOrders }: { pendingOrders: PendingO
 
             <div className="mt-4">
                 <Link href="/orders?status=pending" className="inline-flex items-center gap-1 py-2 text-[13px] font-semibold text-[#3B82F6] hover:underline transition-all no-underline group">
-                    View all Orders <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-all" />
+                    {t.dashboard.overview.actions.viewAll} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-all" />
                 </Link>
             </div>
         </div>

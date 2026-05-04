@@ -6,9 +6,37 @@
  */
 
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { blockRegistry } from '@/blocks/registry'
 
 /** Upload/media field names that must be integer IDs (not objects or URLs) */
 export const UPLOAD_FIELDS = ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage'] as const
+
+/**
+ * Coerce an invalid block `variant` value to the block's default variant.
+ *
+ * Context: AI gen / preset layer sometimes emits variant strings that are
+ * not in the Payload block's select-options enum (e.g. `blog-list` with
+ * variant `"editorial"` when only `cards`/`list` are valid). Payload then
+ * rejects the save with "This field has an invalid selection" and the
+ * editor shows a 500. Drop to the default so persistence proceeds.
+ *
+ * Returns the block unchanged if:
+ *   - `blockType` is missing / not a registered block
+ *   - `variant` is missing / empty / already valid
+ */
+export function sanitizeBlockVariant(block: Record<string, unknown>): Record<string, unknown> {
+    const blockType = typeof block.blockType === 'string' ? block.blockType : null
+    if (!blockType) return block
+    const meta = blockRegistry.getBlockMeta(blockType)
+    if (!meta) return block
+    const current = block.variant
+    if (typeof current !== 'string' || current === '') return block
+    if (meta.variants.includes(current)) return block
+    console.warn(
+        `[Save] Block "${blockType}" variant "${current}" not in enum [${meta.variants.join(', ')}] — coercing to default "${meta.defaultVariant}"`
+    )
+    return { ...block, variant: meta.defaultVariant }
+}
 
 /**
  * Normalize a media/upload field value to an integer ID or null.
@@ -115,9 +143,26 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             b.headline = ''
         }
 
+        // Contact block: empty-string email fails Payload email-format validation on publish.
+        // Strip to null so Payload skips format check (field is not required).
+        if (b.blockType === 'contact' && b.email === '') {
+            b.email = null
+        }
+
         if (b.blockType === 'socialWidget') {
             b = normalizeSocialWidgetConfig(b) as Record<string, unknown>
         }
+
+        // Alias footer variants removed from Payload select options — backward-compat
+        // for existing DB records that stored 'expanded' or 'mega-footer' before PR #757.
+        if (b.blockType === 'footer') {
+            if (b.variant === 'expanded') b.variant = 'simple'
+            else if (b.variant === 'mega-footer') b.variant = 'dark-gradient'
+        }
+
+        // Coerce invalid variants to defaults — Payload rejects with
+        // "invalid selection" when variant doesn't match block enum.
+        b = sanitizeBlockVariant(b)
 
         // Defensively sanitize navigation links (legacy drafts might lack 'label')
         if (b.blockType === 'navigation' && Array.isArray(b.links)) {
@@ -128,6 +173,26 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
                     label: String(link.label || link.text || link.title || link.name || 'Link'),
                     url: String(link.url || link.href || link.link || '#')
                 }
+            })
+        }
+
+        // Defensively sanitize menu-food categories — AI may use 'title' instead of 'name'
+        if (b.blockType === 'menu-food' && Array.isArray(b.categories)) {
+            b.categories = (b.categories as Record<string, unknown>[]).map(cat => {
+                if (!cat || typeof cat !== 'object') return cat
+                const c = { ...cat }
+                c.name = String(c.name || c.title || c.label || c.category || 'Category')
+                if (Array.isArray(c.items)) {
+                    c.items = (c.items as Record<string, unknown>[]).map(item => {
+                        if (!item || typeof item !== 'object') return item
+                        return {
+                            ...item,
+                            name: String((item as Record<string, unknown>).name || (item as Record<string, unknown>).title || (item as Record<string, unknown>).label || 'Item'),
+                            price: String((item as Record<string, unknown>).price || '0'),
+                        }
+                    })
+                }
+                return c
             })
         }
 

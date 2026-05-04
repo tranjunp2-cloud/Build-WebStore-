@@ -171,7 +171,14 @@ export const Categories: CollectionConfig = {
             name: 'deletedAt',
             type: 'date',
             admin: { readOnly: true, description: 'Soft delete timestamp' },
-        }
+        },
+        {
+            name: 'dna',
+            type: 'json',
+            admin: {
+                description: 'Category DNA — block signature, order, forbidden, personality hints. Edited via Studio → Categories.',
+            },
+        },
     ],
     timestamps: true,
 }

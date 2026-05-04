@@ -12,29 +12,41 @@ export async function uploadMediaAction(formData: FormData) {
 
     const file = formData.get('file') as File
     if (!file) throw new Error('No file provided')
+    const altRaw = formData.get('alt')
+    const alt = typeof altRaw === 'string' && altRaw.trim() ? altRaw.trim() : file.name
 
     // Convert File to ArrayBuffer to Buffer for Payload
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
     const payload = await getPayload({ config: configPromise })
-    
-    // Create the media document in Payload
-    const res = await payload.create({
-        collection: 'media',
-        data: {
-            alt: file.name,
-        },
-        file: {
-            data: buffer,
-            name: file.name,
-            mimetype: file.type,
-            size: file.size,
-        },
-        user: user as any,
-    })
 
-    return JSON.parse(JSON.stringify(res))
+    // Magic byte validation handled by Media.ts beforeChange hook
+    try {
+        const res = await payload.create({
+            collection: 'media',
+            data: {
+                alt,
+            },
+            file: {
+                data: buffer,
+                name: file.name,
+                mimetype: file.type,
+                size: file.size,
+            },
+            user: user as any,
+        })
+
+        return JSON.parse(JSON.stringify(res))
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        // Sharp throws "Input file is missing" or "Invalid image file" for unsupported formats.
+        if (/invalid image|input file|unsupported/i.test(msg)) {
+            throw new Error('Invalid image file. Please upload JPG, PNG, WebP, GIF, or AVIF.')
+        }
+        console.error('[uploadMediaAction] Failed to create media:', msg)
+        throw err
+    }
 }
 
 export async function getOrCreateCrateCartonIdAction() {
@@ -76,7 +88,7 @@ export async function getOrCreateCrateCartonIdAction() {
                 mimetype: 'image/png',
                 size: fileData.length,
             },
-            user: user as any,
+            user: user as Parameters<typeof payload.create>[0]['user'],
         })
         
         return res.id

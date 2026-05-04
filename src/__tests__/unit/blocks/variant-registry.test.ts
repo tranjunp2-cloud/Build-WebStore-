@@ -15,10 +15,10 @@ import { NavigationConfigSchema, navigationMeta } from '@/blocks/navigation/conf
 const BLOCK_CONFIGS = [
     { name: 'hero', meta: heroMeta, schema: HeroConfigSchema, expectedCount: 12, minFields: { headline: 'Test' } },
     { name: 'features', meta: featuresMeta, schema: FeaturesConfigSchema, expectedCount: 8, minFields: { headline: 'Test' } },
-    { name: 'testimonials', meta: testimonialsMeta, schema: TestimonialsConfigSchema, expectedCount: 8, minFields: {} },
+    { name: 'testimonials', meta: testimonialsMeta, schema: TestimonialsConfigSchema, expectedCount: 10, minFields: {} },
     { name: 'pricing', meta: pricingMeta, schema: PricingConfigSchema, expectedCount: 8, minFields: {} },
     { name: 'gallery', meta: galleryMeta, schema: GalleryConfigSchema, expectedCount: 6, minFields: {} },
-    { name: 'footer', meta: footerMeta, schema: FooterConfigSchema, expectedCount: 6, minFields: {} },
+    { name: 'footer', meta: footerMeta, schema: FooterConfigSchema, expectedCount: 4, minFields: {} },
     { name: 'contact', meta: contactMeta, schema: ContactConfigSchema, expectedCount: 6, minFields: {} },
     { name: 'navigation', meta: navigationMeta, schema: NavigationConfigSchema, expectedCount: 6, minFields: {} },
 ] as const

@@ -15,11 +15,15 @@ interface BlogPost {
 
 interface StorefrontBlogListProps {
     tenantId: string
+    /** Site base path ('' on subdomain/custom, '/sites/<slug>' on local). */
+    siteBasePath?: string
+    /** @deprecated use siteBasePath */
+    tenantSlug?: string
 }
 
 const POSTS_PER_PAGE = 12
 
-export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
+export function StorefrontBlogList({ tenantId, siteBasePath, tenantSlug }: StorefrontBlogListProps) {
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [totalDocs, setTotalDocs] = useState(0)
     const [page, setPage] = useState(1)
@@ -28,6 +32,13 @@ export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
     const [loading, setLoading] = useState(true)
     const [searchInput, setSearchInput] = useState('')
     const [search, setSearch] = useState('')
+
+    // BUG-F05-06: build blog links using server-provided site base path.
+    // Falls back to tenantSlug for backward compatibility with older callers.
+    const basePath = typeof siteBasePath === 'string'
+        ? siteBasePath
+        : tenantSlug ? `/sites/${tenantSlug}` : ''
+    const blogBasePath = `${basePath}/blogs`
 
     // Restore scroll position when returning from blog detail
     useEffect(() => {
@@ -176,7 +187,7 @@ export function StorefrontBlogList({ tenantId }: StorefrontBlogListProps) {
                 {posts.map(post => (
                     <a
                         key={post.id}
-                        href={`/blogs/${post.slug}`}
+                        href={`${blogBasePath}/${post.slug}`}
                         onClick={() => sessionStorage.setItem('blog-list-scroll', String(window.scrollY))}
                         className="group rounded-2xl overflow-hidden border border-white/5 hover:border-white/15 transition-all hover:shadow-2xl"
                     >

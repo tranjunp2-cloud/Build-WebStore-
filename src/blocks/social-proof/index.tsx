@@ -1,10 +1,15 @@
 'use client'
 
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { SocialProofConfig, SocialProofReview } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body, Caption } from '../shared/Typography'
+import { CARD_PADDING } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
+import { getTeamAvatar } from '@/lib/images/industry-images'
 
 function StarRating({ rating, color }: { rating: number; color: string }) {
     return (
@@ -24,12 +29,12 @@ function StarRating({ rating, color }: { rating: number; color: string }) {
     )
 }
 
-function Avatar({ src, name, color }: { src?: string; name: string; color: string }) {
+function Avatar({ src, name, color, imageIndex }: { src?: string; name: string; color: string; imageIndex?: number }) {
     const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
     if (src) {
         return (
-            <img src={src} alt={name} className="w-10 h-10 rounded-full object-cover" />
+            <Image src={src} alt={name} width={40} height={40} className="rounded-full object-cover" data-image-index={imageIndex} />
         )
     }
 
@@ -43,67 +48,78 @@ function Avatar({ src, name, color }: { src?: string; name: string; color: strin
     )
 }
 
-function ReviewCard({ review, color, variant }: { review: SocialProofReview; color: string; variant: string }) {
+function ReviewCard({ review, color, variant, reviewIndex }: { review: SocialProofReview; color: string; variant: string; reviewIndex?: number }) {
+    const authorBlock = (
+        <div className="flex items-center gap-3">
+            <Avatar src={review.avatar?.url} name={review.author} color={color} imageIndex={reviewIndex} />
+            <div>
+                <Body size="small" className="font-semibold">{review.author}</Body>
+                {review.role && <Caption className="opacity-50 block">{review.role}</Caption>}
+            </div>
+        </div>
+    )
+
     if (variant === 'minimal') {
         return (
             <div className="py-6 border-b last:border-b-0" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.082)` }}>
                 <StarRating rating={review.rating} color={color} />
-                <p className="mt-3 text-sm leading-relaxed opacity-80">{review.content}</p>
-                <div className="flex items-center gap-3 mt-4">
-                    <Avatar src={review.avatar} name={review.author} color={color} />
-                    <div>
-                        <p className="text-sm font-semibold">{review.author}</p>
-                        {review.role && <p className="text-xs opacity-50">{review.role}</p>}
-                    </div>
-                </div>
+                <Body size="small" className="mt-3 leading-relaxed opacity-80">{review.content}</Body>
+                <div className="mt-4">{authorBlock}</div>
             </div>
         )
     }
 
     return (
         <div
-            className="p-6 rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200"
+            className={`${CARD_PADDING.md} rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200`}
             style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.125)` }}
         >
             <StarRating rating={review.rating} color={color} />
-            <p className="mt-4 text-sm leading-relaxed opacity-80">{review.content}</p>
-            <div className="flex items-center gap-3 mt-6 pt-4 border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
-                <Avatar src={review.avatar} name={review.author} color={color} />
-                <div>
-                    <p className="text-sm font-semibold">{review.author}</p>
-                    {review.role && <p className="text-xs opacity-50">{review.role}</p>}
-                </div>
+            <Body size="small" className="mt-4 leading-relaxed opacity-80">{review.content}</Body>
+            <div className="mt-6 pt-4 border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
+                {authorBlock}
             </div>
         </div>
     )
 }
 
-export function SocialProofBlock({ block, theme }: BlockProps<SocialProofConfig>) {
-    const { variant = 'cards', headline, reviews = [] } = block
+export function SocialProofBlock({ block, theme: _theme, site }: BlockProps<SocialProofConfig>) {
+    void _theme
+    const { variant = 'cards', headline, reviews: rawReviews = [] } = block
+    const category = (site?.siteType as string) || 'business'
+
+    const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
+    // Fallback: add avatar from industry images for reviews missing avatars (per-item)
+    const reviews = rawReviews.map((review, i) => ({
+        ...review,
+        avatar: review.avatar?.url ? review.avatar : { url: getTeamAvatar(category, i, s3Map) },
+    }))
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection>
+            <SectionWrapper as="div" padding="default" container="default" background="transparent">
                 {headline && (
                     <div className="text-center mb-14">
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
+                        <Heading level={2}>
+                            <RichText text={headline} as="span" />
+                        </Heading>
                     </div>
                 )}
 
                 {variant === 'minimal' ? (
                     <div className="max-w-2xl mx-auto">
                         {reviews.map((review, i) => (
-                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} />
+                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} reviewIndex={i} />
                         ))}
                     </div>
                 ) : (
                     <div className={`grid grid-cols-1 md:grid-cols-2 ${variant === 'grid' ? 'lg:grid-cols-3' : 'lg:grid-cols-3'} gap-6 max-w-6xl mx-auto`}>
                         {reviews.map((review, i) => (
-                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} />
+                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} reviewIndex={i} />
                         ))}
                     </div>
                 )}
-            </div>
+            </SectionWrapper>
         </AnimatedSection>
     )
 }

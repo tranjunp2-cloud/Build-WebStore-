@@ -1,23 +1,43 @@
 import { notFound, redirect } from 'next/navigation'
+import type { Viewport } from 'next'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
-import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
-import { PreviewScripts } from '@/components/editor/PreviewScripts'
+import { PreviewSiteRenderer } from './PreviewSiteRenderer'
+import { PreviewScripts, BuilderLinkScripts } from '@/components/editor/PreviewScripts'
 import { AppShell } from '@/components/AppShell'
 import { getCurrentUser } from '@/lib/auth'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
+import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
+import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
+
+type PreviewLayoutBlock = Record<string, unknown> & {
+    blockType: string
+    __editorBlockIndex?: number
+}
 
 interface PreviewPageProps {
     params: Promise<{ siteId: string }>
-    searchParams: Promise<{ pageId?: string; v?: string }>
+    searchParams: Promise<{ pageId?: string; v?: string; builder?: string }>
 }
 
 export const dynamic = 'force-dynamic'
 
+// Re-export viewport at the preview page level. Root layout.tsx also exports
+// viewport, but force-dynamic pages rendered inside the editor mobile iframe
+// (390px wide) occasionally drop the inherited viewport meta in Next.js 15,
+// causing blocks to render at the legacy 980px fallback. Explicit re-export
+// guarantees the iframe content always gets `width=device-width` so Tailwind
+// sm:/md:/lg: breakpoints fire at the correct physical width.
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+}
+
 export default async function PreviewPage({ params, searchParams }: PreviewPageProps) {
     const { siteId } = await params
-    const { pageId } = await searchParams
+    const { pageId, builder } = await searchParams
     
     // 1. Auth Check (P0 Security Rule - Auth Redirect)
     const user = await getCurrentUser() as PlatformUser | null
@@ -44,17 +64,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
         
         if (!userTenants.includes(siteTenantId)) {
-            return (
-                <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                    <div className="p-8 bg-white rounded-lg shadow-xl max-w-md text-center">
-                        <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
-                        <p className="text-slate-600 mb-6">You do not have permission to preview this site.</p>
-                        <a href="/dashboard" className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
-                            Back to Dashboard
-                        </a>
-                    </div>
-                </div>
-            )
+            return <PreviewAccessDenied />
         }
 
         // 4. Fetch Page Data
@@ -90,23 +100,32 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             page = pagesResult.docs[0] || null
         }
 
-        if (!page) return <div>No page found for this preview.</div>
+        if (!page) return <PreviewNoPage />
 
-        // 4b. For non-homepage pages without nav/footer, inherit from homepage
-        const pageLayout = (page.layout as Array<{ blockType: string }>) || []
-        const hasNav = pageLayout.some((b: { blockType: string }) => b.blockType === 'navigation')
-        const hasFooter = pageLayout.some((b: { blockType: string }) => b.blockType === 'footer')
+        // 4b. Ensure nav/footer on EVERY page (including homepage).
+        // BUG-F01-26: Check for WORKING nav (with links), not just block presence.
+        // A nav block with empty links renders as invisible thin bar.
+        const pageLayout = ((page.layout as Array<{ blockType: string; links?: unknown[]; columns?: unknown[]; [k: string]: unknown }>) || [])
+            .map((block, index) => ({ ...block, __editorBlockIndex: index })) as PreviewLayoutBlock[]
+        const existingNav = pageLayout.find((b) => b.blockType === 'navigation')
+        const hasNav = Boolean(existingNav && Array.isArray(existingNav.links) && existingNav.links.length > 0)
+        const existingFooter = pageLayout.find((b) => b.blockType === 'footer')
+        const hasFooter = Boolean(existingFooter)
 
-        if (!page.isHomepage && (!hasNav || !hasFooter)) {
+        if (!hasNav || !hasFooter) {
             // Check site-level headerBlock/footerBlock first
             const siteHeaderBlock = site.headerBlock as Record<string, unknown> | null
             const siteFooterBlock = site.footerBlock as Record<string, unknown> | null
 
-            let navBlock = siteHeaderBlock ? { ...siteHeaderBlock, blockType: siteHeaderBlock.blockType || 'navigation' } : null
-            let footerBlock = siteFooterBlock ? { ...siteFooterBlock, blockType: siteFooterBlock.blockType || 'footer' } : null
+            let navBlock: PreviewLayoutBlock | null = siteHeaderBlock
+                ? { ...siteHeaderBlock, blockType: (siteHeaderBlock.blockType as string) || 'navigation', __editorBlockIndex: -1 }
+                : null
+            let footerBlock: PreviewLayoutBlock | null = siteFooterBlock
+                ? { ...siteFooterBlock, blockType: (siteFooterBlock.blockType as string) || 'footer', __editorBlockIndex: -1 }
+                : null
 
-            // Fallback: extract from homepage layout if site-level blocks are not set
-            if (!navBlock || !footerBlock) {
+            // Fallback: extract from homepage layout if current page is not homepage
+            if ((!navBlock || !footerBlock) && !page.isHomepage) {
                 const homepageResult = await payload.find({
                     collection: 'pages',
                     where: { site: { equals: siteId }, isHomepage: { equals: true } },
@@ -119,12 +138,48 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     const homeLayout = homepage.layout as Array<{ blockType: string; [key: string]: unknown }>
                     if (!navBlock) navBlock = homeLayout.find(b => b.blockType === 'navigation') || null
                     if (!footerBlock) footerBlock = homeLayout.find(b => b.blockType === 'footer') || null
+                    if (navBlock) navBlock = { ...navBlock, __editorBlockIndex: -1 }
+                    if (footerBlock) footerBlock = { ...footerBlock, __editorBlockIndex: -1 }
                 }
             }
 
+            // Last resort: build default nav/footer
+            if (!navBlock && !hasNav) {
+                const siteName = (site.name as string) || 'My Website'
+                navBlock = {
+                    blockType: 'navigation',
+                    __editorBlockIndex: -1,
+                    variant: 'simple',
+                    logoText: siteName,
+                    links: [
+                        { label: 'Home', url: '/' },
+                        { label: 'About', url: '/about' },
+                        { label: 'Products', url: '/products' },
+                        { label: 'Contact', url: '/contact' },
+                    ],
+                } as PreviewLayoutBlock
+            }
+            if (!footerBlock && !hasFooter) {
+                const siteName = (site.name as string) || 'My Website'
+                footerBlock = {
+                    blockType: 'footer',
+                    __editorBlockIndex: -1,
+                    variant: 'simple',
+                    logoText: siteName,
+                    description: `© ${new Date().getFullYear()} ${siteName}. All rights reserved.`,
+                    columns: [],
+                } as PreviewLayoutBlock
+            }
+
+            // Strip broken nav/footer blocks (exist but empty) before injecting working ones
+            const cleanedLayout = pageLayout.filter((b) => {
+                if (b.blockType === 'navigation' && !hasNav) return false
+                return true
+            })
+
             const injectedLayout = [
                 ...(!hasNav && navBlock ? [navBlock] : []),
-                ...pageLayout,
+                ...cleanedLayout,
                 ...(!hasFooter && footerBlock ? [footerBlock] : []),
             ]
             page = { ...page, layout: injectedLayout }
@@ -137,25 +192,49 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             limit: 100,
         })
 
+        const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
+
         return (
             <AppShell>
-                <div className="overflow-x-hidden min-height-screen">
+                <div className="min-h-screen">
                     {/* Render with true SiteRenderer in Editor Mode */}
-                    <SiteRenderer
-                        site={site}
+                    <PreviewSiteRenderer
+                        site={{
+                            ...site,
+                            // Inject tenantSlug so CartWidgetBlock can build the checkout URL.
+                            // site.tenant is populated (depth:2) so slug is accessible here.
+                            tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
+                                ? (site.tenant as { slug?: string }).slug || ''
+                                : '',
+                            imageLibraryS3,
+                        }}
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
-                        isEditor={true}
+                        isBuilderPreview={!!builder}
                     />
 
-                    {/* Editor specific listeners */}
-                    <PreviewScripts />
+                    {/* Editor listeners (full) or builder-preview link handler (lightweight) */}
+                    {builder ? <BuilderLinkScripts /> : <PreviewScripts />}
                 </div>
             </AppShell>
         )
 
     } catch (error) {
+        // Re-throw Next.js special errors (notFound, redirect) so the runtime handles them.
+        // Catching NEXT_NOT_FOUND here turns a proper 404 into a Server Component render error.
+        if (
+            error !== null &&
+            typeof error === 'object' &&
+            'digest' in error &&
+            typeof (error as Record<string, string>).digest === 'string' &&
+            (
+                (error as Record<string, string>).digest === 'NEXT_NOT_FOUND' ||
+                (error as Record<string, string>).digest.startsWith('NEXT_REDIRECT')
+            )
+        ) {
+            throw error
+        }
         console.error('[Preview] Error:', error)
-        return <div>Error loading preview. Please ensure you are logged in and have access to this site.</div>
+        return <PreviewLoadError />
     }
 }

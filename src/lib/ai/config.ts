@@ -11,37 +11,116 @@
  */
 
 // ─── Model Routing ──────────────────────────────────────────────────────
-export type AIModel = 'gpt-4o' | 'gpt-4o-mini'
-
 /**
- * Strategy #1: Route to the correct model based on task complexity
- * GPT-4o: Only for first-time site generation (higher quality needed)
- * GPT-4o-mini: Everything else (15x cheaper)
+ * AI models available via OpenAI API (April 2026).
+ * See plan 260414-0914-ai-model-optimization/research/researcher-01-openai-models-2026.md
+ * for pricing + capability comparison.
  */
-export function selectModel(task: AITask): AIModel {
-    switch (task) {
-        case 'site-generation':
-            return 'gpt-4o'
-        case 'chat-edit':
-        case 'inline-edit':
-        case 'seo-generation':
-        case 'content-rewrite':
-        case 'product-description':
-        case 'url-extraction':
-            return 'gpt-4o-mini'
-        default:
-            return 'gpt-4o-mini'
-    }
+export type AIModel =
+    | 'gpt-4o'
+    | 'gpt-4o-mini'
+    | 'gpt-4.1'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1-nano'
+    | 'gpt-5.4-mini'
+
+const VALID_MODELS: ReadonlySet<AIModel> = new Set<AIModel>([
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    'gpt-5.4-mini',
+])
+
+function isValidModel(value: string): value is AIModel {
+    return VALID_MODELS.has(value as AIModel)
 }
 
 export type AITask =
     | 'site-generation'
+    | 'personalize'
     | 'chat-edit'
     | 'inline-edit'
     | 'seo-generation'
     | 'content-rewrite'
     | 'product-description'
     | 'url-extraction'
+    | 'bulk-parse'
+
+/**
+ * Default model per task.
+ *
+ * Phase-03a (2026-04-14): site-generation flipped gpt-4o → gpt-4.1-mini.
+ * Validated by plans/260414-0914-ai-model-optimization/reports/eval-2026-04-14.md
+ * — 30 runs x 3 inputs, 100% valid, 22.8 avg blocks (vs 22.9 for gpt-4o),
+ * 9.9x cheaper ($0.004 vs $0.043 per call). p95 latency is worse
+ * (~99s vs ~45s) but acceptable tradeoff — deferred tuning to phase-03b.
+ *
+ * Other tasks (chat-edit etc.) still on gpt-4o-mini — phase-04 flips those.
+ * Rollback: set env var AI_MODEL_SITEGEN=gpt-4o at environment scope
+ * to instantly revert without redeploy.
+ */
+const DEFAULT_MODELS: Record<AITask, AIModel> = {
+    // phase-03a: gpt-4o → gpt-4.1-mini (eval-2026-04-14 confirmed parity)
+    'site-generation':    'gpt-4.1-mini',
+    // Template-first: GPT only personalizes 4 fields (hero headline/sub, SEO).
+    // nano is cheapest + fastest (~2-3s for ~200 tokens).
+    'personalize':        'gpt-4.1-nano',
+    // phase-04: gpt-4o-mini → gpt-4.1-mini (better instruction following for chat edits)
+    'chat-edit':          'gpt-4.1-mini',
+    'inline-edit':        'gpt-4.1-mini',
+    // Lightweight tasks stay on cheap tier. 4.1-nano is 4x cheaper than 4o-mini,
+    // plenty for single-field text generation or short structured extraction.
+    'seo-generation':     'gpt-4.1-nano',
+    'content-rewrite':    'gpt-4.1-nano',
+    'product-description': 'gpt-4.1-nano',
+    'url-extraction':     'gpt-4.1-nano',
+    // phase-04: hardcoded gpt-4o → gpt-4.1-nano for bulk product CSV parsing
+    // (structured extraction, low creativity, 50x cheaper)
+    'bulk-parse':         'gpt-4.1-nano',
+}
+
+/**
+ * Env var name per task for override. Allows per-task model swap without
+ * code change — e.g. `AI_MODEL_SITEGEN=gpt-4.1-mini` in .env.local flips
+ * site-gen to gpt-4.1-mini for that environment only. Canary rollout via
+ * env override is the recommended path (see plan.md Q5 decision).
+ */
+const ENV_KEY: Record<AITask, string> = {
+    'site-generation':    'AI_MODEL_SITEGEN',
+    'personalize':        'AI_MODEL_PERSONALIZE',
+    'chat-edit':          'AI_MODEL_EDIT',
+    'inline-edit':        'AI_MODEL_INLINE_EDIT',
+    'seo-generation':     'AI_MODEL_SEO',
+    'content-rewrite':    'AI_MODEL_REWRITE',
+    'product-description': 'AI_MODEL_PRODUCT_DESC',
+    'url-extraction':     'AI_MODEL_URL_EXTRACT',
+    'bulk-parse':         'AI_MODEL_BULK_PARSE',
+}
+
+/**
+ * Strategy #1: Route to the correct model based on task complexity.
+ * Priority:
+ *   1. Env var override (per-task, e.g. AI_MODEL_SITEGEN)
+ *   2. DEFAULT_MODELS table
+ *
+ * Invalid override strings fall back to default with a console.warn so
+ * typos don't silently downgrade production.
+ */
+export function selectModel(task: AITask): AIModel {
+    const envKey = ENV_KEY[task]
+    const override = process.env[envKey]
+    if (override) {
+        if (isValidModel(override)) return override
+        console.warn(`[ai-config] ${envKey}="${override}" is not a valid AIModel — falling back to default "${DEFAULT_MODELS[task]}"`)
+    }
+    return DEFAULT_MODELS[task]
+}
+
+/** Exported for tests. Do not mutate. */
+export const __DEFAULT_MODELS_FOR_TEST = DEFAULT_MODELS
+export const __ENV_KEY_FOR_TEST = ENV_KEY
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────
 export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'business'
@@ -52,39 +131,47 @@ export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'business'
 export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
     free: {
         'site-generation': 1,        // 1 total (lifetime)
+        'personalize':     1,        // tied to site-generation
         'chat-edit': 20,             // per day
         'inline-edit': 10,           // per day
         'seo-generation': 3,         // per day
         'content-rewrite': 5,        // per day
         'product-description': 5,    // per day
         'url-extraction': 10,        // per day
+        'bulk-parse': 5,             // per day
     },
     starter: {
         'site-generation': 5,        // per month
+        'personalize':     5,
         'chat-edit': 100,            // per day
         'inline-edit': 50,           // per day
         'seo-generation': 10,        // per day
         'content-rewrite': 20,       // per day
         'product-description': 20,   // per day
         'url-extraction': 30,        // per day
+        'bulk-parse': 20,            // per day
     },
     pro: {
         'site-generation': 20,       // per month
+        'personalize':     20,
         'chat-edit': 500,            // per day
         'inline-edit': 200,          // per day
         'seo-generation': 50,        // per day
         'content-rewrite': 100,      // per day
         'product-description': 100,  // per day
         'url-extraction': 100,       // per day
+        'bulk-parse': 100,           // per day
     },
     business: {
         'site-generation': 999999,   // unlimited
+        'personalize':     999999,
         'chat-edit': 999999,
         'inline-edit': 999999,
         'seo-generation': 999999,
         'content-rewrite': 999999,
         'product-description': 999999,
         'url-extraction': 999999,
+        'bulk-parse': 999999,
     },
 }
 
@@ -142,11 +229,13 @@ Output: product description (plain text).`,
  * Used for internal tracking and billing decisions
  */
 export const ESTIMATED_COSTS: Record<AITask, number> = {
-    'site-generation': 0.04,      // GPT-4o, ~4K in + 3K out
+    'site-generation': 0.004,     // gpt-4.1-mini, ~3.8K in + 7K out
+    'personalize':     0.0001,    // gpt-4.1-nano, ~200 in + 80 out
     'chat-edit': 0.0005,          // GPT-4o-mini, ~1.5K in + 500 out
     'inline-edit': 0.0002,        // GPT-4o-mini, ~500 in + 200 out
     'seo-generation': 0.0004,     // GPT-4o-mini, ~800 in + 400 out
     'content-rewrite': 0.0003,    // GPT-4o-mini, ~600 in + 300 out
     'product-description': 0.0003,
-    'url-extraction': 0.001,         // GPT-4o-mini, ~2.3K in + 500 out
+    'url-extraction': 0.001,      // GPT-4o-mini, ~2.3K in + 500 out
+    'bulk-parse': 0.001,          // GPT-4o-mini, ~2K in + 1K out
 }

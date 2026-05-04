@@ -18,6 +18,8 @@ import { calculateContentQualityScore } from '@/lib/seo/content-score'
 import type { MissingSeoItem } from './SEOView'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
+import { DashboardOnboarding } from '@/components/dashboard/DashboardOnboarding'
 import { PendingOrder } from '@/components/dashboard/DashboardActionList'
 
 interface MetricRow {
@@ -41,6 +43,9 @@ interface PageWithSEO {
 }
 
 interface BlogWithSEO {
+    id: string | number
+    title?: string
+    excerpt?: string
     seo?: { metaTitle?: string, metaDescription?: string }
 }
 
@@ -61,23 +66,49 @@ export async function OverviewView({ searchParams }: Props) {
     const resolvedParams = await searchParams
     const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
 
-    let totalSites = 0
+    // Check site existence and generation status
     if (tenantId) {
-        const sitesResult = await payload.find({ 
-            collection: 'sites', 
-            where: { tenant: { equals: tenantId } }, 
-            limit: 1
+        const allSites = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
+            limit: 5, // 1 site/tenant expected, extra for safety
         })
-        totalSites = sitesResult.totalDocs
-    }
 
-    if (totalSites === 0) {
+        const usable = allSites.docs.filter((s) => {
+            const gs = (s as Record<string, unknown>).generationStatus
+            return !gs || gs === 'none' || gs === 'completed'
+        })
+
+        if (usable.length === 0) {
+            const hasFailed = allSites.docs.some(
+                (s) => (s as Record<string, unknown>).generationStatus === 'failed',
+            )
+            const aiStatusFailed = typeof resolvedParams.ai_status === 'string' && resolvedParams.ai_status === 'failed'
+
+            return (
+                <div className="space-y-8">
+                    {(hasFailed || aiStatusFailed) ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
+                </div>
+            )
+        }
+    } else {
         return (
             <div className="space-y-8">
                 <DashboardEmptyState />
             </div>
         )
     }
+
+    // Check if site is published — for onboarding checklist
+    const hasPublishedSite = tenantId ? (await payload.count({
+        collection: 'sites',
+        where: {
+            and: [
+                { tenant: { equals: tenantId } },
+                { status: { equals: 'published' } },
+            ],
+        },
+    })).totalDocs > 0 : false
 
     const now = new Date()
     let startDate = subDays(startOfDay(now), 7)
@@ -129,8 +160,15 @@ export async function OverviewView({ searchParams }: Props) {
             ordersRes, prevOrdersRes, pendingOrdersRes,
             viewsSeriesRes, leadsSeriesRes, engagementSeriesRes, revenueSeriesRes
         ] = await Promise.all([
-            payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${startDate.toISOString()}`),
-            payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${prevStartDate.toISOString()} AND created_at < ${startDate.toISOString()}`),
+            // Views (Traffic) = total pageview count per PRD: "Lượt views (Traffic)"
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'pageview' } }
+            }),
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevStartDate.toISOString(), less_than: startDate.toISOString() }, event: { equals: 'pageview' } }
+            }),
             payload.count({ 
                 collection: 'analytics', 
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'click' } }
@@ -163,7 +201,7 @@ export async function OverviewView({ searchParams }: Props) {
                 sort: '-createdAt', 
                 limit: 5 
             }),
-            payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`),
+            payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`),
             payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'click' AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`),
             payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event IN ('add_to_cart', 'checkout') AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`),
             payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, SUM(total) as count FROM orders WHERE tenant_id = ${tenantId} AND status IN ('paid', 'completed') AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`)
@@ -174,8 +212,8 @@ export async function OverviewView({ searchParams }: Props) {
             return ((curr - prev) / prev) * 100
         }
 
-        views = Number(viewsRes.rows[0]?.count || 0)
-        prevViews = Number(prevViewsRes.rows[0]?.count || 0)
+        views = viewsRes.totalDocs
+        prevViews = prevViewsRes.totalDocs
         viewsChange = getChange(views, prevViews)
 
         leads = leadsRes.totalDocs
@@ -224,11 +262,23 @@ export async function OverviewView({ searchParams }: Props) {
             const siteIds = sitesRes.docs.map(s => s.id)
             if (sitesRes.docs[0]) siteId = sitesRes.docs[0].id
 
-            const [productsRes, pagesRes, blogsRes] = await Promise.all([
+            // pages: use direct SQL to avoid payload.find() which JOINs block tables
+            // expecting a "data" column that doesn't exist in our pages_blocks_* tables
+            type PageSEORow = { id: number; title: string; slug: string; seo_title: string | null; seo_description: string | null; seo_no_index: boolean | null }
+            const pageDbRows = siteIds.length > 0
+                ? await (payload.db.drizzle.execute(sql`
+                    SELECT id, title, slug, seo_title, seo_description, seo_no_index
+                    FROM pages WHERE site_id = ANY(${siteIds}) AND deleted_at IS NULL LIMIT 1000
+                `) as Promise<{ rows: PageSEORow[] }>)
+                : { rows: [] as PageSEORow[] }
+            const pagesRes = {
+                docs: pageDbRows.rows.map(r => ({
+                    id: r.id, title: r.title, slug: r.slug,
+                    seo: { title: r.seo_title, description: r.seo_description, noIndex: r.seo_no_index },
+                })),
+            }
+            const [productsRes, blogsRes] = await Promise.all([
                 payload.find({ collection: 'products', where: { tenant: { equals: tenantId }, status: { equals: 'active' } }, limit: 1000, depth: 0 }),
-                siteIds.length > 0 
-                  ? payload.find({ collection: 'pages', where: { site: { in: siteIds } }, limit: 1000, depth: 0 })
-                  : Promise.resolve({ docs: [] }),
                 payload.find({ collection: 'blogs', where: { tenant: { equals: tenantId }, status: { equals: 'published' } }, limit: 1000, depth: 0 })
             ])
             
@@ -289,6 +339,21 @@ export async function OverviewView({ searchParams }: Props) {
                 const b = blog as BlogWithSEO
                 if (!b.seo?.metaTitle) invalidBlogTitleCount++
                 if (!b.seo?.metaDescription) missingDescCount++
+
+                const missing: string[] = []
+                if (!b.seo?.metaTitle) missing.push('title')
+                if (!b.seo?.metaDescription) missing.push('description')
+                if (missing.length > 0) {
+                    missingSeoItems.push({
+                        collection: 'blogs',
+                        id: b.id,
+                        title: b.title || 'Untitled Blog',
+                        context: (b.excerpt || '').slice(0, 150),
+                        missingFields: missing,
+                        currentTitle: b.seo?.metaTitle || undefined,
+                        currentDescription: b.seo?.metaDescription || undefined,
+                    })
+                }
             })
             
             seoIssueCounts.missingTitle = missingTitleCount
@@ -330,29 +395,43 @@ export async function OverviewView({ searchParams }: Props) {
 
     return (
         <div className="space-y-6 mt-6">
-            {/* Stats Cards */}
-                    <DashboardStats 
-                        views={views}
-                        leads={leads}
-                        engagement={engagement}
-                        revenue={revenue}
-                        pendingOrdersCount={pendingOrdersCount}
-                        currency="MYR"
-                        preferences={dashboardPreferences}
-                        viewsSeries={viewsSeries}
-                        leadsSeries={leadsSeries}
-                        engagementSeries={engagementSeries}
-                        revenueSeries={revenueSeries}
-                        viewsChange={viewsChange}
-                        leadsChange={leadsChange}
-                        engagementChange={engagementChange}
-                        revenueChange={revenueChange}
-                    />
+            {/* Setup Checklist — shown until site is published */}
+            {!hasPublishedSite && (
+                <DashboardOnboarding
+                    hasWebsite={true}
+                    hasPublishedSite={false}
+                    siteId={siteId as string}
+                />
+            )}
 
-                    {/* Main Content Grid */}
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        <DashboardActionList pendingOrders={pendingOrders} />
-                        <SEOHealthWidget score={seoScore} issueCounts={seoIssueCounts} siteId={siteId} missingSeoItems={missingSeoItems} />
+            {/* Stats Cards */}
+                    {/* Main Content Grid: Combined Stats and SEO Health */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                        <DashboardStats 
+                            views={views}
+                            leads={leads}
+                            engagement={engagement}
+                            // TODO: Re-enable when F10 e-commerce is ready
+                            // revenue={revenue}
+                            pendingOrdersCount={pendingOrdersCount}
+                            currency="MYR"
+                            preferences={dashboardPreferences}
+                            viewsSeries={viewsSeries}
+                            leadsSeries={leadsSeries}
+                            engagementSeries={engagementSeries}
+                            // TODO: Re-enable revenue stats when F10 is ready
+                            // revenueSeries={revenueSeries}
+                            viewsChange={viewsChange}
+                            leadsChange={leadsChange}
+                            engagementChange={engagementChange}
+                            // revenueChange={revenueChange}
+                        />
+                        
+                        {/* TODO: Re-enable ActionList when F10 Orders is ready */}
+                        {/* <DashboardActionList pendingOrders={pendingOrders} /> */}
+                        <div className="h-full">
+                            <SEOHealthWidget score={seoScore} issueCounts={seoIssueCounts} siteId={siteId} missingSeoItems={missingSeoItems} />
+                        </div>
                     </div>
         </div>
     )

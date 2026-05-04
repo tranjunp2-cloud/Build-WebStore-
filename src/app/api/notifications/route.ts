@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 import type { NotificationsResponse } from '@/types/notification'
 
 export const dynamic = 'force-dynamic'
@@ -15,6 +16,15 @@ export const dynamic = 'force-dynamic'
  */
 export const GET = withAuth(async (user, request) => {
     try {
+        // Rate limit: 60 requests per minute per user (supports multi-tab polling)
+        const rateCheck = await checkRateLimit(`notifications:get:${user.id}`, 60, 60_000)
+        if (!rateCheck.allowed) {
+            return NextResponse.json(
+                { success: false, error: 'Too many requests' },
+                { status: 429, headers: { 'Retry-After': String(Math.max(1, Math.ceil((rateCheck.resetAt - Date.now()) / 1000))) } },
+            )
+        }
+
         const payload = await getPayload({ config })
         const url = new URL(request.url)
         const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50)
@@ -79,6 +89,7 @@ export const GET = withAuth(async (user, request) => {
             type: doc.type as NotificationsResponse['items'][number]['type'],
             title: doc.title as string,
             message: (doc.message as string) ?? '',
+            ...(doc.metadata ? { metadata: doc.metadata as Record<string, string> } : {}),
             actionUrl: (doc.actionUrl as string | null) ?? null,
             isRead: Boolean(doc.isRead),
             createdAt: doc.createdAt as string,

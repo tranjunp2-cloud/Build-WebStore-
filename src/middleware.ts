@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { buildMaintenanceHtml } from '@/lib/maintenance'
 
 const ADMIN_PATHS = ['/admin', '/api']
+// Studio internal admin — requires super-admin role (checked below)
+const STUDIO_PATH = '/studio'
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
 
 /**
@@ -29,6 +32,9 @@ const protectedPaths = [
     '/account',
     '/help',
     '/blog',
+    '/products',
+    '/orders',
+    '/media',
 ]
 
 const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
@@ -65,6 +71,41 @@ export async function middleware(req: NextRequest) {
         }
     }
 
+    // ── Studio admin guard (/studio/*) ────────────────────────────────
+    // Edge-runtime: cannot call Payload local API. Decode JWT directly via jose.
+    // Defense-in-depth: layout.tsx also calls requireSuperAdmin() on the server.
+    if (pathname.startsWith(STUDIO_PATH)) {
+        const tokenCookie = req.cookies.get('payload-token')?.value
+        if (!tokenCookie) {
+            url.pathname = '/admin'
+            return NextResponse.redirect(url)
+        }
+        try {
+            // Payload v3 signs JWT with a derived key (not raw PAYLOAD_SECRET),
+            // so jose's jwtVerify fails in edge runtime. We decode unverified
+            // and defer real verification to the Next.js server layer:
+            // layout.tsx calls requireSuperAdmin() which hits Payload local API.
+            // Cookie is httpOnly and set by Payload server — middleware decoding
+            // it here is only a routing hint, not the security boundary.
+            const { decodeJwt } = await import('jose')
+            const decoded = decodeJwt(tokenCookie)
+            const roles = (decoded.roles as string[] | undefined) ?? []
+            const exp = decoded.exp as number | undefined
+            if (exp && exp * 1000 < Date.now()) {
+                url.pathname = '/admin'
+                return NextResponse.redirect(url)
+            }
+            if (!roles.includes('super-admin')) {
+                url.pathname = '/admin'
+                return NextResponse.redirect(url)
+            }
+        } catch {
+            url.pathname = '/admin'
+            return NextResponse.redirect(url)
+        }
+        return NextResponse.next()
+    }
+
     // ── API and admin routes: pass through ─────────────────────────────
     // IMPORTANT: This MUST be checked BEFORE admin domain rewrite.
     // When ADMIN_DOMAIN equals SERVER_DOMAIN (e.g. web-cms-v2.dev.ecommercehub.my),
@@ -95,11 +136,6 @@ export async function middleware(req: NextRequest) {
         const parts = pathname.split('/')
         if (parts.length >= 3) {
             const tenantSlug = parts[2]
-            // Gate ecom storefront routes (v1.0: landing pages only, ecom deferred to v1.1)
-            const remainingPath = '/' + parts.slice(3).join('/')
-            if (remainingPath.startsWith('/products') || remainingPath.startsWith('/checkout')) {
-                return NextResponse.rewrite(new URL('/not-found', req.url))
-            }
             const response = NextResponse.next()
             response.headers.set('x-tenant-slug', tenantSlug)
             response.headers.set('x-tenant-type', 'local')
@@ -114,10 +150,6 @@ export async function middleware(req: NextRequest) {
         hostname !== ADMIN_DOMAIN
 
     if (isSubdomain) {
-        // Gate ecom routes on subdomain (v1.0: landing pages only)
-        if (pathname.startsWith('/products') || pathname.startsWith('/checkout')) {
-            return NextResponse.rewrite(new URL('/not-found', req.url))
-        }
         const tenantSlug = hostname.replace(`.${PLATFORM_DOMAIN}`, '')
 
         // F23: Check if this is an old slug that needs 301 redirect
@@ -129,10 +161,24 @@ export async function middleware(req: NextRequest) {
             try {
                 const checkRes = await fetch(checkUrl, { cache: 'no-store', signal: controller.signal })
                 if (checkRes.ok) {
-                    const { redirect, newSlug } = await checkRes.json()
-                    if (redirect && newSlug && newSlug !== tenantSlug) {
-                        const redirectUrl = `https://${newSlug}.${PLATFORM_DOMAIN}${pathname}`
+                    const data = await checkRes.json()
+                    if (data.redirect && data.newSlug && data.newSlug !== tenantSlug) {
+                        const redirectUrl = `https://${data.newSlug}.${PLATFORM_DOMAIN}${pathname}`
                         return NextResponse.redirect(redirectUrl, { status: 301 })
+                    }
+                    // BUG-F05-006: Return 503 for maintenance mode (draft + was published)
+                    if (data.maintenance && !pathname.startsWith('/api')) {
+                        return new NextResponse(
+                            buildMaintenanceHtml(data.siteName || ''),
+                            {
+                                status: 503,
+                                headers: {
+                                    'Content-Type': 'text/html; charset=utf-8',
+                                    'Retry-After': '3600',
+                                    'Cache-Control': 'no-store',
+                                },
+                            },
+                        )
                     }
                 }
             } finally {

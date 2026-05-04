@@ -28,6 +28,16 @@ function createPool() {
   if (!connStr) return null;
 
   const pg = require('pg');
+  // Honour sslmode=disable (or localhost, which Postgres typically doesn't run
+  // with SSL) so dev DBs work without forcing TLS. Hosted DBs (DO/Vercel/etc.)
+  // still get ssl:{rejectUnauthorized:false} which accepts their self-signed certs.
+  const sslmodeMatch = connStr.match(/[?&]sslmode=([^&]+)/);
+  const sslmode = sslmodeMatch ? sslmodeMatch[1].toLowerCase() : null;
+  const hostMatch = connStr.match(/@([^:/?]+)/);
+  const host = hostMatch ? hostMatch[1].toLowerCase() : '';
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal' || host === 'postgres';
+  const useSsl = sslmode === 'disable' ? false : (isLocal ? false : { rejectUnauthorized: false });
+
   const cleanStr = connStr
     .replace(/[?&]sslmode=[^&]+/g, '')
     .replace(/\?&/, '?')
@@ -35,7 +45,7 @@ function createPool() {
 
   return new pg.Pool({
     connectionString: cleanStr,
-    ssl: { rejectUnauthorized: false },
+    ssl: useSsl,
     connectionTimeoutMillis: 10000,
   });
 }
@@ -529,6 +539,11 @@ const MIGRATIONS = [
   // templates
   { name: 'templates.sort_order', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order numeric DEFAULT 0;` },
   { name: 'templates.usage_count', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS usage_count numeric DEFAULT 0;` },
+  { name: 'templates.status', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS status varchar DEFAULT 'live';` },
+  { name: 'templates.scheduled_for', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS scheduled_for timestamp;` },
+  { name: 'templates.personality', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS personality varchar;` },
+  { name: 'templates.block_prompt_overrides', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS block_prompt_overrides jsonb DEFAULT '{}'::jsonb;` },
+  { name: 'templates.block_schema_version', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS block_schema_version varchar(64);` },
   // templates_tags
   { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
   // ── Templates: Tags array table ──
@@ -1283,6 +1298,34 @@ const MIGRATIONS = [
     sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS push_subscriptions_id integer;`,
   },
   {
+    name: 'payload_locked_documents_rels.template_quality_scores_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS template_quality_scores_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.block_catalog_entries_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS block_catalog_entries_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.block_variants_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS block_variants_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.ai_generation_records_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS ai_generation_records_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.template_issues_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS template_issues_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.content_packs_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS content_packs_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.template_versions_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS template_versions_id integer;`,
+  },
+  {
     name: 'payload_preferences_rels.notifications_id',
     sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS notifications_id integer;`,
   },
@@ -1503,6 +1546,41 @@ const MIGRATIONS = [
     name: '_pages_v_blocks_gallery.variant',
     sql: `ALTER TABLE _pages_v_blocks_gallery ADD COLUMN IF NOT EXISTS variant varchar;`,
   },
+  // ── Plan 260415 — variant column for blocks whose Payload schemas were
+  // missing a variant field entirely. Without this, AI gen + composer
+  // rotation had zero effect because Payload stripped the variant on save.
+  {
+    name: 'pages_blocks_contact.variant',
+    sql: `ALTER TABLE pages_blocks_contact ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_footer.variant',
+    sql: `ALTER TABLE pages_blocks_footer ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_stats.variant',
+    sql: `ALTER TABLE pages_blocks_stats ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_team.variant',
+    sql: `ALTER TABLE pages_blocks_team ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_contact.variant',
+    sql: `ALTER TABLE _pages_v_blocks_contact ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_footer.variant',
+    sql: `ALTER TABLE _pages_v_blocks_footer ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_stats.variant',
+    sql: `ALTER TABLE _pages_v_blocks_stats ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_team.variant',
+    sql: `ALTER TABLE _pages_v_blocks_team ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
   // ── Tenants: Payment Methods ──
   {
     name: 'tenants.payments_payment_cod',
@@ -1615,8 +1693,22 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
-      cta_label varchar, cta_url varchar, cta_style varchar
+      cta_label varchar, cta_url varchar, cta_style varchar,
+      secondary_cta_label varchar, secondary_cta_url varchar
     );`,
+  },
+  // Plan 260415 cta-bugfix — add secondary_cta fields + rename floating → card
+  {
+    name: 'pages_blocks_cta.secondary_cta_label',
+    sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_label varchar;`,
+  },
+  {
+    name: 'pages_blocks_cta.secondary_cta_url',
+    sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
+  },
+  {
+    name: 'pages_blocks_cta.rename_floating_to_card',
+    sql: `UPDATE pages_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
   },
   {
     name: 'pages_blocks_newsletter.create_table',
@@ -1940,8 +2032,22 @@ const MIGRATIONS = [
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
       _path text NOT NULL, _uuid varchar, block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
-      cta_label varchar, cta_url varchar, cta_style varchar
+      cta_label varchar, cta_url varchar, cta_style varchar,
+      secondary_cta_label varchar, secondary_cta_url varchar
     );`,
+  },
+  // Plan 260415 cta-bugfix — version table sync
+  {
+    name: '_pages_v_blocks_cta.secondary_cta_label',
+    sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_label varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_cta.secondary_cta_url',
+    sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_cta.rename_floating_to_card',
+    sql: `UPDATE _pages_v_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
   },
   {
     name: '_pages_v_blocks_newsletter.create_table',
@@ -2300,6 +2406,35 @@ const MIGRATIONS = [
     name: 'subscribers.email_site_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
   },
+  // ── Contact Submissions (Plan 260415 contact-bugfix) ──
+  {
+    name: 'contact_submissions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS contact_submissions (
+      id serial PRIMARY KEY,
+      name varchar NOT NULL,
+      email varchar NOT NULL,
+      phone varchar,
+      message text NOT NULL,
+      site_id integer NOT NULL,
+      status varchar DEFAULT 'new',
+      source varchar DEFAULT 'contact-block',
+      ip_address varchar,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'contact_submissions.site_created_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_site_created_idx ON contact_submissions (site_id, created_at DESC);`,
+  },
+  {
+    name: 'contact_submissions.status_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_status_idx ON contact_submissions (status);`,
+  },
+  {
+    name: 'contact_submissions.email_index',
+    sql: `CREATE INDEX IF NOT EXISTS contact_submissions_email_idx ON contact_submissions (email);`,
+  },
   // ── Sites: SEO auto meta toggle ──
   {
     name: 'sites.seo_auto_meta_enabled',
@@ -2358,6 +2493,1123 @@ const MIGRATIONS = [
     name: 'blogs.published_at',
     sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS published_at timestamp(3) with time zone;`,
   },
+  {
+    name: 'blogs.scheduled_publish_date',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS scheduled_publish_date timestamp(3) with time zone;`,
+  },
+  // ── AI Usage Logs (plan 260414-0914 phase-05) — per-call observability ──
+  {
+    name: 'ai_usage_logs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_usage_logs (
+      id serial PRIMARY KEY,
+      user_id integer,
+      tenant_id integer,
+      endpoint varchar NOT NULL,
+      model varchar NOT NULL,
+      tokens_in integer NOT NULL DEFAULT 0,
+      tokens_out integer NOT NULL DEFAULT 0,
+      cost_usd numeric(12, 6) NOT NULL DEFAULT 0,
+      duration_ms integer NOT NULL DEFAULT 0,
+      success boolean NOT NULL DEFAULT true,
+      error_code varchar,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'ai_usage_logs.created_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_created_at_idx ON ai_usage_logs (created_at DESC);`,
+  },
+  {
+    name: 'ai_usage_logs.endpoint_model_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_endpoint_model_idx ON ai_usage_logs (endpoint, model);`,
+  },
+  {
+    name: 'ai_usage_logs.user_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_user_idx ON ai_usage_logs (user_id) WHERE user_id IS NOT NULL;`,
+  },
+  // ── Sites: AI generation status tracking ──
+  {
+    name: 'sites.generation_status',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS generation_status varchar DEFAULT 'none';`,
+  },
+  {
+    name: 'sites.generation_status_backfill',
+    sql: `UPDATE sites SET generation_status = 'completed' WHERE generation_status IS NULL;`,
+  },
+  // ── Sites: siteType + aiGenerationMetadata (required by /api/ai/generate-site) ──
+  // Root cause 2026-04-20: Sites.ts declares siteType (select, required) and
+  // aiGenerationMetadata (group) but DB staging was seeded before these existed.
+  // CREATE TABLE IF NOT EXISTS skipped column adds → INSERT fails with
+  // "Failed query: insert into sites" on POST /api/ai/generate-site.
+  {
+    name: 'sites.site_type',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS site_type varchar DEFAULT 'business';`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_generated_at',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_generated_at timestamp(3) with time zone;`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_original_prompt',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_original_prompt varchar;`,
+  },
+  {
+    name: 'sites.ai_generation_metadata_business_type',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS ai_generation_metadata_business_type varchar;`,
+  },
+  // ── F16-04: Add metadata column for notification i18n ──
+  {
+    name: 'notifications.metadata',
+    sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata jsonb;`,
+  },
+
+  // ── Industry blocks (Plan 260417-0837 Phase 1.1) ────────────────────────────
+  // 6 blocks registered in Pages.ts — composer builds them but they were
+  // getting silently dropped by Payload because no schema existed.
+  // Unblocks WEAK cats: health, realestate, fitness, education, tech.
+
+  // doctor-profile ──────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_doctor_profile.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_doctor_profile" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_doctor_profile_doctors.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_doctor_profile_doctors" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, specialisation varchar, qualifications jsonb,
+      photo_url varchar, available_days jsonb, languages varchar,
+      consultation_fee varchar, bio varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_doctor_profile.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_doctor_profile" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_doctor_profile_doctors.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_doctor_profile_doctors" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, specialisation varchar, qualifications jsonb,
+      photo_url varchar, available_days jsonb, languages varchar,
+      consultation_fee varchar, bio varchar
+    );`,
+  },
+
+  // property-card ───────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_property_card.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_property_card" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      show_map boolean DEFAULT false, currency varchar DEFAULT 'RM'
+    );`,
+  },
+  {
+    name: 'pages_blocks_property_card_properties.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_property_card_properties" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar, price numeric, location varchar,
+      bedrooms integer, bathrooms integer, area numeric,
+      image_urls jsonb, type varchar, status varchar,
+      map_url varchar, description varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_property_card.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_property_card" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      show_map boolean, currency varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_property_card_properties.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_property_card_properties" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      title varchar, price numeric, location varchar,
+      bedrooms integer, bathrooms integer, area numeric,
+      image_urls jsonb, type varchar, status varchar,
+      map_url varchar, description varchar
+    );`,
+  },
+
+  // class-schedule ──────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_class_schedule.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_class_schedule" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar,
+      show_capacity boolean DEFAULT true, highlight_today boolean DEFAULT true
+    );`,
+  },
+  {
+    name: 'pages_blocks_class_schedule_classes.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_class_schedule_classes" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, instructor varchar, day integer,
+      start_time varchar, end_time varchar, capacity integer,
+      enrolled integer, category varchar, level varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_class_schedule.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_class_schedule" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar,
+      show_capacity boolean, highlight_today boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_class_schedule_classes.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_class_schedule_classes" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, instructor varchar, day integer,
+      start_time varchar, end_time varchar, capacity integer,
+      enrolled integer, category varchar, level varchar
+    );`,
+  },
+
+  // video-showcase ──────────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_video_showcase.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_video_showcase" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      show_categories boolean DEFAULT true, autoplay boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'pages_blocks_video_showcase_videos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_video_showcase_videos" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar, thumbnail_url varchar, video_url varchar,
+      category varchar, duration varchar, description varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_video_showcase.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_video_showcase" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      show_categories boolean, autoplay boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_video_showcase_videos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_video_showcase_videos" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      title varchar, thumbnail_url varchar, video_url varchar,
+      category varchar, duration varchar, description varchar
+    );`,
+  },
+
+  // product-quick-view ──────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_product_quick_view.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_product_quick_view" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      columns integer DEFAULT 4, show_quick_view boolean DEFAULT true,
+      currency varchar DEFAULT 'RM'
+    );`,
+  },
+  {
+    name: 'pages_blocks_product_quick_view_products.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_product_quick_view_products" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, price numeric, original_price numeric,
+      image_urls jsonb, description varchar, variants jsonb,
+      badge varchar, cta_label varchar, cta_url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_product_quick_view.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_product_quick_view" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      columns integer, show_quick_view boolean, currency varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_product_quick_view_products.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_product_quick_view_products" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, price numeric, original_price numeric,
+      image_urls jsonb, description varchar, variants jsonb,
+      badge varchar, cta_label varchar, cta_url varchar
+    );`,
+  },
+
+  // feature-comparison ──────────────────────────────────────────────────────
+  {
+    name: 'pages_blocks_feature_comparison.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_feature_comparison" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_feature_comparison_products.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_feature_comparison_products" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, highlighted boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'pages_blocks_feature_comparison_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_feature_comparison_features" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, values jsonb
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_feature_comparison.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_feature_comparison" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_feature_comparison_products.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_feature_comparison_products" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, highlighted boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_feature_comparison_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_feature_comparison_features" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, values jsonb
+    );`,
+  },
+  // ── Fix: faq + pricing missing variant column (staging 500 on 2026-04-17) ──
+  {
+    name: 'pages_blocks_faq.add_variant',
+    sql: `ALTER TABLE "pages_blocks_faq" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: 'pages_blocks_pricing.add_variant',
+    sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_faq.add_variant',
+    sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_pricing.add_variant',
+    sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+  },
+
+  // ── Fix (2026-04-17, BUG-F05 new-page-stays-draft): `variant` was defined
+  // in every block's Payload schema (Pages.ts) but the original CREATE TABLE
+  // blocks here only listed it for a handful. Draft-save writes to the
+  // versioned `_pages_v_blocks_*` rows, which picked up the column via
+  // Payload's schema sync; the main `pages_blocks_*` rows never did.
+  // Promoting draft→published (PATCH /publish) then hit INSERT/UPDATE on the
+  // main table and silently failed the row — user saw "Update success" toast
+  // but status stayed Draft, hasUnpublishedChanges stayed true. Single bulk
+  // ALTER IF NOT EXISTS covers every block that has `variant` in Pages.ts.
+  // ── Template Quality Scores (Phase 03 — Quality Integration) ────────────────
+  // Persists per-template rubric score snapshots. Each row = one scoring run.
+  // Array sub-table uses varchar id + _parent_id + _order + _uuid per convention.
+  {
+    name: 'template_quality_scores.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_quality_scores (
+      id serial PRIMARY KEY,
+      template_id integer REFERENCES templates(id) ON DELETE CASCADE,
+      rubric_version varchar NOT NULL,
+      avg_score numeric NOT NULL,
+      pass_rubric boolean DEFAULT false,
+      scorer varchar DEFAULT 'manual',
+      scored_at timestamp DEFAULT now(),
+      updated_at timestamp DEFAULT now() NOT NULL,
+      created_at timestamp DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'template_quality_scores.template_scored_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_quality_scores_template_scored_idx
+      ON template_quality_scores (template_id, scored_at DESC);`,
+  },
+  {
+    name: 'template_quality_scores_dimensions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_quality_scores_dimensions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES template_quality_scores(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar NOT NULL,
+      score numeric NOT NULL,
+      weight numeric NOT NULL,
+      criteria_met integer DEFAULT 0,
+      criteria_total integer DEFAULT 0
+    );`,
+  },
+  {
+    name: 'template_quality_scores_dimensions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_quality_scores_dimensions_parent_idx
+      ON template_quality_scores_dimensions (_parent_id);`,
+  },
+  // Idempotent ALTER TABLE fallbacks — safe if tables already created above
+  {
+    name: 'template_quality_scores.alter_template_id',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS template_id integer;`,
+  },
+  {
+    name: 'template_quality_scores.alter_rubric_version',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS rubric_version varchar;`,
+  },
+  {
+    name: 'template_quality_scores.alter_avg_score',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS avg_score numeric;`,
+  },
+  {
+    name: 'template_quality_scores.alter_pass_rubric',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS pass_rubric boolean DEFAULT false;`,
+  },
+  {
+    name: 'template_quality_scores.alter_scorer',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS scorer varchar DEFAULT 'manual';`,
+  },
+  {
+    name: 'template_quality_scores.alter_scored_at',
+    sql: `ALTER TABLE IF EXISTS template_quality_scores
+      ADD COLUMN IF NOT EXISTS scored_at timestamp DEFAULT now();`,
+  },
+
+  // ── Phase 04: Block Catalog ──
+  {
+    name: 'block_catalog_entries.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS block_catalog_entries (
+      id serial PRIMARY KEY,
+      slug varchar NOT NULL UNIQUE,
+      description_override text,
+      description_override_vi text,
+      display_order integer DEFAULT 0,
+      curated_preview_url varchar,
+      hidden_from_catalog boolean DEFAULT false,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'block_catalog_entries.slug_idx',
+    sql: `CREATE INDEX IF NOT EXISTS block_catalog_entries_slug_idx ON block_catalog_entries (slug);`,
+  },
+  {
+    name: 'block_catalog_entries.alter_slug',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS slug varchar;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_description_override',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS description_override text;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_description_override_vi',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS description_override_vi text;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_display_order',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS display_order integer DEFAULT 0;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_curated_preview_url',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS curated_preview_url varchar;`,
+  },
+  {
+    name: 'block_catalog_entries.alter_hidden_from_catalog',
+    sql: `ALTER TABLE IF EXISTS block_catalog_entries ADD COLUMN IF NOT EXISTS hidden_from_catalog boolean DEFAULT false;`,
+  },
+  {
+    name: 'block_variants.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS block_variants (
+      id serial PRIMARY KEY,
+      block_slug varchar NOT NULL,
+      variant_name varchar NOT NULL,
+      preview_url_override varchar,
+      notes text,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'block_variants.block_slug_idx',
+    sql: `CREATE INDEX IF NOT EXISTS block_variants_block_slug_idx ON block_variants (block_slug);`,
+  },
+  {
+    name: 'block_variants.alter_block_slug',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS block_slug varchar;`,
+  },
+  {
+    name: 'block_variants.alter_variant_name',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS variant_name varchar;`,
+  },
+  {
+    name: 'block_variants.alter_preview_url_override',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS preview_url_override varchar;`,
+  },
+  {
+    name: 'block_variants.alter_notes',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS notes text;`,
+  },
+  {
+    name: 'block_variants.alter_enabled',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true;`,
+  },
+  {
+    name: 'block_variants.alter_display_name',
+    sql: `ALTER TABLE IF EXISTS block_variants ADD COLUMN IF NOT EXISTS display_name varchar;`,
+  },
+
+  ...[
+    'hero', 'navigation', 'about', 'contact', 'footer',
+    'social_widget', 'cart_widget', 'features', 'testimonials', 'gallery',
+    'stats', 'team', 'cta', 'newsletter', 'video',
+    'logo_cloud', 'blog_list', 'products_grid', 'products_featured',
+    'service_cards', 'carousel', 'step_process', 'divider',
+    'announcement_bar', 'whatsapp_button', 'google_maps', 'accordion',
+    'countdown_timer', 'social_proof', 'breadcrumb', 'client_logos',
+    'menu_food', 'portfolio_grid', 'doctor_profile', 'property_card',
+    'class_schedule', 'video_showcase', 'product_quick_view',
+    'feature_comparison',
+  ].flatMap(slug => [
+    {
+      name: `pages_blocks_${slug}.add_variant`,
+      sql: `ALTER TABLE "pages_blocks_${slug}" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+    },
+    {
+      name: `_pages_v_blocks_${slug}.add_variant`,
+      sql: `ALTER TABLE "_pages_v_blocks_${slug}" ADD COLUMN IF NOT EXISTS "variant" varchar;`,
+    },
+  ]),
+
+  // ── AiGenerationRecords: Phase 05 Monitoring ──────────────────────────────
+  {
+    name: 'ai_generation_records.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_generation_records (
+      id serial PRIMARY KEY,
+      site_id integer REFERENCES sites(id) ON DELETE SET NULL,
+      user_id integer REFERENCES users(id) ON DELETE SET NULL,
+      endpoint varchar NOT NULL,
+      category varchar,
+      prompt_mode varchar NOT NULL DEFAULT 'full',
+      prompt_text text,
+      prompt_hash varchar,
+      output_snapshot jsonb,
+      status varchar NOT NULL DEFAULT 'running',
+      error_log text,
+      duration_ms integer,
+      cost_usd numeric,
+      completed_at timestamp,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now());`,
+  },
+  {
+    name: 'ai_generation_records.created_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_created_at_idx ON ai_generation_records (created_at DESC);`,
+  },
+  {
+    name: 'ai_generation_records.status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_status_idx ON ai_generation_records (status);`,
+  },
+  {
+    name: 'ai_generation_records.user_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_user_id_idx ON ai_generation_records (user_id);`,
+  },
+  {
+    name: 'ai_generation_records_selected_blocks.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_generation_records_selected_blocks (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES ai_generation_records(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      value varchar);`,
+  },
+  {
+    name: 'ai_generation_records_selected_blocks.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_generation_records_selected_blocks_parent_idx ON ai_generation_records_selected_blocks (_parent_id);`,
+  },
+  // ALTER TABLE safety clones — idempotent if table was created by pushDevSchema
+  {
+    name: 'ai_generation_records.alter_site_id',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS site_id integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_user_id',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS user_id integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_endpoint',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS endpoint varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_category',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS category varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_mode',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_mode varchar NOT NULL DEFAULT 'full';`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_text',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_text text;`,
+  },
+  {
+    name: 'ai_generation_records.alter_prompt_hash',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS prompt_hash varchar;`,
+  },
+  {
+    name: 'ai_generation_records.alter_output_snapshot',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS output_snapshot jsonb;`,
+  },
+  {
+    name: 'ai_generation_records.alter_status',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'running';`,
+  },
+  {
+    name: 'ai_generation_records.alter_error_log',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS error_log text;`,
+  },
+  {
+    name: 'ai_generation_records.alter_duration_ms',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS duration_ms integer;`,
+  },
+  {
+    name: 'ai_generation_records.alter_cost_usd',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS cost_usd numeric;`,
+  },
+  {
+    name: 'ai_generation_records.alter_completed_at',
+    sql: `ALTER TABLE IF EXISTS ai_generation_records ADD COLUMN IF NOT EXISTS completed_at timestamp;`,
+  },
+
+  // ── Phase 06: TemplateIssues ──────────────────────────────────────────────
+  {
+    name: 'template_issues.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues (
+  id serial PRIMARY KEY,
+  title varchar NOT NULL,
+  description text,
+  severity varchar NOT NULL DEFAULT 'medium',
+  category varchar NOT NULL DEFAULT 'other',
+  status varchar NOT NULL DEFAULT 'open',
+  related_type varchar NOT NULL,
+  related_id varchar NOT NULL,
+  reported_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+  assigned_to_id integer REFERENCES users(id) ON DELETE SET NULL,
+  resolved_at timestamp,
+  updated_at timestamp DEFAULT now(),
+  created_at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues.create_status_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_status_idx ON template_issues (status);`,
+  },
+  {
+    name: 'template_issues.create_severity_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_severity_idx ON template_issues (severity);`,
+  },
+  {
+    name: 'template_issues.create_related_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_related_idx ON template_issues (related_type, related_id);`,
+  },
+  {
+    name: 'template_issues_comments.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues_comments (
+  id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  _order integer NOT NULL DEFAULT 0,
+  _parent_id integer NOT NULL REFERENCES template_issues(id) ON DELETE CASCADE,
+  _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+  author_id integer REFERENCES users(id) ON DELETE SET NULL,
+  body text NOT NULL,
+  created_at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues_comments.create_parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_comments_parent_idx ON template_issues_comments (_parent_id);`,
+  },
+  {
+    name: 'template_issues_timeline.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_issues_timeline (
+  id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  _order integer NOT NULL DEFAULT 0,
+  _parent_id integer NOT NULL REFERENCES template_issues(id) ON DELETE CASCADE,
+  _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+  event varchar NOT NULL,
+  actor_id integer REFERENCES users(id) ON DELETE SET NULL,
+  data jsonb,
+  at timestamp DEFAULT now()
+);`,
+  },
+  {
+    name: 'template_issues_timeline.create_parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS template_issues_timeline_parent_idx ON template_issues_timeline (_parent_id);`,
+  },
+  // ALTER TABLE fallbacks for all template_issues columns
+  {
+    name: 'template_issues.alter_title',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS title varchar NOT NULL DEFAULT '';`,
+  },
+  {
+    name: 'template_issues.alter_description',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS description text;`,
+  },
+  {
+    name: 'template_issues.alter_severity',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS severity varchar NOT NULL DEFAULT 'medium';`,
+  },
+  {
+    name: 'template_issues.alter_category',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS category varchar NOT NULL DEFAULT 'other';`,
+  },
+  {
+    name: 'template_issues.alter_status',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'open';`,
+  },
+  {
+    name: 'template_issues.alter_related_type',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_type varchar;`,
+  },
+  {
+    name: 'template_issues.alter_related_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS related_id varchar;`,
+  },
+  {
+    name: 'template_issues.alter_reported_by_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS reported_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_issues.alter_assigned_to_id',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS assigned_to_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_issues.alter_resolved_at',
+    sql: `ALTER TABLE IF EXISTS template_issues ADD COLUMN IF NOT EXISTS resolved_at timestamp;`,
+  },
+
+  // ── Phase 07: AI Quality Dashboard indexes ─────────────────────────────────
+  // Composite index on template_quality_scores(template_id, scored_at DESC)
+  // Note: template_quality_scores_template_scored_idx covers (template_id, scored_at DESC)
+  // so idx_tqs_template_scored is a safe alias — CREATE INDEX IF NOT EXISTS skips if identical.
+  {
+    name: 'template_quality_scores.idx_tqs_template_scored',
+    sql: `CREATE INDEX IF NOT EXISTS idx_tqs_template_scored ON template_quality_scores(template_id, scored_at DESC);`,
+  },
+  // Composite index on ai_generation_records(created_at DESC, status)
+  {
+    name: 'ai_generation_records.idx_agr_created_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_agr_created_status ON ai_generation_records(created_at DESC, status);`,
+  },
+
+  // ── Phase 08: Category DNA + Content Packs + Review ──────────────────────
+
+  // Categories: add dna jsonb column
+  {
+    name: 'categories.alter_dna',
+    sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS dna jsonb;`,
+  },
+
+  // Templates: add dna_compliance_cache jsonb column
+  {
+    name: 'templates.alter_dna_compliance_cache',
+    sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS dna_compliance_cache jsonb;`,
+  },
+
+  // ContentPacks parent table
+  {
+    name: 'content_packs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs (
+      id serial PRIMARY KEY,
+      name varchar NOT NULL,
+      description text,
+      cover_image_id integer REFERENCES media(id) ON DELETE SET NULL,
+      category varchar,
+      personality varchar,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now()
+    );`,
+  },
+
+  // ContentPacks tags array sub-table (Payload array convention: varchar id, _order, _parent_id, _uuid)
+  {
+    name: 'content_packs_tags.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs_tags (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL REFERENCES content_packs(id) ON DELETE CASCADE,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tag varchar
+    );`,
+  },
+  {
+    name: 'content_packs_tags.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS content_packs_tags_parent_idx ON content_packs_tags (_parent_id);`,
+  },
+  // Phase 08 fix: Payload creates {collection}_rels table for relationship hasMany fields
+  // (includedTemplates). Without this table, list queries fail with:
+  //   error: relation "content_packs_rels" does not exist
+  {
+    name: 'content_packs_rels.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS content_packs_rels (
+      id serial PRIMARY KEY,
+      "order" integer,
+      parent_id integer NOT NULL,
+      path varchar NOT NULL,
+      templates_id integer
+    );`,
+  },
+  {
+    name: 'content_packs_rels.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS content_packs_rels_parent_idx ON content_packs_rels (parent_id);`,
+  },
+
+  // Phase 08 data seed: backfill 6 category DNA records (guard: only if dna IS NULL)
+  // Wrapped as a DO block so it runs atomically and is idempotent.
+  {
+    name: 'categories.seed_dna_fnb',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","menu-food","gallery","booking-widget","footer"],"recommendedBlocks":["testimonials","gallery-masonry","cta","google-maps"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["class-schedule","doctor-profile","property-card"],"typicalPersonalities":["warm-traditional","warm-homestyle","bold-dark"],"minSections":5,"aiPromptHint":"Warm, inviting tone focused on food experiences. Emphasize ambiance, freshness, and hospitality."}'::jsonb WHERE slug = 'fnb' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_retail',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","products-grid","cart-widget","testimonials","footer"],"recommendedBlocks":["products-featured","cta","newsletter","pricing"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","class-schedule","doctor-profile"],"typicalPersonalities":["modern-vibrant","soft-feminine","editorial-clean"],"minSections":5,"aiPromptHint":"Confident, product-forward tone. Highlight deals, quality, and social proof. Drive conversion."}'::jsonb WHERE slug = 'retail' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_portfolio',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","portfolio-grid","about","contact","footer"],"recommendedBlocks":["testimonials","stats","team","cta"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","products-grid","cart-widget","class-schedule"],"typicalPersonalities":["editorial-clean","bold-dark","luxury-travel"],"minSections":5,"aiPromptHint":"Sophisticated, minimal tone. Let the work speak. Emphasize craft, process, and results."}'::jsonb WHERE slug = 'portfolio' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_news',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","blog-list","newsletter","footer"],"recommendedBlocks":["stats","testimonials","cta","social-widget"],"mandatoryOrder":["navigation","hero","blog-list","footer"],"forbiddenBlocks":["menu-food","products-grid","booking-widget","class-schedule"],"typicalPersonalities":["editorial-clean","modern-vibrant"],"minSections":5,"aiPromptHint":"Clear, authoritative tone. Prioritize readability and information hierarchy. Build trust through consistency."}'::jsonb WHERE slug = 'news' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_beauty',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","service-cards","booking-widget","gallery","testimonials","footer"],"recommendedBlocks":["gallery-masonry","before-after","team","newsletter","cta"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["products-grid","cart-widget","class-schedule","blog-list"],"typicalPersonalities":["soft-feminine","calm-wellness","luxury-travel"],"minSections":6,"aiPromptHint":"Elegant, nurturing tone. Evoke transformation, self-care, and indulgence. Subtle luxury feel."}'::jsonb WHERE slug = 'beauty' AND dna IS NULL;`,
+  },
+  {
+    name: 'categories.seed_dna_education',
+    sql: `UPDATE categories SET dna = '{"signatureBlocks":["navigation","hero","class-schedule","features","contact","footer"],"recommendedBlocks":["testimonials","faq","team","stats","cta","pricing"],"mandatoryOrder":["navigation","hero","footer"],"forbiddenBlocks":["menu-food","cart-widget","booking-widget","gallery-masonry"],"typicalPersonalities":["modern-vibrant","calm-wellness","editorial-clean"],"minSections":6,"aiPromptHint":"Encouraging, clear, and structured tone. Highlight outcomes, expertise, and learning journey."}'::jsonb WHERE slug = 'education' AND dna IS NULL;`,
+  },
+  // ── Phase 09: TemplateVersions ───────────────────────────────────────────
+  {
+    name: 'template_versions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS template_versions (
+      id serial PRIMARY KEY,
+      template_id integer REFERENCES templates(id) ON DELETE CASCADE,
+      version_number integer NOT NULL,
+      sections_snapshot jsonb NOT NULL DEFAULT '[]'::jsonb,
+      changelog text,
+      created_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+      updated_at timestamp DEFAULT now(),
+      created_at timestamp DEFAULT now()
+    );`,
+  },
+  {
+    name: 'template_versions.create_index',
+    sql: `CREATE INDEX IF NOT EXISTS template_versions_template_version_idx
+      ON template_versions (template_id, version_number DESC);`,
+  },
+  // ALTER TABLE fallbacks (idempotent — in case table pre-existed without all cols)
+  {
+    name: 'template_versions.add_col_template_id',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS template_id integer REFERENCES templates(id) ON DELETE CASCADE;`,
+  },
+  {
+    name: 'template_versions.add_col_version_number',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS version_number integer;`,
+  },
+  {
+    name: 'template_versions.add_col_sections_snapshot',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS sections_snapshot jsonb NOT NULL DEFAULT '[]'::jsonb;`,
+  },
+  {
+    name: 'template_versions.add_col_changelog',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS changelog text;`,
+  },
+  {
+    name: 'template_versions.add_col_created_by_id',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS created_by_id integer REFERENCES users(id) ON DELETE SET NULL;`,
+  },
+  {
+    name: 'template_versions.add_col_updated_at',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now();`,
+  },
+  {
+    name: 'template_versions.add_col_created_at',
+    sql: `ALTER TABLE IF EXISTS template_versions ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now();`,
+  },
+
+  // ── Phase 04: AiGenerationRecord override-rate fields ────────────────────
+  // Pre-migration rows return NULL override rate; acceptable per product (rolling 30d window).
+  {
+    name: 'ai_generation_records.add_field_count_columns',
+    sql: `ALTER TABLE ai_generation_records
+      ADD COLUMN IF NOT EXISTS fields_total integer,
+      ADD COLUMN IF NOT EXISTS fields_filled integer,
+      ADD COLUMN IF NOT EXISTS fields_edited integer DEFAULT 0;`,
+  },
+
+  // ── Pages: Data cleanup for F05 Footer variants ──
+  // Migrate legacy variant values to the new supported values cleanly in the database
+  {
+    name: 'pages_blocks_footer.data_migration_variants',
+    sql: `
+      UPDATE pages_blocks_footer SET variant = 'simple' WHERE variant = 'expanded';
+      UPDATE pages_blocks_footer SET variant = 'dark-gradient' WHERE variant = 'mega-footer';
+      UPDATE _pages_v_blocks_footer SET variant = 'simple' WHERE variant = 'expanded';
+      UPDATE _pages_v_blocks_footer SET variant = 'dark-gradient' WHERE variant = 'mega-footer';
+      
+      -- Update Global Site Footers stored in JSONB (single block object — direct jsonb_set)
+      UPDATE sites
+      SET footer_block = CASE
+        WHEN footer_block->>'variant' = 'expanded'    THEN jsonb_set(footer_block, '{variant}', '"simple"')
+        WHEN footer_block->>'variant' = 'mega-footer' THEN jsonb_set(footer_block, '{variant}', '"dark-gradient"')
+        ELSE footer_block
+      END
+      WHERE footer_block IS NOT NULL
+        AND footer_block->>'variant' IN ('expanded', 'mega-footer');
+
+      -- Update Template Layouts stored in JSONB (mixed-block array — only touch footer blocks)
+      -- COALESCE guards against jsonb_agg returning NULL on empty arrays ([] → [] not NULL)
+      -- jsonb_typeof guard prevents error if layout is not an array (scalar/object)
+      UPDATE templates_template_pages
+      SET layout = COALESCE(
+        (
+          SELECT jsonb_agg(
+            CASE
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'expanded'
+                THEN jsonb_set(elem, '{variant}', '"simple"')
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'mega-footer'
+                THEN jsonb_set(elem, '{variant}', '"dark-gradient"')
+              ELSE elem
+            END
+          )
+          FROM jsonb_array_elements(layout) AS elem
+        ),
+        '[]'::jsonb
+      )
+      WHERE layout IS NOT NULL
+        AND jsonb_typeof(layout) = 'array'
+        AND layout::text LIKE '%"blockType":"footer"%';
+
+      -- Update Template Version Snapshots stored in JSONB (mixed-block array — only touch footer blocks)
+      -- Same COALESCE + jsonb_typeof guards as above
+      UPDATE template_versions
+      SET sections_snapshot = COALESCE(
+        (
+          SELECT jsonb_agg(
+            CASE
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'expanded'
+                THEN jsonb_set(elem, '{variant}', '"simple"')
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'mega-footer'
+                THEN jsonb_set(elem, '{variant}', '"dark-gradient"')
+              ELSE elem
+            END
+          )
+          FROM jsonb_array_elements(sections_snapshot) AS elem
+        ),
+        '[]'::jsonb
+      )
+      WHERE sections_snapshot IS NOT NULL
+        AND jsonb_typeof(sections_snapshot) = 'array'
+        AND sections_snapshot::text LIKE '%"blockType":"footer"%';
+    `,
+  },
+  // F05-GAP06: block_spacing jsonb column — every pages_blocks_* main table
+  { name: 'pages_blocks_hero.add_block_spacing', sql: `ALTER TABLE "pages_blocks_hero" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_navigation.add_block_spacing', sql: `ALTER TABLE "pages_blocks_navigation" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_about.add_block_spacing', sql: `ALTER TABLE "pages_blocks_about" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_features.add_block_spacing', sql: `ALTER TABLE "pages_blocks_features" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_testimonials.add_block_spacing', sql: `ALTER TABLE "pages_blocks_testimonials" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_contact.add_block_spacing', sql: `ALTER TABLE "pages_blocks_contact" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_gallery.add_block_spacing', sql: `ALTER TABLE "pages_blocks_gallery" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_footer.add_block_spacing', sql: `ALTER TABLE "pages_blocks_footer" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_stats.add_block_spacing', sql: `ALTER TABLE "pages_blocks_stats" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_pricing.add_block_spacing', sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_faq.add_block_spacing', sql: `ALTER TABLE "pages_blocks_faq" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_team.add_block_spacing', sql: `ALTER TABLE "pages_blocks_team" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_socialWidget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_socialWidget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_cartWidget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_cartWidget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_social_widget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_social_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_cart_widget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_cart_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_cta.add_block_spacing', sql: `ALTER TABLE "pages_blocks_cta" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_newsletter.add_block_spacing', sql: `ALTER TABLE "pages_blocks_newsletter" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_video.add_block_spacing', sql: `ALTER TABLE "pages_blocks_video" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "pages_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_custom_html.add_block_spacing', sql: `ALTER TABLE "pages_blocks_custom_html" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_service_cards.add_block_spacing', sql: `ALTER TABLE "pages_blocks_service_cards" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_carousel.add_block_spacing', sql: `ALTER TABLE "pages_blocks_carousel" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_step_process.add_block_spacing', sql: `ALTER TABLE "pages_blocks_step_process" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_divider.add_block_spacing', sql: `ALTER TABLE "pages_blocks_divider" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_announcement_bar.add_block_spacing', sql: `ALTER TABLE "pages_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_whatsapp_button.add_block_spacing', sql: `ALTER TABLE "pages_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_google_maps.add_block_spacing', sql: `ALTER TABLE "pages_blocks_google_maps" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_accordion.add_block_spacing', sql: `ALTER TABLE "pages_blocks_accordion" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_countdown_timer.add_block_spacing', sql: `ALTER TABLE "pages_blocks_countdown_timer" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_social_proof.add_block_spacing', sql: `ALTER TABLE "pages_blocks_social_proof" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_breadcrumb.add_block_spacing', sql: `ALTER TABLE "pages_blocks_breadcrumb" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_client_logos.add_block_spacing', sql: `ALTER TABLE "pages_blocks_client_logos" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_menu_food.add_block_spacing', sql: `ALTER TABLE "pages_blocks_menu_food" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_portfolio_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_portfolio_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_doctor_profile.add_block_spacing', sql: `ALTER TABLE "pages_blocks_doctor_profile" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_property_card.add_block_spacing', sql: `ALTER TABLE "pages_blocks_property_card" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_class_schedule.add_block_spacing', sql: `ALTER TABLE "pages_blocks_class_schedule" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_video_showcase.add_block_spacing', sql: `ALTER TABLE "pages_blocks_video_showcase" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_product_quick_view.add_block_spacing', sql: `ALTER TABLE "pages_blocks_product_quick_view" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_feature_comparison.add_block_spacing', sql: `ALTER TABLE "pages_blocks_feature_comparison" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  // F05-GAP06: block_spacing jsonb on _pages_v_blocks_* (version/draft tables — same schema as pages_blocks_*)
+  { name: '_pages_v_blocks_hero.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_hero" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_navigation.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_navigation" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_about.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_about" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_features.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_features" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_testimonials.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_testimonials" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_contact.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_contact" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_gallery.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_gallery" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_footer.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_footer" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_stats.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_stats" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_pricing.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_faq.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_team.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_team" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_socialWidget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_socialWidget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_cartWidget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_cartWidget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_social_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_social_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_cart_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_cart_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_cta.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_cta" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_newsletter.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_newsletter" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_video.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_video" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_custom_html.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_custom_html" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_service_cards.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_service_cards" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_carousel.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_carousel" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_step_process.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_step_process" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_divider.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_divider" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_announcement_bar.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_whatsapp_button.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_google_maps.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_google_maps" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_accordion.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_accordion" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_countdown_timer.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_countdown_timer" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_social_proof.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_social_proof" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_breadcrumb.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_breadcrumb" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_client_logos.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_client_logos" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_menu_food.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_menu_food" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_portfolio_grid.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_portfolio_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_doctor_profile.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_doctor_profile" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_property_card.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_property_card" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_class_schedule.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_class_schedule" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_video_showcase.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_video_showcase" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_product_quick_view.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_product_quick_view" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_feature_comparison.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_feature_comparison" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+
+  // ── Navigation variant rename (Phase 01 — 2026-04-24) ───────────────────────
+  // Renames: simple→default, mega-menu→mega, pill→floating in sites.header_block JSONB.
+  // Idempotent: WHERE clause skips already-migrated rows.
+  {
+    name: 'sites.header_block_variant_simple_to_default',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('default'::text)) WHERE header_block->>'variant' = 'simple';`,
+  },
+  {
+    name: 'sites.header_block_variant_mega_menu_to_mega',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('mega'::text)) WHERE header_block->>'variant' = 'mega-menu';`,
+  },
+  {
+    name: 'sites.header_block_variant_pill_to_floating',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('floating'::text)) WHERE header_block->>'variant' = 'pill';`,
+  },
+
+  // ── Navigation variant enum expansion (Phase 01 — 2026-04-24) ───────────────
+  // Postgres native enums for navigation variant in pages/versioned-pages blocks.
+  // ADD VALUE IF NOT EXISTS is idempotent. Old values kept (can't drop from enum).
+  // Then update any existing rows that still use old names.
+  { name: 'enum_pages_blocks_navigation_variant.add_default',     sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'default';` },
+  { name: 'enum_pages_blocks_navigation_variant.add_mega',        sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'mega';` },
+  { name: 'enum_pages_blocks_navigation_variant.add_floating',    sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'floating';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_default',  sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'default';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_mega',     sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'mega';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_floating', sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'floating';` },
+  // Update existing rows in block tables (idempotent — WHERE filters already-migrated)
+  { name: 'pages_blocks_navigation.variant_simple_to_default',    sql: `UPDATE pages_blocks_navigation SET variant = 'default' WHERE variant = 'simple';` },
+  { name: 'pages_blocks_navigation.variant_mega_menu_to_mega',    sql: `UPDATE pages_blocks_navigation SET variant = 'mega' WHERE variant = 'mega-menu';` },
+  { name: 'pages_blocks_navigation.variant_pill_to_floating',     sql: `UPDATE pages_blocks_navigation SET variant = 'floating' WHERE variant = 'pill';` },
+  { name: '_pages_v_blocks_navigation.variant_simple_to_default', sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'default' WHERE variant = 'simple';` },
+  { name: '_pages_v_blocks_navigation.variant_mega_menu_to_mega', sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'mega' WHERE variant = 'mega-menu';` },
+  { name: '_pages_v_blocks_navigation.variant_pill_to_floating',  sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'floating' WHERE variant = 'pill';` },
 ];
 
 async function runMigrations(pool) {
@@ -2383,6 +3635,15 @@ const COLLECTION_SLUGS = [
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
   'seo_meta_jobs', 'notifications', 'subscribers',
+  'contact_submissions',
+  'ai_usage_logs',
+  'template_quality_scores',
+  'block_catalog_entries',
+  'block_variants',
+  'ai_generation_records',
+  'template_issues',
+  'content_packs',
+  'template_versions',
 ];
 
 /**
@@ -2830,7 +4091,13 @@ async function main() {
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS is_primary
 */
 
-main().catch((e) => {
-  console.error('[db-setup] Fatal:', e);
-  process.exit(1);
-});
+// Only run main() when invoked as CLI (not when required as a module).
+// Prevents side-effects (server.js spawn, stderr noise) when db-migrate-dev.js imports MIGRATIONS.
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('[db-setup] Fatal:', e);
+    process.exit(1);
+  });
+}
+
+module.exports = { MIGRATIONS };

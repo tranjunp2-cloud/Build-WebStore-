@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { PreviewScripts } from '@/components/editor/PreviewScripts'
+import { PreviewScripts, replaceDropHintCSS } from '@/components/editor/PreviewScripts'
 
 describe('PreviewScripts', () => {
     let mockPostMessage: ReturnType<typeof vi.fn>
@@ -74,32 +74,32 @@ describe('PreviewScripts', () => {
         expect(stopPropagationSpy).toHaveBeenCalled()
     })
 
-    it('should allow default click on anchors when outside iframe (standalone view)', () => {
+    it('should open external links in new tab when outside iframe (standalone view)', () => {
         // Arrange
         document.body.innerHTML = `
             <a href="https://example.com" id="test-link">Link</a>
         `
-        
+
         // Mock window === window.parent (standalone scenario)
         Object.defineProperty(window, 'parent', {
             value: window,
             writable: true,
         })
-        
+
         render(<PreviewScripts />)
         const link = document.getElementById('test-link')
 
         const preventDefaultSpy = vi.fn()
         const stopPropagationSpy = vi.fn()
-        
+
         const mockEvent = new MouseEvent('click', { bubbles: true, cancelable: true })
         Object.assign(mockEvent, { preventDefault: preventDefaultSpy, stopPropagation: stopPropagationSpy })
 
         // Act
         link?.dispatchEvent(mockEvent)
 
-        // Assert
-        expect(preventDefaultSpy).not.toHaveBeenCalled()
+        // Assert — external links call preventDefault to open in new tab (not navigate away from preview)
+        expect(preventDefaultSpy).toHaveBeenCalled()
         expect(stopPropagationSpy).not.toHaveBeenCalled()
     })
 
@@ -115,5 +115,30 @@ describe('PreviewScripts', () => {
         expect(removeEventListenerSpy).toHaveBeenCalledWith('click', expect.any(Function))
         expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseover', expect.any(Function))
         removeEventListenerSpy.mockRestore()
+    })
+
+    describe('replaceDropHintCSS', () => {
+        it('should replace drop hint text in CSS', () => {
+            const css = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
+            const result = replaceDropHintCSS(css, 'Lepaskan untuk tambah blok')
+
+            expect(result).toContain("content: 'Lepaskan untuk tambah blok'")
+            expect(result).toContain('/*drop-hint*/')
+            expect(result).not.toContain('Drop to add block')
+        })
+
+        it('should escape single quotes in replacement text', () => {
+            const css = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
+            const result = replaceDropHintCSS(css, "Drop it's here")
+
+            expect(result).toContain("content: 'Drop it\\'s here'")
+        })
+
+        it('should return CSS unchanged when marker is missing', () => {
+            const css = `.insert-marker::after { content: 'no marker here'; }`
+            const result = replaceDropHintCSS(css, 'Test')
+
+            expect(result).toBe(css)
+        })
     })
 })

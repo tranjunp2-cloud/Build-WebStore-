@@ -115,6 +115,97 @@ describe('POST /api/seo/apply-fixes [TC-F03.36, TC-F19.38]', () => {
         expect(body.success).toBe(true)
     })
 
+    // Route context unused by handler — `{} as any` follows existing test pattern (lines 58, 85, 111)
+    it('maps blog fields metaTitle/metaDescription on apply [TC-F03.40]', async () => {
+        // Arrange — blog uses seo.metaTitle / seo.metaDescription
+        mockFindByID.mockResolvedValue({
+            id: 'blog-1',
+            tenant: 'tenant-1',
+            seo: { metaTitle: 'Old Blog Title', metaDescription: 'Old blog desc' },
+        })
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = {
+            json: () => Promise.resolve({
+                fixes: [{
+                    targetId: 'blog-1',
+                    collection: 'blogs',
+                    seo: { title: 'New Blog SEO Title', description: 'New blog SEO desc' },
+                }],
+            }),
+        } as unknown as Request
+        const res = await applyFixesPOST(req, {} as any)
+        const body = await res.json()
+
+        // Assert — should write metaTitle/metaDescription, not title/description
+        expect(body.success).toBe(true)
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'blogs',
+            data: {
+                seo: expect.objectContaining({
+                    metaTitle: 'New Blog SEO Title',
+                    metaDescription: 'New blog SEO desc',
+                }),
+            },
+        }))
+        // Undo data should map back to generic title/description
+        expect(body.undoData[0].seo.title).toBe('Old Blog Title')
+        expect(body.undoData[0].seo.description).toBe('Old blog desc')
+    })
+
+    it('blog undo returns empty string when no existing meta [TC-F03.40]', async () => {
+        // Arrange — blog with no existing SEO
+        mockFindByID.mockResolvedValue({
+            id: 'blog-2',
+            tenant: 'tenant-1',
+            seo: {},
+        })
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = {
+            json: () => Promise.resolve({
+                fixes: [{
+                    targetId: 'blog-2',
+                    collection: 'blogs',
+                    seo: { title: 'Brand New Title' },
+                }],
+            }),
+        } as unknown as Request
+        const res = await applyFixesPOST(req, {} as any)
+        const body = await res.json()
+
+        // Assert
+        expect(body.success).toBe(true)
+        expect(body.undoData[0].seo.title).toBe('')
+        expect(body.undoData[0].seo.description).toBe('')
+    })
+
+    it('rejects cross-tenant blog fix [TC-F19.38]', async () => {
+        // Arrange — blog belongs to different tenant
+        mockFindByID.mockResolvedValue({
+            id: 'blog-1',
+            tenant: 'other-tenant',
+            seo: {},
+        })
+
+        // Act
+        const req = {
+            json: () => Promise.resolve({
+                fixes: [{
+                    targetId: 'blog-1',
+                    collection: 'blogs',
+                    seo: { title: 'Hack' },
+                }],
+            }),
+        } as unknown as Request
+        const res = await applyFixesPOST(req, {} as any)
+
+        // Assert
+        expect(res.status).toBe(500) // throws internally → ALL_FAILED
+    })
+
     it('returns 400 for invalid schema', async () => {
         // Act — missing required fields
         const req = {

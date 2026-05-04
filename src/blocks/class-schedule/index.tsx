@@ -4,9 +4,13 @@ import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { ClassScheduleConfig, ClassItem } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+
+void _CSS_VARS
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -38,6 +42,8 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
         highlightToday = true,
     } = block
 
+    const safeVariant = ['grid', 'list', 'cards'].includes(variant) ? variant : 'grid'
+
     const today = new Date().getDay()
     const [activeDay, setActiveDay] = useState(today)
 
@@ -57,9 +63,22 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
     }, [classes])
 
     /* ── Grid variant: weekly timetable ──────────────────────────────────────── */
-    const renderGrid = () => (
-        <div className="overflow-x-auto -mx-6 px-6">
-            <div className="min-w-[800px]">
+    const renderGrid = () => {
+        let minHour = 7
+        let maxHour = 18
+        classes.forEach((c) => {
+            const match = c.startTime?.match(/^(\d{1,2})/)
+            if (match) {
+                const h = parseInt(match[1], 10)
+                minHour = Math.min(minHour, h)
+                maxHour = Math.max(maxHour, h)
+            }
+        })
+        const rowCount = Math.max(1, maxHour - minHour + 1)
+
+        return (
+        <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
                 <div className="grid grid-cols-8 gap-px rounded-2xl overflow-hidden" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                     {/* Header row */}
                     <div className="p-3 text-sm font-semibold opacity-50" style={{ background: `rgba(var(--brand-primary-rgb), 0.02)` }}>
@@ -81,8 +100,8 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                     ))}
 
                     {/* Time rows */}
-                    {Array.from({ length: 12 }, (_, i) => {
-                        const hour = 7 + i
+                    {Array.from({ length: rowCount }, (_, i) => {
+                        const hour = minHour + i
                         const timeLabel = `${hour.toString().padStart(2, '0')}:00`
                         return (
                             <div key={hour} className="contents">
@@ -91,8 +110,9 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                                 </div>
                                 {Array.from({ length: 7 }, (_, d) => {
                                     const cellClasses = classesByDay[d]?.filter((c) => {
-                                        const [h] = c.startTime.split(':').map(Number)
-                                        return h === hour
+                                        const hStr = c.startTime?.split(':')[0]
+                                        if (!hStr) return false
+                                        return parseInt(hStr, 10) === hour
                                     }) ?? []
                                     return (
                                         <div
@@ -107,12 +127,12 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                                             {cellClasses.map((c, ci) => (
                                                 <div
                                                     key={ci}
-                                                    className="p-2 rounded-lg text-xs mb-1"
+                                                    className="p-2 rounded-lg text-xs mb-1 overflow-hidden"
                                                     style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, borderLeft: `3px solid var(--brand-primary)` }}
                                                 >
-                                                    <p className="font-bold leading-tight">{c.name}</p>
-                                                    <p className="opacity-60">{c.startTime} - {c.endTime}</p>
-                                                    <p className="opacity-50">{c.instructor}</p>
+                                                    <RichText text={c.name} as="p" className="font-bold leading-tight truncate" />
+                                                    <p className="opacity-60 truncate">{c.startTime} - {c.endTime}</p>
+                                                    <p className="opacity-50 truncate">{c.instructor}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -124,7 +144,8 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                 </div>
             </div>
         </div>
-    )
+        )
+    }
 
     /* ── List variant: day tabs + class rows ──────────────────────────────────── */
     const renderList = () => (
@@ -170,7 +191,7 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="font-bold font-heading">{c.name}</h4>
+                                <RichText text={c.name} as="h4" className="font-bold font-heading" />
                                 {c.level && (
                                     <span
                                         className="px-2 py-0.5 rounded-full text-xs"
@@ -221,7 +242,7 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
                         </span>
                         {c.level && <span className="text-xs opacity-40">{c.level}</span>}
                     </div>
-                    <h4 className="text-lg font-bold font-heading mb-1">{c.name}</h4>
+                    <RichText text={c.name} as="h4" className="text-lg font-bold font-heading mb-1" />
                     <p className="text-sm opacity-50 mb-3">{c.instructor}{c.category ? ` \u2022 ${c.category}` : ''}</p>
                     <div className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--brand-primary)' }}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -236,15 +257,17 @@ export function ClassScheduleBlock({ block }: BlockProps<ClassScheduleConfig>) {
     )
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
                 </div>
 
-                {variant === 'grid' && renderGrid()}
-                {variant === 'list' && renderList()}
-                {variant === 'cards' && renderCards()}
+                {safeVariant === 'grid' && renderGrid()}
+                {safeVariant === 'list' && renderList()}
+                {safeVariant === 'cards' && renderCards()}
             </div>
         </AnimatedSection>
     )

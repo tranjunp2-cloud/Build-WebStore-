@@ -91,12 +91,14 @@ export const BaseBlockSchema = z.object({
 })
 
 import type { SiteContactInfo, SiteSocialLinks, SiteBranding } from '@/lib/site-settings'
+import type { ImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 export type SiteData = {
     contactInfo?: SiteContactInfo | null
     socialLinks?: SiteSocialLinks | null
     name?: string | null
     branding?: SiteBranding | null
+    imageLibraryS3?: ImageLibraryS3Map // GH-727 Phase 03: seeded S3 URLs keyed by imglib altKey
     [key: string]: unknown
 }
 
@@ -118,19 +120,34 @@ export type BlockMeta = {
     defaultVariant: string
     editableFields: string[]
     quickActions: string[]
+    /**
+     * Plan 2253 audit-unused-code — when false, this block is hidden from the
+     * AI prompt's block list (buildSystemPrompt's blockList). Users can still
+     * add these blocks manually via the editor library UI. Defaults to true.
+     * Use for editor-only utility blocks: divider, breadcrumb, announcement-bar,
+     * whatsapp-button, cart widgets, etc.
+     */
+    aiVisible?: boolean
 }
 
 // ── CTA Button (shared across blocks) ────────────────────────────────────────
 export type CTAButton = {
     label: string
     url: string
-    style?: 'primary' | 'outline' | 'ghost'
+    style?: 'primary' | 'secondary' | 'outline' | 'ghost'
 }
 
+// Keep enum in sync with Pages.ts hero.ctaButtons.style Payload select options
+// (['primary','secondary','outline','ghost']). The previous 3-value enum
+// caused AI-generated blocks with `style: 'secondary'` to fail
+// blockRegistry.validate() and push invalid data into payload.create
+// downstream — observed as staging 500s after the sanitizer emits
+// 'secondary' as the default style for the 2nd CTA in hero blocks
+// (openai-generator.ts:1023,1032).
 export const CTAButtonSchema = z.object({
     label: z.string(),
     url: z.string(),
-    style: z.enum(['primary', 'outline', 'ghost']).default('primary'),
+    style: z.enum(['primary', 'secondary', 'outline', 'ghost']).default('primary'),
 })
 
 // ── Image Reference (shared) ─────────────────────────────────────────────────

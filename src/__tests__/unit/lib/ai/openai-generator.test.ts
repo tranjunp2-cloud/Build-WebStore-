@@ -55,7 +55,12 @@ describe('generateSiteWithAI — fallback path (no API key) [TC-F01.08]', () => 
     it('emits fallback step event', async () => {
         const { events } = await generateSiteWithAI(businessInfo)
 
-        const fallbackEvent = events.find(e => e.data.step === 'fallback')
+        // Phase-06 rewire: fallback now emits granular step events
+        // ('fallback_analyzing', 'fallback_composing', 'fallback_validating', ...)
+        // or 'fallback_legacy' if composer path throws.
+        const fallbackEvent = events.find(e =>
+            typeof e.data.step === 'string' && (e.data.step as string).startsWith('fallback')
+        )
         expect(fallbackEvent).toBeDefined()
     })
 
@@ -99,10 +104,13 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         process.env.OPENAI_API_KEY = 'test-key'
+        // Force AI-first path so these tests still exercise the GPT code path
+        process.env.GEN_MODE = 'ai-first'
     })
 
     afterAll(() => {
         delete process.env.OPENAI_API_KEY
+        delete process.env.GEN_MODE
     })
 
     it('parses valid AI response and returns blocks', async () => {
@@ -145,7 +153,8 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
         expect(result.theme).toBeDefined()
     })
 
-    it('falls back when OpenAI throws error', async () => {
+    // TC-F01-AI-FALLBACK-SILENT-01 — OpenAI throws → fallback succeeds → no error event emitted
+    it('falls back silently when OpenAI throws error (no error event)', async () => {
         const OpenAI = (await import('openai')).default as any
         OpenAI.mockImplementation(() => ({
             chat: {
@@ -157,13 +166,17 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 
         const { result, events } = await generateSiteWithAI(businessInfo)
 
-        // Should still return valid result via fallback
+        // Site still created via smart templates fallback
         expect(result.blocks.length).toBeGreaterThan(0)
-        const errorEvent = events.find(e => e.event === 'error')
-        expect(errorEvent).toBeDefined()
+        // BUG FIX: fallback success must NOT emit 'error' event (causes false error UI despite successful generation)
+        const errorEvent = events.find(e => e.event === 'error' && (e.data as { code?: string }).code === 'ai_fallback')
+        expect(errorEvent).toBeUndefined()
     })
 
-    it('validates font against allowed list', async () => {
+    it('overrides AI theme with curated category preset [TC-F01D-CP.60]', async () => {
+        // New contract: category theme preset is authoritative.
+        // AI output for theme colors/fonts is IGNORED — preset wins.
+        // See plans/260414-1630-phase-08-audit/phase-02-happy-path-integration.md
         const OpenAI = (await import('openai')).default as any
         OpenAI.mockImplementation(() => ({
             chat: {
@@ -173,7 +186,8 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
                             message: {
                                 content: JSON.stringify({
                                     siteName: 'Test',
-                                    theme: { fontHeading: 'Comic Sans', fontBody: 'Papyrus', colorMode: 'light' },
+                                    // AI attempts garbage fonts + generic blue
+                                    theme: { primaryColor: '#0ea5e9', fontHeading: 'Comic Sans', fontBody: 'Papyrus', colorMode: 'light' },
                                     blocks: [],
                                     seo: {},
                                 }),
@@ -186,9 +200,20 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 
         const { result } = await generateSiteWithAI(businessInfo)
 
-        // Invalid fonts should fall back to defaults
-        expect(result.theme.fontHeading).toBe('Outfit')
-        expect(result.theme.fontBody).toBe('Inter')
+        // Fonts come from the preset's fontPairingId (always allowlist).
+        const ALLOWED_HEADING = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
+        const ALLOWED_BODY = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
+        expect(ALLOWED_HEADING).toContain(result.theme.fontHeading)
+        expect(ALLOWED_BODY).toContain(result.theme.fontBody)
+
+        // "Test Cafe" + Restaurant industry → composer resolves to "restaurant".
+        // Restaurant presets all use warm/earth primary colors, NEVER #0ea5e9.
+        expect(result.theme.primaryColor).not.toBe('#0ea5e9')
+        expect(result.theme.primaryColor).toMatch(/^#[0-9a-f]{6}$/i)
+
+        // Optional preset-only fields exposed by the wider type.
+        expect(result.theme.accentColor).toBeTruthy()
+        expect(result.theme.fontPairingId).toBeTruthy()
     })
 
     it('truncates SEO title to 60 chars and description to 160 chars', async () => {
@@ -255,10 +280,12 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 import { sanitizeBlockData } from '@/lib/ai/openai-generator'
 
 describe('sanitizeBlockData - Normalize AI outputs', () => {
-    it('normalizes legacy/hallucinated string variants to fallback valid enums', () => {
+    it('normalizes invalid variant to a valid one from registry', () => {
         const input = { blockType: 'features', variant: 'grid-5' } // invalid
         const output = sanitizeBlockData(input)
-        expect(output.variant).toBe('grid-2') // fallback for 'features'
+        // Weighted random picks from valid variants — not always the same default
+        const validVariants = ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag', 'carousel']
+        expect(validVariants).toContain(output.variant)
     })
 
     it('forces footer socials into array of object format', () => {
@@ -293,10 +320,13 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
         expect(plans[1].price).toBe('RM 0')
     })
 
-    it('cleans up logo-cloud blocks', () => {
-        const input = { blockType: 'logo-cloud', logos: ['logo1', 'logo2'] }
+    it('preserves logo-cloud name metadata while stripping URLs', () => {
+        const input = { blockType: 'logo-cloud', logos: ['Acme Corp', { name: 'Partner Inc', url: 'http://example.com' }] }
         const output = sanitizeBlockData(input)
-        expect(output.logos).toEqual([])
+        const logos = output.logos as Array<Record<string, unknown>>
+        expect(logos).toHaveLength(2)
+        expect(logos[0]).toEqual({ name: 'Acme Corp' })
+        expect(logos[1]).toEqual({ name: 'Partner Inc' })
     })
 
     it('handles nulls or completely broken objects safely', () => {

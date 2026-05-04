@@ -64,7 +64,7 @@ Chạy **mỗi lần Docker container start**. Tạo accounts bắt buộc nếu
 | Script | Mục đích |
 |--------|---------|
 | `npm run db:seed-sso` | Seed SSO + Admin accounts (Payload API, hash password đúng) |
-| `POST /api/templates/seed` | Seed industry templates |
+| `POST /api/templates/seed?v3=true&force=true` | Seed industry templates (Bearer `SEED_TOKEN`; stamps `block_schema_version` sha256 on each row for drift detection — see `docs/architecture/F01-ai-builder.md` §5). Auto-called post-deploy via `.github/scripts/seed-templates-post-deploy.sh`. |
 
 ---
 

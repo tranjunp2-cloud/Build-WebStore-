@@ -8,6 +8,7 @@ import {
     SPACING_PRESETS,
     RADIUS_PRESETS,
     SHADOW_PRESETS,
+    CSS_VARS,
 } from '@/lib/theme/resolve'
 import { ThemeConfigSchema } from '@/blocks/types'
 
@@ -77,14 +78,15 @@ describe('[TC-S1-006] resolveTheme() backward compat — v1 site (light mode)', 
 })
 
 // ── TC-S1-007: resolveTheme() with completely empty input ───────────────────
+// Plan 260417 Wave 1 A2 — fallback changed from dark cyan/magenta to light slate.
 describe('[TC-S1-007] resolveTheme() with completely empty input', () => {
-    it('returns complete ThemeConfig with all defaults, no undefined/NaN', () => {
+    it('returns complete ThemeConfig with all light-neutral defaults, no undefined/NaN', () => {
         // Act
         const result = resolveTheme({})
 
-        // Assert — all fields present and valid
-        expect(result.primaryColor).toBe('#0ea5e9')
-        expect(result.secondaryColor).toBe('#d946ef')
+        // Assert — fallback is light slate (A2 fix), not dark cyan/magenta
+        expect(result.primaryColor).toBe('#111827')
+        expect(result.secondaryColor).toBe('#374151')
         expect(result.accentColor).toBeTruthy()
         expect(result.surfaceColor).toBeTruthy()
         expect(result.textColor).toBeTruthy()
@@ -94,7 +96,7 @@ describe('[TC-S1-007] resolveTheme() with completely empty input', () => {
         expect(result.spacingPreset).toBe('default')
         expect(result.borderRadius).toBe('rounded')
         expect(result.shadowPreset).toBe('subtle')
-        expect(result.colorMode).toBe('dark')
+        expect(result.colorMode).toBe('light')
         expect(result.backgroundColor).toBeTruthy()
 
         // No undefined or NaN
@@ -420,11 +422,105 @@ describe('generateThemeCSS — additional edge cases', () => {
         expect(css).toContain('--brand-accent-rgb: 0, 0, 0')
     })
 
-    it('font names are wrapped in single quotes in CSS output', () => {
+    it('font CSS vars reference next/font scoped variables (post-F01D fix)', () => {
+        // GH-737 fix: fontNameToCSSVar now puts literal name FIRST (doc-wide @font-face
+        // registration wins over var() chain which is scope-limited to AppShell div).
+        // Editorial pairing = Playfair Display (multi-word, quoted) + Lora (single-word).
         const theme = resolveTheme({ fontPairingId: 'editorial' })
         const css = generateThemeCSS(theme)
-        expect(css).toContain("--font-heading: 'Playfair Display'")
-        expect(css).toContain("--font-body: 'Lora'")
+        expect(css).toContain("--font-heading: 'Playfair Display',")
+        expect(css).toContain('var(--font-playfair-display)')
+        expect(css).toContain('--font-body: Lora,')
+        expect(css).toContain('var(--font-lora)')
+    })
+
+    it('emits font CSS vars directly on :root for heading/body fonts (GH-737 root-cause fix)', () => {
+        // Root cause: var(--font-lato) inside --font-body fails at <body>/<html> level
+        // because --font-lato is only defined on AppShell div (descendant of body, not ancestor).
+        // Fix: generateThemeCSS emits these vars on :root so they resolve everywhere.
+        // Without this, font-family: var(--font-body) on <body> is invalid-at-computed-value-time
+        // → browser shows Inter fallback regardless of saved fontBody.
+        const css = generateThemeCSS(
+            resolveTheme({
+                primaryColor: '#0ea5e9',
+                fontHeading: 'Poppins',
+                fontBody: 'Lato',
+            }),
+        )
+        // Heading + body specific vars
+        expect(css).toContain('--font-poppins: "Poppins", "Poppins Fallback";')
+        expect(css).toContain('--font-lato: "Lato", "Lato Fallback";')
+        // Default fallback vars — always included (used in the var() chain)
+        expect(css).toContain('--font-inter: "Inter", "Inter Fallback";')
+        expect(css).toContain('--font-outfit: "Outfit", "Outfit Fallback";')
+    })
+
+    it('emits semantic color layer alongside legacy brand vars (Phase 03)', () => {
+        const theme = resolveTheme({ primaryColor: '#0ea5e9', colorMode: 'light' })
+        const css = generateThemeCSS(theme)
+
+        // Legacy vars still present
+        expect(css).toContain('--brand-primary: #0ea5e9')
+        expect(css).toContain('--surface:')
+        expect(css).toContain('--text:')
+
+        // Semantic layer added
+        expect(css).toContain('--accent:')
+        expect(css).toContain('--accent-hover:')
+        expect(css).toContain('--accent-rgb:')
+        expect(css).toContain('--surface-primary:')
+        expect(css).toContain('--surface-secondary:')
+        expect(css).toContain('--surface-card:')
+        expect(css).toContain('--text-primary:')
+        expect(css).toContain('--text-secondary:')
+        expect(css).toContain('--text-inverse:')
+        expect(css).toContain('--text-muted:')
+        expect(css).toContain('--border-semantic:')
+        expect(css).toContain('--divider:')
+    })
+
+    it('semantic accent matches brand primary exactly', () => {
+        const css = generateThemeCSS(resolveTheme({ primaryColor: '#ff0000', colorMode: 'light' }))
+        expect(css).toContain('--accent: #ff0000')
+    })
+
+    it('dark mode produces dark surface-primary', () => {
+        const css = generateThemeCSS(resolveTheme({ primaryColor: '#0ea5e9', colorMode: 'dark' }))
+        const match = css.match(/--surface-primary:\s*(#[0-9a-f]{6})/)
+        expect(match).not.toBeNull()
+        // Parse lightness from hex — should be very dark
+        const hex = match![1]
+        const r = parseInt(hex.slice(1, 3), 16)
+        const g = parseInt(hex.slice(3, 5), 16)
+        const b = parseInt(hex.slice(5, 7), 16)
+        const avg = (r + g + b) / 3
+        expect(avg).toBeLessThan(50) // dark
+    })
+
+    it('light mode produces near-white surface-primary', () => {
+        const css = generateThemeCSS(resolveTheme({ primaryColor: '#0ea5e9', colorMode: 'light' }))
+        const match = css.match(/--surface-primary:\s*(#[0-9a-f]{6})/)
+        expect(match).not.toBeNull()
+        const hex = match![1]
+        const r = parseInt(hex.slice(1, 3), 16)
+        const g = parseInt(hex.slice(3, 5), 16)
+        const b = parseInt(hex.slice(5, 7), 16)
+        const avg = (r + g + b) / 3
+        expect(avg).toBeGreaterThan(200) // near-white
+    })
+
+    it('CSS_VARS exports both legacy and semantic accessors', () => {
+        // Legacy preserved
+        expect(CSS_VARS.primary).toContain('var(--brand-primary')
+        expect(CSS_VARS.surface).toContain('var(--surface')
+        expect(CSS_VARS.brandAccent).toContain('var(--brand-accent')
+        // Semantic added (Phase 03)
+        expect(CSS_VARS.accent).toContain('var(--accent')
+        expect(CSS_VARS.surfacePrimary).toContain('var(--surface-primary')
+        expect(CSS_VARS.textPrimary).toContain('var(--text-primary')
+        expect(CSS_VARS.textInverse).toContain('var(--text-inverse')
+        expect(CSS_VARS.borderSemantic).toContain('var(--border-semantic')
+        expect(CSS_VARS.divider).toContain('var(--divider')
     })
 
     it('output count contains at least 26 CSS variable declarations', () => {
@@ -646,6 +742,133 @@ describe('Color utility edge cases', () => {
             // Assert — lightness should increase
             expect(resultHSL.l).toBeGreaterThan(originalHSL.l)
         })
+    })
+})
+
+// ── TC-F01-COLOR-RESET: resolveColor opposite-mode detection ────────────────
+describe('[TC-F01-COLOR-RESET] resolveTheme() opposite-mode color reset', () => {
+    it('TC-F01-COLOR-RESET-01 — resets light bg (#ffffff) to dark default when switching to dark mode', () => {
+        // Arrange — stored backgroundColor is the light-mode default
+        const config = {
+            colorMode: 'dark' as const,
+            backgroundColor: '#ffffff', // light-mode default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert — should reset to dark-mode default, not keep #ffffff
+        expect(result.backgroundColor).toBe('#09090b')
+    })
+
+    it('TC-F01-COLOR-RESET-02 — resets dark bg (#09090b) to light default when switching to light mode', () => {
+        // Arrange
+        const config = {
+            colorMode: 'light' as const,
+            backgroundColor: '#09090b', // dark-mode default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert
+        expect(result.backgroundColor).toBe('#ffffff')
+    })
+
+    it('TC-F01-COLOR-RESET-03 — preserves custom backgroundColor in dark mode', () => {
+        // Arrange — user explicitly set a custom dark bg
+        const config = {
+            colorMode: 'dark' as const,
+            backgroundColor: '#1a1a2e',
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert — custom value preserved
+        expect(result.backgroundColor).toBe('#1a1a2e')
+    })
+
+    it('TC-F01-COLOR-RESET-04 — preserves custom backgroundColor in light mode', () => {
+        // Arrange
+        const config = {
+            colorMode: 'light' as const,
+            backgroundColor: '#f0f0f0',
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert
+        expect(result.backgroundColor).toBe('#f0f0f0')
+    })
+
+    it('TC-F01-COLOR-RESET-05 — resets textColor when it matches opposite mode default', () => {
+        // Arrange — dark text (#09090b) in dark mode = opposite default
+        const config = {
+            colorMode: 'dark' as const,
+            textColor: '#09090b', // this is the light-mode text default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert — reset to dark-mode text default
+        expect(result.textColor).toBe('#fafafa')
+    })
+
+    it('TC-F01-COLOR-RESET-06 — resets surfaceColor when it matches opposite mode default', () => {
+        // Arrange
+        const config = {
+            colorMode: 'light' as const,
+            surfaceColor: '#111111', // dark-mode surface default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert
+        expect(result.surfaceColor).toBe('#f8f8f8')
+    })
+
+    it('TC-F01-COLOR-RESET-07 — resets mutedColor when it matches opposite mode default', () => {
+        // Arrange
+        const config = {
+            colorMode: 'light' as const,
+            mutedColor: '#a1a1aa', // dark-mode muted default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert
+        expect(result.mutedColor).toBe('#71717a')
+    })
+
+    it('TC-F01-COLOR-RESET-08 — undefined colors fall back to mode default', () => {
+        // Arrange — no colors specified
+        const darkResult = resolveTheme({ colorMode: 'dark' })
+        const lightResult = resolveTheme({ colorMode: 'light' })
+
+        // Assert
+        expect(darkResult.backgroundColor).toBe('#09090b')
+        expect(darkResult.textColor).toBe('#fafafa')
+        expect(lightResult.backgroundColor).toBe('#ffffff')
+        expect(lightResult.textColor).toBe('#09090b')
+    })
+
+    it('TC-F01-COLOR-RESET-09 — case-insensitive hex: uppercase #FFFFFF in dark mode resets to #09090b', () => {
+        // Arrange — hex stored with uppercase letters, matches light default modulo case
+        const config = {
+            colorMode: 'dark' as const,
+            backgroundColor: '#FFFFFF', // uppercase light-mode default
+        }
+
+        // Act
+        const result = resolveTheme(config)
+
+        // Assert — case-insensitive compare should treat as opposite default and reset
+        expect(result.backgroundColor).toBe('#09090b')
     })
 })
 

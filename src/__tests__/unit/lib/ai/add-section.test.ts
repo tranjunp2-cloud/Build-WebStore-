@@ -116,16 +116,17 @@ describe('inferAddSectionType [TC-F05.13]', () => {
         expect(inferAddSectionType('show instagram link')).toBe('socialWidget')
     })
 
-    it('returns "cartWidget" for "cart" keyword [TC-F05.27]', () => {
-        expect(inferAddSectionType('add a cart widget')).toBe('cartWidget')
+    // gh-839: cartWidget matcher disabled until checkout ships — these must return null
+    it('returns null for "cart" keyword [TC-F05.27]', () => {
+        expect(inferAddSectionType('add a cart widget')).toBeNull()
     })
 
-    it('returns "cartWidget" for "shopping cart" keyword', () => {
-        expect(inferAddSectionType('add shopping cart')).toBe('cartWidget')
+    it('returns null for "shopping cart" keyword', () => {
+        expect(inferAddSectionType('add shopping cart')).toBeNull()
     })
 
-    it('returns "cartWidget" for "checkout" keyword', () => {
-        expect(inferAddSectionType('show checkout button')).toBe('cartWidget')
+    it('returns null for "checkout" keyword', () => {
+        expect(inferAddSectionType('show checkout button')).toBeNull()
     })
 
     // requestedType is prepended to haystack — whichever SECTION_TYPE_MATCHERS entry
@@ -397,10 +398,11 @@ describe('createAddSectionBlock — team [TC-F05.13]', () => {
     })
 })
 
-describe('createAddSectionBlock — newsletter / banner / cta map to hero [TC-F05.13]', () => {
-    it('newsletter maps to hero blockType', () => {
+describe('createAddSectionBlock — newsletter / banner / cta [TC-F05.13]', () => {
+    it('newsletter keeps newsletter blockType', () => {
         const block = createAddSectionBlock({ instruction: 'add newsletter' })
-        expect(block?.blockType).toBe('hero')
+        expect(block?.blockType).toBe('newsletter')
+        expect(block?.variant).toBe('inline')
     })
 
     it('banner maps to hero blockType', () => {
@@ -413,10 +415,10 @@ describe('createAddSectionBlock — newsletter / banner / cta map to hero [TC-F0
         expect(block?.blockType).toBe('hero')
     })
 
-    it('hero block has ctaButtons array', () => {
+    it('newsletter block has subscription copy', () => {
         const block = createAddSectionBlock({ instruction: 'add newsletter' }) as Record<string, unknown>
-        expect(Array.isArray(block?.ctaButtons)).toBe(true)
-        expect((block?.ctaButtons as unknown[]).length).toBeGreaterThan(0)
+        expect(block?.buttonLabel).toBe('Subscribe')
+        expect(block?.placeholder).toBe('Enter your email')
     })
 })
 
@@ -438,15 +440,16 @@ describe('createAddSectionBlock — socialWidget [TC-F05.26]', () => {
     })
 })
 
+// gh-839: cartWidget disabled — createAddSectionBlock returns null for cart instructions
 describe('createAddSectionBlock — cartWidget [TC-F05.27]', () => {
-    it('returns cartWidget blockType', () => {
+    it('returns null for cart widget instruction (gh-839: hidden until checkout ships)', () => {
         const block = createAddSectionBlock({ instruction: 'add cart widget' })
-        expect(block?.blockType).toBe('cartWidget')
+        expect(block).toBeNull()
     })
 
-    it('sets variant to "floating"', () => {
-        const block = createAddSectionBlock({ instruction: 'add cart' }) as Record<string, unknown>
-        expect(block?.variant).toBe('floating')
+    it('returns null for "add cart" instruction', () => {
+        const block = createAddSectionBlock({ instruction: 'add cart' })
+        expect(block).toBeNull()
     })
 })
 
@@ -534,16 +537,17 @@ describe('normalizeAddSectionBlock — faq normalization [TC-F05.13]', () => {
 })
 
 describe('normalizeAddSectionBlock — testimonials normalization [TC-F05.13]', () => {
-    it('strips avatar field from each testimonial', () => {
+    it('preserves avatar field and whitelists valid testimonial fields', () => {
         const aiBlock = {
             blockType: 'testimonials',
             testimonials: [
-                { quote: 'Great!', name: 'Ali', avatar: 'url/avatar.jpg', rating: 5 },
+                { quote: 'Great!', name: 'Ali', avatar: 'url/avatar.jpg', rating: 5, junk: true },
             ],
         }
         const result = normalizeAddSectionBlock({ instruction: 'add testimonials' }, aiBlock) as Record<string, unknown>
         const testimonials = result?.testimonials as Record<string, unknown>[]
-        expect(testimonials[0]).not.toHaveProperty('avatar')
+        expect(testimonials[0]).toHaveProperty('avatar')
+        expect(testimonials[0]).not.toHaveProperty('junk')
         expect(testimonials[0].quote).toBe('Great!')
     })
 
@@ -564,14 +568,15 @@ describe('normalizeAddSectionBlock — testimonials normalization [TC-F05.13]', 
 })
 
 describe('normalizeAddSectionBlock — gallery normalization [TC-F05.13]', () => {
-    it('strips image field from each gallery item', () => {
+    it('preserves image field and whitelists valid gallery fields', () => {
         const aiBlock = {
             blockType: 'gallery',
-            images: [{ caption: 'Photo 1', image: 'url/photo.jpg' }],
+            images: [{ caption: 'Photo 1', image: 'url/photo.jpg', junk: true }],
         }
         const result = normalizeAddSectionBlock({ instruction: 'add gallery' }, aiBlock) as Record<string, unknown>
         const images = result?.images as Record<string, unknown>[]
-        expect(images[0]).not.toHaveProperty('image')
+        expect(images[0]).toHaveProperty('image')
+        expect(images[0]).not.toHaveProperty('junk')
         expect(images[0].caption).toBe('Photo 1')
     })
 
@@ -651,11 +656,11 @@ describe('normalizeAddSectionBlock — team normalization [TC-F05.13]', () => {
 })
 
 describe('normalizeAddSectionBlock — newsletter/banner/cta remapping [TC-F05.13]', () => {
-    it('remaps newsletter blockType to "hero"', () => {
+    it('keeps newsletter blockType', () => {
         const aiBlock = { blockType: 'newsletter', headline: 'Subscribe' }
         const result = normalizeAddSectionBlock({ instruction: 'add newsletter' }, aiBlock) as Record<string, unknown>
-        expect(result?.blockType).toBe('hero')
-        expect(result?.variant).toBe('centered')
+        expect(result?.blockType).toBe('newsletter')
+        expect(result?.variant).toBe('inline')
     })
 
     it('remaps banner blockType to "hero"', () => {
@@ -690,5 +695,96 @@ describe('normalizeAddSectionBlock — socialWidget [TC-F05.26]', () => {
         const result = normalizeAddSectionBlock({ instruction: 'add social' }, aiBlock) as Record<string, unknown>
         const links = result?.links as Record<string, unknown>[]
         expect(links[0].platform).toBe('facebook')
+    })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// BUG-F05-04: Placeholder images & normalize whitelist
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('BUG-F05-04: Gallery placeholder images', () => {
+    it('createAddSectionBlock returns gallery images with valid image structure', () => {
+        const result = createAddSectionBlock({ instruction: 'add gallery', siteName: 'Test' })
+        expect(result?.blockType).toBe('gallery')
+        const images = (result as Record<string, unknown>).images as Record<string, unknown>[]
+        expect(images.length).toBeGreaterThan(0)
+        expect(images[0]).toHaveProperty('image')
+        expect(images[0]).toHaveProperty('caption')
+        const img = images[0].image as Record<string, unknown>
+        expect(img).toHaveProperty('url')
+        // url is intentionally empty so the gallery block's render-time fallback
+        // picks the correct category + S3 images (GH-727 fix)
+        expect(typeof img.url).toBe('string')
+    })
+
+    it('normalizeAddSectionBlock preserves gallery image structure', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add gallery', siteName: 'Test' },
+            { blockType: 'gallery', variant: 'grid' },
+        ) as Record<string, unknown>
+        const images = result.images as Record<string, unknown>[]
+        expect(images.length).toBeGreaterThan(0)
+        expect(images[0]).toHaveProperty('image')
+        const img = images[0].image as Record<string, unknown>
+        expect(img).toHaveProperty('url')
+    })
+
+    it('normalizeAddSectionBlock strips unknown fields from gallery images', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add gallery', siteName: 'Test' },
+            { blockType: 'gallery', variant: 'grid', images: [{ image: { url: '/test.jpg', alt: 'Test' }, caption: 'C', unknownField: 'junk' }] },
+        ) as Record<string, unknown>
+        const images = result.images as Record<string, unknown>[]
+        expect(images[0]).not.toHaveProperty('unknownField')
+        expect(images[0]).toHaveProperty('image')
+        expect(images[0]).toHaveProperty('caption')
+    })
+})
+
+describe('BUG-F05-04: Team placeholder avatars', () => {
+    it('createAddSectionBlock returns team members with avatar', () => {
+        const result = createAddSectionBlock({ instruction: 'add team', siteName: 'Test' })
+        expect(result?.blockType).toBe('team')
+        const members = (result as Record<string, unknown>).members as Record<string, unknown>[]
+        expect(members.length).toBeGreaterThan(0)
+        expect(members[0]).toHaveProperty('avatar')
+        const avatar = members[0].avatar as Record<string, unknown>
+        expect(avatar).toHaveProperty('url')
+        expect(typeof avatar.url).toBe('string')
+    })
+
+    it('normalizeAddSectionBlock whitelists team member fields', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add team', siteName: 'Test' },
+            { blockType: 'team', members: [{ name: 'A', role: 'Dev', bio: 'Bio', avatar: { url: '/a.jpg' }, extraField: 'junk' }] },
+        ) as Record<string, unknown>
+        const members = result.members as Record<string, unknown>[]
+        expect(members[0]).not.toHaveProperty('extraField')
+        expect(members[0]).toHaveProperty('name')
+        expect(members[0]).toHaveProperty('avatar')
+    })
+})
+
+describe('BUG-F05-04: Testimonials normalize', () => {
+    it('normalizeAddSectionBlock whitelists testimonial fields', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add testimonials', siteName: 'Test' },
+            { blockType: 'testimonials', variant: 'grid', testimonials: [{ quote: 'Great', name: 'A', title: 'CEO', company: 'Co', rating: 5, avatar: { url: '/a.jpg' }, junk: true }] },
+        ) as Record<string, unknown>
+        const testimonials = result.testimonials as Record<string, unknown>[]
+        expect(testimonials[0]).not.toHaveProperty('junk')
+        expect(testimonials[0]).toHaveProperty('quote')
+        expect(testimonials[0]).toHaveProperty('avatar')
+    })
+
+    it('normalizeAddSectionBlock works without avatar in testimonials', () => {
+        const result = normalizeAddSectionBlock(
+            { instruction: 'add testimonials', siteName: 'Test' },
+            { blockType: 'testimonials', variant: 'grid' },
+        ) as Record<string, unknown>
+        const testimonials = result.testimonials as Record<string, unknown>[]
+        expect(testimonials.length).toBeGreaterThan(0)
+        expect(testimonials[0]).toHaveProperty('quote')
+        expect(testimonials[0]).toHaveProperty('name')
     })
 })

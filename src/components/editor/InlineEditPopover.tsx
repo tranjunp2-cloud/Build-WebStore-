@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/i18n'
 
 function normalizeInstructionValue(nextValue: string, previousValue: string): string {
     const isWrappedInStraightQuotes =
@@ -46,6 +47,8 @@ export function InlineEditPopover({
     onClose,
     onSubmit,
 }: InlineEditPopoverProps) {
+    const { t } = useI18n()
+    const ie = t.editor.inlineEdit
     const [instruction, setInstruction] = useState('')
     const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -72,12 +75,12 @@ export function InlineEditPopover({
     return (
         <div className={isMobile
             ? "fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40"
-            : "w-[360px] rounded-2xl border border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40"
+            : "w-full rounded-2xl border border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40"
         }>
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">
-                        Inline AI Edit
+                        {ie.title}
                     </div>
                     <div className="mt-1 text-sm font-semibold text-white">
                         {blockType}
@@ -94,14 +97,14 @@ export function InlineEditPopover({
 
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
                 <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
-                    Current Text
+                    {ie.currentText}
                 </div>
                 <p className="mt-2 text-sm leading-6 text-gray-200">{currentText}</p>
             </div>
 
             <div className="mt-4">
                 <label className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
-                    How would you like to change this?
+                    {ie.instruction}
                 </label>
                 <textarea
                     ref={inputRef}
@@ -120,7 +123,7 @@ export function InlineEditPopover({
                             void handleSubmit()
                         }
                     }}
-                    placeholder="For example: Make this more concise and premium."
+                    placeholder={ie.placeholder}
                     className="mt-2 min-h-[100px] w-full resize-none rounded-xl border border-white/10 bg-[#111827] px-3 py-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-cyan-500/40"
                 />
                 <div className="mt-1 text-right text-[11px] text-gray-500">
@@ -130,7 +133,7 @@ export function InlineEditPopover({
 
             <div className="mt-4 flex items-center justify-end gap-2">
                 <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-                    Cancel
+                    {ie.cancel}
                 </Button>
                 <Button
                     type="button"
@@ -141,12 +144,12 @@ export function InlineEditPopover({
                     {isSubmitting ? (
                         <>
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Applying
+                            {ie.applying}
                         </>
                     ) : (
                         <>
                             <Sparkles className="h-3.5 w-3.5" />
-                            Apply
+                            {ie.apply}
                         </>
                     )}
                 </Button>

@@ -1,16 +1,26 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { PropertyCardConfig, PropertyItem } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import {
+    CONTAINER,
+    INNER_PADDING,
+    SECTION_PADDING,
+    CARD_PADDING,
+    TOUCH_TARGET,
+} from '@/lib/design-tokens'
+
+const PROPERTY_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
 function BedIcon() {
     return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M2 17V7a2 2 0 012-2h16a2 2 0 012 2v10M2 17h20M6 11h12a2 2 0 012 2v4H4v-4a2 2 0 012-2z" />
         </svg>
     )
@@ -18,7 +28,7 @@ function BedIcon() {
 
 function BathIcon() {
     return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 13h18v4a3 3 0 01-3 3H6a3 3 0 01-3-3v-4zM5 13V7a3 3 0 016 0v1" />
         </svg>
     )
@@ -26,7 +36,7 @@ function BathIcon() {
 
 function AreaIcon() {
     return (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
         </svg>
     )
@@ -63,7 +73,7 @@ function PropertyImage({ property, className = '' }: { property: PropertyItem; c
     if (images.length === 0) {
         return (
             <div className={`${className} flex items-center justify-center`} style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
-                <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
                 </svg>
             </div>
@@ -72,24 +82,26 @@ function PropertyImage({ property, className = '' }: { property: PropertyItem; c
 
     return (
         <div className={`${className} relative group`}>
-            <img src={images[imgIndex]} alt={property.title} className="w-full h-full object-cover" />
+            <Image src={images[imgIndex]!} alt={property.title} fill className="object-cover" />
             {images.length > 1 && (
                 <>
                     <button
+                        type="button"
                         onClick={(e) => { e.stopPropagation(); setImgIndex((imgIndex - 1 + images.length) % images.length) }}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        className={`absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px]`}
                         aria-label="Previous image"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                         </svg>
                     </button>
                     <button
+                        type="button"
                         onClick={(e) => { e.stopPropagation(); setImgIndex((imgIndex + 1) % images.length) }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px]`}
                         aria-label="Next image"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
                     </button>
@@ -108,6 +120,35 @@ function PropertyImage({ property, className = '' }: { property: PropertyItem; c
     )
 }
 
+/** Price line with currency + optional /mo suffix for rent. */
+function PropertyPrice({
+    price,
+    type,
+    currency,
+    size = 'lg',
+    className = '',
+}: {
+    price: number
+    type: 'sale' | 'rent'
+    currency: string
+    size?: 'xl' | 'lg' | 'md'
+    className?: string
+}) {
+    const formatPrice = (p: number) => {
+        if (p >= 1000000) return `${(p / 1000000).toFixed(1)}M`
+        if (p >= 1000) return `${(p / 1000).toFixed(0)}K`
+        return p.toLocaleString()
+    }
+    const textSize = size === 'xl' ? 'text-3xl' : size === 'lg' ? 'text-2xl' : 'text-xl'
+    const suffixSize = size === 'xl' ? 'text-base' : size === 'lg' ? 'text-sm' : 'text-xs'
+    return (
+        <p className={`${textSize} font-bold ${className}`} style={{ color: 'var(--brand-primary)' }}>
+            {currency} {formatPrice(price)}
+            {type === 'rent' && <span className={`${suffixSize} font-normal opacity-60`}>/mo</span>}
+        </p>
+    )
+}
+
 export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
     const {
         headline,
@@ -116,12 +157,6 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
         variant = 'grid',
         currency = 'RM',
     } = block
-
-    const formatPrice = (price: number) => {
-        if (price >= 1000000) return `${(price / 1000000).toFixed(1)}M`
-        if (price >= 1000) return `${(price / 1000).toFixed(0)}K`
-        return price.toLocaleString()
-    }
 
     /* ── Grid variant ────────────────────────────────────────────────────────── */
     const renderGrid = () => (
@@ -148,12 +183,9 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                         )}
                     </div>
                     <div className="p-5">
-                        <p className="text-2xl font-bold mb-1" style={{ color: 'var(--brand-primary)' }}>
-                            {currency} {formatPrice(prop.price)}
-                            {prop.type === 'rent' && <span className="text-sm font-normal opacity-60">/mo</span>}
-                        </p>
-                        <h4 className="font-bold font-heading mb-1">{prop.title}</h4>
-                        <p className="text-sm opacity-50 mb-3">{prop.location}</p>
+                        <PropertyPrice price={prop.price} type={prop.type} currency={currency} size="lg" className="mb-1" />
+                        <Heading level={4} className="mb-1">{prop.title}</Heading>
+                        <Body size="small" className="opacity-50 mb-3">{prop.location}</Body>
                         <PropertySpecs property={prop} />
                     </div>
                 </motion.div>
@@ -183,15 +215,12 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                     <div className="p-5 flex-1">
                         <div className="flex items-start justify-between gap-4">
                             <div>
-                                <h4 className="font-bold font-heading text-lg mb-1">{prop.title}</h4>
-                                <p className="text-sm opacity-50 mb-2">{prop.location}</p>
+                                <Heading level={4} className="mb-1">{prop.title}</Heading>
+                                <Body size="small" className="opacity-50 mb-2">{prop.location}</Body>
                             </div>
-                            <p className="text-xl font-bold shrink-0" style={{ color: 'var(--brand-primary)' }}>
-                                {currency} {formatPrice(prop.price)}
-                                {prop.type === 'rent' && <span className="text-xs font-normal opacity-60">/mo</span>}
-                            </p>
+                            <PropertyPrice price={prop.price} type={prop.type} currency={currency} size="md" className="shrink-0" />
                         </div>
-                        {prop.description && <p className="text-sm opacity-50 mb-3 line-clamp-2">{prop.description}</p>}
+                        {prop.description && <Body size="small" className="opacity-50 mb-3 line-clamp-2">{prop.description}</Body>}
                         <PropertySpecs property={prop} />
                     </div>
                 </motion.div>
@@ -214,15 +243,12 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                 >
                     <div className="grid grid-cols-1 lg:grid-cols-2">
                         <PropertyImage property={hero} className="aspect-[16/10] lg:aspect-auto lg:min-h-[400px] overflow-hidden" />
-                        <div className="p-8 lg:p-10 flex flex-col justify-center">
+                        <div className={`${CARD_PADDING.lg} lg:p-10 flex flex-col justify-center`}>
                             <TypeBadge type={hero.type} />
-                            <h3 className="text-2xl font-bold font-heading mt-4 mb-2">{hero.title}</h3>
-                            <p className="text-sm opacity-50 mb-4">{hero.location}</p>
-                            <p className="text-3xl font-bold mb-4" style={{ color: 'var(--brand-primary)' }}>
-                                {currency} {formatPrice(hero.price)}
-                                {hero.type === 'rent' && <span className="text-base font-normal opacity-60">/mo</span>}
-                            </p>
-                            {hero.description && <p className="text-sm opacity-50 mb-4">{hero.description}</p>}
+                            <Heading level={3} className="mt-4 mb-2">{hero.title}</Heading>
+                            <Body size="small" className="opacity-50 mb-4">{hero.location}</Body>
+                            <PropertyPrice price={hero.price} type={hero.type} currency={currency} size="xl" className="mb-4" />
+                            {hero.description && <Body size="small" className="opacity-50 mb-4">{hero.description}</Body>}
                             <PropertySpecs property={hero} />
                         </div>
                     </div>
@@ -242,11 +268,9 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                                 <PropertyImage property={prop} className="aspect-[16/10] overflow-hidden" />
                                 <div className="p-5">
                                     <TypeBadge type={prop.type} />
-                                    <p className="text-xl font-bold mt-2" style={{ color: 'var(--brand-primary)' }}>
-                                        {currency} {formatPrice(prop.price)}
-                                    </p>
-                                    <h4 className="font-bold font-heading mt-1">{prop.title}</h4>
-                                    <p className="text-sm opacity-50 mb-3">{prop.location}</p>
+                                    <PropertyPrice price={prop.price} type={prop.type} currency={currency} size="md" className="mt-2" />
+                                    <Heading level={4} className="mt-1">{prop.title}</Heading>
+                                    <Body size="small" className="opacity-50 mb-3">{prop.location}</Body>
                                     <PropertySpecs property={prop} />
                                 </div>
                             </motion.div>
@@ -258,11 +282,17 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
     }
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={PROPERTY_CONTAINER}>
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-50 leading-relaxed">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {variant === 'grid' && renderGrid()}

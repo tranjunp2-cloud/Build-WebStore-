@@ -12,16 +12,20 @@
  *   TC-F05-save-08  → normalizeUploadField: image is null → kept as null
  *   TC-F05-save-09  → normalizeBlocksForPersistence: footer column links null → no crash
  *   TC-F05-save-10  → normalizeBlocksForPersistence: socialWidget block → normalizeSocialWidgetConfig called
+ *   TC-F05-save-11  → sanitizeBlockVariant: invalid variant for known block → coerced to defaultVariant
+ *   TC-F05-save-12  → sanitizeBlockVariant: valid variant / missing block / empty variant → unchanged
+ *   TC-F05-save-13  → normalizeBlocksForPersistence: blog-list with legacy "editorial" variant → coerced to "cards"
  *
  * Source:
  *   src/lib/block-normalization.ts
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
     normalizeUploadField,
     stripNestedIds,
     normalizeBlocksForPersistence,
+    sanitizeBlockVariant,
 } from '@/lib/block-normalization'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -375,6 +379,26 @@ describe('normalizeBlocksForPersistence', () => {
         expect(firstLink).toHaveProperty('enabled')
     })
 
+    // TC-F05-save-13
+    it('TC-F05-save-13: blog-list with legacy "editorial" variant → coerced to "cards" (defaultVariant)', () => {
+        // Arrange — preset layer produced variants not in the Payload enum.
+        // Real staging 500 payloads: blog-list=grid|editorial|featured-hero,
+        // hero=overlay, social-proof=masonry (all invalid).
+        const blocks = [
+            { blockType: 'blog-list', variant: 'editorial', headline: 'Latest' },
+            { blockType: 'hero', variant: 'overlay', headline: 'Welcome' },
+            { blockType: 'social-proof', variant: 'masonry', headline: 'Love' },
+        ]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — every invalid variant collapsed to block's defaultVariant
+        expect(result[0]!.variant).toBe('cards')     // blog-list default
+        expect(result[1]!.variant).toBe('centered')  // hero default
+        expect(result[2]!.variant).toBe('cards')     // social-proof default
+    })
+
     it('TC-F05-save-10b: socialWidget block with invalid platform → coerced to "facebook"', () => {
         // Arrange — unknown platform from old data
         const blocks = [
@@ -396,5 +420,173 @@ describe('normalizeBlocksForPersistence', () => {
         expect(links[0].platform).toBe('facebook')
         // valid 'facebook' platform kept as-is
         expect(links[1].platform).toBe('facebook')
+    })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 4 — sanitizeBlockVariant (direct unit tests)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('sanitizeBlockVariant', () => {
+    beforeEach(() => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    // TC-F05-save-11
+    it('TC-F05-save-11: invalid variant for known block → coerced to defaultVariant', () => {
+        // Arrange — "editorial" is not in blog-list's enum [cards, list]
+        const block = { blockType: 'blog-list', variant: 'editorial', headline: 'News' }
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert
+        expect(result.variant).toBe('cards')
+        expect(result.headline).toBe('News')
+    })
+
+    it('TC-F05-save-11b: invalid hero variant → coerced to centered', () => {
+        // Arrange
+        const block = { blockType: 'hero', variant: 'overlay' }
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert
+        expect(result.variant).toBe('centered')
+    })
+
+    // TC-F05-save-12
+    it('TC-F05-save-12: valid variant → unchanged (same reference)', () => {
+        // Arrange
+        const block = { blockType: 'hero', variant: 'minimal', headline: 'Hi' }
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert — short-circuit returns input
+        expect(result).toBe(block)
+        expect(result.variant).toBe('minimal')
+    })
+
+    it('TC-F05-save-12b: unknown block type → unchanged', () => {
+        // Arrange
+        const block = { blockType: 'not-a-real-block', variant: 'whatever' }
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert — no meta, leave alone
+        expect(result).toBe(block)
+    })
+
+    it('TC-F05-save-12c: missing/empty variant → unchanged (Zod default applies downstream)', () => {
+        // Arrange
+        const a = { blockType: 'hero', headline: 'Hi' }
+        const b = { blockType: 'hero', variant: '', headline: 'Hi' }
+        const c = { blockType: 'hero', variant: undefined, headline: 'Hi' }
+
+        // Act + Assert
+        expect(sanitizeBlockVariant(a)).toBe(a)
+        expect(sanitizeBlockVariant(b)).toBe(b)
+        expect(sanitizeBlockVariant(c)).toBe(c)
+    })
+
+    it('TC-F05-save-12d: non-string blockType → unchanged', () => {
+        // Arrange
+        const block = { blockType: 42, variant: 'anything' } as unknown as Record<string, unknown>
+
+        // Act
+        const result = sanitizeBlockVariant(block)
+
+        // Assert
+        expect(result).toBe(block)
+    })
+})
+
+describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 backward-compat)', () => {
+    it('TC-F05-save-14: footer with variant="expanded" → aliased to "simple"', () => {
+        // Arrange — old DB record with removed variant
+        const blocks = [{ blockType: 'footer', variant: 'expanded', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — Payload select no longer includes "expanded"
+        expect(result[0].variant).toBe('simple')
+    })
+
+    it('TC-F05-save-15: footer with variant="mega-footer" → aliased to "dark-gradient"', () => {
+        // Arrange — old DB record with removed variant
+        const blocks = [{ blockType: 'footer', variant: 'mega-footer', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — Payload select no longer includes "mega-footer"
+        expect(result[0].variant).toBe('dark-gradient')
+    })
+
+    it('TC-F05-save-16: footer with valid variant → unchanged', () => {
+        // Arrange
+        const blocks = [{ blockType: 'footer', variant: 'minimal', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — valid variants must not be aliased
+        expect(result[0].variant).toBe('minimal')
+    })
+
+    it('TC-F05-save-17: non-footer block with "expanded" variant is NOT aliased by footer guard', () => {
+        // Arrange — 'expanded' on a hero block should NOT be aliased as footer logic
+        // (sanitizeBlockVariant handles coercion for non-footer blocks separately)
+        const blocks = [{ blockType: 'hero', variant: 'expanded', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — footer alias guard skips non-footer blocks; sanitizeBlockVariant
+        // then coerces 'expanded' (invalid for hero) to hero's default 'centered'.
+        expect(result[0].variant).toBe('centered')
+    })
+
+    // TC-F05-save-18 — contact block email empty string → null
+    // Payload email-type field validates format even without required:true,
+    // so empty string '' causes ValidationError on publish. Must be coerced to null.
+    it('TC-F05-save-18: contact block with email="" → coerced to null (prevents Payload email ValidationError on publish)', () => {
+        // Arrange
+        const blocks = [{ blockType: 'contact', variant: 'form', email: '', phone: '+601111', headline: 'Contact Us' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — empty email stripped to null so Payload skips format validation
+        expect(result[0].email).toBeNull()
+        // Other fields must be untouched
+        expect(result[0].phone).toBe('+601111')
+        expect(result[0].headline).toBe('Contact Us')
+    })
+
+    it('TC-F05-save-18b: contact block with valid email → untouched', () => {
+        // Arrange — valid email must not be stripped
+        const blocks = [{ blockType: 'contact', variant: 'form', email: 'info@cafe.com', headline: 'Contact Us' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — valid email preserved
+        expect(result[0].email).toBe('info@cafe.com')
+    })
+
+    it('TC-F05-save-18c: non-contact block with email="" → NOT stripped (only applies to contact)', () => {
+        // Arrange — footer has no email field normally, but if it did, we don't strip it
+        const blocks = [{ blockType: 'footer', variant: 'simple', email: '' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — only contact block gets email coercion
+        expect(result[0].email).toBe('')
     })
 })

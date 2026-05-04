@@ -36,6 +36,7 @@ export const Orders: CollectionConfig = {
                             title: `New Order #${doc.orderNumber} - ${doc.currency || 'MYR'} ${(doc.total ?? 0).toFixed(2)}`,
                             message: `Order placed by ${doc.customerName}`,
                             actionUrl: '/orders',
+                            metadata: { orderNumber: doc.orderNumber, currency: doc.currency || 'MYR', total: (doc.total ?? 0).toFixed(2), customerName: doc.customerName },
                         })
                     })
                     .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))

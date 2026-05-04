@@ -9,9 +9,28 @@ export type TimelineItem = {
     icon?: string
 }
 
+export type AboutVariant =
+    | 'simple'
+    | 'split'
+    | 'story'
+    | 'two-column'
+    | 'founder-quote'
+    | 'centered-large'
+    | 'image-overlay'
+
+export const ABOUT_VARIANTS: AboutVariant[] = [
+    'simple',
+    'split',
+    'story',
+    'two-column',
+    'founder-quote',
+    'centered-large',
+    'image-overlay',
+]
+
 export type AboutConfig = {
     blockType: 'about'
-    variant?: 'simple' | 'split' | 'story'
+    variant?: AboutVariant
     headline: string
     sectionLabel?: string
     body?: string
@@ -22,7 +41,7 @@ export type AboutConfig = {
 
 export const AboutConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('about'),
-    variant: z.enum(['simple', 'split', 'story']).default('simple'),
+    variant: z.enum(['simple', 'split', 'story', 'two-column', 'founder-quote', 'centered-large', 'image-overlay']).default('simple'),
     headline: z.string(),
     body: z.string().optional(),
     image: ImageRefSchema.optional(),
@@ -40,8 +59,11 @@ export const aboutMeta = {
     name: 'About',
     description: 'About us section with text and optional image',
     icon: '📖',
-    variants: ['simple', 'split', 'story'],
-    defaultVariant: 'simple',
+    variants: ABOUT_VARIANTS,
+    defaultVariant: 'simple' as const,
     editableFields: ['headline', 'body', 'image'],
     quickActions: ['Rewrite professional', 'Shorten', 'Add story'],
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = AboutConfigSchema

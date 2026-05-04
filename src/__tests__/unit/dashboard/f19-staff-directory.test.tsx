@@ -110,11 +110,11 @@ describe('F19 Staff Management (StaffDirectoryClient & StaffDrawer)', () => {
         it('[TC-F19.18] Validates invite email', async () => {
             render(<StaffDrawer isOpen={true} onClose={vi.fn()} />);
 
-            // Click Send Invite
+            // Click Send Invite with empty email
             fireEvent.click(screen.getByRole('button', { name: /Send Invite/i }));
 
             await waitFor(() => {
-                expect(toast.error).toHaveBeenCalledWith('Please enter a valid email address');
+                expect(screen.getByText('Please enter an email address')).toBeInTheDocument();
             });
         });
 
@@ -125,15 +125,12 @@ describe('F19 Staff Management (StaffDirectoryClient & StaffDrawer)', () => {
             const emailInput = screen.getByPlaceholderText('staff@domain.com');
             fireEvent.change(emailInput, { target: { value: 'newuser@test.com' } });
 
-            // Select Custom Form
+            // Select Custom role
             fireEvent.click(screen.getByText('Custom Features'));
 
-            // Click Send Invite without picking any permissions
-            fireEvent.click(screen.getByRole('button', { name: /Send Invite/i }));
-
-            await waitFor(() => {
-                expect(toast.error).toHaveBeenCalledWith('Please select at least one custom permission');
-            });
+            // Button should be disabled when no permissions selected
+            const sendButton = screen.getByRole('button', { name: /Send Invite/i });
+            expect(sendButton).toBeDisabled();
         });
 
         it('[TC-F19.20] Submits valid invite with custom features', async () => {

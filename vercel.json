@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/db-setup.js --migrate-only && next build",
+  "buildCommand": "bash scripts/build.sh",
   "framework": "nextjs",
   "regions": ["sin1"],
   "functions": {

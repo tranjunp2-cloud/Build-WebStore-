@@ -4,6 +4,7 @@ import type { BlockProps } from '../types'
 import type { DividerConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 export function DividerBlock({ block, theme }: BlockProps<DividerConfig>) {
     const { variant = 'line', height = 40, color } = block
@@ -14,7 +15,7 @@ export function DividerBlock({ block, theme }: BlockProps<DividerConfig>) {
 
     if (variant === 'dots') {
         return (
-            <AnimatedSection>
+            <SectionWrapper as={AnimatedSection} padding="compact" container="default" background="transparent">
                 <div className="flex items-center justify-center gap-3" style={{ height: `${height}px` }} role="separator">
                     {[0, 1, 2].map((i) => (
                         <span
@@ -24,13 +25,13 @@ export function DividerBlock({ block, theme }: BlockProps<DividerConfig>) {
                         />
                     ))}
                 </div>
-            </AnimatedSection>
+            </SectionWrapper>
         )
     }
 
     if (variant === 'wave') {
         return (
-            <AnimatedSection>
+            <SectionWrapper as={AnimatedSection} padding="compact" container="default" background="transparent">
                 <div className="w-full overflow-hidden" style={{ height: `${height}px` }} role="separator">
                     <svg
                         viewBox="0 0 1200 60"
@@ -45,19 +46,19 @@ export function DividerBlock({ block, theme }: BlockProps<DividerConfig>) {
                         />
                     </svg>
                 </div>
-            </AnimatedSection>
+            </SectionWrapper>
         )
     }
 
     // Default: line
     return (
-        <AnimatedSection>
+        <SectionWrapper as={AnimatedSection} padding="compact" container="default" background="transparent">
             <div className="flex items-center justify-center" style={{ height: `${height}px` }} role="separator">
                 <div
                     className="w-full max-w-4xl mx-auto h-px"
                     style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.125)` }}
                 />
             </div>
-        </AnimatedSection>
+        </SectionWrapper>
     )
 }

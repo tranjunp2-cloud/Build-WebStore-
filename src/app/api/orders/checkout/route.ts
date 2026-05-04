@@ -95,11 +95,11 @@ export async function POST(request: Request) {
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
 
         // Tax (SST 6% for Malaysia)
+        const shippingFee = 10 // Flat RM10 shipping
         const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = subtotal + tax
+        const total = subtotal + shippingFee + tax
 
         // Create order
-        const shippingFee = 10 // Flat RM10 shipping
         const order = await payload.create({
             collection: 'orders',
             data: {

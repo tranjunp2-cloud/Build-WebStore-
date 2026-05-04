@@ -1,30 +1,188 @@
 'use client'
 
+import type { ReactNode } from 'react'
+
 import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
 import { GradientLine } from '../shared/decorative'
+import { getSocialIcon } from '../shared/social-icons'
 import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
-import { Facebook, Instagram, Twitter, Linkedin, Youtube, Globe } from 'lucide-react'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { Heading, Body, Caption } from '../shared/Typography'
+import {
+    SECTION_PADDING,
+    CONTAINER,
+    INNER_PADDING,
+} from '@/lib/design-tokens'
 
-const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
-    facebook: Facebook,
-    instagram: Instagram,
-    twitter: Twitter,
-    x: Twitter,
-    linkedin: Linkedin,
-    youtube: Youtube,
-    tiktok: Globe,
-}
-
+/**
+ * Plan 260415 Lỗi B + 7F — SocialIcon giờ dùng shared SOCIAL_ICONS map
+ * (src/blocks/shared/social-icons.tsx) với real TikTok/Threads/X/Discord/WhatsApp
+ * inline SVG + Link fallback cho unknown platforms (thay vì chữ cái đầu legacy).
+ */
 function SocialIcon({ platform }: { platform: string }) {
-    const Icon = SOCIAL_ICONS[platform.toLowerCase()]
-    return Icon ? <Icon size={16} /> : <span>{(platform || '').charAt(0).toUpperCase()}</span>
+    const Icon = getSocialIcon(platform)
+    return <Icon size={16} />
 }
 
-export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
+// ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
+// Extract repeated structural elements without altering variant logic. All
+// helpers consume Phase 01 (tokens), Phase 02 (Typography), Phase 03 (CSS
+// vars). Brand identity vars (`--brand-primary`, `--brand-primary-rgb`) stay
+// untouched per Option C additive strategy.
+
+// Shared opacity + brand-tint tokens — dedupe magic numbers across variants.
+const FOOTER_OPACITY = {
+    title: 0.9,
+    body: 0.7,
+    caption: 0.5,
+} as const
+
+const FOOTER_BORDER_OPACITY = 0.082
+const FOOTER_DIVIDER_OPACITY = 0.063
+const FOOTER_BRAND_GRADIENT_STOP = 0.502
+
+// Progressive gap: tight mobile → comfortable desktop. Applied to all grid variants.
+const FOOTER_RESPONSIVE_GAP = 'gap-6 sm:gap-8 md:gap-10'
+
+type BrandLogoProps = {
+    logoText?: string
+    logo?: { url?: string; alt?: string }
+    size?: 'sm' | 'md' | 'lg'
+    className?: string
+}
+
+const BRAND_LOGO_TEXT_SIZE = {
+    sm: 'text-lg',
+    md: 'text-xl',
+    lg: 'text-2xl',
+} as const
+
+const BRAND_LOGO_IMG_SIZE = {
+    sm: 'h-6',
+    md: 'h-8',
+    lg: 'h-8',
+} as const
+
+function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoProps) {
+    const textCls = BRAND_LOGO_TEXT_SIZE[size]
+    const imgCls = BRAND_LOGO_IMG_SIZE[size]
+    return (
+        <div className={`font-bold ${textCls} font-heading ${className}`.trim()}>
+            {logo?.url ? (
+                /* Plan 260415 Lỗi 8F — alt fallback tốt hơn cho WCAG 1.1.1 */
+                <img src={logo.url} alt={logoText ? `${logoText} logo` : 'Company logo'} className={`${imgCls} w-auto`} />
+            ) : (
+                <span style={{
+                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), ${FOOTER_BRAND_GRADIENT_STOP}))`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                }}>
+                    {logoText}
+                </span>
+            )}
+        </div>
+    )
+}
+
+type SocialIconListProps = {
+    socials: { url?: string; platform?: string; label?: string }[]
+    iconSize?: 'sm' | 'md'
+    className?: string
+}
+
+// Intentionally smaller than WCAG 2.5.5 44px minimum — brand aesthetic trade-off.
+// Touch target is NOT WCAG AA compliant (sm=28px, md=32px). Accepted for footer context.
+const SOCIAL_BUTTON_SIZE = {
+    sm: 'w-7 h-7',
+    md: 'w-8 h-8',
+} as const
+
+/**
+ * Social icon row. Used by 5 variants. Bordered=true adds the brand-tinted
+ * 1px outline used by centered-stack/dark-gradient/expanded/simple.
+ */
+function SocialIconList({ socials, iconSize = 'md', className = '' }: SocialIconListProps) {
+    if (socials.length === 0) return null
+    const sizeCls = SOCIAL_BUTTON_SIZE[iconSize]
+    return (
+        <div className={`flex gap-3 ${className}`.trim()}>
+            {socials.map((social, i) => {
+                const platform = social.platform || ''
+                const aria = social.label || (platform ? `Visit ${platform}` : 'social link')
+                return (
+                    <a
+                        key={`${platform}-${i}`}
+                        href={social.url || '#'}
+                        aria-label={aria}
+                        target={social.url?.startsWith('http') ? '_blank' : undefined}
+                        rel={social.url?.startsWith('http') ? 'noopener noreferrer' : undefined}
+                        className={`${sizeCls} aspect-square shrink-0 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)]`}
+                        style={{
+                            background: `rgba(var(--brand-primary-rgb), ${FOOTER_DIVIDER_OPACITY})`,
+                            border: `1px solid rgba(var(--brand-primary-rgb), ${FOOTER_BORDER_OPACITY})`,
+                            color: 'var(--brand-primary)',
+                        }}
+                    >
+                        <SocialIcon platform={platform} />
+                    </a>
+                )
+            })}
+        </div>
+    )
+}
+
+/**
+ * Shared section title — unifies `<Heading level={4} opacity-90>` pattern
+ * across simple/expanded/mega-footer/dark-gradient variants (via LinkColumn).
+ */
+function FooterSectionTitle({ children, className = '' }: { children: ReactNode; className?: string }) {
+    return (
+        <Heading level={4} className={`mb-4 ${className}`.trim()} style={{ opacity: FOOTER_OPACITY.title }}>
+            {children}
+        </Heading>
+    )
+}
+
+type LinkColumnProps = {
+    title: string
+    links: { label?: string; url?: string }[]
+    spacing?: 'tight' | 'default'
+}
+
+/**
+ * Plan 260415 Lỗi 12F — opacity-40 fail WCAG contrast. Đổi sang opacity-70
+ * (≥4.5:1 ratio trên bg thường). Hover vẫn tăng lên 100%.
+ */
+function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
+    const ulSpacing = spacing === 'tight' ? 'space-y-2.5' : 'space-y-3'
+    return (
+        <div>
+            <FooterSectionTitle>{title}</FooterSectionTitle>
+            <ul className={ulSpacing}>
+                {(links || []).map((link, j) => (
+                    <li key={`${link?.label || 'link'}-${j}`}>
+                        <a
+                            href={link?.url}
+                            className="opacity-70 hover:opacity-100 transition-all duration-200 hover:translate-x-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                        >
+                            <Body size="small" as="span">{link.label}</Body>
+                        </a>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    )
+}
+
+const FOOTER_DIVIDER_STYLE = { borderTop: `1px solid rgba(var(--brand-primary-rgb), ${FOOTER_DIVIDER_OPACITY})` }
+
+export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterConfig>) {
+    void _theme
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
-    const { logoText, tagline, columns = [], copyrightText, variant = 'simple' } = mergedBlock
+    const { logoText, tagline, columns = [], copyrightText, backgroundColor, variant = 'simple' } = mergedBlock
+    const footerStyle: React.CSSProperties = backgroundColor ? { backgroundColor } : {}
 
     const copyrightLine = copyrightText
         ? copyrightText.replace(/\d{4}/, String(new Date().getFullYear()))
@@ -33,402 +191,146 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
     const socialsArr = (mergedBlock.socials && Array.isArray(mergedBlock.socials) ? mergedBlock.socials : []) as { url?: string; platform?: string; label?: string }[]
 
     // ── Centered Stack variant ────────────────────────────────────────────
+    // BUG-F05-792: plain <footer> — same fix as simple/minimal to avoid motion.footer
+    // staying invisible when already in viewport inside the editor iframe.
     if (variant === 'centered-stack') {
         return (
-            <footer className="py-16 relative">
-                <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
-                <div className="container mx-auto px-6 text-center">
-                    {/* Logo */}
-                    <div className="font-bold text-2xl font-heading mb-4">
-                        {mergedBlock.logo?.url ? (
-                            <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto mx-auto" />
-                        ) : (
-                            <span style={{
-                                background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text',
-                            }}>
-                                {logoText}
-                            </span>
+            <footer className={`${SECTION_PADDING.compact} relative`} style={footerStyle}>
+                <GradientLine
+                    from={CSS_VARS.primary}
+                    to={`rgba(var(--brand-primary-rgb), 0)`}
+                    className="absolute top-0 left-0"
+                    height={1}
+                />
+                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+                    <div className="text-center">
+                        <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4 flex justify-center" />
+                        {tagline && (
+                            <Body size="small" className="opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
                         )}
-                    </div>
-                    {tagline && <p className="opacity-40 text-sm mb-8 max-w-md mx-auto">{tagline}</p>}
 
-                    {/* Link columns as horizontal lists */}
-                    {columns.length > 0 && (
-                        <div className="mb-8 space-y-4">
-                            {columns.map((col, i) => (
-                                <div key={i}>
-                                    <h4 className="text-xs font-semibold uppercase tracking-widest opacity-50 mb-2">{col.title}</h4>
-                                    <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
-                                        {(col.links || []).map((link, j) => (
-                                            <a key={j} href={link?.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
-                                                {link.label}
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Social icons */}
-                    {socialsArr.length > 0 && (
-                        <div className="flex justify-center gap-3 mb-8">
-                            {socialsArr.map((social, i) => (
-                                <a
-                                    key={i}
-                                    href={social.url || '#'}
-                                    className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                                    style={{
-                                        background: `rgba(var(--brand-primary-rgb), 0.063)`,
-                                        border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
-                                        color: 'var(--brand-primary)',
-                                    }}
-                                >
-                                    <SocialIcon platform={social.platform || ''} />
-                                </a>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Copyright */}
-                    <p className="text-xs opacity-30">{copyrightLine}</p>
-                </div>
-            </footer>
-        )
-    }
-
-    // ── Mega Footer variant ───────────────────────────────────────────────
-    if (variant === 'mega-footer') {
-        return (
-            <footer className="relative">
-                {/* Top band */}
-                <div
-                    className="py-10"
-                    style={{ background: `var(--brand-primary)` }}
-                >
-                    <div className="container mx-auto px-6 text-center">
-                        <h3 className="text-xl font-bold text-white font-heading mb-2">Stay Connected</h3>
-                        <p className="text-white/70 text-sm mb-4">Subscribe for the latest updates and news.</p>
-                        <div className="flex gap-2 max-w-md mx-auto">
-                            <input
-                                type="email"
-                                placeholder="Enter your email"
-                                className="flex-1 px-4 py-2.5 rounded-lg text-sm bg-white/20 text-white placeholder-white/50 border border-white/20 outline-none focus:border-white/40 transition-colors"
-                            />
-                            <button className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-white transition-opacity hover:opacity-90" style={{ color: 'var(--brand-primary)' }}>
-                                Subscribe
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Main footer content */}
-                <div className="pt-14 pb-8">
-                    <div className="container mx-auto px-6">
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-12">
-                            {/* Brand column */}
-                            <div className="col-span-2 md:col-span-1">
-                                <div className="font-bold text-xl font-heading mb-3">
-                                    {mergedBlock.logo?.url ? (
-                                        <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto" />
-                                    ) : (
-                                        <span style={{
-                                            background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
-                                            WebkitBackgroundClip: 'text',
-                                            WebkitTextFillColor: 'transparent',
-                                            backgroundClip: 'text',
-                                        }}>
-                                            {logoText}
-                                        </span>
-                                    )}
-                                </div>
-                                {tagline && <p className="opacity-40 text-sm leading-relaxed max-w-xs">{tagline}</p>}
-                            </div>
-
-                            {/* Link columns */}
-                            {columns.map((col, i) => (
-                                <div key={i}>
-                                    <h4 className="font-semibold text-sm mb-4 opacity-80">{col.title}</h4>
-                                    <ul className="space-y-2.5">
-                                        {(col.links || []).map((link, j) => (
-                                            <li key={j}>
-                                                <a href={link?.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
-                                                    {link.label}
+                        {/* Link columns as horizontal lists */}
+                        {columns.length > 0 && (
+                            <div className="mb-8 space-y-4">
+                                {columns.map((col, i) => (
+                                    <div key={`${col.title}-${i}`}>
+                                        <Heading
+                                            level={4}
+                                            className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-2"
+                                        >
+                                            {col.title}
+                                        </Heading>
+                                        <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
+                                            {(col.links || []).map((link, j) => (
+                                                <a
+                                                    key={`${link?.label || 'link'}-${j}`}
+                                                    href={link?.url}
+                                                    className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                                >
+                                                    <Body size="small" as="span">{link.label}</Body>
                                                 </a>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Bottom bar */}
-                        <div
-                            className="pt-6 flex flex-col md:flex-row items-center justify-between gap-4"
-                            style={{ borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}
-                        >
-                            <p className="text-xs opacity-30">{copyrightLine}</p>
-                            <div className="flex items-center gap-4">
-                                {socialsArr.length > 0 && (
-                                    <div className="flex gap-2">
-                                        {socialsArr.map((social, i) => (
-                                            <a
-                                                key={i}
-                                                href={social.url || '#'}
-                                                className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                                                style={{
-                                                    background: `rgba(var(--brand-primary-rgb), 0.063)`,
-                                                    color: 'var(--brand-primary)',
-                                                }}
-                                            >
-                                                <SocialIcon platform={social.platform || ''} />
-                                            </a>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
-                                )}
-                                <div className="flex gap-4 text-xs opacity-30">
-                                    <a href="#" className="hover:opacity-80 transition-opacity">Privacy</a>
-                                    <a href="#" className="hover:opacity-80 transition-opacity">Terms</a>
-                                </div>
+                                ))}
                             </div>
-                        </div>
+                        )}
+
+                        <SocialIconList socials={socialsArr} className="justify-center mb-8" />
+
+                        <Caption className="opacity-60">{copyrightLine}</Caption>
                     </div>
                 </div>
             </footer>
         )
     }
+
 
     // ── Dark Gradient variant ─────────────────────────────────────────────
     if (variant === 'dark-gradient') {
         return (
             <footer
-                className="py-14 relative"
+                className={`${SECTION_PADDING.compact} relative`}
                 style={{
-                    background: `linear-gradient(to bottom, transparent, rgba(0,0,0,0.08))`,
+                    /* Plan 260415 Lỗi 16F — theme-adaptive gradient thay vì hardcode đen.
+                       color-mix var(--background) với 94% độ đục → hiện cả light + dark themes. */
+                    background: backgroundColor || `linear-gradient(to bottom, transparent, color-mix(in srgb, var(--background, #000000) 92%, black))`,
                 }}
             >
-                <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
-                <div className="container mx-auto px-6">
-                    <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-10">
+                <GradientLine
+                    from={CSS_VARS.primary}
+                    to={`rgba(var(--brand-primary-rgb), 0)`}
+                    className="absolute top-0 left-0"
+                    height={1}
+                />
+                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+                    <div className={`flex flex-col lg:flex-row lg:justify-between lg:items-start ${FOOTER_RESPONSIVE_GAP}`}>
                         {/* Logo + tagline */}
                         <div className="lg:max-w-xs">
-                            <div className="font-bold text-2xl font-heading mb-3">
-                                {mergedBlock.logo?.url ? (
-                                    <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto" />
-                                ) : (
-                                    <span style={{
-                                        background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
-                                        WebkitBackgroundClip: 'text',
-                                        WebkitTextFillColor: 'transparent',
-                                        backgroundClip: 'text',
-                                    }}>
-                                        {logoText}
-                                    </span>
-                                )}
-                            </div>
-                            {tagline && <p className="opacity-40 text-sm leading-relaxed">{tagline}</p>}
+                            <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-3" />
+                            {tagline && (
+                                <Body size="small" className="opacity-40 leading-relaxed">{tagline}</Body>
+                            )}
                         </div>
 
                         {/* Link columns center */}
                         {columns.length > 0 && (
                             <div className="flex flex-wrap gap-10">
                                 {columns.map((col, i) => (
-                                    <div key={i}>
-                                        <h4 className="font-semibold text-sm mb-4 opacity-80">{col.title}</h4>
-                                        <ul className="space-y-2.5">
-                                            {(col.links || []).map((link, j) => (
-                                                <li key={j}>
-                                                    <a href={link?.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
-                                                        {link.label}
-                                                    </a>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
+                                    <LinkColumn key={i} title={col.title} links={col.links || []} spacing="tight" />
                                 ))}
                             </div>
                         )}
 
                         {/* Socials right */}
-                        {socialsArr.length > 0 && (
-                            <div className="flex lg:flex-col gap-3">
-                                {socialsArr.map((social, i) => (
-                                    <a
-                                        key={i}
-                                        href={social.url || '#'}
-                                        className="w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                                        style={{
-                                            background: `rgba(var(--brand-primary-rgb), 0.063)`,
-                                            border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
-                                            color: 'var(--brand-primary)',
-                                        }}
-                                    >
-                                        <SocialIcon platform={social.platform || ''} />
-                                    </a>
-                                ))}
-                            </div>
-                        )}
+                        <SocialIconList socials={socialsArr} className="lg:flex-col" />
                     </div>
 
                     {/* Copyright */}
-                    <div className="mt-10 pt-6 text-center" style={{ borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}>
-                        <p className="text-xs opacity-30">{copyrightLine}</p>
+                    <div className="mt-10 pt-6 text-center" style={FOOTER_DIVIDER_STYLE}>
+                        <Caption className="opacity-30">{copyrightLine}</Caption>
                     </div>
                 </div>
             </footer>
         )
     }
 
-    // ── Expanded variant ────────────────────────────────────────────────
-    if (variant === 'expanded') {
-        return (
-            <footer className="pt-20 pb-8 relative">
-                <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
-
-                <div className="container mx-auto px-6">
-                    {/* 4-column links section */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
-                        {/* Brand column as first of 4 */}
-                        <div>
-                            <div className="font-bold text-2xl font-heading mb-4">
-                                {mergedBlock.logo?.url ? (
-                                    <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto" />
-                                ) : (
-                                    <span style={{
-                                        background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
-                                        WebkitBackgroundClip: 'text',
-                                        WebkitTextFillColor: 'transparent',
-                                        backgroundClip: 'text',
-                                    }}>
-                                        {logoText}
-                                    </span>
-                                )}
-                            </div>
-                            {tagline && <p className="opacity-40 text-sm leading-relaxed max-w-xs">{tagline}</p>}
-                            {socialsArr.length > 0 && (
-                                <div className="flex gap-3 mt-6">
-                                    {socialsArr.map((social, i) => (
-                                        <a
-                                            key={i}
-                                            href={social.url || '#'}
-                                            className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110"
-                                            style={{
-                                                background: `rgba(var(--brand-primary-rgb), 0.063)`,
-                                                border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
-                                                color: 'var(--brand-primary)',
-                                            }}
-                                        >
-                                            <SocialIcon platform={social.platform || ''} />
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Link columns (up to 3) */}
-                        {columns.slice(0, 3).map((col, i) => (
-                            <div key={i}>
-                                <h4 className="font-semibold text-sm mb-5 opacity-80">{col.title}</h4>
-                                <ul className="space-y-3">
-                                    {(col.links || []).map((link, j) => (
-                                        <li key={j}>
-                                            <a
-                                                href={link?.url}
-                                                className="text-sm opacity-40 hover:opacity-80 transition-all duration-200 hover:translate-x-1 inline-block"
-                                            >
-                                                {link.label}
-                                            </a>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Divider */}
-                    <div style={{ borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }} />
-
-                    {/* Newsletter row */}
-                    <div className="py-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div>
-                            <h4 className="font-semibold text-sm mb-1">Subscribe to our newsletter</h4>
-                            <p className="text-xs opacity-40">Get the latest updates delivered to your inbox.</p>
-                        </div>
-                        <div className="flex gap-2 w-full md:w-auto">
-                            <input
-                                type="email"
-                                placeholder="Enter your email"
-                                className="flex-1 md:w-64 px-4 py-2.5 rounded-lg text-sm outline-none transition-colors"
-                                style={{
-                                    background: 'rgba(var(--brand-primary-rgb), 0.04)',
-                                    border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
-                                    color: 'inherit',
-                                }}
-                            />
-                            <button
-                                className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 flex-shrink-0"
-                                style={{ background: 'var(--brand-primary)' }}
-                            >
-                                Subscribe
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Copyright bar */}
-                    <div className="pt-6 text-center" style={{ borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}>
-                        <p className="text-xs opacity-30">{copyrightLine}</p>
-                    </div>
-                </div>
-            </footer>
-        )
-    }
 
     // ── Minimal variant ──────────────────────────────────────────────────
+    // BUG-F05-792: plain <footer> — no motion.footer/whileInView to avoid
+    // staying invisible when already in viewport (e.g. short iframe preview).
+    // Mirror nav header links so minimal footer stays in sync with navigation.
+    // Falls back to columns[0] if no header links configured.
     if (variant === 'minimal') {
-        // All flat links from all columns
-        const allLinks = columns.flatMap(col => col.links || [])
+        const navHeaderLinks = ((site?.headerBlock as Record<string, unknown> | undefined)?.links as { label?: string; url?: string }[] | undefined)?.filter(l => l?.url)
+        const firstColLinks = (navHeaderLinks?.length ? navHeaderLinks : columns[0]?.links) || []
 
         return (
-            <footer className="py-6 relative">
-                <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
-                <div className="container mx-auto px-6">
+            <footer className="py-6 relative" style={footerStyle}>
+                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                     <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                         {/* Logo / brand text — left */}
-                        <div className="font-bold text-lg font-heading flex items-center gap-2 flex-shrink-0">
-                            {mergedBlock.logo?.url ? (
-                                <img src={mergedBlock.logo?.url} alt={logoText} className="h-6 w-auto" />
-                            ) : (
-                                <span style={{
-                                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
-                                }}>
-                                    {logoText}
-                                </span>
-                            )}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="sm" />
                         </div>
 
-                        {/* Links — center */}
-                        {allLinks.length > 0 && (
+                        {/* First-column links — center */}
+                        {firstColLinks.length > 0 && (
                             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
-                                {allLinks.slice(0, 6).map((link, i) => (
+                                {firstColLinks.slice(0, 6).map((link, i) => (
                                     <a
-                                        key={i}
+                                        key={`${link?.label || 'link'}-${i}`}
                                         href={link?.url}
-                                        className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200"
+                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                                     >
-                                        {link.label}
+                                        <Body size="small" as="span">{link.label}</Body>
                                     </a>
                                 ))}
                             </div>
                         )}
 
                         {/* Copyright — right */}
-                        <p className="text-xs opacity-30 flex-shrink-0">{copyrightLine}</p>
+                        <Caption className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
                     </div>
                 </div>
             </footer>
@@ -436,75 +338,17 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
     }
 
     // ── Default: simple ──────────────────────────────────────────────────
+    // BUG-F05-792: single-line bar — plain <footer> (no motion/whileInView) so it never
+    // stays invisible when already in viewport (same fix as minimal above).
     return (
-        <footer className="pt-20 pb-8 relative">
-            {/* Top gradient line */}
-            <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
-
-            <div className="container mx-auto px-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-16">
-                    {/* Brand Column */}
-                    <div className="md:col-span-1">
-                        <div className="font-bold text-2xl font-heading mb-4">
-                            {mergedBlock.logo?.url ? (
-                                <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto" />
-                            ) : (
-                                <span style={{
-                                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
-                                }}>
-                                    {logoText}
-                                </span>
-                            )}
-                        </div>
-                        {tagline && <p className="opacity-40 text-sm leading-relaxed max-w-xs">{tagline}</p>}
-
-                        {/* Social icons */}
-                        {socialsArr.length > 0 && (
-                            <div className="flex gap-3 mt-6">
-                                {socialsArr.map((social, i) => (
-                                    <a
-                                        key={i}
-                                        href={social.url || '#'}
-                                        className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110"
-                                        style={{
-                                            background: `rgba(var(--brand-primary-rgb), 0.063)`,
-                                            border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
-                                            color: 'var(--brand-primary)',
-                                        }}
-                                    >
-                                        <SocialIcon platform={social.platform || ''} />
-                                    </a>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Link Columns */}
-                    {columns.map((col, i) => (
-                        <div key={i}>
-                            <h4 className="font-semibold text-sm mb-5 opacity-80">{col.title}</h4>
-                            <ul className="space-y-3">
-                                {(col.links || []).map((link, j) => (
-                                    <li key={j}>
-                                        <a
-                                            href={link?.url}
-                                            className="text-sm opacity-40 hover:opacity-80 transition-all duration-200 hover:translate-x-1 inline-block"
-                                        >
-                                            {link.label}
-                                        </a>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Bottom bar */}
-                <div className="pt-8 text-center" style={{ borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}>
-                    <p className="text-xs opacity-30">{copyrightLine}</p>
+        <footer className="py-5 relative" style={footerStyle}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="sm" />
+                    {socialsArr.length > 0 && (
+                        <SocialIconList socials={socialsArr} iconSize="sm" />
+                    )}
+                    <Caption className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
                 </div>
             </div>
         </footer>

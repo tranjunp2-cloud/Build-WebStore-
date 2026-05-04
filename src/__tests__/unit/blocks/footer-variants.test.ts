@@ -4,7 +4,7 @@ import { FooterConfigSchema, footerMeta } from '@/blocks/footer/config'
 // ── TC-S2-014: Footer Block Variants ────────────────────────────────────────
 
 const FOOTER_VARIANTS = [
-    'simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient',
+    'simple', 'minimal', 'centered-stack', 'dark-gradient',
 ] as const
 
 const minimalFooterConfig = (overrides: Record<string, unknown> = {}) => ({
@@ -24,7 +24,7 @@ const minimalFooterConfig = (overrides: Record<string, unknown> = {}) => ({
 
 describe('[TC-S2-014] Footer Block Variants', () => {
     describe('Config Schema', () => {
-        it('validates all 6 variants', () => {
+        it('validates all 4 variants', () => {
             for (const v of FOOTER_VARIANTS) {
                 const result = FooterConfigSchema.safeParse(minimalFooterConfig({ variant: v }))
                 expect(result.success, `variant '${v}' should be valid`).toBe(true)
@@ -43,7 +43,7 @@ describe('[TC-S2-014] Footer Block Variants', () => {
 
         it('accepts full footer config with socials', () => {
             const result = FooterConfigSchema.safeParse(minimalFooterConfig({
-                variant: 'mega-footer',
+                variant: 'dark-gradient',
                 tagline: 'Building the future',
                 copyrightText: '2026 My Brand',
                 logo: { url: 'https://example.com/logo.png', alt: 'Logo' },
@@ -64,8 +64,8 @@ describe('[TC-S2-014] Footer Block Variants', () => {
     })
 
     describe('Meta', () => {
-        it('has exactly 6 variants', () => {
-            expect(footerMeta.variants).toHaveLength(6)
+        it('has exactly 4 variants', () => {
+            expect(footerMeta.variants).toHaveLength(4)
         })
 
         it('variants match schema enum', () => {

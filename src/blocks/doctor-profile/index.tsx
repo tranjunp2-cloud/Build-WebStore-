@@ -1,12 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { DoctorProfileConfig, DoctorItem } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+
+void _CSS_VARS
 
 const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -35,10 +40,11 @@ function AvailabilityBadges({ days }: { days: number[] }) {
 
 function DoctorAvatar({ doctor, size = 'md' }: { doctor: DoctorItem; size?: 'sm' | 'md' | 'lg' }) {
     const sizeClass = size === 'sm' ? 'w-12 h-12' : size === 'lg' ? 'w-32 h-32' : 'w-20 h-20'
+    const sizePx = size === 'sm' ? 48 : size === 'lg' ? 128 : 80
     const textSize = size === 'sm' ? 'text-lg' : size === 'lg' ? 'text-4xl' : 'text-2xl'
 
     if (doctor.photoUrl) {
-        return <img src={doctor.photoUrl} alt={doctor.name} className={`${sizeClass} rounded-2xl object-cover`} />
+        return <Image src={doctor.photoUrl} alt={doctor.name} width={sizePx} height={sizePx} className={`${sizeClass} rounded-2xl object-cover`} />
     }
     return (
         <div
@@ -76,7 +82,7 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
                     <div className="flex justify-center mb-4">
                         <DoctorAvatar doctor={doc} size="lg" />
                     </div>
-                    <h3 className="text-lg font-bold font-heading mb-1">{doc.name}</h3>
+                    <RichText text={doc.name} as="h3" className="text-lg font-bold font-heading mb-1" />
                     <p className="text-sm mb-3" style={{ color: 'var(--brand-primary)' }}>{doc.specialisation}</p>
 
                     {doc.qualifications.length > 0 && (
@@ -127,7 +133,7 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
                     <div className="flex flex-col md:flex-row gap-6 items-start">
                         <DoctorAvatar doctor={doc} size="lg" />
                         <div className="flex-1">
-                            <h3 className="text-2xl font-bold font-heading mb-1">{doc.name}</h3>
+                            <RichText text={doc.name} as="h3" className="text-2xl font-bold font-heading mb-1" />
                             <p className="text-base mb-4" style={{ color: 'var(--brand-primary)' }}>{doc.specialisation}</p>
 
                             {doc.qualifications.length > 0 && (
@@ -202,7 +208,7 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
                 >
                     <DoctorAvatar doctor={doc} size="sm" />
                     <div className="flex-1 min-w-0">
-                        <h4 className="font-bold font-heading">{doc.name}</h4>
+                        <RichText text={doc.name} as="h4" className="font-bold font-heading" />
                         <p className="text-sm" style={{ color: 'var(--brand-primary)' }}>{doc.specialisation}</p>
                         {doc.languages && <p className="text-xs opacity-40">{doc.languages}</p>}
                     </div>
@@ -217,11 +223,17 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
     )
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-50 leading-relaxed">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {variant === 'cards' && renderCards()}

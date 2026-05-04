@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { ArrowLeft, CheckCircle, Loader2, ShoppingBag, Upload, X, CreditCard, Banknote, QrCode, AlertCircle } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -38,8 +39,11 @@ const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
 const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
 
 export default function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
+    const { t } = useI18n()
+    const ck = t.storefront.checkout
     const [slug, setSlug] = useState('')
     const [siteId, setSiteId] = useState('')
+    const [isOwner, setIsOwner] = useState(false)
     const { items, subtotal, clearCart } = useCartStore()
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
@@ -57,23 +61,30 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         params.then(p => setSlug(p.slug))
     }, [params])
 
-    // Get siteId from slug (slug = tenant slug)
+    // Get siteId from slug using public storefront endpoint (avoids auth-gated /api/tenants)
     useEffect(() => {
         if (!slug) return
         async function fetchSite() {
             try {
-                // Step 1: Find tenant by slug
-                const tenantRes = await fetch(`/api/tenants?where[slug][equals]=${slug}&limit=1`)
-                if (!tenantRes.ok) return
-                const tenantData = await tenantRes.json()
-                const tenant = tenantData.docs?.[0]
-                if (!tenant) return
+                const res = await fetch(`/api/storefront/site-by-slug?slug=${encodeURIComponent(slug)}`)
+                if (!res.ok) {
+                    setError('Unable to load store. Please refresh.')
+                    return
+                }
+                const data = await res.json()
+                if (data.siteId) setSiteId(String(data.siteId))
 
-                // Step 2: Find site belonging to this tenant
-                const siteRes = await fetch(`/api/sites?where[tenant][equals]=${tenant.id}&limit=1`)
-                if (!siteRes.ok) return
-                const siteData = await siteRes.json()
-                if (siteData.docs?.[0]) setSiteId(String(siteData.docs[0].id))
+                // Check if current user is tenant member (skip tracking for owners) — best-effort
+                try {
+                    const meRes = await fetch('/api/users/me')
+                    if (meRes.ok) {
+                        const meData = await meRes.json()
+                        const userTenantIds = (meData.user?.tenants ?? []).map((t: { tenant: string | { id: string } }) =>
+                            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+                        )
+                        setIsOwner(userTenantIds.includes(String(data.tenantId)))
+                    }
+                } catch { }
             } catch { }
         }
         fetchSite()
@@ -97,14 +108,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         if (!file) return
 
         if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-            setProofError('Only JPG / PNG images are accepted')
+            setProofError(ck.invalidImage)
             setProofFile(null)
             setProofPreview(null)
             return
         }
 
         if (file.size > MAX_FILE_SIZE) {
-            setProofError('File size must be under 2MB')
+            setProofError(ck.fileTooLarge)
             setProofFile(null)
             setProofPreview(null)
             return
@@ -125,6 +136,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
     // Can place order?
     const canPlaceOrder =
+        siteId !== '' &&
         form.name.trim() && form.email.trim() &&
         items.length > 0 &&
         (paymentMethod === 'cod' || (paymentMethod === 'qr_banking' && proofFile))
@@ -148,7 +160,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                     body: formData,
                 })
                 if (!uploadRes.ok) {
-                    throw new Error('Failed to upload payment proof')
+                    throw new Error(ck.uploadFailed)
                 }
                 const uploadData = await uploadRes.json()
                 paymentProofImageId = uploadData.doc?.id
@@ -193,6 +205,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                     trackEvent({
                         siteId,
                         event: 'purchase',
+                        isOwner,
                         metadata: {
                             orderNumber: data.data.orderNumber,
                             total: data.data.total,
@@ -207,7 +220,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             }
         } catch (err: unknown) {
             // AC-2: Cart preserved on error
-            setError(err instanceof Error ? err.message : 'Network error. Please try again.')
+            setError(err instanceof Error ? err.message : ck.networkError)
         } finally {
             setIsPlacing(false)
         }
@@ -231,27 +244,27 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                     }}>
                         <CheckCircle size={32} color="#22c55e" />
                     </div>
-                    <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px' }}>Order Confirmed!</h1>
+                    <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px' }}>{ck.orderConfirmed}</h1>
                     <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>
-                        Thank you for your purchase
+                        {ck.thankYou}
                     </p>
                     <div style={{
                         background: '#f8fafc', borderRadius: '12px', padding: '20px', marginBottom: '24px',
                     }}>
-                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>Order Number</p>
+                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>{ck.orderNumber}</p>
                         <p style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 12px', letterSpacing: '1px' }}>
                             {orderResult.orderNumber}
                         </p>
-                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>Total</p>
+                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>{ck.total}</p>
                         <p style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
                             {formatPrice(orderResult.total, orderResult.currency)}
                         </p>
                         <p style={{ fontSize: '13px', color: '#999', margin: '12px 0 0' }}>
-                            Payment: {orderResult.paymentMethod === 'cod' ? 'Cash on Delivery' : 'QR Banking'}
+                            Payment: {orderResult.paymentMethod === 'cod' ? ck.cod : ck.qrBanking}
                         </p>
                     </div>
                     <p style={{ fontSize: '13px', color: '#999' }}>
-                        A confirmation email will be sent to your inbox
+                        {ck.confirmationEmail}
                     </p>
                     <Link href={`/sites/${slug}/products`}
                         style={{
@@ -259,7 +272,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             background: '#111', color: 'white', borderRadius: '12px',
                             textDecoration: 'none', fontSize: '14px', fontWeight: 600,
                         }}>
-                        Continue Shopping
+                        {ck.continueShopping}
                     </Link>
                 </div>
             </div>
@@ -276,10 +289,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             }}>
                 <div style={{ textAlign: 'center' }}>
                     <ShoppingBag size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
-                    <h2 style={{ fontSize: '20px', fontWeight: 600 }}>Your cart is empty</h2>
+                    <h2 style={{ fontSize: '20px', fontWeight: 600 }}>{ck.cartEmpty}</h2>
                     <Link href={`/sites/${slug}/products`}
                         style={{ color: '#0ea5e9', fontSize: '14px', marginTop: '8px', display: 'inline-block' }}>
-                        ← Browse Products
+                        {ck.browseProducts}
                     </Link>
                 </div>
             </div>
@@ -301,7 +314,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                     display: 'flex', alignItems: 'center', gap: '8px',
                     color: '#666', textDecoration: 'none', fontSize: '14px',
                 }}>
-                    <ArrowLeft size={16} /> Back to Products
+                    <ArrowLeft size={16} /> {ck.backToProducts}
                 </Link>
             </nav>
 
@@ -311,7 +324,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             }}>
                 {/* ─── Left: Form ──────────────────────────────────── */}
                 <div style={{ minWidth: 0 }}>
-                    <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 32px' }}>Checkout</h1>
+                    <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 32px' }}>{ck.title}</h1>
 
                     {/* Error Banner */}
                     {error && (
@@ -327,36 +340,36 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
                     {/* Contact */}
                     <section style={{ marginBottom: '32px' }}>
-                        <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>Contact Information</h2>
+                        <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>{ck.contactInfo}</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <input placeholder="Full Name *" value={form.name}
+                            <input placeholder={ck.fullName} value={form.name}
                                 onChange={e => updateField('name', e.target.value)} style={inputStyle} />
-                            <input type="email" placeholder="Email Address *" value={form.email}
+                            <input type="email" placeholder={ck.emailAddress} value={form.email}
                                 onChange={e => updateField('email', e.target.value)} style={inputStyle} />
-                            <input placeholder="Phone (e.g. +60 12-345 6789)" value={form.phone}
+                            <input placeholder={ck.phone} value={form.phone}
                                 onChange={e => updateField('phone', e.target.value)} style={inputStyle} />
                         </div>
                     </section>
 
                     {/* Shipping */}
                     <section style={{ marginBottom: '32px' }}>
-                        <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>Shipping Address</h2>
+                        <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>{ck.shippingAddress}</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <input placeholder="Address Line 1" value={form.line1}
+                            <input placeholder={ck.addressLine1} value={form.line1}
                                 onChange={e => updateField('line1', e.target.value)} style={inputStyle} />
-                            <input placeholder="Address Line 2 (optional)" value={form.line2}
+                            <input placeholder={ck.addressLine2} value={form.line2}
                                 onChange={e => updateField('line2', e.target.value)} style={inputStyle} />
                             <div className="checkout-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <input placeholder="City" value={form.city}
+                                <input placeholder={ck.city} value={form.city}
                                     onChange={e => updateField('city', e.target.value)} style={inputStyle} />
                                 <select value={form.state}
                                     onChange={e => updateField('state', e.target.value)}
                                     style={{ ...inputStyle, color: form.state ? '#111' : '#9ca3af' }}>
-                                    <option value="">State</option>
+                                    <option value="">{ck.state}</option>
                                     {MY_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                             </div>
-                            <input placeholder="Postcode" value={form.postcode}
+                            <input placeholder={ck.postcode} value={form.postcode}
                                 onChange={e => updateField('postcode', e.target.value)}
                                 style={{ ...inputStyle, maxWidth: '200px' }} />
                         </div>
@@ -364,7 +377,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
                     {/* ─── Payment Method ───────────────────────── */}
                     <section style={{ marginBottom: '32px' }}>
-                        <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>Payment Method</h2>
+                        <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>{ck.paymentMethod}</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {/* COD Option */}
                             <label
@@ -385,8 +398,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                 </div>
                                 <Banknote size={20} color="#666" />
                                 <div>
-                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>Cash on Delivery (COD)</p>
-                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>Pay when you receive your order</p>
+                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{ck.cod}</p>
+                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>{ck.codDesc}</p>
                                 </div>
                             </label>
 
@@ -409,8 +422,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                 </div>
                                 <QrCode size={20} color="#666" />
                                 <div>
-                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>QR Banking / DuitNow</p>
-                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>Scan QR code and upload payment proof</p>
+                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{ck.qrBanking}</p>
+                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>{ck.qrBankingDesc}</p>
                                 </div>
                             </label>
                         </div>
@@ -424,7 +437,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                 {/* Merchant QR Code */}
                                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                                     <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 16px' }}>
-                                        Scan to pay via DuitNow QR
+                                        {ck.scanToPay}
                                     </p>
                                     <div style={{
                                         width: '200px', height: '200px', margin: '0 auto',
@@ -434,17 +447,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                         flexDirection: 'column', gap: '8px',
                                     }}>
                                         <QrCode size={48} color="#9ca3af" />
-                                        <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>Merchant QR Code</p>
+                                        <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{ck.merchantQr}</p>
                                     </div>
                                     <p style={{ fontSize: '12px', color: '#999', margin: '12px 0 0' }}>
-                                        Amount: <strong>{formatPrice(total, currency)}</strong>
+                                        {ck.amount} <strong>{formatPrice(total, currency)}</strong>
                                     </p>
                                 </div>
 
                                 {/* Upload Proof */}
                                 <div>
                                     <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 12px' }}>
-                                        Upload Payment Proof <span style={{ color: '#ef4444' }}>*</span>
+                                        {ck.uploadProof} <span style={{ color: '#ef4444' }}>*</span>
                                     </p>
 
                                     {proofPreview ? (
@@ -478,10 +491,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                         >
                                             <Upload size={24} color="#9ca3af" style={{ margin: '0 auto 8px' }} />
                                             <p style={{ fontSize: '13px', color: '#666', margin: '0 0 4px' }}>
-                                                Click to upload receipt / screenshot
+                                                {ck.clickToUpload}
                                             </p>
                                             <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>
-                                                JPG or PNG, max 2MB
+                                                {ck.uploadHint}
                                             </p>
                                         </div>
                                     )}
@@ -511,15 +524,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             transition: 'all 0.15s',
                         }}>
                         {isPlacing ? (
-                            <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Placing Order...</>
+                            <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> {ck.placingOrder}</>
                         ) : (
-                            <>Place Order — {formatPrice(total, currency)}</>
+                            <>{ck.placeOrder}{formatPrice(total, currency)}</>
                         )}
                     </button>
 
                     {paymentMethod === 'qr_banking' && !proofFile && (
                         <p style={{ fontSize: '12px', color: '#f59e0b', textAlign: 'center', margin: '8px 0 0' }}>
-                            Please upload payment proof to proceed
+                            {ck.uploadRequired}
                         </p>
                     )}
                 </div>
@@ -529,7 +542,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                     background: 'white', borderRadius: '16px', padding: '24px',
                     border: '1px solid #eee', height: 'fit-content', position: 'sticky', top: '24px',
                 }}>
-                    <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>Order Summary</h2>
+                    <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>{ck.orderSummary}</h2>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
                         {items.map(item => (
@@ -557,7 +570,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                         {item.name}
                                     </p>
                                     <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>
-                                        Qty: {item.quantity}
+                                        {t.storefront.cart.qty} {item.quantity}
                                     </p>
                                 </div>
                                 <span style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0 }}>
@@ -569,22 +582,22 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
                     <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
-                            <span style={{ color: '#666' }}>Subtotal</span>
+                            <span style={{ color: '#666' }}>{ck.subtotal}</span>
                             <span>{formatPrice(sub, currency)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
-                            <span style={{ color: '#666' }}>Shipping</span>
-                            <span>{shippingFee > 0 ? formatPrice(shippingFee, currency) : 'Free'}</span>
+                            <span style={{ color: '#666' }}>{ck.shipping}</span>
+                            <span>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
-                            <span style={{ color: '#666' }}>SST (6%)</span>
+                            <span style={{ color: '#666' }}>{ck.sst}</span>
                             <span>{formatPrice(tax, currency)}</span>
                         </div>
                         <div style={{
                             display: 'flex', justifyContent: 'space-between',
                             fontSize: '18px', fontWeight: 700, paddingTop: '12px', borderTop: '1px solid #f0f0f0',
                         }}>
-                            <span>Total</span>
+                            <span>{ck.total}</span>
                             <span>{formatPrice(total, currency)}</span>
                         </div>
                     </div>

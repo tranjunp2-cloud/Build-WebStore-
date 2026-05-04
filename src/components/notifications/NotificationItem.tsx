@@ -1,6 +1,7 @@
 'use client'
 
 import { formatDistanceToNow } from 'date-fns'
+import { ms as dateFnsMsLocale } from 'date-fns/locale/ms'
 import { ShoppingCart, Megaphone, CircleAlert, FileText, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { NotificationItem as NotificationItemType } from '@/types/notification'
@@ -10,9 +11,21 @@ interface Props {
   onClick?: (notification: NotificationItemType) => void
 }
 
+/** Interpolate {key} placeholders in a template string with metadata values */
+function interpolate(template: string, metadata: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => metadata[key] ?? `{${key}}`)
+}
+
 export function NotificationItem({ notification, onClick }: Props) {
-  const { type, title, message, isRead, createdAt } = notification
-  const { t } = useI18n()
+  const { type, title, message, metadata, isRead, createdAt } = notification
+  const { t, locale } = useI18n()
+
+  // Use i18n template + metadata for translated content; fallback to raw DB values
+  const typeTemplates = (t.notifications as Record<string, unknown>).types as
+    Record<string, { title: string; message: string }> | undefined
+  const template = typeTemplates?.[type]
+  const displayTitle = template && metadata ? interpolate(template.title, metadata) : title
+  const displayMessage = template && metadata ? interpolate(template.message, metadata) : message
 
   let Icon: LucideIcon = ShoppingCart
   let iconBgClass = 'bg-[#00BC7D]/10 text-[#00BC7D]'
@@ -46,7 +59,7 @@ export function NotificationItem({ notification, onClick }: Props) {
       <div className="flex-1 flex flex-col pt-[2px] pr-[10px]">
         <div className="flex items-center gap-[6px] mb-1">
           <h4 className={`text-[12px] sm:text-[14px] leading-[20px] ${!isRead ? 'font-semibold text-white' : 'font-normal text-[#CBD5E1]'}`}>
-            {title}
+            {displayTitle}
           </h4>
           {type === 'SYSTEM_ALERT' && (
             <span className="inline-flex items-center rounded-full bg-[#7C3AED]/15 px-[6px] py-[1px] text-[10px] font-medium leading-[14px] text-[#A78BFA] whitespace-nowrap">
@@ -55,10 +68,10 @@ export function NotificationItem({ notification, onClick }: Props) {
           )}
         </div>
         <p className="text-[12px] font-medium leading-[16px] text-[#94A3B8]">
-          {message}
+          {displayMessage}
         </p>
         <p className="text-[12px] font-medium leading-[16px] text-[#64748B] mt-1">
-          {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
+          {formatDistanceToNow(new Date(createdAt), { addSuffix: true, locale: locale === 'ms' ? dateFnsMsLocale : undefined })}
         </p>
       </div>
     </div>

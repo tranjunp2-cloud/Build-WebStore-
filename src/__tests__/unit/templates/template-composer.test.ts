@@ -37,14 +37,14 @@ describe('[TC-S3-010] composeTemplate — starter tier', () => {
     expect(template.pages).toHaveLength(1)
   })
 
-  it('home page has 5-7 blocks', () => {
+  it('home page has at least 5 blocks', () => {
     // Act
     const template = composeTemplate(starterInput)
     const homePage = template.pages[0]!
 
-    // Assert
+    // Assert — composer was enriched in 8598e64 to emit signature blocks
+    // (menu-display, booking-widget) for richer starters; upper bound removed.
     expect(homePage.layout.length).toBeGreaterThanOrEqual(5)
-    expect(homePage.layout.length).toBeLessThanOrEqual(7)
   })
 
   it('isPremium is false', () => {
@@ -191,8 +191,40 @@ describe('[TC-S3-010] composeTemplate — common invariants', () => {
   }
 })
 
+describe('[TC-S3-011] composeTemplate — footer ghost links (GH-820 case sensitivity)', () => {
+  // enrichSubPages passes capitalized page titles ('About', 'Contact') to buildBlogPage
+  // which forwards them to buildFooter as the pages array. Before the fix, knownUrls
+  // would have '/About' not '/about', causing Company column to silently drop valid links.
+  it('Blog page footer Company column retains /about and /contact (capitalized pages input)', () => {
+    const template = composeTemplate(premiumInput)
+    expect(template).not.toBeNull()
+    const blogPage = template!.pages.find((p) => p.title.toLowerCase() === 'blog')
+    expect(blogPage).toBeDefined()
+    const footer = blogPage!.layout.find((b) => (b as Record<string, unknown>).blockType === 'footer') as Record<string, unknown> | undefined
+    expect(footer).toBeDefined()
+    type Col = { title: string; links: { url: string }[] }
+    const columns = (footer!.columns as Col[]) ?? []
+    const company = columns.find((c) => c.title === 'Company')
+    if (company) {
+      // If Company column exists, it must not have lost /about or /contact due to case mismatch
+      const urls = company.links.map((l) => l.url)
+      expect(urls).toContain('/about')
+      expect(urls).toContain('/contact')
+    }
+    // Ghost links must not appear in any column
+    const allUrls = columns.flatMap((c) => c.links.map((l) => l.url))
+    const GHOST_URLS = ['/careers', '/help', '/faq', '/privacy', '/terms', '/cookies']
+    for (const ghost of GHOST_URLS) {
+      expect(allUrls, `ghost link "${ghost}" in blog page footer`).not.toContain(ghost)
+    }
+  })
+})
+
 describe('[TC-S3-010] composeTemplate — error handling', () => {
-  it('throws for unknown category', () => {
+  // Plan 260415 fix-500 — composeTemplate now returns null (not throws) on
+  // unrecoverable errors so the AI gen fallback chain can degrade gracefully
+  // instead of bubbling a 500 to the user.
+  it('returns null for unknown category', () => {
     // Arrange
     const badInput: ComposerInput = {
       category: 'nonexistent',
@@ -202,10 +234,10 @@ describe('[TC-S3-010] composeTemplate — error handling', () => {
     }
 
     // Act & Assert
-    expect(() => composeTemplate(badInput)).toThrow('Unknown category')
+    expect(composeTemplate(badInput)).toBeNull()
   })
 
-  it('throws for out-of-range business index', () => {
+  it('returns null for out-of-range business index', () => {
     // Arrange
     const badInput: ComposerInput = {
       category: 'restaurant',
@@ -215,6 +247,6 @@ describe('[TC-S3-010] composeTemplate — error handling', () => {
     }
 
     // Act & Assert
-    expect(() => composeTemplate(badInput)).toThrow('out of range')
+    expect(composeTemplate(badInput)).toBeNull()
   })
 })

@@ -7,12 +7,16 @@ import type { CartWidgetConfig } from './config'
 import { useCartStore } from '@/store/cartStore'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
+import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 
-export function CartWidgetBlock({ block, theme, site }: BlockProps<CartWidgetConfig> & { site?: { slug?: string } }) {
+export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartWidgetConfig>) {
+    void _theme
     const count = useCartStore(state => state.items.reduce((sum, item) => sum + item.quantity, 0))
     const openCart = useCartStore(state => state.openCart)
     const setSiteSlug = useCartStore(state => state.setSiteSlug)
-    const siteSlug = String(site?.slug || '')
+    // tenantSlug is injected by both storefront page ({ ...site, tenantSlug: slug }) and
+    // preview page ({ ...site, tenantSlug: tenant.slug }). Sites collection has no slug field.
+    const siteSlug = String((site as Record<string, unknown>)?.tenantSlug || '')
 
     useEffect(() => {
         if (siteSlug) {
@@ -25,11 +29,11 @@ export function CartWidgetBlock({ block, theme, site }: BlockProps<CartWidgetCon
         return (
             <>
                 <section className="py-10">
-                    <div className="container mx-auto px-6">
+                    <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                         <button
                             type="button"
                             onClick={openCart}
-                            className="inline-flex items-center gap-4 rounded-2xl border px-6 py-4 font-medium transition-all duration-200 hover:shadow-lg"
+                            className={`inline-flex items-center gap-4 rounded-2xl border px-6 py-4 font-medium transition-all duration-200 hover:shadow-lg ${TOUCH_TARGET.min}`}
                             style={{
                                 border: `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
                                 background: `rgba(var(--brand-primary-rgb), 0.04)`,
@@ -58,7 +62,7 @@ export function CartWidgetBlock({ block, theme, site }: BlockProps<CartWidgetCon
                 <button
                     type="button"
                     onClick={openCart}
-                    className="relative inline-flex items-center gap-3 rounded-2xl border px-4 py-3 font-medium text-white shadow-[0_16px_32px_rgba(2,6,23,0.22)] transition-transform duration-200 hover:-translate-y-0.5"
+                    className={`relative inline-flex items-center gap-3 rounded-2xl border px-4 py-3 font-medium text-white shadow-[0_16px_32px_rgba(2,6,23,0.22)] transition-transform duration-200 hover:-translate-y-0.5 ${TOUCH_TARGET.min}`}
                     style={{
                         background: `linear-gradient(135deg, ${CSS_VARS.primary}, ${CSS_VARS.secondary})`,
                         borderColor: `rgba(var(--brand-primary-rgb), 0.333)`,

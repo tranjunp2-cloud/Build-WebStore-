@@ -4,6 +4,8 @@
  * Target Market: Malaysia (EN / MS)
  */
 
+import { dedupSectionLabel } from './dedup-section-label'
+
 export interface TemplateSeed {
     name: string
     description: string
@@ -47,7 +49,7 @@ const hero = (h: string, sub: string, cta1: string, cta2?: string, variant = 'ce
 // Helper to build features block
 const features = (h: string, sub: string, items: { icon: string; title: string; desc: string }[], label?: string) => ({
     blockType: 'features', layout: 'grid-3', headline: h, subheadline: sub,
-    sectionLabel: label || 'Services',
+    sectionLabel: dedupSectionLabel(label || 'Services', h),
     features: items.map(i => ({ icon: i.icon, title: i.title, description: i.desc })),
 })
 
@@ -84,7 +86,7 @@ const stats = (h: string, items: { value: string; label: string }[]) => ({
 
 // Helper for about
 const about = (h: string, body: string, label?: string) => ({
-    blockType: 'about', headline: h, body, sectionLabel: label || 'About Us', layout: 'image-right',
+    blockType: 'about', headline: h, body, sectionLabel: dedupSectionLabel(label || 'About Us', h), layout: 'image-right',
 })
 
 // Helper for CTA
@@ -127,7 +129,7 @@ const aboutPage = (name: string, industry: string, logoText: string) => [
     {
         blockType: 'about',
         layout: 'image-right',
-        sectionLabel: 'Our Story',
+        sectionLabel: dedupSectionLabel('Our Story', `The Passion Behind ${name}`),
         headline: `The Passion Behind ${name}`,
         body: [
             {

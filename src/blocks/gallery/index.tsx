@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { GalleryConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -9,9 +10,166 @@ import { SectionLabel } from '../shared/decorative'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '../shared/SectionWrapper'
+import { getGalleryImages } from '@/lib/images/industry-images'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
-export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
-    const { headline, images = [], variant = 'grid' } = block
+// ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
+// Brand identity vars preserved per Option C additive strategy.
+
+type GallerySectionProps = {
+    children: ReactNode
+}
+
+/** Outer wrapper for all 6 variants. SectionWrapper + AnimatedSection. */
+function GallerySection({ children }: GallerySectionProps) {
+    return (
+        <SectionWrapper as={AnimatedSection} padding="default" container="default">
+            {children}
+        </SectionWrapper>
+    )
+}
+
+/** Section header used by all 6 variants. SectionLabel + Heading. */
+function GalleryHeader({ headline }: { headline?: string }) {
+    if (!headline) return null
+    return (
+        <div className="text-center mb-14">
+            <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
+            <Heading level={2}>
+                <RichText text={headline} as="span" />
+            </Heading>
+        </div>
+    )
+}
+
+type ImageItem = GalleryConfig['images'][number]
+
+type GalleryImageCardProps = {
+    item: ImageItem
+    index?: number
+    aspect?: 'square' | '4/3' | 'video' | 'auto'
+    className?: string
+    overlayClickable?: boolean
+}
+
+const ASPECT_CLASS = {
+    square: 'aspect-square',
+    '4/3': 'aspect-[4/3]',
+    video: 'aspect-video',
+    auto: '',
+} as const
+
+/**
+ * Image card with hover-overlay caption + decorative placeholder fallback.
+ * Used 4+ times across grid/masonry/carousel/lightbox variants.
+ */
+function GalleryImageCard({ item, index, aspect = 'square', className = '', overlayClickable = false }: GalleryImageCardProps) {
+    const isOwner = useIsOwner()
+    const aspectCls = ASPECT_CLASS[aspect]
+
+    if (item.image?.url) {
+        // aspect='auto' means preserve intrinsic ratio — fill won't work without a defined height,
+        // so use w-full h-auto with explicit 0/0 sizing instead.
+        if (aspect === 'auto') {
+            return (
+                <div className={`relative overflow-hidden rounded-2xl ${className}`.trim()}>
+                    <Image
+                        src={item.image.url}
+                        alt={item.caption || item.image.alt || ''}
+                        data-image-index={index}
+                        width={0}
+                        height={0}
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                        className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
+                    />
+                    {item.caption && (
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <Body size="small" className="text-white font-medium">{item.caption}</Body>
+                        </div>
+                    )}
+                </div>
+            )
+        }
+        return (
+            <div className={`relative overflow-hidden rounded-2xl ${aspectCls} ${className}`.trim()}>
+                <Image
+                    src={item.image.url}
+                    alt={item.caption || item.image.alt || ''}
+                    data-image-index={index}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                {item.caption && (
+                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <Body size="small" className="text-white font-medium">{item.caption}</Body>
+                    </div>
+                )}
+                {overlayClickable && (
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 text-white text-2xl transition-opacity duration-300" aria-hidden="true">⊕</span>
+                    </div>
+                )}
+                {isOwner && !overlayClickable && (
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center pointer-events-none">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/50 rounded-full p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                <circle cx="12" cy="13" r="4"/>
+                            </svg>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    return (
+        <div
+            className={`relative ${aspectCls} rounded-2xl flex items-center justify-center ${className}`.trim()}
+            style={{
+                background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
+                border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
+            }}
+            data-image-index={index}
+            aria-hidden="true"
+        >
+            <span className="text-2xl opacity-20">📷</span>
+            {isOwner && (
+                <div className="absolute inset-0 group-hover:bg-black/10 transition-colors duration-300 rounded-2xl flex items-center justify-center pointer-events-none">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 rounded-full p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+export function GalleryBlock({ block, theme, site }: BlockProps<GalleryConfig>) {
+    const { headline, images: rawImages = [], variant = 'grid' } = block
+    const category = (site?.siteType as string) || 'business'
+
+    // Per-slot fallback: slots with a real image show it; null slots show the Unsplash fallback
+    // for that index. This way, replacing one stock image doesn't wipe fallbacks for other slots.
+    const fallbackUrls = getGalleryImages(category, 6, site?.imageLibraryS3 as Record<string, string> | undefined)
+    const slotCount = Math.max(rawImages.length, fallbackUrls.length)
+    const images = Array.from({ length: slotCount }, (_, i) => {
+        const item = rawImages[i] as Record<string, unknown> | undefined
+        const img = item?.image
+        if (img && typeof img === 'object' && (img as Record<string, unknown>)?.url) {
+            return item as GalleryConfig['images'][number]
+        }
+        return {
+            image: { url: fallbackUrls[i % fallbackUrls.length]!, alt: `Gallery image ${i + 1}` },
+            caption: (item?.caption as string) || '',
+        }
+    })
 
     // ── Lightbox variant ──────────────────────────────────────────────────
     if (variant === 'lightbox') {
@@ -40,228 +198,162 @@ export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
 
     // ── Default: grid ────────────────────────────────────────────────────
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
-                {headline && (
-                    <div className="text-center mb-14">
-                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
-                    </div>
-                )}
-                <StaggerGrid className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {images.map((item, i) => (
-                        <StaggerItem key={i} className="group">
-                            {item.image?.url ? (
-                                <div className="relative overflow-hidden rounded-2xl aspect-square">
-                                    <img
-                                        src={item.image?.url}
-                                        alt={item.caption || item.image.alt || ''}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                    {item.caption && (
-                                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                            <p className="text-white text-sm font-medium">{item.caption}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div
-                                    className="aspect-square rounded-2xl flex items-center justify-center"
-                                    style={{
-                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
-                                        border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
-                                    }}
-                                >
-                                    <span className="text-2xl opacity-20">📷</span>
-                                </div>
-                            )}
-                        </StaggerItem>
-                    ))}
-                </StaggerGrid>
-            </div>
-        </AnimatedSection>
+        <GallerySection>
+            <GalleryHeader headline={headline} />
+            {/* flex+justify-center so the last incomplete row is centered, not left-aligned */}
+            <StaggerGrid className="flex flex-wrap justify-center gap-4">
+                {images.map((item, i) => (
+                    <StaggerItem key={i} className="group shrink-0 w-[calc(50%-8px)] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]">
+                        <GalleryImageCard item={item} index={i} aspect="square" />
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+        </GallerySection>
     )
 }
 
 // ── Masonry Gallery ─────────────────────────────────────────────────────────
 
-function MasonryGallery({ headline, images, theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function MasonryGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+    void _theme
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
-                {headline && (
-                    <div className="text-center mb-14">
-                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
+        <GallerySection>
+            <GalleryHeader headline={headline} />
+            {/* True masonry: CSS columns fill vertically — images have natural heights creating the brick-wall effect */}
+            <div className="max-w-5xl mx-auto columns-2 md:columns-3 gap-4">
+                {images.map((item, i) => (
+                    <div key={i} className="group break-inside-avoid mb-4">
+                        <GalleryImageCard item={item} index={i} aspect="auto" />
                     </div>
-                )}
-                <StaggerGrid className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
-                    {images.map((item, i) => (
-                        <StaggerItem key={i} className="break-inside-avoid group">
-                            {item.image?.url ? (
-                                <div className="relative overflow-hidden rounded-2xl">
-                                    <img
-                                        src={item.image?.url}
-                                        alt={item.caption || item.image.alt || ''}
-                                        className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                    {item.caption && (
-                                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                            <p className="text-white text-sm font-medium">{item.caption}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div
-                                    className="aspect-video rounded-2xl flex items-center justify-center"
-                                    style={{
-                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
-                                        border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
-                                    }}
-                                >
-                                    <span className="text-2xl opacity-20">📷</span>
-                                </div>
-                            )}
-                        </StaggerItem>
-                    ))}
-                </StaggerGrid>
+                ))}
             </div>
-        </AnimatedSection>
+        </GallerySection>
     )
 }
 
 // ── Carousel Gallery ────────────────────────────────────────────────────────
 
-function CarouselGallery({ headline, images, theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
-    const [currentIndex, setCurrentIndex] = useState(0)
-    const [isAutoPlaying, setIsAutoPlaying] = useState(true)
-    const totalImages = images.length
+const CAROUSEL_ITEMS_PER_SLIDE = 3
 
-    // Auto-scroll every 4 seconds
+function CarouselGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+    void _theme
+    const [currentSlide, setCurrentSlide] = useState(0)
+    const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+
+    // Group images into pages of 3 — dots = pages, not individual images
+    const slides = Array.from(
+        { length: Math.ceil(images.length / CAROUSEL_ITEMS_PER_SLIDE) },
+        (_, i) => images.slice(i * CAROUSEL_ITEMS_PER_SLIDE, (i + 1) * CAROUSEL_ITEMS_PER_SLIDE),
+    )
+    const totalSlides = slides.length
+
     useEffect(() => {
-        if (!isAutoPlaying || totalImages <= 1) return
+        if (!isAutoPlaying || totalSlides <= 1) return
         const timer = setInterval(() => {
-            setCurrentIndex(prev => (prev + 1) % totalImages)
+            setCurrentSlide(prev => (prev + 1) % totalSlides)
         }, 4000)
         return () => clearInterval(timer)
-    }, [isAutoPlaying, totalImages])
+    }, [isAutoPlaying, totalSlides])
 
     const handlePrev = useCallback(() => {
         setIsAutoPlaying(false)
-        setCurrentIndex(prev => (prev - 1 + totalImages) % totalImages)
-    }, [totalImages])
+        setCurrentSlide(prev => (prev - 1 + totalSlides) % totalSlides)
+    }, [totalSlides])
 
     const handleNext = useCallback(() => {
         setIsAutoPlaying(false)
-        setCurrentIndex(prev => (prev + 1) % totalImages)
-    }, [totalImages])
-
-    const handleDot = useCallback((index: number) => {
-        setIsAutoPlaying(false)
-        setCurrentIndex(index)
-    }, [])
+        setCurrentSlide(prev => (prev + 1) % totalSlides)
+    }, [totalSlides])
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
-                {headline && (
-                    <div className="text-center mb-14">
-                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
-                    </div>
+        <GallerySection>
+            <GalleryHeader headline={headline} />
+
+            <div className="relative max-w-6xl mx-auto">
+                {/* Track: each slide is full-width, shows 3 images side by side */}
+                <div className="overflow-hidden rounded-2xl">
+                    <motion.div
+                        className="flex"
+                        animate={{ x: `-${currentSlide * 100}%` }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                    >
+                        {slides.map((slideImages, slideIdx) => (
+                            <div key={slideIdx} className="w-full flex-shrink-0 flex gap-2">
+                                {slideImages.map((item, itemIdx) => (
+                                    <div key={itemIdx} className="basis-1/3 shrink-0 min-w-0 group">
+                                        <GalleryImageCard
+                                            item={item}
+                                            index={slideIdx * CAROUSEL_ITEMS_PER_SLIDE + itemIdx}
+                                            aspect="4/3"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        ))}
+                    </motion.div>
+                </div>
+
+                {/* Prev/Next arrows */}
+                {totalSlides > 1 && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={handlePrev}
+                            className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 ${TOUCH_TARGET.min} min-w-[44px] rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10`}
+                            aria-label="Previous slide"
+                        >
+                            <ChevronLeft size={20} className="text-gray-700" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleNext}
+                            className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 ${TOUCH_TARGET.min} min-w-[44px] rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10`}
+                            aria-label="Next slide"
+                        >
+                            <ChevronRight size={20} className="text-gray-700" />
+                        </button>
+                    </>
                 )}
 
-                <div className="relative max-w-6xl mx-auto">
-                    {/* Carousel track */}
-                    <div className="overflow-hidden rounded-2xl">
-                        <motion.div
-                            className="flex"
-                            animate={{ x: `-${currentIndex * 100}%` }}
-                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        >
-                            {images.map((item, i) => (
-                                <div
-                                    key={i}
-                                    className="w-full flex-shrink-0 md:w-1/2 lg:w-1/3 px-2"
-                                >
-                                    {item.image?.url ? (
-                                        <div className="relative overflow-hidden rounded-2xl aspect-[4/3] group">
-                                            <img
-                                                src={item.image?.url}
-                                                alt={item.caption || item.image.alt || ''}
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                            />
-                                            {item.caption && (
-                                                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                    <p className="text-white text-sm font-medium">{item.caption}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div
-                                            className="aspect-[4/3] rounded-2xl flex items-center justify-center"
-                                            style={{
-                                                background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
-                                                border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
-                                            }}
-                                        >
-                                            <span className="text-2xl opacity-20">📷</span>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </motion.div>
-                    </div>
-
-                    {/* Prev/Next arrows */}
-                    {totalImages > 1 && (
-                        <>
+                {/* Dots = number of slides (2 dots for 6 images with 3/slide) */}
+                {totalSlides > 1 && (
+                    <div className="flex justify-center gap-2 mt-6">
+                        {slides.map((_, i) => (
                             <button
-                                onClick={handlePrev}
-                                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10"
-                                aria-label="Previous image"
+                                key={i}
+                                type="button"
+                                onClick={() => { setIsAutoPlaying(false); setCurrentSlide(i) }}
+                                className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full transition-all duration-300`}
+                                aria-label={`Go to slide ${i + 1}`}
+                                aria-current={i === currentSlide}
                             >
-                                <ChevronLeft size={20} className="text-gray-700" />
-                            </button>
-                            <button
-                                onClick={handleNext}
-                                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10"
-                                aria-label="Next image"
-                            >
-                                <ChevronRight size={20} className="text-gray-700" />
-                            </button>
-                        </>
-                    )}
-
-                    {/* Dot indicators */}
-                    {totalImages > 1 && (
-                        <div className="flex justify-center gap-2 mt-6">
-                            {images.map((_, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => handleDot(i)}
+                                <span
                                     className="w-2.5 h-2.5 rounded-full transition-all duration-300"
                                     style={{
-                                        background: i === currentIndex
+                                        background: i === currentSlide
                                             ? 'var(--brand-primary)'
                                             : 'rgba(var(--brand-primary-rgb), 0.2)',
-                                        transform: i === currentIndex ? 'scale(1.3)' : 'scale(1)',
+                                        transform: i === currentSlide ? 'scale(1.3)' : 'scale(1)',
                                     }}
-                                    aria-label={`Go to image ${i + 1}`}
                                 />
-                            ))}
-                        </div>
-                    )}
-                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
-        </AnimatedSection>
+        </GallerySection>
     )
 }
 
 // ── Lightbox Gallery ─────────────────────────────────────────────────────────
 
-function LightboxGallery({ headline, images, theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function LightboxGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+    void _theme
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+    /* Plan 260415 Lỗi A (P1 CRITICAL) — refs cho focus trap + restore */
+    const closeButtonRef = useRef<HTMLButtonElement>(null)
+    const prevFocusRef = useRef<HTMLElement | null>(null)
+    const lightboxRef = useRef<HTMLDivElement>(null)
 
     const handlePrev = useCallback(() => {
         setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : images.length - 1))
@@ -275,89 +367,119 @@ function LightboxGallery({ headline, images, theme }: { headline?: string; image
         setSelectedIndex(null)
     }, [])
 
+    /* Plan 260415 Lỗi A — keyboard + scroll lock + focus management */
     useEffect(() => {
         if (selectedIndex === null) return
+
+        /* Save focus trước khi mở lightbox để restore khi close */
+        prevFocusRef.current = (document.activeElement as HTMLElement) || null
+
+        /* Scroll lock body khi lightbox open */
+        const prevOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+
+        /* Focus close button khi open (focus trap entry) */
+        const focusTimer = setTimeout(() => {
+            closeButtonRef.current?.focus()
+        }, 50)
+
         const handleKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') handleClose()
-            if (e.key === 'ArrowLeft') handlePrev()
-            if (e.key === 'ArrowRight') handleNext()
+            if (e.key === 'Escape') {
+                handleClose()
+                return
+            }
+            if (e.key === 'ArrowLeft') {
+                handlePrev()
+                return
+            }
+            if (e.key === 'ArrowRight') {
+                handleNext()
+                return
+            }
+            /* Plan 260415 — Focus trap: Tab/Shift+Tab wrap trong lightbox */
+            if (e.key === 'Tab') {
+                const container = lightboxRef.current
+                if (!container) return
+                const focusable = container.querySelectorAll<HTMLElement>(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+                )
+                if (focusable.length === 0) return
+                const first = focusable[0]!
+                const last = focusable[focusable.length - 1]!
+                const active = document.activeElement as HTMLElement
+                if (e.shiftKey && active === first) {
+                    e.preventDefault()
+                    last.focus()
+                } else if (!e.shiftKey && active === last) {
+                    e.preventDefault()
+                    first.focus()
+                }
+            }
         }
         document.addEventListener('keydown', handleKey)
-        return () => document.removeEventListener('keydown', handleKey)
+
+        return () => {
+            document.removeEventListener('keydown', handleKey)
+            document.body.style.overflow = prevOverflow
+            clearTimeout(focusTimer)
+            /* Restore focus khi lightbox close */
+            prevFocusRef.current?.focus()
+        }
     }, [selectedIndex, handleClose, handlePrev, handleNext])
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
-                {headline && (
-                    <div className="text-center mb-14">
-                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
-                    </div>
-                )}
-
-                <StaggerGrid className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <>
+            <GallerySection>
+                <GalleryHeader headline={headline} />
+                <StaggerGrid className="flex flex-wrap justify-center gap-4">
                     {images.map((item, i) => (
-                        <StaggerItem key={i} className="group cursor-pointer" onClick={() => setSelectedIndex(i)}>
-                            {item.image?.url ? (
-                                <div className="relative overflow-hidden rounded-2xl aspect-square">
-                                    <img
-                                        src={item.image?.url}
-                                        alt={item.caption || item.image.alt || ''}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center">
-                                        <span className="opacity-0 group-hover:opacity-100 text-white text-2xl transition-opacity duration-300">⊕</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    className="aspect-square rounded-2xl flex items-center justify-center"
-                                    style={{
-                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
-                                        border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
-                                    }}
-                                >
-                                    <span className="text-2xl opacity-20">📷</span>
-                                </div>
-                            )}
+                        <StaggerItem key={i} className="group cursor-pointer shrink-0 w-[calc(50%-8px)] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]" onClick={() => setSelectedIndex(i)}>
+                            <GalleryImageCard item={item} index={i} aspect="square" overlayClickable />
                         </StaggerItem>
                     ))}
                 </StaggerGrid>
-            </div>
+            </GallerySection>
 
-            {/* Lightbox Overlay */}
+            {/* Plan 260415 Lỗi A — Lightbox Overlay giờ có role=dialog + aria-modal + scroll lock + focus trap */}
             <AnimatePresence>
                 {selectedIndex !== null && (
                     <motion.div
+                        ref={lightboxRef}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.2 }}
                         className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
                         onClick={handleClose}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`Image viewer, image ${selectedIndex + 1} of ${images.length}`}
                     >
-                        {/* Close button */}
+                        {/* Close button — 44px touch target */}
                         <button
-                            className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10 p-2"
+                            ref={closeButtonRef}
+                            type="button"
+                            className={`absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded`}
                             onClick={handleClose}
                             aria-label="Close lightbox"
                         >
                             <X size={28} />
                         </button>
 
-                        {/* Prev button */}
+                        {/* Prev button — 44px touch target */}
                         <button
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-10 p-2"
+                            type="button"
+                            className={`absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-10 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                             onClick={(e) => { e.stopPropagation(); handlePrev() }}
                             aria-label="Previous image"
                         >
                             <ChevronLeft size={36} />
                         </button>
 
-                        {/* Next button */}
+                        {/* Next button — 44px touch target */}
                         <button
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-10 p-2"
+                            type="button"
+                            className={`absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors z-10 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                             onClick={(e) => { e.stopPropagation(); handleNext() }}
                             aria-label="Next image"
                         >
@@ -375,173 +497,177 @@ function LightboxGallery({ headline, images, theme }: { headline?: string; image
                             onClick={(e) => e.stopPropagation()}
                         >
                             {images[selectedIndex]?.image?.url && (
-                                <img
-                                    src={images[selectedIndex]?.image?.url}
+                                <Image
+                                    src={images[selectedIndex].image.url}
                                     alt={images[selectedIndex].caption || images[selectedIndex].image.alt || ''}
-                                    className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                                    data-image-index={selectedIndex}
+                                    width={0}
+                                    height={0}
+                                    sizes="90vw"
+                                    className="max-w-full max-h-[80vh] w-auto h-auto object-contain rounded-lg"
                                 />
                             )}
                             {images[selectedIndex]?.caption && (
-                                <p className="text-white/70 text-sm mt-4 text-center">{images[selectedIndex].caption}</p>
+                                <Body size="small" className="text-white/70 mt-4 text-center">{images[selectedIndex].caption}</Body>
                             )}
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
-        </AnimatedSection>
+        </>
     )
 }
 
 // ── Filmstrip Gallery ────────────────────────────────────────────────────────
 
-function FilmstripGallery({ headline, images, theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function FilmstripGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+    void _theme
     const [activeIndex, setActiveIndex] = useState(0)
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
-                {headline && (
-                    <div className="text-center mb-14">
-                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
+        <GallerySection>
+            <GalleryHeader headline={headline} />
+
+            {/* Main image */}
+            <div className="relative aspect-video rounded-xl overflow-hidden mb-4 max-w-4xl mx-auto">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={activeIndex}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="absolute inset-0"
+                    >
+                        {images[activeIndex]?.image?.url ? (
+                            <Image
+                                src={images[activeIndex].image.url}
+                                alt={images[activeIndex].caption || images[activeIndex].image.alt || ''}
+                                data-image-index={activeIndex}
+                                fill
+                                className="object-cover"
+                            />
+                        ) : (
+                            <div
+                                className="w-full h-full flex items-center justify-center"
+                                style={{
+                                    background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
+                                }}
+                                aria-hidden="true"
+                            >
+                                <span className="text-4xl opacity-20">📷</span>
+                            </div>
+                        )}
+                    </motion.div>
+                </AnimatePresence>
+                {images[activeIndex]?.caption && (
+                    <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+                        <Body size="small" className="text-white font-medium">{images[activeIndex].caption}</Body>
                     </div>
                 )}
+            </div>
 
-                {/* Main image */}
-                <div className="relative aspect-video rounded-xl overflow-hidden mb-4 max-w-4xl mx-auto">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={activeIndex}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="absolute inset-0"
+            {/* Thumbnail strip — 80px buttons (>44px ✅) */}
+            <div className="max-w-4xl mx-auto overflow-x-auto">
+                <div className="flex gap-2 pb-2">
+                    {images.map((item, i) => (
+                        <button
+                            key={i}
+                            type="button"
+                            onClick={() => setActiveIndex(i)}
+                            className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden transition-all duration-200"
+                            style={{
+                                outline: i === activeIndex ? `2px solid var(--brand-primary)` : '2px solid transparent',
+                                outlineOffset: '2px',
+                                opacity: i === activeIndex ? 1 : 0.6,
+                            }}
+                            aria-label={`View image ${i + 1}`}
+                            aria-current={i === activeIndex}
                         >
-                            {images[activeIndex]?.image?.url ? (
-                                <img
-                                    src={images[activeIndex].image.url}
-                                    alt={images[activeIndex].caption || images[activeIndex].image.alt || ''}
+                            {item.image?.url ? (
+                                <Image
+                                    src={item.image.url}
+                                    alt={item.caption || item.image.alt || ''}
+                                    data-image-index={i}
+                                    width={80}
+                                    height={80}
                                     className="w-full h-full object-cover"
                                 />
                             ) : (
                                 <div
                                     className="w-full h-full flex items-center justify-center"
                                     style={{
-                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
+                                        background: `rgba(var(--brand-primary-rgb), 0.06)`,
                                     }}
+                                    aria-hidden="true"
                                 >
-                                    <span className="text-4xl opacity-20">📷</span>
+                                    <span className="text-sm opacity-30">📷</span>
                                 </div>
                             )}
-                        </motion.div>
-                    </AnimatePresence>
-                    {images[activeIndex]?.caption && (
-                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-                            <p className="text-white text-sm font-medium">{images[activeIndex].caption}</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Thumbnail strip */}
-                <div className="max-w-4xl mx-auto overflow-x-auto">
-                    <div className="flex gap-2 pb-2">
-                        {images.map((item, i) => (
-                            <button
-                                key={i}
-                                onClick={() => setActiveIndex(i)}
-                                className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden transition-all duration-200"
-                                style={{
-                                    outline: i === activeIndex ? `2px solid var(--brand-primary)` : '2px solid transparent',
-                                    outlineOffset: '2px',
-                                    opacity: i === activeIndex ? 1 : 0.6,
-                                }}
-                            >
-                                {item.image?.url ? (
-                                    <img
-                                        src={item.image?.url}
-                                        alt={item.caption || item.image.alt || ''}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div
-                                        className="w-full h-full flex items-center justify-center"
-                                        style={{
-                                            background: `rgba(var(--brand-primary-rgb), 0.06)`,
-                                        }}
-                                    >
-                                        <span className="text-sm opacity-30">📷</span>
-                                    </div>
-                                )}
-                            </button>
-                        ))}
-                    </div>
+                        </button>
+                    ))}
                 </div>
             </div>
-        </AnimatedSection>
+        </GallerySection>
     )
 }
 
 // ── Justified Gallery ────────────────────────────────────────────────────────
 
-function JustifiedGallery({ headline, images, theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+function JustifiedGallery({ headline, images, theme: _theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+    void _theme
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
-                {headline && (
-                    <div className="text-center mb-14">
-                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
-                    </div>
-                )}
-
-                <StaggerGrid className="flex flex-wrap gap-[2px]">
-                    {images.map((item, i) => {
-                        // Vary aspect ratios for visual interest
-                        const flexGrow = [1.2, 0.8, 1, 1.5, 0.9, 1.3][i % 6]
-                        return (
-                            <StaggerItem
-                                key={i}
-                                className="group relative overflow-hidden"
-                                style={{
-                                    flexGrow,
-                                    flexBasis: `${150 * flexGrow}px`,
-                                    height: '220px',
-                                }}
-                            >
-                                {item.image?.url ? (
-                                    <>
-                                        <img
-                                            src={item.image?.url}
-                                            alt={item.caption || item.image.alt || ''}
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                        />
-                                        <div
-                                            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                                            style={{ background: `rgba(var(--brand-primary-rgb), 0.15)` }}
-                                        />
-                                        {item.caption && (
-                                            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                <p className="text-white text-xs font-medium">{item.caption}</p>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
+        <GallerySection>
+            <GalleryHeader headline={headline} />
+            <StaggerGrid className="flex flex-wrap gap-[2px]">
+                {images.map((item, i) => {
+                    // Vary aspect ratios for visual interest
+                    const flexGrow = [1.2, 0.8, 1, 1.5, 0.9, 1.3][i % 6]
+                    return (
+                        <StaggerItem
+                            key={i}
+                            className="group relative overflow-hidden"
+                            style={{
+                                flexGrow,
+                                flexBasis: `${150 * flexGrow}px`,
+                                height: '220px',
+                            }}
+                        >
+                            {item.image?.url ? (
+                                <>
+                                    <Image
+                                        src={item.image.url}
+                                        alt={item.caption || item.image.alt || ''}
+                                        data-image-index={i}
+                                        fill
+                                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                                    />
                                     <div
-                                        className="w-full h-full flex items-center justify-center"
-                                        style={{
-                                            background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
-                                            border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
-                                        }}
-                                    >
-                                        <span className="text-2xl opacity-20">📷</span>
-                                    </div>
-                                )}
-                            </StaggerItem>
-                        )
-                    })}
-                </StaggerGrid>
-            </div>
-        </AnimatedSection>
+                                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                        style={{ background: `rgba(var(--brand-primary-rgb), 0.15)` }}
+                                    />
+                                    {item.caption && (
+                                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                            <RichText text={item.caption} as="p" className="text-white text-xs font-medium" />
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div
+                                    className="w-full h-full flex items-center justify-center"
+                                    style={{
+                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
+                                        border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
+                                    }}
+                                    aria-hidden="true"
+                                >
+                                    <span className="text-2xl opacity-20">📷</span>
+                                </div>
+                            )}
+                        </StaggerItem>
+                    )
+                })}
+            </StaggerGrid>
+        </GallerySection>
     )
 }

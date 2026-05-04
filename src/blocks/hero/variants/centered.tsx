@@ -5,7 +5,8 @@ import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
-import { CTAButtons } from '../shared'
+import { CTAButtons, HERO_CONTAINER, safeAltText } from '../shared'
+import { HeroMediaOverlay } from '../hero-media-overlay'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 
@@ -14,7 +15,7 @@ export function CenteredHero({ block, site }: BlockProps<HeroConfig>) {
 
     return (
         <AnimatedSection
-            className="relative min-h-[92vh] flex items-center overflow-hidden"
+            className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden"
         >
             {/* Multi-layer background */}
             <div className="absolute inset-0" style={{
@@ -27,7 +28,7 @@ export function CenteredHero({ block, site }: BlockProps<HeroConfig>) {
             <GradientBlob color={CSS_VARS.primary} className="top-[-20%] left-[10%]" size={600} opacity={0.1} />
             <GradientBlob color={CSS_VARS.primary} className="bottom-[-10%] right-[5%]" size={400} opacity={0.08} />
 
-            <div className="container mx-auto px-6 relative z-10">
+            <div className={`${HERO_CONTAINER} relative z-10`}>
                 <div className="text-center max-w-4xl mx-auto">
                     {badge?.show && (
                         <motion.div
@@ -76,28 +77,32 @@ export function CenteredHero({ block, site }: BlockProps<HeroConfig>) {
 
                     {/* Hero image — only show if user uploaded an image */}
                     {image?.url && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 40 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.8, delay: 0.3 }}
-                            className="mt-16 relative max-w-4xl mx-auto group"
+                        <HeroMediaOverlay
+                            field="image.url"
+                            altText={safeAltText(image?.alt, headline)}
                         >
-                            <img
-                                src={image?.url}
-                                alt={image?.alt || headline}
-                                className="w-full rounded-2xl object-cover"
-                            />
-                            {/* Gradient overlay for polish */}
-                            <div
-                                className="absolute inset-0 rounded-2xl pointer-events-none"
-                                style={{
-                                    background: `linear-gradient(180deg, transparent 60%, rgba(var(--brand-primary-rgb), 0.082) 100%)`,
-                                    boxShadow: `0 25px 60px rgba(var(--brand-primary-rgb), 0.125), 0 8px 24px rgba(0,0,0,0.3)`,
-                                    borderRadius: 'inherit',
-                                }}
-                            />
-                        </motion.div>
+                            <motion.div
+                                initial={{ opacity: 0, y: 40 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ duration: 0.8, delay: 0.3 }}
+                                className="relative mt-16 max-w-4xl mx-auto group"
+                            >
+                                <img
+                                    src={image?.url}
+                                    alt={safeAltText(image?.alt, headline)}
+                                    className="w-full rounded-2xl object-cover"
+                                />
+                                <div
+                                    className="absolute inset-0 rounded-2xl pointer-events-none"
+                                    style={{
+                                        background: `linear-gradient(180deg, transparent 60%, rgba(var(--brand-primary-rgb), 0.082) 100%)`,
+                                        boxShadow: `0 25px 60px rgba(var(--brand-primary-rgb), 0.125), 0 8px 24px rgba(0,0,0,0.3)`,
+                                        borderRadius: 'inherit',
+                                    }}
+                                />
+                            </motion.div>
+                        </HeroMediaOverlay>
                     )}
                 </div>
             </div>

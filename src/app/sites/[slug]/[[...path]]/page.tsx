@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -10,6 +11,9 @@ import type { SiteData } from '@/blocks/types'
 import type { PageData } from '@/store/editorStore'
 import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogList'
 import DOMPurify from 'isomorphic-dompurify'
+import { getServerI18n } from '@/i18n/server'
+import { getSiteBasePath } from '@/lib/site-base-path'
+import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 // Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
 export const dynamic = 'force-dynamic'
@@ -81,16 +85,26 @@ async function getTenantAndPage(slug: string, pagePath: string) {
 
     // Find the page by slug
     const pageSlug = pagePath === '' ? '/' : `/${pagePath}`
+    // BUG-F05-01: explicitly fetch published versions for live site.
+    // Editor saves with draft:true; publish route promotes to published.
+    // Owner previewing unpublished site sees drafts; visitors see published.
+    // BUG-F05-08: hide pages with isVisible=false from visitors (owner can still preview)
+    // BUG-F05-11: exclude soft-deleted pages (deletedAt set) from live site
+    const visibilityFilter = !isOwner ? [{ isVisible: { not_equals: false } }] : []
+    const deletedFilter = [{ deletedAt: { exists: false } }]
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
             and: [
                 { site: { equals: site.id } },
                 { slug: { equals: pageSlug } },
+                ...visibilityFilter,
+                ...deletedFilter,
             ],
         },
         limit: 1,
-        depth: 3, // Resolve media relationships
+        depth: 3,
+        draft: isOwner && site.status !== 'published' ? true : false,
     })
 
     let page = pagesResult.docs[0]
@@ -103,10 +117,13 @@ async function getTenantAndPage(slug: string, pagePath: string) {
                 and: [
                     { site: { equals: site.id } },
                     { isHomepage: { equals: true } },
+                    ...visibilityFilter,
+                    ...deletedFilter,
                 ],
             },
             limit: 1,
             depth: 3,
+            draft: isOwner && site.status !== 'published' ? true : false,
         })
         page = homepageFallback.docs[0]
     }
@@ -114,7 +131,11 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     const navigationPages = await payload.find({
         collection: 'pages',
         where: {
-            site: { equals: site.id },
+            and: [
+                { site: { equals: site.id } },
+                ...visibilityFilter,
+                ...deletedFilter,
+            ],
         },
         limit: 100,
         sort: 'createdAt',
@@ -145,6 +166,8 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             if (blogPost) {
                 return { tenant, site, page: null, pages: navigationPages.docs, blogPost, isOwner }
             }
+            // Explicit 404 for missing/unpublished blog post
+            notFound()
         }
     }
 
@@ -166,6 +189,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     const title = blogPost?.seo?.metaTitle || blogPost?.title || page?.seo?.title || site.seo?.metaTitle || site.name
     const description = blogPost?.seo?.metaDescription || page?.seo?.description || site.seo?.metaDescription
+    type BlogMedia = { url?: string }
+    const blogThumb = blogPost ? (blogPost as unknown as { thumbnail?: BlogMedia | string }).thumbnail : null
+    const ogImage = blogThumb && typeof blogThumb === 'object' ? blogThumb.url ?? null : null
 
     // Resolve canonical URL from middleware-injected headers
     const reqHeaders = await headers()
@@ -196,6 +222,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             description: description ?? undefined,
             type: blogPost ? 'article' : 'website',
             ...(canonical ? { url: canonical } : {}),
+            ...(ogImage ? { images: [{ url: ogImage }] } : {}),
         },
         robots: page?.seo?.noIndex ? { index: false, follow: false } : undefined,
     }
@@ -210,6 +237,9 @@ export default async function TenantSitePage({ params }: Props) {
         notFound()
     }
 
+    const { t } = await getServerI18n()
+    const base = await getSiteBasePath(slug)
+
     // AC-3: Maintenance mode — was published, now draft
     if ('maintenance' in data && data.maintenance) {
         return <MaintenancePage siteName={data.site?.name as string} />
@@ -221,9 +251,9 @@ export default async function TenantSitePage({ params }: Props) {
         return (
             <div className="min-h-screen bg-[#0B1120] text-white">
                 <div className="max-w-5xl mx-auto px-6 py-16">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4">Blog</h1>
-                    <p className="text-lg opacity-60 mb-12">Latest stories and insights</p>
-                    <StorefrontBlogList tenantId={String(tenant.id)} />
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4">{t.storefront.blog.title}</h1>
+                    <p className="text-lg opacity-60 mb-12">{t.storefront.blog.latestStories}</p>
+                    <StorefrontBlogList tenantId={String(tenant.id)} siteBasePath={base} />
                 </div>
             </div>
         )
@@ -232,7 +262,15 @@ export default async function TenantSitePage({ params }: Props) {
     // Blog detail page — render published blog post
     if ('blogPost' in data && data.blogPost) {
         const { blogPost } = data
-        const post = blogPost as any
+        type BlogPost = {
+            title?: string; slug?: string; content?: string; status?: string
+            publishedAt?: string; createdAt?: string; updatedAt?: string
+            thumbnail?: { url?: string } | string
+            category?: { name?: string } | string
+            author?: { firstName?: string; lastName?: string; email?: string } | string
+            seo?: { metaTitle?: string; metaDescription?: string }
+        }
+        const post = blogPost as BlogPost
         const thumbUrl = typeof post.thumbnail === 'object' ? post.thumbnail?.url : null
         const catName = typeof post.category === 'object' ? post.category?.name : null
         const authorName = typeof post.author === 'object'
@@ -282,9 +320,9 @@ export default async function TenantSitePage({ params }: Props) {
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">
-                        <a href="/blogs" className="text-blue-500 hover:text-blue-400 font-medium">
-                            ← Back to all posts
-                        </a>
+                        <Link href={`${base}/blogs`} className="text-blue-500 hover:text-blue-400 font-medium">
+                            {t.storefront.blog.backToAll}
+                        </Link>
                     </div>
                 </article>
             </div>
@@ -297,9 +335,13 @@ export default async function TenantSitePage({ params }: Props) {
 
     const { site, page, pages, isOwner } = data
 
+    // GH-727 Phase 03: resolve seeded IMAGE_LIBRARY → S3 mappings (best-effort, never throws).
+    const payload = await getPayload({ config })
+    const imageLibraryS3 = await resolveImageLibraryS3Map(payload, site.id)
+
     return (
         <SiteRenderer
-            site={site as unknown as SiteData}
+            site={{ ...site, tenantSlug: slug, siteBasePath: base, imageLibraryS3 } as unknown as SiteData}
             page={page as unknown as PageData}
             pages={pages as unknown as NavPage[]}
             siteId={String(site.id)}

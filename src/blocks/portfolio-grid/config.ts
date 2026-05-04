@@ -2,9 +2,10 @@ import { z } from 'zod'
 import { BaseBlockSchema } from '../types'
 
 export type PortfolioProject = {
+    image?: { id?: number; url: string; alt?: string }
+    imageUrl?: string  // legacy AI gen compat — prefer image.url
     title: string
     description: string
-    imageUrl: string
     category: string
     linkUrl?: string
 }
@@ -23,9 +24,10 @@ export const PortfolioGridConfigSchema = BaseBlockSchema.extend({
     headline: z.string(),
     subheadline: z.string().optional(),
     projects: z.array(z.object({
+        image: z.object({ id: z.number().optional(), url: z.string(), alt: z.string().optional() }).optional(),
+        imageUrl: z.string().optional(),
         title: z.string(),
         description: z.string(),
-        imageUrl: z.string(),
         category: z.string(),
         linkUrl: z.string().optional(),
     })).default([]),
@@ -33,11 +35,15 @@ export const PortfolioGridConfigSchema = BaseBlockSchema.extend({
 
 export const portfolioGridMeta = {
     type: 'portfolio-grid' as const,
-    name: 'Portfolio Grid',
+    name: 'Portfolio',
     description: 'Filterable portfolio grid with hover overlays',
     icon: '🎨',
     variants: ['grid', 'masonry', 'showcase'],
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'projects'],
     quickActions: ['Add project', 'Change layout', 'Edit categories'],
+    aiVisible: true,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = PortfolioGridConfigSchema

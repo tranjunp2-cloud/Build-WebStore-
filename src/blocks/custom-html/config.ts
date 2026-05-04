@@ -17,4 +17,8 @@ export const customHtmlMeta: BlockMeta = {
     defaultVariant: 'default',
     editableFields: ['html'],
     quickActions: [],
+    aiVisible: false,
 }
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = CustomHtmlConfigSchema

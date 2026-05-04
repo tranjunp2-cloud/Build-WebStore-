@@ -5,7 +5,7 @@ import { generateBlocks } from '@/lib/ai/generate-blocks'
 // ─── TC-F01.10: Business type/intent detection ───────────────────────
 
 describe('generateBlocks — output structure [TC-F01.08]', () => {
-    const result = generateBlocks('Create a website for My Cafe, a coffee shop in KL')
+    const result = generateBlocks('Create a website for My Cafe, a coffee shop in KL', 12345)
 
     it('returns siteName extracted from prompt', () => {
         expect(result.siteName).toBe('My Cafe')
@@ -15,16 +15,25 @@ describe('generateBlocks — output structure [TC-F01.08]', () => {
         expect(['business', 'ecommerce', 'restaurant', 'portfolio', 'blog']).toContain(result.siteType)
     })
 
-    it('returns exactly 7 blocks', () => {
-        expect(result.blocks).toHaveLength(7)
+    it('returns 6-12 blocks (dynamic pool + industry blocks)', () => {
+        // Restaurant gets 3 industry blocks (menu-display, booking-widget,
+        // review-cards) prepended before the 3-4 generic middle blocks.
+        // Range: nav + hero + 0-3 industry + 3-4 middle + contact + footer = 7-12
+        expect(result.blocks.length).toBeGreaterThanOrEqual(6)
+        expect(result.blocks.length).toBeLessThanOrEqual(12)
     })
 
-    it('has correct block types in order: navigation, hero, about, features, testimonials, contact, footer', () => {
-        const blockTypes = result.blocks.map(b => b.blockType)
-        expect(blockTypes).toEqual([
-            'navigation', 'hero', 'about', 'features',
-            'testimonials', 'contact', 'footer',
-        ])
+    it('always has navigation first and footer last', () => {
+        expect(result.blocks[0]!.blockType).toBe('navigation')
+        expect(result.blocks[result.blocks.length - 1]!.blockType).toBe('footer')
+    })
+
+    it('always has hero as second block', () => {
+        expect(result.blocks[1]!.blockType).toBe('hero')
+    })
+
+    it('always has contact as second-to-last', () => {
+        expect(result.blocks[result.blocks.length - 2]!.blockType).toBe('contact')
     })
 
     it('returns theme with required fields', () => {
@@ -76,24 +85,39 @@ describe('generateBlocks — business type detection [TC-F01.10]', () => {
 })
 
 describe('generateBlocks — theme palette [TC-F01.08]', () => {
-    it('restaurant gets warm palette (amber/brown)', () => {
-        const result = generateBlocks('Create a restaurant website')
-        expect(result.theme.primaryColor).toBe('#D97706')
+    it('restaurant gets one of 3 restaurant palettes', () => {
+        const result = generateBlocks('Create a restaurant website', 12345)
+        expect(['#D97706', '#DC2626', '#059669']).toContain(result.theme.primaryColor)
     })
 
-    it('ecommerce gets cool palette (sky/indigo)', () => {
-        const result = generateBlocks('Build an online store')
-        expect(result.theme.primaryColor).toBe('#0EA5E9')
+    it('ecommerce gets one of 3 ecommerce palettes', () => {
+        const result = generateBlocks('Build an online store', 12345)
+        expect(['#0EA5E9', '#8B5CF6', '#10B981']).toContain(result.theme.primaryColor)
     })
 
-    it('portfolio uses dark mode', () => {
-        const result = generateBlocks('Create a portfolio for a photographer')
-        expect(result.theme.colorMode).toBe('dark')
+    it('theme has valid colorMode', () => {
+        const result = generateBlocks('Create a portfolio for a photographer', 12345)
+        expect(['light', 'dark']).toContain(result.theme.colorMode)
     })
 
-    it('business gets blue palette', () => {
-        const result = generateBlocks('Create a consulting company website')
-        expect(result.theme.primaryColor).toBe('#3B82F6')
+    it('business gets one of 3 business palettes', () => {
+        const result = generateBlocks('Create a consulting company website', 12345)
+        expect(['#3B82F6', '#0F766E', '#1E293B']).toContain(result.theme.primaryColor)
+    })
+
+    it('same seed produces same theme (reproducibility)', () => {
+        const r1 = generateBlocks('Create a restaurant website', 42)
+        const r2 = generateBlocks('Create a restaurant website', 42)
+        expect(r1.theme).toEqual(r2.theme)
+    })
+
+    it('different seeds produce potentially different themes', () => {
+        const results = new Set<string>()
+        for (let seed = 0; seed < 100; seed++) {
+            const r = generateBlocks('Create a restaurant website', seed * 9973)
+            results.add(r.theme.primaryColor)
+        }
+        expect(results.size).toBeGreaterThan(1)
     })
 })
 
@@ -157,5 +181,99 @@ describe('generateBlocks — footer block', () => {
         const result = generateBlocks('Create a website called "TestBrand"')
         const footer = result.blocks.find(b => b.blockType === 'footer')
         expect(footer?.copyrightText).toContain('TestBrand')
+    })
+})
+
+// ─── Regression: Payload field name mismatches that caused empty blocks ──
+// Bug history: 2026-04-14
+// User reported huge empty space in generated restaurant site (page 179).
+// Root cause: faq builder used `items` field, but Payload schema requires
+// `faqs` → silently dropped on save → empty section rendered.
+// Same class of bug for `gallery` (upload field, can't accept URLs) and
+// `about.body` (textarea, was passed as Lexical richtext object).
+
+describe('generateBlocks — Payload field name compliance', () => {
+    it('faq block uses `faqs` field (not `items`) to match Payload schema', () => {
+        // Force faq into the pool by generating many seeds — pool shuffles.
+        let foundFaq: Record<string, unknown> | undefined
+        for (let seed = 0; seed < 50 && !foundFaq; seed++) {
+            const result = generateBlocks('Create a website for a company', seed * 31)
+            const faq = result.blocks.find(b => b.blockType === 'faq') as Record<string, unknown> | undefined
+            if (faq) foundFaq = faq
+        }
+        expect(foundFaq).toBeDefined()
+        expect(foundFaq).toHaveProperty('faqs')
+        expect(Array.isArray(foundFaq!.faqs)).toBe(true)
+        expect((foundFaq!.faqs as unknown[]).length).toBeGreaterThan(0)
+        // Should NOT have legacy `items` field
+        expect(foundFaq).not.toHaveProperty('items')
+    })
+
+    it('about block body is plain string (not Lexical richtext object)', () => {
+        let foundAbout: Record<string, unknown> | undefined
+        for (let seed = 0; seed < 50 && !foundAbout; seed++) {
+            const result = generateBlocks('Create a website for a company', seed * 47)
+            const about = result.blocks.find(b => b.blockType === 'about') as Record<string, unknown> | undefined
+            if (about) foundAbout = about
+        }
+        expect(foundAbout).toBeDefined()
+        expect(typeof foundAbout!.body).toBe('string')
+        expect((foundAbout!.body as string).length).toBeGreaterThan(0)
+    })
+
+    it('gallery block is excluded from middle pool (requires media uploads)', () => {
+        // Gallery requires upload field IDs that the fallback cannot generate.
+        // Verify gallery never appears in 100 generations.
+        for (let seed = 0; seed < 100; seed++) {
+            const result = generateBlocks('Create a website for a company', seed * 17)
+            const gallery = result.blocks.find(b => b.blockType === 'gallery')
+            expect(gallery, `seed ${seed} should not produce gallery`).toBeUndefined()
+        }
+    })
+})
+
+// ─── Industry-aware fallback: category-specific blocks ──────────────────
+describe('generateBlocks — industry-aware block selection', () => {
+    it('restaurant fallback includes menu-display + booking-widget', () => {
+        const result = generateBlocks('Create a website for "Ben Ben" restaurant', 12345)
+        const blockTypes = result.blocks.map(b => b.blockType)
+        expect(blockTypes).toContain('menu-display')
+        expect(blockTypes).toContain('booking-widget')
+    })
+
+    it('restaurant menu-display has non-empty categories with items', () => {
+        const result = generateBlocks('Create a website for a restaurant', 12345)
+        const menu = result.blocks.find(b => b.blockType === 'menu-display') as Record<string, unknown> | undefined
+        expect(menu).toBeDefined()
+        const categories = menu!.categories as Array<{ items: unknown[] }>
+        expect(Array.isArray(categories)).toBe(true)
+        expect(categories.length).toBeGreaterThan(0)
+        expect(categories[0]!.items.length).toBeGreaterThan(0)
+    })
+
+    it('restaurant review-cards has non-empty reviews array', () => {
+        const result = generateBlocks('Create a website for a restaurant', 12345)
+        const reviews = result.blocks.find(b => b.blockType === 'review-cards') as Record<string, unknown> | undefined
+        expect(reviews).toBeDefined()
+        expect(Array.isArray(reviews!.reviews)).toBe(true)
+        expect((reviews!.reviews as unknown[]).length).toBeGreaterThan(0)
+    })
+
+    it('ecommerce fallback includes products-grid + review-cards', () => {
+        const result = generateBlocks('Create a website for an online store', 12345)
+        const blockTypes = result.blocks.map(b => b.blockType)
+        expect(blockTypes).toContain('products-grid')
+        expect(blockTypes).toContain('review-cards')
+    })
+
+    it('business fallback works without industry blocks', () => {
+        const result = generateBlocks('Create a consulting company website', 12345)
+        // Should still have nav, hero, contact, footer + middle blocks
+        expect(result.blocks.length).toBeGreaterThanOrEqual(6)
+        const blockTypes = result.blocks.map(b => b.blockType)
+        expect(blockTypes).toContain('navigation')
+        expect(blockTypes).toContain('hero')
+        expect(blockTypes).toContain('contact')
+        expect(blockTypes).toContain('footer')
     })
 })

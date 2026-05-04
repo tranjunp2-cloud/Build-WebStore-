@@ -37,6 +37,7 @@ vi.mock('@/i18n', () => ({
                     unpublishSuccess: 'Đã gỡ website',
                     unpublishFailed: 'Gỡ website thất bại',
                     versionConflict: 'Version conflict',
+                    viewAction: 'View',
                 },
             },
             dashboard: { overview: {} },
@@ -58,13 +59,14 @@ vi.mock('@/components/editor/PreviewFrame', () => ({ PreviewFrame: () => <div da
 vi.mock('@/components/editor/EditorSidebar', () => ({ 
     EditorSidebar: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar">{children}</div> 
 }))
-vi.mock('@/components/editor/EditorToolbar', () => ({ 
-    EditorToolbar: ({ onPublish, onSave, isSaving }: any) => (
+vi.mock('@/components/editor/EditorToolbar', () => ({
+    EditorToolbar: ({ onPublish, onRepublish, onSave, isSaving }: any) => (
         <div data-testid="toolbar">
             <button data-testid="save-btn" onClick={onSave} disabled={isSaving}>Save</button>
             <button data-testid="publish-btn" onClick={onPublish}>Publish</button>
+            <button data-testid="republish-btn" onClick={onRepublish}>Update</button>
         </div>
-    ) 
+    )
 }))
 vi.mock('@/components/editor/PrePublishModal', () => ({
     PrePublishModal: ({ isOpen, onPublish }: any) => isOpen ? (
@@ -203,6 +205,77 @@ describe('Publish and Save Flows (TC-F05)', () => {
         // The unpublish API call itself is tested in src/__tests__/api/publish.test.ts
     })
 
+    it('TC-F05.50: handleRepublish refetches pages so new page shows Live instead of stale Draft (BUG-F05 update-new-page)', async () => {
+        // Regression: after creating a new page on a published site and clicking
+        // Update, the sidebar still showed "Draft" because the local pages store
+        // was never synced with the server after promotion.
+        // Seed store with a site that's published + a newly-created draft page.
+        useEditorStore.setState({
+            pages: [
+                { id: 'page-1', title: 'Home', slug: '/', status: 'published', isHomepage: true, isVisible: true, updatedAt: '2026-04-01T00:00:00Z' } as any,
+                { id: 'page-new', title: 'About', slug: '/about', status: 'draft', isHomepage: false, isVisible: true, updatedAt: '2026-04-17T00:00:00Z' } as any,
+            ],
+            hasUnpublishedChanges: true,
+            hasUnsavedChanges: false,
+        })
+
+        const fetchCalls: string[] = []
+        ;(global.fetch as any) = vi.fn().mockImplementation((url: string | URL) => {
+            const urlStr = url.toString()
+            fetchCalls.push(urlStr)
+            if (urlStr.includes('/editor-data')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        site: { id: 'test-site-id', name: 'Test Site', status: 'published', tenantSlug: 'my-shop' },
+                        page: { id: 'page-1', title: 'Home', slug: '/' },
+                    }),
+                })
+            }
+            if (urlStr.includes('/publish')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ data: { url: 'https://my-shop.primeweb.app' } }),
+                })
+            }
+            if (urlStr.includes('/pages')) {
+                // After republish the server returns the page as published.
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        pages: [
+                            { id: 'page-1', title: 'Home', slug: '/', status: 'published', isHomepage: true, isVisible: true, updatedAt: '2026-04-01T00:00:00Z' },
+                            { id: 'page-new', title: 'About', slug: '/about', status: 'published', isHomepage: false, isVisible: true, updatedAt: '2026-04-17T00:00:00Z' },
+                        ],
+                    }),
+                })
+            }
+            return Promise.resolve({ ok: true, json: async () => ({}) })
+        })
+
+        render(<EditorPage />)
+        await waitFor(() => expect(screen.getByTestId('toolbar')).toBeInTheDocument())
+
+        fireEvent.click(screen.getByTestId('republish-btn'))
+
+        await waitFor(() => {
+            // A /pages refetch must happen AFTER the /publish call so the store
+            // reflects the server-side promotion.
+            const publishIdx = fetchCalls.findIndex(u => u.includes('/publish'))
+            expect(publishIdx).toBeGreaterThan(-1)
+            const pagesAfterPublish = fetchCalls
+                .slice(publishIdx + 1)
+                .some(u => u.includes('/pages') && !u.includes('/publish'))
+            expect(pagesAfterPublish).toBe(true)
+        })
+
+        await waitFor(() => {
+            const pages = useEditorStore.getState().pages
+            const newPage = pages.find(p => p.id === 'page-new')
+            expect(newPage?.status).toBe('published')
+        })
+    })
+
     it('TC-F05.36: Multi-tab version conflict Http 409', async () => {
         render(<EditorPage />)
         await waitFor(() => {
@@ -213,7 +286,7 @@ describe('Publish and Save Flows (TC-F05)', () => {
         ;(global.fetch as any).mockImplementation(async (url: string | URL) => {
             const urlStr = url.toString()
             if (urlStr.includes('/save')) {
-                return Promise.resolve({ ok: false, status: 409 })
+                return Promise.resolve({ ok: false, status: 409, json: async () => ({ error: 'Version conflict' }) })
             }
             return Promise.resolve({ ok: true, json: async () => ({}) })
         })
@@ -222,8 +295,8 @@ describe('Publish and Save Flows (TC-F05)', () => {
         fireEvent.click(screen.getByTestId('save-btn'))
 
         await waitFor(() => {
-            // Verify 409 toast fires for generic save failure 
-            expect(toast.error).toHaveBeenCalledWith('Save failed', expect.objectContaining({ description: 'Server returned 409' }))
+            // Verify 409 toast fires with server error message
+            expect(toast.error).toHaveBeenCalledWith('Lưu thất bại')
         })
     })
 

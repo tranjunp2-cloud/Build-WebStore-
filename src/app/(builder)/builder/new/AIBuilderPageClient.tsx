@@ -10,14 +10,17 @@ import BuilderCompletionView from '@/components/builder/BuilderCompletionView'
 import BuilderFullPreview from '@/components/builder/BuilderFullPreview'
 import BuilderGenerationView from '@/components/builder/BuilderGenerationView'
 import { CongratsModal } from '@/components/builder/CongratsModal'
+import { DraftRecoveryDialog } from '@/components/builder/DraftRecoveryDialog'
+import { PaywallCard } from '@/components/builder/PaywallCard'
 import type { BuilderPreviewMode } from '@/components/builder/BuilderPreviewPrimitives'
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
-import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
+import { useBuilderStore, getDraftStatus, getDraftMeta, type BusinessInfo } from '@/store/builderStore'
 import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
+import { useI18n } from '@/i18n'
 
 export interface AIBuilderPageClientProps {
     /** Server-resolved current user ID — used to detect cross-user localStorage contamination */
@@ -88,6 +91,18 @@ function LivePreview({
             axis="y"
             className="min-h-full w-full"
             onReorder={(newOrder) => onReorder?.(newOrder)}
+            // Guard for streaming phase only (siteId not yet set). Once generation
+            // completes, BuilderPreviewSurface switches to an iframe so SiteRenderer
+            // rewrites links correctly. During streaming, blocks render directly in
+            // DOM without URL rewriting, so internal hrefs would hit the app router
+            // → CMS 404 (GH #770). External, mailto, tel, and #hash pass through.
+            onClick={(e: React.MouseEvent) => {
+                const anchor = (e.target as Element).closest('a')
+                if (!anchor) return
+                const href = anchor.getAttribute('href') ?? ''
+                if (href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('#')) return
+                e.preventDefault()
+            }}
             style={{
                 fontFamily: `'${theme.fontBody}', sans-serif`,
                 background: resolved.backgroundColor,
@@ -140,6 +155,7 @@ function LivePreview({
 }
 
 export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps) {
+    const { t } = useI18n()
     const router = useRouter()
     const [isFullPreviewOpen, setIsFullPreviewOpen] = useState(false)
     const [isMobileViewport, setIsMobileViewport] = useState(false)
@@ -150,6 +166,11 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const [publishedSiteUrl, setPublishedSiteUrl] = useState<string | null>(null)
     const [draftSaveState, setDraftSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle')
     const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+    // BUG-F01-26: Track whether user has made manual edits (reorder, etc.)
+    // after generation. Pages are already saved correctly by the gen route;
+    // auto-save should only fire when user actually changes something,
+    // otherwise it overwrites the properly-split page layouts with raw blocks.
+    const hasUserEditsRef = useRef(false)
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const abortControllerRef = useRef<AbortController | null>(null)
     const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -157,6 +178,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const hardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [elapsedSeconds, setElapsedSeconds] = useState(0)
     const [showTimeoutWarning, setShowTimeoutWarning] = useState(false)
+    const sseRetryCountRef = useRef(0)
+    const sseRetryTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const [showDraftDialog, setShowDraftDialog] = useState(false)
+    const [showPaywall, setShowPaywall] = useState(false)
 
     const {
         step,
@@ -218,12 +243,25 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             if (meta.lastTouchedAt && Date.now() - meta.lastTouchedAt > BUILDER_SESSION_TTL_MS) {
                 reset()
                 window.localStorage.removeItem(BUILDER_SESSION_META_KEY)
-                toast.message('Your previous AI builder draft expired after 24 hours.')
+                toast.message(t.onboarding.generating.draftExpired)
             }
         } catch {
             window.localStorage.removeItem(BUILDER_SESSION_META_KEY)
         }
     }, [reset])
+
+    // Draft recovery dialog — show on mount if a valid draft exists
+    useEffect(() => {
+        const stored = useBuilderStore.getState()
+        if (stored.businessInfo && stored.step === 'info' && stored.status !== 'streaming') {
+            const status = getDraftStatus()
+            if (status === 'valid') {
+                setShowDraftDialog(true)
+            } else if (status === 'expired' || status === 'corrupted' || status === 'wrong-user') {
+                stored.clearDraft()
+            }
+        }
+    }, [])
 
     useEffect(() => {
         if (typeof window === 'undefined') return
@@ -238,8 +276,19 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         )
     }, [blocks.length, businessInfo, messages.length, siteId, status])
 
+    // BUG-F01-26: Only auto-save when user has made manual edits.
+    // The gen route already creates pages with correct layouts, nav blocks,
+    // Unsplash images, and per-page structure. Auto-saving the raw SSE blocks
+    // (flat array, no images, no nav) would overwrite the homepage layout and
+    // cause the preview to show different content than what was generated.
     useEffect(() => {
         if (!siteId || status !== 'done' || blocks.length === 0 || !theme) return
+        if (!hasUserEditsRef.current) {
+            // Pages already persisted by gen route — mark as saved without hitting API
+            setDraftSaveState('saved')
+            setLastSavedAt(Date.now())
+            return
+        }
 
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
 
@@ -271,7 +320,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [blocks, siteId, status, theme])
 
     useEffect(() => {
-        if (status === 'done' && blocks.length > 0 && theme) {
+        if (status === 'done' && blocks.length > 0 && theme && hasUserEditsRef.current) {
             setDraftSaveState((current) => (current === 'saving' ? current : 'dirty'))
         }
     }, [blocks, status, theme])
@@ -300,7 +349,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         } catch (error) {
             setDraftSaveState('error')
             console.error('[Save Draft] Failed to persist draft:', error)
-            toast.error('Failed to save the latest preview changes.')
+            toast.error(t.onboarding.generating.saveFailed)
             return false
         }
     }, [blocks, siteId, theme])
@@ -343,16 +392,17 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const prepareGenerationSession = useCallback((info: BusinessInfo) => {
         reset()
+        hasUserEditsRef.current = false
         setGenerationTimeMs(0)
         setBusinessInfo(info)
         setStatus('streaming')
         setProgress({
             step: 'generate',
-            label: 'Generating content & design',
+            label: t.onboarding.generating.stepGenerating,
             progress: 8,
         })
-        addMessage({ role: 'assistant', content: '🚀 Starting website creation...' })
-    }, [addMessage, reset, setBusinessInfo, setProgress, setStatus])
+        addMessage({ role: 'assistant', content: `🚀 ${t.onboarding.generating.startingMessage}` })
+    }, [addMessage, reset, setBusinessInfo, setProgress, setStatus, t])
 
     const handleSSEEvent = useCallback((event: string, data: any) => {
         switch (event) {
@@ -373,7 +423,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 setGenerationTimeMs(data.timeMs || 0)
                 setSiteId(data.siteId)
                 setSiteName(data.siteName)
-                setDraftSaveState('dirty')
+                // BUG-F01-26: Don't mark dirty — gen route already saved pages correctly.
+                // Setting 'dirty' here triggers auto-save which overwrites processed
+                // homepage layout (with nav, images, page split) with raw SSE blocks.
+                hasUserEditsRef.current = false
                 void trackBuilderEvent(data.siteId, 'builder_generation_completed', {
                     totalBlocks: data.totalBlocks,
                     totalPages: data.totalPages || 1,
@@ -382,17 +435,17 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 addMessage({
                     role: 'assistant',
                     content:
-                        `✅ Website **"${data.siteName}"** has been created successfully!\n\n` +
-                        `📄 **${data.totalPages || 1} pages** generated\n` +
-                        `📊 **${data.totalBlocks} sections** generated\n` +
-                        `⏱️ **${Math.round(data.timeMs / 1000)}s** generation time\n\n` +
-                        'You can view the Preview on the right, open the Editor to make changes, or Publish now!',
+                        `✅ ${t.onboarding.completion.createdSuccessfully.replace('{name}', data.siteName)}\n\n` +
+                        `📄 **${t.onboarding.completion.pagesGenerated.replace('{count}', String(data.totalPages || 1))}** ${t.onboarding.completion.generated}\n` +
+                        `📊 **${t.onboarding.completion.sectionsGenerated.replace('{count}', String(data.totalBlocks))}** ${t.onboarding.completion.sectionsGeneratedLabel}\n` +
+                        `⏱️ **${t.onboarding.completion.generationTime.replace('{seconds}', String(Math.round(data.timeMs / 1000)))}** ${t.onboarding.completion.generationTimeLabel}\n\n` +
+                        t.onboarding.completion.viewPreviewHint,
                 })
                 break
             default:
                 break
         }
-    }, [addBlock, addMessage, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme])
+    }, [addBlock, addMessage, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme, t])
 
     const clearGenerationTimers = useCallback(() => {
         if (elapsedIntervalRef.current) {
@@ -425,6 +478,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         return () => {
             abortControllerRef.current?.abort()
             clearGenerationTimers()
+            if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
         }
     }, [clearGenerationTimers])
 
@@ -440,11 +494,14 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const elapsedInterval = setInterval(() => setElapsedSeconds((s) => s + 1), 1000)
         elapsedIntervalRef.current = elapsedInterval
 
-        // 60s warning timeout (v2: increased from 30s — larger prompts take longer)
+        // 60s warning timeout — shows "still working..." hint (non-blocking)
         const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
         warningTimeoutRef.current = warningTimeout
 
-        // 120s hard timeout — auto-abort (v2: increased from 60s for richer extraction prompts)
+        // 300s (5 min) hard timeout — auto-abort.
+        // v3 (2026-04-14): 120s → 300s. site-generation flipped to gpt-4.1-mini
+        // (commit 56adabe0) with p95 ~99s, p99 can exceed 120s. Bumped to 5 min
+        // to absorb long-tail OpenAI latency until phase-03b tuning ships.
         const hardTimeout = setTimeout(() => {
             controller.abort()
             clearGenerationTimers()
@@ -453,7 +510,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             setError({ code: 'timeout', message, retryable: true })
             setStep('info')
             toast.error(message)
-        }, 120_000)
+        }, 300_000)
         hardTimeoutRef.current = hardTimeout
 
         try {
@@ -476,6 +533,14 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 const errorBody = await response.json().catch(() => null)
                 const genError = getGenerationError(response.status, errorBody)
                 const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
+
+                // 402 → show PaywallCard instead of form
+                if (response.status === 402) {
+                    setShowPaywall(true)
+                    setStep('info')
+                    return
+                }
+
                 setError({ code: genError.code, message, retryable: genError.retryable })
                 setStep('info')
                 toast.error(message)
@@ -490,6 +555,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             }
 
             let buffer = ''
+            let currentEvent = ''
 
             while (true) {
                 const { done, value } = await reader.read()
@@ -499,8 +565,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
                 const lines = buffer.split('\n')
                 buffer = lines.pop() || ''
-
-                let currentEvent = ''
 
                 for (const line of lines) {
                     if (line.startsWith('event: ')) {
@@ -516,7 +580,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                         const data = JSON.parse(line.slice(6))
                         handleSSEEvent(currentEvent, data)
                     } catch {
-                        // Malformed SSE payload — log for diagnostics but do not crash stream.
                         console.warn('[SSE] malformed payload, skipping event:', currentEvent)
                     }
 
@@ -528,12 +591,38 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 // User cancelled or hard timeout — already handled
                 return
             }
-            // SSE disconnect or network error
+            // SSE disconnect or network error — show banner, auto-retry up to 3x
             const genError = getGenerationError(0, 'SSE_DISCONNECT')
+            const retryIntervals = genError.retryIntervals || [2000, 5000, 10000]
+            const maxRetries = genError.maxRetries || 3
+            const currentRetry = sseRetryCountRef.current
+
+            if (currentRetry < maxRetries) {
+                const delay = retryIntervals[currentRetry] || retryIntervals[retryIntervals.length - 1]
+                sseRetryCountRef.current += 1
+                toast.warning('Lost connection. Retrying...', { duration: delay })
+                // Store timer ref to prevent duplicate streams on new generation start
+                if (sseRetryTimerRef.current) clearTimeout(sseRetryTimerRef.current)
+                sseRetryTimerRef.current = setTimeout(() => {
+                    sseRetryTimerRef.current = null
+                    void startSSEGeneration(info, extraInstructions, briefSnapshot)
+                }, delay)
+                return
+            }
+
+            // All retries exhausted — show fatal error, redirect to dashboard
+            sseRetryCountRef.current = 0
             const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
             setError({ code: genError.code, message, retryable: genError.retryable })
             setStep('info')
-            toast.error(message)
+            toast.error('Cannot create website', {
+                description: 'Connection failed after multiple retries.',
+                duration: 10000,
+                action: {
+                    label: 'Go to Dashboard',
+                    onClick: () => router.push('/dashboard?ai_status=failed'),
+                },
+            })
         } finally {
             clearGenerationTimers()
             abortControllerRef.current = null
@@ -543,6 +632,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
         // Capture contentBrief BEFORE reset() clears it from the store
         const briefSnapshot = useBuilderStore.getState().contentBrief
+        sseRetryCountRef.current = 0
+        if (sseRetryTimerRef.current) { clearTimeout(sseRetryTimerRef.current); sseRetryTimerRef.current = null }
         prepareGenerationSession(info)
         void startSSEGeneration(info, undefined, briefSnapshot)
     }, [prepareGenerationSession, startSSEGeneration])
@@ -553,8 +644,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const handleDashboard = useCallback(async () => {
         setIsNavigating(true)
-        // Save draft in background — don't block navigation
-        void saveDraftNow()
+        // BUG-F01-26: Only save if user made manual edits
+        if (hasUserEditsRef.current) {
+            void saveDraftNow()
+        }
         // Navigate FIRST, then clear state (prevents flash of empty form)
         router.push('/dashboard')
         // Delay reset so navigation starts before component re-renders
@@ -566,8 +659,12 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const handleOpenEditor = useCallback(async () => {
         if (!siteId) return
-        const saved = await saveDraftNow()
-        if (!saved) return
+        // BUG-F01-26: Only save if user made manual edits. Gen route already
+        // saved pages correctly — saving raw SSE blocks would overwrite them.
+        if (hasUserEditsRef.current) {
+            const saved = await saveDraftNow()
+            if (!saved) return
+        }
         reset()
         clearBuilderSessionStorage()
         router.push(`/editor/${siteId}`)
@@ -597,7 +694,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     url: payload?.data?.url,
                 })
             }
-            toast.success('Website published successfully!')
+            toast.success(t.onboarding.completion.publishSuccess)
         } catch (error: any) {
             toast.error(error?.message || 'Failed to publish website')
         } finally {
@@ -606,6 +703,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [isPublishing, saveDraftNow, siteId])
 
     const handleMoveBlock = useCallback((blockId: string, direction: 'up' | 'down') => {
+        hasUserEditsRef.current = true
         const movableIndices = blocks.reduce<number[]>((acc, block, index) => {
             if (block._id && block.blockType !== 'navigation' && block.blockType !== 'footer') {
                 acc.push(index)
@@ -630,17 +728,17 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const generationMessage =
         messages.find((message) => message.role === 'assistant')?.content.replace(/^🚀\s*/, '') ||
-        'Starting website creation...'
+        t.onboarding.generating.startingMessage
 
     const previewContent = blocks.length > 0 && theme ? (
         <div className="h-full overflow-y-auto bg-[#06090F]">
-            <LivePreview blocks={blocks} onReorder={setBlocks} theme={theme} siteType={businessInfo?.industry} />
+            <LivePreview blocks={blocks} onReorder={(newOrder) => { hasUserEditsRef.current = true; setBlocks(newOrder) }} theme={theme} siteType={businessInfo?.industry} />
         </div>
     ) : (
         <div className="flex h-full items-center justify-center bg-[#06090F]">
             <div className="text-center">
-                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || 'Your website'}</p>
-                <p className="mt-2 text-sm text-white/40">Preview is being prepared.</p>
+                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || t.onboarding.completion.yourWebsite}</p>
+                <p className="mt-2 text-sm text-white/40">{t.onboarding.completion.previewPreparing}</p>
             </div>
         </div>
     )
@@ -652,8 +750,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     ) : (
         <div className="flex h-full items-center justify-center bg-[#06090F]">
             <div className="text-center">
-                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || 'Your website'}</p>
-                <p className="mt-2 text-sm text-white/40">Preview is being prepared.</p>
+                <p className="text-base font-medium text-white/80">{siteName || businessInfo?.businessName || t.onboarding.completion.yourWebsite}</p>
+                <p className="mt-2 text-sm text-white/40">{t.onboarding.completion.previewPreparing}</p>
             </div>
         </div>
     )
@@ -669,13 +767,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const saveStatusLabel =
         draftSaveState === 'saving'
-            ? 'Saving draft...'
+            ? t.onboarding.completion.savingDraft
             : draftSaveState === 'saved'
-                ? `Saved ${formatSavedAt(lastSavedAt) ?? ''}`.trim()
+                ? t.onboarding.completion.savedAt.replace('{time}', formatSavedAt(lastSavedAt) ?? '').trim()
                 : draftSaveState === 'error'
-                    ? 'Save failed'
+                    ? t.onboarding.completion.saveFailed
                     : draftSaveState === 'dirty'
-                        ? 'Unsaved changes'
+                        ? t.onboarding.completion.unsavedChanges
                         : null
 
     const saveStatusBadge = saveStatusLabel ? (
@@ -685,7 +783,21 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     ) : null
 
     if (step === 'info') {
+        if (showPaywall) {
+            return <PaywallCard onBack={() => setShowPaywall(false)} />
+        }
         return (
+            <>
+            {showDraftDialog && (
+                <DraftRecoveryDialog
+                    draft={getDraftMeta()}
+                    onContinue={() => setShowDraftDialog(false)}
+                    onDiscard={() => {
+                        useBuilderStore.getState().clearDraft()
+                        setShowDraftDialog(false)
+                    }}
+                />
+            )}
             <BusinessInfoForm
                 errorMessage={status === 'error' ? error?.message || null : null}
                 initialValues={businessInfo}
@@ -693,6 +805,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 onRetry={status === 'error' && error?.retryable ? handleRetryGeneration : undefined}
                 onSubmit={handleGenerateStart}
             />
+            </>
         )
     }
 
@@ -719,6 +832,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     onBack={() => setIsFullPreviewOpen(false)}
                     onModeChange={setPreviewMode}
                     previewContent={readonlyPreviewContent}
+                    siteId={siteId}
                 />
             )
         }
@@ -739,15 +853,24 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     onPreviewModeChange={setPreviewMode}
                     previewContent={previewContent}
                     previewMode={previewMode}
+                    siteId={siteId}
                     siteName={siteName || businessInfo?.businessName || 'your-site'}
                     totalBlocks={blocks.length || 7}
                 />
                 <CongratsModal
-                    dashboardHref="/admin"
-                    dashboardLabel="Go to Admin Dashboard"
+                    dashboardHref="/dashboard"
+                    dashboardLabel={t.onboarding.completion.goToDashboard}
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
-                        if (!open) setPublishedSiteUrl(null)
+                        if (!open) {
+                            // Dismissing success modal → land users on their dashboard
+                            // (X, backdrop click, Esc all route here). Reset builder state first
+                            // so navigating back to /builder/new starts clean.
+                            setPublishedSiteUrl(null)
+                            reset()
+                            clearBuilderSessionStorage()
+                            router.push('/dashboard')
+                        }
                     }}
                     onNavigate={() => {
                         reset()

@@ -1,60 +1,23 @@
 import type { ThemeConfig } from '@/blocks/types'
-import { getFontPairing } from '@/lib/fonts/pairings'
+import {
+    getFontPairing,
+    validateFontPairing,
+    fontNameToCSSVar,
+    FONT_CSS_VAR_MAP,
+} from '@/lib/fonts/pairings'
+import {
+    generatePalette,
+    validateThemeColors,
+    isValidHex,
+    hexToRGBString,
+    lightenHex,
+    hexToHSL,
+    hslToHex,
+} from './color-utils'
 
-// ── Hex Color Manipulation Helpers ──────────────────────────────────────────
-
-const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/
-
-function isValidHex(hex: string): boolean {
-    return HEX_REGEX.test(hex)
-}
-
-export function hexToHSL(hex: string): { h: number; s: number; l: number } {
-    if (!isValidHex(hex)) return { h: 0, s: 0, l: 50 }
-
-    const r = parseInt(hex.slice(1, 3), 16) / 255
-    const g = parseInt(hex.slice(3, 5), 16) / 255
-    const b = parseInt(hex.slice(5, 7), 16) / 255
-
-    const max = Math.max(r, g, b)
-    const min = Math.min(r, g, b)
-    const l = (max + min) / 2
-
-    if (max === min) return { h: 0, s: 0, l: l * 100 }
-
-    const d = max - min
-    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-
-    let h = 0
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
-    else if (max === g) h = ((b - r) / d + 2) / 6
-    else h = ((r - g) / d + 4) / 6
-
-    return { h: h * 360, s: s * 100, l: l * 100 }
-}
-
-export function hslToHex(h: number, s: number, l: number): string {
-    h = ((h % 360) + 360) % 360
-    s = Math.max(0, Math.min(100, s)) / 100
-    l = Math.max(0, Math.min(100, l)) / 100
-
-    const a = s * Math.min(l, 1 - l)
-    const f = (n: number) => {
-        const k = (n + h / 30) % 12
-        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
-        return Math.round(255 * Math.max(0, Math.min(1, color)))
-            .toString(16)
-            .padStart(2, '0')
-    }
-    return `#${f(0)}${f(8)}${f(4)}`
-}
-
-export function lightenHex(hex: string, percent: number): string {
-    if (!isValidHex(hex)) return hex
-    const hsl = hexToHSL(hex)
-    const newL = Math.min(100, hsl.l + percent)
-    return hslToHex(hsl.h, hsl.s, newL)
-}
+// Re-export hex/HSL helpers so existing consumers (tests, AIBuilderPageClient)
+// that import from '@/lib/theme/resolve' keep working without change.
+export { hexToHSL, hslToHex, lightenHex } from './color-utils'
 
 // ── Spacing Presets ─────────────────────────────────────────────────────────
 
@@ -101,43 +64,96 @@ function resolveBodyFont(pairingId: string | null | undefined): string {
 // Resolves a partial theme (from DB with missing fields) into a full ThemeConfig.
 // Backward compatible: existing sites with only primaryColor + secondaryColor work identically.
 
+const DEFAULT_HEADING_FONT = 'Outfit'
+const DEFAULT_BODY_FONT = 'Inter'
+
+// Plan 260417 Wave 1 A2 — fallback defaults changed from dark cyan/magenta
+// (`#0ea5e9` + `#d946ef`) to light neutral slate. Every preset in
+// `theme-presets.ts` writes a full 11-field palette, so this fallback only
+// hits when a site was saved with incomplete theme OR resolveTheme is called
+// with an empty object. Dark alien cyan/magenta scared users in staging.
+const FALLBACK_PRIMARY_COLOR = '#111827' // slate-900
+const FALLBACK_SECONDARY_COLOR = '#374151' // slate-700
+const FALLBACK_COLOR_MODE: 'light' | 'dark' = 'light'
+
 export function resolveTheme(
     partial: Partial<ThemeConfig> & { primaryColor?: string; colorMode?: 'light' | 'dark' },
 ): ThemeConfig {
-    const colorMode = partial.colorMode || 'dark'
+    const colorMode = partial.colorMode || FALLBACK_COLOR_MODE
     const isDark = colorMode === 'dark'
-    const primaryColor = partial.primaryColor || '#0ea5e9'
+    const primaryColor = partial.primaryColor || FALLBACK_PRIMARY_COLOR
 
-    return {
+    // Dev-time warn when resolver has to fill ≥2 palette fields — signals a
+    // composer bug (picker should emit full 11-field preset). Never throws.
+    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') {
+        const missing: string[] = []
+        if (!partial.primaryColor) missing.push('primaryColor')
+        if (!partial.secondaryColor) missing.push('secondaryColor')
+        if (!partial.colorMode) missing.push('colorMode')
+        if (!partial.backgroundColor) missing.push('backgroundColor')
+        if (missing.length >= 2 && typeof console !== 'undefined' && typeof console.warn === 'function') {
+            console.warn(
+                `[theme] resolveTheme filling ${missing.length} defaults — picker likely emitted partial preset. Missing: ${missing.join(', ')}`,
+            )
+        }
+    }
+
+    // Resolve font pair (pairingId → lookup, fallback to partial overrides)
+    let fontHeading = partial.fontHeading || resolveHeadingFont(partial.fontPairingId)
+    let fontBody = partial.fontBody || resolveBodyFont(partial.fontPairingId)
+
+    // Phase 02: validate contrast axis — reject same-font pairs silently.
+    // Fallback to safe default (Outfit + Inter) + warn. Never throw.
+    const validation = validateFontPairing(fontHeading, fontBody)
+    if (!validation.valid) {
+        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+            console.warn(
+                `[design-quality] invalid font pairing "${fontHeading} + ${fontBody}": ${validation.reason}. Falling back to ${DEFAULT_HEADING_FONT} + ${DEFAULT_BODY_FONT}.`,
+            )
+        }
+        fontHeading = DEFAULT_HEADING_FONT
+        fontBody = DEFAULT_BODY_FONT
+    }
+
+    // Mode-dependent defaults — used when the stored color matches the
+    // *opposite* mode's default, meaning it was never explicitly customized.
+    // Without this check, switching dark→light keeps a dark background.
+    const DARK_DEFAULTS = { bg: '#09090b', surface: '#111111', text: '#fafafa', muted: '#a1a1aa' }
+    const LIGHT_DEFAULTS = { bg: '#ffffff', surface: '#f8f8f8', text: '#09090b', muted: '#71717a' }
+
+    const resolveColor = (value: string | undefined, darkDefault: string, lightDefault: string): string => {
+        if (!value) return isDark ? darkDefault : lightDefault
+        // If the stored value matches the opposite mode's default, reset to current mode's default
+        // Hex is case-insensitive: `#FFFFFF` must match `#ffffff`
+        const opposite = isDark ? lightDefault : darkDefault
+        if (value.toLowerCase() === opposite.toLowerCase()) return isDark ? darkDefault : lightDefault
+        return value
+    }
+
+    const resolved: ThemeConfig = {
         primaryColor,
-        secondaryColor: partial.secondaryColor || '#d946ef',
+        secondaryColor: partial.secondaryColor || FALLBACK_SECONDARY_COLOR,
         accentColor: partial.accentColor || lightenHex(primaryColor, 15),
-        surfaceColor: partial.surfaceColor || (isDark ? '#111111' : '#f8f8f8'),
-        textColor: partial.textColor || (isDark ? '#fafafa' : '#09090b'),
-        mutedColor: partial.mutedColor || (isDark ? '#a1a1aa' : '#71717a'),
+        surfaceColor: resolveColor(partial.surfaceColor, '#111111', '#f8f8f8'),
+        textColor: resolveColor(partial.textColor, '#fafafa', '#09090b'),
+        mutedColor: resolveColor(partial.mutedColor, '#a1a1aa', '#71717a'),
 
         fontPairingId: partial.fontPairingId ?? null,
-        fontHeading: partial.fontHeading || resolveHeadingFont(partial.fontPairingId),
-        fontBody: partial.fontBody || resolveBodyFont(partial.fontPairingId),
+        fontHeading,
+        fontBody,
 
         spacingPreset: partial.spacingPreset || 'default',
         borderRadius: partial.borderRadius || 'rounded',
         shadowPreset: partial.shadowPreset || 'subtle',
 
         colorMode,
-        backgroundColor: partial.backgroundColor || (isDark ? '#09090b' : '#ffffff'),
+        backgroundColor: resolveColor(partial.backgroundColor, '#09090b', '#ffffff'),
     }
+
+    return resolved
 }
 
 // ── CSS Custom Properties Generator ─────────────────────────────────────────
-
-function hexToRGB(hex: string): string {
-    if (!isValidHex(hex)) return '0, 0, 0'
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return `${r}, ${g}, ${b}`
-}
 
 export function generateThemeCSS(theme: ThemeConfig): string {
     try {
@@ -145,8 +161,39 @@ export function generateThemeCSS(theme: ThemeConfig): string {
         const radius = RADIUS_PRESETS[theme.borderRadius] || RADIUS_PRESETS.rounded
         const shadow = SHADOW_PRESETS[theme.shadowPreset] || SHADOW_PRESETS.subtle
 
+        // Phase 03 — Semantic palette (60-30-10) computed from brand + mode.
+        // Emitted alongside legacy --brand-* vars so blocks can migrate
+        // incrementally in Phase 05 without any breaking change.
+        const palette = generatePalette(
+            theme.primaryColor || '#0ea5e9',
+            theme.colorMode || 'dark',
+        )
+
+        // Non-blocking design-quality warnings — runs ONCE per CSS emit
+        // (not per resolveTheme call). Safe because generateThemeCSS is only
+        // invoked when a site actually renders, not on every config read.
+        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+            const warnings = validateThemeColors({
+                textColor: theme.textColor,
+                backgroundColor: theme.backgroundColor,
+                primaryColor: theme.primaryColor,
+            })
+            for (const w of warnings) console.warn(w)
+        }
+
+        const headingFont = theme.fontHeading || 'Outfit'
+        const bodyFont = theme.fontBody || 'Inter'
+        // Emit font CSS vars on :root so nested var(--font-x) references inside
+        // --font-heading/body resolve correctly on <body> and <html>, not only on
+        // the AppShell <div> where next/font applies its scoped class.
+        // Value pattern "FontName", "FontName Fallback" mirrors next/font output.
+        const fontVarsOnRoot = Array.from(new Set([headingFont, bodyFont, 'Inter', 'Outfit']))
+            .filter((name) => FONT_CSS_VAR_MAP[name])
+            .map((name) => `  ${FONT_CSS_VAR_MAP[name]}: "${name}", "${name} Fallback";`)
+            .join('\n')
+
         return `:root {
-  /* Colors */
+  /* Colors (legacy brand vars — preserved for backward compat) */
   --brand-primary: ${theme.primaryColor || '#0ea5e9'};
   --brand-secondary: ${theme.secondaryColor || '#d946ef'};
   --brand-accent: ${theme.accentColor || '#f59e0b'};
@@ -156,13 +203,34 @@ export function generateThemeCSS(theme: ThemeConfig): string {
   --background: ${theme.backgroundColor || '#ffffff'};
 
   /* RGB variants for opacity */
-  --brand-primary-rgb: ${hexToRGB(theme.primaryColor || '#0ea5e9')};
-  --brand-secondary-rgb: ${hexToRGB(theme.secondaryColor || '#d946ef')};
-  --brand-accent-rgb: ${hexToRGB(theme.accentColor || '#f59e0b')};
+  --brand-primary-rgb: ${hexToRGBString(theme.primaryColor || '#0ea5e9')};
+  --brand-secondary-rgb: ${hexToRGBString(theme.secondaryColor || '#d946ef')};
+  --brand-accent-rgb: ${hexToRGBString(theme.accentColor || '#f59e0b')};
+
+  /* Semantic color layer (Phase 03 — 60-30-10) */
+  --accent: ${palette.accent};
+  --accent-hover: ${palette.accentHover};
+  --accent-rgb: ${palette.accentRgb};
+
+  --surface-primary: ${palette.surface.primary};
+  --surface-secondary: ${palette.surface.secondary};
+  --surface-card: ${palette.surface.card};
+
+  --text-primary: ${palette.text.primary};
+  --text-secondary: ${palette.text.secondary};
+  --text-inverse: ${palette.text.inverse};
+  --text-muted: ${palette.text.muted};
+
+  --border-semantic: ${palette.border};
+  --divider: ${palette.divider};
+
+  /* Font CSS vars on :root — makes var(--font-x) in --font-heading/body resolve
+     globally (body, html) not just on AppShell div descendants */
+${fontVarsOnRoot}
 
   /* Typography */
-  --font-heading: '${theme.fontHeading || 'Outfit'}', sans-serif;
-  --font-body: '${theme.fontBody || 'Inter'}', sans-serif;
+  --font-heading: ${fontNameToCSSVar(headingFont, 'heading')};
+  --font-body: ${fontNameToCSSVar(bodyFont, 'body')};
 
   /* Spacing */
   --space-xs: ${spacing.xs};
@@ -183,12 +251,22 @@ export function generateThemeCSS(theme: ThemeConfig): string {
   --shadow-lg: ${shadow.lg};
 }`
     } catch {
-        // Fallback CSS — prevents blank page on corrupted theme data
+        // Fallback CSS — prevents blank page on corrupted theme data.
+        // Reuse the SAME palette generator as the happy path so values stay
+        // consistent and maintenance-free (no hardcoded drift). Safe defaults:
+        // sky blue primary + dark mode.
+        const palette = generatePalette('#0ea5e9', 'dark')
         return `:root {
   --brand-primary: #0ea5e9; --brand-secondary: #d946ef; --brand-accent: #f59e0b;
   --surface: #f8f8f8; --text: #09090b; --muted: #71717a; --background: #ffffff;
   --brand-primary-rgb: 14, 165, 233; --brand-secondary-rgb: 217, 70, 239; --brand-accent-rgb: 245, 158, 11;
-  --font-heading: 'Outfit', sans-serif; --font-body: 'Inter', sans-serif;
+  --accent: ${palette.accent}; --accent-hover: ${palette.accentHover}; --accent-rgb: ${palette.accentRgb};
+  --surface-primary: ${palette.surface.primary}; --surface-secondary: ${palette.surface.secondary}; --surface-card: ${palette.surface.card};
+  --text-primary: ${palette.text.primary}; --text-secondary: ${palette.text.secondary}; --text-inverse: ${palette.text.inverse}; --text-muted: ${palette.text.muted};
+  --border-semantic: ${palette.border}; --divider: ${palette.divider};
+  --font-outfit: "Outfit", "Outfit Fallback"; --font-inter: "Inter", "Inter Fallback";
+  --font-heading: Outfit, var(--font-outfit), 'Outfit', sans-serif;
+  --font-body: Inter, var(--font-inter), 'Inter', sans-serif;
   --space-xs: 0.25rem; --space-sm: 0.5rem; --space-md: 1rem; --space-lg: 1.5rem;
   --space-xl: 2.5rem; --space-2xl: 4rem; --section-padding: 5rem;
   --radius-sm: 4px; --radius-md: 8px; --radius-lg: 16px; --radius-full: 9999px;
@@ -201,21 +279,22 @@ export function generateThemeCSS(theme: ThemeConfig): string {
 // Use these instead of raw strings to prevent typos (Scenario #25)
 
 export const CSS_VARS = {
-    // Colors
+    // Colors — legacy brand (kept for backward compat with 60+ file consumers)
     primary: 'var(--brand-primary, #0ea5e9)',
     secondary: 'var(--brand-secondary, #d946ef)',
-    accent: 'var(--brand-accent, #f59e0b)',
+    brandAccent: 'var(--brand-accent, #f59e0b)',
     surface: 'var(--surface, #f8f8f8)',
     text: 'var(--text, #09090b)',
     muted: 'var(--muted, #71717a)',
     background: 'var(--background, #ffffff)',
-    // RGB (for opacity)
+    // RGB (for opacity) — legacy brand
     primaryRgb: 'var(--brand-primary-rgb, 14, 165, 233)',
     secondaryRgb: 'var(--brand-secondary-rgb, 217, 70, 239)',
-    accentRgb: 'var(--brand-accent-rgb, 245, 158, 11)',
-    // Typography
-    fontHeading: "var(--font-heading, 'Outfit', sans-serif)",
-    fontBody: "var(--font-body, 'Inter', sans-serif)",
+    brandAccentRgb: 'var(--brand-accent-rgb, 245, 158, 11)',
+    // Typography — --font-heading/--font-body are populated by generateThemeCSS
+    // with var(--font-<pairing>) references, falling back to --font-outfit/inter.
+    fontHeading: 'var(--font-heading, var(--font-outfit))',
+    fontBody: 'var(--font-body, var(--font-inter))',
     // Spacing
     spaceXs: 'var(--space-xs, 0.25rem)',
     spaceSm: 'var(--space-sm, 0.5rem)',
@@ -232,4 +311,20 @@ export const CSS_VARS = {
     shadowSm: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
     shadowMd: 'var(--shadow-md, 0 2px 8px rgba(0,0,0,0.08))',
     shadowLg: 'var(--shadow-lg, 0 4px 16px rgba(0,0,0,0.1))',
+
+    // ── Semantic layer (Phase 03 — 60-30-10) ────────────────────────────
+    // Added alongside legacy vars. Fallback chain keeps pre-Phase-03 sites
+    // working until blocks migrate in Phase 05.
+    accent: 'var(--accent, var(--brand-primary))',
+    accentHover: 'var(--accent-hover, var(--brand-primary))',
+    accentRgb: 'var(--accent-rgb, var(--brand-primary-rgb))',
+    surfacePrimary: 'var(--surface-primary, var(--surface))',
+    surfaceSecondary: 'var(--surface-secondary, var(--surface))',
+    surfaceCard: 'var(--surface-card, var(--surface))',
+    textPrimary: 'var(--text-primary, var(--text))',
+    textSecondary: 'var(--text-secondary, var(--muted))',
+    textInverse: 'var(--text-inverse, #ffffff)',
+    textMuted: 'var(--text-muted, var(--muted))',
+    borderSemantic: 'var(--border-semantic, #2a2e34)',
+    divider: 'var(--divider, var(--border-semantic, #22262b))',
 } as const
