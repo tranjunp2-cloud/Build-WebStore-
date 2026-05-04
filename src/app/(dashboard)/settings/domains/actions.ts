@@ -172,6 +172,7 @@ export async function addCustomDomain(rawDomain: string): Promise<DomainActionRe
         }
 
         if (err instanceof VercelDomainsError) {
+            console.error('[addCustomDomain] VercelDomainsError:', { code: err.code, status: err.status, message: err.message });
             return { success: false, error: mapVercelError(err) };
         }
         console.error('[addCustomDomain] Unexpected Vercel error:', err);
