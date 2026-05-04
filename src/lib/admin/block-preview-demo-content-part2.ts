@@ -49,7 +49,7 @@ const PART2_MAP: Record<string, (variant: string) => DemoContent> = {
     blockType: 'video', variant,
     headline: 'See How It Works',
     subheadline: 'Watch our 2-minute product walkthrough.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    videoUrl: 'https://www.youtube.com/embed/k2maqlyUuVw',
     posterImage: IMG.hero,
   }),
 
@@ -70,8 +70,8 @@ const PART2_MAP: Record<string, (variant: string) => DemoContent> = {
     showCategories: true,
     autoplay: false,
     videos: [
-      { title: 'Brand Launch Film', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', thumbnailUrl: IMG.hero, category: 'Branding', duration: '2:30' },
-      { title: 'Product Demo', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', thumbnailUrl: IMG.office, category: 'Product', duration: '4:15' },
+      { title: 'Brand Launch Film', videoUrl: 'https://www.youtube.com/embed/k2maqlyUuVw', thumbnailUrl: IMG.hero, category: 'Branding', duration: '2:30' },
+      { title: 'Product Demo', videoUrl: 'https://www.youtube.com/embed/k2maqlyUuVw', thumbnailUrl: IMG.office, category: 'Product', duration: '4:15' },
     ],
   }),
 
