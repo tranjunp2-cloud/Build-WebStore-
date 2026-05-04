@@ -28,7 +28,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, currentUserR
     }, [pathname])
 
     return (
-        <div className="min-h-screen bg-[#0B1120] flex flex-col">
+        <div className="min-h-screen bg-[#0B1120] flex flex-col overflow-x-hidden">
             <TenantAccessWatcher />
             <TopHeader
                 userName={userName}

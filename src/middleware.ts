@@ -59,6 +59,11 @@ export async function middleware(req: NextRequest) {
     // Read the Host header instead (set by DO load balancer / Cloudflare).
     const hostname = req.headers.get('host')?.split(':')[0] || req.nextUrl.hostname
 
+    // Allow Sentry tunnel to bypass middleware (no subdomain/auth logic needed)
+    if (pathname.startsWith('/sentry-tunnel')) {
+        return NextResponse.next()
+    }
+
     // Allow Next.js internals and static files
     if (!SEO_PATHS.includes(pathname)) {
         if (
@@ -309,6 +314,6 @@ export const config = {
         // Payload admin sends POST as multipart/form-data with _payload field.
         // Vercel edge middleware corrupts multipart body when forwarding to serverless → 500.
         // API routes don't need middleware (no subdomain/domain routing).
-        '/((?!_next/static|_next/image|favicon.ico|api/).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api/|sentry-tunnel).*)',
     ],
 }

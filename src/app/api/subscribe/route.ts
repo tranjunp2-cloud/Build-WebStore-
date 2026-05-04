@@ -41,13 +41,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid site' }, { status: 400 })
         }
 
+        const siteIdInt = parseInt(siteId, 10)
+
         // Check duplicate (same email + same site)
         const existing = await payload.find({
             collection: 'subscribers',
             where: {
                 and: [
                     { email: { equals: email } },
-                    { site: { equals: siteId } },
+                    { site: { equals: siteIdInt } },
                 ],
             },
             limit: 1,
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
         // Create subscriber
         await payload.create({
             collection: 'subscribers',
-            data: { email, site: siteId, source: 'newsletter' },
+            data: { email, site: siteIdInt, source: 'newsletter' },
         })
 
         return NextResponse.json({ success: true })

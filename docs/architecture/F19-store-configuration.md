@@ -20,8 +20,8 @@ graph TD
     Payload -->|Create Staff User| DB[(MongoDB: Users Collection)]
     
     Owner -->|Add Domain| Payload
-    Payload -->|API Call| ExternalDNS(Provider: Cloudflare / Vercel Domains API)
-    ExternalDNS -->|Provision SSL| LB
+    Payload -->|Server Action| VercelAPI(Vercel Domains REST API)
+    VercelAPI -->|Auto-provision SSL| LB
 ```
 
 ## 3. Component Tree
@@ -54,8 +54,38 @@ graph TD
 **Staff Management Data Flow:**
 Owner Action -> Opens Invite Modal -> Selects Custom Roles -> Submits `/api/staff/invite` -> Payload hooks create `User` with scoped `tenantId` and `roles`.
 
-**Domain Provisioning Data Flow:**
-Owner adds domain -> Payload saves `Domain` record as `pending` -> Next.js calls external DNS provider API -> Provider checks DNS config -> If connected, triggers webhook -> Payload updates `Domain` status to `connected` -> SSL is issued.
+**Domain Provisioning Data Flow (Vercel):**
+Owner adds domain via server action → sanitize + punycode + regex validate → Payload write `status='pending'` → `addProjectDomain()` to Vercel → if `verified=true` immediately → `status='active'` + `vercelDomainId` persisted + SSL auto-provisions (1-2 min). If `verification[]` returned → persist TXT challenges, tenant adds TXT to DNS, clicks "Verify Now" → `verifyProjectDomain()` polls Vercel → on success `status='active'`. Rate limit: 50 verify/hr per team. Errors mapped to friendly messages via `mapVercelError()`.
+
+### Provisioning State Machine
+
+`verifyCustomDomain` implements a 3-state machine:
+
+```
+┌───────────────────────────────┐
+│ verifyProjectDomain(domain)   │
+└───────────────────────────────┘
+            │
+       ┌────┴────┐
+       │         │
+       ▼         ▼
+    200 ok   4xx err
+       │         │
+       ▼         ▼
+  verified?  getProjectDomain
+    │    │      │
+   yes  no     persist verification
+    │    │     return
+    ▼    ▼
+  active persist
+         verification
+         return
+```
+
+States:
+- **unverified-needs-txt**: `verification[]` non-empty → show TXT challenge card.
+- **verified-cert-pending**: `verified=true, verification` empty → `status='active'`, show SSL provisioning banner (1-2 min).
+- **active**: SSL issued, tenant can reach `https://` endpoint.
 
 ## 5. State Management
 
@@ -67,19 +97,17 @@ Owner adds domain -> Payload saves `Domain` record as `pending` -> Next.js calls
 
 ## 6. API Design
 
-### POST /api/domains/verify
-```json
-Request:
-{
-  "domain": "mystore.com" // required - the domain string
-}
+### Domain Server Actions
 
-Response (success):
-{
-  "success": true,
-  "data": { "status": "connected", "ssl_active": true }
-}
-```
+Actual implementation uses Next.js server actions (not REST). The `POST /api/domains/verify` route remains only as a legacy reference; business logic lives in these wrappers around the Vercel Domains REST API:
+
+| Server Action | Vercel Endpoint | Purpose |
+|---------------|-----------------|---------|
+| `addCustomDomain(domain)` | `POST /v10/projects/{id}/domains` | Attach domain to the Vercel project + persist `Domain` record. |
+| `verifyCustomDomain(domain)` | `POST /v9/projects/{id}/domains/{domain}/verify` | Run the 3-state machine (see §4). Enforces `tenantId AND domain` ownership check. |
+| `removeCustomDomain(domain)` | `DELETE /v9/projects/{id}/domains/{domain}` | Detach from Vercel + delete Payload `Domain` record. |
+
+All actions call `mapVercelError()` to translate platform errors to tenant-friendly messages and respect a 50 verify/hr per-team rate limit.
 
 ### POST /api/staff/invite
 ```json
@@ -136,5 +164,26 @@ Response (success):
 
 ## 12. Migration / Rollback Plan
 
-- **Migration**: Deploy Payload schema updates. Setup External Domains API tokens in Env.
+- **Migration**: Deploy Payload schema updates. Configure Vercel env vars (see §13) and run `scripts/backfill-vercel-domains.ts` to import existing tenant domains into the Vercel project.
 - **Rollback**: Revert Next.js Middleware changes if custom domain routing fails for the default `*.echprime.com` domains.
+
+## 13. Environment Variables
+
+| Var | Server | Client | Source |
+|-----|--------|--------|--------|
+| `VERCEL_TOKEN` | Yes | No | vercel.com/account/settings/tokens |
+| `VERCEL_TEAM_ID` | Yes | No | `.vercel/project.json` `orgId` |
+| `VERCEL_PROJECT_ID` | Yes | No | `.vercel/project.json` `projectId` |
+| `VERCEL_APEX_A_RECORD` | Yes | No | default `76.76.21.21` |
+| `VERCEL_CNAME_TARGET` | Yes | No | default `cname.vercel-dns.com` |
+| `NEXT_PUBLIC_VERCEL_APEX_IP` | Yes | Yes | default `76.76.21.21` |
+| `NEXT_PUBLIC_VERCEL_CNAME_TARGET` | Yes | Yes | default `cname.vercel-dns.com` |
+
+**REMOVED** (post Vercel migration): `SERVER_IP`, `NEXT_PUBLIC_SERVER_IP`, `DO_API_TOKEN`, `DO_APP_ID`, `NEXT_PUBLIC_CNAME_TARGET`.
+
+## 14. Migration Notes (2026-04-13)
+
+- Post DigitalOcean → Vercel platform migration, this feature rewritten per [plans/260413-1500-f19-vercel-domain-verify-rewrite/plan.md](../../plans/260413-1500-f19-vercel-domain-verify-rewrite/plan.md).
+- Bug #558 root cause: `verifyCustomDomain` still referenced `SERVER_IP` env var which was DO-specific.
+- Security improvement: pre-existing cross-tenant verify vulnerability (scenario 8.1) fixed — now enforces `tenantId AND domain` ownership check.
+- Backfill script at `scripts/backfill-vercel-domains.ts` (idempotent, rate-limited 40s/call, cursor-paginated).
