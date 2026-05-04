@@ -40,11 +40,15 @@ export async function GET(req: NextRequest) {
     try {
         const payload = await getPayload({ config })
 
-        // Check if slug is taken by existing tenant
+        // Check if slug is taken by existing tenant.
+        // overrideAccess: true — this is a public availability check, not a data read.
+        // Without it, the Tenants access rule returns { id: { in: [] } } for unauthenticated
+        // callers, which Drizzle serializes as WHERE id IN () — invalid PostgreSQL → 503.
         const existing = await payload.find({
             collection: 'tenants',
             where: { slug: { equals: slug } },
             limit: 1,
+            overrideAccess: true,
         })
 
         if (existing.docs.length > 0) {
@@ -54,7 +58,8 @@ export async function GET(req: NextRequest) {
         }
 
         return NextResponse.json({ available: true })
-    } catch {
+    } catch (err) {
+        console.error('[slug/check] error:', err instanceof Error ? err.message : err)
         return NextResponse.json(
             { available: false, reason: 'error', message: 'Unable to check slug availability. Please try again.' },
             { status: 503 },
