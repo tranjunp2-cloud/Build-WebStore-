@@ -19,6 +19,10 @@ import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
+// Blocks that render as position:fixed — must match actual Payload blockType slugs.
+// socialWidget/cartWidget are camelCase (BLOCK_TYPES registry); whatsapp-button is kebab.
+const FLOATING_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+
 export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
 
 export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null; children?: NavLinkItem[] };
@@ -456,14 +460,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     isBreadcrumb && navForOffset != null && BREADCRUMB_OFFSET_VARIANTS.has(navVariant)
                         ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
                         : undefined
+                const blockVariant = (block as Record<string, unknown>).variant as string | undefined
+                const isFloatingBlock = FLOATING_BLOCK_TYPES.has(block.blockType) && blockVariant !== 'inline'
                 const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
-                // Floating widget blocks render as position:fixed — they are out of document flow
-                // so the spacing wrapper must not add any padding (otherwise a blank gap appears). GH-821.
-                // blockType uses camelCase slugs (socialWidget, cartWidget) but whatsapp-button is kebab.
-                const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
-                const isFloatingWidget = FLOATING_WIDGET_TYPES.has(block.blockType)
-                    && (block as Record<string, unknown>).variant !== 'inline'
-                const spacingStyle = isGlobalBlock || isFloatingWidget
+                const spacingStyle = (isGlobalBlock || isFloatingBlock)
                     ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
                     : {
                         paddingTop: applyNavOffset && index === firstContentBlockIdx

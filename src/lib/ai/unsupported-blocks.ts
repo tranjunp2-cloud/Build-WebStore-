@@ -21,27 +21,24 @@
  *  and blocks not fully integrated into the Payload schema.
  *  Re-enabled via plan 260414-1400-ai-gen-unsplash-pipeline phase-04:
  *    - gallery, portfolio-grid → now filled by media-pipeline.ts (Unsplash)
+ *  Re-enabled via plan 260422-1900-block-aivisible-audit-fix:
+ *    - before-after, booking-widget → added to Payload Pages.ts + pages-schema.ts
  *  Still dropped (separate followup):
- *    - before-after (needs Payload schema migration per validation Q3)
- *    - menu-display, review-cards, booking-widget (not image-related)
+ *    - menu-display, review-cards (not in Payload schema, not image-related)
  *  GH-820: google-maps temporarily disabled — embedUrl cannot be auto-generated
  *  GH-820: class-schedule not production-ready — also hidden from editor UI
  */
 export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
-    'before-after',
     'menu-display',
     'review-cards',
-    'booking-widget',
     'google-maps',
     'class-schedule',
 ])
 
 /** Blocks missing from Payload Pages.ts layout.blocks — silently dropped on save. */
 export const BLOCKS_NOT_IN_PAYLOAD: ReadonlySet<string> = new Set([
-    'before-after',
     'menu-display',
     'review-cards',
-    'booking-widget',
 ])
 
 /**

@@ -105,13 +105,12 @@ describe('composeFallbackResult — behaviors', () => {
 
     it('drops unsupported blocks from fallback output (fc0020d regression fix)', () => {
         // Health seed 7 previously emitted booking-widget; must not leak through.
-        // Fitness seed 11 emitted before-after; restaurant may emit menu-display.
+        // Restaurant may emit menu-display; review-cards drops on all gen paths.
+        // Note: before-after, booking-widget re-enabled via plan 260422-1900-block-aivisible-audit-fix.
         // Note: gallery + portfolio-grid re-enabled via plan 260414-1400 Unsplash pipeline.
         const UNSUPPORTED = new Set([
-            'before-after',
             'menu-display',
             'review-cards',
-            'booking-widget',
         ])
 
         const scenarios: Array<[string, number]> = [

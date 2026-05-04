@@ -56,7 +56,7 @@ export const propertyCardMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'properties', 'showMap', 'currency'],
     quickActions: ['Add property', 'Filter by type', 'Update prices'],
-    aiVisible: false,
+    aiVisible: true,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

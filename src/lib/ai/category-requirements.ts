@@ -7,8 +7,16 @@
  *
  * Fixes the sparse-layout problem where AI defaults to 5-6 block safe layout.
  *
+ * IMPORTANT: minBlocks, mandatoryBlocks, recommendedBlocks are now derived from
+ * template-rules.ts (single source of truth). Only minItems lives here because
+ * it is specific to the structure-enforcer padding logic and not part of the
+ * shared rubric/composer schema.
+ *
  * Plan: 260414-1400-ai-gen-unsplash-pipeline phase-05
+ * Migrated: 260429-0948-gen-template-harness-rules-overhaul
  */
+
+import { TEMPLATE_RULES } from './template-rules'
 
 export interface CategoryRequirement {
     /** Minimum total blocks per homepage (enforced via gap-filler). */
@@ -29,92 +37,39 @@ const DEFAULT_REQUIREMENT: CategoryRequirement = {
     minItems: { testimonials: 3, features: 4, faq: 4, 'service-cards': 3, stats: 3, 'logo-cloud': 5, team: 3, pricing: 3, gallery: 6 },
 }
 
-export const CATEGORY_REQUIREMENTS: Readonly<Record<string, CategoryRequirement>> = {
-    beauty: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'service-cards', 'team', 'testimonials', 'gallery', 'cta', 'footer'],
-        recommendedBlocks: ['about', 'faq', 'stats'],
-        minItems: { team: 3, testimonials: 4, features: 4, gallery: 6, 'service-cards': 3, faq: 4, stats: 3, 'logo-cloud': 6 },
-    },
-    restaurant: {
-        minBlocks: 11,
-        mandatoryBlocks: ['navigation', 'hero', 'about', 'features', 'gallery', 'testimonials', 'contact', 'footer'],
-        recommendedBlocks: ['stats', 'team', 'cta', 'faq'],
-        minItems: { testimonials: 4, features: 4, gallery: 8, faq: 5, stats: 3 },
-    },
-    fnb: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'about', 'features', 'gallery', 'testimonials', 'cta', 'footer'],
-        recommendedBlocks: ['stats', 'faq', 'team'],
-        minItems: { testimonials: 4, features: 4, gallery: 6, faq: 4, stats: 3 },
-    },
-    tech: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'features', 'pricing', 'testimonials', 'faq', 'cta', 'footer'],
-        recommendedBlocks: ['about', 'stats', 'team', 'logo-cloud'],
-        minItems: { features: 6, testimonials: 3, pricing: 3, faq: 5, stats: 4, 'logo-cloud': 6 },
-    },
-    health: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'service-cards', 'team', 'testimonials', 'faq', 'contact', 'footer'],
-        recommendedBlocks: ['about', 'stats', 'cta', 'features'],
-        minItems: { team: 3, testimonials: 4, features: 4, faq: 5, 'service-cards': 4, stats: 4 },
-    },
-    education: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'features', 'testimonials', 'faq', 'cta', 'footer'],
-        recommendedBlocks: ['about', 'team', 'stats', 'pricing', 'gallery'],
-        minItems: { testimonials: 3, features: 4, faq: 5, stats: 3 },
-    },
-    realestate: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'gallery', 'stats', 'testimonials', 'contact', 'footer'],
-        recommendedBlocks: ['about', 'team', 'features', 'cta', 'faq'],
-        minItems: { testimonials: 3, gallery: 8, stats: 4, faq: 4 },
-    },
-    fitness: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'features', 'team', 'testimonials', 'pricing', 'cta', 'footer'],
-        recommendedBlocks: ['about', 'stats', 'gallery', 'faq'],
-        minItems: { team: 3, testimonials: 4, features: 4, pricing: 3, stats: 3 },
-    },
-    creative: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'gallery', 'about', 'testimonials', 'contact', 'footer'],
-        recommendedBlocks: ['stats', 'features', 'cta', 'team'],
-        minItems: { testimonials: 3, gallery: 6, stats: 3 },
-    },
-    business: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'service-cards', 'features', 'testimonials', 'cta', 'footer'],
-        recommendedBlocks: ['about', 'team', 'stats', 'faq', 'logo-cloud'],
-        minItems: { features: 6, testimonials: 3, 'service-cards': 4, stats: 4, 'logo-cloud': 6 },
-    },
-    ecommerce: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'features', 'testimonials', 'newsletter', 'cta', 'footer'],
-        recommendedBlocks: ['about', 'faq', 'stats', 'gallery', 'logo-cloud'],
-        minItems: { features: 6, testimonials: 4, faq: 4, 'logo-cloud': 6, stats: 3 },
-    },
-    events: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'features', 'gallery', 'testimonials', 'contact', 'footer'],
-        recommendedBlocks: ['about', 'stats', 'team', 'cta', 'faq'],
-        minItems: { testimonials: 3, features: 4, gallery: 6, stats: 3 },
-    },
-    blog: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'features', 'newsletter', 'cta', 'footer'],
-        recommendedBlocks: ['about', 'testimonials', 'stats', 'faq'],
-        minItems: { features: 4, testimonials: 3, faq: 4 },
-    },
-    travel: {
-        minBlocks: 10,
-        mandatoryBlocks: ['navigation', 'hero', 'gallery', 'features', 'testimonials', 'cta', 'footer'],
-        recommendedBlocks: ['about', 'stats', 'faq', 'team'],
-        minItems: { testimonials: 3, features: 4, gallery: 8, stats: 3, faq: 4 },
-    },
+/** Per-category minimum item counts — used by structure-enforcer padding. Not part of shared TEMPLATE_RULES schema. */
+const CATEGORY_MIN_ITEMS: Readonly<Record<string, Readonly<Partial<Record<string, number>>>>> = {
+    beauty:     { team: 3, testimonials: 4, features: 4, gallery: 6, 'service-cards': 3, faq: 4, stats: 3, 'logo-cloud': 6 },
+    restaurant: { testimonials: 4, features: 4, gallery: 8, faq: 5, stats: 3 },
+    fnb:        { testimonials: 4, features: 4, gallery: 6, faq: 4, stats: 3 },
+    tech:       { features: 6, testimonials: 3, pricing: 3, faq: 5, stats: 4, 'logo-cloud': 6 },
+    health:     { team: 3, testimonials: 4, features: 4, faq: 5, 'service-cards': 4, stats: 4 },
+    education:  { testimonials: 3, features: 4, faq: 5, stats: 3 },
+    realestate: { testimonials: 3, gallery: 8, stats: 4, faq: 4 },
+    fitness:    { team: 3, testimonials: 4, features: 4, pricing: 3, stats: 3 },
+    creative:   { testimonials: 3, gallery: 6, stats: 3 },
+    business:   { features: 6, testimonials: 3, 'service-cards': 4, stats: 4, 'logo-cloud': 6 },
+    ecommerce:  { features: 6, testimonials: 4, faq: 4, 'logo-cloud': 6, stats: 3 },
+    events:     { testimonials: 3, features: 4, gallery: 6, stats: 3 },
+    blog:       { features: 4, testimonials: 3, faq: 4 },
+    travel:     { testimonials: 3, features: 4, gallery: 8, stats: 3, faq: 4 },
 }
+
+/**
+ * CATEGORY_REQUIREMENTS — derived from TEMPLATE_RULES + local minItems.
+ * Shape is identical to the old hardcoded version for full backward compatibility.
+ */
+export const CATEGORY_REQUIREMENTS: Readonly<Record<string, CategoryRequirement>> = Object.fromEntries(
+    Object.entries(TEMPLATE_RULES).map(([cat, rule]) => [
+        cat,
+        {
+            minBlocks: rule.minBlocks,
+            mandatoryBlocks: rule.mandatoryBlocks,
+            recommendedBlocks: rule.recommendedBlocks,
+            minItems: CATEGORY_MIN_ITEMS[cat] ?? {},
+        } satisfies CategoryRequirement,
+    ]),
+)
 
 export function getCategoryRequirement(category: string | undefined): CategoryRequirement {
     if (!category) return DEFAULT_REQUIREMENT
