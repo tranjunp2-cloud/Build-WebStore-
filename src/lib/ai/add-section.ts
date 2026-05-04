@@ -646,7 +646,7 @@ export function createAddSectionBlock({
                 variant: 'embed',
                 headline: 'See Us in Action',
                 subheadline: 'Watch our story and learn what drives us forward.',
-                videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw',
             }
 
         case 'blog-list':
@@ -776,9 +776,9 @@ export function createAddSectionBlock({
                 showCategories: true,
                 autoplay: false,
                 videos: [
-                    { title: 'Our Story', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'About', duration: '2:30', description: `How ${brandName} started and where we're going.` },
-                    { title: 'Product Demo', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'Product', duration: '3:45', description: 'See our flagship product in action.' },
-                    { title: 'Customer Story', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'Testimonial', duration: '1:20', description: 'Hear from one of our happiest customers.' },
+                    { title: 'Our Story', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'About', duration: '2:30', description: `How ${brandName} started and where we're going.` },
+                    { title: 'Product Demo', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'Product', duration: '3:45', description: 'See our flagship product in action.' },
+                    { title: 'Customer Story', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'Testimonial', duration: '1:20', description: 'Hear from one of our happiest customers.' },
                 ],
             }
 
