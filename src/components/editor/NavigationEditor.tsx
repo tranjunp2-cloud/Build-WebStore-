@@ -1,7 +1,25 @@
 'use client'
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
-import { Plus, Trash2, ChevronRight, ChevronDown, ExternalLink, FileText } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, ChevronDown, ExternalLink, FileText, GripVertical } from 'lucide-react'
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    TouchSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 import { isValidExternalNavigationUrl } from '@/lib/navigation-url'
@@ -24,6 +42,8 @@ const LINK_TYPE_OPTIONS = [
     { value: 'page', icon: FileText },
     { value: 'external', icon: ExternalLink },
 ] as const
+
+const SYSTEM_PAGE_SLUGS = new Set(['404', '/404'])
 
 function generateId() {
     return `nav_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -98,6 +118,9 @@ function NavLinkRow({
     const [isExpanded, setIsExpanded] = useState(true)
     const [isRenaming, setIsRenaming] = useState(false)
     const isPanelOpen = openPanelId === link.id
+
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: link.id })
+    const dragStyle = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
     const setIsPanelOpen = useCallback((val: boolean) => onSetOpenPanelId(val ? link.id : null), [link.id, onSetOpenPanelId])
     const hasChildren = (link.children || []).length > 0
 
@@ -142,10 +165,20 @@ function NavLinkRow({
     }, [link, onUpdate])
 
     return (
-        <div className="select-none">
+        <div ref={setNodeRef} style={dragStyle} className="select-none">
             <div
                 className={`group flex items-center gap-2 rounded px-2 hover:bg-white/[0.03] transition-colors ${depth === 0 ? 'h-9' : 'h-8'}`}
             >
+                {/* Drag handle */}
+                <div
+                    {...attributes}
+                    {...listeners}
+                    className="shrink-0 cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+                    aria-label="Drag to reorder"
+                >
+                    <GripVertical className="w-3.5 h-3.5" />
+                </div>
+
                 {/* Expand/collapse chevron for parent items */}
                 {hasChildren ? (
                     <button onClick={() => setIsExpanded(!isExpanded)} className="p-0.5 text-slate-500 hover:text-slate-300">
@@ -251,7 +284,7 @@ function NavLinkRow({
                         />
                     )}
                     <div className="flex items-center gap-0.5 pt-0.5">
-                        {depth < 2 && (
+                        {depth < 1 && (
                             <button type="button" onClick={(e) => { e.stopPropagation(); onAddChild(link.id) }} title={nav.addSubLink} className="p-1 text-slate-500 hover:text-cyan-400 rounded transition-colors">
                                 <Plus className="w-3.5 h-3.5" />
                             </button>
@@ -259,7 +292,7 @@ function NavLinkRow({
                         {!isFirst && <button type="button" onClick={() => onMoveUp(link.id)} title={nav.moveUp} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">↑</button>}
                         {!isLast && <button type="button" onClick={() => onMoveDown(link.id)} title={nav.moveDown} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">↓</button>}
                         {depth > 0 && <button type="button" onClick={() => onOutdent(link.id)} title={nav.moveLeft} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">←</button>}
-                        {depth < 2 && !isFirst && <button type="button" onClick={() => onIndent(link.id)} title={nav.makeSubItem} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">→</button>}
+                        {depth < 1 && !isFirst && <button type="button" onClick={() => onIndent(link.id)} title={nav.makeSubItem} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">→</button>}
                         <div className="flex-1" />
                         <button type="button" onClick={() => onDelete(link.id)} className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors">
                             <Trash2 className="w-3.5 h-3.5" />
@@ -271,26 +304,28 @@ function NavLinkRow({
             {/* Children with tree connector (left border) per Figma */}
             {isExpanded && hasChildren && (
                 <div className="ml-6 border-l-2 border-blue-500/[0.04] pl-2.5">
-                    {link.children.map((child, idx) => (
-                        <NavLinkRow
-                            key={child.id}
-                            link={child}
-                            depth={depth + 1}
-                            onUpdate={onUpdate}
-                            onDelete={onDelete}
-                            onAddChild={onAddChild}
-                            onMoveUp={onMoveUp}
-                            onMoveDown={onMoveDown}
-                            onIndent={onIndent}
-                            onOutdent={onOutdent}
-                            isFirst={idx === 0}
-                            isLast={idx === link.children.length - 1}
-                            pages={pages}
-                            nav={nav}
-                            openPanelId={openPanelId}
-                            onSetOpenPanelId={onSetOpenPanelId}
-                        />
-                    ))}
+                    <SortableContext items={link.children.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                        {link.children.map((child, idx) => (
+                            <NavLinkRow
+                                key={child.id}
+                                link={child}
+                                depth={depth + 1}
+                                onUpdate={onUpdate}
+                                onDelete={onDelete}
+                                onAddChild={onAddChild}
+                                onMoveUp={onMoveUp}
+                                onMoveDown={onMoveDown}
+                                onIndent={onIndent}
+                                onOutdent={onOutdent}
+                                isFirst={idx === 0}
+                                isLast={idx === link.children.length - 1}
+                                pages={pages}
+                                nav={nav}
+                                openPanelId={openPanelId}
+                                onSetOpenPanelId={onSetOpenPanelId}
+                            />
+                        ))}
+                    </SortableContext>
                 </div>
             )}
         </div>
@@ -388,6 +423,40 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     const { t } = useI18n()
     const nav = t.editor.navigation
     const [openPanelId, setOpenPanelId] = useState<string | null>(null)
+    const linkablePages = useMemo(
+        () => pages?.filter(page => !SYSTEM_PAGE_SLUGS.has(page.slug)),
+        [pages],
+    )
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    )
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event
+        if (!over || active.id === over.id) return
+        const activeFound = findLinkAndParent(links, String(active.id))
+        const overFound = findLinkAndParent(links, String(over.id))
+        if (!activeFound || !overFound) return
+        // Only allow reorder within the same parent; cross-parent moves use indent/outdent buttons
+        if (activeFound.parentId !== overFound.parentId) return
+
+        const reordered = arrayMove(activeFound.siblings, activeFound.index, overFound.index)
+
+        if (activeFound.parentId === null) {
+            onUpdate(reordered)
+        } else {
+            const rebuild = (items: NavLinkItem[]): NavLinkItem[] =>
+                items.map(item => {
+                    if (item.id === activeFound.parentId) return { ...item, children: reordered }
+                    if (item.children?.length) return { ...item, children: rebuild(item.children) }
+                    return item
+                })
+            onUpdate(rebuild(links))
+        }
+    }, [links, onUpdate])
 
     const handleUpdate = useCallback((id: string, changes: Partial<NavLinkItem>) => {
         onUpdate(updateLinkInTree(links, id, changes))
@@ -451,40 +520,44 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     }, [links, onUpdate, nav.newLink])
 
     return (
-        <div className="flex flex-col gap-2">
-            <div className="rounded-xl border border-blue-500/[0.04] bg-slate-800/30 px-3 pt-3 pb-px">
-                {links.length === 0 ? (
-                    <p className="px-2 py-4 text-center text-xs text-slate-600">{nav.noLinks}</p>
-                ) : (
-                    links.map((link, idx) => (
-                        <NavLinkRow
-                            key={link.id}
-                            link={link}
-                            depth={0}
-                            onUpdate={handleUpdate}
-                            onDelete={handleDelete}
-                            onAddChild={handleAddChild}
-                            onMoveUp={handleMoveUp}
-                            onMoveDown={handleMoveDown}
-                            onIndent={handleIndent}
-                            onOutdent={handleOutdent}
-                            isFirst={idx === 0}
-                            isLast={idx === links.length - 1}
-                            pages={pages}
-                            nav={nav}
-                            openPanelId={openPanelId}
-                            onSetOpenPanelId={setOpenPanelId}
-                        />
-                    ))
-                )}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <div className="flex flex-col gap-2">
+                <div className="rounded-xl border border-blue-500/[0.04] bg-slate-800/30 px-3 pt-3 pb-px">
+                    {links.length === 0 ? (
+                        <p className="px-2 py-4 text-center text-xs text-slate-600">{nav.noLinks}</p>
+                    ) : (
+                        <SortableContext items={links.map(l => l.id)} strategy={verticalListSortingStrategy}>
+                            {links.map((link, idx) => (
+                                <NavLinkRow
+                                    key={link.id}
+                                    link={link}
+                                    depth={0}
+                                    onUpdate={handleUpdate}
+                                    onDelete={handleDelete}
+                                    onAddChild={handleAddChild}
+                                    onMoveUp={handleMoveUp}
+                                    onMoveDown={handleMoveDown}
+                                    onIndent={handleIndent}
+                                    onOutdent={handleOutdent}
+                                    isFirst={idx === 0}
+                                    isLast={idx === links.length - 1}
+                                    pages={linkablePages}
+                                    nav={nav}
+                                    openPanelId={openPanelId}
+                                    onSetOpenPanelId={setOpenPanelId}
+                                />
+                            ))}
+                        </SortableContext>
+                    )}
+                </div>
+                <button
+                    type="button"
+                    onClick={handleAddRoot}
+                    className="w-full h-9 rounded-[10px] border border-blue-500/[0.07] text-sm font-medium text-slate-50 hover:bg-white/[0.03] transition-colors"
+                >
+                    {nav.addLink}
+                </button>
             </div>
-            <button
-                type="button"
-                onClick={handleAddRoot}
-                className="w-full h-9 rounded-[10px] border border-blue-500/[0.07] text-sm font-medium text-slate-50 hover:bg-white/[0.03] transition-colors"
-            >
-                {nav.addLink}
-            </button>
-        </div>
+        </DndContext>
     )
 }

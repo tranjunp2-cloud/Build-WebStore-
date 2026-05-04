@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { CarouselConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -16,16 +17,14 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
     const { headline, items: rawItems = [], variant = 'images', autoplay = true, interval = 5000 } = block
     const category = (site?.siteType as string) || 'business'
 
-    // Fallback to industry images when all items lack image URLs
-    const hasAnyImage = rawItems.some((item) => item.imageUrl)
-    const items = hasAnyImage
-        ? rawItems
-        : getGalleryImages(category, rawItems.length || 4).map((url, i) => ({
-            ...rawItems[i],
-            imageUrl: url,
-            title: rawItems[i]?.title || '',
-            description: rawItems[i]?.description || '',
-        }))
+    // Per-slot fallback: prefer item.image.url (Payload upload), fallback to imageUrl (AI gen string), then Unsplash
+    const fallbackUrls = getGalleryImages(category, 6, site?.imageLibraryS3 as Record<string, string> | undefined)
+    const items = Array.from({ length: Math.max(rawItems.length, fallbackUrls.length) }, (_, i) => {
+        const item = rawItems[i]
+        const imgSrc = (item?.image as { url?: string } | undefined)?.url || item?.imageUrl
+        if (imgSrc) return { ...item, imageUrl: imgSrc }
+        return { ...item, imageUrl: fallbackUrls[i % fallbackUrls.length] ?? fallbackUrls[0], title: item?.title || '', description: item?.description || '' }
+    })
     const [currentIndex, setCurrentIndex] = useState(0)
     const total = items.length
 
@@ -110,6 +109,7 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                                         src={item.imageUrl}
                                         alt={item.title || `Slide ${i + 1}`}
                                         className="w-full h-full object-cover"
+                                        data-image-index={i}
                                     />
                                     {(item.title || item.description) && (
                                         <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 bg-gradient-to-t from-black/70 to-transparent">
@@ -159,8 +159,8 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                                         className="block rounded-2xl overflow-hidden transition-shadow hover:shadow-lg"
                                         style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                                     >
-                                        <div className="aspect-[16/10] overflow-hidden">
-                                            <img src={item.imageUrl} alt={item.title || ''} className="w-full h-full object-cover" />
+                                        <div className="relative aspect-[16/10] overflow-hidden">
+                                            <Image src={item.imageUrl} alt={item.title || ''} fill className="object-cover" data-image-index={i} />
                                         </div>
                                         <div className={CARD_PADDING.md}>
                                             {item.title && <Heading level={4} className="text-lg mb-2">{item.title}</Heading>}
@@ -210,6 +210,7 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                                         alt={item.title || ''}
                                         className="w-16 h-16 rounded-full mx-auto mb-6 object-cover"
                                         style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.188)` }}
+                                        data-image-index={i}
                                     />
                                 )}
                                 {item.description && (
@@ -218,7 +219,7 @@ export function CarouselBlock({ block, theme: _theme, site }: BlockProps<Carouse
                                     </blockquote>
                                 )}
                                 {item.title && (
-                                    <p className="font-bold font-heading" style={{ color: 'var(--brand-primary)' }}>{item.title}</p>
+                                    <RichText text={item.title} as="p" className="font-bold font-heading" style={{ color: 'var(--brand-primary)' }} />
                                 )}
                             </div>
                         </div>

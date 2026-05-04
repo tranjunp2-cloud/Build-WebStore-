@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { revalidateTag } from 'next/cache'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 
@@ -136,6 +137,10 @@ export async function PATCH(
                     // across pages. See stripArrayItemIds doc for details.
                     if (Array.isArray(data.layout)) {
                         data.layout = stripArrayItemIds(data.layout)
+                        // Normalize variants before Payload validates — DB records pre-PR#757
+                        // may still have removed variant strings ('expanded', 'mega-footer')
+                        // that cause ValidationError → 500 on publish.
+                        data.layout = normalizeBlocksForPersistence(data.layout as Record<string, unknown>[])
                     }
 
                     await payload.update({

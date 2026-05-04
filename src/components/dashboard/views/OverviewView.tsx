@@ -83,20 +83,11 @@ export async function OverviewView({ searchParams }: Props) {
             const hasFailed = allSites.docs.some(
                 (s) => (s as Record<string, unknown>).generationStatus === 'failed',
             )
-            const hasIncompleteSite = allSites.docs.length > 0 && usable.length === 0
             const aiStatusFailed = typeof resolvedParams.ai_status === 'string' && resolvedParams.ai_status === 'failed'
 
             return (
                 <div className="space-y-8">
-                    {hasFailed ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
-                    {(hasIncompleteSite || aiStatusFailed) && (
-                        <DashboardOnboarding
-                            hasWebsite={false}
-                            hasPublishedSite={false}
-                            hasIncompleteSite={hasIncompleteSite}
-                            aiStatusFailed={aiStatusFailed}
-                        />
-                    )}
+                    {(hasFailed || aiStatusFailed) ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
                 </div>
             )
         }
@@ -271,11 +262,23 @@ export async function OverviewView({ searchParams }: Props) {
             const siteIds = sitesRes.docs.map(s => s.id)
             if (sitesRes.docs[0]) siteId = sitesRes.docs[0].id
 
-            const [productsRes, pagesRes, blogsRes] = await Promise.all([
+            // pages: use direct SQL to avoid payload.find() which JOINs block tables
+            // expecting a "data" column that doesn't exist in our pages_blocks_* tables
+            type PageSEORow = { id: number; title: string; slug: string; seo_title: string | null; seo_description: string | null; seo_no_index: boolean | null }
+            const pageDbRows = siteIds.length > 0
+                ? await (payload.db.drizzle.execute(sql`
+                    SELECT id, title, slug, seo_title, seo_description, seo_no_index
+                    FROM pages WHERE site_id = ANY(${siteIds}) AND deleted_at IS NULL LIMIT 1000
+                `) as Promise<{ rows: PageSEORow[] }>)
+                : { rows: [] as PageSEORow[] }
+            const pagesRes = {
+                docs: pageDbRows.rows.map(r => ({
+                    id: r.id, title: r.title, slug: r.slug,
+                    seo: { title: r.seo_title, description: r.seo_description, noIndex: r.seo_no_index },
+                })),
+            }
+            const [productsRes, blogsRes] = await Promise.all([
                 payload.find({ collection: 'products', where: { tenant: { equals: tenantId }, status: { equals: 'active' } }, limit: 1000, depth: 0 }),
-                siteIds.length > 0 
-                  ? payload.find({ collection: 'pages', where: { site: { in: siteIds } }, limit: 1000, depth: 0 })
-                  : Promise.resolve({ docs: [] }),
                 payload.find({ collection: 'blogs', where: { tenant: { equals: tenantId }, status: { equals: 'published' } }, limit: 1000, depth: 0 })
             ])
             
@@ -397,6 +400,7 @@ export async function OverviewView({ searchParams }: Props) {
                 <DashboardOnboarding
                     hasWebsite={true}
                     hasPublishedSite={false}
+                    siteId={siteId as string}
                 />
             )}
 

@@ -475,6 +475,7 @@ export async function fulfillImageNeeds(
                 language: ctx.language,
                 products: ctx.products,
                 mood: ctx.mood,
+                englishKeywords: ctx.englishKeywords,
             })
 
             try {
@@ -516,4 +517,150 @@ export async function fulfillImageNeeds(
         `[Media Injector] fulfilled ${succeeded}/${succeeded + failed} image slots across ${groupedByBlock.size} block type(s) in ${Date.now() - start}ms`,
     )
     return { succeeded, failed }
+}
+
+// ── Save pre-pass URL ingest ─────────────────────────────────────────────────
+
+/** Hostnames whose images may be fetched and ingested as Payload Media records. */
+const INGEST_ALLOWED_HOSTNAMES = new Set([
+    'images.unsplash.com',
+    'images.pexels.com',
+    'cdn.pixabay.com',
+    'lh3.googleusercontent.com',
+    'res.cloudinary.com',
+])
+
+/** Test helper — exported for test isolation. No-op for static allowlist. */
+export function __resetIngestAllowlistCache(): void {
+    // Allowlist is statically defined — nothing to reset.
+}
+
+type IngestContext = { tenantId: string }
+type MinimalPayload = { create: (args: unknown) => Promise<{ id: number }> }
+
+/**
+ * Converts a raw image field value to a Payload Media ID, uploading if needed.
+ *
+ * - number → return as-is
+ * - {id: number} → extract id
+ * - {url, alt?} or URL string on allowlisted host → fetch + upload → return new id
+ * - anything else, disallowed host, or upload failure → return null (never throws)
+ */
+export async function ingestUrlToMediaIfNeeded(
+    value: unknown,
+    ctx: IngestContext,
+    payload: MinimalPayload,
+): Promise<number | null> {
+    if (typeof value === 'number') return value
+
+    if (value && typeof value === 'object') {
+        const obj = value as Record<string, unknown>
+        if (typeof obj.id === 'number') return obj.id
+    }
+
+    let url: string | undefined
+    let alt = ''
+    if (typeof value === 'string') {
+        url = value
+    } else if (value && typeof value === 'object') {
+        const obj = value as Record<string, unknown>
+        if (typeof obj.url === 'string') {
+            url = obj.url
+            alt = typeof obj.alt === 'string' ? obj.alt : ''
+        }
+    }
+
+    if (!url) return null
+
+    let hostname: string
+    try {
+        hostname = new URL(url).hostname
+    } catch {
+        return null
+    }
+
+    if (!INGEST_ALLOWED_HOSTNAMES.has(hostname)) {
+        console.warn(`[ingestUrlToMediaIfNeeded] host not in allowlist: ${hostname}`)
+        return null
+    }
+
+    try {
+        const res = await fetch(url)
+        if (!res.ok) return null
+        const buf = await res.arrayBuffer()
+        const mimeType = res.headers.get('content-type') ?? 'image/jpeg'
+        const ext = mimeType.includes('png') ? 'png' : 'jpg'
+        const uid = Math.random().toString(16).slice(2, 10).padEnd(8, '0')
+        const fileName = `ingest-${uid}-${Date.now()}.${ext}`
+        const result = await payload.create({
+            collection: 'media',
+            data: { tenant: ctx.tenantId, alt, aiGenerated: true },
+            file: { name: fileName, data: Buffer.from(buf), mimetype: mimeType, size: buf.byteLength },
+        })
+        return result.id
+    } catch {
+        return null
+    }
+}
+
+const MAX_INGEST_SLOTS = 50
+
+/**
+ * Walks all blocks using BLOCK_IMAGE_SPEC, finds image fields that hold URL objects
+ * (not yet numeric Media IDs), and ingests them. Caps at 50 slots to bound latency.
+ * Mutates blocks in place. Returns hydrated/failed/skipped counts.
+ */
+export async function hydrateUrlUploadsToMedia(
+    blocks: Record<string, unknown>[],
+    payload: MinimalPayload,
+    ctx: IngestContext,
+): Promise<{ hydrated: number; failed: number; skipped: number }> {
+    if (blocks.length === 0) return { hydrated: 0, failed: 0, skipped: 0 }
+
+    type Slot = { getValue: () => unknown; setValue: (id: number) => void }
+    const slots: Slot[] = []
+
+    for (const block of blocks) {
+        const spec = BLOCK_IMAGE_SPEC[block.blockType as string]
+        if (!spec) continue
+
+        for (const field of spec.topLevel ?? []) {
+            const val = block[field]
+            if (val === undefined || typeof val === 'number') continue
+            slots.push({ getValue: () => block[field], setValue: (id) => { block[field] = id } })
+        }
+
+        for (const { arrayField, itemField } of spec.nestedArray ?? []) {
+            const arr = block[arrayField]
+            if (!Array.isArray(arr)) continue
+            for (let i = 0; i < arr.length; i++) {
+                const item = arr[i] as Record<string, unknown> | undefined
+                if (!item) continue
+                const val = item[itemField]
+                if (val === undefined || typeof val === 'number') continue
+                const ci = i
+                slots.push({
+                    getValue: () => (arr[ci] as Record<string, unknown>)[itemField],
+                    setValue: (id) => { (arr[ci] as Record<string, unknown>)[itemField] = id },
+                })
+            }
+        }
+    }
+
+    const toProcess = slots.slice(0, MAX_INGEST_SLOTS)
+    const skipped = slots.length - toProcess.length
+    let hydrated = 0
+    let failed = 0
+
+    for (const slot of toProcess) {
+        const id = await ingestUrlToMediaIfNeeded(slot.getValue(), ctx, payload)
+        if (id !== null) {
+            slot.setValue(id)
+            hydrated++
+        } else {
+            failed++
+        }
+    }
+
+    return { hydrated, failed, skipped }
 }

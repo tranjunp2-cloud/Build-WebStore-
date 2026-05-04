@@ -35,7 +35,7 @@ function createPool() {
   const sslmode = sslmodeMatch ? sslmodeMatch[1].toLowerCase() : null;
   const hostMatch = connStr.match(/@([^:/?]+)/);
   const host = hostMatch ? hostMatch[1].toLowerCase() : '';
-  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal';
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'host.docker.internal' || host === 'postgres';
   const useSsl = sslmode === 'disable' ? false : (isLocal ? false : { rejectUnauthorized: false });
 
   const cleanStr = connStr
@@ -523,6 +523,17 @@ const MIGRATIONS = [
   { name: 'tenants_custom_domains.domain', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS domain varchar;` },
   { name: 'tenants_custom_domains.status', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS status varchar DEFAULT \'pending\';` },
   { name: 'tenants_custom_domains.is_primary', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS is_primary boolean DEFAULT false;` },
+  // F19 Vercel domain provisioning (#558) — new fields inside customDomains array.
+  // Real column lives on tenants_custom_domains (Payload array sub-table).
+  // Duplicate "tenants.*" entries satisfy scripts/check-migrations.js naive table attribution
+  // (the CI script maps all fields in Tenants.ts to `tenants` table without array awareness).
+  { name: 'tenants_custom_domains.vercel_domain_id', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS vercel_domain_id varchar;` },
+  { name: 'tenants_custom_domains.vercel_verification', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS vercel_verification jsonb;` },
+  // Prevents two tenants adding the same domain concurrently (TOCTOU race on payload.find check).
+  // Vercel 409 is the second line of defense; this is the DB-level guarantee.
+  { name: 'tenants_custom_domains.domain_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS tenants_custom_domains_domain_uniq ON tenants_custom_domains (domain) WHERE domain IS NOT NULL;` },
+  { name: 'tenants.vercel_domain_id', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS vercel_domain_id varchar;` },
+  { name: 'tenants.vercel_verification', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS vercel_verification jsonb;` },
   // sites_seo_tracked_keywords
   { name: 'sites_seo_tracked_keywords.keyword', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS keyword varchar;` },
   { name: 'sites_seo_tracked_keywords.current_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS current_rank numeric;` },
@@ -3411,6 +3422,197 @@ const MIGRATIONS = [
       ADD COLUMN IF NOT EXISTS fields_filled integer,
       ADD COLUMN IF NOT EXISTS fields_edited integer DEFAULT 0;`,
   },
+
+  // ── Pages: Data cleanup for F05 Footer variants ──
+  // Migrate legacy variant values to the new supported values cleanly in the database
+  {
+    name: 'pages_blocks_footer.data_migration_variants',
+    sql: `
+      UPDATE pages_blocks_footer SET variant = 'simple' WHERE variant = 'expanded';
+      UPDATE pages_blocks_footer SET variant = 'dark-gradient' WHERE variant = 'mega-footer';
+      UPDATE _pages_v_blocks_footer SET variant = 'simple' WHERE variant = 'expanded';
+      UPDATE _pages_v_blocks_footer SET variant = 'dark-gradient' WHERE variant = 'mega-footer';
+      
+      -- Update Global Site Footers stored in JSONB (single block object — direct jsonb_set)
+      UPDATE sites
+      SET footer_block = CASE
+        WHEN footer_block->>'variant' = 'expanded'    THEN jsonb_set(footer_block, '{variant}', '"simple"')
+        WHEN footer_block->>'variant' = 'mega-footer' THEN jsonb_set(footer_block, '{variant}', '"dark-gradient"')
+        ELSE footer_block
+      END
+      WHERE footer_block IS NOT NULL
+        AND footer_block->>'variant' IN ('expanded', 'mega-footer');
+
+      -- Update Template Layouts stored in JSONB (mixed-block array — only touch footer blocks)
+      -- COALESCE guards against jsonb_agg returning NULL on empty arrays ([] → [] not NULL)
+      -- jsonb_typeof guard prevents error if layout is not an array (scalar/object)
+      UPDATE templates_template_pages
+      SET layout = COALESCE(
+        (
+          SELECT jsonb_agg(
+            CASE
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'expanded'
+                THEN jsonb_set(elem, '{variant}', '"simple"')
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'mega-footer'
+                THEN jsonb_set(elem, '{variant}', '"dark-gradient"')
+              ELSE elem
+            END
+          )
+          FROM jsonb_array_elements(layout) AS elem
+        ),
+        '[]'::jsonb
+      )
+      WHERE layout IS NOT NULL
+        AND jsonb_typeof(layout) = 'array'
+        AND layout::text LIKE '%"blockType":"footer"%';
+
+      -- Update Template Version Snapshots stored in JSONB (mixed-block array — only touch footer blocks)
+      -- Same COALESCE + jsonb_typeof guards as above
+      UPDATE template_versions
+      SET sections_snapshot = COALESCE(
+        (
+          SELECT jsonb_agg(
+            CASE
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'expanded'
+                THEN jsonb_set(elem, '{variant}', '"simple"')
+              WHEN elem->>'blockType' = 'footer' AND elem->>'variant' = 'mega-footer'
+                THEN jsonb_set(elem, '{variant}', '"dark-gradient"')
+              ELSE elem
+            END
+          )
+          FROM jsonb_array_elements(sections_snapshot) AS elem
+        ),
+        '[]'::jsonb
+      )
+      WHERE sections_snapshot IS NOT NULL
+        AND jsonb_typeof(sections_snapshot) = 'array'
+        AND sections_snapshot::text LIKE '%"blockType":"footer"%';
+    `,
+  },
+  // F05-GAP06: block_spacing jsonb column — every pages_blocks_* main table
+  { name: 'pages_blocks_hero.add_block_spacing', sql: `ALTER TABLE "pages_blocks_hero" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_navigation.add_block_spacing', sql: `ALTER TABLE "pages_blocks_navigation" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_about.add_block_spacing', sql: `ALTER TABLE "pages_blocks_about" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_features.add_block_spacing', sql: `ALTER TABLE "pages_blocks_features" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_testimonials.add_block_spacing', sql: `ALTER TABLE "pages_blocks_testimonials" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_contact.add_block_spacing', sql: `ALTER TABLE "pages_blocks_contact" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_gallery.add_block_spacing', sql: `ALTER TABLE "pages_blocks_gallery" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_footer.add_block_spacing', sql: `ALTER TABLE "pages_blocks_footer" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_stats.add_block_spacing', sql: `ALTER TABLE "pages_blocks_stats" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_pricing.add_block_spacing', sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_faq.add_block_spacing', sql: `ALTER TABLE "pages_blocks_faq" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_team.add_block_spacing', sql: `ALTER TABLE "pages_blocks_team" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_socialWidget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_socialWidget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_cartWidget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_cartWidget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_social_widget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_social_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_cart_widget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_cart_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_cta.add_block_spacing', sql: `ALTER TABLE "pages_blocks_cta" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_newsletter.add_block_spacing', sql: `ALTER TABLE "pages_blocks_newsletter" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_video.add_block_spacing', sql: `ALTER TABLE "pages_blocks_video" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "pages_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "pages_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "pages_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_custom_html.add_block_spacing', sql: `ALTER TABLE "pages_blocks_custom_html" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_service_cards.add_block_spacing', sql: `ALTER TABLE "pages_blocks_service_cards" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_carousel.add_block_spacing', sql: `ALTER TABLE "pages_blocks_carousel" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_step_process.add_block_spacing', sql: `ALTER TABLE "pages_blocks_step_process" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_divider.add_block_spacing', sql: `ALTER TABLE "pages_blocks_divider" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_announcement_bar.add_block_spacing', sql: `ALTER TABLE "pages_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_whatsapp_button.add_block_spacing', sql: `ALTER TABLE "pages_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_google_maps.add_block_spacing', sql: `ALTER TABLE "pages_blocks_google_maps" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_accordion.add_block_spacing', sql: `ALTER TABLE "pages_blocks_accordion" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_countdown_timer.add_block_spacing', sql: `ALTER TABLE "pages_blocks_countdown_timer" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_social_proof.add_block_spacing', sql: `ALTER TABLE "pages_blocks_social_proof" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_breadcrumb.add_block_spacing', sql: `ALTER TABLE "pages_blocks_breadcrumb" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_client_logos.add_block_spacing', sql: `ALTER TABLE "pages_blocks_client_logos" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_menu_food.add_block_spacing', sql: `ALTER TABLE "pages_blocks_menu_food" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_portfolio_grid.add_block_spacing', sql: `ALTER TABLE "pages_blocks_portfolio_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_doctor_profile.add_block_spacing', sql: `ALTER TABLE "pages_blocks_doctor_profile" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_property_card.add_block_spacing', sql: `ALTER TABLE "pages_blocks_property_card" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_class_schedule.add_block_spacing', sql: `ALTER TABLE "pages_blocks_class_schedule" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_video_showcase.add_block_spacing', sql: `ALTER TABLE "pages_blocks_video_showcase" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_product_quick_view.add_block_spacing', sql: `ALTER TABLE "pages_blocks_product_quick_view" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_feature_comparison.add_block_spacing', sql: `ALTER TABLE "pages_blocks_feature_comparison" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  // F05-GAP06: block_spacing jsonb on _pages_v_blocks_* (version/draft tables — same schema as pages_blocks_*)
+  { name: '_pages_v_blocks_hero.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_hero" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_navigation.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_navigation" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_about.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_about" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_features.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_features" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_testimonials.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_testimonials" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_contact.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_contact" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_gallery.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_gallery" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_footer.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_footer" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_stats.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_stats" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_pricing.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_faq.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_team.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_team" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_socialWidget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_socialWidget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_cartWidget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_cartWidget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_social_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_social_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_cart_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_cart_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_cta.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_cta" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_newsletter.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_newsletter" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_video.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_video" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_logo_cloud.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_logo_cloud" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_blog_list.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_blog_list" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_products_grid.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_products_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_products_featured.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_products_featured" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_custom_html.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_custom_html" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_service_cards.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_service_cards" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_carousel.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_carousel" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_step_process.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_step_process" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_divider.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_divider" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_announcement_bar.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_whatsapp_button.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_google_maps.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_google_maps" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_accordion.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_accordion" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_countdown_timer.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_countdown_timer" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_social_proof.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_social_proof" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_breadcrumb.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_breadcrumb" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_client_logos.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_client_logos" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_menu_food.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_menu_food" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_portfolio_grid.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_portfolio_grid" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_doctor_profile.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_doctor_profile" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_property_card.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_property_card" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_class_schedule.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_class_schedule" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_video_showcase.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_video_showcase" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_product_quick_view.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_product_quick_view" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_feature_comparison.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_feature_comparison" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+
+  // ── Navigation variant rename (Phase 01 — 2026-04-24) ───────────────────────
+  // Renames: simple→default, mega-menu→mega, pill→floating in sites.header_block JSONB.
+  // Idempotent: WHERE clause skips already-migrated rows.
+  {
+    name: 'sites.header_block_variant_simple_to_default',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('default'::text)) WHERE header_block->>'variant' = 'simple';`,
+  },
+  {
+    name: 'sites.header_block_variant_mega_menu_to_mega',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('mega'::text)) WHERE header_block->>'variant' = 'mega-menu';`,
+  },
+  {
+    name: 'sites.header_block_variant_pill_to_floating',
+    sql: `UPDATE sites SET header_block = jsonb_set(header_block, '{variant}', to_jsonb('floating'::text)) WHERE header_block->>'variant' = 'pill';`,
+  },
+
+  // ── Navigation variant enum expansion (Phase 01 — 2026-04-24) ───────────────
+  // Postgres native enums for navigation variant in pages/versioned-pages blocks.
+  // ADD VALUE IF NOT EXISTS is idempotent. Old values kept (can't drop from enum).
+  // Then update any existing rows that still use old names.
+  { name: 'enum_pages_blocks_navigation_variant.add_default',     sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'default';` },
+  { name: 'enum_pages_blocks_navigation_variant.add_mega',        sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'mega';` },
+  { name: 'enum_pages_blocks_navigation_variant.add_floating',    sql: `ALTER TYPE enum_pages_blocks_navigation_variant ADD VALUE IF NOT EXISTS 'floating';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_default',  sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'default';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_mega',     sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'mega';` },
+  { name: 'enum__pages_v_blocks_navigation_variant.add_floating', sql: `ALTER TYPE "enum__pages_v_blocks_navigation_variant" ADD VALUE IF NOT EXISTS 'floating';` },
+  // Update existing rows in block tables (idempotent — WHERE filters already-migrated)
+  { name: 'pages_blocks_navigation.variant_simple_to_default',    sql: `UPDATE pages_blocks_navigation SET variant = 'default' WHERE variant = 'simple';` },
+  { name: 'pages_blocks_navigation.variant_mega_menu_to_mega',    sql: `UPDATE pages_blocks_navigation SET variant = 'mega' WHERE variant = 'mega-menu';` },
+  { name: 'pages_blocks_navigation.variant_pill_to_floating',     sql: `UPDATE pages_blocks_navigation SET variant = 'floating' WHERE variant = 'pill';` },
+  { name: '_pages_v_blocks_navigation.variant_simple_to_default', sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'default' WHERE variant = 'simple';` },
+  { name: '_pages_v_blocks_navigation.variant_mega_menu_to_mega', sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'mega' WHERE variant = 'mega-menu';` },
+  { name: '_pages_v_blocks_navigation.variant_pill_to_floating',  sql: `UPDATE "_pages_v_blocks_navigation" SET variant = 'floating' WHERE variant = 'pill';` },
 ];
 
 async function runMigrations(pool) {

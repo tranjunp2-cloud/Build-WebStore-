@@ -273,8 +273,12 @@ function PopupVariant({ block, siteId }: { block: NewsletterConfig; siteId?: str
     useEffect(() => {
         if (typeof window === 'undefined') return
 
-        // Skip auto-open trong test-harness route — screenshots overlap với layout review
-        if (window.location.pathname.startsWith('/test-harness/')) return
+        // Skip auto-open in non-production contexts: test-harness screenshots,
+        // AI builder (generation preview), and editor iframe (/preview/{siteId}).
+        const { pathname } = window.location
+        if (pathname.startsWith('/test-harness/')) return
+        if (pathname.startsWith('/builder/')) return
+        if (window.parent !== window) return
 
         const prefersReducedMotion =
             typeof window.matchMedia === 'function' &&
@@ -513,7 +517,8 @@ export function NewsletterBlock({ block, site }: BlockProps<NewsletterConfig>) {
 
     switch (variant) {
         case 'popup':
-            return <PopupVariant block={block} siteId={siteId} />
+            // return <PopupVariant block={block} siteId={siteId} /> // Temporarily disabled: Bug #791
+            return <InlineVariant block={block} siteId={siteId} />
         case 'banner':
             return <BannerVariant block={block} siteId={siteId} />
         case 'stacked-card':

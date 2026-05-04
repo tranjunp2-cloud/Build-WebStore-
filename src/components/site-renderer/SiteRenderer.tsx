@@ -1,4 +1,5 @@
 import { blockRegistry } from '@/blocks/registry'
+import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import {
@@ -14,12 +15,17 @@ import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
 import { OwnerProvider } from './OwnerContext'
+import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
+// Blocks that render as position:fixed — must match actual Payload blockType slugs.
+// socialWidget/cartWidget are camelCase (BLOCK_TYPES registry); whatsapp-button is kebab.
+const FLOATING_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+
 export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
 
-export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
+export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null; children?: NavLinkItem[] };
 type PreviewBlock = {
     blockType: string
     links?: NavLinkItem[]
@@ -58,8 +64,10 @@ export type SiteRendererProps = {
     }
     pages?: NavPage[]
     isEditor?: boolean
+    isBuilderPreview?: boolean
     siteId?: string
     isOwner?: boolean
+    onBlockFieldChange?: (blockIndex: number, field: string, value: unknown) => void
 }
 
 function applyGlobalSystemBlocks(
@@ -87,10 +95,37 @@ function applyGlobalSystemBlocks(
             : [...nextBlocks, normalizedFooter]
     }
 
+    // Inject breadcrumb globally from headerBlock.breadcrumbConfig
+    const breadcrumbCfg = (siteHeaderBlock as Record<string, unknown> | null | undefined)?.breadcrumbConfig as
+        { homeLabel?: string; separator?: string; showOnAllPages?: boolean } | undefined
+    // Only inject breadcrumb when user has explicitly configured it; existing sites without the
+    // config key must not get breadcrumb auto-enabled (would surprise published site owners).
+    // Treat null same as false — Payload CMS may store unset booleans as null.
+    const showBreadcrumb = breadcrumbCfg !== undefined &&
+        breadcrumbCfg.showOnAllPages !== false &&
+        breadcrumbCfg.showOnAllPages !== null
+    // Remove any per-page breadcrumb blocks (legacy manual adds) — breadcrumb is global-only now.
+    // DB data is unchanged; only the render is suppressed.
+    nextBlocks = nextBlocks.filter(b => b.blockType !== 'breadcrumb')
+    if (showBreadcrumb) {
+        const navIdx = nextBlocks.findIndex(b => b.blockType === 'navigation')
+        const breadcrumbBlock: PreviewBlock = {
+            ...breadcrumbCfg,
+            blockType: 'breadcrumb',
+            homeLabel: breadcrumbCfg?.homeLabel || 'Home',
+            separator: breadcrumbCfg?.separator || '/',
+            showOnAllPages: true,
+            items: [],
+            __editorBlockIndex: -1,
+            _navTree: siteHeaderBlock?.links || [], // Vital for mapping custom sub-menu labels
+        }
+        nextBlocks.splice(navIdx >= 0 ? navIdx + 1 : 0, 0, breadcrumbBlock)
+    }
+
     return nextBlocks
 }
 
-export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuilderPreview = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -114,7 +149,13 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
         ...block,
         __editorBlockIndex: block.__editorBlockIndex ?? index,
     }))
-    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site)
+    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site).map(b => {
+        if (b.blockType !== 'breadcrumb') return b
+        // Pass page slug so breadcrumb renders correct path (in editor, usePathname returns /preview/... not the real slug)
+        // Runtime check required: Payload may store slug as null; type cast alone doesn't guard this
+        const slug = (page as Record<string, unknown>)?.slug
+        return { ...b, _pageSlug: typeof slug === 'string' ? slug : undefined }
+    })
 
     // In editor preview, rewrite internal nav/CTA links so subpages are navigable.
     // - Internal paths ("/about") → /preview/{siteId}?pageId={matchedPageId} (keeps iframe in preview scope)
@@ -171,7 +212,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
             slugToPageId.get(path) ??
             slugToPageId.get(path.toLowerCase()) ??
             slugToPageId.get(path.replace(/^\//, ''))
-        if (hit) return `/preview/${previewSiteId}?pageId=${hit}`
+        if (hit) return `/preview/${previewSiteId}?pageId=${hit}${isBuilderPreview ? '&builder=1' : ''}`
         return '#'
     }
 
@@ -192,12 +233,24 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
             }
         })
     }
+    const rewriteNavLinks = (links: unknown): unknown => {
+        if (!Array.isArray(links)) return links
+        return links.map((l) => {
+            if (!l || typeof l !== 'object') return l
+            const link = l as { url?: string; children?: unknown; [k: string]: unknown }
+            return {
+                ...link,
+                url: rewriteUrl(link.url),
+                children: link.children ? rewriteNavLinks(link.children) : undefined,
+            }
+        })
+    }
 
     const blocks = rawBlocks.map((b) => {
         if (b.blockType === 'navigation') {
             return {
                 ...b,
-                links: b.links?.map((l) => ({ ...l, url: rewriteUrl(l.url) })),
+                links: rewriteNavLinks(b.links) as typeof b.links,
                 ctaButton: b.ctaButton
                     ? { ...b.ctaButton, url: rewriteUrl(b.ctaButton.url) }
                     : b.ctaButton,
@@ -210,6 +263,62 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                     ...btn,
                     url: rewriteUrl(btn?.url),
                 })),
+            }
+        }
+        if (b.blockType === 'breadcrumb') {
+            const pageSlug = (page as Record<string, unknown>)?.slug as string || ''
+            const navTree = b._navTree as NavLinkItem[] || []
+            const homeLabel = (b.homeLabel as string) || 'Home'
+
+            const normalize = (s: string) => s.startsWith('/') ? s : `/${s}`
+            const target = normalize(pageSlug)
+
+            let computedItems: { label: string; url: string }[] = []
+
+            function searchTree(links: NavLinkItem[], currentPath: { label: string; url: string }[]): { label: string; url: string }[] | null {
+                for (const link of links) {
+                    const linkUrl = link.url || ''
+                    const newPath = [...currentPath, { label: link.label, url: linkUrl }]
+                    if (normalize(linkUrl) === target) return newPath
+                    if (link.children && link.children.length > 0) {
+                        const found = searchTree(link.children, newPath)
+                        if (found) return found
+                    }
+                }
+                return null
+            }
+
+            const foundPath = searchTree(navTree, [])
+            if (foundPath !== null) {
+                const firstLabel = foundPath[0]?.label.toLowerCase().trim() || ''
+                const targetHomeLabel = homeLabel.toLowerCase().trim()
+                
+                // Only skip prepending Home if the first item in nav path is literally named Home/Trang chủ
+                const isHomeAlreadyFirst = firstLabel === targetHomeLabel || firstLabel === 'home' || firstLabel === 'trang chủ'
+                
+                if (foundPath.length > 0 && !isHomeAlreadyFirst) {
+                    computedItems = [{ label: homeLabel, url: '/' }, ...foundPath]
+                } else {
+                    computedItems = foundPath
+                }
+            } else {
+                // Fallback to legacy slug split
+                const fallbackItems: { label: string; url: string }[] = [{ label: homeLabel, url: '/' }]
+                const HOMEPAGE_SLUGS = new Set(['/', '', 'home', 'index'])
+                const segments = HOMEPAGE_SLUGS.has(pageSlug.replace(/^\//, '')) ? [] : target.split('/').filter(Boolean)
+                const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')
+                const safeDecodeSegment = (seg: string) => { try { return decodeURIComponent(seg) } catch { return seg } }
+                let accumulated = ''
+                for (const seg of segments) {
+                    accumulated += '/' + seg
+                    fallbackItems.push({ label: capitalize(safeDecodeSegment(seg)), url: accumulated })
+                }
+                computedItems = fallbackItems
+            }
+
+            return {
+                ...b,
+                items: computedItems.map(item => ({ ...item, url: rewriteUrl(item.url) })),
             }
         }
         if (b.blockType === 'footer') {
@@ -225,8 +334,8 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                 ctaButton: { ...ctaBtn, url: rewriteUrl(ctaBtn.url) },
             }
         }
-        return b
-    })
+        return b as PreviewBlock
+    }) as PreviewBlock[]
 
     // JSON-LD schemas — auto-detect from blocks present
     const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
@@ -234,6 +343,37 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
 
     // Heading hierarchy — compute levels for all blocks
     const allBlockTypes = blocks.map(b => b.blockType).filter(Boolean)
+
+    // Nav offset: overlay nav variants (transparent, floating) are fixed-position and out of
+    // document flow — in the editor their content can hide behind the nav without a paddingTop.
+    // On live sites the overlay is intentional (hero background fills behind nav), so no offset.
+    // Sticky variants (default, centered, mega) push content down naturally via document flow —
+    // adding paddingTop would create a double gap. Sidebar nav is off-canvas (no top bar).
+    const GLOBAL_BLOCK_TYPES = ['header', 'navigation', 'footer', 'breadcrumb']
+    const navForOffset = blocks.find(b => isNavBlock(b))
+    const firstContentBlockIdx = blocks.findIndex(b => !GLOBAL_BLOCK_TYPES.includes(b.blockType))
+    // Normalize raw DB variant through legacy aliases (mirrors NavigationBlock VARIANT_ALIASES).
+    // 'pill' is stored in legacy sites but resolves to 'floating' at render time.
+    const NAV_VARIANT_DB_ALIASES: Record<string, string> = { simple: 'default', 'mega-menu': 'mega', pill: 'floating' }
+    const rawNavVariant = ((navForOffset as Record<string, unknown> | undefined)?.variant as string) ?? 'default'
+    const navVariant = NAV_VARIANT_DB_ALIASES[rawNavVariant] ?? rawNavVariant
+    const OVERLAY_NAV_VARIANTS = new Set(['transparent', 'floating'])
+    // Per-variant paddingTop for breadcrumb (always a thin strip directly under nav).
+    // Heights confirmed from src/blocks/navigation/index.tsx: transparent/sidebar = 64px,
+    // floating (pill, top-4) has ~80px footprint so 88px clears with margin.
+    const BREADCRUMB_NAV_OFFSET: Record<string, string> = {
+        transparent: '64px',
+        sidebar:     '64px',
+        floating:    '88px',
+        default:     'var(--nav-height, 64px)',
+        centered:    'var(--nav-height, 64px)',
+        mega:        'var(--nav-height, 64px)',
+    }
+    const applyNavOffset =
+        navForOffset != null &&
+        OVERLAY_NAV_VARIANTS.has(navVariant) &&
+        isEditor &&
+        firstContentBlockIdx >= 0
 
     return (
         <OwnerProvider value={!!isOwner}>
@@ -311,21 +451,47 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                 const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
 
                 // Block spacing — navigation/footer default to 0, others use custom or default
-                const isGlobalBlock = block.blockType === 'navigation' || block.blockType === 'footer'
-                const blockStyle = (block as Record<string, unknown>).style as { paddingTop?: number; paddingBottom?: number } | undefined
-                const spacingStyle = isGlobalBlock
-                    ? {}
+                const isGlobalBlock = ['header', 'navigation', 'footer', 'breadcrumb'].includes(block.blockType)
+                const isBreadcrumb = block.blockType === 'breadcrumb'
+                // Only out-of-flow nav variants (fixed/off-canvas) need to offset the breadcrumb.
+                // Sticky variants (default/centered/mega) are in document flow — no extra offset needed.
+                const BREADCRUMB_OFFSET_VARIANTS = new Set(['transparent', 'floating', 'sidebar'])
+                const breadcrumbOffset =
+                    isBreadcrumb && navForOffset != null && BREADCRUMB_OFFSET_VARIANTS.has(navVariant)
+                        ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
+                        : undefined
+                const blockVariant = (block as Record<string, unknown>).variant as string | undefined
+                const isFloatingBlock = FLOATING_BLOCK_TYPES.has(block.blockType) && blockVariant !== 'inline'
+                const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
+                const spacingStyle = (isGlobalBlock || isFloatingBlock)
+                    ? (breadcrumbOffset ? { paddingTop: breadcrumbOffset } : {})
                     : {
-                        paddingTop: blockStyle?.paddingTop !== undefined ? `${blockStyle.paddingTop}px` : 'var(--block-spacing-default)',
-                        paddingBottom: blockStyle?.paddingBottom !== undefined ? `${blockStyle.paddingBottom}px` : 'var(--block-spacing-default)',
+                        paddingTop: applyNavOffset && index === firstContentBlockIdx
+                            ? (navVariant === 'floating' ? 'calc(var(--nav-height, 64px) + 1rem)' : 'var(--nav-height, 64px)')
+                            : blockSpacing?.paddingTop !== undefined ? `${blockSpacing.paddingTop}px` : 'var(--block-spacing-default)',
+                        paddingBottom: blockSpacing?.paddingBottom !== undefined ? `${blockSpacing.paddingBottom}px` : 'var(--block-spacing-default)',
                     }
 
+                // Use __editorBlockIndex when available (set by PreviewSiteRenderer from store order).
+                // Falls back to loop index only for non-editor contexts or uninjected blocks.
+                // This prevents nav-injection offset mismatch: preview injects nav at position 0 which
+                // shifts all loop indices by +1, but the store has no injected nav, so hero is at
+                // store index 0 while its loop index would be 1.
+                const editorBlockIndex = typeof block.__editorBlockIndex === 'number' && block.__editorBlockIndex >= 0
+                    ? block.__editorBlockIndex
+                    : index
+                const callbackValue = onBlockFieldChange
+                    ? { blockIndex: editorBlockIndex, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorBlockIndex, field, value) }
+                    : null
+
                 const blockContent = (
-                    <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <HeadingProvider level={headingLevel}>
-                            <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
-                        </HeadingProvider>
-                    </BlockErrorBoundary>
+                    <BlockEditCallbackProvider value={callbackValue}>
+                        <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
+                            <HeadingProvider level={headingLevel}>
+                                <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
+                            </HeadingProvider>
+                        </BlockErrorBoundary>
+                    </BlockEditCallbackProvider>
                 )
 
                 if (isEditor) {
@@ -342,8 +508,18 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
                     )
                 }
 
-                // Public site: no extra wrapper div to avoid breaking CSS selectors.
-                // Spacing is applied via the global CSS variable on block root elements.
+                // Public site: wrap non-global blocks with spacing style so
+                // user-customized blockSpacing (paddingTop/paddingBottom) is
+                // preserved on the live published site. Global blocks (nav,
+                // footer, breadcrumb) normally return unwrapped; breadcrumb gets
+                // wrapped when a fixed-nav offset applies.
+                if (!isGlobalBlock || (isBreadcrumb && breadcrumbOffset)) {
+                    return (
+                        <div key={`${block.blockType}-${index}`} style={spacingStyle}>
+                            {blockContent}
+                        </div>
+                    )
+                }
                 return blockContent
             })}
         </OwnerProvider>

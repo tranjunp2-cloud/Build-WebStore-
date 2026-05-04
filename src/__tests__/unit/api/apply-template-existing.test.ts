@@ -100,11 +100,11 @@ const mockPayloadInstance = {
     findByID: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
         if (collection === 'templates') return mockTemplate
         if (collection === 'sites') return mockSite
+        if (collection === 'pages') return mockHomepage
         return null
     }),
     find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
         if (collection === 'tenants') return { docs: mockTenant ? [mockTenant] : [] }
-        if (collection === 'pages') return { docs: mockHomepage ? [mockHomepage] : [] }
         return { docs: [] }
     }),
     create: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
@@ -115,6 +115,12 @@ const mockPayloadInstance = {
     delete: vi.fn().mockResolvedValue({}),
     db: {
         beginTransaction: vi.fn().mockResolvedValue(mockTransaction),
+        drizzle: {
+            // Simulates: SELECT id FROM pages WHERE site_id = ? AND deleted_at IS NULL LIMIT 100
+            execute: vi.fn().mockImplementation(async () => ({
+                rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [],
+            })),
+        },
     },
 }
 
@@ -155,11 +161,11 @@ describe('POST /api/ai/apply-template', () => {
         mockPayloadInstance.findByID.mockImplementation(async ({ collection }: { collection: string }) => {
             if (collection === 'templates') return mockTemplate
             if (collection === 'sites') return mockSite
+            if (collection === 'pages') return mockHomepage
             return null
         })
         mockPayloadInstance.find.mockImplementation(async ({ collection }: { collection: string }) => {
             if (collection === 'tenants') return { docs: mockTenant ? [mockTenant] : [] }
-            if (collection === 'pages') return { docs: mockHomepage ? [mockHomepage] : [] }
             return { docs: [] }
         })
         mockPayloadInstance.create.mockImplementation(async ({ collection }: { collection: string }) => {
@@ -168,6 +174,9 @@ describe('POST /api/ai/apply-template', () => {
         })
         mockPayloadInstance.update.mockResolvedValue({})
         mockPayloadInstance.delete.mockResolvedValue({})
+        mockPayloadInstance.db.drizzle.execute.mockImplementation(async () => ({
+            rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [],
+        }))
     })
 
     // ── TC-F07.022: Rate limiting ─────────────────────────────────────────────
@@ -459,14 +468,14 @@ describe('POST /api/ai/apply-template', () => {
             // Act
             await POST(req)
 
-            // Assert — verify the find() query shape for pages (all pages, not just homepage)
-            const pageFindCall = mockPayloadInstance.find.mock.calls.find(
-                (c: any[]) => c[0].collection === 'pages'
+            // Assert — route now uses drizzle.execute (raw SQL) to fetch page IDs
+            // instead of payload.find, bypassing the aggregate-SQL bug (GH-767).
+            expect(mockPayloadInstance.db.drizzle.execute).toHaveBeenCalled()
+            // payload.findByID must be called for the fetched page IDs
+            const pageFindByIDCall = mockPayloadInstance.findByID.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
             )
-            expect(pageFindCall).toBeDefined()
-            expect(pageFindCall[0].where).toMatchObject({
-                site: { equals: 101 },
-            })
+            expect(pageFindByIDCall).toBeDefined()
         })
     })
 
@@ -724,9 +733,9 @@ describe('POST /api/ai/apply-template', () => {
             expect(formFields.map(f => f.fieldName)).toEqual(['name', 'email', 'message'])
         })
 
-        // ── TC-F07.047: google-maps embedUrl sanitization ─────────────────────
+        // ── TC-F07.047: google-maps dropped — temporarily disabled per GH-820 ──
 
-        it('TC-F07.047: empty google-maps embedUrl gets default placeholder', async () => {
+        it('TC-F07.047: google-maps block is dropped (embedUrl cannot be auto-generated, GH-820)', async () => {
             mockHomepage = {
                 ...DEFAULT_HOMEPAGE,
                 layout: [
@@ -743,9 +752,8 @@ describe('POST /api/ai/apply-template', () => {
                 (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
             )
             const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
-            const mapsBlock = layout.find(b => b.blockType === 'google-maps')!
-            expect(typeof mapsBlock.embedUrl).toBe('string')
-            expect((mapsBlock.embedUrl as string).length).toBeGreaterThan(0)
+            const mapsBlock = layout.find(b => b.blockType === 'google-maps')
+            expect(mapsBlock).toBeUndefined()
         })
 
         // ── TC-F07.048: usageCount failure doesn't crash apply ────────────────

@@ -70,6 +70,7 @@ type EditorState = {
     hasUnpublishedChanges: boolean
     lastSavedAt: number | null
     isSaving: boolean
+    pendingManualSave: boolean
     saveStatus: 'idle' | 'saving' | 'saved' | 'error'
     autoSaveTimer: NodeJS.Timeout | null
     autoSaveEnabled: boolean
@@ -128,6 +129,7 @@ type EditorActions = {
     markSaved: () => void
     markPublished: () => void
     setIsSaving: (saving: boolean) => void
+    setAutoSaveEnabled: (val: boolean) => void
 
     // Reset
     reset: () => void
@@ -204,6 +206,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     hasUnpublishedChanges: false,
     lastSavedAt: null,
     isSaving: false,
+    pendingManualSave: false,
     autoSaveEnabled: true,
     autoSaveIntervalMs: 3000,
     saveStatus: 'idle',
@@ -273,8 +276,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     addBlock: (afterIndex, block, label) => {
         const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        // Footer must always be last — clamp insert position to just before it
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        const safeAfterIndex = footerIdx >= 0 ? Math.min(afterIndex, footerIdx - 1) : afterIndex
         const newBlocks = [...blocks]
-        newBlocks.splice(afterIndex + 1, 0, block)
+        newBlocks.splice(safeAfterIndex + 1, 0, block)
 
         const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
@@ -305,9 +311,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     duplicateBlock: (index) => {
         const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        if (index === footerIdx) return // never duplicate footer
         const blockCopy = JSON.parse(JSON.stringify(blocks[index]))
+        const insertAt = footerIdx >= 0 ? Math.min(index + 1, footerIdx) : index + 1
         const newBlocks = [...blocks]
-        newBlocks.splice(index + 1, 0, blockCopy)
+        newBlocks.splice(insertAt, 0, blockCopy)
 
         const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Duplicated ${blocks[index]?.blockType}`, 'manual')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
@@ -322,6 +331,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     reorderBlocks: (fromIndex, toIndex) => {
         const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        // Footer must always be last — block any move that violates this
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        if (footerIdx >= 0) {
+            if (fromIndex === footerIdx) return // footer itself cannot move
+            if (toIndex >= footerIdx) return // nothing can land after footer
+        }
         const newBlocks = [...blocks]
         const [moved] = newBlocks.splice(fromIndex, 1)
         newBlocks.splice(toIndex, 0, moved)
@@ -363,11 +378,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     pushBatch: (blocks, theme, label) => {
         const { headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
-        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, label, 'ai_chat')
+        // Enforce footer-last invariant on AI-generated blocks — dedupe and sort
+        const footerBlocks = blocks.filter(b => b.blockType === 'footer')
+        const nonFooter = blocks.filter(b => b.blockType !== 'footer')
+        const sanitized = footerBlocks.length > 0 ? [...nonFooter, footerBlocks[0]] : nonFooter
+        const snapshot = createSnapshot(sanitized, theme, headerBlock, footerBlock, label, 'ai_chat')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
-            blocks: JSON.parse(JSON.stringify(blocks)),
+            blocks: JSON.parse(JSON.stringify(sanitized)),
             theme: JSON.parse(JSON.stringify(theme)),
             history: newHistory,
             historyIndex: newHistory.length - 1,
@@ -440,14 +459,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     // ── Save (F-07) ─────────────────────────────────────────────────────
     handleContentChange: () => {
-        const { autoSaveTimer, siteId, isInlineEditing } = get()
+        const { autoSaveTimer, siteId, isInlineEditing, autoSaveEnabled } = get()
         if (!siteId) return
 
+        // Always mark dirty — auto-save disabled only suspends scheduling, not tracking
         set({ hasUnsavedChanges: true, saveStatus: 'idle' })
 
-        // Suspend auto-save while inline editing is active. The TEXT_EDITING_STOPPED
-        // pipeline (performSave after editing) handles persisting the final state.
-        if (isInlineEditing) return
+        // Suspend scheduling while auto-save is disabled (e.g. template applied) or
+        // inline editing is active (TEXT_EDITING_STOPPED pipeline handles that case)
+        if (!autoSaveEnabled || isInlineEditing) return
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
 
@@ -462,8 +482,13 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const { siteId, autoSaveTimer, isSaving } = get()
         if (!siteId) return false
 
-        // Anti-spam backpressure for manual save
-        if (isManual && isSaving) return false
+        // If a save is already in-flight, mark as pending and return.
+        // The in-flight save's success path reads this flag and fires a retry immediately
+        // after it completes — deterministic, no magic timeout.
+        if (isManual && isSaving) {
+            set({ pendingManualSave: true })
+            return false
+        }
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
         set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
@@ -471,9 +496,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const RETRY_DELAYS = [5000, 10000, 20000]
 
         const attemptSave = async (retryCount = 0): Promise<boolean> => {
-            // Re-read currentPageId from store each attempt to prevent stale closure
-            // after page switch (blocks/theme already re-read below)
-            const { blocks, theme, currentPageId: pageIdNow } = get()
+            // Re-read all state each attempt to prevent stale closure after page switch
+            const { blocks, theme, headerBlock, footerBlock, currentPageId: pageIdNow } = get()
             try {
                 const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
                 if (pageIdNow) {
@@ -482,21 +506,27 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                 const res = await fetch(saveUrl.toString(), {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ blocks, theme, isDraft: true }),
+                    credentials: 'include',
+                    body: JSON.stringify({ blocks, theme, headerBlock, footerBlock, isDraft: true }),
                 })
 
                 if (res.ok) {
+                    const hasPending = get().pendingManualSave
                     set({
                         hasUnsavedChanges: false,
                         hasUnpublishedChanges: true,
                         saveStatus: 'saved',
                         lastSavedAt: Date.now(),
                         isSaving: false,
+                        pendingManualSave: false,
                     })
+                    // Fire the queued manual save immediately now that the slot is free.
+                    // Uses latest store blocks — no stale-closure risk.
+                    if (hasPending) void get().performSave(true)
                     return true
                 } else {
                     if (res.status === 401) {
-                        set({ saveStatus: 'error', isSaving: false })
+                        set({ saveStatus: 'error', isSaving: false, pendingManualSave: false })
                         return false
                     }
                     throw new Error('Save failed')
@@ -509,6 +539,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                         attemptSave(retryCount + 1)
                     }, RETRY_DELAYS[retryCount])
                     set({ autoSaveTimer: timer })
+                } else {
+                    set({ pendingManualSave: false })
                 }
                 return false
             }
@@ -520,6 +552,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     markSaved: () => set({ hasUnsavedChanges: false, hasUnpublishedChanges: true, lastSavedAt: Date.now(), saveStatus: 'saved' }),
     markPublished: () => set({ hasUnpublishedChanges: false }),
     setIsSaving: (saving) => set({ isSaving: saving }),
+    setAutoSaveEnabled: (val) => set({ autoSaveEnabled: val }),
 
     // ── Header/Footer (F-05-07) ──────────────────────────────────────────
 
@@ -536,8 +569,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             headerBlock: newHeader,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     updateFooterBlock: (changes) => {
@@ -553,19 +586,25 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             footerBlock: newFooter,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
-    reset: () => set({
-        siteId: null, blocks: [], theme: {}, siteName: '',
-        headerBlock: null, footerBlock: null,
-        pages: [], currentPageId: null,
-        history: [], historyIndex: -1,
-        isAIStreaming: false,
-        isInlineEditing: false,
-        hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
-        autoSaveEnabled: true, autoSaveIntervalMs: 3000,
-        saveStatus: 'idle', autoSaveTimer: null,
-    }),
+    reset: () => {
+        // Cancel any pending auto-save/retry timer before clearing state — prevents
+        // stale cross-site writes when the user navigates to a different site.
+        const { autoSaveTimer } = get()
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+        set({
+            siteId: null, blocks: [], theme: {}, siteName: '',
+            headerBlock: null, footerBlock: null,
+            pages: [], currentPageId: null,
+            history: [], historyIndex: -1,
+            isAIStreaming: false,
+            isInlineEditing: false,
+            hasUnsavedChanges: false, lastSavedAt: null, isSaving: false, pendingManualSave: false,
+            autoSaveEnabled: true, autoSaveIntervalMs: 3000,
+            saveStatus: 'idle', autoSaveTimer: null,
+        })
+    },
 }))

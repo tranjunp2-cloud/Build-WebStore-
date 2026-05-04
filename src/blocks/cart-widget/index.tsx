@@ -9,12 +9,14 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 
-export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartWidgetConfig> & { site?: { slug?: string } }) {
+export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartWidgetConfig>) {
     void _theme
     const count = useCartStore(state => state.items.reduce((sum, item) => sum + item.quantity, 0))
     const openCart = useCartStore(state => state.openCart)
     const setSiteSlug = useCartStore(state => state.setSiteSlug)
-    const siteSlug = String(site?.slug || '')
+    // tenantSlug is injected by both storefront page ({ ...site, tenantSlug: slug }) and
+    // preview page ({ ...site, tenantSlug: tenant.slug }). Sites collection has no slug field.
+    const siteSlug = String((site as Record<string, unknown>)?.tenantSlug || '')
 
     useEffect(() => {
         if (siteSlug) {

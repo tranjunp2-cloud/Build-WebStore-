@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { TestimonialsConfig, TestimonialItem } from './config'
@@ -14,11 +14,10 @@ import {
 } from '../shared/decorative'
 import { getTeamAvatar } from '@/lib/images/industry-images'
 import { CSS_VARS } from '@/lib/theme/resolve'
-import { RichText as _RichText } from '../shared/RichText'
+import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 
-void _RichText
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
 // Extract structural duplication across 8 variants. Brand identity vars
@@ -107,6 +106,7 @@ type AuthorMetaProps = {
     layout?: 'inline' | 'stacked'
     nameWeight?: 'semibold' | 'bold'
     showAvatar?: boolean
+    imageIndex?: number
     className?: string
 }
 
@@ -121,6 +121,7 @@ function AuthorMeta({
     layout = 'inline',
     nameWeight = 'semibold',
     showAvatar = true,
+    imageIndex,
     className = '',
 }: AuthorMetaProps) {
     const subtitle = (title || company) ? [title, company].filter(Boolean).join(' \u2022 ') : undefined
@@ -129,7 +130,7 @@ function AuthorMeta({
     if (layout === 'stacked') {
         return (
             <div className={className}>
-                <p className={nameClass}>{name}</p>
+                <RichText text={name} as="p" className={nameClass} />
                 {subtitle && (
                     <Caption className="opacity-45 mt-1">{subtitle}</Caption>
                 )}
@@ -140,10 +141,10 @@ function AuthorMeta({
     return (
         <div className={`flex items-center gap-3 ${className}`.trim()}>
             {showAvatar && (
-                <AvatarRing color={CSS_VARS.primary} src={avatar?.url || fallbackSrc} name={name} size={avatarSize} />
+                <AvatarRing color={CSS_VARS.primary} src={avatar?.url || fallbackSrc} name={name} size={avatarSize} imageIndex={imageIndex} />
             )}
             <div>
-                <p className={nameClass}>{name}</p>
+                <RichText text={name} as="p" className={nameClass} />
                 {subtitle && (
                     <Caption className="opacity-45 block">{subtitle}</Caption>
                 )}
@@ -197,7 +198,7 @@ type CarouselArrowProps = {
 
 /** Carousel arrow with TOUCH_TARGET.min (was w-10 h-10 = 40px ❌). */
 function CarouselArrow({ direction, onClick, className = '' }: CarouselArrowProps) {
-    const positionCls = direction === 'prev' ? '-left-4 md:-left-14' : '-right-4 md:-right-14'
+    const positionCls = direction === 'prev' ? '-left-4 md:-left-10' : '-right-4 md:-right-10'
     return (
         <button
             type="button"
@@ -219,6 +220,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     const { headline, testimonials = [] } = block
     const variant = block.variant || 'cards'
     const category = (site?.siteType as string) || 'business'
+    const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
 
     /* Plan 260415 Lỗi G — empty state dev console.warn + early return */
     if (!testimonials.length) {
@@ -256,8 +258,9 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                 title={t.title}
                                 company={t.company}
                                 avatar={t.avatar}
-                                fallbackSrc={getTeamAvatar(category, i)}
+                                fallbackSrc={getTeamAvatar(category, i, s3Map)}
                                 avatarSize={40}
+                                imageIndex={i}
                             />
                         </motion.div>
                     ))}
@@ -268,17 +271,17 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
 
     // ── spotlight variant ─────────────────────────────────────────────────
     if (variant === 'spotlight') {
-        return <TestimonialsSpotlight headline={headline} testimonials={testimonials} theme={theme} category={category} />
+        return <TestimonialsSpotlight headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── minimal-quote variant ─────────────────────────────────────────────
     if (variant === 'minimal-quote') {
-        return <TestimonialsMinimalQuote headline={headline} testimonials={testimonials} theme={theme} category={category} />
+        return <TestimonialsMinimalQuote headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── avatar-row variant ────────────────────────────────────────────────
     if (variant === 'avatar-row') {
-        return <TestimonialsAvatarRow headline={headline} testimonials={testimonials} theme={theme} category={category} />
+        return <TestimonialsAvatarRow headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── video-text variant ────────────────────────────────────────────────
@@ -311,7 +314,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                                 </div>
                                             </>
                                         ) : (
-                                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={120} />
+                                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i, s3Map)} name={t.name} size={120} imageIndex={i} />
                                         )}
                                     </div>
                                     {/* Text side */}
@@ -325,8 +328,9 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                             title={t.title}
                                             company={t.company}
                                             avatar={t.avatar}
-                                            fallbackSrc={getTeamAvatar(category, i)}
+                                            fallbackSrc={getTeamAvatar(category, i, s3Map)}
                                             avatarSize={44}
+                                            imageIndex={i}
                                         />
                                     </div>
                                 </div>
@@ -340,7 +344,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
 
     // ── carousel variant ───────────────────────────────────────────────
     if (variant === 'carousel') {
-        return <TestimonialsCarousel headline={headline} testimonials={testimonials} theme={theme} category={category} />
+        return <TestimonialsCarousel headline={headline} testimonials={testimonials} theme={theme} category={category} s3Map={s3Map} />
     }
 
     // ── simple variant ───────────────────────────────────────────────────
@@ -407,8 +411,9 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                 title={t.title}
                                 company={t.company}
                                 avatar={t.avatar}
-                                fallbackSrc={getTeamAvatar(category, i)}
+                                fallbackSrc={getTeamAvatar(category, i, s3Map)}
                                 avatarSize={44}
+                                imageIndex={i}
                                 className="mt-auto"
                             />
                         </HoverCard>
@@ -424,11 +429,13 @@ function TestimonialsSpotlight({
     headline,
     testimonials,
     category,
+    s3Map,
 }: {
     headline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
+    s3Map?: Record<string, string>
 }) {
     const [centerIdx, setCenterIdx] = useState(0)
 
@@ -483,13 +490,13 @@ function TestimonialsSpotlight({
                         }}
                     >
                         <div className="flex justify-center mb-6">
-                            <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx)} name={center.name} size={72} />
+                            <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx, s3Map)} name={center.name} size={72} imageIndex={centerIdx} />
                         </div>
                         <StarRating count={center.rating || 5} size="lg" className="flex justify-center gap-0.5 mb-4" />
                         <Body size="lg" className="opacity-70 mb-6 italic">
                             &ldquo;{center.quote}&rdquo;
                         </Body>
-                        <p className="font-bold">{center.name}</p>
+                        <RichText text={center.name} as="p" className="font-bold" />
                         {(center.title || center.company) && (
                             <Body size="small" className="opacity-45 mt-1">{[center.title, center.company].filter(Boolean).join(' \u2022 ')}</Body>
                         )}
@@ -521,11 +528,13 @@ function TestimonialsMinimalQuote({
     headline,
     testimonials,
     category,
+    s3Map,
 }: {
     headline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
+    s3Map?: Record<string, string>
 }) {
     const [currentIndex, setCurrentIndex] = useState(0)
     /* Plan 260415 Lỗi E — pause on hover/focus */
@@ -584,7 +593,7 @@ function TestimonialsMinimalQuote({
                             &ldquo;{t.quote}&rdquo;
                         </blockquote>
                         <div className="flex items-center justify-center gap-3">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={48} />
+                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex, s3Map)} name={t.name} size={48} imageIndex={currentIndex} />
                             <AuthorMeta
                                 name={t.name}
                                 title={t.title}
@@ -617,17 +626,31 @@ function TestimonialsCarousel({
     headline,
     testimonials,
     category,
+    s3Map,
 }: {
     headline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
+    s3Map?: Record<string, string>
 }) {
     const [currentIndex, setCurrentIndex] = useState(0)
     /* Plan 260415 Lỗi E — pause on hover: state paused, clear timer khi hover */
     const [isPaused, setIsPaused] = useState(false)
+    const touchStartX = useRef<number | null>(null)
+    const touchStartY = useRef<number | null>(null)
+    const touchDirectionLock = useRef<'horizontal' | 'vertical' | null>(null)
+    const carouselRef = useRef<HTMLDivElement>(null)
+    const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    // Ref keeps currentIndex readable inside the touch effect without forcing re-registration
+    const currentIndexRef = useRef(currentIndex)
+    currentIndexRef.current = currentIndex
 
+    // BUG-TEST-019: pause auto-rotate on manual nav, resume after 5s
     const goTo = useCallback((idx: number) => {
+        setIsPaused(true)
+        if (resumeTimer.current) clearTimeout(resumeTimer.current)
+        resumeTimer.current = setTimeout(() => setIsPaused(false), 5000)
         if (idx < 0) setCurrentIndex(testimonials.length - 1)
         else if (idx >= testimonials.length) setCurrentIndex(0)
         else setCurrentIndex(idx)
@@ -644,6 +667,53 @@ function TestimonialsCarousel({
         return () => clearInterval(timer)
     }, [testimonials.length, isPaused])
 
+    // Non-passive touch listeners so we can preventDefault() on horizontal swipe
+    // to stop the page from scrolling while the user navigates the carousel.
+    useEffect(() => {
+        const el = carouselRef.current
+        if (!el) return
+
+        const onStart = (e: TouchEvent) => {
+            touchStartX.current = e.touches[0]!.clientX
+            touchStartY.current = e.touches[0]!.clientY
+            touchDirectionLock.current = null
+        }
+        const onMove = (e: TouchEvent) => {
+            if (touchStartX.current === null || touchStartY.current === null) return
+            // Lock direction once at 10px threshold — prevents diagonal swipe from
+            // triggering both page scroll and carousel navigation simultaneously.
+            if (!touchDirectionLock.current) {
+                const dx = Math.abs(e.touches[0]!.clientX - touchStartX.current)
+                const dy = Math.abs(e.touches[0]!.clientY - touchStartY.current)
+                if (dx > 10 || dy > 10)
+                    touchDirectionLock.current = dx >= dy ? 'horizontal' : 'vertical'
+            }
+            if (touchDirectionLock.current === 'horizontal') e.preventDefault()
+        }
+        const onEnd = (e: TouchEvent) => {
+            if (touchStartX.current === null) return
+            const delta = e.changedTouches[0]!.clientX - touchStartX.current
+            touchStartX.current = null
+            touchStartY.current = null
+            touchDirectionLock.current = null
+            // Use ref so this closure stays correct across slide changes without re-registering
+            if (Math.abs(delta) > 50) goTo(delta > 0 ? currentIndexRef.current - 1 : currentIndexRef.current + 1)
+        }
+
+        el.addEventListener('touchstart', onStart, { passive: true })
+        el.addEventListener('touchmove', onMove, { passive: false })
+        el.addEventListener('touchend', onEnd, { passive: true })
+        return () => {
+            el.removeEventListener('touchstart', onStart)
+            el.removeEventListener('touchmove', onMove)
+            el.removeEventListener('touchend', onEnd)
+        }
+    }, [goTo])  // goTo changes only when testimonials.length changes — no churn on slide transitions
+
+    useEffect(() => {
+        return () => { if (resumeTimer.current) clearTimeout(resumeTimer.current) }
+    }, [])
+
     if (testimonials.length === 0) return null
     const t = testimonials[currentIndex]
 
@@ -651,7 +721,9 @@ function TestimonialsCarousel({
         <TestimonialsSection>
             <TestimonialsHeader headline={headline} showSubtitle />
             {/* Plan 260415 Lỗi D + E — aria-live="polite" announce slide changes + pause on hover/focus */}
+            {/* BUG-TEST-019 — non-passive touch listeners on carouselRef prevent page scroll on horizontal swipe */}
             <div
+                ref={carouselRef}
                 className="relative max-w-2xl mx-auto"
                 onMouseEnter={() => setIsPaused(true)}
                 onMouseLeave={() => setIsPaused(false)}
@@ -685,13 +757,13 @@ function TestimonialsCarousel({
                         aria-atomic="true"
                     >
                         <div className="flex justify-center mb-6">
-                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={72} />
+                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex, s3Map)} name={t.name} size={72} imageIndex={currentIndex} />
                         </div>
                         <StarRating count={t.rating || 5} size="lg" className="flex justify-center gap-0.5 mb-5" />
                         <Body size="lg" className="italic opacity-70 mb-6">
                             &ldquo;{t.quote}&rdquo;
                         </Body>
-                        <p className="font-bold">{t.name}</p>
+                        <RichText text={t.name} as="p" className="font-bold" />
                         {(t.title || t.company) && (
                             <Body size="small" className="opacity-45 mt-1">{[t.title, t.company].filter(Boolean).join(' \u2022 ')}</Body>
                         )}
@@ -717,11 +789,13 @@ function TestimonialsAvatarRow({
     headline,
     testimonials,
     category,
+    s3Map,
 }: {
     headline?: string
     testimonials: TestimonialItem[]
     theme: BlockProps<TestimonialsConfig>['theme']
     category: string
+    s3Map?: Record<string, string>
 }) {
     const [selectedIndex, setSelectedIndex] = useState(0)
 
@@ -751,9 +825,10 @@ function TestimonialsAvatarRow({
                     >
                         <AvatarRing
                             color={CSS_VARS.primary}
-                            src={t.avatar?.url || getTeamAvatar(category, i)}
+                            src={t.avatar?.url || getTeamAvatar(category, i, s3Map)}
                             name={t.name}
                             size={56}
+                            imageIndex={i}
                         />
                     </button>
                 ))}
@@ -777,7 +852,7 @@ function TestimonialsAvatarRow({
                     <Body size="lg" className="opacity-70 mb-6 italic">
                         &ldquo;{selected.quote}&rdquo;
                     </Body>
-                    <p className="font-bold">{selected.name}</p>
+                    <RichText text={selected.name} as="p" className="font-bold" />
                     {(selected.title || selected.company) && (
                         <Body size="small" className="opacity-45 mt-1">{[selected.title, selected.company].filter(Boolean).join(' \u2022 ')}</Body>
                     )}

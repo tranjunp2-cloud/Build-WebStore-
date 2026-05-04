@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { MenuFoodConfig, MenuItem } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
@@ -55,8 +56,8 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
             style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
         >
             {item.imageUrl && (
-                <div className="aspect-[16/10] overflow-hidden">
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                <div className="relative aspect-[16/10] overflow-hidden">
+                    <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
                 </div>
             )}
             <div className="p-5">
@@ -79,7 +80,7 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
             style={{ borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}
         >
             <div className="flex items-center gap-3">
-                <span className="font-medium">{item.name}</span>
+                <RichText text={item.name} as="span" className="font-medium" />
                 {item.tag && <TagBadge tag={item.tag} />}
             </div>
             <span className="font-bold text-sm" style={{ color: 'var(--brand-primary)' }}>

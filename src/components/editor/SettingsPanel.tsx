@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
+import { OgImageEditor } from './og-image-editor'
 import { BlockImageEditor } from './BlockImageEditor'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
+import { THEME_ENUMS } from '@/lib/theme/enums'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
@@ -69,7 +71,8 @@ const FOOTER_SOCIAL_PLATFORMS = [
 ] as const
 
 // ─── Constants ──────────────────────────────────────────────────────────
-const FONT_OPTIONS = ['Outfit', 'Inter', 'DM Sans', 'Playfair Display', 'Roboto', 'Poppins', 'Plus Jakarta Sans']
+const HEADING_FONT_OPTIONS = [...THEME_ENUMS.fontHeading]
+const BODY_FONT_OPTIONS = [...THEME_ENUMS.fontBody]
 const labelCls = "text-[11px] font-medium text-slate-400"
 const sectionCls = "border-t border-white/10 pt-4"
 // Hide newsletter variants from footer UI — feature not ready for users
@@ -179,7 +182,7 @@ interface SettingsPanelProps {
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
-    requestedTab?: { tab: SettingsTab; key: number } | null
+    requestedTab?: { tab: SettingsTab; key: number; section?: string } | null
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -199,9 +202,23 @@ function SettingsPanelInner({
     }, [block])
     const bk = `${blockIndex}-${blockDataVersion.length}` // short block key for input keys
     const fbk = `footer-${((footerBlock?.columns as unknown[]) || []).length}-${footerBlock?.variant || ''}` // footer block key
+    const footerVariant = (footerBlock?.variant as string) || 'simple'
+    const footerShowColumns = footerVariant !== 'simple' && footerVariant !== 'minimal'
+    const footerShowSocials = footerVariant !== 'minimal'
+    const footerShowTagline = footerVariant === 'centered-stack' || footerVariant === 'dark-gradient'
+
+    const [localPaddingTop, setLocalPaddingTop] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? 32))
+    const [localPaddingBottom, setLocalPaddingBottom] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? 32))
+    useEffect(() => {
+        setLocalPaddingTop(Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? 32))
+        setLocalPaddingBottom(Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? 32))
+    }, [block?.blockSpacing])
 
     // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
     const storeBlocks = useEditorStore(state => state.blocks)
+    // Breadcrumb config stored globally in headerBlock.breadcrumbConfig
+    const breadcrumbCfg = (headerBlock as Record<string, unknown> | null | undefined)?.breadcrumbConfig as
+        { homeLabel?: string; separator?: string; showOnAllPages?: boolean } | undefined
     const resolvedNavLinks = useMemo(() => {
         const headerLinks = (((headerBlock as Record<string, unknown>)?.links as Array<Record<string, unknown>>) || [])
         if (headerLinks.length > 0) return normalizeNavLinkItems(headerLinks, pages)
@@ -217,6 +234,7 @@ function SettingsPanelInner({
         contact: true,
         social: true,
         theme: true,
+        seo: true,
     })
     const [isFooterBrandOpen, setIsFooterBrandOpen] = useState(false)
     const [isFooterSocialOpen, setIsFooterSocialOpen] = useState(false)
@@ -228,11 +246,22 @@ function SettingsPanelInner({
     const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
     const [seoFieldError, setSeoFieldError] = useState<string | null>(null)
 
+    const breadcrumbSectionRef = React.useRef<HTMLDivElement>(null)
+    const breadcrumbScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
         if (requestedTab) {
             setActiveTab(requestedTab.tab)
-            return
+            if (requestedTab.section === 'breadcrumb') {
+                if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
+                breadcrumbScrollTimerRef.current = setTimeout(() => {
+                    breadcrumbSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 80)
+            }
+            return () => {
+                if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
+            }
         }
         if (block) {
             setActiveTab('block')
@@ -300,14 +329,14 @@ function SettingsPanelInner({
                 <label className="text-xs text-gray-400">{s.headingFont}</label>
                 <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
                     className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
-                    {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                    {HEADING_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
             <div>
                 <label className="text-xs text-gray-400">{s.bodyFont}</label>
                 <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
                     className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
-                    {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                    {BODY_FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
             <div>
@@ -349,12 +378,25 @@ function SettingsPanelInner({
                         <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.uploadLogo}</label>
                         <div className="mt-2">
                             <LogoEditor
-                                currentLogo={(siteBranding.logo as string) || ((headerBlock as Record<string, unknown>)?.logo as string) || null}
+                                currentLogo={
+                                    (siteBranding.logo as string | undefined) ||
+                                    (typeof (headerBlock as Record<string, unknown>)?.logo === 'string'
+                                        ? ((headerBlock as Record<string, unknown>)?.logo as string)
+                                        : ((headerBlock as Record<string, unknown>)?.logo as { url?: string } | undefined)?.url) ||
+                                    null
+                                }
                                 onLogoChange={(logoUrl, faviconUrl) => {
                                     const siteBrandingChanges: Record<string, unknown> = { logo: logoUrl }
-                                    if (faviconUrl) siteBrandingChanges.favicon = faviconUrl
-                                    onHeaderUpdate?.(siteBrandingChanges)
-                                    onFooterUpdate?.(siteBrandingChanges)
+                                    if (faviconUrl) {
+                                        siteBrandingChanges.favicon = faviconUrl
+                                    } else if (!logoUrl) {
+                                        siteBrandingChanges.favicon = ''
+                                    }
+                                    // Pass logo as { url, alt } object so NavigationBlock/FooterBlock
+                                    // can render it immediately via block.logo?.url
+                                    const logoObj = logoUrl ? { url: logoUrl, alt: '' } : null
+                                    onHeaderUpdate?.({ ...siteBrandingChanges, logo: logoObj })
+                                    onFooterUpdate?.({ ...siteBrandingChanges, logo: logoObj })
                                     void onSiteSettingsChange?.({ branding: siteBrandingChanges })
                                     if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
                                 }}
@@ -595,6 +637,18 @@ function SettingsPanelInner({
                     </div>
                 </div>
 
+                <div>
+                    <div className="mb-3 border-t border-white/10 pt-4">
+                        <label className={labelCls}>{s.socialImage}</label>
+                    </div>
+                    <OgImageEditor
+                        currentOgImage={typeof site?.seo?.ogImage === 'string' ? site.seo.ogImage : null}
+                        onOgImageChange={(url) => {
+                            void onSiteSettingsChange?.({ seo: { ...siteSeo, ogImage: url } })
+                        }}
+                    />
+                </div>
+
                 <div className="pt-2">
                     <button
                         type="button"
@@ -635,6 +689,7 @@ function SettingsPanelInner({
                                     }
                                     await applyChanges()
                                     toast.success(s.seoGenerated, { id: loadingToastId })
+                                    if (data.warning) toast.warning(data.warning)
                                 } else {
                                     toast.error(s.seoFailed, { id: loadingToastId })
                                 }
@@ -678,37 +733,104 @@ function SettingsPanelInner({
     }
 
     const renderMenuContent = () => {
+        const menuHeaderLogoRaw = (headerBlock as Record<string, unknown>)?.logo
+        const menuHeaderLogo =
+            (typeof menuHeaderLogoRaw === 'string'
+                ? menuHeaderLogoRaw
+                : (menuHeaderLogoRaw as { url?: string } | undefined)?.url) || null
         return (
             <div className="space-y-5">
                 {/* Logo Editor (AC-2) */}
                 <LogoEditor
-                    currentLogo={((headerBlock as Record<string, unknown>)?.logo as string) || null}
+                    currentLogo={menuHeaderLogo}
                     onLogoChange={(logoUrl, faviconUrl) => {
-                        const changes: Record<string, unknown> = { logo: logoUrl }
-                        if (faviconUrl) changes.favicon = faviconUrl
+                        const changes: Record<string, unknown> = {
+                            logo: logoUrl ? { url: logoUrl, alt: '' } : null,
+                        }
+                        if (faviconUrl) {
+                            changes.favicon = faviconUrl
+                        } else if (!logoUrl) {
+                            changes.favicon = ''
+                        }
                         onHeaderUpdate?.(changes)
                         if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
                     }}
                 />
 
                 <div className={sectionCls}>
-                    <label className={labelCls}>{s.navStyle}</label>
+                    <label className={labelCls}>{s.navVariant}</label>
                     <div className="mt-2 grid grid-cols-2 gap-2">
-                        {(['standard', 'centered'] as const).map(style => (
-                            <button
-                                key={style}
-                                type="button"
-                                onClick={() => onHeaderUpdate?.({ navStyle: style })}
-                                className={cn(
-                                    'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                    (headerBlock as Record<string, unknown>)?.navStyle === style || (!((headerBlock as Record<string, unknown>)?.navStyle) && style === 'standard')
-                                        ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                        : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                                )}
-                            >
-                                {style === 'standard' ? s.navStyleStandard : s.navStyleCentered}
-                            </button>
-                        ))}
+                        {([
+                            { key: 'default', label: s.navVariantDefault },
+                            { key: 'centered', label: s.navVariantCentered },
+                            { key: 'mega', label: s.navVariantMega },
+                            { key: 'transparent', label: s.navVariantTransparent },
+                            { key: 'sidebar', label: s.navVariantSidebar },
+                            { key: 'floating', label: s.navVariantFloating },
+                        ] as { key: string; label: string }[]).map(({ key, label }) => {
+                            const current = (headerBlock as Record<string, unknown>)?.variant as string | undefined
+                            const active = current === key || (!current && key === 'default')
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => onHeaderUpdate?.({ variant: key })}
+                                    className={cn(
+                                        'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                                        active
+                                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                            : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                                    )}
+                                >
+                                    {label}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* ─── Nav CTA Button ──────────────────────────────────── */}
+                <div className={sectionCls}>
+                    <label className={labelCls}>{s.navCta}</label>
+                    <div className="mt-2 space-y-2">
+                        <label className="flex items-center gap-2 text-xs text-slate-400">
+                            <input
+                                type="checkbox"
+                                checked={Boolean((headerBlock?.ctaButton as Record<string, unknown>)?.show)}
+                                onChange={(e) => {
+                                    const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: false, label: 'Get started', url: '/contact' }
+                                    onHeaderUpdate?.({ ctaButton: { ...current, show: e.target.checked } })
+                                }}
+                            />
+                            {s.navCtaShow}
+                        </label>
+                        <Input
+                            key={`nav-cta-label-${((headerBlock?.ctaButton as Record<string, unknown>)?.label as string) || ''}`}
+                            defaultValue={((headerBlock?.ctaButton as Record<string, unknown>)?.label as string) || ''}
+                            placeholder={s.navCtaLabel}
+                            variant="editor"
+                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: true, label: '', url: '' }
+                                onHeaderUpdate?.({ ctaButton: { ...current, label: e.target.value } })
+                            }}
+                        />
+                        <Input
+                            key={`nav-cta-url-${((headerBlock?.ctaButton as Record<string, unknown>)?.url as string) || ''}`}
+                            defaultValue={((headerBlock?.ctaButton as Record<string, unknown>)?.url as string) || ''}
+                            placeholder={s.navCtaUrl}
+                            variant="editor"
+                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                const raw = e.target.value.trim()
+                                const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: true, label: '', url: '' }
+                                // Block javascript:/data:/vbscript: URIs — relative paths (/contact, #section) are allowed.
+                                if (raw && /^(javascript|data|vbscript):/i.test(raw)) {
+                                    toast.error(s.invalidSocialUrl)
+                                    e.target.value = (current.url as string) || ''
+                                    return
+                                }
+                                onHeaderUpdate?.({ ctaButton: { ...current, url: raw } })
+                            }}
+                        />
                     </div>
                 </div>
 
@@ -718,6 +840,23 @@ function SettingsPanelInner({
                         links={resolvedNavLinks}
                         onUpdate={(links) => onHeaderUpdate?.({ links })}
                         pages={pages}
+                    />
+                </div>
+
+                {/* ─── Breadcrumb Settings ─────────────────────────────────── */}
+                <div ref={breadcrumbSectionRef} className={sectionCls}>
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="text-base leading-none">🍞</span>
+                        <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.breadcrumbSettings}</span>
+                    </div>
+                    <BreadcrumbEditor
+                        homeLabel={String(breadcrumbCfg?.homeLabel || 'Home')}
+                        separator={String(breadcrumbCfg?.separator || '/')}
+                        showOnAllPages={Boolean(breadcrumbCfg?.showOnAllPages ?? true)}
+                        pageSlug={activePage?.slug ?? undefined}
+                        onChange={(changes) => {
+                            onHeaderUpdate?.({ breadcrumbConfig: { ...breadcrumbCfg, ...changes } })
+                        }}
                     />
                 </div>
 
@@ -822,7 +961,8 @@ function SettingsPanelInner({
                                             className="mt-1 h-8 text-[12px]"
                                         />
                                     </div>
-                                    {/* Company Description */}
+                                    {/* Company Description — only for variants that render tagline */}
+                                    {footerShowTagline && (
                                     <div>
                                         <label className={labelCls}>{s.companyDescription}</label>
                                         <Textarea
@@ -833,19 +973,22 @@ function SettingsPanelInner({
                                             className="mt-1 min-h-[66px] resize-none rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#0b1120] px-3 py-2 text-[12px] text-white placeholder:text-slate-400 outline-none focus:border-blue-500/30"
                                         />
                                     </div>
+                                    )}
                                 </div>
                                 )
                             })()}
                         </div>
 
-                        {/* Column Link Editor — rendered directly, no extra wrapper label */}
-                        <FooterLinkEditor
-                            columns={(footerBlock?.columns as FooterColumn[]) || []}
-                            onUpdate={(cols) => onFooterUpdate?.({ columns: cols })}
-                        />
+                        {/* Column Link Editor — hidden for simple; minimal uses single-column mode */}
+                        {footerShowColumns && (
+                            <FooterLinkEditor
+                                columns={(footerBlock?.columns as FooterColumn[]) || []}
+                                onUpdate={(cols) => onFooterUpdate?.({ columns: cols })}
+                            />
+                        )}
 
-                        {/* Social Media */}
-                        <div className="mb-4">
+                        {/* Social Media — hidden for minimal (no socials rendered) */}
+                        {footerShowSocials && <div className="mb-4">
                             <button
                                 type="button"
                                 onClick={() => setIsFooterSocialOpen(v => !v)}
@@ -890,7 +1033,7 @@ function SettingsPanelInner({
                                     })}
                                 </div>
                             )}
-                        </div>
+                        </div>}
 
                         {/* Copyright Text */}
                         <div className="mb-4">
@@ -1084,16 +1227,17 @@ function SettingsPanelInner({
                                         <div>
                                             <div className="flex items-center justify-between">
                                                 <span className={labelCls}>Top Spacing</span>
-                                                <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingTop ?? 32))}px</span>
+                                                <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
                                             </div>
                                             <input
                                                 type="range"
                                                 min={0} max={120} step={4}
-                                                defaultValue={Number((block.style as Record<string, unknown>)?.paddingTop ?? 32)}
-                                                onChange={(e) => {
-                                                    const val = Number(e.target.value)
-                                                    const prevStyle = (block.style as Record<string, unknown>) || {}
-                                                    onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingTop: val } })
+                                                value={localPaddingTop}
+                                                onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
+                                                onPointerUp={(e) => {
+                                                    const val = Number((e.target as HTMLInputElement).value)
+                                                    const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                    onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
                                                 }}
                                                 className="mt-1 w-full accent-blue-500"
                                             />
@@ -1101,16 +1245,17 @@ function SettingsPanelInner({
                                         <div>
                                             <div className="flex items-center justify-between">
                                                 <span className={labelCls}>Bottom Spacing</span>
-                                                <span className="text-[10px] text-slate-500">{String(Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32))}px</span>
+                                                <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
                                             </div>
                                             <input
                                                 type="range"
                                                 min={0} max={120} step={4}
-                                                defaultValue={Number((block.style as Record<string, unknown>)?.paddingBottom ?? 32)}
-                                                onChange={(e) => {
-                                                    const val = Number(e.target.value)
-                                                    const prevStyle = (block.style as Record<string, unknown>) || {}
-                                                    onBlockUpdate(currentBlockIndex, { style: { ...prevStyle, paddingBottom: val } })
+                                                value={localPaddingBottom}
+                                                onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
+                                                onPointerUp={(e) => {
+                                                    const val = Number((e.target as HTMLInputElement).value)
+                                                    const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                    onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
                                                 }}
                                                 className="mt-1 w-full accent-blue-500"
                                             />
@@ -1547,24 +1692,6 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
-                            {/* Breadcrumb Editor */}
-                            {block && block.blockType === 'breadcrumb' && (
-                                <div className={sectionCls}>
-                                    <BreadcrumbEditor
-                                        items={Array.isArray(block.items) ? block.items as { label: string; url: string }[] : []}
-                                        mode={(block.mode as 'auto' | 'manual') || 'auto'}
-                                        homeLabel={String(block.homeLabel || 'Home')}
-                                        separator={String(block.separator || '/')}
-                                        showIcon={Boolean(block.showIcon)}
-                                        onChange={(changes) => {
-                                            onBlockUpdate(currentBlockIndex, {
-                                                ...changes,
-                                                ...(changes.showIcon !== undefined ? { variant: changes.showIcon ? 'with-icon' : 'simple' } : {}),
-                                            })
-                                        }}
-                                    />
-                                </div>
-                            )}
 
 
                             {/* Theme editing removed from Block tab — available in Global tab */}

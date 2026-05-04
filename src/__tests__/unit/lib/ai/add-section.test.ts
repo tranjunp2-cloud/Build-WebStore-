@@ -116,16 +116,17 @@ describe('inferAddSectionType [TC-F05.13]', () => {
         expect(inferAddSectionType('show instagram link')).toBe('socialWidget')
     })
 
-    it('returns "cartWidget" for "cart" keyword [TC-F05.27]', () => {
-        expect(inferAddSectionType('add a cart widget')).toBe('cartWidget')
+    // gh-839: cartWidget matcher disabled until checkout ships — these must return null
+    it('returns null for "cart" keyword [TC-F05.27]', () => {
+        expect(inferAddSectionType('add a cart widget')).toBeNull()
     })
 
-    it('returns "cartWidget" for "shopping cart" keyword', () => {
-        expect(inferAddSectionType('add shopping cart')).toBe('cartWidget')
+    it('returns null for "shopping cart" keyword', () => {
+        expect(inferAddSectionType('add shopping cart')).toBeNull()
     })
 
-    it('returns "cartWidget" for "checkout" keyword', () => {
-        expect(inferAddSectionType('show checkout button')).toBe('cartWidget')
+    it('returns null for "checkout" keyword', () => {
+        expect(inferAddSectionType('show checkout button')).toBeNull()
     })
 
     // requestedType is prepended to haystack — whichever SECTION_TYPE_MATCHERS entry
@@ -397,10 +398,11 @@ describe('createAddSectionBlock — team [TC-F05.13]', () => {
     })
 })
 
-describe('createAddSectionBlock — newsletter / banner / cta map to hero [TC-F05.13]', () => {
-    it('newsletter maps to hero blockType', () => {
+describe('createAddSectionBlock — newsletter / banner / cta [TC-F05.13]', () => {
+    it('newsletter keeps newsletter blockType', () => {
         const block = createAddSectionBlock({ instruction: 'add newsletter' })
-        expect(block?.blockType).toBe('hero')
+        expect(block?.blockType).toBe('newsletter')
+        expect(block?.variant).toBe('inline')
     })
 
     it('banner maps to hero blockType', () => {
@@ -413,10 +415,10 @@ describe('createAddSectionBlock — newsletter / banner / cta map to hero [TC-F0
         expect(block?.blockType).toBe('hero')
     })
 
-    it('hero block has ctaButtons array', () => {
+    it('newsletter block has subscription copy', () => {
         const block = createAddSectionBlock({ instruction: 'add newsletter' }) as Record<string, unknown>
-        expect(Array.isArray(block?.ctaButtons)).toBe(true)
-        expect((block?.ctaButtons as unknown[]).length).toBeGreaterThan(0)
+        expect(block?.buttonLabel).toBe('Subscribe')
+        expect(block?.placeholder).toBe('Enter your email')
     })
 })
 
@@ -438,15 +440,16 @@ describe('createAddSectionBlock — socialWidget [TC-F05.26]', () => {
     })
 })
 
+// gh-839: cartWidget disabled — createAddSectionBlock returns null for cart instructions
 describe('createAddSectionBlock — cartWidget [TC-F05.27]', () => {
-    it('returns cartWidget blockType', () => {
+    it('returns null for cart widget instruction (gh-839: hidden until checkout ships)', () => {
         const block = createAddSectionBlock({ instruction: 'add cart widget' })
-        expect(block?.blockType).toBe('cartWidget')
+        expect(block).toBeNull()
     })
 
-    it('sets variant to "floating"', () => {
-        const block = createAddSectionBlock({ instruction: 'add cart' }) as Record<string, unknown>
-        expect(block?.variant).toBe('floating')
+    it('returns null for "add cart" instruction', () => {
+        const block = createAddSectionBlock({ instruction: 'add cart' })
+        expect(block).toBeNull()
     })
 })
 
@@ -653,11 +656,11 @@ describe('normalizeAddSectionBlock — team normalization [TC-F05.13]', () => {
 })
 
 describe('normalizeAddSectionBlock — newsletter/banner/cta remapping [TC-F05.13]', () => {
-    it('remaps newsletter blockType to "hero"', () => {
+    it('keeps newsletter blockType', () => {
         const aiBlock = { blockType: 'newsletter', headline: 'Subscribe' }
         const result = normalizeAddSectionBlock({ instruction: 'add newsletter' }, aiBlock) as Record<string, unknown>
-        expect(result?.blockType).toBe('hero')
-        expect(result?.variant).toBe('centered')
+        expect(result?.blockType).toBe('newsletter')
+        expect(result?.variant).toBe('inline')
     })
 
     it('remaps banner blockType to "hero"', () => {
@@ -709,8 +712,9 @@ describe('BUG-F05-04: Gallery placeholder images', () => {
         expect(images[0]).toHaveProperty('caption')
         const img = images[0].image as Record<string, unknown>
         expect(img).toHaveProperty('url')
+        // url is intentionally empty so the gallery block's render-time fallback
+        // picks the correct category + S3 images (GH-727 fix)
         expect(typeof img.url).toBe('string')
-        expect((img.url as string).length).toBeGreaterThan(0)
     })
 
     it('normalizeAddSectionBlock preserves gallery image structure', () => {

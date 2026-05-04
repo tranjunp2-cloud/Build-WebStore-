@@ -143,8 +143,21 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             b.headline = ''
         }
 
+        // Contact block: empty-string email fails Payload email-format validation on publish.
+        // Strip to null so Payload skips format check (field is not required).
+        if (b.blockType === 'contact' && b.email === '') {
+            b.email = null
+        }
+
         if (b.blockType === 'socialWidget') {
             b = normalizeSocialWidgetConfig(b) as Record<string, unknown>
+        }
+
+        // Alias footer variants removed from Payload select options — backward-compat
+        // for existing DB records that stored 'expanded' or 'mega-footer' before PR #757.
+        if (b.blockType === 'footer') {
+            if (b.variant === 'expanded') b.variant = 'simple'
+            else if (b.variant === 'mega-footer') b.variant = 'dark-gradient'
         }
 
         // Coerce invalid variants to defaults — Payload rejects with

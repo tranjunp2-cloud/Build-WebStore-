@@ -50,8 +50,8 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
             <Body size="small" className="opacity-70 leading-relaxed mb-4">{service.description}</Body>
             {service.price && (
                 <p className="text-xl sm:text-2xl font-bold mb-1 break-words" style={{ color: 'var(--brand-primary)' }}>
-                    {service.price}
-                    {service.priceUnit && <span className="text-sm font-normal opacity-70 ml-1">{service.priceUnit}</span>}
+                    <RichText text={service.price} as="span" />
+                    {service.priceUnit && <RichText text={service.priceUnit} as="span" className="text-sm font-normal opacity-70 ml-1" />}
                 </p>
             )}
             <ServiceCTA cta={service.cta} />
@@ -78,7 +78,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
             </div>
             {service.price && (
                 <div className="shrink-0 text-center sm:text-right">
-                    <p className="text-xl sm:text-2xl font-bold break-words" style={{ color: 'var(--brand-primary)' }}>{service.price}</p>
+                    <RichText text={service.price} as="p" className="text-xl sm:text-2xl font-bold break-words" style={{ color: 'var(--brand-primary)' }} />
                     {service.priceUnit && <Body size="small" className="opacity-70">{service.priceUnit}</Body>}
                 </div>
             )}
@@ -105,8 +105,8 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                     <Body size="lg" className="opacity-60 leading-relaxed max-w-xl mb-4">{featured.description}</Body>
                     {featured.price && (
                         <p className="text-3xl font-bold mb-2" style={{ color: 'var(--brand-primary)' }}>
-                            {featured.price}
-                            {featured.priceUnit && <span className="text-base font-normal opacity-60">{featured.priceUnit}</span>}
+                            <RichText text={featured.price} as="span" />
+                            {featured.priceUnit && <RichText text={featured.priceUnit} as="span" className="text-base font-normal opacity-60" />}
                         </p>
                     )}
                     {featured.cta && (

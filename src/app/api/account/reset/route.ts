@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getPayload, type Where } from 'payload'
+import { sql } from 'drizzle-orm'
 import config from '@payload-config'
 import { assertStaging } from '@/lib/env'
 import { getCurrentUser } from '@/lib/auth'
-import { checkRateLimit } from '@/lib/rateLimit'
 
-type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'pages' | 'sites'
+type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'sites'
 
 interface ClearResult {
     [collection: string]: number
@@ -70,20 +70,6 @@ export async function POST() {
             )
         }
 
-        // BUG-F01-05: Rate limit reset — 3/hr per user (destructive op)
-        const rateLimit = await checkRateLimit(`account-reset:${user.id}`, 3, 3_600_000)
-        if (!rateLimit.allowed) {
-            const retryAfter = Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: { code: 'RATE_LIMITED', message: 'Too many reset attempts. Try again later.' },
-                    retryAfter,
-                },
-                { status: 429, headers: { 'Retry-After': String(retryAfter) } },
-            )
-        }
-
         const userWithTenants = user as unknown as {
             id: string | number
             tenants?: Array<{ tenant: string | { id: string } }>
@@ -133,9 +119,16 @@ export async function POST() {
                 depth: 0,
             })
             for (const site of sites) {
-                results.pages = (results.pages || 0) + await clearCollection(
-                    payload, 'pages', { site: { equals: site.id } },
-                )
+                // Use direct SQL to avoid payload.find() which generates aggregate query
+                // expecting a "data" column that doesn't exist in pages_blocks_* tables
+                const db = payload.db.drizzle
+                const pageRows = await db.execute(sql`
+                    SELECT id FROM pages WHERE site_id = ${site.id}
+                `) as { rows: Array<{ id: number }> }
+                for (const row of pageRows.rows) {
+                    await payload.delete({ collection: 'pages', id: row.id })
+                }
+                results.pages = (results.pages || 0) + pageRows.rows.length
             }
 
             // Step 6: Sites

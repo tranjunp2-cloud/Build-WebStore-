@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '@/components/ui/dialog'
 import {
     ChevronDown,
     Globe,
@@ -10,6 +18,7 @@ import {
     LayoutDashboard,
     LayoutTemplate,
     LogOut,
+    Package,
     Settings,
     X,
 } from 'lucide-react'
@@ -35,13 +44,16 @@ type EditorMenuDrawerProps = {
     currentUserRole?: string
     userName?: string
     userInitial?: string
+    hasUnsavedChanges?: boolean
 }
 
-export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial }: EditorMenuDrawerProps) {
+export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial, hasUnsavedChanges }: EditorMenuDrawerProps) {
     const pathname = usePathname()
+    const router = useRouter()
     const { t, locale, toggleLocale } = useI18n()
     const menu = t.editor.menu
     const [expandedGroups, setExpandedGroups] = useState<string[]>(['/editor'])
+    const [pendingAction, setPendingAction] = useState<{ href: string } | 'logout' | null>(null)
 
     useEffect(() => {
         if (!open) return
@@ -71,6 +83,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                     { label: { en: 'Blog', ms: 'Blog' }, href: '/blog' },
                 ],
             },
+            { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
             {
                 label: { en: 'Site Settings', ms: 'Tetapan Laman' },
                 href: '/settings',
@@ -100,6 +113,28 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
         } finally {
             document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
             window.location.href = '/login'
+        }
+    }
+
+    const guardedNavigate = (href: string) => (e: React.MouseEvent) => {
+        e.preventDefault()
+        if (hasUnsavedChanges) {
+            setPendingAction({ href })
+            return
+        }
+        onClose()
+        router.push(href)
+    }
+
+    const handleUnsavedConfirm = () => {
+        const action = pendingAction
+        setPendingAction(null)
+        if (action === 'logout') {
+            onClose()
+            void handleLogout()
+        } else if (action) {
+            onClose()
+            router.push(action.href)
         }
     }
 
@@ -160,7 +195,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                                                     <Link
                                                         key={child.href}
                                                         href={child.href}
-                                                        onClick={onClose}
+                                                        onClick={guardedNavigate(child.href)}
                                                         className={cn(
                                                             'flex h-10 items-center gap-[18px] rounded-[12px] px-4 text-[14px] font-medium transition-colors',
                                                             childActive
@@ -188,7 +223,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                onClick={onClose}
+                                onClick={guardedNavigate(item.href)}
                                 className={cn(
                                     'flex h-[44px] items-center gap-3 rounded-[16px] px-4 text-[14px] font-medium transition-colors',
                                     isActive
@@ -211,7 +246,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 <div className="flex flex-col gap-3 border-t border-white/[0.08] px-3 pt-[17px]" style={{ height: 182 }}>
                     {/* User info + Notification bell */}
                     <div className="flex items-center gap-3">
-                        <Link href="/dashboard/settings" className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
+                        <Link href="/dashboard/settings" onClick={guardedNavigate('/dashboard/settings')} className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0)] shadow-[0_0_0_2px_rgba(59,130,246,0.3)] text-[12px] font-bold text-white overflow-hidden">
                                 {userInitial || '?'}
                             </div>
@@ -255,7 +290,10 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
 
                     <button
                         type="button"
-                        onClick={handleLogout}
+                        onClick={() => {
+                            if (hasUnsavedChanges) { setPendingAction('logout'); return }
+                            void handleLogout()
+                        }}
                         className="flex h-[44px] items-center gap-3 rounded-[16px] border border-white/[0.08] pl-4 text-[14px] font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
                     >
                         <LogOut className="h-4 w-4 shrink-0" />
@@ -263,6 +301,33 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                     </button>
                 </div>
             </aside>
+
+            <Dialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) setPendingAction(null) }}>
+                <DialogContent className="max-w-sm border-white/[0.08] bg-[#0F172A] text-white">
+                    <DialogHeader>
+                        <DialogTitle className="text-white">{menu.unsavedTitle}</DialogTitle>
+                        <DialogDescription className="text-slate-400">
+                            {menu.unsavedConfirm}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setPendingAction(null)}
+                            className="flex-1 rounded-[10px] border border-white/[0.08] py-2 text-[13px] font-medium text-slate-300 hover:bg-white/5 transition-colors"
+                        >
+                            {menu.unsavedStay}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleUnsavedConfirm}
+                            className="flex-1 rounded-[10px] bg-rose-500/20 py-2 text-[13px] font-medium text-rose-400 hover:bg-rose-500/30 transition-colors"
+                        >
+                            {menu.unsavedLeave}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

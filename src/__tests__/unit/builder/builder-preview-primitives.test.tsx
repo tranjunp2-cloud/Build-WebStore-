@@ -483,3 +483,137 @@ describe('[TC-F01.37-TC-F01.45] Drag-and-Drop block logic', () => {
         })
     })
 })
+
+// ── TC-F01-GH770: BuilderPreviewSurface with siteId (post-generation iframes) ──────────────────
+
+describe('[TC-F01-GH770] BuilderPreviewSurface — iframe mode when siteId is set', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F01-GH770-01: desktop mode with siteId renders iframe instead of children', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderPreviewSurface mode="desktop" variant="panel" siteId="site-123">
+                <div data-testid="should-not-render">This should not render when siteId is set</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert — iframe should be rendered
+        const iframe = container.querySelector('iframe')
+        expect(iframe).toBeInTheDocument()
+        // Children should NOT be rendered in iframe mode
+        expect(screen.queryByTestId('should-not-render')).not.toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-02: desktop iframe includes builder=1 query parameter', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderPreviewSurface mode="desktop" variant="panel" siteId="site-456">
+                <div>content</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert — iframe src must include builder=1 param
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement
+        expect(iframe.src).toContain('/preview/site-456')
+        expect(iframe.src).toContain('builder=1')
+        expect(iframe.src).toContain('v=')  // Also has cache-buster
+    })
+
+    it('TC-F01-GH770-03: desktop mode without siteId still renders children (streaming phase)', () => {
+        // Arrange + Act
+        render(
+            <BuilderPreviewSurface mode="desktop" variant="panel">
+                <div data-testid="live-preview-content">Streaming preview</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert — children should be rendered when siteId is undefined
+        expect(screen.getByTestId('live-preview-content')).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-04: desktop fullwidth with siteId renders iframe', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderPreviewSurface mode="desktop" variant="fullwidth" siteId="site-789">
+                <div data-testid="should-not-appear">Child content</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert
+        const iframe = container.querySelector('iframe')
+        expect(iframe).toBeInTheDocument()
+        expect(screen.queryByTestId('should-not-appear')).not.toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-05: desktop fullwidth switches overflow from auto to hidden when siteId is set', () => {
+        // Arrange + Act — with siteId
+        const { container: containerWithSiteId } = render(
+            <BuilderPreviewSurface mode="desktop" variant="fullwidth" siteId="site-999">
+                <div>content</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert — inner div should have overflow-hidden (not overflow-y-auto) when iframe
+        const innerDiv = containerWithSiteId.querySelector('.rounded-\\[inherit\\]')
+        expect(innerDiv).toHaveClass('overflow-hidden')
+        expect(innerDiv).not.toHaveClass('overflow-y-auto')
+    })
+
+    it('TC-F01-GH770-06: desktop fullwidth keeps overflow-y-auto when siteId not set', () => {
+        // Arrange + Act — without siteId
+        const { container: containerNoSiteId } = render(
+            <BuilderPreviewSurface mode="desktop" variant="fullwidth">
+                <div>content</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert — inner div should have overflow-y-auto when rendering children
+        const innerDiv = containerNoSiteId.querySelector('.rounded-\\[inherit\\]')
+        expect(innerDiv).toHaveClass('overflow-y-auto')
+        expect(innerDiv).not.toHaveClass('overflow-hidden')
+    })
+
+    it('TC-F01-GH770-07: mobile iframe includes builder=1 query parameter', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderPreviewSurface mode="mobile" variant="panel" siteId="site-mobile-123">
+                <div>fallback content</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert — mobile shell iframe should have builder=1 param
+        const iframe = container.querySelector('iframe') as HTMLIFrameElement
+        expect(iframe.src).toContain('/preview/site-mobile-123')
+        expect(iframe.src).toContain('builder=1')
+    })
+
+    it('TC-F01-GH770-08: mobile shell renders iframe when siteId is present', () => {
+        // Arrange + Act
+        const { container } = render(
+            <BuilderPreviewSurface mode="mobile" variant="panel" siteId="site-mobile">
+                <div data-testid="fallback">This is fallback</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert — iframe should be rendered in mobile shell
+        const iframes = container.querySelectorAll('iframe')
+        expect(iframes.length).toBeGreaterThan(0)
+        expect(iframes[0].src).toContain('/preview/site-mobile')
+        // Fallback content should not be rendered
+        expect(screen.queryByTestId('fallback')).not.toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-09: mobile shell renders children when siteId not set', () => {
+        // Arrange + Act
+        render(
+            <BuilderPreviewSurface mode="mobile" variant="panel">
+                <div data-testid="mobile-preview-child">Mobile streaming content</div>
+            </BuilderPreviewSurface>,
+        )
+
+        // Assert — children should be rendered when no siteId
+        expect(screen.getByTestId('mobile-preview-child')).toBeInTheDocument()
+    })
+})

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
@@ -11,6 +11,7 @@ import { EditorSidebar, type EditorSidebarTabId } from '@/components/editor/Edit
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
+import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import type { AIAction } from '@/types/editor'
@@ -101,10 +102,15 @@ export default function EditorPage() {
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
-    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number } | null>(null)
+    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string } | null>(null)
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
     const [showSaveGuard, setShowSaveGuard] = useState(false)
+    const reorderSaveTimerRef = useRef<number | null>(null)
+    // Imperative handle to send postMessages to iframe without full reload (Gap B)
+    const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
+    const isSavingRef = useRef(false)
+    const pendingSaveRef = useRef<SaveOptions | null>(null)
 
     const { isOnline, isSyncing } = useConnectivity()
     const { isMaster, reclaimAuthority } = useTabAuthority(siteId)
@@ -118,8 +124,6 @@ export default function EditorPage() {
     const hasUnpublishedChanges = useEditorStore(state => state.hasUnpublishedChanges)
     const lastSavedAt = useEditorStore(state => state.lastSavedAt)
     const isSaving = useEditorStore(state => state.isSaving)
-    const autoSaveEnabled = useEditorStore(state => state.autoSaveEnabled)
-    const autoSaveIntervalMs = useEditorStore(state => state.autoSaveIntervalMs)
     const init = useEditorStore(state => state.init)
     const setPages = useEditorStore(state => state.setPages)
     const setCurrentPageId = useEditorStore(state => state.setCurrentPageId)
@@ -142,6 +146,7 @@ export default function EditorPage() {
     const markSaved = useEditorStore(state => state.markSaved)
     const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
+    const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
 
     const currentBlock = useMemo(
         () => (selectedBlock !== null ? blocks[selectedBlock] || null : null),
@@ -250,7 +255,16 @@ export default function EditorPage() {
                     // Set directly — don't use handleContentChange which also sets hasUnsavedChanges.
                     const siteIsPublished = data.site?.status === 'published'
                     const hasDraftPages = loadedPages.some((p: { status: string }) => p.status === 'draft')
-                    if (siteIsPublished && hasDraftPages) {
+
+                    // GH-843: also detect pending draft from current page _status returned by
+                    // editor-data (fetched with draft:true — returns draft version when it exists).
+                    // The pages API _status reflects the live document and misses auto-saved draft
+                    // versions. Timestamp comparison is intentionally omitted: seo-queue runs
+                    // payload.update() after publish (no draft:true), bumping page.updatedAt past
+                    // site.publishedAt and causing a false positive Update button.
+                    const currentPageIsDraft = data.page?._status === 'draft'
+
+                    if (siteIsPublished && (hasDraftPages || currentPageIsDraft)) {
                         useEditorStore.setState({ hasUnpublishedChanges: true })
                     }
                 }
@@ -271,6 +285,37 @@ export default function EditorPage() {
 
     const handleSave = useCallback(async (options: SaveOptions = {}) => {
         if (!siteId) return false
+
+        if (isSavingRef.current) {
+            // A save is already in progress. Mutex lock.
+            // Queue this save request as "dirty" to fire after the current one completes.
+            pendingSaveRef.current = {
+                ...pendingSaveRef.current,
+                ...options,
+                showToast: options.showToast || pendingSaveRef.current?.showToast,
+                refreshPreview: options.refreshPreview === true || pendingSaveRef.current?.refreshPreview === true
+                    ? true
+                    : options.refreshPreview ?? pendingSaveRef.current?.refreshPreview
+            }
+            return true
+        }
+
+        isSavingRef.current = true
+        pendingSaveRef.current = null
+        setIsSaving(true)
+
+        // Cancel any pending reorder-triggered save to prevent double-fire
+        if (reorderSaveTimerRef.current !== null) {
+            window.clearTimeout(reorderSaveTimerRef.current)
+            reorderSaveTimerRef.current = null
+        }
+
+        // Cancel the store's pending auto-save timer — explicit saves subsume it
+        const storeTimer = useEditorStore.getState().autoSaveTimer
+        if (storeTimer) {
+            clearTimeout(storeTimer)
+            useEditorStore.setState({ autoSaveTimer: null })
+        }
 
         const snapshot = useEditorStore.getState()
         const currentBlocks = snapshot.blocks
@@ -332,23 +377,23 @@ export default function EditorPage() {
             toast.error(t.editor.toast.saveFailed)
             return false
         } finally {
-            setIsSaving(false)
+            isSavingRef.current = false
+            if (pendingSaveRef.current) {
+                // There were unsaved changes queued while we were saving.
+                // Fetch the latest state and save again.
+                const nextOptions = pendingSaveRef.current
+                pendingSaveRef.current = null
+                void handleSave(nextOptions)
+            } else {
+                setIsSaving(false)
+            }
         }
     }, [markSaved, page, setIsSaving, siteId])
 
+    // Suspend store auto-save while a template is applied (user must confirm first)
     useEffect(() => {
-        // Pause auto-save while template was just applied (user must confirm save first)
-        if (!siteId || !hasUnsavedChanges || !autoSaveEnabled || templateApplied) return
-
-        const timer = window.setTimeout(() => {
-            // Skip if user is currently inline editing — the TEXT_EDITING_STOPPED
-            // pipeline saves the final state and avoids overwriting partial edits.
-            if (useEditorStore.getState().isInlineEditing) return
-            void handleSave({ showToast: false, refreshPreview: true })
-        }, autoSaveIntervalMs)
-
-        return () => window.clearTimeout(timer)
-    }, [autoSaveEnabled, autoSaveIntervalMs, handleSave, hasUnsavedChanges, siteId, templateApplied])
+        setAutoSaveEnabled(!templateApplied)
+    }, [templateApplied, setAutoSaveEnabled])
 
     // Warn user before leaving page with unsaved changes
     useEffect(() => {
@@ -361,6 +406,15 @@ export default function EditorPage() {
         window.addEventListener('beforeunload', handleBeforeUnload)
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
     }, [hasUnsavedChanges])
+
+    // Clear pending reorder-save timer on unmount
+    useEffect(() => {
+        return () => {
+            if (reorderSaveTimerRef.current !== null) {
+                window.clearTimeout(reorderSaveTimerRef.current)
+            }
+        }
+    }, [])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -375,14 +429,20 @@ export default function EditorPage() {
                 if (e.shiftKey) {
                     if (canRedo()) {
                         redo()
-                        setIframeKey(key => key + 1)
+                        const redoState = useEditorStore.getState()
+                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: redoState.blocks })
+                        if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.headerBlock })
+                        if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.footerBlock })
                     }
                     return
                 }
 
                 if (canUndo()) {
                     undo()
-                    setIframeKey(key => key + 1)
+                    const undoState = useEditorStore.getState()
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: undoState.blocks })
+                    if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.headerBlock })
+                    if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.footerBlock })
                 }
             }
 
@@ -404,13 +464,28 @@ export default function EditorPage() {
         updateTheme({ [key]: value })
         // Save to DB but don't reload iframe — live CSS update handles preview
         void handleSave({ showToast: false, refreshPreview: false })
+        // colorMode (dark/light) requires toggling the Tailwind `dark` class on <html>
+        // inside the preview iframe — CSS variables alone don't flip dark: utility classes.
+        // Send UPDATE_SITE_THEME so PreviewSiteRenderer re-renders with new theme, and
+        // send THEME_COLOR_MODE_UPDATE so PreviewScripts toggles the html.dark class.
+        if (key === 'colorMode') {
+            const updatedTheme = useEditorStore.getState().theme
+            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_SITE_THEME', theme: updatedTheme })
+            previewFrameSendRef.current?.sendToIframe({ type: 'THEME_COLOR_MODE_UPDATE', colorMode: value })
+        }
     }, [updateTheme, handleSave])
 
     const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
         if (!siteId) return
 
+        // Business name is required — silently ignore blank submissions
+        if ('name' in changes && !changes.name) return
+
         if (changes.name) {
             updateSiteName(changes.name)
+            // Sync business name into navigation logoText so the nav header
+            // reflects the new name without a separate block edit.
+            updateHeaderBlock({ logoText: changes.name })
         }
 
         setSite(prev => {
@@ -449,12 +524,15 @@ export default function EditorPage() {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    siteName: changes.name,
+                    ...(changes.name ? { siteName: changes.name } : {}),
                     contactInfo: changes.contactInfo,
                     socialLinks: changes.socialLinks,
                     branding: changes.branding,
                     seo: changes.seo,
-                    headerBlock: changes.headerBlock,
+                    // When name changes, persist updated headerBlock (logoText synced above)
+                    headerBlock: changes.name
+                        ? useEditorStore.getState().headerBlock
+                        : changes.headerBlock,
                     footerBlock: changes.footerBlock,
                 }),
             })
@@ -464,13 +542,22 @@ export default function EditorPage() {
             }
 
             setSaveSuccess(true)
-            setIframeKey(key => key + 1)
+            // header/footer update in-place; branding (CSS vars) still needs full reload
+            if (changes.headerBlock || changes.name) {
+                const latestHeader = useEditorStore.getState().headerBlock
+                if (latestHeader) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: latestHeader })
+            }
+            if (changes.footerBlock) {
+                const latestFooter = useEditorStore.getState().footerBlock
+                if (latestFooter) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: latestFooter })
+            }
+            if (changes.branding) setIframeKey(key => key + 1)
             window.setTimeout(() => setSaveSuccess(false), 1800)
         } catch (error) {
             console.error('Failed to update site settings', error)
             toast.error('Failed to update site settings', { description: 'Please try again later.' })
         }
-    }, [currentPageId, siteId, updateSiteName])
+    }, [currentPageId, siteId, updateSiteName, updateHeaderBlock])
 
     const handleDeleteBlock = useCallback((index: number) => {
         deleteBlock(index)
@@ -480,13 +567,26 @@ export default function EditorPage() {
             if (index === prev) return null
             return prev
         })
-        void handleSave({ showToast: false, refreshPreview: true })
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+        }, 0)
+        void handleSave({ showToast: false, refreshPreview: false })
     }, [deleteBlock, handleSave])
 
     const handleDuplicateBlock = useCallback((index: number) => {
         duplicateBlock(index)
         setSelectedBlock(index + 1)
-        void handleSave({ showToast: false, refreshPreview: true })
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+            previewFrameSendRef.current?.setScrollToBlock?.(index + 1)
+        }, 0)
+        void handleSave({ showToast: false, refreshPreview: false })
     }, [duplicateBlock, handleSave])
 
     // BUG-F05-01: retry save once on failure to handle transient Payload errors
@@ -501,26 +601,63 @@ export default function EditorPage() {
 
     const handleBlockFieldChange = useCallback((index: number, field: string, value: string) => {
         updateBlock(index, { [field]: value })
-        // Save + reload preview to show changes
-        void saveWithRetry({ showToast: false, refreshPreview: true })
+        // Partial live update — no iframe reload needed
+        const updatedBlock = useEditorStore.getState().blocks[index]
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: updatedBlock })
+        void saveWithRetry({ showToast: false, refreshPreview: false })
     }, [updateBlock, saveWithRetry])
 
     const handleBlockUpdate = useCallback((index: number, changes: Record<string, unknown>) => {
         updateBlock(index, changes)
-        void saveWithRetry({ showToast: false, refreshPreview: true })
+        const updatedBlock = useEditorStore.getState().blocks[index]
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_BLOCK_DATA', blockIndex: index, blockData: updatedBlock })
+        void saveWithRetry({ showToast: false, refreshPreview: false })
     }, [updateBlock, saveWithRetry])
 
-    const handleReorderBlocks = useCallback(async (fromIndex: number, toIndex: number) => {
+    const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return
         reorderBlocks(fromIndex, toIndex)
         setSelectedBlock(toIndex)
-        // Save FIRST so iframe reloads with correct order from DB
-        await handleSave({ showToast: false, refreshPreview: true })
         setChatActivity({
             id: `reorder-${Date.now()}`,
             content: `Moved block #${fromIndex + 1} to position #${toIndex + 1}`,
         })
+        
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+            previewFrameSendRef.current?.setScrollToBlock?.(toIndex)
+        }, 0)
+
+        // Coalesce consecutive reorders — save once after 500ms idle
+        if (reorderSaveTimerRef.current !== null) {
+            window.clearTimeout(reorderSaveTimerRef.current)
+        }
+        reorderSaveTimerRef.current = window.setTimeout(() => {
+            reorderSaveTimerRef.current = null
+            void handleSave({ showToast: false, refreshPreview: false })
+        }, 500)
     }, [reorderBlocks, handleSave])
+
+    // Seed gallery images from Unsplash → S3, then push the S3 map into the iframe
+    // via postMessage so the gallery re-renders with correct images without a reload.
+    // Idempotent — if already seeded (e.g. via AI gen) the endpoint returns immediately.
+    const triggerImageSeed = useCallback(async () => {
+        if (!siteId) return
+        try {
+            const res = await fetch(`/api/sites/${siteId}/seed-images`, { method: 'POST', credentials: 'include' })
+            if (res.ok) {
+                const data = await res.json()
+                if (data.imageLibraryS3 && Object.keys(data.imageLibraryS3).length > 0) {
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_IMAGE_LIBRARY_S3', imageLibraryS3: data.imageLibraryS3 })
+                }
+            }
+        } catch {
+            // non-fatal
+        }
+    }, [siteId])
 
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
         const nextBlock = normalizeAddSectionBlock(
@@ -532,18 +669,32 @@ export default function EditorPage() {
             },
             blockData as Record<string, unknown>
         )
-        
+
         const safeBlock: BlockData = nextBlock || { blockType: blockData.blockType || 'hero', variant: blockData.variant || 'default' }
 
         addBlock(index - 1, safeBlock)
         setSelectedBlock(index)
-        setIframeKey(key => key + 1)
+
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({
+                type: 'UPDATE_FULL_LAYOUT',
+                bodyBlocks: useEditorStore.getState().blocks
+            })
+        }, 0)
+
+        // Don't call setIframeKey(key => key + 1) because save happens asynchronously via autoSave,
+        // which causes a race condition where the iframe fetches stale db state.
+
         setChatActivity({
             id: `drop-${Date.now()}`,
             content: `Added ${blockData.blockType} block`,
         })
+
+        if (blockData.blockType === 'gallery') void triggerImageSeed()
+
+        void handleSave({ showToast: false, refreshPreview: false })
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [addBlock, theme])
+    }, [addBlock, theme, handleSave, triggerImageSeed])
 
     const handleAIAction = useCallback(async (action: AIAction) => {
         // Cancel any pending debounced auto-save to prevent race conditions
@@ -577,6 +728,7 @@ export default function EditorPage() {
                 if (nextBlock) {
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
+                    if (nextBlock.blockType === 'gallery') void triggerImageSeed()
                 } else {
                     toast.error('Unable to add this section yet')
                 }
@@ -613,7 +765,13 @@ export default function EditorPage() {
             case 'undo': {
                 if (canUndo()) {
                     undo()
-                    setIframeKey(key => key + 1)
+                    // Replaced setIframeKey with seamless update
+                    setTimeout(() => {
+                        previewFrameSendRef.current?.sendToIframe({ 
+                            type: 'UPDATE_FULL_LAYOUT', 
+                            bodyBlocks: useEditorStore.getState().blocks 
+                        })
+                    }, 0)
                 } else {
                     toast.error('Nothing to undo')
                     return // Nothing changed, skip save
@@ -627,14 +785,30 @@ export default function EditorPage() {
         // otherwise a page reload would lose the undo.
         // setTimeout lets Zustand state settle before reading snapshot.
         setTimeout(() => {
-            void handleSave({ showToast: false, refreshPreview: true })
+            const currentBlocks = useEditorStore.getState().blocks
+            // Perform a seamless update for layout modifications
+            if (['add_block', 'delete_block', 'reorder_blocks', 'update_multiple_blocks', 'undo'].includes(action.action)) {
+                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: currentBlocks })
+                if (action.action === 'add_block') {
+                    const afterIndex = action.afterIndex ?? (blocks.length - 1)
+                    previewFrameSendRef.current?.setScrollToBlock?.(Math.max(0, afterIndex + 1))
+                }
+                void handleSave({ showToast: false, refreshPreview: false })
+            } else {
+                void handleSave({ showToast: false, refreshPreview: true })
+            }
         }, 300)
-    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo])
+    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo, triggerImageSeed])
 
     const handleUndo = useCallback(() => {
         if (!canUndo()) return
         undo()
-        setIframeKey(key => key + 1)
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+        }, 0)
         // If user undoes the template apply, clear the save guard
         setTemplateApplied(false)
     }, [canUndo, undo])
@@ -642,7 +816,12 @@ export default function EditorPage() {
     const handleRedo = useCallback(() => {
         if (!canRedo()) return
         redo()
-        setIframeKey(key => key + 1)
+        setTimeout(() => {
+            previewFrameSendRef.current?.sendToIframe({ 
+                type: 'UPDATE_FULL_LAYOUT', 
+                bodyBlocks: useEditorStore.getState().blocks 
+            })
+        }, 0)
     }, [canRedo, redo])
 
     const handlePublish = useCallback(async () => {
@@ -886,10 +1065,10 @@ export default function EditorPage() {
 
     // BUG-F05-032/046: context-sensitive tab switching when blocks are clicked
     const handleBlockSelectWithContext = useCallback((blockIndex: number | null, blockType?: string) => {
-        if (blockType === 'navigation' || blockType === 'footer') {
+        if (blockType === 'navigation' || blockType === 'footer' || blockType === 'breadcrumb') {
             setSelectedBlock(null)
             // Use unique key to force re-trigger even on repeated clicks
-            setSettingsRequestedTab({ tab: 'menu', key: Date.now() })
+            setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: blockType === 'breadcrumb' ? 'breadcrumb' : undefined })
         } else {
             setSelectedBlock(blockIndex)
             setSettingsRequestedTab(null)
@@ -960,6 +1139,7 @@ export default function EditorPage() {
                 currentUserRole={userData?.role}
                 userName={userData?.name}
                 userInitial={userData?.initial}
+                hasUnsavedChanges={hasUnsavedChanges}
             />
 
             <EditorToolbar
@@ -1024,7 +1204,8 @@ export default function EditorPage() {
                         <button
                             type="button"
                             onClick={() => setActiveSidebarTab('chat')}
-                            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/25 transition-transform active:scale-95"
+                            className="fixed right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/25 transition-transform active:scale-95"
+                            style={{ bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
                             aria-label="Open AI Chat"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1042,7 +1223,7 @@ export default function EditorPage() {
                                 tabIndex={0}
                                 aria-label="Close settings"
                             />
-                            <div className="relative max-h-[70vh] overflow-y-auto rounded-t-2xl border-t border-white/10 bg-[#0F172A]">
+                            <div className="relative max-h-[70vh] landscape:max-h-[90vh] overflow-y-auto rounded-t-2xl border-t border-white/10 bg-[#0F172A]">
                                 <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-[#0F172A] px-4 py-3">
                                     <span className="text-sm font-medium text-white">Block Settings</span>
                                     <button
@@ -1067,8 +1248,18 @@ export default function EditorPage() {
                                     onThemeChange={handleThemeChange}
                                     onBlockFieldChange={handleBlockFieldChange}
                                     onBlockUpdate={handleBlockUpdate}
-                                    onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
-                                    onFooterUpdate={(changes) => updateFooterBlock(changes)}
+                                    onHeaderUpdate={(changes) => {
+                                        updateHeaderBlock(changes)
+                                        const updatedHeader = useEditorStore.getState().headerBlock
+                                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
+                                        void saveWithRetry({ showToast: false, refreshPreview: false })
+                                    }}
+                                    onFooterUpdate={(changes) => {
+                                        updateFooterBlock(changes)
+                                        const updatedFooter = useEditorStore.getState().footerBlock
+                                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                                        void saveWithRetry({ showToast: false, refreshPreview: false })
+                                    }}
                                     onSiteSettingsChange={handleSiteSettingsChange}
                                     onPageUpdate={handlePageUpdate}
                                     requestedTab={settingsRequestedTab}
@@ -1123,16 +1314,26 @@ export default function EditorPage() {
                                         content,
                                     })
                                 }
-                                // BUG-F05-13: await save BEFORE iframe reload
+                                // Inline edit already pushed UPDATE_BLOCK_DATA during editing session
+                                // — no iframe reload needed, just persist to DB.
                                 await handleSave({ showToast: false, refreshPreview: false })
-                                setIframeKey(key => key + 1)
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
+                            onImageReplaced={async () => {
+                                // UPDATE_BLOCK_DATA (sent by PreviewFrame after updateBlock) already
+                                // updates the iframe preview in-place — no full reload needed.
+                                // refreshPreview: false prevents setIframeKey from firing and avoids
+                                // the stale-DB-data race when a prior save is still in-flight.
+                                await handleSave({ showToast: false, refreshPreview: false })
+                            }}
                             onPageNavigate={handlePageSelected}
                             onInlineEditSave={async () => {
-                                await handleSave({ showToast: false, refreshPreview: true })
+                                // Inline edit already updated text in iframe — no reload needed.
+                                // Reloading here causes visible jank while user is still editing.
+                                await handleSave({ showToast: false, refreshPreview: false })
                             }}
+                            onHandleReady={(handle) => { previewFrameSendRef.current = handle }}
                         />
                     </div>
 
@@ -1150,8 +1351,18 @@ export default function EditorPage() {
                         onThemeChange={handleThemeChange}
                         onBlockFieldChange={handleBlockFieldChange}
                         onBlockUpdate={handleBlockUpdate}
-                        onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
-                        onFooterUpdate={(changes) => updateFooterBlock(changes)}
+                        onHeaderUpdate={(changes) => {
+                            updateHeaderBlock(changes)
+                            const updatedHeader = useEditorStore.getState().headerBlock
+                            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
+                            void saveWithRetry({ showToast: false, refreshPreview: false })
+                        }}
+                        onFooterUpdate={(changes) => {
+                            updateFooterBlock(changes)
+                            const updatedFooter = useEditorStore.getState().footerBlock
+                            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                            void saveWithRetry({ showToast: false, refreshPreview: false })
+                        }}
                         onSiteSettingsChange={handleSiteSettingsChange}
                         onPageUpdate={handlePageUpdate}
                         requestedTab={settingsRequestedTab}
@@ -1204,6 +1415,15 @@ export default function EditorPage() {
                             `Apply template: ${templateName}`
                         )
 
+                        // Disable auto-save BEFORE mutating store — prevents the 3s debounce
+                        // timer from firing before user confirms the template save guard.
+                        store.setAutoSaveEnabled(false)
+                        const pendingTimer = useEditorStore.getState().autoSaveTimer
+                        if (pendingTimer) {
+                            clearTimeout(pendingTimer)
+                            useEditorStore.setState({ autoSaveTimer: null })
+                        }
+
                         // Update header/footer
                         if (data.site?.headerBlock) store.updateHeaderBlock(data.site.headerBlock)
                         if (data.site?.footerBlock) store.updateFooterBlock(data.site.footerBlock)
@@ -1214,8 +1434,11 @@ export default function EditorPage() {
                         // Mark template as just applied (for save guard)
                         setTemplateApplied(true)
 
-                        // Refresh preview iframe
-                        setIframeKey(prev => prev + 1)
+                        // Update preview in-place — pushBatch already updated blocks/theme in store
+                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: useEditorStore.getState().blocks })
+                        if (data.site?.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: data.site.headerBlock })
+                        if (data.site?.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: data.site.footerBlock })
+                        if (data.site?.theme) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_SITE_THEME', theme: data.site.theme })
 
                         // Show unmatched block notification (Phase 3)
                         if (unmatchedBlocks && unmatchedBlocks.length > 0) {

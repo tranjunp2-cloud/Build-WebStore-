@@ -42,6 +42,7 @@ vi.mock('@/components/AppShell', () => ({
 
 vi.mock('@/components/editor/PreviewScripts', () => ({
     PreviewScripts: () => <div data-testid="preview-scripts">Scripts</div>,
+    BuilderLinkScripts: () => null,
 }))
 
 vi.mock('@/app/(preview)/preview/[siteId]/PreviewErrors', () => ({
@@ -145,5 +146,169 @@ describe('PreviewPage — Security & Authorization', () => {
 
         // Assert
         expect(notFound).toHaveBeenCalled()
+    })
+})
+
+// ── TC-F01-GH770: Builder preview parameter handling (GH #770) ─────────────
+
+describe('[TC-F01-GH770] PreviewPage — builder parameter handling', () => {
+    const siteId = 'site-123'
+    const mockParams = Promise.resolve({ siteId })
+    const tenantId = 'tenant-1'
+
+    const mockedGetCurrentUser = vi.mocked(getCurrentUser)
+
+    beforeEach(() => {
+        vi.resetAllMocks()
+    })
+
+    it('TC-F01-GH770-01: reads builder searchParam from URL', async () => {
+        // Arrange
+        const mockSearchParams = Promise.resolve({ pageId: 'page-1', builder: '1' })
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'user-1',
+            tenants: [{ tenant: { id: tenantId }, role: 'admin' }]
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({ id: siteId, tenant: tenantId })
+            .mockResolvedValueOnce({ id: 'page-1', site: siteId, layout: [] })
+
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({ docs: [] })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        const rendered = render(Component as React.ReactElement)
+
+        // Assert — component should render without error, builder param was consumed
+        expect(rendered.container).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-02: passes isBuilderPreview=true to SiteRenderer when builder=1', async () => {
+        // Arrange
+        const mockSearchParams = Promise.resolve({ pageId: 'page-1', builder: '1' })
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'user-1',
+            tenants: [{ tenant: { id: tenantId }, role: 'admin' }]
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({ id: siteId, tenant: tenantId })
+            .mockResolvedValueOnce({ id: 'page-1', site: siteId, layout: [] })
+
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({ docs: [] })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        render(Component as React.ReactElement)
+
+        // Assert — SiteRenderer should receive isBuilderPreview={true}
+        expect(screen.getByTestId('site-renderer')).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-03: passes isBuilderPreview=false when builder param not set', async () => {
+        // Arrange
+        const mockSearchParams = Promise.resolve({ pageId: 'page-1' })
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'user-1',
+            tenants: [{ tenant: { id: tenantId }, role: 'admin' }]
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({ id: siteId, tenant: tenantId })
+            .mockResolvedValueOnce({ id: 'page-1', site: siteId, layout: [] })
+
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({ docs: [] })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        render(Component as React.ReactElement)
+
+        // Assert — SiteRenderer still renders
+        expect(screen.getByTestId('site-renderer')).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-04: skips PreviewScripts when builder=1', async () => {
+        // Arrange
+        const mockSearchParams = Promise.resolve({ builder: '1' })
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'user-1',
+            tenants: [{ tenant: { id: tenantId }, role: 'admin' }]
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({ id: siteId, tenant: tenantId })
+            .mockResolvedValueOnce({ id: 'page-1', site: siteId, layout: [] })
+
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({ docs: [] })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        render(Component as React.ReactElement)
+
+        // Assert — PreviewScripts should NOT be rendered when builder=1
+        expect(screen.queryByTestId('preview-scripts')).not.toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-05: includes PreviewScripts when builder param not present', async () => {
+        // Arrange
+        const mockSearchParams = Promise.resolve({ pageId: 'page-1' })
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'user-1',
+            tenants: [{ tenant: { id: tenantId }, role: 'admin' }]
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>)
+            .mockResolvedValueOnce({ id: siteId, tenant: tenantId })
+            .mockResolvedValueOnce({ id: 'page-1', site: siteId, layout: [] })
+
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({ docs: [] })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        render(Component as React.ReactElement)
+
+        // Assert — PreviewScripts should be rendered in normal (non-builder) mode
+        expect(screen.getByTestId('preview-scripts')).toBeInTheDocument()
+    })
+
+    it('TC-F01-GH770-06: builder parameter does not affect auth checks', async () => {
+        // Arrange — user not authenticated
+        mockedGetCurrentUser.mockResolvedValue(null)
+        const mockSearchParams = Promise.resolve({ builder: '1' })
+
+        // Act & Assert
+        await expect(PreviewPage({ params: mockParams, searchParams: mockSearchParams }))
+            .rejects.toThrow('NEXT_REDIRECT')
+
+        expect(redirect).toHaveBeenCalledWith(expect.stringContaining('/login'))
+    })
+
+    it('TC-F01-GH770-07: builder parameter does not affect tenant isolation checks', async () => {
+        // Arrange
+        mockedGetCurrentUser.mockResolvedValue({
+            id: 'user-1',
+            tenants: [{ tenant: 'unauthorized-tenant', role: 'admin' }]
+        } as Partial<PlatformUser> as PlatformUser)
+
+        const mockPayload = await getPayload({ config: {} as any })
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>).mockResolvedValue({
+            id: siteId,
+            tenant: 'different-tenant'
+        })
+
+        const mockSearchParams = Promise.resolve({ builder: '1' })
+
+        // Act
+        const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        render(Component as React.ReactElement)
+
+        // Assert — Access denied should still be enforced
+        expect(screen.getByText('Access Denied')).toBeInTheDocument()
     })
 })

@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
                 email,
                 phone: phone || undefined,
                 message,
-                site: siteId,
+                site: parseInt(siteId, 10),
                 status: 'new',
                 source: 'contact-block',
                 ipAddress: ip,

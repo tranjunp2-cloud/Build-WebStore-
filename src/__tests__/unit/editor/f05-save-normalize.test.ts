@@ -503,3 +503,90 @@ describe('sanitizeBlockVariant', () => {
         expect(result).toBe(block)
     })
 })
+
+describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 backward-compat)', () => {
+    it('TC-F05-save-14: footer with variant="expanded" → aliased to "simple"', () => {
+        // Arrange — old DB record with removed variant
+        const blocks = [{ blockType: 'footer', variant: 'expanded', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — Payload select no longer includes "expanded"
+        expect(result[0].variant).toBe('simple')
+    })
+
+    it('TC-F05-save-15: footer with variant="mega-footer" → aliased to "dark-gradient"', () => {
+        // Arrange — old DB record with removed variant
+        const blocks = [{ blockType: 'footer', variant: 'mega-footer', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — Payload select no longer includes "mega-footer"
+        expect(result[0].variant).toBe('dark-gradient')
+    })
+
+    it('TC-F05-save-16: footer with valid variant → unchanged', () => {
+        // Arrange
+        const blocks = [{ blockType: 'footer', variant: 'minimal', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — valid variants must not be aliased
+        expect(result[0].variant).toBe('minimal')
+    })
+
+    it('TC-F05-save-17: non-footer block with "expanded" variant is NOT aliased by footer guard', () => {
+        // Arrange — 'expanded' on a hero block should NOT be aliased as footer logic
+        // (sanitizeBlockVariant handles coercion for non-footer blocks separately)
+        const blocks = [{ blockType: 'hero', variant: 'expanded', columns: [] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — footer alias guard skips non-footer blocks; sanitizeBlockVariant
+        // then coerces 'expanded' (invalid for hero) to hero's default 'centered'.
+        expect(result[0].variant).toBe('centered')
+    })
+
+    // TC-F05-save-18 — contact block email empty string → null
+    // Payload email-type field validates format even without required:true,
+    // so empty string '' causes ValidationError on publish. Must be coerced to null.
+    it('TC-F05-save-18: contact block with email="" → coerced to null (prevents Payload email ValidationError on publish)', () => {
+        // Arrange
+        const blocks = [{ blockType: 'contact', variant: 'form', email: '', phone: '+601111', headline: 'Contact Us' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — empty email stripped to null so Payload skips format validation
+        expect(result[0].email).toBeNull()
+        // Other fields must be untouched
+        expect(result[0].phone).toBe('+601111')
+        expect(result[0].headline).toBe('Contact Us')
+    })
+
+    it('TC-F05-save-18b: contact block with valid email → untouched', () => {
+        // Arrange — valid email must not be stripped
+        const blocks = [{ blockType: 'contact', variant: 'form', email: 'info@cafe.com', headline: 'Contact Us' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — valid email preserved
+        expect(result[0].email).toBe('info@cafe.com')
+    })
+
+    it('TC-F05-save-18c: non-contact block with email="" → NOT stripped (only applies to contact)', () => {
+        // Arrange — footer has no email field normally, but if it did, we don't strip it
+        const blocks = [{ blockType: 'footer', variant: 'simple', email: '' }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+
+        // Assert — only contact block gets email coercion
+        expect(result[0].email).toBe('')
+    })
+})

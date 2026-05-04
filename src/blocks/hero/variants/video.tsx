@@ -5,7 +5,8 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
-import { CTAButtons, HERO_CONTAINER, HeroBadge, VideoControlButton } from '../shared'
+import { CTAButtons, HERO_CONTAINER, HeroBadge, VideoControlButton, safeAltText } from '../shared'
+import { HeroMediaOverlay } from '../hero-media-overlay'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 
 void _CSS_VARS
@@ -13,12 +14,14 @@ import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
 
 export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
-    const { headline, subheadline, ctaButtons = [], badge, videoUrl, image } = block
+    const { headline, subheadline, ctaButtons = [], badge, videoUrl: initialVideoUrl, image } = block
     const category = (site?.siteType as string) || 'business'
-    const fallbackHeroUrl = getHeroImage(category)
+    const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const [isPlaying, setIsPlaying] = useState(true)
+    const [videoUrl, setVideoUrl] = useState(initialVideoUrl)
+    const prevVideoUrlRef = useRef(initialVideoUrl)
 
     // Respect prefers-reduced-motion
     useEffect(() => {
@@ -34,6 +37,14 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
         return () => mq.removeEventListener('change', handler)
     }, [])
 
+    // Explicit play() after first-upload React render — autoPlay alone may not fire on dynamic mount
+    useEffect(() => {
+        if (videoUrl && videoUrl !== prevVideoUrlRef.current) {
+            prevVideoUrlRef.current = videoUrl
+            videoRef.current?.play().catch(() => {})
+        }
+    }, [videoUrl])
+
     const togglePlayback = () => {
         if (!videoRef.current) return
         if (isPlaying) {
@@ -46,30 +57,37 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
 
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
-            {/* Full-bleed background video */}
-            {videoUrl ? (
-                <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    poster={image?.url || fallbackHeroUrl}
-                    className="absolute inset-0 w-full h-full object-cover"
-                />
-            ) : (
-                /* Poster image fallback when no video */
-                <div
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{
-                        backgroundImage: `url(${image?.url || fallbackHeroUrl})`,
-                    }}
-                />
-            )}
+            {/* Full-bleed background video — muted + playsInline satisfies mobile autoplay policy */}
+            <HeroMediaOverlay
+                field="image.url"
+                altText={safeAltText(image?.alt, headline)}
+                positionClass="absolute inset-0"
+                showImageButton={false}
+                showVideoButton={true}
+                videoField="videoUrl"
+                onVideoUploaded={(url) => { setVideoUrl(url); setIsPlaying(true) }}
+            >
+                {videoUrl ? (
+                    <video
+                        ref={videoRef}
+                        src={videoUrl}
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        poster={image?.url || fallbackHeroUrl}
+                        className="absolute inset-0 w-full h-full object-cover"
+                    />
+                ) : (
+                    <div
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${image?.url || fallbackHeroUrl})` }}
+                    />
+                )}
+            </HeroMediaOverlay>
 
-            {/* Dark overlay for text readability */}
-            <div className="absolute inset-0 bg-black/50" />
+            {/* Dark overlay for text readability — pointer-events-none lets HeroMediaOverlay hover fire */}
+            <div className="absolute inset-0 bg-black/50 pointer-events-none" />
 
             <div className={`${HERO_CONTAINER} relative z-10 text-center max-w-3xl`}>
                 {badge?.show && (
@@ -113,7 +131,7 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
                 </motion.div>
             </div>
 
-            {/* Play/Pause button in corner */}
+            {/* Play/Pause button in corner — only when video is active */}
             {videoUrl && (
                 <VideoControlButton
                     isPlaying={isPlaying}

@@ -139,7 +139,8 @@ export function PricingTableBlock({ block }: BlockProps<PricingTableConfig>) {
                             <ul className="space-y-3 mb-8">
                                 {plan.features.map((f, j) => (
                                     <li key={j} className="flex items-center gap-2 text-sm">
-                                        <span style={{ color: 'var(--brand-primary)' }}>✓</span> {f}
+                                        <span style={{ color: 'var(--brand-primary)' }}>✓</span>
+                                        <RichText text={f} as="span" />
                                     </li>
                                 ))}
                             </ul>

@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { SocialProofConfig, SocialProofReview } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -28,12 +29,12 @@ function StarRating({ rating, color }: { rating: number; color: string }) {
     )
 }
 
-function Avatar({ src, name, color }: { src?: string; name: string; color: string }) {
+function Avatar({ src, name, color, imageIndex }: { src?: string; name: string; color: string; imageIndex?: number }) {
     const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
     if (src) {
         return (
-            <img src={src} alt={name} className="w-10 h-10 rounded-full object-cover" />
+            <Image src={src} alt={name} width={40} height={40} className="rounded-full object-cover" data-image-index={imageIndex} />
         )
     }
 
@@ -47,10 +48,10 @@ function Avatar({ src, name, color }: { src?: string; name: string; color: strin
     )
 }
 
-function ReviewCard({ review, color, variant }: { review: SocialProofReview; color: string; variant: string }) {
+function ReviewCard({ review, color, variant, reviewIndex }: { review: SocialProofReview; color: string; variant: string; reviewIndex?: number }) {
     const authorBlock = (
         <div className="flex items-center gap-3">
-            <Avatar src={review.avatar} name={review.author} color={color} />
+            <Avatar src={review.avatar?.url} name={review.author} color={color} imageIndex={reviewIndex} />
             <div>
                 <Body size="small" className="font-semibold">{review.author}</Body>
                 {review.role && <Caption className="opacity-50 block">{review.role}</Caption>}
@@ -87,10 +88,11 @@ export function SocialProofBlock({ block, theme: _theme, site }: BlockProps<Soci
     const { variant = 'cards', headline, reviews: rawReviews = [] } = block
     const category = (site?.siteType as string) || 'business'
 
+    const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
     // Fallback: add avatar from industry images for reviews missing avatars (per-item)
     const reviews = rawReviews.map((review, i) => ({
         ...review,
-        avatar: review.avatar || getTeamAvatar(category, i),
+        avatar: review.avatar?.url ? review.avatar : { url: getTeamAvatar(category, i, s3Map) },
     }))
 
     return (
@@ -107,13 +109,13 @@ export function SocialProofBlock({ block, theme: _theme, site }: BlockProps<Soci
                 {variant === 'minimal' ? (
                     <div className="max-w-2xl mx-auto">
                         {reviews.map((review, i) => (
-                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} />
+                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} reviewIndex={i} />
                         ))}
                     </div>
                 ) : (
                     <div className={`grid grid-cols-1 md:grid-cols-2 ${variant === 'grid' ? 'lg:grid-cols-3' : 'lg:grid-cols-3'} gap-6 max-w-6xl mx-auto`}>
                         {reviews.map((review, i) => (
-                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} />
+                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} reviewIndex={i} />
                         ))}
                     </div>
                 )}

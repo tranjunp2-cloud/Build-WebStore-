@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next'
 import { withPayload } from '@payloadcms/next/withPayload'
+import { withSentryConfig } from '@sentry/nextjs'
 
 // Polyfill File + Blob for Node 18 (required by undici/Payload CMS)
 if (typeof globalThis.File === 'undefined') {
@@ -46,6 +47,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     reactCompiler: false,
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
   },
   logging: {
     fetches: {
@@ -70,4 +74,21 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withPayload(nextConfig)
+const sentryWebpackOptions = {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    silent: !process.env.CI,
+    widenClientFileUpload: false,
+    sourcemaps: {
+        deleteSourcemapsAfterUpload: true,
+    },
+    tunnelRoute: '/sentry-tunnel',
+    hideSourceMaps: true,
+    webpack: {
+        treeshake: { removeDebugLogging: true },
+        automaticVercelMonitors: false,
+    },
+}
+
+export default withSentryConfig(withPayload(nextConfig), sentryWebpackOptions)

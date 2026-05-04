@@ -5,6 +5,7 @@ import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { parseRequest } from '@/lib/validations/helpers'
 import { revalidateTag } from 'next/cache'
 import { z } from 'zod'
@@ -184,7 +185,9 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             const layout = (page as unknown as { layout?: unknown[] }).layout
             const data: Record<string, unknown> = { ...visibilityFields }
             if (Array.isArray(layout)) {
-                data.layout = stripArrayItemIds(layout)
+                data.layout = normalizeBlocksForPersistence(
+                    stripArrayItemIds(layout) as Record<string, unknown>[]
+                )
             }
             await payload.update({
                 collection: 'pages',

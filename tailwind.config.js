@@ -33,6 +33,8 @@ module.exports = {
                 //   3. System fallback
                 sans: ['var(--font-body, var(--font-inter))', 'system-ui', 'sans-serif'],
                 heading: ['var(--font-heading, var(--font-outfit))', 'system-ui', 'sans-serif'],
+                // Keep identical to 'sans' — AppShell uses font-sans, Typography blocks use font-body; both must track --font-body
+                body: ['var(--font-body, var(--font-inter))', 'system-ui', 'sans-serif'],
             },
             colors: {
                 // Studio admin CSS-var bridge tokens (scoped via .studio-shell)
@@ -131,6 +133,11 @@ module.exports = {
             },
         },
     },
+    // Safelist: arbitrary z-index classes from NAV_Z_CLASS design tokens.
+    // JIT may not scan src/lib/design-tokens.ts string values; explicit safelist guarantees generation.
+    safelist: [
+        'z-[50]', 'z-[51]', 'z-[52]', 'z-[53]',
+    ],
     // Disable Preflight — its CSS reset overrides Payload admin styles
     // (globals.css has custom resets in @layer base instead)
     corePlugins: {

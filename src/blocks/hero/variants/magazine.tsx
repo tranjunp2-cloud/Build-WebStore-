@@ -1,19 +1,25 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useScroll, useTransform } from 'framer-motion'
+import { useRef } from 'react'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
 import { CTAButtons, HERO_CONTAINER, safeAltText } from '../shared'
+import { HeroMediaOverlay } from '../hero-media-overlay'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
 
 export function MagazineHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], image, badge } = block
+    const imageRef = useRef<HTMLDivElement>(null)
+    const { scrollYProgress } = useScroll({ target: imageRef, offset: ['start end', 'end start'] })
+    // Parallax: image shifts up 40px as it scrolls out of view
+    const imageY = useTransform(scrollYProgress, [0, 1], [0, -40])
     const category = (site?.siteType as string) || 'business'
-    const fallbackHeroUrl = getHeroImage(category)
+    const fallbackHeroUrl = getHeroImage(category, 0, site?.imageLibraryS3 as Record<string, string> | undefined)
 
     return (
         <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
@@ -23,23 +29,41 @@ export function MagazineHero({ block, site }: BlockProps<HeroConfig>) {
             <div className={`${HERO_CONTAINER} relative z-10`}>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-center">
                     {/* Left — Large image (60%) */}
-                    <motion.div
-                        initial={{ opacity: 0, x: -30 }}
-                        whileInView={{ opacity: 1, x: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                        className="md:col-span-3 relative"
+                    <HeroMediaOverlay
+                        field="image.url"
+                        altText={safeAltText(image?.alt, headline)}
+                        className="md:col-span-3 overflow-hidden rounded-2xl"
                     >
-                        <img
-                            src={image?.url || fallbackHeroUrl}
-                            alt={safeAltText(image?.alt, headline)}
-                            className="w-full h-auto rounded-2xl object-cover aspect-[4/3] max-h-[600px]"
-                            style={{
-                                border: `2px solid rgba(var(--brand-primary-rgb), 0.2)`,
-                                boxShadow: `0 25px 60px rgba(var(--brand-primary-rgb), 0.1), 0 8px 24px rgba(0,0,0,0.2)`,
-                            }}
-                        />
-                    </motion.div>
+                        <motion.div
+                            ref={imageRef}
+                            initial={{ opacity: 0, x: -30 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                            className="md:col-span-3 relative overflow-hidden rounded-2xl"
+                        >
+                            <motion.img
+                                src={image?.url || fallbackHeroUrl}
+                                alt={safeAltText(image?.alt, headline)}
+                                className="w-full h-auto object-cover aspect-[4/3] max-h-[600px] hidden md:block"
+                                style={{
+                                    y: imageY,
+                                    border: `2px solid rgba(var(--brand-primary-rgb), 0.2)`,
+                                    boxShadow: `0 25px 60px rgba(var(--brand-primary-rgb), 0.1), 0 8px 24px rgba(0,0,0,0.2)`,
+                                }}
+                            />
+                            {/* Mobile: static image, no parallax */}
+                            <img
+                                src={image?.url || fallbackHeroUrl}
+                                alt={safeAltText(image?.alt, headline)}
+                                className="w-full h-auto rounded-2xl object-cover aspect-[4/3] max-h-[600px] md:hidden"
+                                style={{
+                                    border: `2px solid rgba(var(--brand-primary-rgb), 0.2)`,
+                                    boxShadow: `0 25px 60px rgba(var(--brand-primary-rgb), 0.1), 0 8px 24px rgba(0,0,0,0.2)`,
+                                }}
+                            />
+                        </motion.div>
+                    </HeroMediaOverlay>
 
                     {/* Right — Content (40%) */}
                     <motion.div

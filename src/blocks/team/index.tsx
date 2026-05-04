@@ -90,7 +90,7 @@ function hashHue(name: string): number {
     return hash
 }
 
-function InitialsAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
+function InitialsAvatar({ name, size = 'md', imageIndex }: { name: string; size?: 'sm' | 'md' | 'lg'; imageIndex?: number }) {
     const initials = getInitials(name)
     const hue = hashHue(name)
     const sizeCls = size === 'lg' ? 'w-32 h-32 text-3xl' : size === 'sm' ? 'w-16 h-16 text-base' : 'w-24 h-24 text-2xl'
@@ -99,6 +99,7 @@ function InitialsAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md
             className={`${sizeCls} rounded-full mx-auto mb-4 flex items-center justify-center font-bold text-white`}
             style={{ background: `hsl(${hue}, 55%, 50%)` }}
             aria-hidden="true"
+            data-image-index={imageIndex}
         >
             {initials}
         </div>
@@ -110,18 +111,19 @@ function InitialsAvatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md
  * Nếu avatar URL 404 hoặc load fail → tự swap sang initials đẹp, không icon
  * broken. Vẫn dùng raw <img> (chưa next/image) để giảm scope PR.
  */
-function MemberAvatar({ member }: { member: TeamMember }) {
+function MemberAvatar({ member, imageIndex }: { member: TeamMember; imageIndex?: number }) {
     const [imgError, setImgError] = useState(false)
-    if (!member.avatar?.url || imgError) {
-        return <InitialsAvatar name={member.name} />
+    if (!member.image?.url || imgError) {
+        return <InitialsAvatar name={member.name} imageIndex={imageIndex} />
     }
     return (
         <img
-            src={member.avatar.url}
-            alt={member.avatar.alt || `${member.name} portrait`}
+            src={member.image.url}
+            alt={member.image.alt || `${member.name} portrait`}
             className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
             loading="lazy"
             onError={() => setImgError(true)}
+            data-image-index={imageIndex}
         />
     )
 }
@@ -202,12 +204,12 @@ function SectionHeader({
 function MemberMeta({ member, align = 'center' }: { member: TeamMember; align?: 'center' | 'left' }) {
     return (
         <>
-            <Heading level={4} className="font-bold" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
+            <Heading level={4} className="font-bold break-words" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
                 {member.name}
             </Heading>
-            <Body size="small" className="mb-2" style={{ color: CSS_VARS.primary }}>{member.role}</Body>
+            <Body size="small" className="mb-2 break-words" style={{ color: CSS_VARS.primary }}>{member.role}</Body>
             {member.bio && (
-                <Body size="small" className={`line-clamp-3 ${align === 'left' ? 'mt-1' : ''}`} style={{ color: CSS_VARS.muted }}>
+                <Body size="small" className={`line-clamp-3 break-words ${align === 'left' ? 'mt-1' : ''}`} style={{ color: CSS_VARS.muted }}>
                     {member.bio}
                 </Body>
             )}
@@ -238,9 +240,9 @@ function GridVariant({
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
             <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`}>
+                    <StaggerItem key={`${m.name}-${i}`} className="h-full">
                         <HoverCard
-                            className={`text-center ${CARD_PADDING.md} transition-shadow`}
+                            className={`text-center ${CARD_PADDING.md} transition-shadow h-full flex flex-col`}
                             style={{
                                 background: CSS_VARS.surface,
                                 borderRadius: 'var(--radius-lg)',
@@ -248,9 +250,11 @@ function GridVariant({
                                 border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
                             }}
                         >
-                            <article aria-label={`${m.name}, ${m.role}`}>
-                                <MemberAvatar member={m} />
-                                <MemberMeta member={m} align="center" />
+                            <article aria-label={`${m.name}, ${m.role}`} className="flex flex-col h-full flex-1 justify-between">
+                                <div>
+                                    <MemberAvatar member={m} imageIndex={i} />
+                                    <MemberMeta member={m} align="center" />
+                                </div>
                                 <SocialLinks socials={m.socials} name={m.name} />
                             </article>
                         </HoverCard>
@@ -289,7 +293,7 @@ function ListVariant({
                     >
                         <article className="flex flex-col sm:flex-row items-center sm:items-start gap-4 w-full" aria-label={`${m.name}, ${m.role}`}>
                             <div className="flex-shrink-0">
-                                <MemberAvatar member={m} />
+                                <MemberAvatar member={m} imageIndex={i} />
                             </div>
                             <div className="flex-1 text-center sm:text-left min-w-0">
                                 <MemberMeta member={m} align="left" />
@@ -336,7 +340,7 @@ function CardsHoverRevealVariant({
                             }}
                         >
                             <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 group-hover:opacity-0">
-                                <MemberAvatar member={m} />
+                                <MemberAvatar member={m} imageIndex={i} />
                             </div>
                             <div
                                 className="absolute inset-x-0 bottom-0 p-5 text-center translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"
@@ -345,7 +349,7 @@ function CardsHoverRevealVariant({
                                     color: '#ffffff',
                                 }}
                             >
-                                <p className="font-bold text-base">{m.name}</p>
+                                <RichText text={m.name} as="p" className="font-bold text-base" />
                                 <p className="text-sm opacity-90 mb-1">{m.role}</p>
                                 {m.bio && (
                                     <p className="text-xs opacity-85 line-clamp-3">{m.bio}</p>
@@ -353,7 +357,7 @@ function CardsHoverRevealVariant({
                                 <SocialLinks socials={m.socials} name={m.name} />
                             </div>
                             <div className="absolute inset-x-0 bottom-0 py-3 text-center transition-opacity duration-300 group-hover:opacity-0">
-                                <p className="font-semibold text-sm" style={{ color: CSS_VARS.text }}>{m.name}</p>
+                                <RichText text={m.name} as="p" className="font-semibold text-sm" style={{ color: CSS_VARS.text }} />
                                 <p className="text-xs" style={{ color: CSS_VARS.muted }}>{m.role}</p>
                             </div>
                         </article>
@@ -384,15 +388,16 @@ function HorizontalScrollVariant({
         <TeamSection decorative={<GridLines color={CSS_VARS.primary} spacing={48} opacity={0.05} />}>
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
             <div
-                className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4"
+                className="overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4"
                 style={{ scrollbarWidth: 'thin' }}
                 role="region"
                 aria-label="Team members carousel"
             >
+                <div className="flex gap-6 w-fit mx-auto">
                 {members.map((m, i) => (
                     <article
                         key={`${m.name}-${i}`}
-                        className={`shrink-0 w-72 snap-center text-center ${CARD_PADDING.md}`}
+                        className={`shrink-0 w-72 snap-center text-center ${CARD_PADDING.md} flex flex-col justify-between`}
                         style={{
                             background: CSS_VARS.surface,
                             borderRadius: 'var(--radius-lg)',
@@ -401,11 +406,14 @@ function HorizontalScrollVariant({
                         }}
                         aria-label={`${m.name}, ${m.role}`}
                     >
-                        <MemberAvatar member={m} />
-                        <MemberMeta member={m} align="center" />
+                        <div>
+                            <MemberAvatar member={m} imageIndex={i} />
+                            <MemberMeta member={m} align="center" />
+                        </div>
                         <SocialLinks socials={m.socials} name={m.name} />
                     </article>
                 ))}
+                </div>
             </div>
         </TeamSection>
     )
@@ -440,22 +448,24 @@ function BioModalVariant({
     return (
         <TeamSection decorative={<NoiseTexture opacity={0.05} />}>
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
-            <StaggerGrid className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <StaggerGrid className="flex flex-wrap justify-center gap-4">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`}>
+                    <StaggerItem key={`${m.name}-${i}`} className="h-full w-[calc(50%-8px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(16.666%-14px)]">
                         <button
                             type="button"
                             onClick={() => setActive(m)}
-                            className={`w-full text-center p-4 rounded-xl transition-all hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.5)] ${TOUCH_TARGET.min}`}
+                            className={`w-full h-full text-center p-4 rounded-xl transition-all hover:scale-[1.03] flex flex-col items-center justify-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.5)] ${TOUCH_TARGET.min}`}
                             style={{
                                 background: CSS_VARS.surface,
                                 border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
                             }}
                             aria-label={`Open bio for ${m.name}`}
                         >
-                            <MemberAvatar member={m} />
-                            <p className="font-semibold text-sm truncate" style={{ color: CSS_VARS.text }}>{m.name}</p>
-                            <p className="text-xs truncate" style={{ color: CSS_VARS.muted }}>{m.role}</p>
+                            <MemberAvatar member={m} imageIndex={i} />
+                            <div className="w-full min-w-0">
+                                <RichText text={m.name} as="p" className="font-semibold text-sm truncate" style={{ color: CSS_VARS.text }} />
+                                <p className="text-xs truncate" style={{ color: CSS_VARS.muted }}>{m.role}</p>
+                            </div>
                         </button>
                     </StaggerItem>
                 ))}
@@ -522,18 +532,20 @@ function CompactRowVariant({
                         style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.08)' }}
                     >
                         <div className="flex-shrink-0 w-12 h-12">
-                            {m.avatar?.url ? (
+                            {m.image?.url ? (
                                 <img
-                                    src={m.avatar.url}
-                                    alt={m.avatar.alt || `${m.name} portrait`}
+                                    src={m.image.url}
+                                    alt={m.image.alt || `${m.name} portrait`}
                                     className="w-12 h-12 rounded-full object-cover"
                                     loading="lazy"
+                                    data-image-index={i}
                                 />
                             ) : (
                                 <div
                                     className="w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold text-white"
                                     style={{ background: `hsl(${hashHue(m.name)}, 55%, 50%)` }}
                                     aria-hidden="true"
+                                    data-image-index={i}
                                 >
                                     {getInitials(m.name)}
                                 </div>
@@ -541,7 +553,7 @@ function CompactRowVariant({
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-baseline gap-x-2">
-                                <p className="font-semibold text-sm" style={{ color: CSS_VARS.text }}>{m.name}</p>
+                                <RichText text={m.name} as="p" className="font-semibold text-sm" style={{ color: CSS_VARS.text }} />
                                 <p className="text-xs" style={{ color: CSS_VARS.primary }}>{m.role}</p>
                             </div>
                             {m.bio && (

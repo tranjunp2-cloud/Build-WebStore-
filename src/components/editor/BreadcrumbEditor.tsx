@@ -1,150 +1,153 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Input } from '@/components/ui/input'
+import { useI18n } from '@/i18n'
+import { cn } from '@/lib/utils'
 
-type BreadcrumbItem = {
-    label: string
-    url: string
+const SEPARATORS = ['/', '>', '→', '•', '|'] as const
+const HOMEPAGE_SLUGS = new Set(['/', '', 'home', 'index'])
+
+function slugToSegments(slug: string): string[] {
+    const raw = slug.replace(/^\//, '')
+    if (HOMEPAGE_SLUGS.has(raw)) return []
+    return slug.split('/').filter(Boolean)
+}
+
+function capitalize(s: string) {
+    return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')
 }
 
 interface BreadcrumbEditorProps {
-    items: BreadcrumbItem[]
-    mode: 'auto' | 'manual'
     homeLabel: string
     separator: string
-    showIcon: boolean
+    showOnAllPages: boolean
+    pageSlug?: string
     onChange: (changes: {
-        items?: BreadcrumbItem[]
-        mode?: 'auto' | 'manual'
         homeLabel?: string
         separator?: string
-        showIcon?: boolean
+        showOnAllPages?: boolean
     }) => void
 }
 
-const labelCls = 'text-[11px] font-medium text-slate-400'
-const inputCls = 'mt-1 h-8 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-xs text-white placeholder:text-slate-500 outline-none focus:border-blue-500/50'
+export function BreadcrumbEditor({ homeLabel, separator, showOnAllPages, pageSlug, onChange }: BreadcrumbEditorProps) {
+    const { t } = useI18n()
+    const s = t.editor.settings
 
-export function BreadcrumbEditor({
-    items,
-    mode,
-    homeLabel,
-    separator,
-    showIcon,
-    onChange,
-}: BreadcrumbEditorProps) {
+    // local state for immediate visual feedback without waiting for store round-trip
+    const [localSeparator, setLocalSeparator] = useState(separator)
+    const [localHomeLabel, setLocalHomeLabel] = useState(homeLabel)
+    const [localShowOnAllPages, setLocalShowOnAllPages] = useState(showOnAllPages)
+
+    // sync all local state when props change (e.g. undo/redo from parent store)
+    useEffect(() => { setLocalSeparator(separator) }, [separator])
+    useEffect(() => { setLocalHomeLabel(homeLabel) }, [homeLabel])
+    useEffect(() => { setLocalShowOnAllPages(showOnAllPages) }, [showOnAllPages])
+
     return (
-        <div className="space-y-4">
-            <div>
-                <label className={labelCls}>Navigation Path</label>
-            </div>
-
-            {/* Mode toggle */}
-            <div className="flex gap-2">
-                {(['auto', 'manual'] as const).map((m) => (
-                    <button
-                        key={m}
-                        type="button"
-                        onClick={() => onChange({ mode: m })}
-                        className={`flex-1 rounded-lg px-3 py-2 text-xs font-medium capitalize transition-colors ${
-                            mode === m
-                                ? 'border border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                : 'border border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
-                        }`}
-                    >
-                        {m}
-                    </button>
-                ))}
-            </div>
-
-            {/* Auto mode settings */}
-            {mode === 'auto' && (
-                <div className="space-y-3">
-                    <div>
-                        <label className={labelCls}>Home Label</label>
-                        <input
-                            type="text"
-                            defaultValue={homeLabel}
-                            onBlur={(e) => onChange({ homeLabel: e.target.value })}
-                            placeholder="Home"
-                            className={inputCls}
-                        />
-                    </div>
-                    <div>
-                        <label className={labelCls}>Separator</label>
-                        <input
-                            type="text"
-                            defaultValue={separator}
-                            onBlur={(e) => onChange({ separator: e.target.value })}
-                            placeholder="/"
-                            className={inputCls}
-                            maxLength={3}
-                        />
-                    </div>
+        <div className="flex flex-col gap-3">
+            {/* Mode */}
+            <div className="flex flex-col gap-1.5">
+                <span className="text-[12px] font-medium text-slate-400">{s.breadcrumbMode}</span>
+                <div className="bg-[#0b1120] rounded-xl px-3 py-2 text-center text-[12px] font-medium text-blue-400">
+                    {s.breadcrumbAuto}
                 </div>
-            )}
+                <p className="text-[12px] text-slate-400/80 leading-4">{s.breadcrumbAutoDesc}</p>
+            </div>
 
-            {/* Manual mode — editable items */}
-            {mode === 'manual' && (
-                <div className="space-y-2">
-                    {items.map((item, index) => (
-                        <div key={index} className="flex gap-2">
-                            <input
-                                type="text"
-                                defaultValue={item.label}
-                                onBlur={(e) => {
-                                    const updated = [...items]
-                                    updated[index] = { ...updated[index], label: e.target.value }
-                                    onChange({ items: updated })
-                                }}
-                                placeholder="Label"
-                                className="h-8 flex-1 rounded-lg border border-white/10 bg-white/5 px-2 text-xs text-white placeholder:text-slate-500 outline-none focus:border-blue-500/50"
-                            />
-                            <input
-                                type="text"
-                                defaultValue={item.url}
-                                onBlur={(e) => {
-                                    const updated = [...items]
-                                    updated[index] = { ...updated[index], url: e.target.value }
-                                    onChange({ items: updated })
-                                }}
-                                placeholder="/page"
-                                className="h-8 w-24 rounded-lg border border-white/10 bg-white/5 px-2 text-xs text-white placeholder:text-slate-500 outline-none focus:border-blue-500/50"
-                            />
+            {/* Home Label */}
+            <div className="flex flex-col gap-1.5">
+                <span className="text-[12px] font-medium text-slate-400">{s.breadcrumbHomeLabel}</span>
+                <Input
+                    key={homeLabel}
+                    variant="editor"
+                    defaultValue={homeLabel}
+                    placeholder="Home"
+                    maxLength={80}
+                    onChange={(e) => setLocalHomeLabel(e.target.value)}
+                    onBlur={(e) => onChange({ homeLabel: e.target.value })}
+                />
+            </div>
+
+            {/* Separator */}
+            <div className="flex flex-col gap-1.5">
+                <span className="text-[12px] font-medium text-slate-400">{s.breadcrumbSeparator}</span>
+                <div className="flex gap-2">
+                    {SEPARATORS.map((sep) => {
+                        const active = localSeparator === sep
+                        return (
                             <button
+                                key={sep}
                                 type="button"
                                 onClick={() => {
-                                    const updated = items.filter((_, i) => i !== index)
-                                    onChange({ items: updated })
+                                    setLocalSeparator(sep)
+                                    onChange({ separator: sep })
                                 }}
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-400 hover:bg-red-500/10"
+                                className={cn(
+                                    'flex-1 h-[38px] rounded-xl text-[14px] font-medium transition-colors border',
+                                    active
+                                        ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
+                                        : 'bg-[#0b1120] border-[rgba(59,130,246,0.04)] text-slate-100 hover:bg-white/5'
+                                )}
                             >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                {sep}
                             </button>
-                        </div>
-                    ))}
-                    <button
-                        type="button"
-                        onClick={() => onChange({ items: [...items, { label: '', url: '' }] })}
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-white/10 py-2 text-xs text-slate-400 transition-colors hover:border-white/20 hover:text-slate-300"
-                    >
-                        <Plus className="h-3.5 w-3.5" /> Add item
-                    </button>
+                        )
+                    })}
                 </div>
-            )}
+            </div>
 
-            {/* Show icon toggle */}
+            {/* Show on All Pages */}
             <div className="flex items-center justify-between">
-                <label className={labelCls}>Show Icon</label>
+                <div className="flex flex-col gap-1">
+                    <span className="text-[12px] font-medium text-slate-400">{s.breadcrumbShowOnAllPages}</span>
+                    <span className="text-[12px] text-slate-400/70 leading-4">{s.breadcrumbShowOnAllPagesDesc}</span>
+                </div>
                 <button
                     type="button"
-                    onClick={() => onChange({ showIcon: !showIcon })}
-                    className={`relative h-5 w-9 rounded-full transition-colors ${showIcon ? 'bg-blue-500' : 'bg-white/10'}`}
+                    onClick={() => {
+                        const next = !localShowOnAllPages
+                        setLocalShowOnAllPages(next)
+                        onChange({ showOnAllPages: next })
+                    }}
+                    className={cn(
+                        'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                        localShowOnAllPages ? 'bg-blue-500' : 'bg-white/10'
+                    )}
                 >
-                    <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${showIcon ? 'left-[18px]' : 'left-0.5'}`} />
+                    <span
+                        className={cn(
+                            'absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-colors',
+                            localShowOnAllPages ? 'left-[26px]' : 'left-1'
+                        )}
+                    />
                 </button>
             </div>
+
+            {/* Preview */}
+            {(() => {
+                const segments = pageSlug ? slugToSegments(pageSlug) : []
+                const allItems = [localHomeLabel || 'Home', ...segments.map(capitalize)]
+                // on homepage (no segments), show a demo path so preview is always meaningful
+                const previewItems = allItems.length <= 1
+                    ? [localHomeLabel || 'Home', 'About']
+                    : allItems
+                return (
+                    <div className="bg-[#0b1120] border border-[rgba(59,130,246,0.04)] rounded-xl px-3 pt-3 pb-3 flex flex-col gap-2">
+                        <span className="text-[12px] text-slate-400">{s.breadcrumbPreview}:</span>
+                        <div className="flex items-center gap-1 flex-wrap">
+                            {previewItems.map((item, i) => (
+                                <span key={i} className="flex items-center gap-1">
+                                    {i > 0 && <span className="text-[12px] text-slate-400 mx-0.5">{localSeparator}</span>}
+                                    <span className={`text-[12px] ${i === previewItems.length - 1 ? 'text-slate-100 font-medium' : i === 0 ? 'text-blue-400' : 'text-slate-400'}`}>
+                                        {item}
+                                    </span>
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )
+            })()}
         </div>
     )
 }

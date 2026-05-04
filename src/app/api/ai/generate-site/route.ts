@@ -18,17 +18,23 @@ import { getCurrentUser } from '@/lib/auth'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { blockRegistry } from '@/blocks/registry'
+import { withSentrySpan } from '@/lib/ai/sentry-spans'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood, hashBusinessName } from '@/lib/ai/category-theme-picker'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool } from '@/lib/ai/image-pool'
+import { translateProductTerm } from '@/lib/ai/product-translator'
+import { translateToEnglishKeywords } from '@/lib/ai/dynamic-translator'
 import { resolveTheme } from '@/lib/theme/resolve'
-import { ensureNavigationBlocks, type PageShape } from '@/lib/ai/ensure-navigation'
+import { ensureNavigationBlocks, stripNavOffset, DEFAULT_NAV_LINKS, resolveCtaUrl, type PageShape, type PageBlockShape } from '@/lib/ai/ensure-navigation'
+import { extractPageLinks } from '@/lib/ai/apply-site-nav'
 import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
+import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -350,9 +356,23 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Generate with AI (or fallback)
+        // Start sample product generation in parallel with site AI generation (non-blocking)
+        // Note: siteId intentionally omitted — products run before site row is created so site.id
+        // doesn't exist yet. Filenames fall back to a timestamp-based key (acceptable; filenames
+        // are internal storage keys, not user-visible). Restructuring to pass siteId would serialize
+        // the pipeline (~5-10s slower). See plans/260429-0941-fix-product-generation-bugs/phase-03-pass-site-id.md.
+        const sampleProductsPromise = generateSampleProducts(
+            businessInfo,
+            (language as 'en' | 'ms' | 'auto'),
+            String(resolvedTenantId),
+            payload,
+        )
+
+        // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
         const { result, events } = await trackPhase('ai', () =>
-            generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides),
+            withSentrySpan('ai.generateSite', () =>
+                generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides),
+            ),
         )
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)
@@ -446,11 +466,31 @@ export async function POST(req: NextRequest) {
                     // Plan 07 — pass top-3 products so two restaurants whose
                     // first product collides still produce different queries.
                     const topProduct = parsedProducts[0]
+
+                    // Plan 260424: Dynamic LLM Translation with Tier 2 Fallback
+                    let englishKeywords: string[] = []
+                    try {
+                        const aiTranslation = await translateToEnglishKeywords({
+                            industry: businessInfo.industry,
+                            products: businessInfo.products
+                        })
+                        if (aiTranslation && aiTranslation.length > 0) {
+                            englishKeywords = aiTranslation
+                        }
+                    } catch (e) {
+                        console.warn('[AI Translation] LLM failed, falling back to dictionary', e)
+                    }
+
+                    if (englishKeywords.length === 0) {
+                        const dictKeyword = translateProductTerm(topProduct || '') 
+                        if (dictKeyword) englishKeywords.push(dictKeyword)
+                    }
+
                     const imagePool = await buildImagePool({
                         category: presetCategory,
                         mood: themeMood,
-                        topProduct,
-                        products: parsedProducts.slice(0, 3),
+                        topProduct: englishKeywords[0] || translateProductTerm(topProduct || ''),
+                        products: englishKeywords.length > 0 ? englishKeywords : parsedProducts.slice(0, 3).map(p => translateProductTerm(p)),
                         seed: themeSeed,
                     })
                     console.info(
@@ -468,6 +508,7 @@ export async function POST(req: NextRequest) {
                                 products: parsedProducts.length > 0 ? parsedProducts : undefined,
                                 mood: themeMood,
                                 pool: imagePool,
+                                englishKeywords: englishKeywords.length > 0 ? englishKeywords : undefined,
                             },
                             payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                         ),
@@ -539,7 +580,14 @@ export async function POST(req: NextRequest) {
         // fallback-adapter creative→portfolio mapping) which Payload rejected
         // → "The following field is invalid: Site Type" → 500. Logs showed
         // this was the dominant 500 source (~7 hits / 6h window).
-        const safeSiteType = resolveSiteType(result.siteType)
+        // GH-727: if AI output maps to generic 'business' fallback, use the
+        // composer category (which has broader VN keyword matching) as backup
+        // so the seeder seeds industry-correct images (e.g. fitness vs business).
+        const safeSiteType = (() => {
+            const fromAI = resolveSiteType(result.siteType)
+            if (fromAI !== 'business') return fromAI
+            return resolveSiteType(resolveComposerCategory(businessInfo.industry))
+        })()
 
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
@@ -607,10 +655,16 @@ export async function POST(req: NextRequest) {
         }
         _site = site
 
+        // Derive nav links from AI multi-page output so menu reflects actual generated pages
+        const aiPageLinks = extractPageLinks(
+            (result as { pages?: Array<{ title?: string; slug?: string; isHomepage?: boolean }> }).pages,
+        )
+
         // Sanitize blocks for Payload CMS compatibility
         const sanitizedBlocks = applyGeneratedSiteNavigation(
             sanitizeBlocksForPayload(result.blocks),
             result.siteName,
+            aiPageLinks,
         )
 
         // B4 fix: detect duplicate hero blocks — take first, log warning
@@ -671,12 +725,22 @@ export async function POST(req: NextRequest) {
             result,
         })
 
+        // GH-820: build nav links from normalized definitions so URLs match canonical page slugs.
+        // aiPageLinks (derived above from result.pages) still carries raw AI slugs like /book-trial;
+        // rawPageDefinitions has already run canonicalizePageSlug so slugs are /contact, /about, etc.
+        const normalizedPageLinks: Array<{ label: string; url: string }> = rawPageDefinitions.map((p) => ({
+            label: p.title,
+            url: p.slug === '/' ? '/' : `/${String(p.slug).replace(/^\/+/, '')}`,
+        }))
+
         // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
         // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
+        // GH-817: pass page links so injected/hollow nav reflects actual generated pages
         const pageDefinitions = enforcePageVariety(
             ensureNavigationBlocks(
                 rawPageDefinitions as unknown as PageShape[],
                 businessInfo.businessName,
+                normalizedPageLinks,
             ),
         )
 
@@ -706,7 +770,11 @@ export async function POST(req: NextRequest) {
                 })
                 : pageDefinition.layout
             const sanitizedLayout = Array.isArray(variantFixed)
-                ? sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b)))
+                ? stripArrayItemIds(
+                    stripNavOffset(
+                        sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b))) as PageBlockShape[]
+                    ) as Record<string, unknown>[]
+                  ) as AIBlock[]
                 : variantFixed
 
             // Plan 260415 fix-500 — per-page try/catch so one bad page (FK
@@ -809,6 +877,97 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // GH-817 post-creation layout sync: if any pages failed to create, their links are
+        // still present in nav AND footer blocks of successfully saved pages (normalizedPageLinks
+        // was computed BEFORE the for-loop). Patch both blocks in a single update per page.
+        if (pageFailures.length > 0 && normalizedPageLinks.length > 0 && createdPages.length > 0) {
+            const succeededSlugs = new Set(
+                createdPages.map(p => {
+                    const s = String(p.slug ?? '')
+                    return s === '/' ? '/' : s.replace(/^\/+/, '')
+                }),
+            )
+            const survivingLinks = normalizedPageLinks.filter(l => {
+                const normalized = l.url === '/' ? '/' : l.url.replace(/^\/+/, '')
+                return succeededSlugs.has(normalized)
+            })
+            // URLs that no longer have a backing page — used to filter footer column links
+            const failedUrls = new Set(
+                pageFailures.map(f => f.slug === '/' ? '/' : `/${f.slug.replace(/^\/+/, '')}`)
+            )
+
+            if (survivingLinks.length < normalizedPageLinks.length) {
+                const survivingCtaUrl = resolveCtaUrl(survivingLinks)
+                for (const createdPage of createdPages) {
+                    const rawLayout = Array.isArray(createdPage.layout)
+                        ? (createdPage.layout as Record<string, unknown>[])
+                        : []
+                    let layoutChanged = false
+
+                    const patchedLayout = rawLayout.map(block => {
+                        const bt = typeof block?.blockType === 'string'
+                            ? (block.blockType as string).toLowerCase() : ''
+
+                        // Patch nav — replace links with survivingLinks
+                        if (['navigation', 'header', 'navbar'].includes(bt)) {
+                            layoutChanged = true
+                            return {
+                                ...block,
+                                links: survivingLinks.map(l => ({ ...l })),
+                                ...(block.ctaButton && typeof block.ctaButton === 'object'
+                                    ? { ctaButton: { ...(block.ctaButton as Record<string, unknown>), url: survivingCtaUrl } }
+                                    : {}),
+                            }
+                        }
+
+                        // Patch footer — remove links pointing to failed pages from every column
+                        if (bt === 'footer' && Array.isArray(block.columns)) {
+                            const patchedColumns = (block.columns as Record<string, unknown>[]).map(col => {
+                                if (!Array.isArray(col.links)) return col
+                                const filtered = (col.links as Record<string, unknown>[]).filter(
+                                    l => !failedUrls.has(String(l.url ?? ''))
+                                )
+                                if (filtered.length === (col.links as unknown[]).length) return col
+                                layoutChanged = true
+                                return { ...col, links: filtered }
+                            })
+                            return { ...block, columns: patchedColumns }
+                        }
+
+                        return block
+                    })
+
+                    if (!layoutChanged) continue
+
+                    const cleanedPatchedLayout = stripArrayItemIds(patchedLayout) as Record<string, unknown>[]
+                    try {
+                        await payload.update({
+                            collection: 'pages',
+                            id: createdPage.id as string | number,
+                            data: { layout: cleanedPatchedLayout },
+                        })
+                    } catch (syncErr) {
+                        console.warn(
+                            '[generate-site] layout-sync patch failed page=%s: %s',
+                            createdPage.slug,
+                            syncErr instanceof Error ? syncErr.message : syncErr,
+                        )
+                    }
+                }
+                // Patch sanitizedBlocks nav so headerBlock persistence also reflects surviving pages
+                const navInSanitized = sanitizedBlocks.find(b => b.blockType === 'navigation')
+                if (navInSanitized) {
+                    navInSanitized.links = survivingLinks.map(l => ({ ...l }))
+                    if (navInSanitized.ctaButton && typeof navInSanitized.ctaButton === 'object') {
+                        ;(navInSanitized.ctaButton as Record<string, unknown>).url = survivingCtaUrl
+                    }
+                }
+                console.info(
+                    `[generate-site] layout-sync: removed ${normalizedPageLinks.length - survivingLinks.length} ghost link(s), patched ${createdPages.length} page(s) (nav+footer)`,
+                )
+            }
+        }
+
         // BUG-F05-005: Auto-create 404 page for every new site
         try {
             await payload.create({
@@ -835,6 +994,20 @@ export async function POST(req: NextRequest) {
             console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
+        // GH-727: backfill IMAGE_LIBRARY → S3 for this site's category (fire-and-forget)
+        // Use safeSiteType (same key used by storefront blocks) so seeder alt keys match resolver lookups.
+        if (resolvedTenantId) {
+            const _seedCategory = safeSiteType
+            import('@/lib/images/image-library-seeder')
+                .then(({ seedImageLibraryForSite }) =>
+                    seedImageLibraryForSite(payload, resolvedTenantId!, site.id as string | number, _seedCategory),
+                )
+                .catch(err =>
+                    console.error('[generate-site] image-library seed failed',
+                        err instanceof Error ? err.message : err),
+                )
+        }
+
         phaseTimings.db = (phaseTimings.db ?? 0) + (Date.now() - dbPhaseStart)
 
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
@@ -848,12 +1021,94 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        // Mark generation completed
+        // Mark generation completed and persist headerBlock so SiteRenderer
+        // can read breadcrumbConfig on the public site without requiring a
+        // manual editor save first.
+        // GH-820: read nav from pageDefinitions (links already normalized) instead of
+        // sanitizedBlocks which still has raw AI slugs (/book-trial, /the-lab, etc.)
+        const homepageLayout = (pageDefinitions[0]?.layout ?? []) as Array<{ blockType?: unknown }>
+        const generatedHeaderBlock = homepageLayout.find(b => b.blockType === 'navigation') ?? null
         await payload.update({
             collection: 'sites',
             id: site.id as string | number,
-            data: { generationStatus: 'completed' },
+            data: {
+                generationStatus: 'completed',
+                ...(generatedHeaderBlock ? { headerBlock: generatedHeaderBlock } : {}),
+            },
         })
+
+        // Write sample products to DB (non-fatal — awaits the parallel promise started above)
+        // Matches constraint name from Drizzle: <table>_<col>_<reftable>_<refcol>_fk
+        // Combines constraint-name regex with PG code for cases where Payload wraps the
+        // error and the constraint name appears in .cause.constraint rather than .message.
+        const isStaleMediaFk = (e: unknown): boolean => {
+            const msg = e instanceof Error ? e.message : String(e ?? '')
+            const code = (e as { code?: string })?.code ?? ((e as { cause?: { code?: string } })?.cause?.code ?? '')
+            const constraint = (e as { constraint?: string })?.constraint ?? ((e as { cause?: { constraint?: string } })?.cause?.constraint ?? '')
+            return /products_images_image_id_media_id_fk/i.test(msg)
+                || (code === '23503' && /products_images_image_id_media_id_fk|image_id/i.test(constraint + msg))
+        }
+        let productsCreatedCount = 0
+        try {
+            const sampleProducts = await sampleProductsPromise
+            for (const product of sampleProducts) {
+                // Guard: name must be at least 3 chars (Products schema minLength)
+                const name = product.name?.trim()
+                if (!name || name.length < 3) {
+                    console.warn('[generate-site] sample product skipped — name too short:', JSON.stringify(name))
+                    continue
+                }
+                // Pre-create media check: shrink TOCTOU window between fetchProductImage verify
+                // and payload.create. Media row can be deleted by orphan stripper / afterChange
+                // hook between those two points. Drop imageId early if no longer exists.
+                let safeImageId = product.imageId
+                if (safeImageId != null) {
+                    const exists = await payload.findByID({ collection: 'media', id: safeImageId, depth: 0 }).catch(() => null)
+                    if (!exists) {
+                        console.warn(`[generate-site] STALE_MEDIA_PRECHECK product="${name}" imageId=${safeImageId} dropped`)
+                        safeImageId = undefined
+                    }
+                }
+                const baseData = {
+                    tenant: resolvedTenantId,
+                    site: site.id,
+                    name,
+                    shortDescription: product.shortDescription,
+                    description: product.description,
+                    ...(product.descriptionBM ? { descriptionBM: product.descriptionBM } : {}),
+                    price: product.price,
+                    status: 'active' as const,
+                }
+                try {
+                    await payload.create({
+                        collection: 'products',
+                        data: {
+                            ...baseData,
+                            ...(safeImageId ? { images: [{ image: safeImageId }] } : {}),
+                        },
+                    })
+                    productsCreatedCount++
+                } catch (err) {
+                    if (safeImageId != null && isStaleMediaFk(err)) {
+                        // FK violation on products_images_image_id_media_id_fk — media row
+                        // was deleted between pre-check and create. Retry without image.
+                        try {
+                            await payload.create({ collection: 'products', data: baseData })
+                            productsCreatedCount++
+                            console.warn(`[generate-site] STALE_MEDIA_FK product="${name}" imageId=${safeImageId} created without image`)
+                        } catch (retryErr) {
+                            console.warn('[generate-site] sample product write failed after FK-strip retry (non-fatal):', (retryErr as Error).message)
+                        }
+                    } else {
+                        // Non-FK error or no image attached — do NOT silently retry without image
+                        const e = err as Error
+                        console.warn(`[generate-site] sample product write failed (non-fatal): name="${name}" imageId=${safeImageId ?? 'none'} ${e.name}: ${e.message}`)
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
+        }
 
         const timeMs = Date.now() - startTime
 
@@ -881,6 +1136,12 @@ export async function POST(req: NextRequest) {
                             controller.enqueue(encoder.encode(sseData))
                             // Small delay between events for visual effect
                             await new Promise(resolve => setTimeout(resolve, 100))
+                        }
+
+                        // Emit products_generated event if any sample products were created
+                        if (productsCreatedCount > 0) {
+                            const productEventData = `event: products_generated\ndata: ${JSON.stringify({ count: productsCreatedCount })}\n\n`
+                            controller.enqueue(encoder.encode(productEventData))
                         }
 
                         // Final done event with siteId
@@ -994,25 +1255,25 @@ function normalizeInternalUrl(url: unknown): string {
     return url
 }
 
-function applyGeneratedSiteNavigation(blocks: AIBlock[], businessName: string): AIBlock[] {
+function applyGeneratedSiteNavigation(
+    blocks: AIBlock[],
+    businessName: string,
+    pageLinks?: readonly { label: string; url: string }[] | null,
+): AIBlock[] {
     const normalizedBlocks = cloneBlockData(blocks)
-    const pageLinks = [
-        { label: 'Home', url: '/' },
-        { label: 'About', url: '/about' },
-        { label: 'Products', url: '/products' },
-        { label: 'Contact', url: '/contact' },
-    ]
+    const links = pageLinks ?? DEFAULT_NAV_LINKS
 
     return normalizedBlocks.map((block) => {
         if (block.blockType === 'navigation') {
             return {
                 ...block,
                 logoText: block.logoText || businessName,
-                links: pageLinks,
+                links: links.map((l) => ({ ...l })),
                 ctaButton: block.ctaButton
                     ? {
                         ...block.ctaButton,
-                        url: normalizeInternalUrl(block.ctaButton.url),
+                        // Resolve to a real generated page — avoids /contact 404 when no Contact page exists.
+                        url: resolveCtaUrl(links),
                     }
                     : block.ctaButton,
             }
@@ -1035,18 +1296,26 @@ function applyGeneratedSiteNavigation(blocks: AIBlock[], businessName: string): 
             return {
                 ...block,
                 logoText: block.logoText || businessName,
-                columns: block.columns.map((column: AIBlock | string) => {
+                columns: block.columns.map((column: AIBlock | string, colIdx: number) => {
                     if (typeof column === 'string') return { title: column, links: [] }
+
+                    // When aiPageLinks provided, replace the first (pages) column with actual page links
+                    // so footer mirrors the nav menu — same fix as navigation block above.
+                    if (pageLinks != null && colIdx === 0) {
+                        return { ...column, links: links.map(l => ({ ...l })) }
+                    }
 
                     return {
                         ...column,
                         links: Array.isArray(column.links)
                             ? column.links.map((link: AIBlock | string) => {
                                 if (typeof link === 'string') return { label: link, url: '#' }
-                                return {
-                                    ...link,
-                                    url: normalizeInternalUrl(link.url),
+                                const url = String(link.url || '#')
+                                // Update contact-type links in non-pages columns to a real page
+                                if (pageLinks != null && /^(\/|#)?contact\b/i.test(url)) {
+                                    return { ...link, url: resolveCtaUrl(links) }
                                 }
+                                return { ...link, url: normalizeInternalUrl(url) }
                             })
                             : column.links,
                     }
@@ -1104,6 +1373,33 @@ function createPageHero(baseHero: AIBlock | null, options: {
     return hero
 }
 
+// GH-820: normalize canonical page slugs so AI cannot invent arbitrary slugs
+// for well-known pages (e.g. slug "free-trial" instead of "contact").
+// Detection priority: block content (structural) > title keyword match.
+function canonicalizePageSlug(
+    page: { title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[] },
+    index: number,
+): string {
+    if (page.isHomepage === true || index === 0) return '/'
+    // Title is authoritative — AI titles are reliable signals and checked first to
+    // avoid misclassifying pages that include secondary structural blocks (e.g. a
+    // Services page with a contact form at the bottom must not become slug 'contact').
+    const title = (page.title || '').toLowerCase()
+    if (/\babout\b/.test(title)) return '/about'
+    if (/\bcontact\b|\bget[\s-]started\b|\bfree[\s-]trial\b|\btrial\b/.test(title)) return '/contact'
+    if (/\bblog\b|\bnews\b|\barticles\b/.test(title)) return '/blog'
+    // Block-based fallback: use the FIRST non-structural content block only.
+    // Set-membership would misclassify pages where contact/about appear as secondary sections.
+    const STRUCTURAL = new Set(['navigation', 'footer', 'hero'])
+    const firstContent = (page.blocks || []).find((b) => !STRUCTURAL.has(b.blockType ?? ''))
+    if (firstContent?.blockType === 'contact') return '/contact'
+    if (firstContent?.blockType === 'about') return '/about'
+    if (firstContent?.blockType === 'blog-list') return '/blog'
+    // Ensure leading slash to match builder convention (routing queries slug with '/' prefix)
+    const raw = page.slug || `page-${index}`
+    return raw.startsWith('/') ? raw : `/${raw}`
+}
+
 function buildGeneratedPages({
     blocks,
     businessInfo,
@@ -1118,7 +1414,7 @@ function buildGeneratedPages({
     if (aiPages && aiPages.length > 0) {
         return aiPages.map((page, index) => ({
             title: page.title || `Page ${index + 1}`,
-            slug: page.slug || (index === 0 ? '/' : `page-${index}`),
+            slug: canonicalizePageSlug(page, index),
             isHomepage: page.isHomepage === true || index === 0,
             layout: cloneBlockData(page.blocks || []),
             seo: {
@@ -1147,7 +1443,7 @@ function buildGeneratedPages({
 
     return [
         {
-            title: 'Homepage',
+            title: 'Home',
             slug: '/',
             isHomepage: true,
             layout: cloneBlockData(blocks),
@@ -1158,7 +1454,7 @@ function buildGeneratedPages({
         },
         {
             title: 'About',
-            slug: 'about',
+            slug: '/about',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -1182,7 +1478,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Products',
-            slug: 'products',
+            slug: '/products',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -1206,7 +1502,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Contact',
-            slug: 'contact',
+            slug: '/contact',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -1311,10 +1607,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                     else if (name.includes('message') || name.includes('content') || name.includes('mesej')) fieldType = 'textarea'
                     return { fieldName: field, label: field, fieldType, required: true }
                 }
+                const VALID_FIELD_TYPES = ['text', 'email', 'phone', 'textarea', 'select']
+                let ft = String(field.fieldType || field.type || 'text')
+                if (ft === 'tel' || ft === 'telephone') ft = 'phone'
+                if (ft === 'number') ft = 'text'
+                if (!VALID_FIELD_TYPES.includes(ft)) ft = 'text'
                 return {
                     fieldName: String(field.fieldName || field.name || field.id || 'field'),
                     label: String(field.label || field.fieldName || field.name || 'Field'),
-                    fieldType: field.fieldType || field.type || 'text',
+                    fieldType: ft,
                     required: field.required !== undefined ? field.required : true,
                     placeholder: field.placeholder || '',
                 }
@@ -1464,23 +1765,40 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             })
         }
 
-        // ── FAQ: items[] normalization ──
-        if (sanitized.blockType === 'faq' && Array.isArray(sanitized.items)) {
-            sanitized.items = sanitized.items.map((itemRaw: unknown) => {
-                if (typeof itemRaw === 'string') {
-                    return { question: itemRaw, answer: '...' }
-                }
-                const item = (typeof itemRaw === 'object' && itemRaw !== null) ? itemRaw as Record<string, unknown> : {};
-                return {
-                    question: String(item.question || item.title || item.q || 'Question?'),
-                    answer: String(item.answer || item.description || item.a || 'Answer.'),
-                }
-            })
+        // ── FAQ: normalize items/faqs array — Payload schema uses 'faqs' not 'items' ──
+        if (sanitized.blockType === 'faq') {
+            const rawFaqs = sanitized.faqs || sanitized.items
+            if (Array.isArray(rawFaqs)) {
+                sanitized.faqs = rawFaqs.map((itemRaw: unknown) => {
+                    if (typeof itemRaw === 'string') {
+                        return { question: itemRaw, answer: '...' }
+                    }
+                    const item = (typeof itemRaw === 'object' && itemRaw !== null) ? itemRaw as Record<string, unknown> : {}
+                    return {
+                        question: String(item.question || item.title || item.q || 'Question?'),
+                        answer: String(item.answer || item.description || item.a || 'Answer.'),
+                    }
+                })
+                delete sanitized.items
+            }
         }
 
         // ── Logo Cloud: strip logos (needs real media) ──
         if (sanitized.blockType === 'logo-cloud') {
             sanitized.logos = []
+        }
+
+        // ── Google Maps: fix invalid variant + ensure embedUrl present + height as number ──
+        if (sanitized.blockType === 'google-maps') {
+            if (!['full-width', 'card'].includes(String(sanitized.variant ?? ''))) {
+                sanitized.variant = 'full-width'
+            }
+            if (!sanitized.embedUrl) sanitized.embedUrl = ''
+            if (sanitized.height !== undefined && typeof sanitized.height !== 'number') {
+                const parsed = parseInt(String(sanitized.height), 10)
+                sanitized.height = isNaN(parsed) ? 400 : parsed
+            }
+            delete sanitized.zoom
         }
 
         // ── Remove non-schema fields that AI might add ──

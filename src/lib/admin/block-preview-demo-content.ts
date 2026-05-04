@@ -142,18 +142,34 @@ const DEMO_CONTENT_MAP: Record<string, (variant: string) => DemoContent> = {
     ],
   }),
 
-  footer: (variant) => ({
-    blockType: 'footer', variant,
-    logoText: 'BrandName',
-    tagline: 'Building the web, one site at a time.',
-    columns: [
-      { title: 'Product', links: [{ label: 'Features', url: '#' }, { label: 'Pricing', url: '#' }, { label: 'Changelog', url: '#' }] },
-      { title: 'Company', links: [{ label: 'About', url: '#' }, { label: 'Blog', url: '#' }, { label: 'Careers', url: '#' }] },
-      { title: 'Support', links: [{ label: 'Help Center', url: '#' }, { label: 'Contact', url: '#' }, { label: 'Status', url: '#' }] },
-    ],
-    copyrightText: '© 2025 BrandName. All rights reserved.',
-    socials: [{ platform: 'twitter', url: '#' }, { platform: 'linkedin', url: '#' }],
-  }),
+  footer: (variant) => {
+    const base = {
+      blockType: 'footer', variant,
+      logoText: 'BrandName',
+      copyrightText: '© 2025 BrandName. All rights reserved.',
+    }
+    if (variant === 'simple') {
+      return { ...base, columns: [], socials: [{ platform: 'instagram', url: '#' }, { platform: 'facebook', url: '#' }] }
+    }
+    if (variant === 'minimal') {
+      return {
+        ...base,
+        columns: [{ title: 'Links', links: [{ label: 'Features', url: '#' }, { label: 'Pricing', url: '#' }, { label: 'About', url: '#' }, { label: 'Contact', url: '#' }] }],
+        socials: [],
+      }
+    }
+    // centered-stack / dark-gradient
+    return {
+      ...base,
+      tagline: 'Building the web, one site at a time.',
+      columns: [
+        { title: 'Product', links: [{ label: 'Features', url: '#' }, { label: 'Pricing', url: '#' }, { label: 'Changelog', url: '#' }] },
+        { title: 'Company', links: [{ label: 'About', url: '#' }, { label: 'Blog', url: '#' }, { label: 'Careers', url: '#' }] },
+        { title: 'Support', links: [{ label: 'Help Center', url: '#' }, { label: 'Contact', url: '#' }, { label: 'Status', url: '#' }] },
+      ],
+      socials: [{ platform: 'twitter', url: '#' }, { platform: 'linkedin', url: '#' }],
+    }
+  },
 
   contact: (variant) => ({
     blockType: 'contact', variant,

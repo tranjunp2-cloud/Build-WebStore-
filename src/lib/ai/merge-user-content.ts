@@ -7,7 +7,7 @@
  * of truth shared with apply-template sanitizer).
  */
 
-import { CONTENT_FIELDS, PAGES_FIELDS } from './pages-schema'
+import { CONTENT_FIELDS, PAGES_FIELDS, USER_PRESERVE_MEDIA_FIELDS } from './pages-schema'
 
 export { PAGES_FIELDS, CONTENT_FIELDS }
 
@@ -67,6 +67,18 @@ export function mergeUserContent(
             // Only preserve user content if it's non-empty
             if (userValue !== undefined && userValue !== null && userValue !== '') {
                 merged[field] = userValue
+            }
+        }
+        // Preserve user's uploaded media (valid Payload IDs) — these are excluded
+        // from PAGES_FIELDS to prevent template string-URL assets failing validation,
+        // so we carry them over explicitly from the user's existing block.
+        const mediaFields = USER_PRESERVE_MEDIA_FIELDS[bt]
+        if (mediaFields) {
+            for (const field of mediaFields) {
+                const userValue = existingBlock[field]
+                if (userValue !== undefined && userValue !== null) {
+                    merged[field] = userValue
+                }
             }
         }
         return merged

@@ -1,17 +1,16 @@
 'use client'
 
 import React, { useRef } from 'react'
-import { ImagePlus, Sparkles } from 'lucide-react'
+import { ImagePlus } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { useI18n } from '@/i18n'
 
 interface ImageToolbarProps {
     onImageSelect: (file: File, compressedUrl: string) => void
-    onAiGenerate?: () => void
     isProcessing?: boolean
 }
 
-export function ImageToolbar({ onImageSelect, onAiGenerate, isProcessing }: ImageToolbarProps) {
+export function ImageToolbar({ onImageSelect, isProcessing }: ImageToolbarProps) {
     const { t } = useI18n()
     const it = t.editor.imageToolbar
     const fileInputRef = useRef<HTMLInputElement>(null)
@@ -53,16 +52,6 @@ export function ImageToolbar({ onImageSelect, onAiGenerate, isProcessing }: Imag
                 {it.changeImage}
             </button>
 
-            <div className="w-px h-5 bg-white/10 mx-1" />
-
-            <button 
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-400 hover:bg-cyan-400/10 rounded transition-colors disabled:opacity-50"
-                onClick={onAiGenerate}
-                disabled={isProcessing}
-            >
-                <Sparkles className="w-4 h-4" />
-                {it.generateAI}
-            </button>
         </div>
     )
 }

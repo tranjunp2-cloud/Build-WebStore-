@@ -11,7 +11,7 @@ export type NavLink = {
 
 export type NavigationConfig = {
     blockType: 'navigation'
-    variant?: 'simple' | 'centered' | 'mega-menu' | 'transparent' | 'sidebar' | 'pill'
+    variant?: 'default' | 'centered' | 'mega' | 'transparent' | 'sidebar' | 'floating'
     logoText?: string
     logo?: ImageRef
     links: NavLink[]
@@ -30,7 +30,7 @@ const NavLinkSchema: z.ZodType<NavLink> = z.lazy(() =>
 
 export const NavigationConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('navigation'),
-    variant: z.enum(['simple', 'centered', 'mega-menu', 'transparent', 'sidebar', 'pill']).default('simple'),
+    variant: z.enum(['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating']).default('default'),
     logoText: z.string().optional(),
     logo: ImageRefSchema.optional(),
     links: z.array(NavLinkSchema).default([]),
@@ -47,8 +47,8 @@ export const navigationMeta = {
     name: 'Navigation',
     description: 'Site navigation bar with logo, links, and optional CTA',
     icon: '🧭',
-    variants: ['simple', 'centered', 'mega-menu', 'transparent', 'sidebar', 'pill'],
-    defaultVariant: 'simple',
+    variants: ['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'],
+    defaultVariant: 'default',
     editableFields: ['logoText', 'links', 'ctaButton'],
     quickActions: ['Add link', 'Change logo', 'Toggle CTA'],
     category: 'nav' as const,

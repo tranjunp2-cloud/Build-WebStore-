@@ -5,6 +5,7 @@ import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { z } from 'zod'
 
 const MAX_PAGES_PER_SITE = 100
@@ -229,7 +230,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                     slug: normalizedSlug,
                     site: Number(siteId),
                     isVisible: true,
-                    layout: defaultLayout.length > 0 ? defaultLayout : [],
+                    layout: defaultLayout.length > 0 ? normalizeBlocksForPersistence(defaultLayout as Record<string, unknown>[]) : [],
                     _status: 'draft',
                 },
             })

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
+import { sql } from 'drizzle-orm'
 import config from '@payload-config'
 import { applyTemplateSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -265,14 +266,19 @@ export const POST = withAuth(async (user, req) => {
 
             // 2. Fetch existing pages + snapshot for rollback (BR-06)
             // MUST use draft: true — editor saves blocks as drafts,
-            // reading published version would miss user's latest edits
-            const existingPages = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: Number(siteId) } },
-                limit: 100,
-                depth: 0,
-                draft: true,
-            })
+            // reading published version would miss user's latest edits.
+            // payload.find() generates aggregate SQL expecting "data" column that
+            // doesn't exist in our pages_blocks_* tables — use SQL for IDs + findByID per page.
+            const db = payload.db.drizzle
+            const pageIdRows = await db.execute(sql`
+                SELECT id FROM pages WHERE site_id = ${Number(siteId)} AND deleted_at IS NULL LIMIT 100
+            `) as { rows: Array<{ id: number }> }
+            const pageDocs = await Promise.all(
+                pageIdRows.rows.map(row =>
+                    payload.findByID({ collection: 'pages', id: row.id, depth: 0, draft: true })
+                )
+            )
+            const existingPages = { docs: pageDocs }
 
             const rollbackData = {
                 theme: existingSite.theme,
@@ -310,6 +316,10 @@ export const POST = withAuth(async (user, req) => {
                 const templateBlocksClean = sanitizeBlocks(
                     templateHomepageLayout.length ? templateHomepageLayout : blocks,
                 )
+
+                // Hoisted outside page loop — same values for every page
+                const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
+                const VALID_NAV_VARIANTS = new Set(['default', 'centered', 'mega', 'transparent', 'sidebar', 'floating'])
 
                 // 2. Smart Mapping: replace layout with template blocks, map user content
                 //    PRD F07 US-F07-05: "mapping nội dung hiện tại sang block tương ứng của template mới"
@@ -363,10 +373,11 @@ export const POST = withAuth(async (user, req) => {
                     }
 
                     // Strip system fields — Payload rejects 'id' in layout block data
-                    const cleanLayout = stripSystemFields(newLayout) as Record<string, unknown>[]
+                    // GH-820: also drop google-maps — embedUrl cannot be auto-generated
+                    const cleanLayout = (stripSystemFields(newLayout) as Record<string, unknown>[])
+                        .filter(b => b.blockType !== 'google-maps')
 
                     // Sanitize blocks with required fields that may be empty/invalid
-                    const VALID_FIELD_TYPES = new Set(['text', 'email', 'phone', 'textarea', 'select', 'checkbox', 'number'])
                     for (const block of cleanLayout) {
                         // Contact: formFields array items need fieldName + label + fieldType
                         if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
@@ -383,10 +394,10 @@ export const POST = withAuth(async (user, req) => {
                                 ]
                             }
                         }
-                        // Google Maps: embedUrl is required
-                        if (block.blockType === 'google-maps') {
-                            if (!block.embedUrl || (typeof block.embedUrl === 'string' && block.embedUrl.trim().length === 0)) {
-                                block.embedUrl = 'https://www.google.com/maps/embed?pb=!1m18!1m12'
+                        // Navigation: variant must be one of the valid enum values
+                        if (block.blockType === 'navigation') {
+                            if (!block.variant || !VALID_NAV_VARIANTS.has(block.variant as string)) {
+                                block.variant = 'default'
                             }
                         }
                     }

@@ -32,7 +32,8 @@ import {
     Headphones,
     LogOut,
     ShieldCheck,
-
+    Package,
+    Users,
     Menu,
     X,
     ChevronDown,
@@ -71,6 +72,16 @@ const NAV_ITEMS: NavItemConfig[] = [
             { label: { en: 'Editor', ms: 'Editor' }, href: '/editor' },
             { label: { en: 'Blog', ms: 'Blog' }, href: '/blog' },
         ],
+    },
+    {
+        label: { en: 'Products', ms: 'Produk' },
+        icon: Package,
+        href: '/products',
+    },
+    {
+        label: { en: 'Customers', ms: 'Pelanggan' },
+        icon: Users,
+        href: '/customers',
     },
     {
         label: { en: 'Site Settings', ms: 'Tetapan Laman' },

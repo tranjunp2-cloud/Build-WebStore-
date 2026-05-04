@@ -83,6 +83,12 @@ const VI_NAME_MAP: Record<string, string> = {
     'product-quick-view': 'Xem nhanh sản phẩm',
 }
 
+// ── Blocks hidden from the editor library UI (user cannot add them) ──────────
+// TODO: remove when the block is production-ready
+const EDITOR_HIDDEN_BLOCKS = new Set([
+    'class-schedule', // not production-ready — temporarily hidden from editor
+])
+
 // ── Module-level cache (process lifetime) ────────────────────────────────────
 
 let _cached: NormalizedBlock[] | null = null
@@ -94,7 +100,7 @@ let _cached: NormalizedBlock[] | null = null
 export function listAllBlocks(): NormalizedBlock[] {
     if (_cached) return _cached
 
-    const slugs = blockRegistry.getBlockTypes()
+    const slugs = blockRegistry.getBlockTypes().filter((s) => !EDITOR_HIDDEN_BLOCKS.has(s))
     _cached = slugs.map((slug) => {
         const meta = blockRegistry.getBlockMeta(slug)
         if (!meta) {

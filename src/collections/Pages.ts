@@ -65,14 +65,14 @@ const NavigationBlock = {
         {
             name: 'variant',
             type: 'select',
-            defaultValue: 'simple',
+            defaultValue: 'default',
             options: [
-                { label: 'Simple', value: 'simple' },
+                { label: 'Default', value: 'default' },
                 { label: 'Centered', value: 'centered' },
-                { label: 'Mega Menu', value: 'mega-menu' },
+                { label: 'Mega', value: 'mega' },
                 { label: 'Transparent', value: 'transparent' },
                 { label: 'Sidebar', value: 'sidebar' },
-                { label: 'Pill', value: 'pill' },
+                { label: 'Floating', value: 'floating' },
             ],
         },
         {
@@ -637,7 +637,7 @@ const NewsletterBlock = {
             name: 'variant', type: 'select', defaultValue: 'inline',
             options: [
                 { label: 'Inline', value: 'inline' },
-                { label: 'Popup', value: 'popup' },
+                // { label: 'Popup', value: 'popup' }, // Temporarily disabled: Bug #791
                 { label: 'Banner', value: 'banner' },
                 { label: 'Stacked Card', value: 'stacked-card' },
                 { label: 'Minimal', value: 'minimal' },
@@ -904,7 +904,7 @@ const GoogleMapsBlock = {
             ],
         },
         { name: 'headline', type: 'text' },
-        { name: 'embedUrl', type: 'text', required: true },
+        { name: 'embedUrl', type: 'text' },
         { name: 'address', type: 'textarea' },
         { name: 'height', type: 'number', defaultValue: 400 },
     ],
@@ -1387,7 +1387,13 @@ export const Pages: CollectionConfig = {
                 VideoShowcaseBlock,
                 ProductQuickViewBlock,
                 FeatureComparisonBlock,
-            ] as Block[],
+            ].map(b => ({
+                ...b,
+                fields: [
+                    ...(b as { fields: unknown[] }).fields,
+                    { name: 'blockSpacing', type: 'json' as const },
+                ],
+            })) as Block[],
         },
         {
             name: 'seo',

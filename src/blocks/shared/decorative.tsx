@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { RichText } from './RichText'
 import { hasInlineFormatting } from '@/lib/utils/rich-text-render'
 
@@ -218,14 +219,15 @@ interface AvatarRingProps {
     src?: string
     name: string
     size?: number
+    imageIndex?: number
 }
 
-export function AvatarRing({ color, src, name, size = 48 }: AvatarRingProps) {
+export function AvatarRing({ color, src, name, size = 48, imageIndex }: AvatarRingProps) {
     const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
     return (
         <div
-            className="rounded-full flex items-center justify-center font-bold text-sm"
+            className="relative rounded-full flex items-center justify-center font-bold text-sm overflow-hidden"
             style={{
                 width: size,
                 height: size,
@@ -236,7 +238,7 @@ export function AvatarRing({ color, src, name, size = 48 }: AvatarRingProps) {
             }}
         >
             {src ? (
-                <img src={src} alt={name} className="w-full h-full rounded-full object-cover" />
+                <Image src={src} alt={name} fill className="rounded-full object-cover" data-image-index={imageIndex} />
             ) : initials}
         </div>
     )

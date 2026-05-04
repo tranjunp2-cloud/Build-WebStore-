@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { VideoShowcaseConfig, VideoItem } from './config'
@@ -11,6 +12,11 @@ import { Heading, Body } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
 
 void _CSS_VARS
+
+function getYoutubeThumbnail(videoUrl: string): string | null {
+    const id = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1]
+    return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null
+}
 
 function PlayIcon({ size = 48 }: { size?: number }) {
     return (
@@ -75,7 +81,9 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
         ? videos
         : videos.filter((v) => v.category === activeCategory)
 
-    const VideoCard = ({ video, index, aspectClass = 'aspect-video' }: { video: VideoItem; index: number; aspectClass?: string }) => (
+    const VideoCard = ({ video, index, aspectClass = 'aspect-video' }: { video: VideoItem; index: number; aspectClass?: string }) => {
+        const effectiveThumbnail = video.thumbnailUrl || getYoutubeThumbnail(video.videoUrl)
+        return (
         <div
             className={`relative ${aspectClass} rounded-2xl overflow-hidden cursor-pointer group`}
             style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
@@ -85,14 +93,14 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                 <VideoEmbed videoUrl={video.videoUrl} autoplay={true} />
             ) : (
                 <>
-                    {video.thumbnailUrl ? (
-                        <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+                    {effectiveThumbnail ? (
+                        <Image src={effectiveThumbnail} alt={video.title} fill className="object-cover" />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                             <PlayIcon />
                         </div>
                     )}
-                    {video.thumbnailUrl && (
+                    {effectiveThumbnail && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
                             <PlayIcon />
                         </div>
@@ -106,6 +114,7 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
             )}
         </div>
     )
+    }
 
     /* ── Grid variant ────────────────────────────────────────────────────────── */
     const renderGrid = () => (
@@ -138,8 +147,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                     >
                         <VideoCard video={video} index={i} />
                         <div className="mt-3">
-                            <h4 className="font-bold font-heading">{video.title}</h4>
-                            {video.description && <p className="text-sm opacity-50 mt-1">{video.description}</p>}
+                            <RichText text={video.title} as="h4" className="font-bold font-heading" />
+                            {video.description && <RichText text={video.description} as="p" className="text-sm opacity-50 mt-1" />}
                             {video.category && <span className="text-xs opacity-40">{video.category}</span>}
                         </div>
                     </motion.div>
@@ -157,12 +166,14 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                 <div className="lg:col-span-2">
                     <VideoCard video={featured} index={featuredIndex} aspectClass="aspect-video" />
                     <div className="mt-4">
-                        <h3 className="text-xl font-bold font-heading">{featured.title}</h3>
-                        {featured.description && <p className="text-sm opacity-50 mt-2">{featured.description}</p>}
+                        <RichText text={featured.title} as="h3" className="text-xl font-bold font-heading" />
+                        {featured.description && <RichText text={featured.description} as="p" className="text-sm opacity-50 mt-2" />}
                     </div>
                 </div>
                 <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    {filtered.map((video, i) => (
+                    {filtered.map((video, i) => {
+                        const sidebarThumb = video.thumbnailUrl || getYoutubeThumbnail(video.videoUrl)
+                        return (
                         <button
                             key={i}
                             onClick={() => { setFeaturedIndex(i); setPlayingIndex(null) }}
@@ -173,8 +184,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                             }}
                         >
                             <div className="w-24 aspect-video rounded-lg overflow-hidden shrink-0 relative">
-                                {video.thumbnailUrl ? (
-                                    <img src={video.thumbnailUrl} alt={video.title} className="w-full h-full object-cover" />
+                                {sidebarThumb ? (
+                                    <Image src={sidebarThumb} alt={video.title} fill className="object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                                         <PlayIcon size={20} />
@@ -191,7 +202,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                                 {video.category && <p className="text-xs opacity-40 mt-1">{video.category}</p>}
                             </div>
                         </button>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         )
@@ -210,8 +222,8 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                 >
                     <VideoCard video={video} index={i} aspectClass="aspect-[21/9]" />
                     <div className="mt-4 max-w-2xl">
-                        <h3 className="text-2xl font-bold font-heading">{video.title}</h3>
-                        {video.description && <p className="text-base opacity-50 mt-2">{video.description}</p>}
+                        <RichText text={video.title} as="h3" className="text-2xl font-bold font-heading" />
+                        {video.description && <RichText text={video.description} as="p" className="text-base opacity-50 mt-2" />}
                     </div>
                 </motion.div>
             ))}

@@ -127,9 +127,9 @@ function SimpleVariant({ block }: { block: AboutConfig }) {
  * thay vì duplicate motion.div. 30 dòng code giảm còn 1 render. Lỗi B — memoize
  * getAboutImage per category để không gọi lại mỗi render.
  */
-function SplitVariant({ block, category }: { block: AboutConfig; category: string }) {
+function SplitVariant({ block, category, s3Map }: { block: AboutConfig; category: string; s3Map?: Record<string, string> }) {
     const { headline, sectionLabel, body, layout = 'image-right' } = block
-    const imageUrl = useMemo(() => block.image?.url || getAboutImage(category), [block.image?.url, category])
+    const imageUrl = useMemo(() => block.image?.url || getAboutImage(category, s3Map), [block.image?.url, category, s3Map])
     const imageAlt = block.image?.alt || `About ${headline || 'us'}`
     const isImageLeft = layout === 'image-left'
 
@@ -395,9 +395,9 @@ function CenteredLargeVariant({ block }: { block: AboutConfig }) {
  * image-overlay: full-bleed image (when provided) with text overlaid + tinted
  * DuotoneOverlay for legibility. Falls back to centered-large when no image.
  */
-function ImageOverlayVariant({ block, category }: { block: AboutConfig; category: string }) {
+function ImageOverlayVariant({ block, category, s3Map }: { block: AboutConfig; category: string; s3Map?: Record<string, string> }) {
     const { headline, sectionLabel, body } = block
-    const imageUrl = block.image?.url || getAboutImage(category)
+    const imageUrl = block.image?.url || getAboutImage(category, s3Map)
     if (!imageUrl) return <CenteredLargeVariant block={block} />
     return (
         <AnimatedSection
@@ -449,10 +449,11 @@ export function AboutBlock({ block, site }: BlockProps<AboutConfig>) {
     const { variant = 'simple' } = block
     // Plan 260415 Lỗi 8A — category fallback chain: siteType → category → business
     const category = (site?.siteType as string) || (site?.category as string) || 'business'
+    const s3Map = site?.imageLibraryS3 as Record<string, string> | undefined
 
     switch (variant) {
         case 'split':
-            return <SplitVariant block={block} category={category} />
+            return <SplitVariant block={block} category={category} s3Map={s3Map} />
         case 'story':
             return <StoryVariant block={block} />
         case 'two-column':
@@ -462,7 +463,7 @@ export function AboutBlock({ block, site }: BlockProps<AboutConfig>) {
         case 'centered-large':
             return <CenteredLargeVariant block={block} />
         case 'image-overlay':
-            return <ImageOverlayVariant block={block} category={category} />
+            return <ImageOverlayVariant block={block} category={category} s3Map={s3Map} />
         case 'simple':
         default:
             return <SimpleVariant block={block} />

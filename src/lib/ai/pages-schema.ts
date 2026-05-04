@@ -41,6 +41,10 @@ export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
  */
 export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fallback: string } | null> = {
     hero:         { field: 'variant', values: ['centered', 'split-left', 'split-right', 'fullscreen', 'video', 'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax', 'slideshow', 'split-video'], fallback: 'centered' },
+    // navigation has TWO select columns: `style` (validated here) and `variant`.
+    // `variant` is intentionally NOT validated here because schema.field='style' means
+    // the delete-cleanup inside sanitizeBlockForPayload never runs for variant — so variant
+    // passes through as-is to Payload. It is sanitized downstream in apply-template/route.ts.
     navigation:   { field: 'style',   values: ['fixed', 'sticky', 'static', 'transparent'], fallback: 'fixed' },
     about:        { field: 'layout',  values: ['image-right', 'image-left', 'centered', 'cards'], fallback: 'image-right' },
     features:     { field: 'layout',  values: ['grid-3', 'grid-2', 'alternating', 'centered-list'], fallback: 'grid-3' },
@@ -54,7 +58,8 @@ export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fal
     team:         { field: 'variant', values: ['grid', 'list', 'cards-hover-reveal', 'horizontal-scroll', 'bio-modal', 'compact-row'], fallback: 'grid' },
     socialWidget: { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
     cartWidget:   { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
-    pricing: null, faq: null,
+    pricing:      { field: 'variant', values: ['cards', 'table', 'horizontal', 'toggle', 'tiered', 'comparison', 'minimal', 'slider'], fallback: 'cards' },
+    faq:          { field: 'variant', values: ['accordion', 'grid', 'simple', 'two-column-accordion', 'chat-bubbles', 'numbered'], fallback: 'accordion' },
     // Industry blocks (Plan 260417-0837 Phase 1.1)
     'doctor-profile': { field: 'variant', values: ['cards', 'detailed', 'list'], fallback: 'cards' },
     'property-card': { field: 'variant', values: ['grid', 'list', 'featured'], fallback: 'grid' },
@@ -76,7 +81,7 @@ export const VARIANT_ALIASES: Record<string, Record<string, string>> = {
     features: { 'grid': 'grid-3', 'list': 'centered-list', 'icon-grid': 'grid-3', 'card-grid': 'grid-3', 'cards': 'grid-3', 'detailed': 'centered-list', 'detailed-list': 'centered-list', 'icon-top': 'grid-3', 'icon-left': 'grid-2', 'zigzag': 'alternating', 'carousel': 'grid-3', 'minimal-list': 'centered-list' },
     testimonials: { 'cards': 'grid', 'simple': 'carousel', 'spotlight': 'single', 'minimal-quote': 'single', 'avatar-row': 'carousel', 'video-text': 'carousel', 'featured': 'single', 'marquee': 'carousel', 'quote': 'single', 'single-highlight': 'single', 'slider': 'carousel' },
     gallery: { 'filmstrip': 'carousel', 'justified': 'grid', 'fullscreen-grid': 'grid', 'slider': 'carousel', 'spotlight': 'lightbox' },
-    navigation: { 'simple': 'fixed', 'centered': 'fixed', 'mega-menu': 'fixed', 'sidebar': 'fixed', 'pill': 'fixed' },
+    navigation: { 'default': 'fixed', 'centered': 'fixed', 'mega': 'fixed', 'sidebar': 'fixed', 'floating': 'fixed' },
     footer: { 'expanded': 'simple', 'mega-footer': 'dark-gradient' },
 }
 
@@ -98,15 +103,15 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     contact: ['variant', 'headline', 'subtext', 'email', 'phone', 'address', 'formFields', 'showMap', 'mapEmbedUrl'],
     footer: ['variant', 'logoText', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
     stats: ['variant', 'headline', 'stats'],
-    pricing: ['headline', 'subheadline', 'plans'],
-    faq: ['headline', 'faqs'],
+    pricing: ['variant', 'headline', 'subheadline', 'plans'],
+    faq: ['variant', 'headline', 'faqs'],
     team: ['variant', 'headline', 'members'],
     socialWidget: ['variant', 'headline', 'links'],
     cartWidget: ['variant', 'label', 'showLabel'],
     // AI-generated / Block Library blocks (must be here for content merge during template switch)
     cta: ['variant', 'headline', 'subheadline', 'ctaLabel', 'ctaUrl', 'ctaStyle'],
     newsletter: ['variant', 'headline', 'subheadline', 'buttonLabel', 'placeholder'],
-    video: ['variant', 'headline', 'subheadline', 'videoUrl', 'posterImage'],
+    video: ['variant', 'headline', 'subheadline', 'videoUrl'],
     'logo-cloud': ['variant', 'headline', 'logos'],
     'products-grid': ['variant', 'headline', 'subheadline', 'limit', 'category'],
     'products-featured': ['variant', 'headline', 'subheadline'],
@@ -136,6 +141,32 @@ export const PAGES_FIELDS: Record<string, string[]> = {
 }
 
 const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
+
+/**
+ * Top-level upload/media fields to carry over from the USER'S existing blocks
+ * when switching templates on an existing site.
+ *
+ * Intentionally separate from PAGES_FIELDS so that sanitizeBlockForPayload
+ * (which runs on template DB blocks) never touches these — template blocks
+ * may have null/string-URL assets that Payload upload validators reject.
+ * mergeUserContent reads this map to copy only the user's valid media IDs.
+ *
+ * Nested array upload fields (team.members[].image, testimonials[].avatar) are
+ * already preserved because their parent arrays (members, testimonials) are in
+ * CONTENT_FIELDS and copied wholesale.
+ *
+ * gallery.images is intentionally NOT in this map — gallery.images is also absent
+ * from PAGES_FIELDS, so it is neither sanitized from templates nor preserved from
+ * users. Wiring it up requires Payload upload-field validation (same class of risk
+ * as hero.image); defer to the Unsplash pipeline (Phase 05).
+ */
+export const USER_PRESERVE_MEDIA_FIELDS: Record<string, string[]> = {
+    hero: ['image', 'backgroundImage'],
+    navigation: ['logo'],
+    about: ['image'],
+    footer: ['logo'],
+    video: ['posterImage'], // upload field — excluded from PAGES_FIELDS to prevent template string URLs failing Payload validation
+}
 
 /** PAGES_FIELDS minus structural fields — used by mergeUserContent to preserve user copy. */
 export const CONTENT_FIELDS: Record<string, string[]> = Object.fromEntries(

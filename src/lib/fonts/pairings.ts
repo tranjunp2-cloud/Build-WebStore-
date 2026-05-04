@@ -328,6 +328,7 @@ export const FONT_CSS_VAR_MAP: Readonly<Record<string, string>> = {
   'Quicksand': '--font-quicksand',
   'Montserrat': '--font-montserrat',
   'Hind': '--font-hind',
+  'Lato': '--font-lato',
 } as const
 
 /** Default CSS vars guaranteed loaded (for fallback chains) */
@@ -356,7 +357,8 @@ export function fontNameToCSSVar(
   const systemFallback = role === 'heading' ? "'Outfit', sans-serif" : "'Inter', sans-serif"
 
   if (knownVar) {
-    return `var(${knownVar}), var(${defaultVar}), ${systemFallback}`
+    const quoted = /\s/.test(trimmed) ? `'${trimmed}'` : trimmed
+    return `${quoted}, var(${knownVar}), var(${defaultVar}), ${systemFallback}`
   }
 
   // Unknown font — quote and try system, fall back to default loaded var

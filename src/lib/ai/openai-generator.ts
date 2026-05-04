@@ -612,7 +612,10 @@ export async function generateSiteWithAI(
     } catch (error: unknown) {
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
-        events.push({ event: 'error', data: { code: 'ai_fallback', message: 'Using smart templates', retryable: false } })
+        // Fallback succeeded — site will still be created via smart templates.
+        // Don't emit 'error' event (would show error UI even though generation succeeds).
+        // Keep warn log for ops visibility on fallback rate.
+        console.warn('[AI Generator] Falling back to smart templates (OpenAI unavailable)')
         const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
         const fallbackResult = await generateWithFallback(promptText, events, fallbackLang, businessInfo)
         const fallbackBlocks = fallbackResult.result.blocks.map((b: GeneratedBlock) => String((b as Record<string, unknown>).blockType ?? ''))
@@ -762,6 +765,9 @@ const VARIANT_ALIASES: Record<string, string> = {
     // Footer newsletter variants (hidden — alias to available variants)
     'expanded': 'simple',
     'mega-footer': 'dark-gradient',
+    // Navigation variant rename (plan 260424) — old DB names resolve to canonical
+    'mega-menu': 'mega',
+    'pill': 'floating',
     // Defaults
     'default': 'simple',
     'basic': 'simple',
@@ -797,7 +803,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'table', 'horizontal'],
         about: ['split', 'story', 'image-overlay', 'founder-quote'],
         cta: ['banner', 'image-bg', 'mesh-gradient-hero', 'split-testimonial'],
-        navigation: ['simple', 'transparent', 'centered'],
+        navigation: ['default', 'transparent', 'centered'],
         newsletter: ['inline', 'banner', 'stacked-card'],
         team: ['grid', 'list', 'bio-modal', 'cards-hover-reveal'],
     },
@@ -813,8 +819,8 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'toggle', 'comparison'],
         about: ['simple', 'split', 'centered-large'],
         cta: ['banner', 'floating-sticky', 'dark-card', 'image-bg'],
-        navigation: ['simple', 'mega-menu', 'pill'],
-        newsletter: ['inline', 'popup', 'minimal'],
+        navigation: ['default', 'mega', 'floating'],
+        newsletter: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'minimal'],
         team: ['grid', 'compact-row'],
     },
     beauty: {
@@ -829,8 +835,8 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'minimal', 'toggle'],
         about: ['split', 'story', 'founder-quote', 'centered-large'],
         cta: ['card', 'mesh-gradient-hero', 'image-bg', 'floating-sticky'],
-        navigation: ['transparent', 'simple', 'pill'],
-        newsletter: ['inline', 'popup', 'incentive-grid', 'stacked-card'],
+        navigation: ['transparent', 'default', 'floating'],
+        newsletter: ['inline', /* 'popup', // Temporarily disabled: Bug #791 */ 'incentive-grid', 'stacked-card'],
         team: ['cards-hover-reveal', 'grid', 'bio-modal'],
     },
     tech: {
@@ -845,7 +851,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['toggle', 'comparison', 'cards'],
         about: ['simple', 'split', 'two-column', 'founder-quote'],
         cta: ['dark-card', 'inline', 'mesh-gradient-hero', 'banner'],
-        navigation: ['simple', 'transparent', 'pill'],
+        navigation: ['default', 'transparent', 'floating'],
         newsletter: ['inline', 'banner', 'minimal', 'incentive-grid'],
         team: ['grid', 'list', 'bio-modal', 'compact-row'],
     },
@@ -861,7 +867,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'table', 'toggle'],
         about: ['split', 'simple', 'two-column', 'centered-large'],
         cta: ['banner', 'inline', 'split-testimonial', 'card'],
-        navigation: ['simple', 'centered', 'mega-menu'],
+        navigation: ['default', 'centered', 'mega'],
         newsletter: ['inline', 'banner', 'stacked-card', 'incentive-grid'],
         team: ['grid', 'list', 'bio-modal', 'compact-row'],
     },
@@ -877,7 +883,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['minimal', 'cards'],
         about: ['story', 'image-overlay', 'founder-quote', 'centered-large'],
         cta: ['dark-card', 'mesh-gradient-hero', 'image-bg', 'inline'],
-        navigation: ['transparent', 'pill', 'simple'],
+        navigation: ['transparent', 'floating', 'default'],
         newsletter: ['inline', 'minimal'],
         team: ['cards-hover-reveal', 'bio-modal', 'horizontal-scroll'],
     },
@@ -893,8 +899,8 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'minimal'],
         about: ['simple', 'story', 'two-column', 'founder-quote'],
         cta: ['inline', 'card', 'split-testimonial'],
-        navigation: ['simple', 'centered'],
-        newsletter: ['inline', 'banner', 'popup', 'minimal'],
+        navigation: ['default', 'centered'],
+        newsletter: ['inline', 'banner', /* 'popup', // Temporarily disabled: Bug #791 */ 'minimal'],
         team: ['list', 'compact-row'],
     },
     health: {
@@ -909,7 +915,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'table'],
         about: ['split', 'simple', 'founder-quote', 'centered-large'],
         cta: ['banner', 'card', 'split-testimonial', 'inline'],
-        navigation: ['simple', 'centered'],
+        navigation: ['default', 'centered'],
         newsletter: ['inline', 'stacked-card'],
         team: ['grid', 'bio-modal', 'list'],
     },
@@ -925,7 +931,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'table', 'toggle'],
         about: ['split', 'story', 'two-column', 'founder-quote'],
         cta: ['banner', 'card', 'mesh-gradient-hero', 'split-testimonial'],
-        navigation: ['simple', 'centered', 'mega-menu'],
+        navigation: ['default', 'centered', 'mega'],
         newsletter: ['inline', 'banner', 'incentive-grid'],
         team: ['grid', 'bio-modal', 'cards-hover-reveal'],
     },
@@ -941,7 +947,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'table'],
         about: ['split', 'story', 'image-overlay', 'centered-large'],
         cta: ['image-bg', 'split-testimonial', 'banner', 'dark-card'],
-        navigation: ['simple', 'transparent'],
+        navigation: ['default', 'transparent'],
         newsletter: ['inline', 'incentive-grid'],
         team: ['grid', 'bio-modal', 'compact-row'],
     },
@@ -957,7 +963,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'toggle', 'comparison'],
         about: ['split', 'simple', 'image-overlay', 'centered-large'],
         cta: ['dark-card', 'mesh-gradient-hero', 'image-bg', 'floating-sticky'],
-        navigation: ['transparent', 'simple', 'pill'],
+        navigation: ['transparent', 'default', 'floating'],
         newsletter: ['banner', 'inline', 'incentive-grid', 'stacked-card'],
         team: ['cards-hover-reveal', 'horizontal-scroll', 'grid'],
     },
@@ -973,8 +979,8 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['minimal', 'cards'],
         about: ['story', 'split', 'image-overlay', 'founder-quote'],
         cta: ['dark-card', 'mesh-gradient-hero', 'image-bg', 'inline'],
-        navigation: ['transparent', 'pill', 'sidebar'],
-        newsletter: ['popup', 'inline', 'minimal'],
+        navigation: ['transparent', 'floating', 'sidebar'],
+        newsletter: [/* 'popup', // Temporarily disabled: Bug #791 */ 'inline', 'minimal'],
         team: ['horizontal-scroll', 'cards-hover-reveal', 'bio-modal', 'list'],
     },
     fnb: {
@@ -989,7 +995,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'horizontal'],
         about: ['split', 'story', 'image-overlay', 'founder-quote'],
         cta: ['banner', 'image-bg', 'mesh-gradient-hero', 'card'],
-        navigation: ['simple', 'transparent'],
+        navigation: ['default', 'transparent'],
         newsletter: ['inline', 'banner', 'stacked-card'],
         team: ['grid', 'cards-hover-reveal'],
     },
@@ -1005,8 +1011,8 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'table'],
         about: ['story', 'split', 'image-overlay', 'centered-large'],
         cta: ['banner', 'image-bg', 'mesh-gradient-hero', 'floating-sticky'],
-        navigation: ['simple', 'transparent', 'centered'],
-        newsletter: ['banner', 'inline', 'stacked-card', 'popup'],
+        navigation: ['default', 'transparent', 'centered'],
+        newsletter: ['banner', 'inline', 'stacked-card', /* 'popup', // Temporarily disabled: Bug #791 */],
         team: ['grid', 'cards-hover-reveal', 'horizontal-scroll'],
     },
     travel: {
@@ -1021,7 +1027,7 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         pricing: ['cards', 'toggle'],
         about: ['story', 'split', 'image-overlay', 'centered-large'],
         cta: ['image-bg', 'mesh-gradient-hero', 'banner', 'split-testimonial'],
-        navigation: ['transparent', 'simple'],
+        navigation: ['transparent', 'default'],
         newsletter: ['inline', 'banner', 'incentive-grid'],
         team: ['cards-hover-reveal', 'horizontal-scroll', 'grid'],
     },

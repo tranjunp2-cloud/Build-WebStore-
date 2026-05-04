@@ -2,13 +2,14 @@ import { notFound, redirect } from 'next/navigation'
 import type { Viewport } from 'next'
 import payloadConfig from '@payload-config'
 import { getPayload } from 'payload'
-import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
-import { PreviewScripts } from '@/components/editor/PreviewScripts'
+import { PreviewSiteRenderer } from './PreviewSiteRenderer'
+import { PreviewScripts, BuilderLinkScripts } from '@/components/editor/PreviewScripts'
 import { AppShell } from '@/components/AppShell'
 import { getCurrentUser } from '@/lib/auth'
 import type { NavPage } from '@/components/site-renderer/SiteRenderer'
 import type { PlatformUser } from '@/types/user'
 import { PreviewAccessDenied, PreviewNoPage, PreviewLoadError } from './PreviewErrors'
+import { resolveImageLibraryS3Map } from '@/lib/images/image-library-resolver'
 
 type PreviewLayoutBlock = Record<string, unknown> & {
     blockType: string
@@ -17,7 +18,7 @@ type PreviewLayoutBlock = Record<string, unknown> & {
 
 interface PreviewPageProps {
     params: Promise<{ siteId: string }>
-    searchParams: Promise<{ pageId?: string; v?: string }>
+    searchParams: Promise<{ pageId?: string; v?: string; builder?: string }>
 }
 
 export const dynamic = 'force-dynamic'
@@ -36,7 +37,7 @@ export const viewport: Viewport = {
 
 export default async function PreviewPage({ params, searchParams }: PreviewPageProps) {
     const { siteId } = await params
-    const { pageId } = await searchParams
+    const { pageId, builder } = await searchParams
     
     // 1. Auth Check (P0 Security Rule - Auth Redirect)
     const user = await getCurrentUser() as PlatformUser | null
@@ -191,24 +192,48 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             limit: 100,
         })
 
+        const imageLibraryS3 = await resolveImageLibraryS3Map(payload, siteId)
+
         return (
             <AppShell>
-                <div className="overflow-x-hidden min-height-screen">
+                <div className="min-h-screen">
                     {/* Render with true SiteRenderer in Editor Mode */}
-                    <SiteRenderer
-                        site={site}
+                    <PreviewSiteRenderer
+                        site={{
+                            ...site,
+                            // Inject tenantSlug so CartWidgetBlock can build the checkout URL.
+                            // site.tenant is populated (depth:2) so slug is accessible here.
+                            tenantSlug: typeof site.tenant === 'object' && site.tenant !== null
+                                ? (site.tenant as { slug?: string }).slug || ''
+                                : '',
+                            imageLibraryS3,
+                        }}
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
-                        isEditor={true}
+                        isBuilderPreview={!!builder}
                     />
 
-                    {/* Editor specific listeners */}
-                    <PreviewScripts />
+                    {/* Editor listeners (full) or builder-preview link handler (lightweight) */}
+                    {builder ? <BuilderLinkScripts /> : <PreviewScripts />}
                 </div>
             </AppShell>
         )
 
     } catch (error) {
+        // Re-throw Next.js special errors (notFound, redirect) so the runtime handles them.
+        // Catching NEXT_NOT_FOUND here turns a proper 404 into a Server Component render error.
+        if (
+            error !== null &&
+            typeof error === 'object' &&
+            'digest' in error &&
+            typeof (error as Record<string, string>).digest === 'string' &&
+            (
+                (error as Record<string, string>).digest === 'NEXT_NOT_FOUND' ||
+                (error as Record<string, string>).digest.startsWith('NEXT_REDIRECT')
+            )
+        ) {
+            throw error
+        }
         console.error('[Preview] Error:', error)
         return <PreviewLoadError />
     }

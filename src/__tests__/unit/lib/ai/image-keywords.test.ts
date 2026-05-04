@@ -112,6 +112,13 @@ describe('image-keywords [plan-260414-unsplash]', () => {
             }
             expect(seen.size).toBeGreaterThanOrEqual(2)
         })
+
+        it('prioritizes englishKeywords when provided in context', () => {
+            const result = deriveKeywords('business', 'products-grid', { englishKeywords: ['organic', 'skincare'] })
+            const joined = result.join(' ')
+            expect(joined.toLowerCase()).toContain('organic')
+            expect(joined.toLowerCase()).toContain('skincare')
+        })
     })
 
     describe('fallbackBroaden', () => {

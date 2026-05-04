@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { LogoCloudConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
@@ -18,8 +19,9 @@ function LogoHeadline({ text }: { text?: string }) {
     )
 }
 
-/** Text placeholder for logos without valid image URL — shows initials in a styled div */
-function LogoPlaceholder({ name }: { name?: string }) {
+/** Text placeholder for logos without valid image URL — shows initials in a styled div.
+ *  data-image-index enables editor image-replace on placeholder click (no real <img> present). */
+function LogoPlaceholder({ name, imageIndex }: { name?: string; imageIndex?: number }) {
     const initials = (name ?? '')
         .split(/\s+/)
         .map((w) => w[0] ?? '')
@@ -34,6 +36,7 @@ function LogoPlaceholder({ name }: { name?: string }) {
                 color: 'var(--brand-primary)',
                 background: `rgba(var(--brand-primary-rgb), 0.04)`,
             }}
+            data-image-index={imageIndex}
         >
             {initials}
         </div>
@@ -48,22 +51,22 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
     if (variant === 'grid') {
         return (
             <AnimatedSection>
-                <SectionWrapper as="div" padding="compact" container="default" background="transparent">
+                <SectionWrapper as="div" padding="compact" container="default" background="alternate">
                     <LogoHeadline text={headline} />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                    <div className="flex flex-wrap justify-center gap-6 max-w-5xl mx-auto">
                         {logos.map((item, i) => (
                             <div
                                 key={i}
-                                className={`flex items-center justify-center ${CARD_PADDING.sm} rounded-xl transition-all duration-200 hover:shadow-md`}
+                                className={`flex items-center justify-center ${CARD_PADDING.sm} rounded-xl transition-all duration-200 hover:shadow-md w-36`}
                                 style={{
                                     border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
                                     background: `rgba(var(--brand-primary-rgb), 0.02)`,
                                 }}
                             >
                                 {item.logo?.url ? (
-                                    <img src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 w-auto opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
+                                    <Image src={item.logo.url} alt={item.logo?.alt || item.name} width={0} height={0} sizes="256px" className="h-8 w-auto opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" data-image-index={i} />
                                 ) : (
-                                    <LogoPlaceholder name={item.name} />
+                                    <LogoPlaceholder name={item.name} imageIndex={i} />
                                 )}
                             </div>
                         ))}
@@ -76,14 +79,14 @@ export function LogoCloudBlock({ block, theme: _theme }: BlockProps<LogoCloudCon
     // ── Default: row variant ─────────────────────────────────────────────
     return (
         <AnimatedSection>
-            <SectionWrapper as="div" padding="compact" container="default" background="transparent">
+            <SectionWrapper as="div" padding="compact" container="default" background="alternate">
                 <LogoHeadline text={headline} />
-                <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
+                <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 max-w-5xl mx-auto">
                     {logos.map((item, i) => (
                         item.logo?.url ? (
-                            <img key={i} src={item.logo.url} alt={item.logo?.alt || item.name} className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" />
+                            <Image key={i} src={item.logo.url} alt={item.logo?.alt || item.name} width={0} height={0} sizes="256px" className="h-8 md:h-10 w-auto opacity-50 hover:opacity-100 transition-opacity grayscale hover:grayscale-0" data-image-index={i} />
                         ) : (
-                            <LogoPlaceholder key={i} name={item.name} />
+                            <LogoPlaceholder key={i} name={item.name} imageIndex={i} />
                         )
                     ))}
                 </div>
