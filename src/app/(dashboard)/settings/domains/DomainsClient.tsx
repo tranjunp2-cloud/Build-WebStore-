@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState, useTransition, useCallback, useRef, useEffect } from 'react';
-import { Globe, Plus, AlertCircle, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
+import { Globe, Plus, AlertCircle, AlertTriangle, Info, X, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useI18n } from '@/i18n';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
+import type { VercelDomainVerification } from '@/lib/vercel/domains.types';
 
 // Đọc từ env vars — deploy production chỉ cần set các biến này, không sửa code
-const DNS_A_RECORD = process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98';
-const DNS_CNAME = process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'cname.vercel-dns.com';
+const DNS_A_RECORD = process.env.NEXT_PUBLIC_VERCEL_APEX_IP ?? '76.76.21.21';
+const DNS_CNAME = process.env.NEXT_PUBLIC_VERCEL_CNAME_TARGET ?? 'cname.vercel-dns.com';
 
 type DomainEntry = { domain: string; status: string; isPrimary?: boolean | null };
 
@@ -129,6 +130,161 @@ function SelectPrimaryPanel({
     );
 }
 
+// ── TXT Challenge Card ──────────────────────────────────────────────────────
+function formatTimeAgo(epochMs: number): string {
+    const diff = Date.now() - epochMs;
+    if (diff < 5000) return 'just now';
+    if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return `${Math.floor(diff / 86400000)}d ago`;
+}
+
+function TxtChallengeCard({
+    domain,
+    verification,
+    onVerifyClick,
+    isVerifying,
+    lastCheckedAt,
+}: {
+    domain: string;
+    verification: VercelDomainVerification[];
+    onVerifyClick: () => void;
+    isVerifying: boolean;
+    lastCheckedAt: number | null;
+}) {
+    const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+    const copy = async (key: string, value: string) => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopiedKey(key);
+            setTimeout(() => setCopiedKey(null), 2000);
+        } catch {
+            toast.error('Failed to copy to clipboard');
+        }
+    };
+
+    const timeAgo = lastCheckedAt ? formatTimeAgo(lastCheckedAt) : null;
+
+    return (
+        <div
+            className="mt-4 p-4 sm:p-6 rounded-[16px] border border-[#FFB020]/30 bg-[rgba(255,176,32,0.04)]"
+            role="region"
+            aria-labelledby={`txt-challenge-${domain}`}
+        >
+            <div className="flex items-start gap-3 mb-4">
+                <AlertTriangle className="h-5 w-5 text-[#FFB020] shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                    <h4 id={`txt-challenge-${domain}`} className="text-[15px] font-semibold text-[#F8FAFC] font-['Inter']">
+                        Verify domain ownership
+                    </h4>
+                    <p className="mt-1 text-[13px] text-[rgba(248,250,252,0.6)] font-['Inter']">
+                        Add this TXT record to your DNS, then click Verify.
+                    </p>
+                </div>
+            </div>
+
+            {verification.map((v, i) => (
+                <div key={`${v.domain}-${i}`} className="mb-4 p-4 rounded-[12px] bg-[#0B1120] border border-white/[0.06]">
+                    <p className="text-[12px] font-medium text-[rgba(248,250,252,0.5)] uppercase tracking-wide font-['Inter'] mb-3">
+                        TXT Record #{i + 1}
+                    </p>
+
+                    <label className="text-[12px] text-[rgba(248,250,252,0.6)] font-['Inter']">Name</label>
+                    <div className="flex items-center gap-2 mt-1 mb-3">
+                        <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] text-[#F8FAFC] font-mono break-all">
+                            {v.domain}
+                        </code>
+                        <button
+                            type="button"
+                            onClick={() => copy(`name-${i}`, v.domain)}
+                            aria-label={`Copy TXT record name ${v.domain}`}
+                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] border border-white/10 text-[rgba(248,250,252,0.6)] hover:bg-white/5 transition-colors"
+                        >
+                            {copiedKey === `name-${i}` ? <Check className="h-4 w-4 text-[#10B981]" /> : <Copy className="h-4 w-4" />}
+                        </button>
+                    </div>
+
+                    <label className="text-[12px] text-[rgba(248,250,252,0.6)] font-['Inter']">Value</label>
+                    <div className="flex items-center gap-2 mt-1 mb-2">
+                        <code className="flex-1 p-2 rounded-[8px] bg-white/[0.03] text-[13px] text-[#F8FAFC] font-mono break-all">
+                            {v.value}
+                        </code>
+                        <button
+                            type="button"
+                            onClick={() => copy(`value-${i}`, v.value)}
+                            aria-label="Copy TXT record value"
+                            className="shrink-0 h-8 w-8 flex items-center justify-center rounded-[8px] border border-white/10 text-[rgba(248,250,252,0.6)] hover:bg-white/5 transition-colors"
+                        >
+                            {copiedKey === `value-${i}` ? <Check className="h-4 w-4 text-[#10B981]" /> : <Copy className="h-4 w-4" />}
+                        </button>
+                    </div>
+
+                    {v.reason && (
+                        <p className="text-[12px] text-[rgba(248,250,252,0.5)] font-['Inter']">Reason: {v.reason}</p>
+                    )}
+                </div>
+            ))}
+
+            {timeAgo && (
+                <p className="text-[12px] text-[rgba(248,250,252,0.4)] font-['Inter'] mb-3" aria-live="polite">
+                    Last checked: {timeAgo}
+                </p>
+            )}
+
+            <button
+                type="button"
+                onClick={onVerifyClick}
+                disabled={isVerifying}
+                aria-busy={isVerifying}
+                className="flex items-center justify-center gap-2 h-[44px] px-6 rounded-[12px] bg-[#00D3D4] text-[#0B1120] text-[14px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed font-['Inter']"
+            >
+                {isVerifying && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isVerifying ? 'Verifying…' : 'Verify Now'}
+            </button>
+        </div>
+    );
+}
+
+// ── SSL Provisioning Banner ─────────────────────────────────────────────────
+function SslProvisioningBanner({
+    domain,
+    shownAt,
+    onDismiss,
+}: {
+    domain: string;
+    shownAt: number;
+    onDismiss: () => void;
+}) {
+    useEffect(() => {
+        const timeout = setTimeout(onDismiss, 60000); // auto-dismiss after 60s
+        return () => clearTimeout(timeout);
+    }, [onDismiss, shownAt]);
+
+    return (
+        <div
+            role="status"
+            aria-live="polite"
+            className="mt-3 flex items-start gap-3 p-3 rounded-[10px] bg-[rgba(0,211,212,0.06)] border border-[#00D3D4]/20"
+        >
+            <Info className="h-4 w-4 text-[#00D3D4] shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="flex-1 text-[13px] text-[#F8FAFC] font-['Inter']">
+                SSL certificate is being provisioned. May take 1-2 minutes.
+                Try <code className="text-[#00D3D4]">https://{domain}</code> after a moment.
+            </p>
+            <button
+                type="button"
+                onClick={onDismiss}
+                aria-label="Dismiss SSL provisioning notice"
+                className="shrink-0 h-6 w-6 flex items-center justify-center rounded text-[rgba(248,250,252,0.4)] hover:text-[#F8FAFC] transition-colors"
+            >
+                <X className="h-4 w-4" />
+            </button>
+        </div>
+    );
+}
+
 // ── Main DomainsClient ───────────────────────────────────────────────────────
 export function DomainsClient({
     tenantId,
@@ -148,6 +304,10 @@ export function DomainsClient({
     const [verifyErrors, setVerifyErrors] = useState<Record<string, string>>({});
     const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
     const [removingDomain, setRemovingDomain] = useState<string | null>(null);
+    const [verifications, setVerifications] = useState<Record<string, VercelDomainVerification[]>>({});
+    const [lastCheckedAt, setLastCheckedAt] = useState<Record<string, number>>({});
+    const [sslProvisioningDomains, setSslProvisioningDomains] = useState<Record<string, number>>({});
+    const lastVerifyClickRef = useRef<Record<string, number>>({});
     const [domainError, setDomainError] = useState('');
 
     // F23: Slug editor state
@@ -249,11 +409,20 @@ export function DomainsClient({
             if (res.success) {
                 setIsAddModalOpen(false);
                 setNewDomainInput('');
-                setDomains(prev => [...prev, { domain: domainValue, status: 'pending' }]);
+                const hasVerification = !!(res.verification && res.verification.length > 0);
+                setDomains(prev => [
+                    ...prev,
+                    { domain: domainValue, status: hasVerification ? 'pending' : 'active' },
+                ]);
+                if (hasVerification) {
+                    setVerifications(prev => ({ ...prev, [domainValue]: res.verification! }));
+                    toast.success('Add the TXT record below, then click Verify.');
+                } else {
+                    setSslProvisioningDomains(prev => ({ ...prev, [domainValue]: Date.now() }));
+                    toast.success('Domain active. SSL provisioning may take 1-2 minutes.');
+                }
                 if (res.warning) {
                     toast.warning(res.warning);
-                } else {
-                    toast.success(t?.Domains?.domainAdded || 'Domain added successfully! Please configure DNS.');
                 }
             } else {
                 toast.error(res.error || t?.Domains?.domainAddFailed || 'Failed to add domain');
@@ -262,17 +431,31 @@ export function DomainsClient({
     };
 
     const handleVerify = (domain: string) => {
-        if (verifyingDomain) return; // BUG-F19.05: Prevent double-click
+        // Client-side debounce — block double-clicks within 1s
+        const now = Date.now();
+        if (now - (lastVerifyClickRef.current[domain] ?? 0) < 1000) return;
+        lastVerifyClickRef.current[domain] = now;
+
+
         setVerifyErrors(prev => { const next = { ...prev }; delete next[domain]; return next; });
         setVerifyingDomain(domain);
+        const clickedAt = Date.now();
         startTransition(async () => {
             const res = await verifyCustomDomain(domain);
             setVerifyingDomain(null);
+            setLastCheckedAt(prev => ({ ...prev, [domain]: clickedAt }));
             if (res.success) {
                 setDomains(prev => prev.map(d => d.domain === domain ? { ...d, status: 'active' } : d));
-                toast.success(t?.Domains?.domainVerified || 'Domain verified successfully! SSL connection secured.');
+                setVerifications(prev => { const next = { ...prev }; delete next[domain]; return next; });
+                setSslProvisioningDomains(prev => ({ ...prev, [domain]: Date.now() }));
+                toast.success('Domain active. SSL provisioning may take 1-2 minutes.');
             } else {
-                setVerifyErrors(prev => ({ ...prev, [domain]: res.error || t?.Domains?.verificationFailed || 'Verification failed.' }));
+                if (res.verification && res.verification.length > 0) {
+                    setVerifications(prev => ({ ...prev, [domain]: res.verification! }));
+                }
+                const friendly = res.error || 'Verification failed. Please check your DNS records.';
+                setVerifyErrors(prev => ({ ...prev, [domain]: friendly }));
+                toast.error(`Verification failed: ${friendly}`);
             }
         });
     };
@@ -285,6 +468,9 @@ export function DomainsClient({
             setRemovingDomain(null);
             if (res.success) {
                 setDomains(prev => prev.filter(d => d.domain !== domain));
+                setVerifications(prev => { const next = { ...prev }; delete next[domain]; return next; });
+                setSslProvisioningDomains(prev => { const next = { ...prev }; delete next[domain]; return next; });
+                setLastCheckedAt(prev => { const next = { ...prev }; delete next[domain]; return next; });
                 if (res.warning) {
                     toast.warning(res.warning);
                 } else {
@@ -567,6 +753,17 @@ export function DomainsClient({
                                         {t?.Domains?.remove || 'Remove'}
                                     </button>
                                 </div>
+
+                                {/* TXT Challenge card — render only when verification present */}
+                                {verifications[domain] && verifications[domain].length > 0 && (
+                                    <TxtChallengeCard
+                                        domain={domain}
+                                        verification={verifications[domain]}
+                                        onVerifyClick={() => handleVerify(domain)}
+                                        isVerifying={verifyingDomain === domain}
+                                        lastCheckedAt={lastCheckedAt[domain] ?? null}
+                                    />
+                                )}
                             </div>
                         );
                     }
@@ -574,7 +771,8 @@ export function DomainsClient({
                     if (status === 'active') {
                         const isPrimary = domainObj.isPrimary;
                         return (
-                            <div key={domain} className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300">
+                            <div key={domain} className="flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px]">
                                 <div className="flex flex-col gap-2 pb-[25px]">
                                     <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{domain}</h3>
                                     <div className="flex flex-wrap gap-2 items-center">
@@ -601,6 +799,19 @@ export function DomainsClient({
                                         {t?.Domains?.removeDomain || 'Remove Domain'}
                                     </button>
                                 </div>
+                                </div>
+                                {/* SSL Provisioning banner — render only when recently flipped active */}
+                                {sslProvisioningDomains[domain] && (
+                                    <SslProvisioningBanner
+                                        domain={domain}
+                                        shownAt={sslProvisioningDomains[domain]}
+                                        onDismiss={() => setSslProvisioningDomains(prev => {
+                                            const next = { ...prev };
+                                            delete next[domain];
+                                            return next;
+                                        })}
+                                    />
+                                )}
                             </div>
                         );
                     }
