@@ -13,6 +13,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { buildMatrix, type BuildMatrixOpts } from './matrix'
 import { invokeComposer } from './compose-runner'
+import { validateAllPresets } from './validate-presets'
 import type { HarnessMode, HarnessResult, MatrixReport } from './types'
 
 type CliArgs = {
@@ -51,6 +52,9 @@ async function main() {
     variants: args.variants,
     seedsPerCell: args.seeds,
   }
+  // Fail fast: catch invalid/default variants before generating 280 fixtures
+  validateAllPresets()
+
   const fixtures = buildMatrix(opts)
   console.log(`[harness] built ${fixtures.length} fixtures`)
 

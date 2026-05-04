@@ -1,25 +1,19 @@
 /**
- * AI Gen Test Harness — index route (Phase 01 of plan 260419-2231).
+ * AI Gen Test Harness — Blueprint Gallery (QC Overview)
  *
- * Lists all blueprint fixtures (deduped to seed=0) in a grid so PM can eyeball
- * 56 blueprints in one sitting + tag triage verdicts. If a rubric score report
- * exists (`.harness-out/report.json` from staging scorer), per-card status dot
- * surfaces pass/warn/fail to help PM prioritize attention.
- *
- * Gated same way as `/test-harness/[fixtureId]`: only loaded when
- * `ENABLE_HARNESS=1` (see next.config.ts pageExtensions).
+ * Lists all 56 blueprint presets (deduped to seed=0) in a dark-mode grid.
+ * Per-card: rubric score bar, status border, weakest dimension inline.
+ * Per-category: health summary chips (X pass / Y warn / Z fail).
  *
  * Run locally:
  *   npm run harness:gen            # writes .harness-out/matrix.json
- *   ENABLE_HARNESS=1 npm run dev   # includes this file in routes
+ *   ENABLE_HARNESS=1 npm run dev   # includes .harness.tsx routes
  *   open http://localhost:3000/test-harness
  */
 
 import fs from 'node:fs'
 import path from 'node:path'
 import Link from 'next/link'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { TriagePanel } from './_components/triage-panel.harness-client'
 import type { MatrixReport, HarnessResult } from '../../../scripts/test-harness/types'
 import { readReport, loadRubric } from '../../../scripts/test-harness/rubric/scorer-lib'
@@ -28,6 +22,24 @@ import { getFixHint } from '../../../scripts/test-harness/rubric/fix-hints'
 
 export const dynamic = 'force-dynamic'
 
+// ─── dark theme tokens ────────────────────────────────────────────────────────
+const DK = {
+  bg: '#0a0a0a',
+  surface: '#111111',
+  surfaceHover: '#161616',
+  border: '#262626',
+  borderStrong: '#3f3f46',
+  text: '#f5f5f5',
+  textSub: '#a1a1aa',
+  textMuted: '#71717a',
+  pass: '#10b981',
+  warn: '#f59e0b',
+  fail: '#ef4444',
+  accent: '#7c3aed',
+  ai: { bg: '#0f0a2e', card: '#13103a', border: '#4c1d95', text: '#c4b5fd', sub: '#8b5cf6' },
+} as const
+
+// ─── data types ───────────────────────────────────────────────────────────────
 type BlueprintCard = {
   fixtureId: string
   category: string
@@ -38,28 +50,24 @@ type BlueprintCard = {
   score?: FixtureScore
 }
 
+type AiCacheMeta = { cachedAt: string; siteName: string; blocksCount: number }
+
+// ─── data loaders (no rendering) ─────────────────────────────────────────────
 function loadMatrix(): MatrixReport | null {
-  const matrixPath = path.resolve(process.cwd(), '.harness-out/matrix.json')
-  if (!fs.existsSync(matrixPath)) return null
-  try {
-    const raw = fs.readFileSync(matrixPath, 'utf8')
-    return JSON.parse(raw) as MatrixReport
-  } catch {
-    return null
-  }
+  const p = path.resolve(process.cwd(), '.harness-out/matrix.json')
+  if (!fs.existsSync(p)) return null
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')) as MatrixReport } catch { return null }
 }
 
 function pickUniqueBlueprints(matrix: MatrixReport, scoreMap: Map<string, FixtureScore>): BlueprintCard[] {
   const byPreset = new Map<string, HarnessResult>()
   for (const r of matrix.results) {
     if (r.fixture.source !== 'blueprint') continue
-    const presetIndex = r.fixture.presetIndex
-    if (presetIndex === undefined) continue
-    const key = `${r.fixture.category}:${presetIndex}`
-    const existing = byPreset.get(key)
-    if (!existing || r.fixture.compositionSeed < existing.fixture.compositionSeed) {
-      byPreset.set(key, r)
-    }
+    const idx = r.fixture.presetIndex
+    if (idx === undefined) continue
+    const key = `${r.fixture.category}:${idx}`
+    const ex = byPreset.get(key)
+    if (!ex || r.fixture.compositionSeed < ex.fixture.compositionSeed) byPreset.set(key, r)
   }
   return Array.from(byPreset.values())
     .map((r) => ({
@@ -74,25 +82,6 @@ function pickUniqueBlueprints(matrix: MatrixReport, scoreMap: Map<string, Fixtur
     .sort((a, b) => a.category.localeCompare(b.category) || a.presetName.localeCompare(b.presetName))
 }
 
-function scoreDot(score?: FixtureScore): string {
-  if (!score) return '⚪'
-  return score.status === 'pass' ? '🟢' : score.status === 'warn' ? '🟡' : '🔴'
-}
-
-/** Lowest-scoring dimension — signal area for improvement, full DimensionScore for detail drill-down. */
-function weakestDim(score?: FixtureScore): DimensionScore | null {
-  if (!score || !score.dimensions.length) return null
-  const sorted = [...score.dimensions].sort((a, b) => a.score - b.score)
-  return sorted[0]
-}
-
-type AiCacheMeta = {
-  cachedAt: string
-  siteName: string
-  blocksCount: number
-}
-
-/** Read AI cache dir — returns map category → meta (null if dir empty). */
 function readAiCachedMap(): Map<string, AiCacheMeta> {
   const dir = path.resolve(process.cwd(), '.harness-out/ai-cache')
   const out = new Map<string, AiCacheMeta>()
@@ -100,34 +89,20 @@ function readAiCachedMap(): Map<string, AiCacheMeta> {
   try {
     for (const file of fs.readdirSync(dir)) {
       if (!file.endsWith('.json')) continue
-      const category = file.replace(/\.json$/, '')
+      const cat = file.replace(/\.json$/, '')
       try {
-        const full = path.join(dir, file)
-        const raw = JSON.parse(fs.readFileSync(full, 'utf8')) as {
-          cachedAt?: string
-          output?: { siteName?: string; blocks?: unknown[] }
-          siteName?: string
-          blocks?: unknown[]
+        const raw = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')) as {
+          cachedAt?: string; output?: { siteName?: string; blocks?: unknown[] }; siteName?: string; blocks?: unknown[]
         }
-        // v2 wrapped (input/output/cachedAt) or v1 legacy (flat GenerationResult)
-        const out_ = raw.output ?? (raw as { siteName?: string; blocks?: unknown[] })
-        const stat = fs.statSync(full)
-        out.set(category, {
-          cachedAt: raw.cachedAt ?? stat.mtime.toISOString(),
-          siteName: (out_.siteName as string) ?? '(unnamed)',
-          blocksCount: Array.isArray(out_.blocks) ? out_.blocks.length : 0,
-        })
-      } catch {
-        // skip malformed file
-      }
+        const o = raw.output ?? raw
+        const stat = fs.statSync(path.join(dir, file))
+        out.set(cat, { cachedAt: raw.cachedAt ?? stat.mtime.toISOString(), siteName: (o.siteName as string) ?? '(unnamed)', blocksCount: Array.isArray(o.blocks) ? o.blocks.length : 0 })
+      } catch { /* skip malformed */ }
     }
-  } catch {
-    // skip dir read error
-  }
+  } catch { /* skip dir read error */ }
   return out
 }
 
-/** Short relative time — "2h ago", "3d ago". */
 function timeAgo(iso: string): string {
   if (iso === 'legacy-cache') return 'legacy'
   const t = new Date(iso).getTime()
@@ -139,16 +114,72 @@ function timeAgo(iso: string): string {
   return `${Math.floor(sec / 86400)}d ago`
 }
 
+function weakestDim(score?: FixtureScore): DimensionScore | null {
+  if (!score?.dimensions.length) return null
+  return [...score.dimensions].sort((a, b) => a.score - b.score)[0]
+}
+
+// ─── mini components ──────────────────────────────────────────────────────────
+
+/** 8px colored dot indicating rubric status */
+function StatusDot({ score }: { score?: FixtureScore }) {
+  const color = !score ? '#404040' : score.status === 'pass' ? DK.pass : score.status === 'warn' ? DK.warn : DK.fail
+  const title = score ? `${score.status}: ${score.weighted.toFixed(1)}/10` : 'no rubric score'
+  return (
+    <span
+      title={title}
+      style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }}
+    />
+  )
+}
+
+/** Thin score progress bar — always visible under preset name */
+function ScoreBar({ score }: { score?: FixtureScore }) {
+  if (!score) return null
+  const color = score.status === 'pass' ? DK.pass : score.status === 'warn' ? DK.warn : DK.fail
+  return (
+    <div style={{ height: 3, background: DK.border, borderRadius: 2, overflow: 'hidden', margin: '5px 0 7px' }}>
+      <div style={{ height: '100%', width: `${score.weighted * 10}%`, background: color }} />
+    </div>
+  )
+}
+
+/** Category pass-rate mini progress bar */
+function CategoryHealthBar({ pass, total, warn, fail }: { pass: number; total: number; warn: number; fail: number }) {
+  if (total === 0) return null
+  const passPct = (pass / total) * 100
+  const warnPct = (warn / total) * 100
+  const failPct = (fail / total) * 100
+  const passRate = Math.round(passPct)
+  const rateColor = failPct > 0 ? DK.fail : warnPct > 0 ? DK.warn : DK.pass
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ flex: 1, height: 5, background: '#1a1a1a', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
+        <div style={{ height: '100%', width: `${passPct}%`, background: DK.pass }} />
+        <div style={{ height: '100%', width: `${warnPct}%`, background: DK.warn }} />
+        <div style={{ height: '100%', width: `${failPct}%`, background: DK.fail }} />
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, color: rateColor, fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 32, textAlign: 'right' }}>
+        {passRate}%
+      </span>
+    </div>
+  )
+}
+
+// ─── page ─────────────────────────────────────────────────────────────────────
+
 export default function HarnessIndexPage() {
   const matrix = loadMatrix()
 
   if (!matrix) {
     return (
-      <div style={{ padding: 40, fontFamily: 'monospace' }}>
-        <h1>harness matrix not found</h1>
-        <p>
-          Run <code>npm run harness:gen</code> first to generate{' '}
-          <code>.harness-out/matrix.json</code>.
+      <div style={{ background: DK.bg, color: DK.text, minHeight: '100vh', padding: 40, fontFamily: 'ui-monospace, monospace' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12 }}>Harness matrix not found</h1>
+        <p style={{ color: DK.textSub }}>
+          Run{' '}
+          <code style={{ background: '#1c1c1c', padding: '2px 8px', borderRadius: 4 }}>npm run harness:gen</code>
+          {' '}to generate{' '}
+          <code style={{ background: '#1c1c1c', padding: '2px 8px', borderRadius: 4 }}>.harness-out/matrix.json</code>
         </p>
       </div>
     )
@@ -161,21 +192,21 @@ export default function HarnessIndexPage() {
   const aiCacheMap = readAiCachedMap()
   const aiCached = new Set(aiCacheMap.keys())
   const blueprints = pickUniqueBlueprints(matrix, scoreMap)
-  const categories = Array.from(new Set(blueprints.map((b) => b.category))).sort()
 
-  // Rubric dimension descriptions — explains what each dim measures, helps team know
-  // what to fix when a dim scores low. Loaded once per request; rubric is memoized.
-  const rubric = (() => {
-    try {
-      return loadRubric()
-    } catch {
-      return null
-    }
-  })()
+  // Sort categories: fail first, then warn, then clean
+  const categories = Array.from(new Set(blueprints.map((b) => b.category))).sort((a, b) => {
+    const aFail = blueprints.filter((bp) => bp.category === a && bp.score?.status === 'fail').length
+    const bFail = blueprints.filter((bp) => bp.category === b && bp.score?.status === 'fail').length
+    const aWarn = blueprints.filter((bp) => bp.category === a && bp.score?.status === 'warn').length
+    const bWarn = blueprints.filter((bp) => bp.category === b && bp.score?.status === 'warn').length
+    if (bFail !== aFail) return bFail - aFail
+    if (bWarn !== aWarn) return bWarn - aWarn
+    return a.localeCompare(b)
+  })
+
+  const rubric = (() => { try { return loadRubric() } catch { return null } })()
   const dimDescriptions = new Map<string, string>()
-  if (rubric) {
-    for (const d of rubric.dimensions) dimDescriptions.set(d.id, d.description ?? '')
-  }
+  if (rubric) for (const d of rubric.dimensions) dimDescriptions.set(d.id, d.description ?? '')
 
   const totalFixtures = matrix.results.length
   const blueprintCount = matrix.results.filter((r) => r.fixture.source === 'blueprint').length
@@ -184,459 +215,532 @@ export default function HarnessIndexPage() {
   const rubricPass = report?.summary.pass ?? 0
   const rubricWarn = report?.summary.warn ?? 0
   const rubricFail = report?.summary.fail ?? 0
+  const needsFix = rubricWarn + rubricFail
 
-  const statCard: React.CSSProperties = {
-    background: 'hsl(var(--card, 0 0% 100%))',
-    border: '1px solid hsl(var(--border, 214 32% 91%))',
-    borderRadius: 10,
-    padding: '14px 16px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  }
-  const statLabel: React.CSSProperties = {
-    fontSize: 10,
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: 'hsl(var(--muted-foreground, 215 16% 47%))',
-  }
-  const statValue: React.CSSProperties = {
-    fontSize: 24,
-    fontWeight: 700,
-    lineHeight: 1.1,
-    fontVariantNumeric: 'tabular-nums',
-  }
-  const statSubtle: React.CSSProperties = {
-    fontSize: 11,
-    color: 'hsl(var(--muted-foreground, 215 16% 47%))',
-  }
+  // Fixtures needing attention (fail or warn)
+  const attentionFixtures = blueprints
+    .filter((b) => b.score && b.score.status !== 'pass')
+    .sort((a, b) => (a.score?.weighted ?? 10) - (b.score?.weighted ?? 10))
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
-      {/* HEADER — compact, single row. Stats row below. */}
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold">Template Quality Triage</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {blueprints.length} blueprints · {categories.length} categories · {totalFixtures} fixtures ({blueprintCount} blueprint + {legacyCount} legacy)
-            {' · '}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">plans/260419-2231-GH-1-per-template-quality-fix</code>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/test-harness/admin"
-            className="inline-flex items-center rounded-md px-3 py-2 text-xs font-semibold no-underline shadow-sm transition"
-            style={{ background: '#7c3aed', color: '#fff' }}
-          >
-            📊 Admin Dashboard
-          </Link>
-          <TriagePanel totalCount={blueprints.length} fixtureIds={blueprints.map((b) => b.fixtureId)} />
-        </div>
-      </header>
+    <div style={{ background: DK.bg, color: DK.text, minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
 
-      {/* STATS ROW — 5 KPI cards: overall health signal at a glance. */}
-      <section className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <div style={statCard}>
-          <span style={statLabel}>Rubric Avg</span>
-          <span style={{ ...statValue, color: '#7c3aed' }}>
-            {rubricAvg !== null ? `${rubricAvg.toFixed(2)}/10` : '—'}
-          </span>
-          <span style={statSubtle}>{report ? `wix-pro ${report.rubric?.name ?? ''}` : 'score missing'}</span>
-        </div>
-        <div style={statCard}>
-          <span style={statLabel}>Score Distribution</span>
-          <span style={statValue}>
-            <span style={{ color: '#10b981' }}>{rubricPass}</span>
-            <span style={{ ...statSubtle, margin: '0 4px' }}>·</span>
-            <span style={{ color: '#f59e0b' }}>{rubricWarn}</span>
-            <span style={{ ...statSubtle, margin: '0 4px' }}>·</span>
-            <span style={{ color: '#ef4444' }}>{rubricFail}</span>
-          </span>
-          <span style={statSubtle}>🟢 pass · 🟡 warn · 🔴 fail</span>
-        </div>
-        <div style={statCard}>
-          <span style={statLabel}>AI Cached</span>
-          <span style={statValue}>
-            {aiCached.size}<span style={statSubtle}> / {categories.length}</span>
-          </span>
-          <span style={statSubtle}>💾 ready · ✨ costs $</span>
-        </div>
-        <div style={statCard}>
-          <span style={statLabel}>Blueprints to Review</span>
-          <span style={statValue}>{blueprints.length}</span>
-          <span style={statSubtle}>OK / Minor / Major (counter top-right)</span>
-        </div>
-        <div style={statCard}>
-          <span style={statLabel}>Harness Errors</span>
-          <span style={{ ...statValue, color: matrix.summary.composerErrors > 0 ? '#ef4444' : '#10b981' }}>
-            {matrix.summary.composerErrors}
-          </span>
-          <span style={statSubtle}>{matrix.summary.composerErrors === 0 ? '0 compose failures' : 'needs fix'}</span>
-        </div>
-      </section>
-
-      {/* QUICK LEGEND + CATEGORY CHIPS */}
-      <section className="mb-5 flex flex-wrap items-center gap-2 text-xs">
-        <span className="font-semibold">Rubric:</span>
-        <span>🟢 pass</span>
-        <span>🟡 warn</span>
-        <span>🔴 fail</span>
-        <span>⚪ none</span>
-        <span className="mx-2 text-muted-foreground">·</span>
-        <span className="font-semibold">Categories:</span>
-        {categories.map((c) => {
-          const count = blueprints.filter((b) => b.category === c).length
-          const cached = aiCached.has(c)
-          return (
-            <a
-              key={c}
-              href={`#cat-${c}`}
-              className="rounded-md px-2 py-0.5 text-xs no-underline hover:opacity-80"
-              style={{
-                background: cached ? '#ede9fe' : 'hsl(var(--muted, 210 40% 96%))',
-                color: cached ? '#4c1d95' : 'hsl(var(--muted-foreground, 215 16% 47%))',
-                fontWeight: cached ? 600 : 400,
-              }}
-              title={cached ? 'AI cached — scroll to section' : 'AI not cached'}
-            >
-              {cached ? '💾' : ''} {c} ({count})
-            </a>
-          )
-        })}
-      </section>
-
-      {/* AI-FIRST — distinct purple panel. Cached = mini card with meta; fresh = pill */}
-      <section
-        className="mb-6 rounded-lg p-4"
-        style={{ background: '#faf5ff', border: '1.5px solid #d8b4fe' }}
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold" style={{ color: '#581c87' }}>
-              🤖 AI-First Gen · Real OpenAI per business
-            </h2>
-            <p className="mt-0.5 text-xs" style={{ color: '#6b21a8' }}>
-              GPT-4o personalizes content per business sample · click 💾 card to open cached output (instant) or ✨ pill to trigger fresh gen (5–15s, costs $) · opened page has <strong>Inspect Prompts + Output</strong> drawer bottom-right
-            </p>
+      {/* ── sticky top bar ── */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 20, background: '#0d0d0d', borderBottom: `1px solid ${DK.border}`, padding: '10px 24px' }}>
+        <div style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>Blueprint Gallery</span>
+            <span style={{ fontSize: 11, color: DK.textMuted }}>
+              {blueprints.length} blueprints · {categories.length} categories · {totalFixtures} fixtures ({blueprintCount} blueprint + {legacyCount} legacy)
+            </span>
           </div>
-          <span
-            className="shrink-0 rounded px-2 py-1 text-[10px] font-mono font-semibold"
-            style={{ background: '#7c3aed', color: '#fff' }}
-          >
-            COSTS $
-          </span>
-        </div>
-        {aiCacheMap.size > 0 && (
-          <div className="mb-3">
-            <div
-              className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide"
-              style={{ color: '#581c87' }}
-            >
-              💾 Cached — {aiCacheMap.size} gen&apos;d
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {/* Enlarged pass/warn/fail counts */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#052e16', border: '1px solid #166534', borderRadius: 6, padding: '4px 10px' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: DK.pass, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{rubricPass}</span>
+                <span style={{ fontSize: 10, color: '#4ade80', textTransform: 'uppercase', letterSpacing: 0.5 }}>pass</span>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: rubricWarn > 0 ? '#451a03' : '#1a1a1a', border: `1px solid ${rubricWarn > 0 ? '#92400e' : DK.border}`, borderRadius: 6, padding: '4px 10px' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: rubricWarn > 0 ? DK.warn : DK.textMuted, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{rubricWarn}</span>
+                <span style={{ fontSize: 10, color: rubricWarn > 0 ? '#fcd34d' : DK.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>warn</span>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: rubricFail > 0 ? '#450a0a' : '#1a1a1a', border: `1px solid ${rubricFail > 0 ? '#991b1b' : DK.border}`, borderRadius: 6, padding: '4px 10px' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: rubricFail > 0 ? DK.fail : DK.textMuted, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{rubricFail}</span>
+                <span style={{ fontSize: 10, color: rubricFail > 0 ? '#fca5a5' : DK.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>fail</span>
+              </span>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {Array.from(aiCacheMap.entries())
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([cat, meta]) => (
+            {/* "X cần fix" badge */}
+            {rubricFail > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#7f1d1d', border: '1px solid #dc2626', borderRadius: 6, padding: '5px 12px', fontWeight: 700 }}>
+                <span style={{ fontSize: 16, color: '#fca5a5', fontVariantNumeric: 'tabular-nums' }}>{rubricFail}</span>
+                <span style={{ fontSize: 11, color: '#fca5a5' }}>cần fix</span>
+              </span>
+            )}
+            {rubricAvg !== null && (
+              <span style={{ fontSize: 15, fontWeight: 700, color: DK.accent, fontVariantNumeric: 'tabular-nums' }}>{rubricAvg.toFixed(2)}/10</span>
+            )}
+            <Link href="/test-harness/admin" style={{ background: DK.accent, color: '#fff', padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              Debug Console →
+            </Link>
+            <TriagePanel totalCount={blueprints.length} fixtureIds={blueprints.map((b) => b.fixtureId)} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1440, margin: '0 auto', padding: '20px 24px' }}>
+
+        {/* ── KPI cards ── */}
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 20 }}>
+          {([
+            { label: 'Rubric Avg', value: rubricAvg !== null ? `${rubricAvg.toFixed(2)}/10` : '—', sub: report ? `rubric ${report.rubric?.name ?? ''}` : 'run harness:score', color: DK.accent, highlight: false },
+            { label: 'Pass ≥ 7.0', value: rubricPass, sub: 'score distribution', color: DK.pass, highlight: false },
+            { label: 'Warn 5–6.9', value: rubricWarn, sub: 'score distribution', color: DK.warn, highlight: rubricWarn > 0 },
+            { label: 'Fail < 5.0', value: rubricFail, sub: rubricFail === 0 ? 'none — clean' : 'needs fix!', color: rubricFail > 0 ? DK.fail : DK.textMuted, highlight: rubricFail > 0 },
+            { label: 'Needs Fix', value: needsFix, sub: 'warn + fail total', color: needsFix > 0 ? '#fb923c' : DK.textMuted, highlight: needsFix > 0 },
+          ] as const).map((s) => (
+            <div key={s.label} style={{
+              background: s.highlight && s.label === 'Fail < 5.0' ? '#1a0808' : DK.surface,
+              border: `1px solid ${s.highlight ? (s.label === 'Fail < 5.0' ? '#7f1d1d' : '#78350f') : DK.border}`,
+              borderTop: `3px solid ${s.color}`,
+              borderRadius: 8,
+              padding: '14px 16px',
+            }}>
+              <div style={{ fontSize: 10, color: DK.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{s.label}</div>
+              <div style={{ fontSize: s.highlight ? 32 : 26, fontWeight: 700, color: s.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: DK.textMuted, marginTop: 4 }}>{s.sub}</div>
+            </div>
+          ))}
+        </section>
+
+        {/* ── category jump chips ── */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 20 }}>
+          <span style={{ fontSize: 11, color: DK.textMuted, marginRight: 4 }}>Jump to:</span>
+          {categories.map((c) => {
+            const catBps = blueprints.filter((b) => b.category === c)
+            const catFail = catBps.filter((b) => b.score?.status === 'fail').length
+            const catWarn = catBps.filter((b) => b.score?.status === 'warn').length
+            const hasFail = catFail > 0
+            const hasWarn = catWarn > 0
+            const cached = aiCached.has(c)
+            return (
+              <a
+                key={c}
+                href={`#cat-${c}`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: hasFail ? '5px 12px' : '4px 10px',
+                  borderRadius: 20, fontSize: hasFail ? 12 : 11,
+                  textDecoration: 'none', transition: 'opacity 0.15s',
+                  background: hasFail ? '#2d0a0a' : hasWarn ? '#1f1008' : '#1a1a1a',
+                  border: `1px solid ${hasFail ? '#991b1b' : hasWarn ? '#5c3010' : DK.border}`,
+                  color: hasFail ? '#fca5a5' : hasWarn ? '#fcd34d' : DK.textSub,
+                  fontWeight: hasFail ? 700 : hasWarn ? 600 : 400,
+                }}
+              >
+                {hasFail && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DK.fail, display: 'inline-block', flexShrink: 0 }} />}
+                {!hasFail && hasWarn && <span style={{ width: 5, height: 5, borderRadius: '50%', background: DK.warn, display: 'inline-block', flexShrink: 0 }} />}
+                {c} ({catBps.length})
+                {hasFail && <span style={{ fontSize: 9, background: '#7f1d1d', color: '#fca5a5', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>{catFail}F</span>}
+                {hasWarn && <span style={{ fontSize: 9, background: '#78350f', color: '#fcd34d', padding: '1px 5px', borderRadius: 3 }}>{catWarn}W</span>}
+                {cached && <span style={{ fontSize: 9, background: DK.accent, color: '#fff', padding: '1px 5px', borderRadius: 3 }}>AI</span>}
+              </a>
+            )
+          })}
+        </div>
+
+        {/* ── AI-First Gen section ── */}
+        <section style={{ marginBottom: 24, background: DK.ai.bg, border: `1px solid ${DK.ai.border}`, borderRadius: 10, padding: '14px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+            <div>
+              <h2 style={{ fontSize: 13, fontWeight: 700, color: DK.ai.text, margin: 0 }}>AI Gen · Real OpenAI per business (mirrors user flow)</h2>
+              <p style={{ fontSize: 11, color: DK.ai.sub, margin: '4px 0 0', lineHeight: 1.5 }}>
+                Runs exact same <code style={{ background: '#1e1040', padding: '1px 4px', borderRadius: 3 }}>generateSiteWithAI()</code> as user flow.
+                Default (<code style={{ background: '#1e1040', padding: '1px 4px', borderRadius: 3 }}>template-first</code>): composer + GPT hero/SEO only (~3–8s).
+                Set <code style={{ background: '#1e1040', padding: '1px 4px', borderRadius: 3 }}>GEN_MODE=ai-first</code> to test full AI gen path.
+                Cached = instant; Fresh = costs $.
+                Each page has <strong style={{ color: DK.ai.text }}>Inspect Prompts + Output</strong> drawer bottom-right.
+              </p>
+            </div>
+            <span style={{ flexShrink: 0, background: DK.accent, color: '#fff', fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 4, letterSpacing: 0.5, fontFamily: 'ui-monospace, monospace' }}>COSTS $</span>
+          </div>
+
+          {aiCacheMap.size > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: DK.ai.sub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                Cached ({aiCacheMap.size} gen&apos;d)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+                {Array.from(aiCacheMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([cat, meta]) => (
                   <Link
                     key={`ai-cached-${cat}`}
                     href={`/test-harness/ai/${cat}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex flex-col gap-0.5 rounded-md px-3 py-2 no-underline"
-                    style={{
-                      background: '#ede9fe',
-                      color: '#4c1d95',
-                      border: '1px solid #a78bfa',
-                    }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 3, borderRadius: 6, padding: '10px 12px', background: DK.ai.card, border: `1px solid ${DK.ai.border}`, color: DK.ai.text, textDecoration: 'none' }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold capitalize">💾 {cat}</span>
-                      <span className="text-[10px] font-mono opacity-70">
-                        {meta.blocksCount} blocks
-                      </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{cat}</span>
+                      <span style={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', color: DK.ai.sub }}>{meta.blocksCount} blk</span>
                     </div>
-                    <div
-                      className="truncate text-[11px] font-medium"
-                      title={meta.siteName}
-                    >
-                      {meta.siteName}
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] opacity-70">
-                      <span>gen&apos;d {timeAgo(meta.cachedAt)}</span>
+                    <div style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#a78bfa' }} title={meta.siteName}>{meta.siteName}</div>
+                    <div style={{ fontSize: 10, color: '#6d28d9', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{timeAgo(meta.cachedAt)}</span>
                       <span>↗ open + prompts</span>
                     </div>
                   </Link>
                 ))}
+              </div>
             </div>
-          </div>
-        )}
-        {categories.filter((c) => !aiCached.has(c)).length > 0 && (
-          <div>
-            <div
-              className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide"
-              style={{ color: '#581c87' }}
-            >
-              ✨ Fresh — not yet gen&apos;d ({categories.filter((c) => !aiCached.has(c)).length}) · clicking fires OpenAI call
-            </div>
-            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7">
-              {categories
-                .filter((c) => !aiCached.has(c))
-                .map((c) => (
+          )}
+
+          {categories.filter((c) => !aiCached.has(c)).length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: DK.ai.sub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                Fresh — {categories.filter((c) => !aiCached.has(c)).length} not yet gen&apos;d (clicking fires OpenAI call)
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {categories.filter((c) => !aiCached.has(c)).map((c) => (
                   <Link
                     key={`ai-fresh-${c}`}
                     href={`/test-harness/ai/${c}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-mono capitalize no-underline"
-                    style={{
-                      background: '#fff',
-                      color: '#4c1d95',
-                      border: '1px solid #c4b5fd',
-                    }}
+                    style={{ padding: '5px 12px', borderRadius: 20, fontSize: 11, fontFamily: 'ui-monospace, monospace', textTransform: 'capitalize', textDecoration: 'none', background: '#07051a', color: DK.ai.sub, border: `1px solid ${DK.ai.border}` }}
                     title="Fresh — sẽ gọi OpenAI (5–15s, tốn $)"
                   >
-                    <span>✨</span>
-                    <span>{c}</span>
+                    {c}
                   </Link>
                 ))}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* TEMPLATE-FIRST heading */}
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-lg font-semibold">📐 Template-First Blueprints</h2>
-        <span className="rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase text-white">
-          Free · Instant
-        </span>
-        <span className="text-xs text-muted-foreground">— precomposed from matrix.json, click card to render</span>
-      </div>
-
-      {/* Grouped by category — anchor id on each heading for chip jumping. */}
-      <div className="space-y-6">
-        {categories.map((cat) => {
-          const catBlueprints = blueprints.filter((b) => b.category === cat)
-          const catScores = catBlueprints
-            .map((b) => b.score?.weighted)
-            .filter((x): x is number => typeof x === 'number')
-          const catAvg = catScores.length
-            ? catScores.reduce((s, x) => s + x, 0) / catScores.length
-            : null
-          const cached = aiCached.has(cat)
-          return (
-            <section key={cat} id={`cat-${cat}`} className="scroll-mt-6">
-              <div className="mb-3 flex items-center gap-3 border-b pb-2">
-                <h3 className="text-base font-semibold capitalize">{cat}</h3>
-                <Badge variant="secondary" className="text-xs">
-                  {catBlueprints.length} presets
-                </Badge>
-                {catAvg !== null && (
-                  <Badge variant="outline" className="text-xs" title="Avg rubric score">
-                    avg {catAvg.toFixed(2)}/10
-                  </Badge>
-                )}
-                <Link
-                  href={`/test-harness/ai/${cat}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-auto rounded px-2 py-1 text-xs font-mono no-underline"
-                  style={{
-                    background: cached ? '#ede9fe' : '#fff',
-                    color: '#4c1d95',
-                    border: `1px solid ${cached ? '#a78bfa' : '#c4b5fd'}`,
-                    fontWeight: cached ? 600 : 400,
-                  }}
-                  title={cached ? 'Cached AI gen — mở tức thì' : 'Fresh AI gen — tốn $'}
-                >
-                  {cached ? '💾' : '✨'} AI gen {cat}
-                </Link>
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {catBlueprints.map((bp) => {
-                  const weakest = weakestDim(bp.score)
-                  return (
-                    <Card key={bp.fixtureId} className="p-4">
-                      <div className="mb-2 flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 truncate font-medium">
-                            <span
-                              title={
-                                bp.score
-                                  ? `rubric ${bp.score.status}: ${bp.score.weighted.toFixed(1)}/10`
-                                  : 'no rubric score'
-                              }
-                            >
-                              {scoreDot(bp.score)}
+            </div>
+          )}
+        </section>
+
+        {/* ── Template-First heading ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: 0 }}>Template-First Blueprints</h2>
+          <span style={{ background: '#052e16', color: '#34d399', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Free · Instant</span>
+          <span style={{ fontSize: 12, color: DK.textMuted }}>— composer output, no GPT, click card to render</span>
+        </div>
+
+        {/* ── Needs Attention section ── */}
+        {attentionFixtures.length > 0 && (
+          <NeedsAttentionSection fixtures={attentionFixtures} dimDescriptions={dimDescriptions} />
+        )}
+
+        {/* ── Category sections ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          {categories.map((cat) => {
+            const catBps = blueprints.filter((b) => b.category === cat)
+            const catScored = catBps.map((b) => b.score).filter((s): s is FixtureScore => !!s)
+            const catPass = catScored.filter((s) => s.status === 'pass').length
+            const catWarn = catScored.filter((s) => s.status === 'warn').length
+            const catFail = catScored.filter((s) => s.status === 'fail').length
+            const catAvg = catScored.length ? catScored.reduce((s, x) => s + x.weighted, 0) / catScored.length : null
+            const cached = aiCached.has(cat)
+            const hasIssues = catWarn + catFail > 0
+            const hasFail = catFail > 0
+
+            return (
+              <section key={cat} id={`cat-${cat}`} style={{ scrollMarginTop: 60 }}>
+                {/* category header */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  borderBottom: `1px solid ${hasFail ? '#7f1d1d' : hasIssues ? '#3d2010' : DK.border}`,
+                  paddingBottom: 10, marginBottom: 14, flexWrap: 'wrap',
+                }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, textTransform: 'capitalize', color: '#fff', margin: 0 }}>{cat}</h3>
+                  <span style={{ fontSize: 11, color: DK.textMuted }}>{catBps.length} presets</span>
+                  {catAvg !== null && (
+                    <span style={{ fontSize: 11, fontFamily: 'ui-monospace, monospace', color: DK.textMuted }}>avg {catAvg.toFixed(2)}/10</span>
+                  )}
+                  {/* health chips */}
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {catPass > 0 && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: '#052e16', color: DK.pass, fontWeight: 600 }}>{catPass} pass</span>}
+                    {catWarn > 0 && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: '#451a03', color: DK.warn, fontWeight: 700 }}>{catWarn} warn</span>}
+                    {catFail > 0 && <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 3, background: '#450a0a', color: DK.fail, fontWeight: 700 }}>{catFail} fail</span>}
+                  </div>
+                  {/* Category health progress bar */}
+                  {catScored.length > 0 && (
+                    <div style={{ flex: 1, maxWidth: 160, minWidth: 80 }}>
+                      <CategoryHealthBar pass={catPass} total={catScored.length} warn={catWarn} fail={catFail} />
+                    </div>
+                  )}
+                  {/* AI gen link */}
+                  <Link
+                    href={`/test-harness/ai/${cat}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 5, fontSize: 10, fontFamily: 'ui-monospace, monospace', textDecoration: 'none', background: cached ? DK.ai.card : DK.surface, color: cached ? DK.ai.text : DK.textMuted, border: `1px solid ${cached ? DK.ai.border : DK.border}` }}
+                  >
+                    {cached ? 'CACHED' : 'FRESH'} · AI gen {cat} →
+                  </Link>
+                </div>
+
+                {/* blueprint cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
+                  {catBps.map((bp) => {
+                    const weakest = weakestDim(bp.score)
+                    const statusColor = bp.score
+                      ? bp.score.status === 'pass' ? DK.pass : bp.score.status === 'warn' ? DK.warn : DK.fail
+                      : '#404040'
+                    const isFail = bp.score?.status === 'fail'
+                    const issueCount = bp.score?.dimensions.reduce(
+                      (sum, d) => sum + d.criteria.filter((c) => c.status !== 'pass').length, 0
+                    ) ?? 0
+
+                    return (
+                      <div
+                        key={bp.fixtureId}
+                        style={{
+                          background: isFail ? '#1a0808' : DK.surface,
+                          border: `1px solid ${isFail ? '#7f1d1d' : DK.border}`,
+                          borderLeft: `4px solid ${statusColor}`,
+                          borderRadius: 8,
+                          padding: '12px 14px',
+                        }}
+                      >
+                        {/* card header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <StatusDot score={bp.score} />
+                            <span style={{ fontSize: 13, fontWeight: 500, color: '#f5f5f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {bp.presetName}
                             </span>
-                            <span className="truncate">{bp.presetName}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {issueCount > 0 && (
+                              <span style={{
+                                fontSize: 11, fontWeight: 700,
+                                background: isFail ? '#7f1d1d' : '#451a03',
+                                color: isFail ? '#fca5a5' : '#fcd34d',
+                                border: `1px solid ${isFail ? '#991b1b' : '#92400e'}`,
+                                padding: '2px 7px', borderRadius: 4,
+                              }}>
+                                {issueCount} issue{issueCount > 1 ? 's' : ''}
+                              </span>
+                            )}
                             {bp.score && (
-                              <span className="ml-1 shrink-0 font-mono text-[10px] text-muted-foreground">
+                              <span style={{ fontSize: 32, fontWeight: 700, color: statusColor, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
                                 {bp.score.weighted.toFixed(1)}
                               </span>
                             )}
+                            <span style={{ fontSize: 10, color: DK.textMuted, background: '#1a1a1a', border: `1px solid ${DK.border}`, padding: '2px 6px', borderRadius: 4 }}>
+                              {bp.blockCount} blk
+                            </span>
                           </div>
                         </div>
-                        <Badge variant="outline" className="shrink-0 text-xs">
-                          {bp.blockCount} blocks
-                        </Badge>
+
+                        <ScoreBar score={bp.score} />
+
+                        {/* block list — wrap tags instead of truncated string */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+                          {bp.blockTypes.slice(0, 10).map((bt, i) => (
+                            <span key={`${bt}-${i}`} style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: '#1a1a1a', border: `1px solid ${DK.border}`, color: DK.textMuted, fontFamily: 'ui-monospace, monospace' }}>
+                              {bt}
+                            </span>
+                          ))}
+                          {bp.blockTypes.length > 10 && (
+                            <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: '#1a1a1a', color: DK.textMuted }}>
+                              +{bp.blockTypes.length - 10}
+                            </span>
+                          )}
+                        </div>
+
+                        {weakest && (
+                          <WeakestDrawer
+                            dim={weakest}
+                            description={dimDescriptions.get(weakest.id) ?? ''}
+                            defaultOpen={!bp.score || bp.score.weighted < 8}
+                          />
+                        )}
+
+                        {/* actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Link
+                            href={`/test-harness/${bp.fixtureId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 10px', borderRadius: 5, fontSize: 11, textDecoration: 'none', background: '#1a1a1a', border: `1px solid ${DK.border}`, color: DK.textSub }}
+                          >
+                            Open render ↗
+                          </Link>
+                          <span data-triage-slot={bp.fixtureId} style={{ marginLeft: 'auto', fontSize: 11, color: DK.textMuted }}>
+                            verdict?
+                          </span>
+                        </div>
                       </div>
-                      <div className="mb-2 line-clamp-2 text-xs text-muted-foreground">
-                        {bp.blockTypes.slice(0, 8).join(' → ')}
-                        {bp.blockTypes.length > 8 ? ` → +${bp.blockTypes.length - 8} more` : ''}
-                      </div>
-                      {weakest && (
-                        <WeakestDrawer
-                          dim={weakest}
-                          description={dimDescriptions.get(weakest.id) ?? ''}
-                        />
-                      )}
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/test-harness/${bp.fixtureId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center rounded-md border bg-background px-2.5 py-1 text-xs hover:bg-accent"
-                        >
-                          Open render ↗
-                        </Link>
-                        <span
-                          data-triage-slot={bp.fixtureId}
-                          className="ml-auto text-xs text-muted-foreground"
-                        >
-                          verdict?
-                        </span>
-                      </div>
-                    </Card>
-                  )
-                })}
-              </div>
-            </section>
-          )
-        })}
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
 }
 
-/** Expandable "Weakest dimension" drawer — native <details> so no JS.
- * Summary shows dim name + score; body explains description + lists failed/partial
- * criteria with their reason so team knows exactly what to fix. */
-function WeakestDrawer({ dim, description }: { dim: DimensionScore; description: string }) {
-  // Color by score severity — same as old inline badge
-  const weakColor = dim.score < 6 ? '#ef4444' : dim.score < 7.5 ? '#f59e0b' : '#71717a'
-  // Only show criteria that didn't earn full points (sorted by impact: biggest gap first)
+// ─── NeedsAttentionSection ────────────────────────────────────────────────────
+/**
+ * Collapsed section showing all fail/warn fixtures sorted worst-first.
+ * Uses native <details> so no JS needed (Server Component compatible).
+ */
+function NeedsAttentionSection({
+  fixtures,
+  dimDescriptions,
+}: {
+  fixtures: BlueprintCard[]
+  dimDescriptions: Map<string, string>
+}) {
+  const failCount = fixtures.filter((f) => f.score?.status === 'fail').length
+  const warnCount = fixtures.filter((f) => f.score?.status === 'warn').length
+
+  return (
+    <details open style={{ marginBottom: 28 }}>
+      <summary
+        style={{
+          cursor: 'pointer', listStyle: 'none', outline: 'none',
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: '#1a0808',
+          border: '1px solid #7f1d1d',
+          borderRadius: 8, padding: '10px 16px', marginBottom: 0,
+          userSelect: 'none',
+        }}
+      >
+        <span style={{ fontSize: 18 }}>⚠</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#fca5a5' }}>Needs Attention</span>
+        {failCount > 0 && (
+          <span style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #dc2626', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+            {failCount} fail
+          </span>
+        )}
+        {warnCount > 0 && (
+          <span style={{ background: '#451a03', color: '#fcd34d', border: '1px solid #92400e', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 }}>
+            {warnCount} warn
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: '#ef4444', marginLeft: 4 }}>sorted worst-first</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#a1a1aa' }}>click to collapse</span>
+      </summary>
+      <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
+        {fixtures.map((bp) => {
+          const weakest = weakestDim(bp.score)
+          const statusColor = bp.score?.status === 'fail' ? DK.fail : DK.warn
+          const isFail = bp.score?.status === 'fail'
+          const issueCount = bp.score?.dimensions.reduce(
+            (sum, d) => sum + d.criteria.filter((c) => c.status !== 'pass').length, 0
+          ) ?? 0
+          return (
+            <div
+              key={`att-${bp.fixtureId}`}
+              style={{
+                background: isFail ? '#1a0808' : '#1a1000',
+                border: `1px solid ${isFail ? '#7f1d1d' : '#78350f'}`,
+                borderLeft: `4px solid ${statusColor}`,
+                borderRadius: 8,
+                padding: '12px 14px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Link
+                    href={`/test-harness/${bp.fixtureId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', color: '#60a5fa', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {bp.fixtureId}
+                  </Link>
+                  <span style={{ fontSize: 11, color: '#d4d4d8', marginTop: 2, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {bp.presetName}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {issueCount > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 700, background: isFail ? '#7f1d1d' : '#451a03', color: isFail ? '#fca5a5' : '#fcd34d', padding: '2px 7px', borderRadius: 4 }}>
+                      {issueCount}i
+                    </span>
+                  )}
+                  <span style={{ fontSize: 28, fontWeight: 700, color: statusColor, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                    {bp.score?.weighted.toFixed(1) ?? '—'}
+                  </span>
+                </div>
+              </div>
+              {weakest && (
+                <WeakestDrawer
+                  dim={weakest}
+                  description={dimDescriptions.get(weakest.id) ?? ''}
+                  defaultOpen
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </details>
+  )
+}
+
+// ─── WeakestDrawer ────────────────────────────────────────────────────────────
+/**
+ * Expandable weakest-dimension breakdown — uses native <details> so no JS.
+ * Dark mode version: shows issue count badge in summary; full criteria list in body.
+ * defaultOpen: true when score < 8 or in attention section.
+ */
+function WeakestDrawer({ dim, description, defaultOpen = false }: { dim: DimensionScore; description: string; defaultOpen?: boolean }) {
+  const weakColor = dim.score < 6 ? DK.fail : dim.score < 7.5 ? DK.warn : '#71717a'
   const failed = [...dim.criteria]
     .filter((c) => c.points < c.maxPoints)
     .sort((a, b) => (b.maxPoints - b.points) - (a.maxPoints - a.points))
-  const criterionIcon = (status: 'pass' | 'partial' | 'fail'): string =>
-    status === 'fail' ? '✗' : status === 'partial' ? '⚠' : '✓'
+  const criterionIcon = (status: 'pass' | 'partial' | 'fail') =>
+    status === 'fail' ? '✗' : status === 'partial' ? '◐' : '✓'
 
   return (
     <details
-      className="mb-3 rounded border text-[10px]"
-      style={{
-        borderColor: weakColor + '40',
-        background: weakColor + '10',
-        color: weakColor,
-      }}
+      open={defaultOpen}
+      style={{ borderRadius: 5, border: `1px solid ${weakColor}40`, background: weakColor + '12', fontSize: 10, marginBottom: 8 }}
     >
       <summary
-        className="cursor-pointer px-2 py-1 outline-none"
-        style={{ listStyle: 'none' }}
-        title="Click to expand — explains what's measured + what to fix"
+        style={{ padding: '5px 8px', cursor: 'pointer', listStyle: 'none', color: weakColor, display: 'flex', alignItems: 'center', gap: 5, outline: 'none' }}
       >
-        ⚠ Weakest: <strong>{dim.name}</strong> {dim.score.toFixed(1)}/10
-        <span style={{ opacity: 0.6, marginLeft: 6 }}>
-          ({dim.earnedPoints}/{dim.maxPoints} pts · weight {dim.weight}) · click to fix
-        </span>
+        <span>▶</span>
+        Weakest: <strong style={{ marginLeft: 2 }}>{dim.name}</strong>
+        <span style={{ marginLeft: 4, opacity: 0.8 }}>{dim.score.toFixed(1)}/10</span>
+        {failed.length > 0 && (
+          <span style={{ marginLeft: 6, background: weakColor + '30', padding: '1px 5px', borderRadius: 3 }}>
+            {failed.length} issue{failed.length > 1 ? 's' : ''} — expand to fix
+          </span>
+        )}
       </summary>
-      <div
-        className="space-y-2 px-2 pb-2 pt-1"
-        style={{ color: '#27272a', background: '#fff', borderTop: `1px solid ${weakColor}30` }}
-      >
+      <div style={{ padding: 8, background: '#0d0d0d', borderTop: `1px solid ${weakColor}30` }}>
         {description && (
-          <div
-            className="rounded px-2 py-1.5 leading-relaxed"
-            style={{ background: '#f4f4f5', color: '#3f3f46' }}
-          >
-            <strong style={{ color: '#18181b' }}>What it measures:</strong> {description}
+          <div style={{ marginBottom: 6, padding: '4px 8px', background: '#1a1a1a', borderRadius: 4, color: '#a1a1aa', lineHeight: 1.5 }}>
+            <strong style={{ color: '#d4d4d8' }}>Measures:</strong> {description}
           </div>
         )}
         {failed.length > 0 ? (
           <div>
-            <div className="mb-1 font-semibold" style={{ color: '#18181b' }}>
-              Lost points on {failed.length} criteria — fix priority top-down:
+            <div style={{ marginBottom: 5, fontWeight: 600, color: '#d4d4d8' }}>
+              Lost points ({failed.length} criteria) — fix priority top-down:
             </div>
-            <ul className="m-0 list-none space-y-1 pl-0">
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
               {failed.slice(0, 5).map((c) => {
                 const hint = getFixHint(c.criterionId)
                 return (
                   <li
                     key={c.criterionId}
-                    className="flex items-start gap-2 rounded px-1.5 py-1"
-                    style={{
-                      background:
-                        c.status === 'fail'
-                          ? '#fef2f2'
-                          : c.status === 'partial'
-                            ? '#fffbeb'
-                            : '#f4f4f5',
-                    }}
+                    style={{ padding: '4px 8px', borderRadius: 4, background: c.status === 'fail' ? '#1a0808' : '#1a1000', display: 'flex', flexDirection: 'column', gap: 2 }}
                   >
-                    <span
-                      className="shrink-0 font-mono"
-                      style={{
-                        color:
-                          c.status === 'fail'
-                            ? '#dc2626'
-                            : c.status === 'partial'
-                              ? '#d97706'
-                              : '#16a34a',
-                      }}
-                    >
-                      {criterionIcon(c.status)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span style={{ color: '#18181b', fontWeight: 500 }}>{c.label}</span>
-                        <span className="shrink-0 font-mono" style={{ color: '#71717a' }}>
-                          {c.points}/{c.maxPoints}
-                        </span>
-                      </div>
-                      {c.reason && (
-                        <div className="mt-0.5 leading-relaxed" style={{ color: '#52525b' }}>
-                          <span style={{ color: '#9ca3af' }}>evidence:</span> {c.reason}
-                        </div>
-                      )}
-                      {hint && (
-                        <div
-                          className="mt-1 rounded px-2 py-1 leading-relaxed"
-                          style={{
-                            background: '#dbeafe',
-                            color: '#1e40af',
-                            borderLeft: '2px solid #3b82f6',
-                          }}
-                        >
-                          <span style={{ fontWeight: 600 }}>🔧 Fix:</span> {hint}
-                        </div>
-                      )}
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ color: c.status === 'fail' ? '#fca5a5' : '#fcd34d', fontWeight: 500 }}>
+                        <span style={{ fontFamily: 'ui-monospace, monospace', marginRight: 4 }}>{criterionIcon(c.status)}</span>
+                        {c.label}
+                      </span>
+                      <span style={{ fontSize: 9, color: DK.textMuted, fontFamily: 'ui-monospace, monospace', flexShrink: 0 }}>{c.points}/{c.maxPoints}</span>
                     </div>
+                    {c.reason && (
+                      <div style={{ color: '#71717a', fontSize: 9, fontStyle: 'italic' }}>{c.reason}</div>
+                    )}
+                    {hint && (
+                      <div style={{ background: '#0c1a2e', color: '#93c5fd', padding: '3px 6px', borderRadius: 3, borderLeft: '2px solid #3b82f6', marginTop: 2 }}>
+                        Fix: {hint}
+                      </div>
+                    )}
                   </li>
                 )
               })}
               {failed.length > 5 && (
-                <li className="px-1.5 text-[10px]" style={{ color: '#71717a' }}>
-                  … +{failed.length - 5} more criteria with lost points (see admin dashboard)
+                <li style={{ fontSize: 9, color: DK.textMuted, padding: '2px 4px' }}>
+                  +{failed.length - 5} more issues — see Debug Console for full list
                 </li>
               )}
             </ul>
           </div>
         ) : (
-          <div style={{ color: '#16a34a' }}>All criteria passed — dim scored {dim.score.toFixed(1)}/10 on check thresholds.</div>
+          <div style={{ color: DK.pass }}>All criteria passed — dim scored {dim.score.toFixed(1)}/10</div>
         )}
       </div>
     </details>
