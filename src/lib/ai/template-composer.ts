@@ -1025,9 +1025,9 @@ function buildVideoShowcase(): Record<string, unknown> {
     showCategories: true,
     autoplay: false,
     videos: [
-      { title: 'Getting Started Guide', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'Tutorial', duration: '5:30', description: 'Learn the basics in just 5 minutes.' },
-      { title: 'Customer Success Story', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'Testimonial', duration: '3:15', description: 'Hear how we helped transform a business.' },
-      { title: 'Behind the Scenes', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', category: 'About Us', duration: '4:00', description: 'A peek into our daily operations.' },
+      { title: 'Getting Started Guide', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'Tutorial', duration: '5:30', description: 'Learn the basics in just 5 minutes.' },
+      { title: 'Customer Success Story', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'Testimonial', duration: '3:15', description: 'Hear how we helped transform a business.' },
+      { title: 'Behind the Scenes', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'About Us', duration: '4:00', description: 'A peek into our daily operations.' },
     ],
   }
 }
