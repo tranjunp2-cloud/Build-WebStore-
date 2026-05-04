@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nextjs'
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN
-const env = process.env.NEXT_PUBLIC_APP_ENV || 'development'
+const env = process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || 'development'
 
 Sentry.init({
     dsn,

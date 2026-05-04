@@ -27,3 +27,9 @@ export async function register() {
         await import('../sentry.edge.config')
     }
 }
+
+// Captures all server-side request errors (RSC, API routes, streaming)
+export const onRequestError = async (...args: Parameters<typeof import('@sentry/nextjs').captureRequestError>) => {
+    const { captureRequestError } = await import('@sentry/nextjs')
+    return captureRequestError(...args)
+}
