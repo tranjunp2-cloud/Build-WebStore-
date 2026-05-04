@@ -190,6 +190,11 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
         'doctors', 'properties', 'classes', 'videos', 'products',
     ] as const
 
+    // Payload upload fields within array items — must be a numeric Media ID or absent.
+    // Template/composer data may carry string URLs or SVG placeholders that Payload
+    // rejects with "field is invalid". Strip anything that is not already a numeric ID.
+    const ITEM_UPLOAD_FIELDS = ['image', 'avatar', 'logo', 'posterImage', 'backgroundImage']
+
     for (const field of ARRAY_FIELDS) {
         const arr = block[field]
         if (!Array.isArray(arr)) continue
@@ -198,6 +203,11 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
             const copy: Record<string, unknown> = { ...(item as Record<string, unknown>) }
             delete copy.id
             delete copy._uuid
+            for (const uploadField of ITEM_UPLOAD_FIELDS) {
+                if (uploadField in copy && typeof copy[uploadField] !== 'number') {
+                    delete copy[uploadField]
+                }
+            }
             // Recurse 1 level deeper for nested sub-arrays (e.g.
             // footer.columns[].links[], menu-food.categories[].items[]).
             for (const subField of ARRAY_FIELDS) {
@@ -208,6 +218,11 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
                     const subCopy: Record<string, unknown> = { ...(subItem as Record<string, unknown>) }
                     delete subCopy.id
                     delete subCopy._uuid
+                    for (const uploadField of ITEM_UPLOAD_FIELDS) {
+                        if (uploadField in subCopy && typeof subCopy[uploadField] !== 'number') {
+                            delete subCopy[uploadField]
+                        }
+                    }
                     return subCopy
                 })
             }
