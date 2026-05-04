@@ -21,6 +21,9 @@ interface BlockActionBarProps {
 
 const ACTION_BTN = 'inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed'
 
+// Floating widgets are position:fixed — drag-to-order and duplicate are not applicable.
+const FLOATING_WIDGET_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+
 export function BlockActionBar({
     blockIndex,
     blockType,
@@ -38,8 +41,9 @@ export function BlockActionBar({
     // Hide for global blocks (navigation/footer)
     if (blockType === 'navigation' || blockType === 'footer') return null
 
-    const showDrag = !isMobile && onDragStart
-    const showMoveUpDown = isMobile
+    const isFloatingWidget = FLOATING_WIDGET_BLOCK_TYPES.has(blockType)
+    const showDrag = !isMobile && onDragStart && !isFloatingWidget
+    const showMoveUpDown = isMobile && !isFloatingWidget
 
     return (
         <div
@@ -89,9 +93,11 @@ export function BlockActionBar({
                 </>
             )}
 
-            <button type="button" className={ACTION_BTN} onClick={onDuplicate} title="Duplicate block">
-                <Copy className="h-3.5 w-3.5 text-slate-300" />
-            </button>
+            {!isFloatingWidget && (
+                <button type="button" className={ACTION_BTN} onClick={onDuplicate} title="Duplicate block">
+                    <Copy className="h-3.5 w-3.5 text-slate-300" />
+                </button>
+            )}
             <button type="button" className={ACTION_BTN} onClick={onAIEdit} title="Edit with AI">
                 <Sparkles className="h-3.5 w-3.5 text-amber-300" />
             </button>

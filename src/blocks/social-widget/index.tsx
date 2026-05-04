@@ -65,9 +65,11 @@ type SocialLinkAnchorProps = {
 function SocialLinkAnchor({ platform, url, showLabelAlways = false, extraClassName = '' }: SocialLinkAnchorProps) {
     const meta = PLATFORM_META[platform]
     const style = getPlatformStyles(platform)
+    // Floating variant is icon-only — labels are screen-reader-only (not hover-shown).
+    // Inline variant (showLabelAlways) renders visible text beside the icon.
     const labelCls = showLabelAlways
         ? 'text-sm font-medium text-white/85'
-        : 'hidden text-sm font-medium text-white/85 group-hover:block'
+        : 'sr-only'
     return (
         <a
             href={normalizeUrl(platform, url)}

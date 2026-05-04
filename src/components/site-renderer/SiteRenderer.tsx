@@ -457,10 +457,10 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                         ? (BREADCRUMB_NAV_OFFSET[navVariant] ?? 'var(--nav-height, 64px)')
                         : undefined
                 const blockSpacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
-                // Floating widget blocks (social-widget, whatsapp-button, cart-widget) render as
-                // position:fixed — they are out of document flow so the spacing wrapper must not add
-                // any padding (otherwise a blank 64px gap appears on the page). GH-821.
-                const FLOATING_WIDGET_TYPES = new Set(['social-widget', 'whatsapp-button', 'cart-widget'])
+                // Floating widget blocks render as position:fixed — they are out of document flow
+                // so the spacing wrapper must not add any padding (otherwise a blank gap appears). GH-821.
+                // blockType uses camelCase slugs (socialWidget, cartWidget) but whatsapp-button is kebab.
+                const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
                 const isFloatingWidget = FLOATING_WIDGET_TYPES.has(block.blockType)
                     && (block as Record<string, unknown>).variant !== 'inline'
                 const spacingStyle = isGlobalBlock || isFloatingWidget
@@ -495,28 +495,27 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 )
 
                 if (isEditor) {
-                    // Floating widgets are position:fixed — no in-flow click target exists.
-                    // Render a compact dashed placeholder so the block is selectable in the
-                    // editor layout, plus the actual fixed-position widget for live preview.
+                    // Floating widgets are position:fixed — the selector wrapper is also made
+                    // fixed at the same coordinates so the editor toolbar & selection outline
+                    // appear at the widget's actual on-screen position (GH-821).
                     if (isFloatingWidget) {
-                        const FLOATING_WIDGET_META: Record<string, { icon: string; name: string }> = {
-                            'social-widget':    { icon: '📲', name: 'Social Media' },
-                            'whatsapp-button':  { icon: '💬', name: 'WhatsApp Button' },
-                            'cart-widget':      { icon: '🛒', name: 'Cart Button' },
-                        }
-                        const meta = FLOATING_WIDGET_META[block.blockType] ?? { icon: '📌', name: block.blockType }
+                        // Mirror each widget's fixed position so the selector wrapper overlaps it.
+                        // whatsapp-button has a configurable left/right position prop.
+                        const blockPos = (block as Record<string, unknown>).position
+                        const floatingPositionClass =
+                            block.blockType === 'cartWidget'
+                                ? 'bottom-6 left-6'
+                                : block.blockType === 'whatsapp-button' && blockPos === 'bottom-left'
+                                    ? 'bottom-6 left-6'
+                                    : 'bottom-6 right-6'
+
                         return (
                             <div
                                 key={`${block.blockType}-${index}`}
                                 data-block-index={block.__editorBlockIndex ?? index}
                                 data-block-type={block.blockType}
-                                className="group/block relative w-full"
+                                className={`group/block fixed z-[51] ${floatingPositionClass}`}
                             >
-                                <div className="mx-4 my-2 flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white/60 px-4 py-2.5 text-xs text-slate-400">
-                                    <span className="text-base leading-none">{meta.icon}</span>
-                                    <span className="font-medium text-slate-500">{meta.name}</span>
-                                    <span>· Floating</span>
-                                </div>
                                 {blockContent}
                             </div>
                         )
