@@ -10,6 +10,7 @@ import type { VercelDomainVerification } from '@/lib/vercel/domains.types';
 // Đọc từ env vars — deploy production chỉ cần set các biến này, không sửa code
 const DNS_A_RECORD = process.env.NEXT_PUBLIC_VERCEL_APEX_IP ?? '76.76.21.21';
 const DNS_CNAME = process.env.NEXT_PUBLIC_VERCEL_CNAME_TARGET ?? 'cname.vercel-dns.com';
+const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'primeweb.app';
 
 type DomainEntry = { domain: string; status: string; isPrimary?: boolean | null };
 
@@ -31,7 +32,7 @@ function SelectPrimaryPanel({
     onSave: (selected: string | null) => void;
     t: ReturnType<typeof useI18n>['t'];
 }) {
-    const platformDomain = `${tenantSlug}.${DNS_CNAME}`;
+    const platformDomain = `${tenantSlug}.${PLATFORM_DOMAIN}`;
     const activeDomains = domains.filter(d => d.status === 'active');
     const [selected, setSelected] = useState<string | null>(currentPrimary);
 
@@ -560,7 +561,7 @@ export function DomainsClient({
                         <div className="flex flex-col gap-2">
                             {!isEditingSlug ? (
                                 <div className="flex flex-wrap items-center gap-3">
-                                    <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{currentSlug}.{DNS_CNAME}</h3>
+                                    <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{currentSlug}.{PLATFORM_DOMAIN}</h3>
                                     {!hasCustomPrimary && (
                                         <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
                                             <span className="text-[12px] font-semibold text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
@@ -577,7 +578,7 @@ export function DomainsClient({
                                         autoFocus
                                     />
                                     <div className="h-[44px] flex items-center px-3 rounded-r-[12px] border border-l-0 border-white/[0.08] bg-[#0B1120]/40 text-[13px] text-slate-500 whitespace-nowrap">
-                                        .{DNS_CNAME}
+                                        .{PLATFORM_DOMAIN}
                                     </div>
                                     <div className="ml-2">
                                         {slugStatus === 'checking' && <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />}
