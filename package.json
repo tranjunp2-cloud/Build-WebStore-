@@ -25,6 +25,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:all": "vitest run && playwright test",
     "typecheck": "tsc --noEmit",
+    "harness:validate": "tsx scripts/test-harness/validate-presets.ts",
     "harness:gen": "tsx scripts/test-harness/cli.ts --mode=full",
     "harness:quick": "tsx scripts/test-harness/cli.ts --mode=quick",
     "harness:check": "tsx scripts/test-harness/check.ts",

@@ -88,4 +88,5 @@ Adding a new collection requires: Payload config + migration in `scripts/db-setu
 - Feature detail: `docs/architecture/F*.md`, `docs/prd/F*.md`
 - System architecture (layers + data flow): `docs/architecture/_OVERVIEW.md`
 - Code standards (lint, imports, naming): `docs/standards/CODE_STANDARDS.md`
+- Harness rubric QC guide (all 11 dims, 58 criteria, FAQ): `docs/standards/HARNESS_EVALUATION_RULES.md`
 - DB lifecycle: `docs/DB-LIFECYCLE.md`

@@ -74,15 +74,11 @@ async function genForCategory(category: string): Promise<CacheEntry | null> {
     const input = buildInputForCategory(category)
     if (!input) return null
 
-    const prevMode = process.env.GEN_MODE
-    process.env.GEN_MODE = 'ai-first'
-    try {
-        const { result } = await generateSiteWithAI(input, undefined, 'en')
-        return { input, output: result, cachedAt: new Date().toISOString() }
-    } finally {
-        if (prevMode === undefined) delete process.env.GEN_MODE
-        else process.env.GEN_MODE = prevMode
-    }
+    // Use template-first (same as user-facing flow) so harness tests the real user path.
+    // ai-first was the old default before plan 260416-1450; keeping it here made QA
+    // test a code path users never hit.
+    const { result } = await generateSiteWithAI(input, undefined, 'en')
+    return { input, output: result, cachedAt: new Date().toISOString() }
 }
 
 function normalizeSlug(slug: string): string {

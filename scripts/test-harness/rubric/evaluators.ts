@@ -6,6 +6,16 @@
  */
 
 import type { HarnessBlock } from '../types'
+import { TEMPLATE_RULES } from '../../../src/lib/ai/template-rules'
+
+/** Structural chrome blocks — exclude from "content block" coverage checks (content-depth, section-headlines, etc.). */
+const STRUCTURAL_BLOCKS_NON_CONTENT = new Set([
+    'navigation', 'footer', 'announcement-bar', 'breadcrumb',
+])
+/** Blocks valid before hero position — exclude from heading-order scan (they have no section headings). */
+const STRUCTURAL_BLOCKS_PRE_HERO = new Set([
+    'navigation', 'announcement-bar', 'breadcrumb',
+])
 
 export interface EvalContext {
     /** Homepage blocks (primary scope). */
@@ -53,25 +63,6 @@ const GENERIC_CTA_LABELS = new Set([
     'more info',
     'submit',
 ])
-
-/** Category DNA mapping (WEBSITE_TEMPLATE_STANDARDS §4.1).
- *  Mandatory blocks per category — fixture must include ≥1 from each required group. */
-const CATEGORY_DNA_MAP: Record<string, { mandatory: string[][]; signature: string[] }> = {
-    restaurant: { mandatory: [['menu-display', 'booking-widget'], ['gallery', 'gallery-masonry']], signature: ['menu-display', 'booking-widget', 'review-cards'] },
-    fnb: { mandatory: [['menu-display', 'features'], ['gallery', 'gallery-masonry']], signature: ['menu-display', 'gallery', 'review-cards'] },
-    ecommerce: { mandatory: [['product-quick-view', 'features'], ['pricing', 'pricing-table']], signature: ['product-quick-view', 'pricing'] },
-    beauty: { mandatory: [['service-cards', 'features'], ['gallery', 'gallery-masonry', 'before-after']], signature: ['service-cards', 'booking-widget', 'before-after'] },
-    tech: { mandatory: [['pricing', 'pricing-table'], ['features']], signature: ['pricing', 'features', 'feature-comparison', 'video-showcase'] },
-    health: { mandatory: [['doctor-profile', 'service-cards', 'team'], ['faq']], signature: ['doctor-profile', 'booking-widget'] },
-    education: { mandatory: [['class-schedule', 'features', 'service-cards'], ['faq']], signature: ['class-schedule', 'pricing'] },
-    realestate: { mandatory: [['property-card', 'gallery'], ['stats', 'features']], signature: ['property-card', 'gallery'] },
-    fitness: { mandatory: [['class-schedule', 'features'], ['pricing', 'team']], signature: ['class-schedule', 'team', 'pricing'] },
-    creative: { mandatory: [['gallery', 'gallery-masonry', 'portfolio-grid'], ['testimonials']], signature: ['portfolio-grid', 'gallery-masonry', 'video-showcase'] },
-    business: { mandatory: [['team', 'features'], ['testimonials']], signature: ['team', 'stats', 'features'] },
-    blog: { mandatory: [['features', 'testimonials'], ['newsletter']], signature: ['newsletter', 'features'] },
-    events: { mandatory: [['booking-widget', 'contact'], ['gallery']], signature: ['booking-widget', 'gallery'] },
-    travel: { mandatory: [['gallery', 'gallery-masonry'], ['features', 'service-cards']], signature: ['gallery', 'features'] },
-}
 
 function hasBlockInGroup(blocks: HarnessBlock[], group: string[]): boolean {
     const types = new Set(blocks.map((b) => b.blockType))
@@ -164,8 +155,7 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         ({ pass: Boolean(theme?.spacingPreset) }),
     sectionHeadlinesCoverage70: ({ blocks }) => {
         // Count content blocks that have headline OR sectionLabel
-        const SKIP = new Set(['navigation', 'footer', 'announcement-bar', 'breadcrumb'])
-        const content = blocks.filter((b) => !SKIP.has(b.blockType))
+        const content = blocks.filter((b) => !STRUCTURAL_BLOCKS_NON_CONTENT.has(b.blockType))
         if (content.length === 0) return { pass: false, reason: 'no content blocks' }
         const withHeadline = content.filter((b) =>
             Boolean(b.data?.headline || b.data?.sectionLabel || b.data?.title),
@@ -234,8 +224,7 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         return { pass, reason: pass ? `${h} / ${b}` : `same font (${h})` }
     },
     sectionHeadlinesCoverage85: ({ blocks }) => {
-        const SKIP = new Set(['navigation', 'footer', 'announcement-bar', 'breadcrumb'])
-        const content = blocks.filter((b) => !SKIP.has(b.blockType))
+        const content = blocks.filter((b) => !STRUCTURAL_BLOCKS_NON_CONTENT.has(b.blockType))
         if (content.length === 0) return { pass: false, reason: 'no content blocks' }
         const withHeadline = content.filter((b) => Boolean(b.data?.headline || b.data?.sectionLabel || b.data?.title)).length
         const ratio = withHeadline / content.length
@@ -355,18 +344,132 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         return { pass: false, reason: `${len} chars (off)` }
     },
     contentDepth500: ({ blocks }) => {
-        const hero = blocks.find((b) => b.blockType === 'hero')
+        // Collect all visible body-copy text across the template.
+        // Counts structural labels (sectionLabel, headline, subheadline) PLUS rich body-copy
+        // fields (feature descriptions, FAQ answers, testimonial quotes, about body, etc.)
+        // so templates with dense body text are not penalised for short section labels alone.
         const parts: string[] = []
+
+        /** Safely extract a string value from an unknown field. */
+        function str(val: unknown): string {
+            return typeof val === 'string' ? val : ''
+        }
+
+        /** Collect text from an array of items via a named field key. */
+        function collectArrayField(arr: unknown, key: string): void {
+            if (!Array.isArray(arr)) return
+            for (const item of arr) {
+                if (item && typeof item === 'object') {
+                    const v = (item as Record<string, unknown>)[key]
+                    const s = str(v)
+                    if (s) parts.push(s)
+                }
+            }
+        }
+
+        const hero = blocks.find((b) => b.blockType === 'hero')
         if (hero) {
-            parts.push(String(hero.data?.headline ?? ''))
-            parts.push(String(hero.data?.subheadline ?? hero.data?.subHeadline ?? ''))
+            parts.push(str(hero.data?.headline))
+            parts.push(str(hero.data?.subheadline ?? hero.data?.subHeadline))
         }
+
         for (const b of blocks) {
-            if (b.data?.sectionLabel) parts.push(String(b.data.sectionLabel))
-            if (b.data?.headline && b.blockType !== 'hero') parts.push(String(b.data.headline))
-            if (b.data?.subheadline && b.blockType !== 'hero') parts.push(String(b.data.subheadline))
+            const d = b.data ?? {}
+
+            // Structural labels — every block
+            if (b.blockType !== 'hero') {
+                if (d.sectionLabel) parts.push(str(d.sectionLabel))
+                if (d.headline) parts.push(str(d.headline))
+                if (d.subheadline) parts.push(str(d.subheadline ?? d.subHeadline))
+                if (d.description && b.blockType !== 'features') parts.push(str(d.description))
+                if (d.body) parts.push(str(d.body))
+            }
+
+            // Block-type-specific body-copy fields
+            switch (b.blockType) {
+                case 'features': {
+                    // features[].description
+                    const items = (d.features ?? d.items) as unknown
+                    collectArrayField(items, 'description')
+                    collectArrayField(items, 'body')
+                    break
+                }
+                case 'faq': {
+                    // faq.items[].answer
+                    const items = (d.items ?? d.faqs ?? d.questions) as unknown
+                    collectArrayField(items, 'answer')
+                    collectArrayField(items, 'content')
+                    break
+                }
+                case 'testimonials': {
+                    // testimonials[].quote
+                    const items = (d.testimonials ?? d.items) as unknown
+                    collectArrayField(items, 'quote')
+                    collectArrayField(items, 'text')
+                    break
+                }
+                case 'about': {
+                    // about.body already handled above via d.body — also check content
+                    if (d.content) parts.push(str(d.content))
+                    break
+                }
+                case 'service-cards':
+                case 'services': {
+                    // services[].description
+                    const items = (d.services ?? d.items ?? d.cards) as unknown
+                    collectArrayField(items, 'description')
+                    collectArrayField(items, 'body')
+                    break
+                }
+                case 'gallery':
+                case 'gallery-masonry':
+                case 'portfolio-grid': {
+                    // gallery.caption
+                    if (d.caption) parts.push(str(d.caption))
+                    break
+                }
+                case 'footer': {
+                    // footer.tagline
+                    if (d.tagline) parts.push(str(d.tagline))
+                    break
+                }
+                case 'blog-preview':
+                case 'blog-grid': {
+                    const items = (d.posts ?? d.items) as unknown
+                    collectArrayField(items, 'excerpt')
+                    collectArrayField(items, 'description')
+                    break
+                }
+                case 'pricing':
+                case 'pricing-table': {
+                    const items = (d.plans ?? d.tiers ?? d.items) as unknown
+                    collectArrayField(items, 'description')
+                    break
+                }
+                case 'team': {
+                    const items = (d.members ?? d.team ?? d.items) as unknown
+                    collectArrayField(items, 'bio')
+                    collectArrayField(items, 'description')
+                    break
+                }
+                case 'stats': {
+                    const items = (d.stats ?? d.items) as unknown
+                    collectArrayField(items, 'label')
+                    collectArrayField(items, 'description')
+                    break
+                }
+                case 'cta':
+                case 'cta-banner': {
+                    if (d.subtitle) parts.push(str(d.subtitle))
+                    if (d.description) parts.push(str(d.description))
+                    break
+                }
+                default:
+                    break
+            }
         }
-        const total = parts.join(' ').trim().length
+
+        const total = parts.filter(Boolean).join(' ').trim().length
         return { pass: total >= 500, reason: `${total} chars` }
     },
     varietyUnique85: ({ blocks }) => {
@@ -419,10 +522,9 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
         const heroIdx = blocks.findIndex((b) => b.blockType === 'hero')
         if (heroIdx === -1) return { pass: false, reason: 'no hero (missing H1)' }
         // Check: no non-skip blocks with headline BEFORE hero (would imply H2 before H1)
-        const SKIP = new Set(['navigation', 'announcement-bar', 'breadcrumb'])
         for (let i = 0; i < heroIdx; i++) {
             const b = blocks[i]!
-            if (SKIP.has(b.blockType)) continue
+            if (STRUCTURAL_BLOCKS_PRE_HERO.has(b.blockType)) continue
             if (b.data?.headline || b.data?.title) return { pass: false, reason: `${b.blockType} at index ${i} has headline before hero` }
         }
         // Multiple heroes = multiple H1s = violates
@@ -466,50 +568,36 @@ export const CUSTOM_EVALUATORS: Record<string, Evaluator> = {
     },
     categoryDnaCompliance: ({ blocks, category, allBlocks }) => {
         if (!category) return { pass: false, reason: 'no category on fixture' }
-        const dna = CATEGORY_DNA_MAP[category]
-        if (!dna) return { pass: false, reason: `unknown category: ${category}` }
+        const rule = TEMPLATE_RULES[category]
+        if (!rule) return { pass: false, reason: `unknown category: ${category}` }
         // Use allBlocks (cross-page) — category blocks may be on sub-pages
         const searchPool = allBlocks ?? blocks
-        const groupsPassed = dna.mandatory.filter((grp) => hasBlockInGroup(searchPool, grp)).length
-        const total = dna.mandatory.length
+        const groupsPassed = rule.dnaMandatoryGroups.filter((grp) => hasBlockInGroup(searchPool, [...grp])).length
+        const total = rule.dnaMandatoryGroups.length
         if (groupsPassed === total) return { pass: true, reason: `${groupsPassed}/${total} mandatory groups met` }
         if (groupsPassed >= Math.ceil(total / 2)) return { pass: false, partial: true, reason: `${groupsPassed}/${total} (partial)` }
         return { pass: false, reason: `${groupsPassed}/${total} groups` }
     },
     categorySignatureVariety: ({ blocks, category, allBlocks }) => {
         if (!category) return { pass: false, reason: 'no category' }
-        const dna = CATEGORY_DNA_MAP[category]
-        if (!dna) return { pass: false, reason: `unknown category: ${category}` }
+        const rule = TEMPLATE_RULES[category]
+        if (!rule) return { pass: false, reason: `unknown category: ${category}` }
         const searchPool = allBlocks ?? blocks
         const types = new Set(searchPool.map((b) => b.blockType))
-        const present = dna.signature.filter((t) => types.has(t))
+        const present = rule.signatureBlocks.filter((t) => types.has(t))
         if (present.length >= 2) return { pass: true, reason: `${present.length} signature blocks: ${present.join(', ')}` }
         if (present.length === 1) return { pass: false, partial: true, reason: `1 signature block: ${present[0]}` }
-        return { pass: false, reason: `0 signature blocks (expected: ${dna.signature.join(', ')})` }
+        return { pass: false, reason: `0 signature blocks (expected: ${rule.signatureBlocks.join(', ')})` }
     },
-    spacingRhythmTokenOnly: ({ blocks }) => {
-        const TOKEN_SCALE = new Set([4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128])
-        let total = 0
-        let compliant = 0
-        for (const b of blocks) {
-            for (const field of ['padding', 'margin', 'paddingTop', 'paddingBottom', 'marginTop', 'marginBottom', 'gap']) {
-                const v = b.data?.[field]
-                if (typeof v === 'number') {
-                    total++
-                    if (TOKEN_SCALE.has(v)) compliant++
-                } else if (typeof v === 'string') {
-                    const m = v.match(/^(\d+)(px)?$/)
-                    if (m) {
-                        total++
-                        if (TOKEN_SCALE.has(Number(m[1]))) compliant++
-                    }
-                }
-            }
-        }
-        if (total === 0) return { pass: true, reason: 'no explicit spacing values (theme-driven)' }
-        const ratio = compliant / total
-        return { pass: ratio >= 0.9, reason: `${compliant}/${total} compliant (${Math.round(ratio * 100)}%)` }
+    themeSpacingPresetValid: ({ theme }) => {
+        const VALID = new Set(['compact', 'default', 'relaxed'])
+        const v = theme?.spacingPreset as string | undefined
+        if (!v) return { pass: false, reason: 'no spacingPreset on theme' }
+        if (!VALID.has(v)) return { pass: false, reason: `invalid spacingPreset: "${v}"` }
+        return { pass: true, reason: v }
     },
+    // Backward-compat alias — rubric v1.0/v1.1/v1.2 reference old name
+    spacingRhythmTokenOnly: (ctx) => CUSTOM_EVALUATORS.themeSpacingPresetValid(ctx),
     heroCtaVariety: ({ blocks }) => {
         const hero = blocks.find((b) => b.blockType === 'hero')
         const arr = (hero?.data?.ctaButtons ?? hero?.data?.buttons) as Array<{ variant?: unknown; style?: unknown; type?: unknown }> | undefined
