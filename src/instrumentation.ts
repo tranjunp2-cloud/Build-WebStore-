@@ -19,4 +19,17 @@ export async function register() {
         globalThis.FormData = class FormData { }
     }
 
+    // Sentry — load correct config per runtime
+    if (process.env.NEXT_RUNTIME === 'nodejs') {
+        await import('../sentry.server.config')
+    }
+    if (process.env.NEXT_RUNTIME === 'edge') {
+        await import('../sentry.edge.config')
+    }
+}
+
+// Captures all server-side request errors (RSC, API routes, streaming)
+export const onRequestError = async (...args: Parameters<typeof import('@sentry/nextjs').captureRequestError>) => {
+    const { captureRequestError } = await import('@sentry/nextjs')
+    return captureRequestError(...args)
 }

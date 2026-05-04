@@ -18,6 +18,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { blockRegistry } from '@/blocks/registry'
+import { withSentrySpan } from '@/lib/ai/sentry-spans'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
@@ -367,9 +368,11 @@ export async function POST(req: NextRequest) {
             payload,
         )
 
-        // Generate with AI (or fallback)
+        // Generate with AI (or fallback) — span surfaces in Sentry Performance trace
         const { result, events } = await trackPhase('ai', () =>
-            generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides),
+            withSentrySpan('ai.generateSite', () =>
+                generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt, blockPromptOverrides),
+            ),
         )
 
         // Override AI theme with extracted visual style (URL extraction provides specific colors)

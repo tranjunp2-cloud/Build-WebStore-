@@ -94,6 +94,22 @@ export const Tenants: CollectionConfig = {
                 { name: 'domain', type: 'text', required: true, index: true },
                 { name: 'status', type: 'select', defaultValue: 'pending', options: [{ label: 'Pending', value: 'pending' }, { label: 'Active', value: 'active' }] },
                 { name: 'isPrimary', type: 'checkbox', defaultValue: false },
+                {
+                    name: 'vercelDomainId',
+                    type: 'text',
+                    admin: {
+                        description: 'Vercel project-domain handle. Auto-managed.',
+                        readOnly: true,
+                    },
+                },
+                {
+                    name: 'vercelVerification',
+                    type: 'json',
+                    admin: {
+                        description: 'Outstanding TXT challenges from Vercel verify. Auto-managed.',
+                        readOnly: true,
+                    },
+                },
             ],
         },
         {

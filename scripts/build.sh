@@ -9,4 +9,4 @@ if [ "$ENABLE_HARNESS" = "1" ]; then
 else
   echo "[harness] ENABLE_HARNESS not set — skipping gen"
 fi
-next build
+NODE_OPTIONS="--max-old-space-size=4096" next build
