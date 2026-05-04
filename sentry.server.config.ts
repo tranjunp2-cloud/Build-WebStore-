@@ -18,6 +18,10 @@ Sentry.init({
         Sentry.captureConsoleIntegration({ levels: ['error'] }),
     ],
     beforeSend(event) {
+        // Drop Next.js internal abort — happens when user navigates away mid-stream, not a real error
+        const errType = event.exception?.values?.[0]?.type
+        if (errType === 'ResponseAborted') return null
+
         // Drop 4xx response errors to save quota
         const status = (event.contexts?.response as { status_code?: number } | undefined)?.status_code
         if (status && status >= 400 && status < 500) return null
