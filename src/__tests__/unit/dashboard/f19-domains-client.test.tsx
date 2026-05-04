@@ -50,6 +50,7 @@ import { toast } from 'sonner';
 // Override via NEXT_PUBLIC_VERCEL_APEX_IP / NEXT_PUBLIC_VERCEL_CNAME_TARGET.
 const EXPECTED_A_RECORD = process.env.NEXT_PUBLIC_VERCEL_APEX_IP ?? '76.76.21.21';
 const EXPECTED_CNAME = process.env.NEXT_PUBLIC_VERCEL_CNAME_TARGET ?? 'cname.vercel-dns.com';
+const EXPECTED_PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'primeweb.app';
 
 const mockDomains = [
     { domain: 'store.custom.com', status: 'active', isPrimary: true },
@@ -65,7 +66,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
     it('[TC-F19.01] Renders active and pending domains in the directory', () => {
         render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={mockDomains} />);
 
-        expect(screen.getByText(`mywebstore.${EXPECTED_CNAME}`)).toBeInTheDocument();
+        expect(screen.getByText(`mywebstore.${EXPECTED_PLATFORM_DOMAIN}`)).toBeInTheDocument();
         expect(screen.getAllByText('store.custom.com').length).toBeGreaterThan(0);
         expect(screen.getByText('pending.custom.com')).toBeInTheDocument();
         expect(screen.getByText('Pending Verification')).toBeInTheDocument();
@@ -211,7 +212,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
     it('[TC-F19.10] Protects default platform subdomain from removal', () => {
         render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[]} />);
 
-        expect(screen.getByText(`mywebstore.${EXPECTED_CNAME}`)).toBeInTheDocument();
+        expect(screen.getByText(`mywebstore.${EXPECTED_PLATFORM_DOMAIN}`)).toBeInTheDocument();
 
         // There shouldn't be a generic Remove Domain button for it.
         const removeBtns = screen.queryAllByRole('button', { name: /Remove/i });
