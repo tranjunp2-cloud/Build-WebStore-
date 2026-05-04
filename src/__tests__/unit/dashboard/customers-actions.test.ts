@@ -1,5 +1,5 @@
 /**
- * Customers Server Actions — TC-CUST-16 through TC-CUST-25
+ * Customers Server Actions — TC-CUST-16 through TC-CUST-25, TC-CUST-30..31
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { getCurrentTenantId } from '@/lib/auth'
@@ -76,6 +76,28 @@ describe('[TC-CUST-16..19] getCustomersAction', () => {
         expect(mockPayload.find).toHaveBeenCalledWith(
             expect.objectContaining({ collection: 'contact-submissions' }),
         )
+    })
+
+    it('[TC-CUST-30] status=read skips newsletter query (read is contact-only)', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue(TENANT_ID)
+        mockPayload.find
+            .mockResolvedValueOnce({ docs: [siteDoc] })    // getTenantSiteIds
+            .mockResolvedValueOnce({ docs: [contactDoc] }) // contact-submissions only
+        await getCustomersAction({ status: 'read' })
+        expect(mockPayload.find).toHaveBeenCalledTimes(2)
+        const calls = vi.mocked(mockPayload.find).mock.calls.map(c => c[0] as { collection: string })
+        expect(calls.some(c => c.collection === 'subscribers')).toBe(false)
+    })
+
+    it('[TC-CUST-31] status=subscribed skips contact-submissions query (subscribed is newsletter-only)', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue(TENANT_ID)
+        mockPayload.find
+            .mockResolvedValueOnce({ docs: [siteDoc] })       // getTenantSiteIds
+            .mockResolvedValueOnce({ docs: [subscriberDoc] }) // subscribers only
+        await getCustomersAction({ status: 'subscribed' })
+        expect(mockPayload.find).toHaveBeenCalledTimes(2)
+        const calls = vi.mocked(mockPayload.find).mock.calls.map(c => c[0] as { collection: string })
+        expect(calls.some(c => c.collection === 'contact-submissions')).toBe(false)
     })
 })
 

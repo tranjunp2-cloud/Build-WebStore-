@@ -25,5 +25,6 @@ function recordToCsvRow(record: CustomerRecord): string {
 
 export function toCsv(records: CustomerRecord[]): string {
     const header = HEADERS.map(h => `"${h}"`).join(',')
-    return [header, ...records.map(recordToCsvRow)].join('\n')
+    // BOM ensures Excel opens UTF-8 CSV correctly without encoding prompt
+    return '﻿' + [header, ...records.map(recordToCsvRow)].join('\n')
 }

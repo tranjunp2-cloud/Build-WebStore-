@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Trash2 } from 'lucide-react'
+import { useI18n } from '@/i18n'
 import {
     Dialog,
     DialogContent,
@@ -23,6 +24,8 @@ import type { CustomerRecord } from '../_lib/customer-record'
 const LIMIT = 20
 
 export function CustomersClientLayout() {
+    const { t } = useI18n()
+    const c = t.dashboard.customers
     const [records, setRecords] = useState<CustomerRecord[]>([])
     const [total, setTotal] = useState(0)
     const [page, setPage] = useState(1)
@@ -41,7 +44,7 @@ export function CustomersClientLayout() {
             setRecords(res.data)
             setTotal(res.meta.total)
         } catch {
-            toast.error('Failed to load customers')
+            toast.error(c.loadFailed)
         } finally {
             setLoading(false)
         }
@@ -55,14 +58,14 @@ export function CustomersClientLayout() {
         const record = pendingDelete
         setPendingDelete(null)
         setRecords(prev => prev.filter(r => r.id !== record.id))
-        setTotal(t => t - 1)
+        setTotal(n => n - 1)
         if (selected?.id === record.id) setSelected(null)
         try {
             await deleteCustomerAction(record.rawId, record.source)
-            toast.success('Deleted')
+            toast.success(c.deleteSuccess)
         } catch {
             load()
-            toast.error('Failed to delete')
+            toast.error(c.deleteFailed)
         }
     }
 
@@ -70,7 +73,7 @@ export function CustomersClientLayout() {
         setExporting(true)
         try {
             const csv = await exportCustomersCsvAction({ search, status, source })
-            const blob = new Blob([csv], { type: 'text/csv' })
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
@@ -78,7 +81,7 @@ export function CustomersClientLayout() {
             a.click()
             setTimeout(() => URL.revokeObjectURL(url), 100)
         } catch {
-            toast.error('Export failed')
+            toast.error(c.exportFailed)
         } finally {
             setExporting(false)
         }
@@ -103,10 +106,8 @@ export function CustomersClientLayout() {
         <div className="space-y-6 pb-20">
             {/* Header */}
             <div>
-                <h1 className="text-[24px] font-bold text-[#F8FAFC]">Customers</h1>
-                <p className="text-[14px] text-white/60 mt-1">
-                    Track all customer leads from Contact Forms and Newsletter Subscriptions across your websites.
-                </p>
+                <h1 className="text-[24px] font-bold text-[#F8FAFC]">{c.title}</h1>
+                <p className="text-[14px] text-white/60 mt-1">{c.subtitle}</p>
             </div>
 
             <CustomersActionBar
