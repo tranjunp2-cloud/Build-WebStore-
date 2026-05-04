@@ -8,6 +8,9 @@ Sentry.init({
     environment: env,
     tracesSampleRate: env === 'production' ? 0.1 : env === 'staging' ? 0.5 : 1.0,
     sendDefaultPii: false,
+    integrations: [
+        Sentry.captureConsoleIntegration({ levels: ['error'] }),
+    ],
     beforeSend(event) {
         const msg = event.exception?.values?.[0]?.value || ''
         if (/ResizeObserver loop|Non-Error promise rejection captured/.test(msg)) return null

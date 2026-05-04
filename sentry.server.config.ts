@@ -12,6 +12,11 @@ Sentry.init({
     tracesSampleRate: sampleByEnv(env),
     sendDefaultPii: false,
     maxBreadcrumbs: 50,
+    integrations: [
+        // Auto-capture console.error() as Sentry events — catches all caught errors
+        // that are logged but not re-thrown (106+ catch blocks in codebase)
+        Sentry.captureConsoleIntegration({ levels: ['error'] }),
+    ],
     beforeSend(event) {
         // Drop 4xx response errors to save quota
         const status = (event.contexts?.response as { status_code?: number } | undefined)?.status_code
