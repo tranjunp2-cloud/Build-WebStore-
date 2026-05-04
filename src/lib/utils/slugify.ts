@@ -39,7 +39,6 @@ export async function ensureUniqueSlug(
             collection: 'tenants',
             where: { slug: { equals: candidate } },
             limit: 1,
-            overrideAccess: true,
         })
 
         if (existing.docs.length === 0) return candidate
