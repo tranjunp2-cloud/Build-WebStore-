@@ -221,20 +221,27 @@ export async function addCustomDomain(rawDomain: string): Promise<DomainActionRe
     };
 }
 
-export async function removeCustomDomain(domain: string): Promise<DomainActionResult> {
+export async function removeCustomDomain(rawDomain: string): Promise<DomainActionResult> {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) {
         return { success: false, error: 'Unauthorized' };
     }
 
+    const domain = rawDomain.trim().toLowerCase();
     const payload = await getPayloadHMR({ config: configPromise });
 
     try {
         const current = await getTenantDomains(payload, tenantId);
 
-        // Block removing the current primary (TC-F19.14 QA).
+        // CRITICAL — scenario 8.1 mirror: verify domain belongs to THIS tenant before
+        // calling Vercel. Without this, tenant A could remove tenant B's domain from Vercel.
         const target = current.find((d) => d.domain === domain);
-        if (target?.isPrimary) {
+        if (!target) {
+            return { success: false, error: 'Domain not found in your store.' };
+        }
+
+        // Block removing the current primary (TC-F19.14 QA).
+        if (target.isPrimary) {
             return {
                 success: false,
                 error: 'Cannot remove the primary domain. Please set another domain as primary first.',
@@ -285,12 +292,13 @@ export async function removeCustomDomain(domain: string): Promise<DomainActionRe
     }
 }
 
-export async function verifyCustomDomain(domain: string): Promise<DomainActionResult> {
+export async function verifyCustomDomain(rawDomain: string): Promise<DomainActionResult> {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) {
         return { success: false, error: 'Unauthorized' };
     }
 
+    const domain = rawDomain.trim().toLowerCase();
     const payload = await getPayloadHMR({ config: configPromise });
 
     // CRITICAL — scenario 8.1: verify the domain belongs to THIS tenant before

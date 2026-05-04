@@ -374,11 +374,28 @@ async function processDomain(
         vercelVerification: verification,
     })
 
-    await payload.update({
-        collection: 'tenants',
-        id: tenantId as string,
-        data: { customDomains: updatedRows } as unknown as Record<string, unknown>,
-    })
+    // Wrap final Payload write — if this throws (DB drop, validation failure), Vercel has already
+    // bound the domain. Log the error to the report so the operator can reconcile manually.
+    try {
+        await payload.update({
+            collection: 'tenants',
+            id: tenantId as string,
+            data: { customDomains: updatedRows } as unknown as Record<string, unknown>,
+        })
+    } catch (err) {
+        const message = (err as Error).message ?? 'unknown'
+        summary.errors.push({ tenantId, domain, message, code: 'payload_update_failed' })
+        summary.counts.error++
+        const entry: DomainLogEntry = {
+            tenantId,
+            domain,
+            result: 'error',
+            note: `Vercel bound OK but Payload write failed: ${message}`,
+        }
+        summary.log.push(entry)
+        log(entry)
+        return
+    }
 
     const result: DomainResult = status === 'active' ? 'active' : 'pending'
     const entry: DomainLogEntry = {
