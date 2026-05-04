@@ -51,6 +51,7 @@ export const classScheduleMeta = {
     editableFields: ['headline', 'classes', 'showCapacity', 'highlightToday'],
     quickActions: ['Add class', 'Update schedule', 'Change instructor'],
     aiVisible: true,
+    category: 'content' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

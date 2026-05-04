@@ -13,7 +13,7 @@ export const PricingTableConfigSchema = BaseBlockSchema.extend({
         cta: z.object({ label: z.string(), url: z.string() }), popular: z.boolean().default(false),
     })).default([]),
 })
-export const pricingTableMeta = { type: 'pricing-table' as const, name: 'Pricing Table', description: 'Pricing plans with monthly/yearly toggle and feature comparison', icon: '💲', variants: ['columns', 'horizontal'], defaultVariant: 'columns', editableFields: ['headline', 'subheadline', 'billingToggle', 'plans'], quickActions: ['Add plan', 'Toggle billing', 'Mark popular'], aiVisible: false }
+export const pricingTableMeta = { type: 'pricing-table' as const, name: 'Pricing Table', description: 'Pricing plans with monthly/yearly toggle and feature comparison', icon: '💲', variants: ['columns', 'horizontal'], defaultVariant: 'columns', editableFields: ['headline', 'subheadline', 'billingToggle', 'plans'], quickActions: ['Add plan', 'Toggle billing', 'Mark popular'], aiVisible: false, category: 'archive' as const }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
 export const configSchema = PricingTableConfigSchema

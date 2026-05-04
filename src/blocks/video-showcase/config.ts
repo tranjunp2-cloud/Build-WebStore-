@@ -47,6 +47,7 @@ export const videoShowcaseMeta = {
     editableFields: ['headline', 'subheadline', 'videos', 'showCategories', 'autoplay'],
     quickActions: ['Add video', 'Filter categories', 'Toggle autoplay'],
     aiVisible: false,
+    category: 'archive' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

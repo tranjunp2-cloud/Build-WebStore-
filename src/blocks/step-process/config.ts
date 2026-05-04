@@ -37,6 +37,7 @@ export const stepProcessMeta = {
     editableFields: ['headline', 'subheadline', 'steps'],
     quickActions: ['Add step', 'Rewrite steps', 'Change layout'],
     aiVisible: true,
+    category: 'basics' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

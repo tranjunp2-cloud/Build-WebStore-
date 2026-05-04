@@ -21,6 +21,7 @@ export const productsGridMeta: BlockMeta = {
     defaultVariant: 'grid-3',
     editableFields: ['headline', 'subheadline', 'limit', 'category'],
     quickActions: ['change-limit'],
+    category: 'commerce' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

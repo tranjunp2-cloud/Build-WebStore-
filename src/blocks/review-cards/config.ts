@@ -48,6 +48,7 @@ export const reviewCardsMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'reviews', 'showAverage', 'totalReviewCount'],
     quickActions: ['Add review', 'Sort by rating', 'Toggle average'],
+    category: 'archive' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

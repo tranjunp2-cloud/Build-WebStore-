@@ -20,7 +20,7 @@ export const BreadcrumbConfigSchema = BaseBlockSchema.extend({
     showIcon: z.boolean().default(false),
     showOnAllPages: z.boolean().default(true),
 })
-export const breadcrumbMeta = { type: 'breadcrumb' as const, name: 'Breadcrumb', description: 'Navigation breadcrumb trail', icon: '🧭', variants: ['simple', 'with-icon'], defaultVariant: 'simple', editableFields: ['items', 'homeLabel', 'separator', 'showIcon', 'showOnAllPages'], quickActions: ['Reset path'], aiVisible: false }
+export const breadcrumbMeta = { type: 'breadcrumb' as const, name: 'Breadcrumb', description: 'Navigation breadcrumb trail', icon: '🧭', variants: ['simple', 'with-icon'], defaultVariant: 'simple', editableFields: ['items', 'homeLabel', 'separator', 'showIcon', 'showOnAllPages'], quickActions: ['Reset path'], aiVisible: false, category: 'archive' as const }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
 export const configSchema = BreadcrumbConfigSchema

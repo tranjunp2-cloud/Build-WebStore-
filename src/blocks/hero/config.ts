@@ -48,6 +48,7 @@ export const heroMeta = {
     defaultVariant: 'centered',
     editableFields: ['headline', 'subheadline', 'ctaButtons', 'image', 'badge', 'videoUrl', 'gradientPreset', 'images'],
     quickActions: ['Rewrite headline', 'Change CTA', 'Change style'],
+    category: 'basics' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

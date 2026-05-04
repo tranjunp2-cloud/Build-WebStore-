@@ -7,61 +7,9 @@
  */
 import { blockRegistry } from '@/blocks/registry'
 
-// ── Category groupings (derived from block naming conventions) ───────────────
-
-const CATEGORY_MAP: Record<string, string> = {
-    navigation: 'nav',
-    footer: 'nav',
-    breadcrumb: 'nav',
-    'announcement-bar': 'nav',
-    hero: 'hero',
-    features: 'content',
-    about: 'content',
-    stats: 'content',
-    team: 'content',
-    faq: 'content',
-    accordion: 'content',
-    'step-process': 'content',
-    'feature-comparison': 'content',
-    'before-after': 'content',
-    divider: 'content',
-    testimonials: 'social',
-    'social-proof': 'social',
-    'review-cards': 'social',
-    'client-logos': 'social',
-    'logo-cloud': 'social',
-    'social-widget': 'social',
-    gallery: 'media',
-    'gallery-masonry': 'media',
-    video: 'media',
-    'video-background': 'media',
-    'video-showcase': 'media',
-    carousel: 'media',
-    'portfolio-grid': 'media',
-    cta: 'conversion',
-    newsletter: 'conversion',
-    contact: 'conversion',
-    'download-cta': 'conversion',
-    'whatsapp-button': 'conversion',
-    'countdown-timer': 'conversion',
-    pricing: 'commerce',
-    'pricing-table': 'commerce',
-    'products-grid': 'commerce',
-    'products-featured': 'commerce',
-    'cart-widget': 'commerce',  // normalised key
-    cartWidget: 'commerce',
-    'blog-list': 'blog',
-    'custom-html': 'utility',
-    'google-maps': 'utility',
-    'menu-food': 'industry',
-    'menu-display': 'industry',
-    'booking-widget': 'industry',
-    'class-schedule': 'industry',
-    'doctor-profile': 'industry',
-    'property-card': 'industry',
-    'product-quick-view': 'industry',
-    socialWidget: 'social',
-}
+// ── Category fallback ────────────────────────────────────────────────────────
+// Category is now sourced from meta.category (set in each block's config.ts).
+// This fallback is used only when a block has no category in its meta.
 
 const DEFAULT_CATEGORY = 'other'
 
@@ -78,6 +26,7 @@ export type NormalizedBlock = {
     defaultVariant: string
     editableFields: string[]
     aiVisible: boolean
+    isSystem: boolean
 }
 
 // Vietnamese name map (curated for common blocks; others fall back to English)
@@ -168,6 +117,7 @@ export function listAllBlocks(): NormalizedBlock[] {
                 defaultVariant: '',
                 editableFields: [],
                 aiVisible: true,
+                isSystem: false,
             }
         }
         return {
@@ -176,11 +126,12 @@ export function listAllBlocks(): NormalizedBlock[] {
             nameVi: VI_NAME_MAP[slug] ?? meta.name,
             description: meta.description,
             icon: meta.icon,
-            category: CATEGORY_MAP[slug] ?? DEFAULT_CATEGORY,
+            category: meta.category ?? DEFAULT_CATEGORY,
             variants: meta.variants,
             defaultVariant: meta.defaultVariant,
             editableFields: meta.editableFields,
             aiVisible: meta.aiVisible ?? true,
+            isSystem: meta.isSystem ?? false,
         }
     })
     return _cached
