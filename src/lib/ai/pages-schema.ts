@@ -193,7 +193,9 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
     // Payload upload fields within array items — must be a numeric Media ID or absent.
     // Template/composer data may carry string URLs or SVG placeholders that Payload
     // rejects with "field is invalid". Strip anything that is not already a numeric ID.
-    const ITEM_UPLOAD_FIELDS = ['image', 'avatar', 'logo', 'posterImage', 'backgroundImage']
+    // Covers: portfolio-grid.projects[].image, team.members[].image,
+    //         testimonials[].avatar, logo-cloud.logos[].logo
+    const ITEM_UPLOAD_FIELDS = ['image', 'avatar', 'logo']
 
     for (const field of ARRAY_FIELDS) {
         const arr = block[field]

@@ -268,6 +268,22 @@ describe('pages-schema sanitizer', () => {
             expect(testimonials[0]).not.toHaveProperty('avatar')
             expect(testimonials[0]!.name).toBe('Bob')
         })
+
+        it('logo-cloud: logos[].logo string URL is stripped', () => {
+            const block = {
+                blockType: 'logo-cloud',
+                variant: 'grid',
+                headline: 'Partners',
+                logos: [
+                    { logo: 'https://example.com/logo.svg', name: 'Acme' },
+                    { logo: 99, name: 'BrandCo' },
+                ],
+            }
+            const result = sanitizeBlockForPayload(block)
+            const logos = result!.logos as Array<Record<string, unknown>>
+            expect(logos[0]).not.toHaveProperty('logo')
+            expect(logos[1]!.logo).toBe(99)
+        })
     })
 
     describe('whitelist coverage invariants', () => {
