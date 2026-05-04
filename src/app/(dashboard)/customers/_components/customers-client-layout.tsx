@@ -48,7 +48,7 @@ export function CustomersClientLayout() {
         } finally {
             setLoading(false)
         }
-    }, [search, status, source, page])
+    }, [search, status, source, page, c])
 
     useEffect(() => { setPage(1) }, [status, source, search])
     useEffect(() => { load() }, [load])
@@ -121,7 +121,7 @@ export function CustomersClientLayout() {
             />
 
             {loading ? (
-                <div className="py-16 text-center text-[14px] text-white/30">Loading…</div>
+                <div className="py-16 text-center text-[14px] text-white/30">{c.loading}</div>
             ) : (
                 <>
                     {/* Mobile: card list */}
@@ -170,15 +170,15 @@ export function CustomersClientLayout() {
                                 <Trash2 className="w-5 h-5 text-red-400" />
                             </div>
                             <DialogTitle className="text-[18px] font-bold text-[#f8fafc]">
-                                Delete Customer?
+                                {c.deleteTitle}
                             </DialogTitle>
                         </div>
                     </DialogHeader>
 
                     <p className="text-[14px] text-white/60 leading-relaxed mb-6">
-                        This will permanently remove{' '}
+                        {c.deleteConfirmPre}{' '}
                         <span className="text-white font-medium">{deleteDisplayName}</span>
-                        {' '}and cannot be undone.
+                        {' '}{c.deleteConfirmPost}
                     </p>
 
                     <div className="flex gap-3">
@@ -187,7 +187,7 @@ export function CustomersClientLayout() {
                             onClick={() => setPendingDelete(null)}
                             className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium text-white/70 border border-white/[0.08] bg-transparent hover:bg-white/[0.05] transition-colors cursor-pointer"
                         >
-                            Cancel
+                            {c.cancel}
                         </button>
                         <button
                             type="button"
@@ -195,7 +195,7 @@ export function CustomersClientLayout() {
                             className="flex-1 h-[44px] rounded-[10px] text-[14px] font-medium text-white transition-opacity hover:opacity-90 cursor-pointer border-none"
                             style={{ background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)' }}
                         >
-                            Delete
+                            {c.deleteButton}
                         </button>
                     </div>
                 </DialogContent>
