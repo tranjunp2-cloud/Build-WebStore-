@@ -80,20 +80,18 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
 
                 <span className="relative flex items-center gap-3 px-5 py-3">
                     <WhatsAppIcon />
-                    {callback ? (
-                        <InlineEdit
-                            value={label}
-                            onSave={val => callback.onFieldChange('label', val)}
-                            blockType="whatsapp-button"
-                            fieldName="label"
-                            maxLength={50}
-                            previewClassName="text-sm font-semibold whitespace-nowrap text-white"
-                        />
-                    ) : (
-                        <span className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
-                            {label}
-                        </span>
-                    )}
+                    <span className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs focus-within:max-w-xs transition-all duration-300 whitespace-nowrap">
+                        {callback ? (
+                            <InlineEdit
+                                value={label}
+                                onSave={val => callback.onFieldChange('label', val)}
+                                blockType="whatsapp-button"
+                                fieldName="label"
+                                maxLength={50}
+                                previewClassName="text-sm font-semibold whitespace-nowrap text-white"
+                            />
+                        ) : label}
+                    </span>
                 </span>
             </a>
         </div>
