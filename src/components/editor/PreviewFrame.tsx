@@ -900,6 +900,7 @@ function PreviewFrameInner({
                         testimonials: { arrayField: 'testimonials', imageSubField: 'avatar' },
                         'social-proof': { arrayField: 'reviews', imageSubField: 'avatar' },
                         'logo-cloud': { arrayField: 'logos', imageSubField: 'logo' },
+                        'property-card': { arrayField: 'properties', imageSubField: 'image' },
                     }
                     const arrayConfig = ARRAY_IMAGE_CONFIG[imageClickData.blockType]
                     if (arrayConfig) {
