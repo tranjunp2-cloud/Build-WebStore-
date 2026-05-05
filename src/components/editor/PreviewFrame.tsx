@@ -528,6 +528,20 @@ function PreviewFrameInner({
                     } else {
                         setSelectedGlobalBlockLayout(null)
                         setBlockHover(e.data.layout as BlockLayoutRect)
+                        // Refresh the clicked block's layout so the action bar uses the
+                        // current position (guards against stale BLOCK_LAYOUT after block deletion).
+                        if (e.data.layout) {
+                            const freshLayout = e.data.layout as BlockLayoutRect
+                            setBlockLayouts(prev => {
+                                const idx = prev.findIndex(l => l.blockIndex === freshLayout.blockIndex)
+                                if (idx >= 0) {
+                                    const updated = [...prev]
+                                    updated[idx] = freshLayout
+                                    return updated
+                                }
+                                return [...prev, freshLayout]
+                            })
+                        }
                     }
                     setIsEditing(false)
                 }
