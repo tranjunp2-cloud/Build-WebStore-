@@ -790,7 +790,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     // (step→'info') that fires before the component unmounts doesn't flash the form.
     if (isNavigating) {
         return (
-            <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#06090F]">
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-[#06090F]">
                 <Loader2 className="size-8 animate-spin text-white/40" />
                 <p className="text-sm text-white/40">Redirecting...</p>
             </div>
