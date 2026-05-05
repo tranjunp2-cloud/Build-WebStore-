@@ -18,6 +18,7 @@ import { FooterLinkEditor } from './footer-link-editor'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
+import type { StepItem } from '@/blocks/step-process/config'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { useEditorStore } from '@/store/editorStore'
@@ -238,6 +239,7 @@ function SettingsPanelInner({
     })
     const [isFooterBrandOpen, setIsFooterBrandOpen] = useState(false)
     const [isFooterSocialOpen, setIsFooterSocialOpen] = useState(false)
+    const [isStepConfigOpen, setIsStepConfigOpen] = useState(false)
     const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false)
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
@@ -1506,6 +1508,62 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
+
+                            {/* ─── Step Process Configuration ─────────────── */}
+                            {bt === 'step-process' && (() => {
+                                const steps = (block.steps || []) as StepItem[]
+                                const count = steps.length
+                                return (
+                                    <div className={sectionCls}>
+                                        <div className="bg-[rgba(30,41,59,0.3)] border border-[rgba(59,130,246,0.04)] rounded-xl overflow-hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsStepConfigOpen(!isStepConfigOpen)}
+                                                className="w-full flex items-center justify-between px-3 h-12"
+                                            >
+                                                <span className="text-sm font-medium text-white">{s.stepConfiguration}</span>
+                                                <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform', isStepConfigOpen && 'rotate-180')} />
+                                            </button>
+                                            {isStepConfigOpen && (
+                                                <div className="px-3 pb-3">
+                                                    <div className="flex gap-4 items-center">
+                                                        <div className="w-[100px] shrink-0">
+                                                            <p className="text-[12px] font-medium text-[#94a3b8] leading-4">{s.numberOfSteps}</p>
+                                                            <p className="text-[10px] text-[#94a3b8] leading-4">{s.stepsMinMax}</p>
+                                                        </div>
+                                                        <div className="flex flex-1 items-center justify-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                aria-label="Decrease step count"
+                                                                disabled={count <= 3}
+                                                                onClick={() => onBlockUpdate(currentBlockIndex, { steps: steps.slice(0, -1) })}
+                                                                className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/5 transition-colors"
+                                                            >−</button>
+                                                            {/* count may display < 3 if block was set externally; − is disabled so it cannot go lower */}
+                                                            <div className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#1f2937] flex items-center justify-center text-white text-sm font-medium">
+                                                                {count}
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                aria-label="Increase step count"
+                                                                disabled={count >= 10}
+                                                                onClick={() => {
+                                                                    const n = count + 1
+                                                                    const stepEmojis = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟']
+                                                                    onBlockUpdate(currentBlockIndex, {
+                                                                        steps: [...steps, { title: `Step ${n}`, description: `Description ${n}`, icon: stepEmojis[n - 1] ?? String(n) }]
+                                                                    })
+                                                                }}
+                                                                className="h-[38px] w-[44px] rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#0b1120] text-white text-sm font-medium disabled:opacity-30 hover:bg-white/10 transition-colors"
+                                                            >+</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })()}
 
                             {bt === 'socialWidget' && (
                                 <div className={sectionCls}>
