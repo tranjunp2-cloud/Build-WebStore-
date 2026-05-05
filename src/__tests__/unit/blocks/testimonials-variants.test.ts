@@ -5,7 +5,7 @@ import { enforceMinContent } from '@/lib/ai/variant-validation'
 // ── TC-S2-006: Testimonials Block Variants ──────────────────────────────────
 
 const TESTIMONIALS_VARIANTS = [
-    'cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote', 'avatar-row', 'video-text',
+    'cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote', 'avatar-row', 'video-text', 'grid', 'single',
 ] as const
 
 const minimalTestimonialsConfig = (overrides: Record<string, unknown> = {}) => ({
@@ -20,7 +20,7 @@ const minimalTestimonialsConfig = (overrides: Record<string, unknown> = {}) => (
 
 describe('[TC-S2-006] Testimonials Block Variants', () => {
     describe('Config Schema', () => {
-        it('validates all 8 variants', () => {
+        it('validates all 10 variants', () => {
             for (const v of TESTIMONIALS_VARIANTS) {
                 const result = TestimonialsConfigSchema.safeParse(minimalTestimonialsConfig({ variant: v }))
                 expect(result.success, `variant '${v}' should be valid`).toBe(true)
@@ -201,5 +201,39 @@ describe('[TC-BUG-TEST-019] resumeTimer — auto-rotate pause on manual nav', ()
         const firstTimer = resumeTimer.current
         goTo()
         expect(clearTimeoutSpy).toHaveBeenCalledWith(firstTimer)
+    })
+})
+
+// ── TC-F31-BVA-080: Testimonials Grid — Schema Valid ─────────────────────────
+describe('[TC-F31-BVA-080] Testimonials grid variant — schema and meta', () => {
+    it('grid is accepted by schema', () => {
+        const result = TestimonialsConfigSchema.safeParse(minimalTestimonialsConfig({ variant: 'grid' }))
+        expect(result.success).toBe(true)
+    })
+
+    it('grid is in testimonialsMeta.variants', () => {
+        expect(testimonialsMeta.variants).toContain('grid')
+    })
+
+    it('enforceMinContent keeps grid with 1+ testimonial', () => {
+        expect(enforceMinContent('testimonials', 'grid', 1)).toBe('grid')
+        expect(enforceMinContent('testimonials', 'grid', 5)).toBe('grid')
+    })
+})
+
+// ── TC-F31-BVA-081: Testimonials Single — Schema Valid ───────────────────────
+describe('[TC-F31-BVA-081] Testimonials single variant — schema and meta', () => {
+    it('single is accepted by schema', () => {
+        const result = TestimonialsConfigSchema.safeParse(minimalTestimonialsConfig({ variant: 'single' }))
+        expect(result.success).toBe(true)
+    })
+
+    it('single is in testimonialsMeta.variants', () => {
+        expect(testimonialsMeta.variants).toContain('single')
+    })
+
+    it('enforceMinContent keeps single with 1+ testimonial', () => {
+        expect(enforceMinContent('testimonials', 'single', 1)).toBe('single')
+        expect(enforceMinContent('testimonials', 'single', 3)).toBe('single')
     })
 })
