@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GripVertical, Lock } from 'lucide-react'
+import { GripVertical, Loader2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Reorder } from 'framer-motion'
@@ -786,10 +786,15 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         </div>
     ) : null
 
-    // Guard: while navigating away, show a blank screen so any store reset
+    // Guard: while navigating away, show a loading screen so any store reset
     // (step→'info') that fires before the component unmounts doesn't flash the form.
     if (isNavigating) {
-        return <div className="h-full bg-[#06090F]" />
+        return (
+            <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#06090F]">
+                <Loader2 className="size-8 animate-spin text-white/40" />
+                <p className="text-sm text-white/40">Redirecting...</p>
+            </div>
+        )
     }
 
     if (step === 'info') {
