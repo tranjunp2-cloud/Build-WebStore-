@@ -35,6 +35,7 @@ export const statsMeta = {
     defaultVariant: 'row' as const,
     editableFields: ['headline', 'stats'],
     quickActions: ['Add stat', 'Update numbers'],
+    category: 'widgets' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

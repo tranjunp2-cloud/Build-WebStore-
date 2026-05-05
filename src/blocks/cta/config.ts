@@ -68,6 +68,7 @@ export const ctaMeta = {
     defaultVariant: 'banner',
     editableFields: ['headline', 'subheadline', 'ctaLabel', 'ctaUrl', 'secondaryCtaLabel', 'secondaryCtaUrl'],
     quickActions: ['Rewrite CTA', 'Make urgent'],
+    category: 'basics' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

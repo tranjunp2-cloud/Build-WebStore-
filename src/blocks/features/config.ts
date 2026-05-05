@@ -37,6 +37,7 @@ export const featuresMeta = {
     defaultVariant: 'grid-3',
     editableFields: ['headline', 'subheadline', 'features'],
     quickActions: ['Add feature', 'Rewrite all', 'Change icons'],
+    category: 'basics' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

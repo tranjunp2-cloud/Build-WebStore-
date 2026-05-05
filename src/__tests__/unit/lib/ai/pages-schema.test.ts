@@ -1,11 +1,15 @@
 /**
- * TC-F01-AT-01..04 — Phase 01 apply-template whitelist bug fix.
+ * TC-F01-AT-01..05 — Phase 01 apply-template whitelist bug fix.
  * Plan: plans/260415-1745-ai-gen-flow-fix-v2/phase-01-fix-apply-template-whitelist.md
  *
  * Verifies `sanitizeBlocksForPayload` preserves the content fields that
  * were previously stripped by the PAGES_FIELDS whitelist (team.members,
  * pricing.plans, stats.variant, etc.) while still rejecting unknown
  * block types + fields.
+ *
+ * TC-F01-AT-05: nested array upload fields (portfolio-grid projects[].image,
+ * team members[].image, testimonials[].avatar) are stripped when non-numeric
+ * so Payload upload field validation does not reject the block.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -186,6 +190,99 @@ describe('pages-schema sanitizer', () => {
             const block = { blockType: 'hero', variant: 'split-image', headline: 'x' }
             const result = sanitizeBlockForPayload(block)
             expect(result!.variant).toBe('split-left')
+        })
+    })
+
+    describe('TC-F01-AT-05: non-numeric upload fields in nested array items are stripped', () => {
+        it('portfolio-grid: projects[].image string URL is stripped', () => {
+            const block = {
+                blockType: 'portfolio-grid',
+                variant: 'grid',
+                headline: 'Recent Work',
+                projects: [
+                    { title: 'Project A', description: 'Desc', category: 'Web', image: 'https://placehold.co/800x600' },
+                    { title: 'Project B', description: 'Desc', category: 'Brand', image: 'data:image/svg+xml,...' },
+                ],
+            }
+            const result = sanitizeBlockForPayload(block)
+            const projects = result!.projects as Array<Record<string, unknown>>
+            expect(projects[0]).not.toHaveProperty('image')
+            expect(projects[1]).not.toHaveProperty('image')
+            expect(projects[0]!.title).toBe('Project A')
+        })
+
+        it('portfolio-grid: projects[].image object {url,alt} is stripped', () => {
+            const block = {
+                blockType: 'portfolio-grid',
+                variant: 'masonry',
+                headline: 'Work',
+                projects: [
+                    { title: 'P1', description: 'D1', category: 'C1', image: { url: 'https://example.com/img.jpg', alt: 'Alt' } },
+                ],
+            }
+            const result = sanitizeBlockForPayload(block)
+            const projects = result!.projects as Array<Record<string, unknown>>
+            expect(projects[0]).not.toHaveProperty('image')
+        })
+
+        it('portfolio-grid: projects[].image numeric Media ID is preserved', () => {
+            const block = {
+                blockType: 'portfolio-grid',
+                variant: 'grid',
+                headline: 'Portfolio',
+                projects: [
+                    { title: 'P1', description: 'D1', category: 'C1', image: 42 },
+                ],
+            }
+            const result = sanitizeBlockForPayload(block)
+            const projects = result!.projects as Array<Record<string, unknown>>
+            expect(projects[0]!.image).toBe(42)
+        })
+
+        it('team: members[].image string URL is stripped', () => {
+            const block = {
+                blockType: 'team',
+                variant: 'grid',
+                headline: 'Team',
+                members: [
+                    { name: 'Alice', role: 'CEO', bio: 'Bio', image: 'https://example.com/alice.jpg' },
+                ],
+            }
+            const result = sanitizeBlockForPayload(block)
+            const members = result!.members as Array<Record<string, unknown>>
+            expect(members[0]).not.toHaveProperty('image')
+            expect(members[0]!.name).toBe('Alice')
+        })
+
+        it('testimonials: testimonials[].avatar string URL is stripped', () => {
+            const block = {
+                blockType: 'testimonials',
+                variant: 'cards',
+                headline: 'Reviews',
+                testimonials: [
+                    { name: 'Bob', quote: 'Great!', avatar: 'https://example.com/bob.jpg' },
+                ],
+            }
+            const result = sanitizeBlockForPayload(block)
+            const testimonials = result!.testimonials as Array<Record<string, unknown>>
+            expect(testimonials[0]).not.toHaveProperty('avatar')
+            expect(testimonials[0]!.name).toBe('Bob')
+        })
+
+        it('logo-cloud: logos[].logo string URL is stripped', () => {
+            const block = {
+                blockType: 'logo-cloud',
+                variant: 'grid',
+                headline: 'Partners',
+                logos: [
+                    { logo: 'https://example.com/logo.svg', name: 'Acme' },
+                    { logo: 99, name: 'BrandCo' },
+                ],
+            }
+            const result = sanitizeBlockForPayload(block)
+            const logos = result!.logos as Array<Record<string, unknown>>
+            expect(logos[0]).not.toHaveProperty('logo')
+            expect(logos[1]!.logo).toBe(99)
         })
     })
 

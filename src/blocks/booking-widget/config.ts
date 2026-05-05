@@ -51,6 +51,7 @@ export const bookingWidgetMeta = {
     editableFields: ['headline', 'subheadline', 'services', 'availableDays', 'timeSlotInterval', 'startTime', 'endTime', 'bookingUrl', 'showPrice'],
     quickActions: ['Add service', 'Change time slots', 'Update availability'],
     aiVisible: true,
+    category: 'widgets' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

@@ -21,6 +21,7 @@ export const productsFeaturedMeta: BlockMeta = {
     editableFields: ['headline', 'subheadline'],
     quickActions: [],
     aiVisible: true,
+    category: 'commerce' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

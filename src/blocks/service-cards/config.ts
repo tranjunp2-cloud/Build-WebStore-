@@ -48,6 +48,7 @@ export const serviceCardsMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'services'],
     quickActions: ['Add service', 'Rewrite descriptions', 'Change icons'],
+    category: 'basics' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

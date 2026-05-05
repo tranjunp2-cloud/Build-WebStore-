@@ -10,7 +10,7 @@ export const PricingConfigSchema = BaseBlockSchema.extend({
     yearlyDiscount: z.number().optional(),
     plans: z.array(z.object({ name: z.string(), price: z.string(), period: z.string().optional(), description: z.string().optional(), features: z.array(z.union([z.string().transform(text => ({ text, included: true })), z.object({ text: z.string(), included: z.boolean().default(true) })])), ctaLabel: z.string(), ctaUrl: z.string(), highlighted: z.boolean().default(false) })).default([]),
 })
-export const pricingMeta = { type: 'pricing' as const, name: 'Pricing', description: 'Pricing plans comparison', icon: '💰', variants: ['cards', 'table', 'horizontal', 'toggle', 'tiered', 'comparison', 'minimal', 'slider'], defaultVariant: 'cards', editableFields: ['headline', 'plans'], quickActions: ['Add plan', 'Change prices'] }
+export const pricingMeta = { type: 'pricing' as const, name: 'Pricing', description: 'Pricing plans comparison', icon: '💰', variants: ['cards', 'table', 'horizontal', 'toggle', 'tiered', 'comparison', 'minimal', 'slider'], defaultVariant: 'cards', editableFields: ['headline', 'plans'], quickActions: ['Add plan', 'Change prices'], category: 'store' as const }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
 export const configSchema = PricingConfigSchema

@@ -18,6 +18,7 @@ export const customHtmlMeta: BlockMeta = {
     editableFields: ['html'],
     quickActions: [],
     aiVisible: false,
+    category: 'archive' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
