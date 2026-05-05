@@ -21,7 +21,7 @@ import {
 } from '../actions'
 import type { CustomerRecord } from '../_lib/customer-record'
 
-const LIMIT = 20
+const LIMIT = 10
 
 export function CustomersClientLayout() {
     const { t } = useI18n()
@@ -73,7 +73,11 @@ export function CustomersClientLayout() {
         setExporting(true)
         try {
             const csv = await exportCustomersCsvAction({ search, status, source })
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+            const bom = new Uint8Array([0xEF, 0xBB, 0xBF])
+            const encoder = new TextEncoder()
+            // strip Unicode BOM char if csv-exporter prepended it — avoid double BOM
+            const csvBody = csv.startsWith('﻿') ? csv.slice(1) : csv
+            const blob = new Blob([bom, encoder.encode(csvBody)], { type: 'text/csv;charset=utf-8;' })
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
@@ -116,7 +120,12 @@ export function CustomersClientLayout() {
                 exporting={exporting}
                 onSearch={setSearch}
                 onStatusChange={setStatus}
-                onSourceChange={(s: string) => setSource(s)}
+                onSourceChange={(s: string) => {
+                    setSource(s)
+                    // Reset incompatible status when switching sources
+                    if (s === 'newsletter' && status !== '' && status !== 'subscribed') setStatus('')
+                    if (s === 'contact-form' && status === 'subscribed') setStatus('')
+                }}
                 onExport={handleExport}
             />
 
