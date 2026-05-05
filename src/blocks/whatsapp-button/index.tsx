@@ -75,8 +75,8 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
                 className="group flex items-center gap-3 bg-[#25D366] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 aria-label={label}
             >
-                {/* Pulse animation ring */}
-                <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-20" />
+                {/* Pulse animation ring — hidden in editor to avoid obscuring selection border */}
+                {!callback && <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-20" />}
 
                 <span className="relative flex items-center gap-3 px-5 py-3">
                     <WhatsAppIcon />
