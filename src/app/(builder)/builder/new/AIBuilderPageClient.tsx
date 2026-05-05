@@ -868,17 +868,22 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     onOpenChange={(open) => {
                         if (!open) {
                             // Dismissing success modal → land users on their dashboard
-                            // (X, backdrop click, Esc all route here). Reset builder state first
-                            // so navigating back to /builder/new starts clean.
+                            // (X, backdrop click, Esc all route here).
                             setPublishedSiteUrl(null)
-                            reset()
-                            clearBuilderSessionStorage()
+                            // Navigate FIRST, then clear state (prevents flash of builder form)
                             router.push('/dashboard')
+                            setTimeout(() => {
+                                reset()
+                                clearBuilderSessionStorage()
+                            }, 100)
                         }
                     }}
                     onNavigate={() => {
-                        reset()
-                        clearBuilderSessionStorage()
+                        // Link handles navigation — delay reset to avoid flash of builder form
+                        setTimeout(() => {
+                            reset()
+                            clearBuilderSessionStorage()
+                        }, 100)
                     }}
                     siteId={siteId || ''}
                     siteName={siteName || businessInfo?.businessName || 'your-site'}
