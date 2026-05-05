@@ -29,8 +29,8 @@ export function PreviewScripts() {
 
         const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
         const excludedBlockTypes = ['navigation', 'footer', 'breadcrumb']
-        // All floating widgets: block global contenteditable (sr-only text still triggers onTextClick otherwise)
-        const noTextEditBlockTypes = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+        // cartWidget has no user-editable text fields — block contenteditable entirely
+        const noTextEditBlockTypes = new Set(['cartWidget'])
         // Only whatsapp-button and cartWidget suppress BLOCK_HOVERED — socialWidget hover is intentionally allowed
         const noHoverHintBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
         // Blocks whose images come from external product catalog — image editing not supported
@@ -313,6 +313,10 @@ export function PreviewScripts() {
                 target = target.parentElement!
             }
             if (!target || target === blockContainer || !validTags.includes(target.tagName)) return
+            // Skip elements explicitly marked as non-editable
+            if (target.hasAttribute('data-no-text-edit')) return
+            // Skip elements inside a no-edit zone unless they carry data-text-editable
+            if (!target.hasAttribute('data-text-editable') && !!target.parentElement?.closest('[data-no-text-edit]')) return
             // Skip image-placeholder elements — clicking them triggers image-replace, not text-edit
             if (target.getAttribute('data-image-index') !== null) return
             // Don't edit elements with many block-level children (sections, not text)

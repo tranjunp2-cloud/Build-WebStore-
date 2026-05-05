@@ -1278,6 +1278,7 @@ function PreviewFrameInner({
                                     <BlockActionBar
                                         blockIndex={selectedLayout.blockIndex}
                                         blockType={selectedLayout.blockType}
+                                        blockVariant={(blocks[selectedLayout.blockIndex] as Record<string, unknown>)?.variant as string | undefined}
                                         blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
                                         totalBlocks={editableLayouts.length}
                                         isMobile={viewport === 'mobile'}

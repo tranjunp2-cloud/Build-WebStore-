@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 interface BlockActionBarProps {
     blockIndex: number
     blockType: string
+    blockVariant?: string
     blockName: string
     totalBlocks: number
     isMobile?: boolean
@@ -21,12 +22,13 @@ interface BlockActionBarProps {
 
 const ACTION_BTN = 'inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed'
 
-// Floating widgets are position:fixed — drag-to-order and duplicate are not applicable.
+// Floating widgets (non-inline variant) are position:fixed — drag-to-order and duplicate are not applicable.
 const FLOATING_WIDGET_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
 
 export function BlockActionBar({
     blockIndex,
     blockType,
+    blockVariant,
     blockName,
     totalBlocks,
     isMobile = false,
@@ -41,7 +43,8 @@ export function BlockActionBar({
     // Hide for global blocks (navigation/footer)
     if (blockType === 'navigation' || blockType === 'footer') return null
 
-    const isFloatingWidget = FLOATING_WIDGET_BLOCK_TYPES.has(blockType)
+    // Only floating variant (not inline) disables drag/duplicate
+    const isFloatingWidget = FLOATING_WIDGET_BLOCK_TYPES.has(blockType) && blockVariant !== 'inline'
     const showDrag = !isMobile && onDragStart && !isFloatingWidget
     const showMoveUpDown = isMobile && !isFloatingWidget
 

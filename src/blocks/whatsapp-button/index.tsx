@@ -5,7 +5,6 @@ import type { WhatsappButtonConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
-import { InlineEdit } from '@/components/editor/InlineEdit'
 import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 
 void _CSS_VARS
@@ -47,16 +46,7 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
                         style={{ backgroundColor: '#25D366' }}
                     >
                         <WhatsAppIcon />
-                        {callback ? (
-                            <InlineEdit
-                                value={label}
-                                onSave={val => callback.onFieldChange('label', val)}
-                                blockType="whatsapp-button"
-                                fieldName="label"
-                                maxLength={50}
-                                previewClassName="text-white"
-                            />
-                        ) : label}
+                        <span>{label}</span>
                     </a>
                 </div>
             </section>
@@ -72,25 +62,18 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={callback ? e => e.preventDefault() : undefined}
+                data-no-text-edit
                 className="group flex items-center gap-3 bg-[#25D366] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 aria-label={label}
             >
                 {/* Pulse animation ring — hidden in editor to avoid obscuring selection border */}
                 {!callback && <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-20" />}
 
-                <span className="relative flex items-center gap-3 px-5 py-3">
+                <span data-no-text-edit className="relative flex items-center px-5 py-3">
                     <WhatsAppIcon />
-                    <span className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs focus-within:max-w-xs transition-all duration-300 whitespace-nowrap">
-                        {callback ? (
-                            <InlineEdit
-                                value={label}
-                                onSave={val => callback.onFieldChange('label', val)}
-                                blockType="whatsapp-button"
-                                fieldName="label"
-                                maxLength={50}
-                                previewClassName="text-sm font-semibold whitespace-nowrap text-white"
-                            />
-                        ) : label}
+                    <span data-text-editable className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs group-hover:ml-3 transition-all duration-300 whitespace-nowrap">
+                        {label}
                     </span>
                 </span>
             </a>
