@@ -65,9 +65,10 @@ async function queryAllCustomers(tenantId: string, search: string, status: strin
     const siteIds = await getTenantSiteIds(payload, tenantId)
     if (siteIds.length === 0) return []
 
-    const doContact = !source || source === 'contact-form'
-    // Newsletter rows are always 'subscribed' — skip when filtering by contact-only statuses
-    const doNewsletter = (!source || source === 'newsletter') && !['new', 'contacted', 'ignored'].includes(status)
+    // 'subscribed' is newsletter-only — skip contact query to avoid returning all contacts
+    const doContact = (!source || source === 'contact-form') && status !== 'subscribed'
+    // 'read' is contact-only — skip newsletter query when filtering by contact-only statuses
+    const doNewsletter = (!source || source === 'newsletter') && !['new', 'contacted', 'ignored', 'read'].includes(status)
 
     const [contactDocs, subscriberDocs] = await Promise.all([
         doContact

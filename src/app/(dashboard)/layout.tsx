@@ -7,6 +7,7 @@ import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
 import { NotificationProvider } from '@/providers/NotificationProvider'
 import { ToastContainer } from '@/components/notifications/ToastContainer'
 import { PushOptInPrompt } from '@/components/notifications/PushOptInPrompt'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 export default async function DashboardLayout({
     children,
@@ -30,20 +31,22 @@ export default async function DashboardLayout({
     return (
         <AppShell>
             <I18nProvider defaultLocale="en">
-                <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
-                    {children}
-                </CMSLayoutClient>
-                {typedUser && (
-                    <>
-                        <NotificationProvider />
-                        <ToastContainer />
-                        <PushOptInPrompt />
-                    </>
-                )}
-                {/* Only evaluate and render if the user hasn't seen the wizard yet */}
-                {!typedUser?.has_seen_ai_wizard && (
-                    <AIDiscoveryWizard userId={typedUser?.id} />
-                )}
+                <TooltipProvider delayDuration={300}>
+                    <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
+                        {children}
+                    </CMSLayoutClient>
+                    {typedUser && (
+                        <>
+                            <NotificationProvider />
+                            <ToastContainer />
+                            <PushOptInPrompt />
+                        </>
+                    )}
+                    {/* Only evaluate and render if the user hasn't seen the wizard yet */}
+                    {!typedUser?.has_seen_ai_wizard && (
+                        <AIDiscoveryWizard userId={typedUser?.id} />
+                    )}
+                </TooltipProvider>
             </I18nProvider>
         </AppShell>
     )

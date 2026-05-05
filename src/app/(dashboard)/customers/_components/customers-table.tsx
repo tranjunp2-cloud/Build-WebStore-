@@ -6,6 +6,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { CustomerAvatar } from './customer-avatar'
 import { CustomerStatusBadge } from './customer-status-badge'
 import { CustomerSourceBadge } from './customer-source-badge'
+import { useI18n } from '@/i18n'
 import type { CustomerRecord } from '../_lib/customer-record'
 
 // Figma: 7 cols — Profile(237) | Email(flex) | Source(218) | Message(412→flex) | Date(flex) | Status(flex) | Actions(119)
@@ -27,10 +28,12 @@ type Props = {
 }
 
 export function CustomersTable({ records, total, page, limit, selectedId, onSelect, onDelete, onPageChange }: Props) {
+    const { t } = useI18n()
+    const c = t.dashboard.customers
     const totalPages = Math.ceil(total / limit)
 
     if (records.length === 0) {
-        return <div className="py-16 text-center text-[14px] text-white/30">No customers found</div>
+        return <div className="py-16 text-center text-[14px] text-white/30">{c.empty}</div>
     }
 
     return (

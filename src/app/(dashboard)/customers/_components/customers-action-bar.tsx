@@ -1,22 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Search, ChevronDown } from 'lucide-react'
-
-const STATUS_OPTIONS = [
-    { key: '', label: 'All Status' },
-    { key: 'new', label: 'New' },
-    { key: 'read', label: 'Read' },
-    { key: 'contacted', label: 'Contacted' },
-    { key: 'ignored', label: 'Ignored' },
-    { key: 'subscribed', label: 'Subscribed' },
-]
-
-const SOURCE_OPTIONS = [
-    { key: '', label: 'All Sources' },
-    { key: 'contact-form', label: 'Contact Forms' },
-    { key: 'newsletter', label: 'Newsletter Subscriptions' },
-]
+import { useI18n } from '@/i18n'
 
 function InlineSelect({ value, options, onChange }: {
     value: string
@@ -81,10 +67,27 @@ type Props = {
 
 export function CustomersActionBar({ onSearch, onStatusChange, onSourceChange, onExport, exporting, status, source }: Props) {
     const [input, setInput] = useState('')
+    const { t } = useI18n()
+    const c = t.dashboard.customers
+
+    const STATUS_OPTIONS = useMemo(() => [
+        { key: '', label: c.statusAll },
+        { key: 'new', label: c.statusNew },
+        { key: 'read', label: c.statusRead },
+        { key: 'contacted', label: c.statusContacted },
+        { key: 'ignored', label: c.statusIgnored },
+        { key: 'subscribed', label: c.statusSubscribed },
+    ], [c])
+
+    const SOURCE_OPTIONS = useMemo(() => [
+        { key: '', label: c.sourceAll },
+        { key: 'contact-form', label: c.sourceContact },
+        { key: 'newsletter', label: c.sourceNewsletter },
+    ], [c])
 
     useEffect(() => {
-        const t = setTimeout(() => onSearch(input), 500)
-        return () => clearTimeout(t)
+        const timer = setTimeout(() => onSearch(input), 500)
+        return () => clearTimeout(timer)
     }, [input, onSearch])
 
     return (
@@ -96,7 +99,7 @@ export function CustomersActionBar({ onSearch, onStatusChange, onSourceChange, o
                     type="text"
                     value={input}
                     onChange={e => setInput(e.target.value)}
-                    placeholder="Name or email..."
+                    placeholder={c.searchPlaceholder}
                     className="w-full h-[50px] bg-[#1e293b] border border-white/[0.08] rounded-[16px] pl-11 pr-4 text-[16px] text-white placeholder:text-white/40 outline-none focus:border-blue-500/50 transition-colors"
                 />
             </div>
@@ -115,7 +118,7 @@ export function CustomersActionBar({ onSearch, onStatusChange, onSourceChange, o
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M8 10L8 2M8 10L5 7M8 10L11 7M3 12H13" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    {exporting ? 'Exporting…' : 'Export CSV'}
+                    {exporting ? c.exporting : c.exportCsv}
                 </button>
             </div>
         </div>
