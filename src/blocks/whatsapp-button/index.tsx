@@ -4,6 +4,8 @@ import type { BlockProps } from '../types'
 import type { WhatsappButtonConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
+import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 
 void _CSS_VARS
 
@@ -13,9 +15,20 @@ const WhatsAppIcon = () => (
     </svg>
 )
 
+// Strip any HTML that may have been stored incorrectly in the label field
+function sanitizeLabel(raw: string | undefined): string {
+    if (!raw) return 'Chat with us'
+    const stripped = raw.replace(/<[^>]*>/g, '').trim()
+    return stripped || 'Chat with us'
+}
+
 export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<WhatsappButtonConfig>) {
     void _theme
-    const { variant = 'floating', phoneNumber, message, label = 'Chat with us', position = 'bottom-right' } = block
+    const { variant = 'floating', phoneNumber, message, label: rawLabel = 'Chat with us', position = 'bottom-right' } = block
+    const label = sanitizeLabel(rawLabel)
+
+    const callback = useBlockEditCallback()
+    const inContainer = useInFloatingContainer()
 
     const cleanPhone = phoneNumber?.replace(/[^0-9]/g, '') || ''
     const whatsappUrl = `https://wa.me/${cleanPhone}${message ? `?text=${encodeURIComponent(message)}` : ''}`
@@ -33,7 +46,7 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
                         style={{ backgroundColor: '#25D366' }}
                     >
                         <WhatsAppIcon />
-                        {label}
+                        <span>{label}</span>
                     </a>
                 </div>
             </section>
@@ -43,21 +56,23 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
     // ── Default: floating variant ────────────────────────────────────────
     return (
         <div
-            className={`fixed z-50 ${position === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6`}
+            className={inContainer ? '' : `fixed z-50 ${position === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6`}
         >
             <a
                 href={whatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={callback ? e => e.preventDefault() : undefined}
+                data-no-text-edit
                 className="group flex items-center gap-3 bg-[#25D366] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 aria-label={label}
             >
-                {/* Pulse animation ring */}
-                <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-20" />
+                {/* Pulse animation ring — hidden in editor to avoid obscuring selection border */}
+                {!callback && <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-20" />}
 
-                <span className="relative flex items-center gap-3 px-5 py-3">
+                <span data-no-text-edit className="relative flex items-center px-5 py-3">
                     <WhatsAppIcon />
-                    <span className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
+                    <span data-text-editable className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs group-hover:ml-3 transition-all duration-300 whitespace-nowrap">
                         {label}
                     </span>
                 </span>

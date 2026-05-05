@@ -803,8 +803,8 @@ export function createAddSectionBlock({
                 showMap: false,
                 currency: 'RM',
                 properties: [
-                    { title: '3-Bedroom Apartment', price: 450000, location: 'Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, imageUrls: [], type: 'sale' as const, description: 'Modern apartment in a prime location.' },
-                    { title: 'Studio Unit', price: 1800, location: 'Petaling Jaya', bedrooms: 1, bathrooms: 1, area: 550, imageUrls: [], type: 'rent' as const, description: 'Cozy studio ideal for working professionals.' },
+                    { title: '3-Bedroom Apartment', price: 450000, location: 'Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, type: 'sale' as const, description: 'Modern apartment in a prime location.' },
+                    { title: 'Studio Unit', price: 1800, location: 'Petaling Jaya', bedrooms: 1, bathrooms: 1, area: 550, type: 'rent' as const, description: 'Cozy studio ideal for working professionals.' },
                 ],
             }
 

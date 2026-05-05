@@ -1149,7 +1149,7 @@ const PropertyCardBlock = {
                 { name: 'bedrooms', type: 'number' },
                 { name: 'bathrooms', type: 'number' },
                 { name: 'area', type: 'number' },
-                { name: 'imageUrls', type: 'json' },
+                { name: 'image', type: 'upload', relationTo: 'media' },
                 {
                     name: 'type', type: 'select', defaultValue: 'sale',
                     options: [

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
@@ -8,12 +8,12 @@ import type { PropertyCardConfig, PropertyItem } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
+import { HeroMediaOverlay } from '../hero/hero-media-overlay'
 import {
     CONTAINER,
     INNER_PADDING,
     SECTION_PADDING,
     CARD_PADDING,
-    TOUCH_TARGET,
 } from '@/lib/design-tokens'
 
 const PROPERTY_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -66,57 +66,31 @@ function TypeBadge({ type }: { type: 'sale' | 'rent' }) {
     )
 }
 
-function PropertyImage({ property, className = '' }: { property: PropertyItem; className?: string }) {
-    const [imgIndex, setImgIndex] = useState(0)
-    const images = property.imageUrls.length > 0 ? property.imageUrls : []
+function PropertyImage({ property, imageField, className = '' }: { property: PropertyItem; imageField: string; className?: string }) {
+    const imageUrl = property.image && typeof property.image === 'object' && 'url' in property.image
+        ? (property.image as { url: string }).url
+        : typeof property.image === 'string'
+            ? property.image
+            : null
 
-    if (images.length === 0) {
-        return (
-            <div className={`${className} flex items-center justify-center`} style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
-                <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-                </svg>
-            </div>
-        )
-    }
+    const placeholder = (
+        <div className="w-full h-full flex items-center justify-center" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
+            <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+            </svg>
+        </div>
+    )
+
+    const image = imageUrl ? (
+        <div className="relative w-full h-full">
+            <Image src={imageUrl} alt={property.title} fill className="object-cover" />
+        </div>
+    ) : placeholder
 
     return (
-        <div className={`${className} relative group`}>
-            <Image src={images[imgIndex]!} alt={property.title} fill className="object-cover" />
-            {images.length > 1 && (
-                <>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setImgIndex((imgIndex - 1 + images.length) % images.length) }}
-                        className={`absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px]`}
-                        aria-label="Previous image"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setImgIndex((imgIndex + 1) % images.length) }}
-                        className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px]`}
-                        aria-label="Next image"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                        {images.map((_, i) => (
-                            <span
-                                key={i}
-                                className="w-1.5 h-1.5 rounded-full"
-                                style={{ background: i === imgIndex ? '#fff' : 'rgba(255,255,255,0.5)' }}
-                            />
-                        ))}
-                    </div>
-                </>
-            )}
-        </div>
+        <HeroMediaOverlay field={imageField} altText={property.title} positionClass="relative" className={className}>
+            {image}
+        </HeroMediaOverlay>
     )
 }
 
@@ -172,7 +146,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                     style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                 >
                     <div className="relative">
-                        <PropertyImage property={prop} className="aspect-[16/10] overflow-hidden" />
+                        <PropertyImage property={prop} imageField={`properties.${i}.image`} className="aspect-[16/10] overflow-hidden" />
                         <div className="absolute top-3 left-3">
                             <TypeBadge type={prop.type} />
                         </div>
@@ -207,7 +181,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                     style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                 >
                     <div className="md:w-72 shrink-0 relative">
-                        <PropertyImage property={prop} className="aspect-[16/10] md:aspect-auto md:h-full overflow-hidden" />
+                        <PropertyImage property={prop} imageField={`properties.${i}.image`} className="aspect-[16/10] md:aspect-auto md:h-full overflow-hidden" />
                         <div className="absolute top-3 left-3">
                             <TypeBadge type={prop.type} />
                         </div>
@@ -242,7 +216,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                     style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                 >
                     <div className="grid grid-cols-1 lg:grid-cols-2">
-                        <PropertyImage property={hero} className="aspect-[16/10] lg:aspect-auto lg:min-h-[400px] overflow-hidden" />
+                        <PropertyImage property={hero} imageField="properties.0.image" className="aspect-[16/10] lg:aspect-auto lg:min-h-[400px] overflow-hidden" />
                         <div className={`${CARD_PADDING.lg} lg:p-10 flex flex-col justify-center`}>
                             <TypeBadge type={hero.type} />
                             <Heading level={3} className="mt-4 mb-2">{hero.title}</Heading>
@@ -265,7 +239,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                                 className="rounded-2xl overflow-hidden transition-shadow duration-300 hover:shadow-lg"
                                 style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                             >
-                                <PropertyImage property={prop} className="aspect-[16/10] overflow-hidden" />
+                                <PropertyImage property={prop} imageField={`properties.${i + 1}.image`} className="aspect-[16/10] overflow-hidden" />
                                 <div className="p-5">
                                     <TypeBadge type={prop.type} />
                                     <PropertyPrice price={prop.price} type={prop.type} currency={currency} size="md" className="mt-2" />
