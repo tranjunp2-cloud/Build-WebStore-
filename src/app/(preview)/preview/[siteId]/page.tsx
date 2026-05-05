@@ -87,10 +87,32 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         if (String(pageSiteId) !== String(siteId)) {
             return notFound()
         }
-        // Issue 862: hidden pages (isVisible=false) return 404 in preview to match live site behavior.
+        // Issue 862: hidden pages (isVisible=false) render the site's 404 page in preview.
         // Builder mode is exempt so the owner can still edit/view the hidden page in the editor.
         if (page.isVisible === false && !builder) {
-            return notFound()
+            const notFoundResult = await payload.find({
+                collection: 'pages',
+                where: {
+                    and: [
+                        { site: { equals: siteId } },
+                        { or: [{ slug: { equals: '/404' } }, { slug: { equals: '404' } }] },
+                    ],
+                },
+                draft: true,
+                limit: 1,
+                depth: 3,
+            })
+            page = notFoundResult.docs[0] || {
+                id: 0,
+                title: '404 — Page Not Found',
+                slug: '404',
+                layout: [{
+                    blockType: 'hero',
+                    variant: 'centered',
+                    headline: '404',
+                    subheadline: 'This page is hidden and not visible to visitors.',
+                }],
+            }
         }
     } else {
         // Find Homepage
