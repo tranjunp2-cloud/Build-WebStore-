@@ -105,6 +105,7 @@ export default function ProductEditPage() {
                         shippingHeight: data.dimensions?.height ? parseFloat(data.dimensions.height) : undefined,
 
                         metaTitle: data.seo?.title || '',
+                        metaDescription: data.seo?.description || '',
                         autoGenerateSeo: false, // UI default
                     }
                     setInitialData(mappedData)
