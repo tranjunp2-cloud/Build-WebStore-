@@ -44,11 +44,15 @@ export function PreviewScripts() {
             return Array.from(document.querySelectorAll('[data-block-index]'))
                 .map((node) => {
                     const rect = node.getBoundingClientRect()
+                    // Use first element child's top to skip block-spacing padding so the
+                    // action bar appears just above the visible content, not the invisible gap.
+                    const firstChild = node.firstElementChild as HTMLElement | null
+                    const contentTop = firstChild ? firstChild.getBoundingClientRect().top : rect.top
                     return {
-                        top: rect.top,
+                        top: contentTop,
                         left: rect.left,
                         width: rect.width,
-                        height: rect.height,
+                        height: rect.bottom - contentTop,
                         blockIndex: parseInt(node.getAttribute('data-block-index') || '-1', 10),
                         blockType: node.getAttribute('data-block-type')
                     }
@@ -86,13 +90,15 @@ export function PreviewScripts() {
             if (blockType && !excludedBlockTypes.includes(blockType) && hoveredBlock !== blockContainer) {
                 hoveredBlock = blockContainer
                 const rect = blockContainer.getBoundingClientRect()
+                const firstChild = (blockContainer as HTMLElement).firstElementChild as HTMLElement | null
+                const contentTop = firstChild ? firstChild.getBoundingClientRect().top : rect.top
                 window.parent.postMessage({
                     type: 'BLOCK_CONTAINER_HOVERED',
                     layout: {
-                        top: rect.top,
+                        top: contentTop,
                         left: rect.left,
                         width: rect.width,
-                        height: rect.height,
+                        height: rect.bottom - contentTop,
                         blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10),
                         blockType
                     }
@@ -425,12 +431,14 @@ export function PreviewScripts() {
                 const isGlobal = ['navigation', 'footer', 'breadcrumb'].includes(blockType || '')
                 if (blockIndex >= 0 || isGlobal) {
                     const rect = clickedBlock.getBoundingClientRect()
+                    const firstChild = (clickedBlock as HTMLElement).firstElementChild as HTMLElement | null
+                    const contentTop = firstChild ? firstChild.getBoundingClientRect().top : rect.top
                     window.parent.postMessage({
                         type: 'BLOCK_CONTAINER_CLICKED',
                         blockIndex,
                         layout: {
-                            top: rect.top, left: rect.left,
-                            width: rect.width, height: rect.height,
+                            top: contentTop, left: rect.left,
+                            width: rect.width, height: rect.bottom - contentTop,
                             blockIndex, blockType,
                         },
                     }, parentOrigin)
