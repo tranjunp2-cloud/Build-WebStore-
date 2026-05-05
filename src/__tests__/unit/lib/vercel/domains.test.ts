@@ -116,7 +116,7 @@ describe('addProjectDomain', () => {
             `https://api.vercel.com/v10/projects/${PROJECT_ID}/domains?teamId=${TEAM_ID}`,
         )
         expect(init.method).toBe('POST')
-        expect(init.body).toBe(JSON.stringify({ name: 'example.com' }))
+        expect(init.body).toBe(JSON.stringify({ name: 'example.com', gitBranch: 'main' }))
         const headers = init.headers as Record<string, string>
         expect(headers.Authorization).toBe(`Bearer ${TOKEN}`)
         expect(headers['Content-Type']).toBe('application/json')
