@@ -377,6 +377,60 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
         )
     }
 
+    // ── grid variant ──────────────────────────────────────────────────────
+    if (variant === 'grid') {
+        return (
+            <TestimonialsSection decorative={<GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={350} opacity={0.05} />}>
+                <TestimonialsHeader headline={headline} showSubtitle />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {testimonials.map((t, i) => (
+                        <motion.div
+                            key={`${t.name || 'testimonial'}-${i}`}
+                            initial={{ opacity: 0, y: 16 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: i * 0.06, duration: 0.4 }}
+                            className="flex gap-4 p-5 rounded-xl"
+                            style={{
+                                background: 'rgba(var(--brand-primary-rgb), 0.025)',
+                                border: '1px solid rgba(var(--brand-primary-rgb), 0.063)',
+                                borderLeft: '3px solid rgba(var(--brand-primary-rgb), 0.3)',
+                            }}
+                        >
+                            <div className="shrink-0 mt-1">
+                                <AvatarRing
+                                    color={CSS_VARS.primary}
+                                    src={t.avatar?.url || getTeamAvatar(category, i, s3Map)}
+                                    name={t.name}
+                                    size={40}
+                                    imageIndex={i}
+                                />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <StarRating count={t.rating || 5} className="flex gap-0.5 mb-2" />
+                                <Body size="small" className="opacity-70 italic mb-3 line-clamp-4">
+                                    &ldquo;{t.quote}&rdquo;
+                                </Body>
+                                <AuthorMeta
+                                    name={t.name}
+                                    title={t.title}
+                                    company={t.company}
+                                    showAvatar={false}
+                                    layout="stacked"
+                                />
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+            </TestimonialsSection>
+        )
+    }
+
+    // ── single variant ────────────────────────────────────────────────────
+    if (variant === 'single') {
+        return <TestimonialsSingle headline={headline} testimonials={testimonials} category={category} s3Map={s3Map} />
+    }
+
     // ── Default: cards variant ────────────────────────────────────────────
     return (
         <TestimonialsSection decorative={<LayeredShapes color={CSS_VARS.primary} opacity={0.1} />}>
@@ -858,6 +912,89 @@ function TestimonialsAvatarRow({
                     )}
                 </motion.div>
             </AnimatePresence>
+        </TestimonialsSection>
+    )
+}
+
+// \u2500\u2500 Single sub-component \u2014 1 large testimonial, manual prev/next \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+function TestimonialsSingle({
+    headline,
+    testimonials,
+    category,
+    s3Map,
+}: {
+    headline?: string
+    testimonials: TestimonialItem[]
+    category: string
+    s3Map?: Record<string, string>
+}) {
+    const [currentIndex, setCurrentIndex] = useState(0)
+
+    if (testimonials.length === 0) return null
+    // Clamp index in case testimonials array shrinks (e.g. CMS live preview deletes items)
+    const safeIndex = Math.min(currentIndex, testimonials.length - 1)
+    const t = testimonials[safeIndex]
+
+    const goPrev = () => setCurrentIndex(i => (i - 1 + testimonials.length) % testimonials.length)
+    const goNext = () => setCurrentIndex(i => (i + 1) % testimonials.length)
+
+    return (
+        <TestimonialsSection decorative={<TypographicMark text="\u201c" color={CSS_VARS.primary} opacity={0.05} size="xl" />}>
+            <TestimonialsHeader headline={headline} />
+            {/* aria-live on the stable container, not the AnimatePresence child that unmounts */}
+            <div
+                className="relative max-w-3xl mx-auto"
+                role="region"
+                aria-roledescription="carousel"
+                aria-label="Customer testimonial"
+                aria-live="polite"
+                aria-atomic="true"
+            >
+                {testimonials.length > 1 && (
+                    <>
+                        <CarouselArrow direction="prev" onClick={goPrev} />
+                        <CarouselArrow direction="next" onClick={goNext} />
+                    </>
+                )}
+
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={safeIndex}
+                        initial={{ opacity: 0, scale: 0.97 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.97 }}
+                        transition={{ duration: 0.35 }}
+                        className="p-10 md:p-14 rounded-2xl text-center"
+                        style={{
+                            background: 'linear-gradient(160deg, rgba(var(--brand-primary-rgb), 0.05), transparent 60%)',
+                            border: '1px solid rgba(var(--brand-primary-rgb), 0.12)',
+                            boxShadow: '0 12px 48px rgba(var(--brand-primary-rgb), 0.08)',
+                        }}
+                    >
+                        <div className="flex justify-center mb-8">
+                            <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, safeIndex, s3Map)} name={t.name} size={88} imageIndex={safeIndex} />
+                        </div>
+                        <StarRating count={t.rating || 5} size="lg" className="flex justify-center gap-1 mb-6" />
+                        <blockquote className="text-xl md:text-2xl italic opacity-70 leading-relaxed mb-8">
+                            &ldquo;{t.quote}&rdquo;
+                        </blockquote>
+                        <RichText text={t.name} as="p" className="font-bold text-lg" />
+                        {(t.title || t.company) && (
+                            <Body size="small" className="opacity-45 mt-1">{[t.title, t.company].filter(Boolean).join(' \u2022 ')}</Body>
+                        )}
+                    </motion.div>
+                </AnimatePresence>
+
+                {testimonials.length > 1 && (
+                    <DotIndicator
+                        count={testimonials.length}
+                        activeIndex={safeIndex}
+                        onSelect={setCurrentIndex}
+                        label={(i) => `View testimonial ${i + 1}`}
+                        className="flex justify-center gap-2 mt-8"
+                    />
+                )}
+            </div>
         </TestimonialsSection>
     )
 }
