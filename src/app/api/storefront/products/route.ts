@@ -53,6 +53,15 @@ export async function GET(req: Request) {
             currency: doc.currency,
             images: doc.images,
             status: doc.status,
+            hasVariants: doc.hasVariants ?? false,
+            variants: Array.isArray(doc.variants)
+                ? doc.variants.map((v: Record<string, unknown>) => ({
+                      name: v.name,
+                      price: v.price,
+                      compareAtPrice: v.compareAtPrice ?? null,
+                      stock: v.stock ?? 0,
+                  }))
+                : [],
         }))
 
         return NextResponse.json({
