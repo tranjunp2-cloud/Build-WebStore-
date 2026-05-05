@@ -5,7 +5,16 @@ import config from '@payload-config'
 import { assertStaging } from '@/lib/env'
 import { getCurrentUser } from '@/lib/auth'
 
-type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'sites'
+type CollectionSlug =
+    | 'analytics'
+    | 'orders'
+    | 'subscriptions'
+    | 'products'
+    | 'sites'
+    | 'blogs'
+    | 'subscribers'
+    | 'contact-submissions'
+    | 'categories'
 
 interface ClearResult {
     [collection: string]: number
@@ -111,7 +120,8 @@ export async function POST() {
                 payload, 'products', { tenant: { equals: tenantId } },
             )
 
-            // Step 5: Pages (linked via site, not tenant directly)
+            // Step 5: Collections with NOT NULL site_id must be deleted before sites
+            // to avoid FK constraint violations (SET NULL blocked by NOT NULL).
             const { docs: sites } = await payload.find({
                 collection: 'sites',
                 where: { tenant: { equals: tenantId } },
@@ -119,6 +129,13 @@ export async function POST() {
                 depth: 0,
             })
             for (const site of sites) {
+                const siteWhere = { site: { equals: site.id } }
+
+                results.blogs = (results.blogs || 0) + await clearCollection(payload, 'blogs', siteWhere)
+                results.subscribers = (results.subscribers || 0) + await clearCollection(payload, 'subscribers', siteWhere)
+                results['contact-submissions'] = (results['contact-submissions'] || 0) + await clearCollection(payload, 'contact-submissions', siteWhere)
+                results.categories = (results.categories || 0) + await clearCollection(payload, 'categories', siteWhere)
+
                 // Use direct SQL to avoid payload.find() which generates aggregate query
                 // expecting a "data" column that doesn't exist in pages_blocks_* tables
                 const db = payload.db.drizzle

@@ -3731,6 +3731,8 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_booking_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_booking_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "pages_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_property_card_properties.add_image_id', sql: `ALTER TABLE "pages_blocks_property_card_properties" ADD COLUMN IF NOT EXISTS image_id integer;` },
+  { name: '_pages_v_blocks_property_card_properties.add_image_id', sql: `ALTER TABLE "_pages_v_blocks_property_card_properties" ADD COLUMN IF NOT EXISTS image_id integer;` },
 ];
 
 async function runMigrations(pool) {

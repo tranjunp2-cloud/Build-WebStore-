@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import type { BlockProps } from '../types'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig, type SocialLinkItem, type SocialPlatform, type SocialWidgetConfig } from './config'
 import { mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { Facebook, Instagram, Linkedin, Youtube, MessageCircle } from 'lucide-react'
+import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 
 const SW_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
@@ -65,20 +67,26 @@ type SocialLinkAnchorProps = {
 function SocialLinkAnchor({ platform, url, showLabelAlways = false, extraClassName = '' }: SocialLinkAnchorProps) {
     const meta = PLATFORM_META[platform]
     const style = getPlatformStyles(platform)
+    const [hovered, setHovered] = useState(false)
+
     const labelCls = showLabelAlways
         ? 'text-sm font-medium text-white/85'
-        : 'hidden text-sm font-medium text-white/85 group-hover:block'
+        : `text-sm font-medium overflow-hidden transition-all duration-300 whitespace-nowrap ${hovered ? 'max-w-xs ml-3' : 'max-w-0'}`
+
     return (
         <a
             href={normalizeUrl(platform, url)}
             target="_blank"
             rel="noreferrer"
             aria-label={meta.label}
-            className={`group flex items-center gap-3 rounded-2xl border px-3 py-2 transition-transform duration-200 hover:-translate-y-0.5 ${TOUCH_TARGET.min} ${extraClassName}`.trim()}
+            data-no-text-edit
+            onMouseEnter={showLabelAlways ? undefined : () => setHovered(true)}
+            onMouseLeave={showLabelAlways ? undefined : () => setHovered(false)}
+            className={`flex items-center ${showLabelAlways ? 'gap-3' : ''} rounded-2xl border px-3 py-2 transition-transform duration-200 hover:-translate-y-0.5 ${TOUCH_TARGET.min} ${extraClassName}`.trim()}
             style={style}
         >
             <PlatformBadge platform={platform} />
-            <span className={labelCls}>{meta.label}</span>
+            <span data-no-text-edit className={labelCls}>{meta.label}</span>
         </a>
     )
 }
@@ -89,16 +97,17 @@ export function SocialWidgetBlock({ block, site }: BlockProps<SocialWidgetConfig
     if (links.length === 0) {
         links = getDefaultSocialWidgetLinks().filter(item => item.enabled !== false)
     }
+    const inContainer = useInFloatingContainer()
 
     // ── Inline variant ───────────────────────────────────────────────────
     if (block.variant === 'inline') {
         return (
             <section className="py-10">
-                <div className={SW_CONTAINER}>
+                <div data-no-text-edit className={SW_CONTAINER}>
                     {normalizedBlock.headline ? (
-                        <Caption className="mb-3 block font-medium text-slate-400">{normalizedBlock.headline}</Caption>
+                        <Caption data-text-editable className="mb-3 block font-medium text-slate-400">{normalizedBlock.headline}</Caption>
                     ) : null}
-                    <div className="flex flex-wrap gap-3">
+                    <div data-no-text-edit className="flex flex-wrap gap-3">
                         {links.map(item => (
                             <SocialLinkAnchor
                                 key={item.platform}
@@ -116,12 +125,12 @@ export function SocialWidgetBlock({ block, site }: BlockProps<SocialWidgetConfig
 
     // ── Default: floating variant ────────────────────────────────────────
     return (
-        <section className="fixed bottom-6 right-6 z-40">
-            <div className="flex flex-col items-end gap-3">
+        <section className={inContainer ? '' : 'fixed bottom-6 right-6 z-40'}>
+            <div data-no-text-edit className="flex flex-col items-end gap-3">
                 {normalizedBlock.headline ? (
-                    <Caption className="mb-1 block font-medium text-slate-400">{normalizedBlock.headline}</Caption>
+                    <Caption data-text-editable className="mb-1 block font-medium text-slate-400">{normalizedBlock.headline}</Caption>
                 ) : null}
-                <div className="flex flex-col gap-3">
+                <div data-no-text-edit className="flex flex-col items-end gap-3">
                     {links.map(item => (
                         <SocialLinkAnchor
                             key={item.platform}

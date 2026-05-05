@@ -8,7 +8,7 @@ export type PropertyItem = {
     bedrooms: number
     bathrooms: number
     area: number
-    imageUrls: string[]
+    image?: { id: number; url: string; alt?: string } | string | number | null
     type: 'sale' | 'rent'
     status?: string
     mapUrl?: string
@@ -37,7 +37,7 @@ export const PropertyCardConfigSchema = BaseBlockSchema.extend({
         bedrooms: z.number(),
         bathrooms: z.number(),
         area: z.number(),
-        imageUrls: z.array(z.string()).default([]),
+        image: z.union([z.object({ id: z.number(), url: z.string(), alt: z.string().optional() }), z.string(), z.number(), z.null()]).optional(),
         type: z.enum(['sale', 'rent']),
         status: z.string().optional(),
         mapUrl: z.string().optional(),

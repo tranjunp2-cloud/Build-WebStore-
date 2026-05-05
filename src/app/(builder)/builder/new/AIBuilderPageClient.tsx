@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GripVertical, Lock } from 'lucide-react'
+import { GripVertical, Loader2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { Reorder } from 'framer-motion'
@@ -665,9 +665,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             const saved = await saveDraftNow()
             if (!saved) return
         }
-        reset()
-        clearBuilderSessionStorage()
+        setIsNavigating(true)
+        // Navigate FIRST, then clear state (prevents flash of builder form — mirrors handleDashboard)
         router.push(`/editor/${siteId}`)
+        setTimeout(() => {
+            reset()
+            clearBuilderSessionStorage()
+        }, 100)
     }, [reset, router, saveDraftNow, siteId])
 
     const handlePublish = useCallback(async () => {
@@ -782,6 +786,17 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         </div>
     ) : null
 
+    // Guard: while navigating away, show a loading screen so any store reset
+    // (step→'info') that fires before the component unmounts doesn't flash the form.
+    if (isNavigating) {
+        return (
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-[#06090F]">
+                <Loader2 className="size-8 animate-spin text-white/40" />
+                <p className="text-sm text-white/40">{t.onboarding.completion.redirecting}</p>
+            </div>
+        )
+    }
+
     if (step === 'info') {
         if (showPaywall) {
             return <PaywallCard onBack={() => setShowPaywall(false)} />
@@ -863,18 +878,21 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
                         if (!open) {
-                            // Dismissing success modal → land users on their dashboard
-                            // (X, backdrop click, Esc all route here). Reset builder state first
-                            // so navigating back to /builder/new starts clean.
                             setPublishedSiteUrl(null)
-                            reset()
-                            clearBuilderSessionStorage()
+                            setIsNavigating(true)
                             router.push('/dashboard')
+                            setTimeout(() => {
+                                reset()
+                                clearBuilderSessionStorage()
+                            }, 100)
                         }
                     }}
                     onNavigate={() => {
-                        reset()
-                        clearBuilderSessionStorage()
+                        setIsNavigating(true)
+                        setTimeout(() => {
+                            reset()
+                            clearBuilderSessionStorage()
+                        }, 100)
                     }}
                     siteId={siteId || ''}
                     siteName={siteName || businessInfo?.businessName || 'your-site'}

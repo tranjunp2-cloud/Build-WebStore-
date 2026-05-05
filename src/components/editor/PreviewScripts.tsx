@@ -29,6 +29,10 @@ export function PreviewScripts() {
 
         const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
         const excludedBlockTypes = ['navigation', 'footer', 'breadcrumb']
+        // cartWidget has no user-editable text fields — block contenteditable entirely
+        const noTextEditBlockTypes = new Set(['cartWidget'])
+        // Only whatsapp-button and cartWidget suppress BLOCK_HOVERED — socialWidget hover is intentionally allowed
+        const noHoverHintBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
         // Blocks whose images come from external product catalog — image editing not supported
         const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
         
@@ -40,11 +44,19 @@ export function PreviewScripts() {
             return Array.from(document.querySelectorAll('[data-block-index]'))
                 .map((node) => {
                     const rect = node.getBoundingClientRect()
+                    // Use first element child's top to skip block-spacing padding so the
+                    // action bar appears just above the visible content, not the invisible gap.
+                    // Guard: only use contentTop if it's actually lower (avoids breaking floating
+                    // blocks whose wrapper top ≈ contentTop and have rect.height already correct).
+                    const firstChild = node.firstElementChild as HTMLElement | null
+                    const contentTop = firstChild ? firstChild.getBoundingClientRect().top : rect.top
+                    const top = contentTop > rect.top ? contentTop : rect.top
+                    const topDelta = top - rect.top
                     return {
-                        top: rect.top,
+                        top,
                         left: rect.left,
                         width: rect.width,
-                        height: rect.height,
+                        height: rect.height - topDelta,
                         blockIndex: parseInt(node.getAttribute('data-block-index') || '-1', 10),
                         blockType: node.getAttribute('data-block-type')
                     }
@@ -118,6 +130,9 @@ export function PreviewScripts() {
             }
 
             if (target.closest('[data-editor-control]')) return
+
+            // whatsapp-button and cartWidget use InlineEdit — skip BLOCK_HOVERED text hint
+            if (blockType && noHoverHintBlockTypes.has(blockType)) return
 
             if (!validTags.includes(target.tagName) || target.children.length > 1) {
                 return
@@ -295,6 +310,8 @@ export function PreviewScripts() {
             if (!blockContainer) return
             const blockType = blockContainer.getAttribute('data-block-type')
             if (blockType && excludedBlockTypes.includes(blockType)) return
+            // whatsapp-button and cartWidget use InlineEdit — global contenteditable must not activate
+            if (blockType && noTextEditBlockTypes.has(blockType)) return
 
             // Walk up from click target to find nearest valid editable element
             // (click may land on <b>, <i>, <u> inside a valid element)
@@ -304,6 +321,10 @@ export function PreviewScripts() {
                 target = target.parentElement!
             }
             if (!target || target === blockContainer || !validTags.includes(target.tagName)) return
+            // Skip elements explicitly marked as non-editable
+            if (target.hasAttribute('data-no-text-edit')) return
+            // Skip elements inside a no-edit zone unless they carry data-text-editable
+            if (!target.hasAttribute('data-text-editable') && !!target.parentElement?.closest('[data-no-text-edit]')) return
             // Skip image-placeholder elements — clicking them triggers image-replace, not text-edit
             if (target.getAttribute('data-image-index') !== null) return
             // Don't edit elements with many block-level children (sections, not text)
@@ -412,12 +433,16 @@ export function PreviewScripts() {
                 const isGlobal = ['navigation', 'footer', 'breadcrumb'].includes(blockType || '')
                 if (blockIndex >= 0 || isGlobal) {
                     const rect = clickedBlock.getBoundingClientRect()
+                    const firstChild = (clickedBlock as HTMLElement).firstElementChild as HTMLElement | null
+                    const contentTop = firstChild ? firstChild.getBoundingClientRect().top : rect.top
+                    const clickTop = contentTop > rect.top ? contentTop : rect.top
+                    const clickTopDelta = clickTop - rect.top
                     window.parent.postMessage({
                         type: 'BLOCK_CONTAINER_CLICKED',
                         blockIndex,
                         layout: {
-                            top: rect.top, left: rect.left,
-                            width: rect.width, height: rect.height,
+                            top: clickTop, left: rect.left,
+                            width: rect.width, height: rect.height - clickTopDelta,
                             blockIndex, blockType,
                         },
                     }, parentOrigin)
@@ -445,6 +470,8 @@ export function PreviewScripts() {
                                 if (pageId) window.parent.postMessage({ type: 'PAGE_NAVIGATE', pageId }, parentOrigin)
                             } catch (_) { /* invalid href */ }
                         }
+                    } else if (['socialWidget', 'whatsapp-button', 'cartWidget'].includes(anchorBlockType || '')) {
+                        // Floating widgets — absorb click, don't redirect in editor
                     } else if (href && isSafeUrl(href)) {
                         window.parent.postMessage({ type: 'OPEN_LINK', href }, parentOrigin)
                     }
