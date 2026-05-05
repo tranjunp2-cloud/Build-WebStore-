@@ -14,7 +14,6 @@ import {
     INNER_PADDING,
     SECTION_PADDING,
     CARD_PADDING,
-    TOUCH_TARGET,
 } from '@/lib/design-tokens'
 
 const PROPERTY_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
