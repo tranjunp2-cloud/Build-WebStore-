@@ -38,7 +38,7 @@ export const viewport: Viewport = {
 export default async function PreviewPage({ params, searchParams }: PreviewPageProps) {
     const { siteId } = await params
     const { pageId, builder } = await searchParams
-    
+
     // 1. Auth Check (P0 Security Rule - Auth Redirect)
     const user = await getCurrentUser() as PlatformUser | null
     if (!user) {
@@ -47,62 +47,92 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
 
     const payload = await getPayload({ config: payloadConfig })
 
-    try {
-        // 2. Fetch Site Data
-        // Using 'any' cast here as fallback because payload-types.ts is generated in the build step and not consistently available in all dev environments
-        const site = await payload.findByID({
-            collection: 'sites',
-            id: siteId,
-            depth: 2,
-        }) as any
+    // 2. Fetch Site Data
+    // Data-fetching and validation are kept outside try-catch so Next.js navigation
+    // errors (notFound, redirect) propagate correctly to the runtime instead of
+    // being swallowed by the catch block and rendered as PreviewLoadError.
+    // Using 'any' cast here as fallback because payload-types.ts is generated in the build step and not consistently available in all dev environments
+    const site = await payload.findByID({
+        collection: 'sites',
+        id: siteId,
+        depth: 2,
+    }) as any
 
-        if (!site) return notFound()
+    if (!site) return notFound()
 
-        // 3. Tenant Isolation Check (P0 Security Rule - Tenant Isolation)
-        // Ensure user has access to this site's tenant
-        const userTenants = user.tenants?.map((t: NonNullable<PlatformUser['tenants']>[number]) => typeof t.tenant === 'object' ? t.tenant.id : t.tenant) || []
-        const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
-        
-        if (!userTenants.includes(siteTenantId)) {
-            return <PreviewAccessDenied />
+    // 3. Tenant Isolation Check (P0 Security Rule - Tenant Isolation)
+    // Ensure user has access to this site's tenant
+    const userTenants = user.tenants?.map((t: NonNullable<PlatformUser['tenants']>[number]) => typeof t.tenant === 'object' ? t.tenant.id : t.tenant) || []
+    const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
+
+    if (!userTenants.includes(siteTenantId)) {
+        return <PreviewAccessDenied />
+    }
+
+    // 4. Fetch Page Data
+    // Using 'any' as fallback type for generated Payload Page interface
+    let page: any = null
+    if (pageId) {
+        page = await payload.findByID({
+            collection: 'pages',
+            id: pageId,
+            draft: true,
+            depth: 3,
+        })
+        if (!page) {
+            return notFound()
         }
-
-        // 4. Fetch Page Data
-        // Using 'any' as fallback type for generated Payload Page interface
-        let page: any = null
-        if (pageId) {
-            page = await payload.findByID({
-                collection: 'pages',
-                id: pageId,
-                draft: true,
-                depth: 3,
-            })
-            if (!page) {
-                return notFound()
-            }
-            // Verify page belongs to the current site (P0 Security Rule - prevent cross-site page access)
-            const pageSiteId = typeof page.site === 'object' ? page.site?.id : page.site
-            if (String(pageSiteId) !== String(siteId)) {
-                return notFound()
-            }
-        } else {
-            // Find Homepage
-            const pagesResult = await payload.find({
+        // Verify page belongs to the current site (P0 Security Rule - prevent cross-site page access)
+        const pageSiteId = typeof page.site === 'object' ? page.site?.id : page.site
+        if (String(pageSiteId) !== String(siteId)) {
+            return notFound()
+        }
+        // Issue 862: hidden pages (isVisible=false) render the site's 404 page in preview.
+        // Builder mode is exempt so the owner can still edit/view the hidden page in the editor.
+        if (page.isVisible === false && !builder) {
+            const notFoundResult = await payload.find({
                 collection: 'pages',
                 where: {
-                    site: { equals: siteId },
-                    isHomepage: { equals: true },
+                    and: [
+                        { site: { equals: siteId } },
+                        { or: [{ slug: { equals: '/404' } }, { slug: { equals: '404' } }] },
+                    ],
                 },
                 draft: true,
                 limit: 1,
                 depth: 3,
             })
-            page = pagesResult.docs[0] || null
+            page = notFoundResult.docs[0] || {
+                id: 0,
+                title: '404 — Page Not Found',
+                slug: '404',
+                layout: [{
+                    blockType: 'hero',
+                    variant: 'centered',
+                    headline: '404',
+                    subheadline: 'This page is hidden and not visible to visitors.',
+                }],
+            }
         }
+    } else {
+        // Find Homepage
+        const pagesResult = await payload.find({
+            collection: 'pages',
+            where: {
+                site: { equals: siteId },
+                isHomepage: { equals: true },
+            },
+            draft: true,
+            limit: 1,
+            depth: 3,
+        })
+        page = pagesResult.docs[0] || null
+    }
 
-        if (!page) return <PreviewNoPage />
+    if (!page) return <PreviewNoPage />
 
-        // 4b. Ensure nav/footer on EVERY page (including homepage).
+    // 5. Nav/footer injection + render (try-catch only wraps complex rendering logic)
+    try {
         // BUG-F01-26: Check for WORKING nav (with links), not just block presence.
         // A nav block with empty links renders as invisible thin bar.
         const pageLayout = ((page.layout as Array<{ blockType: string; links?: unknown[]; columns?: unknown[]; [k: string]: unknown }>) || [])
@@ -185,7 +215,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             page = { ...page, layout: injectedLayout }
         }
 
-        // 5. Fetch all pages for navigation filtering parity
+        // Fetch all pages for navigation filtering parity
         const navPagesResult = await payload.find({
             collection: 'pages',
             where: { site: { equals: siteId } },
@@ -220,20 +250,6 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         )
 
     } catch (error) {
-        // Re-throw Next.js special errors (notFound, redirect) so the runtime handles them.
-        // Catching NEXT_NOT_FOUND here turns a proper 404 into a Server Component render error.
-        if (
-            error !== null &&
-            typeof error === 'object' &&
-            'digest' in error &&
-            typeof (error as Record<string, string>).digest === 'string' &&
-            (
-                (error as Record<string, string>).digest === 'NEXT_NOT_FOUND' ||
-                (error as Record<string, string>).digest.startsWith('NEXT_REDIRECT')
-            )
-        ) {
-            throw error
-        }
         console.error('[Preview] Error:', error)
         return <PreviewLoadError />
     }
