@@ -156,6 +156,23 @@ export function DescriptionSeoSection() {
                     </div>
                     
                     <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-[14px] font-medium text-[#F8FAFC] m-0">{t.dashboard.products.form.sections?.metaDesc || 'Meta Description'}</label>
+                            <span className="text-[12px] text-[#F8FAFC]/40">{t.dashboard.products.form.sections?.metaDescMax || '(max 160 chars)'}</span>
+                        </div>
+                        <textarea
+                            {...register('metaDescription')}
+                            placeholder="Brief description for search engines (150-160 chars)"
+                            rows={3}
+                            className={cn(
+                                "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white focus:outline-none transition-colors resize-none",
+                                errors.metaDescription ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                            )}
+                        />
+                        {errors.metaDescription && <span className="text-[12px] text-red-500">{errors.metaDescription.message}</span>}
+                    </div>
+
+                    <div className="flex flex-col gap-2">
                         <label className="text-[14px] font-medium text-[#F8FAFC] m-0">{t.dashboard.products.form.sections?.urlSlug || 'URL Slug'}</label>
                         <input
                             {...register('urlSlug')}
