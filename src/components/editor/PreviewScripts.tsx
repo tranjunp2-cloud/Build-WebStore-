@@ -29,9 +29,10 @@ export function PreviewScripts() {
 
         const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
         const excludedBlockTypes = ['navigation', 'footer', 'breadcrumb']
-        // These floating widgets have visible editable labels — global text-edit mode must not activate on them.
-        // socialWidget uses icon-only sr-only labels, so it does not need this exclusion.
-        const noTextEditBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
+        // All floating widgets: block global contenteditable (sr-only text still triggers onTextClick otherwise)
+        const noTextEditBlockTypes = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+        // Only whatsapp-button and cartWidget suppress BLOCK_HOVERED — socialWidget hover is intentionally allowed
+        const noHoverHintBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
         // Blocks whose images come from external product catalog — image editing not supported
         const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
         
@@ -123,7 +124,7 @@ export function PreviewScripts() {
             if (target.closest('[data-editor-control]')) return
 
             // whatsapp-button and cartWidget use InlineEdit — skip BLOCK_HOVERED text hint
-            if (blockType && noTextEditBlockTypes.has(blockType)) return
+            if (blockType && noHoverHintBlockTypes.has(blockType)) return
 
             if (!validTags.includes(target.tagName) || target.children.length > 1) {
                 return
