@@ -18,7 +18,7 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
         const bg = backgroundColor || CSS_VARS.primary
         switch (variant) {
             case 'gradient':
-                return { background: `linear-gradient(135deg, ${bg}, ${bg}cc)` }
+                return { background: `linear-gradient(135deg, ${bg}, ${CSS_VARS.secondary})` }
             case 'solid':
                 return { backgroundColor: bg }
             case 'minimal':

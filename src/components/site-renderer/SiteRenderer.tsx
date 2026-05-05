@@ -19,9 +19,9 @@ import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
-// Blocks that render as position:fixed — must match actual Payload blockType slugs.
-// socialWidget/cartWidget are camelCase (BLOCK_TYPES registry); whatsapp-button is kebab.
-const FLOATING_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+// Blocks that skip block-spacing wrapper (position:fixed or sticky) — no padding applied.
+// socialWidget/cartWidget are camelCase (BLOCK_TYPES registry); whatsapp-button/announcement-bar are kebab.
+const FLOATING_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget', 'announcement-bar'])
 
 export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
 
