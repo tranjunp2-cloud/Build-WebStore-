@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import Link from 'next/link'
 import type { BlockProps } from '../types'
 import type { ProductsFeaturedConfig } from './config'
 import { GradientBlob, SectionLabel } from '../shared/decorative'
@@ -18,6 +19,7 @@ const CART_ENABLED = false
 
 interface FeaturedProduct {
     id: string
+    slug: string
     name: string
     price: string
     description: string
@@ -61,6 +63,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                     const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
                     return {
                         id: String(doc.id),
+                        slug: String(doc.slug || ''),
                         name: String(doc.name || ''),
                         price: `${currency} ${price.toFixed(2)}`,
                         description: String(doc.shortDescription || ''),
@@ -98,6 +101,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
         : [
             {
                 id: 'fallback-1',
+                slug: '',
                 name: headline,
                 price: '',
                 description: subheadline || '',
@@ -107,6 +111,10 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
         ]
 
     const product = displayProducts[0]!
+    const siteRec = site as Record<string, unknown>
+    const siteBasePath = typeof siteRec?.siteBasePath === 'string'
+        ? (siteRec.siteBasePath as string)
+        : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
 
     if (variant === 'carousel') {
         return (
@@ -193,13 +201,15 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                             Add to Cart
                         </button>
                         )}
-                        <button
-                            type="button"
-                            className={`px-8 py-4 rounded-full font-bold text-lg transition-colors ${TOUCH_TARGET.min}`}
-                            style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`, color: theme.colorMode === 'dark' ? '#fff' : '#000' }}
-                        >
-                            View Details
-                        </button>
+                        {product.slug && (
+                            <Link
+                                href={`${siteBasePath}/products/${product.slug}`}
+                                className={`px-8 py-4 rounded-full font-bold text-lg transition-colors inline-block text-center ${TOUCH_TARGET.min}`}
+                                style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`, color: theme.colorMode === 'dark' ? '#fff' : '#000' }}
+                            >
+                                View Details
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>
