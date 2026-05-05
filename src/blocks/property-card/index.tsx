@@ -8,6 +8,7 @@ import type { PropertyCardConfig, PropertyItem } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
+import { HeroMediaOverlay } from '../hero/hero-media-overlay'
 import {
     CONTAINER,
     INNER_PADDING,
@@ -66,27 +67,31 @@ function TypeBadge({ type }: { type: 'sale' | 'rent' }) {
     )
 }
 
-function PropertyImage({ property, index, className = '' }: { property: PropertyItem; index: number; className?: string }) {
+function PropertyImage({ property, imageField, className = '' }: { property: PropertyItem; imageField: string; className?: string }) {
     const imageUrl = property.image && typeof property.image === 'object' && 'url' in property.image
         ? (property.image as { url: string }).url
         : typeof property.image === 'string'
             ? property.image
             : null
 
-    if (!imageUrl) {
-        return (
-            <div data-image-index={index} className={`${className} flex items-center justify-center cursor-pointer`} style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
-                <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
-                </svg>
-            </div>
-        )
-    }
+    const placeholder = (
+        <div className={`${className} flex items-center justify-center`} style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
+            <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+            </svg>
+        </div>
+    )
+
+    const image = imageUrl ? (
+        <div className={`${className} relative`}>
+            <Image src={imageUrl} alt={property.title} fill className="object-cover" />
+        </div>
+    ) : placeholder
 
     return (
-        <div className={`${className} relative`}>
-            <Image src={imageUrl} alt={property.title} data-image-index={index} fill className="object-cover" />
-        </div>
+        <HeroMediaOverlay field={imageField} altText={property.title} positionClass="relative">
+            {image}
+        </HeroMediaOverlay>
     )
 }
 
@@ -142,7 +147,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                     style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                 >
                     <div className="relative">
-                        <PropertyImage property={prop} index={i} className="aspect-[16/10] overflow-hidden" />
+                        <PropertyImage property={prop} imageField={`properties.${i}.image`} className="aspect-[16/10] overflow-hidden" />
                         <div className="absolute top-3 left-3">
                             <TypeBadge type={prop.type} />
                         </div>
@@ -177,7 +182,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                     style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                 >
                     <div className="md:w-72 shrink-0 relative">
-                        <PropertyImage property={prop} index={i} className="aspect-[16/10] md:aspect-auto md:h-full overflow-hidden" />
+                        <PropertyImage property={prop} imageField={`properties.${i}.image`} className="aspect-[16/10] md:aspect-auto md:h-full overflow-hidden" />
                         <div className="absolute top-3 left-3">
                             <TypeBadge type={prop.type} />
                         </div>
@@ -212,7 +217,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                     style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                 >
                     <div className="grid grid-cols-1 lg:grid-cols-2">
-                        <PropertyImage property={hero} index={0} className="aspect-[16/10] lg:aspect-auto lg:min-h-[400px] overflow-hidden" />
+                        <PropertyImage property={hero} imageField="properties.0.image" className="aspect-[16/10] lg:aspect-auto lg:min-h-[400px] overflow-hidden" />
                         <div className={`${CARD_PADDING.lg} lg:p-10 flex flex-col justify-center`}>
                             <TypeBadge type={hero.type} />
                             <Heading level={3} className="mt-4 mb-2">{hero.title}</Heading>
@@ -235,7 +240,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                                 className="rounded-2xl overflow-hidden transition-shadow duration-300 hover:shadow-lg"
                                 style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                             >
-                                <PropertyImage property={prop} index={i + 1} className="aspect-[16/10] overflow-hidden" />
+                                <PropertyImage property={prop} imageField={`properties.${i + 1}.image`} className="aspect-[16/10] overflow-hidden" />
                                 <div className="p-5">
                                     <TypeBadge type={prop.type} />
                                     <PropertyPrice price={prop.price} type={prop.type} currency={currency} size="md" className="mt-2" />
