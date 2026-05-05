@@ -85,7 +85,7 @@ function PropertyImage({ property, index, className = '' }: { property: Property
 
     return (
         <div className={`${className} relative`}>
-            <Image src={imageUrl} alt={property.title} fill className="object-cover" />
+            <Image src={imageUrl} alt={property.title} data-image-index={index} fill className="object-cover" />
         </div>
     )
 }

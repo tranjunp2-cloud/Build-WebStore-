@@ -740,7 +740,7 @@ function PreviewFrameInner({
             // Skip URL-based strategies for blocks where imageIndex precisely identifies the array slot.
             // Strategies 1-5 can false-positive on OTHER array items (e.g. testimonials[0].avatar
             // matching when the user clicked testimonials[1]); Strategy 7 handles these correctly.
-            const ARRAY_BLOCK_TYPES = new Set(['carousel', 'portfolio-grid', 'team', 'testimonials', 'social-proof', 'logo-cloud'])
+            const ARRAY_BLOCK_TYPES = new Set(['carousel', 'portfolio-grid', 'team', 'testimonials', 'social-proof', 'logo-cloud', 'property-card'])
             const hasArrayIndex = imageClickData.imageIndex !== undefined && ARRAY_BLOCK_TYPES.has(imageClickData.blockType)
 
             // Strategy 1: Find URL string match in block data (text fields with URL)
