@@ -172,9 +172,9 @@ function EmailForm({ placeholder, buttonLabel, siteId, layout = 'row', onSuccess
                     placeholder={placeholder}
                     required
                     disabled={state === 'loading'}
-                    className="w-full px-4 py-3 bg-transparent border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] transition-colors disabled:opacity-60"
+                    className={`w-full px-4 py-3 rounded-md outline-none focus-visible:ring-2 transition-colors disabled:opacity-60 ${variantColor === 'inverse' ? 'border-2 bg-white/15 placeholder:text-white focus-visible:ring-white/50' : 'border focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)]'}`}
                     style={{
-                        borderColor: error ? '#ef4444' : 'rgba(var(--brand-primary-rgb), 0.3)',
+                        borderColor: error ? '#ef4444' : variantColor === 'inverse' ? 'rgba(255,255,255,0.9)' : 'rgba(var(--brand-primary-rgb), 0.3)',
                         color: variantColor === 'inverse' ? '#ffffff' : CSS_VARS.text,
                     }}
                     aria-describedby={error ? errorId : undefined}
