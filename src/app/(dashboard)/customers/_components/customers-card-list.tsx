@@ -65,7 +65,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
 
                             {/* Message preview */}
                             <p className="text-[12px] text-white/60 truncate">
-                                {record.message ?? 'Subscribed to Monthly News'}
+                                {record.message ?? c.defaultMessage}
                             </p>
                         </div>
 
@@ -77,7 +77,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                                 style={{ background: 'rgba(0,201,80,0.1)', color: '#05df72' }}
                             >
                                 <Eye className="w-4 h-4" />
-                                View
+                                {c.view}
                             </button>
                             <button
                                 onClick={() => onDelete(record)}
@@ -85,7 +85,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
                                 style={{ background: 'rgba(251,44,54,0.1)', color: '#ff6467' }}
                             >
                                 <Trash2 className="w-4 h-4" />
-                                Delete
+                                {c.deleteButton}
                             </button>
                         </div>
                     </div>
@@ -93,7 +93,7 @@ export function CustomersCardList({ records, total, page, limit, onSelect, onDel
             })}
 
             {totalPages > 1 && (
-                <div className="flex justify-center">
+                <div className="flex justify-center py-6 border-t border-white/[0.08] mt-2">
                     <Pagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} />
                 </div>
             )}

@@ -1212,7 +1212,25 @@
             "deleteConfirmPre": "Ini akan memadam secara kekal",
             "deleteConfirmPost": "dan tidak boleh dibatalkan.",
             "cancel": "Batal",
-            "deleteButton": "Padam"
+            "deleteButton": "Padam",
+            "colProfile": "Profil Pelanggan",
+            "colEmail": "E-mel",
+            "colSource": "Sumber & Laman",
+            "colMessage": "Mesej",
+            "colDate": "Tarikh Terkini",
+            "colStatus": "Status",
+            "colActions": "Tindakan",
+            "profileTitle": "Profil Pelanggan",
+            "infoTitle": "Maklumat Pelanggan",
+            "fieldName": "Nama",
+            "fieldEmail": "E-mel",
+            "fieldLatestDate": "Tarikh Terkini",
+            "timelineEntry": "Penghantaran Hubungi",
+            "loadDetailsFailed": "Gagal memuatkan butiran",
+            "sourceBadgeContact": "Borang Hubungi",
+            "sourceBadgeNewsletter": "Langganan Newsletter",
+            "defaultMessage": "Melanggan Berita Bulanan",
+            "view": "Lihat"
         },
         "settings": {
             "payments": {

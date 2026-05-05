@@ -20,6 +20,7 @@ import {
     LogOut,
     Package,
     Settings,
+    Users,
     X,
 } from 'lucide-react'
 import { NotificationBell } from '@/components/dashboard/NotificationBell'
@@ -84,6 +85,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 ],
             },
             { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
+            { label: { en: 'Customers', ms: 'Pelanggan' }, href: '/customers', icon: Users },
             {
                 label: { en: 'Site Settings', ms: 'Tetapan Laman' },
                 href: '/settings',

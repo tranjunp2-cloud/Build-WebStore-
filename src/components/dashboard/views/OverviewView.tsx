@@ -268,7 +268,7 @@ export async function OverviewView({ searchParams }: Props) {
             const pageDbRows = siteIds.length > 0
                 ? await (payload.db.drizzle.execute(sql`
                     SELECT id, title, slug, seo_title, seo_description, seo_no_index
-                    FROM pages WHERE site_id = ANY(${siteIds}) AND deleted_at IS NULL LIMIT 1000
+                    FROM pages WHERE site_id IN (${sql.raw(siteIds.join(','))}) AND deleted_at IS NULL LIMIT 1000
                 `) as Promise<{ rows: PageSEORow[] }>)
                 : { rows: [] as PageSEORow[] }
             const pagesRes = {

@@ -75,12 +75,11 @@ export async function SEOView() {
                     })
                 }
 
-                const siteIds = [site.id]
                 // pages: use direct SQL to avoid payload.find() which JOINs block tables
                 // expecting a "data" column that doesn't exist in our pages_blocks_* tables
                 const pageDbRows = await (payload.db.drizzle.execute(sql`
                     SELECT id, title, slug, seo_title, seo_description, seo_no_index
-                    FROM pages WHERE site_id = ANY(${siteIds}) AND deleted_at IS NULL LIMIT 1000
+                    FROM pages WHERE site_id = ${site.id} AND deleted_at IS NULL LIMIT 1000
                 `) as Promise<{ rows: Array<{ id: number; title: string; slug: string; seo_title: string | null; seo_description: string | null; seo_no_index: boolean | null }> }>)
                 const pagesRes = {
                     docs: pageDbRows.rows.map(r => ({

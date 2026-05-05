@@ -1,15 +1,21 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, User, Mail, Loader2 } from 'lucide-react'
+import { X, User, Mail, Loader2, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomerAvatar } from './customer-avatar'
 import { CustomerStatusBadge } from './customer-status-badge'
 import { getCustomerDetailAction, updateContactStatusAction } from '../actions'
+import { useI18n } from '@/i18n'
+import { cn } from '@/lib/utils'
 import type { CustomerRecord, CustomerStatus } from '../_lib/customer-record'
 
-const STATUS_LABELS: Record<CustomerStatus, string> = {
-    new: 'New', read: 'Read', contacted: 'Contacted', ignored: 'Ignored', subscribed: 'Subscribed',
+// Fixed to 'en-US' intentionally — dashboard date format is English regardless of active locale
+function formatLatestDate(iso: string): string {
+    const d = new Date(iso)
+    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    const date = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    return `${time} , ${date}`
 }
 
 // Allowed manual transitions per current status (per Figma spec)
@@ -36,6 +42,12 @@ function StatusDropdown({ status, disabled, onChange }: {
 }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
+    const { t } = useI18n()
+    const i = t.dashboard.customers
+    const statusLabels: Record<CustomerStatus, string> = {
+        new: i.statusNew, read: i.statusRead, contacted: i.statusContacted,
+        ignored: i.statusIgnored, subscribed: i.statusSubscribed,
+    }
     const c = STATUS_COLORS[status]
     const canChange = ALLOWED_TRANSITIONS[status].length > 0
 
@@ -56,7 +68,7 @@ function StatusDropdown({ status, disabled, onChange }: {
                 className="inline-flex items-center gap-1 rounded-[24px] pl-3 text-[14px] font-medium border bg-transparent cursor-pointer"
                 style={{ borderColor: c.border, color: c.text, background: c.bg, paddingRight: canChange ? '6px' : '12px', paddingTop: '5px', paddingBottom: '5px' }}
             >
-                {STATUS_LABELS[status]}
+                {statusLabels[status]}
                 {canChange && (
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className={`shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}>
                         <path d="M4.5 6.5L8 10L11.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -73,7 +85,7 @@ function StatusDropdown({ status, disabled, onChange }: {
                             onClick={() => { onChange(s); setOpen(false) }}
                             className={`w-full px-4 py-[10px] text-left text-[14px] transition-colors hover:bg-white/[0.05] border-none bg-transparent cursor-pointer ${s === status ? 'font-semibold text-white' : 'text-white/60'}`}
                         >
-                            {STATUS_LABELS[s]}
+                            {statusLabels[s]}
                         </button>
                     ))}
                 </div>
@@ -89,44 +101,58 @@ type Props = {
 }
 
 export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) {
+    const { t } = useI18n()
+    const c = t.dashboard.customers
     const [timeline, setTimeline] = useState<CustomerRecord[]>([])
     const [loadingDetail, setLoadingDetail] = useState(false)
     const [localStatus, setLocalStatus] = useState<CustomerStatus>('new')
     const [updating, setUpdating] = useState(false)
+    // Tracks the last status saved to server (after auto-transition or Update)
+    const serverStatusRef = useRef<CustomerStatus>('new')
 
     useEffect(() => {
         if (!record) return
         setLocalStatus(record.status)
+        serverStatusRef.current = record.status
         if (record.source !== 'contact-form') { setTimeline([]); return }
 
         // Auto-transition: New → Read when detail panel is first opened
         if (record.status === 'new') {
             setLocalStatus('read')
+            serverStatusRef.current = 'read'
             updateContactStatusAction(record.rawId, 'read')
                 .then(() => onStatusUpdate(record, 'read'))
-                .catch(() => {/* non-critical, don't show error */})
+                .catch(() => {/* non-critical */})
         }
 
         setLoadingDetail(true)
         getCustomerDetailAction(record.rawId, record.source)
             .then(res => setTimeline(res.timeline as CustomerRecord[]))
-            .catch(() => toast.error('Failed to load details'))
+            .catch(() => toast.error(c.loadDetailsFailed))
             .finally(() => setLoadingDetail(false))
     }, [record?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!record) return null
 
-    async function handleStatusChange(newStatus: CustomerStatus) {
-        if (!record || newStatus === localStatus) return
+    // Dropdown only updates local state — no API call until Update is clicked
+    function handleStatusChange(newStatus: CustomerStatus) {
+        if (newStatus === localStatus) return
         setLocalStatus(newStatus)
+    }
+
+    async function handleUpdate() {
+        if (!record) return
+        if (localStatus === serverStatusRef.current) { onClose(); return }
         setUpdating(true)
         try {
-            await updateContactStatusAction(record.rawId, newStatus)
-            onStatusUpdate(record, newStatus)
-            toast.success('Status updated')
+            await updateContactStatusAction(record.rawId, localStatus)
+            onStatusUpdate(record, localStatus)
+            serverStatusRef.current = localStatus
+            toast.success(c.statusUpdated)
+            onClose()
         } catch {
-            setLocalStatus(record.status)
-            toast.error('Failed to update status')
+            setLocalStatus(serverStatusRef.current)
+            toast.error(c.statusFailed)
         } finally {
             setUpdating(false)
         }
@@ -147,7 +173,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
 
             {/* Panel — bottom sheet on mobile, right sidebar on md+ */}
             <div
-                className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-[24px] min-h-[80vh] max-h-[90vh] md:min-h-0 md:bottom-auto md:top-0 md:left-auto md:h-full md:w-[500px] md:rounded-none border-t border-white/[0.08] md:border-l"
+                className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-[24px] min-h-[80vh] max-h-[90vh] md:min-h-0 md:max-h-none md:bottom-0 md:top-0 md:left-auto md:w-[500px] md:rounded-none border-t border-white/[0.08] md:border-l"
                 style={{ background: '#0b1120', backdropFilter: 'blur(20px)' }}
             >
                 {/* Drag handle (mobile only) */}
@@ -157,7 +183,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
 
                 {/* Header row: title + close */}
                 <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08] shrink-0">
-                    <h2 className="text-[18px] md:text-[20px] font-bold text-[#f8fafc]">Customer Profile</h2>
+                    <h2 className="text-[18px] md:text-[20px] font-bold text-[#f8fafc]">{c.profileTitle}</h2>
                     <button
                         onClick={onClose}
                         className="flex items-center justify-center w-9 h-9 rounded-[12px] text-white/50 hover:text-white hover:bg-white/10 transition-colors border-none bg-transparent cursor-pointer"
@@ -186,7 +212,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                         {/* Section header + status */}
                         <div className="flex items-center justify-between">
                             <p className="text-[12px] font-semibold uppercase tracking-[0.3px] text-white/60">
-                                Customer Information
+                                {c.infoTitle}
                             </p>
 
                             {record.source === 'contact-form' ? (
@@ -208,7 +234,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <User className="w-4 h-4 text-blue-400" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[12px] text-white/40 leading-4">Name</span>
+                                    <span className="text-[12px] text-white/40 leading-4">{c.fieldName}</span>
                                     <span className="text-[14px] text-[#f8fafc] leading-5">{displayName}</span>
                                 </div>
                             </div>
@@ -219,8 +245,21 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <Mail className="w-4 h-4 text-blue-400" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[12px] text-white/40 leading-4">Email</span>
+                                    <span className="text-[12px] text-white/40 leading-4">{c.fieldEmail}</span>
                                     <span className="text-[14px] text-[#f8fafc] leading-5">{record.email}</span>
+                                </div>
+                            </div>
+
+                            {/* Latest Date — all sources */}
+                            <div className="flex items-center gap-3 h-9">
+                                <div className="flex items-center justify-center w-8 h-8 rounded-[12px] shrink-0" style={{ background: 'rgba(59,130,246,0.1)' }}>
+                                    <CalendarDays className="w-4 h-4 text-blue-400" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[12px] text-white/40 leading-4">{c.fieldLatestDate}</span>
+                                    <span className="text-[14px] text-[#f8fafc] leading-5">
+                                        {formatLatestDate(record.createdAt)}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -232,7 +271,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                             {/* Section title */}
                             <div className="border-b pb-[17px]" style={{ borderColor: 'rgba(66,71,84,0.1)' }}>
                                 <p className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#dde2f8]">
-                                    Activity Timeline
+                                    {c.timeline}
                                 </p>
                             </div>
 
@@ -241,24 +280,29 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                     <Loader2 className="w-5 h-5 animate-spin text-white/30" />
                                 </div>
                             ) : timeline.length === 0 ? (
-                                <p className="text-[13px] text-white/30">No previous submissions</p>
+                                <p className="text-[13px] text-white/30">{c.noTimeline}</p>
                             ) : (
                                 /* Vertical timeline */
-                                <div className="relative flex flex-col gap-10 pl-[26px] border-l-2" style={{ borderColor: '#2f3445' }}>
-                                    {timeline.map(t => (
-                                        <div key={t.id} className="relative">
-                                            {/* Teal circle bullet */}
-                                            <div
-                                                className="absolute -left-[33px] top-0 w-4 h-4 rounded-full bg-[#2dd4bf]"
-                                                style={{ boxShadow: '0 0 0 4px #0d1322' }}
-                                            />
+                                <div className="relative flex flex-col gap-10 pl-[26px]">
+                                    {/* Vertical line — runs from top of container, stops at top-4 of the last item via overlay */}
+                                    <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: 'rgba(255,255,255,0.12)' }} />
+                                    {timeline.map((t, idx) => (
+                                        <div
+                                            key={t.id}
+                                            className={cn(
+                                                'relative',
+                                                // Mask the line below the last bullet using panel bg color
+                                                idx === timeline.length - 1 && "after:content-[''] after:absolute after:left-[-26px] after:top-4 after:bottom-0 after:w-[2px] after:bg-[#0b1120]"
+                                            )}
+                                        >
+                                            {/* Half-circle (D-shape) bullet — flat side flush with the vertical line */}
+                                            <div className="absolute -left-[26px] top-0 w-2 h-4 rounded-r-full bg-[#2dd4bf]" />
                                             <div className="flex flex-col gap-2">
                                                 {/* Title + date */}
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[12px] font-bold text-[#dde2f8]">Contact Submission</span>
+                                                    <span className="text-[12px] font-bold text-[#dde2f8]">{c.timelineEntry}</span>
                                                     <span className="text-[10px]" style={{ color: 'rgba(194,198,214,0.5)' }}>
-                                                        {new Date(t.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}{', '}
-                                                        {new Date(t.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                        {formatLatestDate(t.createdAt)}
                                                     </span>
                                                 </div>
                                                 {/* Message card */}
@@ -279,16 +323,19 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     )}
                 </div>
 
-                {/* Update button — mobile only, contact-form only, pinned at bottom */}
-                {record.source === 'contact-form' && <div className="md:hidden px-6 pb-6 pt-2 shrink-0">
-                    <button
-                        onClick={onClose}
-                        className="w-full h-[44px] rounded-[10px] text-[14px] font-medium text-white cursor-pointer border-none"
-                        style={{ background: 'linear-gradient(90deg, #3b82f6 0%, #2dd4bf 100%)' }}
-                    >
-                        Update
-                    </button>
-                </div>}
+                {/* Update button — contact-form only, pinned at bottom */}
+                {record.source === 'contact-form' && (
+                    <div className="px-6 pb-6 pt-2 shrink-0">
+                        <button
+                            onClick={handleUpdate}
+                            disabled={updating || localStatus === serverStatusRef.current}
+                            className="w-full h-[44px] rounded-[10px] text-[14px] font-medium text-white cursor-pointer border-none disabled:opacity-60 disabled:cursor-not-allowed"
+                            style={{ background: 'linear-gradient(90deg, #3b82f6 0%, #2dd4bf 100%)' }}
+                        >
+                            {updating ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : c.update}
+                        </button>
+                    </div>
+                )}
             </div>
         </>
     )

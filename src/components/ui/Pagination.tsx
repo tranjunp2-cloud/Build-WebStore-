@@ -19,7 +19,7 @@ export function Pagination({
     previousLabel = 'Previous',
     nextLabel = 'Next'
 }: PaginationProps) {
-    if (totalPages <= 1) return null
+    if (totalPages <= 0) return null
 
     const getVisiblePages = () => {
         const delta = 1
