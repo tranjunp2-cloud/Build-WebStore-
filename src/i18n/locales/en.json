@@ -1199,7 +1199,19 @@
             "close": "Close",
             "update": "Update",
             "timeline": "Activity Timeline",
-            "noTimeline": "No previous submissions"
+            "noTimeline": "No previous submissions",
+            "statusRead": "Read",
+            "tooltipNew": "New consultation request from Contact Form. Seller needs to contact within 24 hours for the highest conversion effectiveness.",
+            "tooltipContacted": "Seller has responded or contacted this customer. Currently in the care process.",
+            "tooltipIgnored": "Spam data or customers without actual demand. Will not appear in the main conversion report.",
+            "tooltipSubscribed": "Customer subscribes to automatic newsletter via Email. Includes only Email information.",
+            "tooltipRead": "Admin has opened the details view. The system automatically changes the status from 'New' to 'Read'. You can switch it back to 'New' if you need to process it later.",
+            "loading": "Loading…",
+            "deleteTitle": "Delete Customer?",
+            "deleteConfirmPre": "This will permanently remove",
+            "deleteConfirmPost": "and cannot be undone.",
+            "cancel": "Cancel",
+            "deleteButton": "Delete"
         },
         "settings": {
             "payments": {
@@ -2296,34 +2308,118 @@
                 "layout": "Layout"
             },
             "blocks": {
-                "hero": { "name": "Hero", "description": "Hero banner with headline and CTA" },
-                "cta": { "name": "CTA", "description": "Call to action banner" },
-                "about": { "name": "About", "description": "About us section" },
-                "features": { "name": "Features", "description": "Feature highlights with icons" },
-                "step-process": { "name": "Step Process", "description": "Step-by-step process flow" },
-                "service-cards": { "name": "Service Cards", "description": "Service offerings with cards" },
-                "faq": { "name": "FAQ", "description": "Frequently asked questions" },
-                "testimonials": { "name": "Testimonials", "description": "Customer reviews and testimonials" },
-                "social-proof": { "name": "Social Proof", "description": "Customer reviews with star ratings" },
-                "portfolio-grid": { "name": "Portfolio Grid", "description": "Portfolio showcase grid" },
-                "gallery": { "name": "Gallery", "description": "Image gallery with layouts" },
-                "video": { "name": "Video", "description": "Embedded video section" },
-                "carousel": { "name": "Carousel", "description": "Image or content carousel" },
-                "pricing": { "name": "Pricing", "description": "Pricing plans comparison" },
-                "feature-comparison": { "name": "Feature Comparison", "description": "Compare products with feature matrix" },
-                "menu-food": { "name": "Food Menu", "description": "Restaurant food menu" },
-                "products-grid": { "name": "Products Grid", "description": "Product listing grid" },
-                "products-featured": { "name": "Featured Products", "description": "Highlighted product showcase" },
-                "cartWidget": { "name": "Cart Button", "description": "Shopping cart widget" },
-                "contact": { "name": "Contact", "description": "Contact form and business info" },
-                "newsletter": { "name": "Newsletter", "description": "Email subscription form" },
-                "whatsapp-button": { "name": "WhatsApp Button", "description": "WhatsApp contact button" },
-                "stats": { "name": "Stats", "description": "Key metrics and statistics" },
-                "logo-cloud": { "name": "Logo Cloud", "description": "Partner and client logos" },
-                "socialWidget": { "name": "Social Media", "description": "Social media links widget" },
-                "team": { "name": "Team", "description": "Team member profiles" },
-                "divider": { "name": "Divider", "description": "Visual separator between sections" },
-                "announcement-bar": { "name": "Announcement Bar", "description": "Top banner for promotions" }
+                "hero": {
+                    "name": "Hero",
+                    "description": "Hero banner with headline and CTA"
+                },
+                "cta": {
+                    "name": "CTA",
+                    "description": "Call to action banner"
+                },
+                "about": {
+                    "name": "About",
+                    "description": "About us section"
+                },
+                "features": {
+                    "name": "Features",
+                    "description": "Feature highlights with icons"
+                },
+                "step-process": {
+                    "name": "Step Process",
+                    "description": "Step-by-step process flow"
+                },
+                "service-cards": {
+                    "name": "Service Cards",
+                    "description": "Service offerings with cards"
+                },
+                "faq": {
+                    "name": "FAQ",
+                    "description": "Frequently asked questions"
+                },
+                "testimonials": {
+                    "name": "Testimonials",
+                    "description": "Customer reviews and testimonials"
+                },
+                "social-proof": {
+                    "name": "Social Proof",
+                    "description": "Customer reviews with star ratings"
+                },
+                "portfolio-grid": {
+                    "name": "Portfolio Grid",
+                    "description": "Portfolio showcase grid"
+                },
+                "gallery": {
+                    "name": "Gallery",
+                    "description": "Image gallery with layouts"
+                },
+                "video": {
+                    "name": "Video",
+                    "description": "Embedded video section"
+                },
+                "carousel": {
+                    "name": "Carousel",
+                    "description": "Image or content carousel"
+                },
+                "pricing": {
+                    "name": "Pricing",
+                    "description": "Pricing plans comparison"
+                },
+                "feature-comparison": {
+                    "name": "Feature Comparison",
+                    "description": "Compare products with feature matrix"
+                },
+                "menu-food": {
+                    "name": "Food Menu",
+                    "description": "Restaurant food menu"
+                },
+                "products-grid": {
+                    "name": "Products Grid",
+                    "description": "Product listing grid"
+                },
+                "products-featured": {
+                    "name": "Featured Products",
+                    "description": "Highlighted product showcase"
+                },
+                "cartWidget": {
+                    "name": "Cart Button",
+                    "description": "Shopping cart widget"
+                },
+                "contact": {
+                    "name": "Contact",
+                    "description": "Contact form and business info"
+                },
+                "newsletter": {
+                    "name": "Newsletter",
+                    "description": "Email subscription form"
+                },
+                "whatsapp-button": {
+                    "name": "WhatsApp Button",
+                    "description": "WhatsApp contact button"
+                },
+                "stats": {
+                    "name": "Stats",
+                    "description": "Key metrics and statistics"
+                },
+                "logo-cloud": {
+                    "name": "Logo Cloud",
+                    "description": "Partner and client logos"
+                },
+                "socialWidget": {
+                    "name": "Social Media",
+                    "description": "Social media links widget"
+                },
+                "team": {
+                    "name": "Team",
+                    "description": "Team member profiles"
+                },
+                "divider": {
+                    "name": "Divider",
+                    "description": "Visual separator between sections"
+                },
+                "announcement-bar": {
+                    "name": "Announcement Bar",
+                    "description": "Top banner for promotions"
+                }
             }
         },
         "inlineEdit": {
@@ -2391,11 +2487,26 @@
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
             "socialLinks": "Social Links",
             "socialPlatforms": {
-                "facebook": { "label": "Facebook", "placeholder": "facebook.com/yourbrand" },
-                "whatsapp": { "label": "WhatsApp", "placeholder": "60123456789" },
-                "instagram": { "label": "Instagram", "placeholder": "instagram.com/yourbrand" },
-                "linkedin": { "label": "LinkedIn", "placeholder": "linkedin.com/company/yourbrand" },
-                "youtube": { "label": "YouTube", "placeholder": "youtube.com/@yourbrand" }
+                "facebook": {
+                    "label": "Facebook",
+                    "placeholder": "facebook.com/yourbrand"
+                },
+                "whatsapp": {
+                    "label": "WhatsApp",
+                    "placeholder": "60123456789"
+                },
+                "instagram": {
+                    "label": "Instagram",
+                    "placeholder": "instagram.com/yourbrand"
+                },
+                "linkedin": {
+                    "label": "LinkedIn",
+                    "placeholder": "linkedin.com/company/yourbrand"
+                },
+                "youtube": {
+                    "label": "YouTube",
+                    "placeholder": "youtube.com/@yourbrand"
+                }
             },
             "socialHintWhatsapp": "Phone number or wa.me link",
             "socialHintDefault": "Public profile URL",

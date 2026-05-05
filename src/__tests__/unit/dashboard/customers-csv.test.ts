@@ -20,9 +20,10 @@ const makeRecord = (overrides: Partial<CustomerRecord> = {}): CustomerRecord => 
 })
 
 describe('[TC-CUST-11..15] toCsv', () => {
-    it('[TC-CUST-11] first line is the header row', () => {
+    it('[TC-CUST-11] starts with UTF-8 BOM and header row', () => {
         const csv = toCsv([])
-        const firstLine = csv.split('\n')[0]
+        expect(csv.charCodeAt(0)).toBe(0xFEFF)
+        const firstLine = csv.split('\n')[0]!
         expect(firstLine).toContain('"ID"')
         expect(firstLine).toContain('"Email"')
         expect(firstLine).toContain('"Status"')
