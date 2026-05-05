@@ -792,7 +792,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         return (
             <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-[#06090F]">
                 <Loader2 className="size-8 animate-spin text-white/40" />
-                <p className="text-sm text-white/40">Redirecting...</p>
+                <p className="text-sm text-white/40">{t.onboarding.completion.redirecting}</p>
             </div>
         )
     }

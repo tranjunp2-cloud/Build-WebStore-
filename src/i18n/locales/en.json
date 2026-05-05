@@ -198,6 +198,7 @@
             "publishWebsite": "Publish Website",
             "publishSuccess": "Website published successfully!",
             "loading": "Loading...",
+            "redirecting": "Redirecting...",
             "goToDashboard": "Go To Dashboard",
             "congratulations": "Congratulations!",
             "websiteLiveMessage": "Your website {name} is now live and published to the internet.",

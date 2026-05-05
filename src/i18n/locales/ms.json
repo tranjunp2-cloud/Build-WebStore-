@@ -198,6 +198,7 @@
             "publishWebsite": "Terbitkan Laman Web",
             "publishSuccess": "Laman web berjaya diterbitkan!",
             "loading": "Memuatkan...",
+            "redirecting": "Mengalihkan...",
             "goToDashboard": "Pergi ke Papan Pemuka",
             "congratulations": "Tahniah!",
             "websiteLiveMessage": "Laman web anda {name} kini tersiar dan diterbitkan ke internet.",
