@@ -786,6 +786,12 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         </div>
     ) : null
 
+    // Guard: while navigating away, show a blank screen so any store reset
+    // (step→'info') that fires before the component unmounts doesn't flash the form.
+    if (isNavigating) {
+        return <div className="h-full bg-[#06090F]" />
+    }
+
     if (step === 'info') {
         if (showPaywall) {
             return <PaywallCard onBack={() => setShowPaywall(false)} />
@@ -867,10 +873,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
                         if (!open) {
-                            // Dismissing success modal → land users on their dashboard
-                            // (X, backdrop click, Esc all route here).
                             setPublishedSiteUrl(null)
-                            // Navigate FIRST, then clear state (prevents flash of builder form)
+                            setIsNavigating(true)
                             router.push('/dashboard')
                             setTimeout(() => {
                                 reset()
@@ -879,7 +883,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                         }
                     }}
                     onNavigate={() => {
-                        // Link handles navigation — delay reset to avoid flash of builder form
+                        setIsNavigating(true)
                         setTimeout(() => {
                             reset()
                             clearBuilderSessionStorage()
