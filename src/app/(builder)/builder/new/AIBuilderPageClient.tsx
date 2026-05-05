@@ -665,9 +665,13 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             const saved = await saveDraftNow()
             if (!saved) return
         }
-        reset()
-        clearBuilderSessionStorage()
+        setIsNavigating(true)
+        // Navigate FIRST, then clear state (prevents flash of builder form — mirrors handleDashboard)
         router.push(`/editor/${siteId}`)
+        setTimeout(() => {
+            reset()
+            clearBuilderSessionStorage()
+        }, 100)
     }, [reset, router, saveDraftNow, siteId])
 
     const handlePublish = useCallback(async () => {
