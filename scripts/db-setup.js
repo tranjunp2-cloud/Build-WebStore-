@@ -3733,6 +3733,18 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_property_card_properties.add_image_id', sql: `ALTER TABLE "pages_blocks_property_card_properties" ADD COLUMN IF NOT EXISTS image_id integer;` },
   { name: '_pages_v_blocks_property_card_properties.add_image_id', sql: `ALTER TABLE "_pages_v_blocks_property_card_properties" ADD COLUMN IF NOT EXISTS image_id integer;` },
+
+  // ── enum_sites_site_type: add values missing from the original enum ──────
+  // Commit ec71ed01 expanded siteType options (tech, health, education,
+  // realestate, fitness, creative, beauty) without a DB migration.
+  // ADD VALUE IF NOT EXISTS is idempotent — safe to run on any env.
+  { name: 'enum_sites_site_type.add_tech',        sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'tech';` },
+  { name: 'enum_sites_site_type.add_health',      sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'health';` },
+  { name: 'enum_sites_site_type.add_education',   sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'education';` },
+  { name: 'enum_sites_site_type.add_realestate',  sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'realestate';` },
+  { name: 'enum_sites_site_type.add_fitness',     sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'fitness';` },
+  { name: 'enum_sites_site_type.add_creative',    sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'creative';` },
+  { name: 'enum_sites_site_type.add_beauty',      sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'beauty';` },
 ];
 
 async function runMigrations(pool) {
