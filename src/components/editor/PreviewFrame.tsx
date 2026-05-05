@@ -913,7 +913,9 @@ function PreviewFrameInner({
                         while (currentArray.length <= idx) {
                             currentArray.push({} as Record<string, unknown>)
                         }
-                        currentArray[idx] = { ...currentArray[idx], [arrayConfig.imageSubField]: newMediaId }
+                        // Store {id, url} so the component can render immediately without a page reload.
+                        // normalizeUploadField extracts .id on save — safe for Payload persistence.
+                        currentArray[idx] = { ...currentArray[idx], [arrayConfig.imageSubField]: { id: newMediaId, url: newUrl } }
                         updateBlock(blockIndex, { [arrayConfig.arrayField]: currentArray })
                         matched = true
                     }
