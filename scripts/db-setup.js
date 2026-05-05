@@ -3725,6 +3725,12 @@ const MIGRATIONS = [
       url varchar, alt varchar, caption varchar
     );`,
   },
+  { name: 'pages_blocks_before_after.add_block_spacing', sql: `ALTER TABLE "pages_blocks_before_after" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_before_after.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_before_after" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_booking_widget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_booking_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_booking_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_booking_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "pages_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
 ];
 
 async function runMigrations(pool) {
