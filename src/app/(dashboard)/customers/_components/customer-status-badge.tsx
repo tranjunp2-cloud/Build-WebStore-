@@ -28,7 +28,7 @@ export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
         <Tooltip>
             <TooltipTrigger asChild>
                 <span
-                    className="inline-flex items-center rounded-[24px] px-3 py-[5px] text-[14px] font-medium border cursor-default"
+                    className="inline-flex items-center rounded-[24px] px-3 py-[5px] text-[14px] font-medium border cursor-default transition-all duration-150 hover:brightness-110 hover:scale-[1.03]"
                     style={{ background: s.bg, borderColor: s.border, color: s.text }}
                 >
                     {labelMap[status]}

@@ -70,14 +70,18 @@ export function CustomersActionBar({ onSearch, onStatusChange, onSourceChange, o
     const { t } = useI18n()
     const c = t.dashboard.customers
 
-    const STATUS_OPTIONS = useMemo(() => [
-        { key: '', label: c.statusAll },
-        { key: 'new', label: c.statusNew },
-        { key: 'read', label: c.statusRead },
-        { key: 'contacted', label: c.statusContacted },
-        { key: 'ignored', label: c.statusIgnored },
-        { key: 'subscribed', label: c.statusSubscribed },
-    ], [c])
+    const STATUS_OPTIONS = useMemo(() => {
+        const base = [{ key: '', label: c.statusAll }]
+        const contactOpts = [
+            { key: 'new', label: c.statusNew },
+            { key: 'read', label: c.statusRead },
+            { key: 'contacted', label: c.statusContacted },
+            { key: 'ignored', label: c.statusIgnored },
+        ]
+        if (source === 'newsletter') return [...base, { key: 'subscribed', label: c.statusSubscribed }]
+        if (source === 'contact-form') return [...base, ...contactOpts]
+        return [...base, ...contactOpts, { key: 'subscribed', label: c.statusSubscribed }]
+    }, [c, source])
 
     const SOURCE_OPTIONS = useMemo(() => [
         { key: '', label: c.sourceAll },

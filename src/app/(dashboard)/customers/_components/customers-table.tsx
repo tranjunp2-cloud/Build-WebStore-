@@ -37,17 +37,18 @@ export function CustomersTable({ records, total, page, limit, selectedId, onSele
     }
 
     return (
-        <div className="flex flex-col gap-4 w-full min-w-0">
-            <div className="w-full rounded-[16px] border border-white/[0.08] bg-[#1e293b]/60 overflow-x-auto">
+        <div className="w-full min-w-0 rounded-[16px] border border-white/[0.08] bg-[#1e293b]/60">
+            {/* Scrollable table area */}
+            <div className="overflow-x-auto">
                 {/* Header */}
                 <div className={cn('min-w-[779px] grid gap-0', COLS, 'bg-[#0b1120]/50 border-b border-white/5')}>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>Customer Profile</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>Email</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>Source &amp; Site</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>Message</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>Latest Date</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>Status</div>
-                    <div className={cn(CELL_PAD, HEADER_TEXT)}>Actions</div>
+                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colProfile}</div>
+                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colEmail}</div>
+                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colSource}</div>
+                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colMessage}</div>
+                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colDate}</div>
+                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colStatus}</div>
+                    <div className={cn(CELL_PAD, HEADER_TEXT)}>{c.colActions}</div>
                 </div>
 
                 {/* Rows */}
@@ -86,7 +87,7 @@ export function CustomersTable({ records, total, page, limit, selectedId, onSele
                                 {/* Message */}
                                 <div className={cn(CELL_PAD, 'min-w-0')}>
                                     <p className="text-[14px] text-white/70 truncate">
-                                        {record.message ?? 'Subscribed to Monthly News'}
+                                        {record.message ?? c.defaultMessage}
                                     </p>
                                 </div>
 
@@ -117,8 +118,9 @@ export function CustomersTable({ records, total, page, limit, selectedId, onSele
                 </div>
             </div>
 
+            {/* Pagination — inside card, right-aligned, matches products layout */}
             {totalPages > 1 && (
-                <div className="flex justify-center md:justify-end">
+                <div className="flex justify-end items-center p-[16px] border-t border-white/[0.08]">
                     <Pagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} />
                 </div>
             )}

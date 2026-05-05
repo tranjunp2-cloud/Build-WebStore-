@@ -56,14 +56,14 @@ describe('[TC-CUST-26..27] CustomerStatusBadge', () => {
 
 describe('[TC-CUST-28..29] CustomerSourceBadge', () => {
     it('[TC-CUST-28] renders "Contact Forms" label with blue color for contact-form', () => {
-        const { container } = render(<CustomerSourceBadge source="contact-form" />)
+        const { container } = withI18n(<CustomerSourceBadge source="contact-form" />)
         expect(screen.getByText('Contact Forms')).toBeTruthy()
         const span = container.querySelector('span')!
         expect(span.style.color).toBe('rgb(59, 130, 246)')
     })
 
     it('[TC-CUST-29] renders "Newsletter Subscriptions" label with indigo color', () => {
-        const { container } = render(<CustomerSourceBadge source="newsletter" />)
+        const { container } = withI18n(<CustomerSourceBadge source="newsletter" />)
         expect(screen.getByText('Newsletter Subscriptions')).toBeTruthy()
         const span = container.querySelector('span')!
         expect(span.style.color).toBe('rgb(138, 129, 245)')

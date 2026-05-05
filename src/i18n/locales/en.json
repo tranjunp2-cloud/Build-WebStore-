@@ -1211,7 +1211,25 @@
             "deleteConfirmPre": "This will permanently remove",
             "deleteConfirmPost": "and cannot be undone.",
             "cancel": "Cancel",
-            "deleteButton": "Delete"
+            "deleteButton": "Delete",
+            "colProfile": "Customer Profile",
+            "colEmail": "Email",
+            "colSource": "Source & Site",
+            "colMessage": "Message",
+            "colDate": "Latest Date",
+            "colStatus": "Status",
+            "colActions": "Actions",
+            "profileTitle": "Customer Profile",
+            "infoTitle": "Customer Information",
+            "fieldName": "Name",
+            "fieldEmail": "Email",
+            "fieldLatestDate": "Latest Date",
+            "timelineEntry": "Contact Submission",
+            "loadDetailsFailed": "Failed to load details",
+            "sourceBadgeContact": "Contact Forms",
+            "sourceBadgeNewsletter": "Newsletter Subscriptions",
+            "defaultMessage": "Subscribed to Monthly News",
+            "view": "View"
         },
         "settings": {
             "payments": {

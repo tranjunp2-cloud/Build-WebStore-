@@ -67,8 +67,12 @@ async function queryAllCustomers(tenantId: string, search: string, status: strin
 
     // 'subscribed' is newsletter-only — skip contact query to avoid returning all contacts
     const doContact = (!source || source === 'contact-form') && status !== 'subscribed'
-    // 'read' is contact-only — skip newsletter query when filtering by contact-only statuses
-    const doNewsletter = (!source || source === 'newsletter') && !['new', 'contacted', 'ignored', 'read'].includes(status)
+    // Bug fix: old expression skipped newsletter when source='newsletter' AND status='new' (because
+    // 'new' is in the exclusion list). The inner short-circuit ensures source='newsletter' always
+    // queries regardless of status filter (subscribers only have 'subscribed' status anyway).
+    // For 'all sources', newsletter is still skipped for contact-only statuses (new/read/contacted/ignored).
+    const doNewsletter = (!source || source === 'newsletter') &&
+        (source === 'newsletter' || !['new', 'contacted', 'ignored', 'read'].includes(status))
 
     const [contactDocs, subscriberDocs] = await Promise.all([
         doContact
@@ -121,7 +125,7 @@ async function queryAllCustomers(tenantId: string, search: string, status: strin
 
 export async function getCustomersAction(filters: CustomerFilters = {}) {
     const tenantId = await requireTenantId()
-    const { search = '', status = '', source = '', page = 1, limit = 20 } = filters
+    const { search = '', status = '', source = '', page = 1, limit = 10 } = filters
     const safeLimit = Math.min(200, Math.max(1, limit))
     const all = await queryAllCustomers(tenantId, search, status, source)
     const start = (page - 1) * safeLimit
