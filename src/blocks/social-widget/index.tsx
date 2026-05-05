@@ -6,6 +6,7 @@ import { mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { Facebook, Instagram, Linkedin, Youtube, MessageCircle } from 'lucide-react'
+import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 
 const SW_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
@@ -91,6 +92,7 @@ export function SocialWidgetBlock({ block, site }: BlockProps<SocialWidgetConfig
     if (links.length === 0) {
         links = getDefaultSocialWidgetLinks().filter(item => item.enabled !== false)
     }
+    const inContainer = useInFloatingContainer()
 
     // ── Inline variant ───────────────────────────────────────────────────
     if (block.variant === 'inline') {
@@ -118,7 +120,7 @@ export function SocialWidgetBlock({ block, site }: BlockProps<SocialWidgetConfig
 
     // ── Default: floating variant ────────────────────────────────────────
     return (
-        <section className="fixed bottom-6 right-6 z-40">
+        <section className={inContainer ? '' : 'fixed bottom-6 right-6 z-40'}>
             <div className="flex flex-col items-end gap-3">
                 {normalizedBlock.headline ? (
                     <Caption className="mb-1 block font-medium text-slate-400">{normalizedBlock.headline}</Caption>

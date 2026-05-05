@@ -9,12 +9,14 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
+import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 
 export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartWidgetConfig>) {
     void _theme
     const count = useCartStore(state => state.items.reduce((sum, item) => sum + item.quantity, 0))
     const openCart = useCartStore(state => state.openCart)
     const callback = useBlockEditCallback()
+    const inContainer = useInFloatingContainer()
     const setSiteSlug = useCartStore(state => state.setSiteSlug)
     // tenantSlug is injected by both storefront page ({ ...site, tenantSlug: slug }) and
     // preview page ({ ...site, tenantSlug: tenant.slug }). Sites collection has no slug field.
@@ -60,7 +62,7 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
     // ── Default: floating ────────────────────────────────────────────────
     return (
         <>
-            <section className="fixed bottom-6 left-6 z-40">
+            <section className={inContainer ? '' : 'fixed bottom-6 left-6 z-40'}>
                 <button
                     type="button"
                     onClick={callback ? undefined : openCart}

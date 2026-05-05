@@ -6,6 +6,7 @@ import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { InlineEdit } from '@/components/editor/InlineEdit'
+import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 
 void _CSS_VARS
 
@@ -28,6 +29,7 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
     const label = sanitizeLabel(rawLabel)
 
     const callback = useBlockEditCallback()
+    const inContainer = useInFloatingContainer()
 
     const cleanPhone = phoneNumber?.replace(/[^0-9]/g, '') || ''
     const whatsappUrl = `https://wa.me/${cleanPhone}${message ? `?text=${encodeURIComponent(message)}` : ''}`
@@ -64,7 +66,7 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
     // ── Default: floating variant ────────────────────────────────────────
     return (
         <div
-            className={`fixed z-50 ${position === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6`}
+            className={inContainer ? '' : `fixed z-50 ${position === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6`}
         >
             <a
                 href={whatsappUrl}

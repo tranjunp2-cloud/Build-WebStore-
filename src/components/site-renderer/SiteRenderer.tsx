@@ -16,6 +16,7 @@ import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
 import { OwnerProvider } from './OwnerContext'
 import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
+import { FloatingContainerProvider } from './FloatingContainerContext'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -375,6 +376,25 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         isEditor &&
         firstContentBlockIdx >= 0
 
+    // Group floating widgets by their corner position so they stack vertically
+    // instead of overlapping when multiple are placed on the same corner.
+    const FLOATING_WIDGET_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+    const getFloatingBlockPos = (b: PreviewBlock) => {
+        if (b.blockType === 'cartWidget') return 'bottom-left'
+        if (b.blockType === 'whatsapp-button' && (b.position as string) === 'bottom-left') return 'bottom-left'
+        return 'bottom-right'
+    }
+    const floatingBlockSet = new Set<number>()
+    const floatingByPos = new Map<string, number[]>()
+    blocks.forEach((b, i) => {
+        if (!FLOATING_WIDGET_TYPES.has(b.blockType) || (b.variant as string) === 'inline') return
+        floatingBlockSet.add(i)
+        const pos = getFloatingBlockPos(b)
+        const arr = floatingByPos.get(pos) ?? []
+        arr.push(i)
+        floatingByPos.set(pos, arr)
+    })
+
     return (
         <OwnerProvider value={!!isOwner}>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
@@ -433,6 +453,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
             {blocks.map((block, index) => {
                 if (!block.blockType) return null
+
+                // Floating widgets are rendered in grouped stacking containers below
+                if (floatingBlockSet.has(index)) return null
 
                 const BlockComponent = blockRegistry.getComponent(block.blockType)
                 if (!BlockComponent) {
@@ -495,31 +518,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 )
 
                 if (isEditor) {
-                    // Floating widgets are position:fixed — the selector wrapper is also made
-                    // fixed at the same coordinates so the editor toolbar & selection outline
-                    // appear at the widget's actual on-screen position (GH-821).
-                    if (isFloatingWidget) {
-                        // Mirror each widget's fixed position so the selector wrapper overlaps it.
-                        // whatsapp-button has a configurable left/right position prop.
-                        const blockPos = (block as Record<string, unknown>).position
-                        const floatingPositionClass =
-                            block.blockType === 'cartWidget'
-                                ? 'bottom-6 left-6'
-                                : block.blockType === 'whatsapp-button' && blockPos === 'bottom-left'
-                                    ? 'bottom-6 left-6'
-                                    : 'bottom-6 right-6'
-
-                        return (
-                            <div
-                                key={`${block.blockType}-${index}`}
-                                data-block-index={block.__editorBlockIndex ?? index}
-                                data-block-type={block.blockType}
-                                className={`group/block fixed z-[51] ${floatingPositionClass}`}
-                            >
-                                {blockContent}
-                            </div>
-                        )
-                    }
                     return (
                         <div
                             key={`${block.blockType}-${index}`}
@@ -547,6 +545,47 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 }
                 return blockContent
             })}
+
+            {/* Floating widgets — grouped by corner so they stack vertically instead of overlapping */}
+            {Array.from(floatingByPos.entries()).map(([pos, blockIndices]) => (
+                <div
+                    key={pos}
+                    className={`fixed ${pos === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6 z-[51] flex flex-col-reverse items-end gap-3`}
+                >
+                    {blockIndices.map(blockIndex => {
+                        const floatingBlock = blocks[blockIndex]
+                        const FloatingComponent = blockRegistry.getComponent(floatingBlock.blockType)
+                        if (!FloatingComponent) return null
+                        const editorIdx = typeof floatingBlock.__editorBlockIndex === 'number' && floatingBlock.__editorBlockIndex >= 0
+                            ? floatingBlock.__editorBlockIndex : blockIndex
+                        const floatingCallback = onBlockFieldChange
+                            ? { blockIndex: editorIdx, onFieldChange: (field: string, value: unknown) => onBlockFieldChange(editorIdx, field, value) }
+                            : null
+                        const floatingContent = (
+                            <FloatingContainerProvider value={true}>
+                                <BlockEditCallbackProvider value={floatingCallback}>
+                                    <BlockErrorBoundary blockType={floatingBlock.blockType}>
+                                        <FloatingComponent block={floatingBlock} theme={theme} site={site} page={page} />
+                                    </BlockErrorBoundary>
+                                </BlockEditCallbackProvider>
+                            </FloatingContainerProvider>
+                        )
+                        if (isEditor) {
+                            return (
+                                <div
+                                    key={blockIndex}
+                                    data-block-index={editorIdx}
+                                    data-block-type={floatingBlock.blockType}
+                                    className="group/block relative"
+                                >
+                                    {floatingContent}
+                                </div>
+                            )
+                        }
+                        return <div key={blockIndex}>{floatingContent}</div>
+                    })}
+                </div>
+            ))}
         </OwnerProvider>
     )
 }
