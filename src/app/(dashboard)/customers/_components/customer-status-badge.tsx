@@ -1,7 +1,7 @@
 'use client'
 
 import type { CustomerStatus } from '../_lib/customer-record'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 
 const STATUS_VISUAL: Record<CustomerStatus, { bg: string; border: string; text: string }> = {
@@ -25,18 +25,16 @@ export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
     }
     const s = STATUS_VISUAL[status]
     return (
-        <TooltipProvider delayDuration={300}>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <span
-                        className="inline-flex items-center rounded-[24px] px-3 py-[5px] text-[14px] font-medium border cursor-default"
-                        style={{ background: s.bg, borderColor: s.border, color: s.text }}
-                    >
-                        {labelMap[status]}
-                    </span>
-                </TooltipTrigger>
-                <TooltipContent>{tooltipMap[status]}</TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <span
+                    className="inline-flex items-center rounded-[24px] px-3 py-[5px] text-[14px] font-medium border cursor-default"
+                    style={{ background: s.bg, borderColor: s.border, color: s.text }}
+                >
+                    {labelMap[status]}
+                </span>
+            </TooltipTrigger>
+            <TooltipContent>{tooltipMap[status]}</TooltipContent>
+        </Tooltip>
     )
 }

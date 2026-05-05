@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Search, ChevronDown } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
@@ -70,20 +70,20 @@ export function CustomersActionBar({ onSearch, onStatusChange, onSourceChange, o
     const { t } = useI18n()
     const c = t.dashboard.customers
 
-    const STATUS_OPTIONS = [
+    const STATUS_OPTIONS = useMemo(() => [
         { key: '', label: c.statusAll },
         { key: 'new', label: c.statusNew },
         { key: 'read', label: c.statusRead },
         { key: 'contacted', label: c.statusContacted },
         { key: 'ignored', label: c.statusIgnored },
         { key: 'subscribed', label: c.statusSubscribed },
-    ]
+    ], [c])
 
-    const SOURCE_OPTIONS = [
+    const SOURCE_OPTIONS = useMemo(() => [
         { key: '', label: c.sourceAll },
         { key: 'contact-form', label: c.sourceContact },
         { key: 'newsletter', label: c.sourceNewsletter },
-    ]
+    ], [c])
 
     useEffect(() => {
         const timer = setTimeout(() => onSearch(input), 500)

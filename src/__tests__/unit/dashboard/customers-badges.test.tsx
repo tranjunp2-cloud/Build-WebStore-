@@ -1,15 +1,20 @@
 /**
- * Customer Badge Components — TC-CUST-26 through TC-CUST-29
+ * Customer Badge Components — TC-CUST-26..26d, TC-CUST-27..29
  */
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import React from 'react'
 import { I18nProvider } from '@/i18n'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { CustomerStatusBadge } from '@/app/(dashboard)/customers/_components/customer-status-badge'
 import { CustomerSourceBadge } from '@/app/(dashboard)/customers/_components/customer-source-badge'
 
 function withI18n(ui: React.ReactElement) {
-    return render(<I18nProvider defaultLocale="en">{ui}</I18nProvider>)
+    return render(
+        <I18nProvider defaultLocale="en">
+            <TooltipProvider>{ui}</TooltipProvider>
+        </I18nProvider>
+    )
 }
 
 describe('[TC-CUST-26..27] CustomerStatusBadge', () => {
@@ -32,6 +37,13 @@ describe('[TC-CUST-26..27] CustomerStatusBadge', () => {
         expect(screen.getByText('Ignored')).toBeTruthy()
         const span = container.querySelector('span')!
         expect(span.style.color).toBe('rgb(156, 163, 175)')
+    })
+
+    it('[TC-CUST-26d] renders "Read" label with indigo color', () => {
+        const { container } = withI18n(<CustomerStatusBadge status="read" />)
+        expect(screen.getByText('Read')).toBeTruthy()
+        const span = container.querySelector('span')!
+        expect(span.style.color).toBe('rgb(129, 140, 248)')
     })
 
     it('[TC-CUST-27] renders "Subscribed" label with violet color', () => {
