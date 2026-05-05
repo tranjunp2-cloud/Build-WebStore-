@@ -5,6 +5,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { CustomerAvatar } from './customer-avatar'
 import { CustomerStatusBadge } from './customer-status-badge'
 import { CustomerSourceBadge } from './customer-source-badge'
+import { useI18n } from '@/i18n'
 import type { CustomerRecord } from '../_lib/customer-record'
 
 type Props = {
@@ -18,10 +19,12 @@ type Props = {
 }
 
 export function CustomersCardList({ records, total, page, limit, onSelect, onDelete, onPageChange }: Props) {
+    const { t } = useI18n()
+    const c = t.dashboard.customers
     const totalPages = Math.ceil(total / limit)
 
     if (records.length === 0) {
-        return <div className="py-16 text-center text-[14px] text-white/30">No customers found</div>
+        return <div className="py-16 text-center text-[14px] text-white/30">{c.empty}</div>
     }
 
     return (

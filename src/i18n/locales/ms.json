@@ -1199,7 +1199,19 @@
             "close": "Tutup",
             "update": "Kemas Kini",
             "timeline": "Garis Masa Aktiviti",
-            "noTimeline": "Tiada penghantaran sebelum ini"
+            "noTimeline": "Tiada penghantaran sebelum ini",
+            "statusRead": "Dibaca",
+            "tooltipNew": "Permintaan perundingan baharu dari Borang Hubungi. Penjual perlu menghubungi dalam masa 24 jam untuk keberkesanan penukaran tertinggi.",
+            "tooltipContacted": "Penjual telah membalas atau menghubungi pelanggan ini. Sedang dalam proses penjagaan.",
+            "tooltipIgnored": "Data spam atau pelanggan tanpa permintaan sebenar. Tidak akan muncul dalam laporan penukaran utama.",
+            "tooltipSubscribed": "Pelanggan melanggan newsletter automatik melalui E-mel. Hanya mengandungi maklumat E-mel.",
+            "tooltipRead": "Admin telah membuka paparan butiran. Sistem menukar status secara automatik dari 'Baharu' kepada 'Dibaca'. Anda boleh menukarnya semula kepada 'Baharu' jika perlu memproses kemudian.",
+            "loading": "Memuatkan…",
+            "deleteTitle": "Padam Pelanggan?",
+            "deleteConfirmPre": "Ini akan memadam secara kekal",
+            "deleteConfirmPost": "dan tidak boleh dibatalkan.",
+            "cancel": "Batal",
+            "deleteButton": "Padam"
         },
         "settings": {
             "payments": {
@@ -2296,34 +2308,118 @@
                 "layout": "Susun Atur"
             },
             "blocks": {
-                "hero": { "name": "Hero", "description": "Sepanduk hero dengan tajuk dan CTA" },
-                "cta": { "name": "CTA", "description": "Sepanduk seruan tindakan" },
-                "about": { "name": "Tentang Kami", "description": "Bahagian tentang kami" },
-                "features": { "name": "Ciri-ciri", "description": "Sorotan ciri dengan ikon" },
-                "step-process": { "name": "Proses Langkah", "description": "Aliran proses langkah demi langkah" },
-                "service-cards": { "name": "Kad Perkhidmatan", "description": "Tawaran perkhidmatan dengan kad" },
-                "faq": { "name": "Soalan Lazim", "description": "Soalan yang kerap ditanya" },
-                "testimonials": { "name": "Testimoni", "description": "Ulasan dan testimoni pelanggan" },
-                "social-proof": { "name": "Bukti Sosial", "description": "Ulasan pelanggan dengan penilaian bintang" },
-                "portfolio-grid": { "name": "Grid Portfolio", "description": "Pameran portfolio dalam grid" },
-                "gallery": { "name": "Galeri", "description": "Galeri gambar dengan susun atur" },
-                "video": { "name": "Video", "description": "Bahagian video terbenam" },
-                "carousel": { "name": "Karusel", "description": "Karusel gambar atau kandungan" },
-                "pricing": { "name": "Harga", "description": "Perbandingan pelan harga" },
-                "feature-comparison": { "name": "Perbandingan Ciri", "description": "Bandingkan produk dengan matriks ciri" },
-                "menu-food": { "name": "Menu Makanan", "description": "Menu makanan restoran" },
-                "products-grid": { "name": "Grid Produk", "description": "Grid senarai produk" },
-                "products-featured": { "name": "Produk Pilihan", "description": "Pameran produk yang ditonjolkan" },
-                "cartWidget": { "name": "Butang Troli", "description": "Widget troli beli-belah" },
-                "contact": { "name": "Hubungi", "description": "Borang hubungi dan maklumat perniagaan" },
-                "newsletter": { "name": "Surat Berita", "description": "Borang langganan e-mel" },
-                "whatsapp-button": { "name": "Butang WhatsApp", "description": "Butang hubungi WhatsApp" },
-                "stats": { "name": "Statistik", "description": "Metrik dan statistik utama" },
-                "logo-cloud": { "name": "Awan Logo", "description": "Logo rakan kongsi dan pelanggan" },
-                "socialWidget": { "name": "Media Sosial", "description": "Widget pautan media sosial" },
-                "team": { "name": "Pasukan", "description": "Profil ahli pasukan" },
-                "divider": { "name": "Pemisah", "description": "Pemisah visual antara bahagian" },
-                "announcement-bar": { "name": "Bar Pengumuman", "description": "Sepanduk atas untuk promosi" }
+                "hero": {
+                    "name": "Hero",
+                    "description": "Sepanduk hero dengan tajuk dan CTA"
+                },
+                "cta": {
+                    "name": "CTA",
+                    "description": "Sepanduk seruan tindakan"
+                },
+                "about": {
+                    "name": "Tentang Kami",
+                    "description": "Bahagian tentang kami"
+                },
+                "features": {
+                    "name": "Ciri-ciri",
+                    "description": "Sorotan ciri dengan ikon"
+                },
+                "step-process": {
+                    "name": "Proses Langkah",
+                    "description": "Aliran proses langkah demi langkah"
+                },
+                "service-cards": {
+                    "name": "Kad Perkhidmatan",
+                    "description": "Tawaran perkhidmatan dengan kad"
+                },
+                "faq": {
+                    "name": "Soalan Lazim",
+                    "description": "Soalan yang kerap ditanya"
+                },
+                "testimonials": {
+                    "name": "Testimoni",
+                    "description": "Ulasan dan testimoni pelanggan"
+                },
+                "social-proof": {
+                    "name": "Bukti Sosial",
+                    "description": "Ulasan pelanggan dengan penilaian bintang"
+                },
+                "portfolio-grid": {
+                    "name": "Grid Portfolio",
+                    "description": "Pameran portfolio dalam grid"
+                },
+                "gallery": {
+                    "name": "Galeri",
+                    "description": "Galeri gambar dengan susun atur"
+                },
+                "video": {
+                    "name": "Video",
+                    "description": "Bahagian video terbenam"
+                },
+                "carousel": {
+                    "name": "Karusel",
+                    "description": "Karusel gambar atau kandungan"
+                },
+                "pricing": {
+                    "name": "Harga",
+                    "description": "Perbandingan pelan harga"
+                },
+                "feature-comparison": {
+                    "name": "Perbandingan Ciri",
+                    "description": "Bandingkan produk dengan matriks ciri"
+                },
+                "menu-food": {
+                    "name": "Menu Makanan",
+                    "description": "Menu makanan restoran"
+                },
+                "products-grid": {
+                    "name": "Grid Produk",
+                    "description": "Grid senarai produk"
+                },
+                "products-featured": {
+                    "name": "Produk Pilihan",
+                    "description": "Pameran produk yang ditonjolkan"
+                },
+                "cartWidget": {
+                    "name": "Butang Troli",
+                    "description": "Widget troli beli-belah"
+                },
+                "contact": {
+                    "name": "Hubungi",
+                    "description": "Borang hubungi dan maklumat perniagaan"
+                },
+                "newsletter": {
+                    "name": "Surat Berita",
+                    "description": "Borang langganan e-mel"
+                },
+                "whatsapp-button": {
+                    "name": "Butang WhatsApp",
+                    "description": "Butang hubungi WhatsApp"
+                },
+                "stats": {
+                    "name": "Statistik",
+                    "description": "Metrik dan statistik utama"
+                },
+                "logo-cloud": {
+                    "name": "Awan Logo",
+                    "description": "Logo rakan kongsi dan pelanggan"
+                },
+                "socialWidget": {
+                    "name": "Media Sosial",
+                    "description": "Widget pautan media sosial"
+                },
+                "team": {
+                    "name": "Pasukan",
+                    "description": "Profil ahli pasukan"
+                },
+                "divider": {
+                    "name": "Pemisah",
+                    "description": "Pemisah visual antara bahagian"
+                },
+                "announcement-bar": {
+                    "name": "Bar Pengumuman",
+                    "description": "Sepanduk atas untuk promosi"
+                }
             }
         },
         "inlineEdit": {
@@ -2391,11 +2487,26 @@
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
             "socialLinks": "Pautan Sosial",
             "socialPlatforms": {
-                "facebook": { "label": "Facebook", "placeholder": "facebook.com/yourbrand" },
-                "whatsapp": { "label": "WhatsApp", "placeholder": "60123456789" },
-                "instagram": { "label": "Instagram", "placeholder": "instagram.com/yourbrand" },
-                "linkedin": { "label": "LinkedIn", "placeholder": "linkedin.com/company/yourbrand" },
-                "youtube": { "label": "YouTube", "placeholder": "youtube.com/@yourbrand" }
+                "facebook": {
+                    "label": "Facebook",
+                    "placeholder": "facebook.com/yourbrand"
+                },
+                "whatsapp": {
+                    "label": "WhatsApp",
+                    "placeholder": "60123456789"
+                },
+                "instagram": {
+                    "label": "Instagram",
+                    "placeholder": "instagram.com/yourbrand"
+                },
+                "linkedin": {
+                    "label": "LinkedIn",
+                    "placeholder": "linkedin.com/company/yourbrand"
+                },
+                "youtube": {
+                    "label": "YouTube",
+                    "placeholder": "youtube.com/@yourbrand"
+                }
             },
             "socialHintWhatsapp": "Nombor telefon atau pautan wa.me",
             "socialHintDefault": "URL profil awam",
