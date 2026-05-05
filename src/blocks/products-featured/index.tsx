@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { BlockProps } from '../types'
 import type { ProductsFeaturedConfig } from './config'
@@ -41,6 +41,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
 
     const [products, setProducts] = useState<FeaturedProduct[]>([])
     const [loading, setLoading] = useState(true)
+    const scrollRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         const siteId = site?.id ? String(site.id) : null
@@ -50,9 +51,9 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
         }
 
         const controller = new AbortController()
-
-        // limit is hardcoded to 2 for featured hero display; not a block prop
-        fetch(`/api/storefront/products?site=${siteId}&limit=2&sort=-createdAt`, { signal: controller.signal })
+        // carousel shows multiple products; hero needs only 2
+        const limit = variant === 'carousel' ? 6 : 2
+        fetch(`/api/storefront/products?site=${siteId}&limit=${limit}&sort=-createdAt`, { signal: controller.signal })
             .then(res => res.ok ? res.json() : Promise.reject(res))
             .then(json => {
                 const docs = json.docs || []
@@ -79,7 +80,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
             .finally(() => setLoading(false))
 
         return () => controller.abort()
-    }, [site])
+    }, [site, variant])
 
     if (loading) {
         return (
@@ -91,30 +92,48 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
         )
     }
 
-    // Fallback to industry gallery images when no DB products exist
-    const fallbackImages = getGalleryImages(category, 2)
+    // Fallback: carousel needs more items than hero-product
+    const fallbackCount = variant === 'carousel' ? 6 : 2
+    const fallbackImages = getGalleryImages(category, fallbackCount)
     const displayProducts: FeaturedProduct[] = products.length > 0
         ? products.map((p, i) => ({
             ...p,
             image: p.image ?? fallbackImages[i] ?? fallbackImages[0] ?? null,
         }))
-        : [
-            {
-                id: 'fallback-1',
+        : variant === 'carousel'
+            ? fallbackImages.map((img, i) => ({
+                id: `fallback-${i}`,
                 slug: '',
                 name: headline,
                 price: '',
                 description: subheadline || '',
-                image: fallbackImages[0] ?? null,
+                image: img ?? null,
                 tags: [],
-            },
-        ]
+            }))
+            : [
+                {
+                    id: 'fallback-1',
+                    slug: '',
+                    name: headline,
+                    price: '',
+                    description: subheadline || '',
+                    image: fallbackImages[0] ?? null,
+                    tags: [],
+                },
+            ]
 
     const product = displayProducts[0]!
     const siteRec = site as Record<string, unknown>
     const siteBasePath = typeof siteRec?.siteBasePath === 'string'
         ? (siteRec.siteBasePath as string)
         : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
+
+    const scrollCarousel = (dir: 'prev' | 'next') => {
+        const el = scrollRef.current
+        if (!el) return
+        const itemWidth = (el.firstElementChild as HTMLElement)?.offsetWidth ?? 500
+        el.scrollBy({ left: dir === 'next' ? itemWidth + 24 : -(itemWidth + 24), behavior: 'smooth' })
+    }
 
     if (variant === 'carousel') {
         return (
@@ -126,7 +145,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                     {subheadline && <RichText text={subheadline} as="p" className="opacity-60 text-lg" />}
                 </div>
 
-                <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 hide-scrollbar">
+                <div ref={scrollRef} className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 no-scrollbar">
                     {displayProducts.map((p) => (
                         <div key={p.id} className="snap-center w-[85vw] sm:w-[500px] flex-shrink-0 relative rounded-3xl overflow-hidden group">
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
@@ -142,6 +161,24 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                         </div>
                     ))}
                 </div>
+                {displayProducts.length > 1 && (
+                    <div className="flex justify-center gap-3 mt-4">
+                        {(['prev', 'next'] as const).map((dir) => (
+                            <button
+                                key={dir}
+                                type="button"
+                                onClick={() => scrollCarousel(dir)}
+                                className={`rounded-full flex items-center justify-center transition-opacity hover:opacity-80 ${TOUCH_TARGET.min} min-w-[44px]`}
+                                style={{ background: `rgba(var(--brand-primary-rgb), 0.12)`, color: 'var(--brand-primary)' }}
+                                aria-label={dir === 'prev' ? 'Previous products' : 'Next products'}
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d={dir === 'prev' ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'} />
+                                </svg>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </SectionWrapper>
         )
     }
