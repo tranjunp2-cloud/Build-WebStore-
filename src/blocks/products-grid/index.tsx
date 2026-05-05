@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { BlockProps } from '../types'
 import type { ProductsGridConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
@@ -17,6 +18,7 @@ const CART_ENABLED = false
 
 interface ProductItem {
     id: string
+    slug: string
     name: string
     price: string
     image: string | null
@@ -24,6 +26,7 @@ interface ProductItem {
 
 export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGridConfig>) {
     const { headline = 'Featured Products', subheadline, limit = 6, variant = 'grid-3' } = block
+    const router = useRouter()
     const [products, setProducts] = useState<ProductItem[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -47,6 +50,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                     const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
                     return {
                         id: String(doc.id),
+                        slug: String(doc.slug || ''),
                         name: String(doc.name || ''),
                         price: `${currency} ${price.toFixed(2)}`,
                         image: images?.[0]?.image?.url ?? null,
@@ -93,6 +97,11 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
         )
     }
 
+    const siteRec = site as Record<string, unknown>
+    const siteBasePath = typeof siteRec?.siteBasePath === 'string'
+        ? (siteRec.siteBasePath as string)
+        : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
+
     return (
         <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
             <GradientBlob color={CSS_VARS.primary} className="bottom-[10%] left-[-5%]" size={500} opacity={0.04} />
@@ -135,7 +144,11 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                                 {/* Quick View Overlay */}
                                 {variant !== 'list' && (
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
-                                        <button type="button" className={`px-6 py-2 bg-white text-black font-semibold rounded-full transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 ${TOUCH_TARGET.min}`}>
+                                        <button
+                                            type="button"
+                                            onClick={() => product.slug && router.push(`${siteBasePath}/products/${product.slug}`)}
+                                            className={`px-6 py-2 bg-white text-black font-semibold rounded-full transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 ${TOUCH_TARGET.min}`}
+                                        >
                                             Quick View
                                         </button>
                                     </div>
