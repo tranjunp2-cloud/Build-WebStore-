@@ -1037,9 +1037,9 @@ function buildPropertyCard(): Record<string, unknown> {
     showMap: false,
     currency: 'RM',
     properties: [
-      { title: 'Luxury Condo in KLCC', price: 1200000, location: 'KLCC, Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, imageUrls: [NEUTRAL_FALLBACK_SVG], type: 'sale' as const, description: 'Modern luxury condo with stunning twin tower views.' },
-      { title: 'Semi-D in Shah Alam', price: 850000, location: 'Seksyen 7, Shah Alam', bedrooms: 4, bathrooms: 3, area: 2200, imageUrls: [NEUTRAL_FALLBACK_SVG], type: 'sale' as const, description: 'Spacious family home in quiet neighbourhood.' },
-      { title: 'Studio in Mont Kiara', price: 2500, location: 'Mont Kiara, Kuala Lumpur', bedrooms: 1, bathrooms: 1, area: 550, imageUrls: [NEUTRAL_FALLBACK_SVG], type: 'rent' as const, description: 'Fully furnished studio, walking distance to MRT.' },
+      { title: 'Luxury Condo in KLCC', price: 1200000, location: 'KLCC, Kuala Lumpur', bedrooms: 3, bathrooms: 2, area: 1200, type: 'sale' as const, description: 'Modern luxury condo with stunning twin tower views.' },
+      { title: 'Semi-D in Shah Alam', price: 850000, location: 'Seksyen 7, Shah Alam', bedrooms: 4, bathrooms: 3, area: 2200, type: 'sale' as const, description: 'Spacious family home in quiet neighbourhood.' },
+      { title: 'Studio in Mont Kiara', price: 2500, location: 'Mont Kiara, Kuala Lumpur', bedrooms: 1, bathrooms: 1, area: 550, type: 'rent' as const, description: 'Fully furnished studio, walking distance to MRT.' },
     ],
   }
 }

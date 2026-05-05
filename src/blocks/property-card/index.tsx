@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
@@ -67,10 +67,13 @@ function TypeBadge({ type }: { type: 'sale' | 'rent' }) {
 }
 
 function PropertyImage({ property, className = '' }: { property: PropertyItem; className?: string }) {
-    const [imgIndex, setImgIndex] = useState(0)
-    const images = property.imageUrls.length > 0 ? property.imageUrls : []
+    const imageUrl = property.image && typeof property.image === 'object' && 'url' in property.image
+        ? (property.image as { url: string }).url
+        : typeof property.image === 'string'
+            ? property.image
+            : null
 
-    if (images.length === 0) {
+    if (!imageUrl) {
         return (
             <div className={`${className} flex items-center justify-center`} style={{ background: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                 <svg className="w-12 h-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
@@ -81,41 +84,8 @@ function PropertyImage({ property, className = '' }: { property: PropertyItem; c
     }
 
     return (
-        <div className={`${className} relative group`}>
-            <Image src={images[imgIndex]!} alt={property.title} fill className="object-cover" />
-            {images.length > 1 && (
-                <>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setImgIndex((imgIndex - 1 + images.length) % images.length) }}
-                        className={`absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px]`}
-                        aria-label="Previous image"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setImgIndex((imgIndex + 1) % images.length) }}
-                        className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px]`}
-                        aria-label="Next image"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                        {images.map((_, i) => (
-                            <span
-                                key={i}
-                                className="w-1.5 h-1.5 rounded-full"
-                                style={{ background: i === imgIndex ? '#fff' : 'rgba(255,255,255,0.5)' }}
-                            />
-                        ))}
-                    </div>
-                </>
-            )}
+        <div className={`${className} relative`}>
+            <Image src={imageUrl} alt={property.title} fill className="object-cover" />
         </div>
     )
 }
