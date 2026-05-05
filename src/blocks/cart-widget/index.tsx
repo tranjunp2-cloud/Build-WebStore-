@@ -8,11 +8,13 @@ import { useCartStore } from '@/store/cartStore'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 
 export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartWidgetConfig>) {
     void _theme
     const count = useCartStore(state => state.items.reduce((sum, item) => sum + item.quantity, 0))
     const openCart = useCartStore(state => state.openCart)
+    const callback = useBlockEditCallback()
     const setSiteSlug = useCartStore(state => state.setSiteSlug)
     // tenantSlug is injected by both storefront page ({ ...site, tenantSlug: slug }) and
     // preview page ({ ...site, tenantSlug: tenant.slug }). Sites collection has no slug field.
@@ -32,7 +34,7 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
                     <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                         <button
                             type="button"
-                            onClick={openCart}
+                            onClick={callback ? undefined : openCart}
                             className={`inline-flex items-center gap-4 rounded-2xl border px-6 py-4 font-medium transition-all duration-200 hover:shadow-lg ${TOUCH_TARGET.min}`}
                             style={{
                                 border: `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
@@ -61,7 +63,7 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
             <section className="fixed bottom-6 left-6 z-40">
                 <button
                     type="button"
-                    onClick={openCart}
+                    onClick={callback ? undefined : openCart}
                     className={`relative inline-flex items-center gap-3 rounded-2xl border px-4 py-3 font-medium text-white shadow-[0_16px_32px_rgba(2,6,23,0.22)] transition-transform duration-200 hover:-translate-y-0.5 ${TOUCH_TARGET.min}`}
                     style={{
                         background: `linear-gradient(135deg, ${CSS_VARS.primary}, ${CSS_VARS.secondary})`,

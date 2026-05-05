@@ -445,6 +445,8 @@ export function PreviewScripts() {
                                 if (pageId) window.parent.postMessage({ type: 'PAGE_NAVIGATE', pageId }, parentOrigin)
                             } catch (_) { /* invalid href */ }
                         }
+                    } else if (['socialWidget', 'whatsapp-button', 'cartWidget'].includes(anchorBlockType || '')) {
+                        // Floating widgets — absorb click, don't redirect in editor
                     } else if (href && isSafeUrl(href)) {
                         window.parent.postMessage({ type: 'OPEN_LINK', href }, parentOrigin)
                     }

@@ -4,6 +4,8 @@ import type { BlockProps } from '../types'
 import type { WhatsappButtonConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
+import { InlineEdit } from '@/components/editor/InlineEdit'
 
 void _CSS_VARS
 
@@ -13,9 +15,19 @@ const WhatsAppIcon = () => (
     </svg>
 )
 
+// Strip any HTML that may have been stored incorrectly in the label field
+function sanitizeLabel(raw: string | undefined): string {
+    if (!raw) return 'Chat with us'
+    const stripped = raw.replace(/<[^>]*>/g, '').trim()
+    return stripped || 'Chat with us'
+}
+
 export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<WhatsappButtonConfig>) {
     void _theme
-    const { variant = 'floating', phoneNumber, message, label = 'Chat with us', position = 'bottom-right' } = block
+    const { variant = 'floating', phoneNumber, message, label: rawLabel = 'Chat with us', position = 'bottom-right' } = block
+    const label = sanitizeLabel(rawLabel)
+
+    const callback = useBlockEditCallback()
 
     const cleanPhone = phoneNumber?.replace(/[^0-9]/g, '') || ''
     const whatsappUrl = `https://wa.me/${cleanPhone}${message ? `?text=${encodeURIComponent(message)}` : ''}`
@@ -33,7 +45,16 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
                         style={{ backgroundColor: '#25D366' }}
                     >
                         <WhatsAppIcon />
-                        {label}
+                        {callback ? (
+                            <InlineEdit
+                                value={label}
+                                onSave={val => callback.onFieldChange('label', val)}
+                                blockType="whatsapp-button"
+                                fieldName="label"
+                                maxLength={50}
+                                previewClassName="text-white"
+                            />
+                        ) : label}
                     </a>
                 </div>
             </section>
@@ -57,9 +78,20 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
 
                 <span className="relative flex items-center gap-3 px-5 py-3">
                     <WhatsAppIcon />
-                    <span className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
-                        {label}
-                    </span>
+                    {callback ? (
+                        <InlineEdit
+                            value={label}
+                            onSave={val => callback.onFieldChange('label', val)}
+                            blockType="whatsapp-button"
+                            fieldName="label"
+                            maxLength={50}
+                            previewClassName="text-sm font-semibold whitespace-nowrap text-white"
+                        />
+                    ) : (
+                        <span className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
+                            {label}
+                        </span>
+                    )}
                 </span>
             </a>
         </div>
