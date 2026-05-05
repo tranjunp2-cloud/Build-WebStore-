@@ -85,6 +85,11 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             if (String(pageSiteId) !== String(siteId)) {
                 return notFound()
             }
+            // Issue 862: hidden pages (isVisible=false) return 404 in preview to match live site behavior.
+            // Builder mode is exempt so the owner can still edit/view the hidden page in the editor.
+            if (page.isVisible === false && !builder) {
+                return notFound()
+            }
         } else {
             // Find Homepage
             const pagesResult = await payload.find({
