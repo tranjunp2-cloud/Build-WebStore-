@@ -70,7 +70,7 @@ function SocialLinkAnchor({ platform, url, showLabelAlways = false, extraClassNa
     // Inline variant (showLabelAlways) renders visible text beside the icon.
     const labelCls = showLabelAlways
         ? 'text-sm font-medium text-white/85'
-        : 'sr-only'
+        : 'text-sm font-medium max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap'
     return (
         <a
             href={normalizeUrl(platform, url)}
