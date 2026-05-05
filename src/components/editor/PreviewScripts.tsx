@@ -29,8 +29,9 @@ export function PreviewScripts() {
 
         const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
         const excludedBlockTypes = ['navigation', 'footer', 'breadcrumb']
-        // Floating widgets manage their own label editing via InlineEdit — global text-edit mode must not activate on them
-        const floatingWidgetBlockTypes = new Set(['socialWidget', 'whatsapp-button', 'cartWidget'])
+        // These floating widgets have visible editable labels — global text-edit mode must not activate on them.
+        // socialWidget uses icon-only sr-only labels, so it does not need this exclusion.
+        const noTextEditBlockTypes = new Set(['whatsapp-button', 'cartWidget'])
         // Blocks whose images come from external product catalog — image editing not supported
         const imageReadOnlyBlockTypes = new Set(['products-featured', 'products-grid'])
         
@@ -121,8 +122,8 @@ export function PreviewScripts() {
 
             if (target.closest('[data-editor-control]')) return
 
-            // Floating widgets use InlineEdit — skip BLOCK_HOVERED text hint
-            if (blockType && floatingWidgetBlockTypes.has(blockType)) return
+            // whatsapp-button and cartWidget use InlineEdit — skip BLOCK_HOVERED text hint
+            if (blockType && noTextEditBlockTypes.has(blockType)) return
 
             if (!validTags.includes(target.tagName) || target.children.length > 1) {
                 return
@@ -300,8 +301,8 @@ export function PreviewScripts() {
             if (!blockContainer) return
             const blockType = blockContainer.getAttribute('data-block-type')
             if (blockType && excludedBlockTypes.includes(blockType)) return
-            // Floating widgets use InlineEdit for label editing — global contenteditable must not activate
-            if (blockType && floatingWidgetBlockTypes.has(blockType)) return
+            // whatsapp-button and cartWidget use InlineEdit — global contenteditable must not activate
+            if (blockType && noTextEditBlockTypes.has(blockType)) return
 
             // Walk up from click target to find nearest valid editable element
             // (click may land on <b>, <i>, <u> inside a valid element)
