@@ -433,12 +433,16 @@ export function PreviewScripts() {
                 const isGlobal = ['navigation', 'footer', 'breadcrumb'].includes(blockType || '')
                 if (blockIndex >= 0 || isGlobal) {
                     const rect = clickedBlock.getBoundingClientRect()
+                    const firstChild = (clickedBlock as HTMLElement).firstElementChild as HTMLElement | null
+                    const contentTop = firstChild ? firstChild.getBoundingClientRect().top : rect.top
+                    const clickTop = contentTop > rect.top ? contentTop : rect.top
+                    const clickTopDelta = clickTop - rect.top
                     window.parent.postMessage({
                         type: 'BLOCK_CONTAINER_CLICKED',
                         blockIndex,
                         layout: {
-                            top: rect.top, left: rect.left,
-                            width: rect.width, height: rect.height,
+                            top: clickTop, left: rect.left,
+                            width: rect.width, height: rect.height - clickTopDelta,
                             blockIndex, blockType,
                         },
                     }, parentOrigin)
