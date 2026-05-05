@@ -3579,12 +3579,6 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_video_showcase.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_video_showcase" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_product_quick_view.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_product_quick_view" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_feature_comparison.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_feature_comparison" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
-  { name: 'pages_blocks_before_after.add_block_spacing', sql: `ALTER TABLE "pages_blocks_before_after" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
-  { name: '_pages_v_blocks_before_after.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_before_after" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
-  { name: 'pages_blocks_booking_widget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_booking_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
-  { name: '_pages_v_blocks_booking_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_booking_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
-  { name: 'pages_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "pages_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
-  { name: '_pages_v_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
 
   // ── Navigation variant rename (Phase 01 — 2026-04-24) ───────────────────────
   // Renames: simple→default, mega-menu→mega, pill→floating in sites.header_block JSONB.
@@ -3731,6 +3725,12 @@ const MIGRATIONS = [
       url varchar, alt varchar, caption varchar
     );`,
   },
+  { name: 'pages_blocks_before_after.add_block_spacing', sql: `ALTER TABLE "pages_blocks_before_after" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_before_after.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_before_after" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_booking_widget.add_block_spacing', sql: `ALTER TABLE "pages_blocks_booking_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_booking_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_booking_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: 'pages_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "pages_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
 ];
 
 async function runMigrations(pool) {
