@@ -35,7 +35,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
     const renderGridCard = (service: ServiceItem, i: number) => (
         <div
             key={`${service.title}-${i}`}
-            className={`min-w-0 overflow-hidden ${CARD_PADDING.lg} rounded-2xl transition-all duration-300 hover:shadow-lg group`}
+            className={`min-w-0 ${CARD_PADDING.lg} rounded-2xl transition-all duration-300 hover:shadow-lg group`}
             style={{ background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
         >
             <div
@@ -101,8 +101,8 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                     >
                         {featured.icon}
                     </div>
-                    <Heading level={2} className="mb-4">{featured.title}</Heading>
-                    <Body size="lg" className="opacity-60 leading-relaxed max-w-xl mb-4">{featured.description}</Body>
+                    <Heading level={2} className="mb-4 break-words">{featured.title}</Heading>
+                    <Body size="lg" className="opacity-60 leading-relaxed max-w-xl mb-4 break-words">{featured.description}</Body>
                     {featured.price && (
                         <p className="text-3xl font-bold mb-2" style={{ color: 'var(--brand-primary)' }}>
                             <RichText text={featured.price} as="span" />
