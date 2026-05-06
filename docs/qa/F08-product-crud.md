@@ -151,6 +151,22 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
+### US-831 — Storefront API: site param validation (9 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F08-831-01** | `US-831/AC1` | `API` | Site param hợp lệ trả về danh sách sản phẩm | 1. `GET /api/storefront/products?site=1`. | - HTTP 200, `docs` chứa sản phẩm, `totalDocs` > 0.<br>- Payload được gọi với `site: { equals: 1 }` (integer). | High | [x] |
+| **TC-F08-831-02** | `US-831/AC2` | `API` | Phân trang được truyền đúng vào Payload | 1. `GET /api/storefront/products?site=1&page=2&limit=6`. | - HTTP 200, response trả về `page=2`, `totalPages` đúng.<br>- Payload gọi với `page: 2, limit: 6`. | High | [x] |
+| **TC-F08-831-03** | `US-831/Edge` | `Edge` | Thiếu site param trả về 200 empty | 1. `GET /api/storefront/products` (không có `?site=`). | - HTTP 200, `{docs:[], totalDocs:0}`.<br>- Payload **không** được gọi. | High | [x] |
+| **TC-F08-831-04** | `US-831/Edge` | `Edge` | site=0 trả về 200 empty | 1. `GET /api/storefront/products?site=0`. | - HTTP 200, `{docs:[], totalDocs:0}`.<br>- Payload **không** được gọi (0 không phải ID hợp lệ). | High | [x] |
+| **TC-F08-831-05** | `US-831/Bug` | `Edge` | Non-numeric site param không gây 500 | 1. `GET /api/storefront/products?site=abc`. | - HTTP 200, `{docs:[], totalDocs:0}`.<br>- Payload **không** được gọi.<br>- **Không** trả về HTTP 500. | Blocker | [x] |
+| **TC-F08-831-06** | `US-831/Edge` | `Edge` | Decimal site param trả về 200 empty | 1. `GET /api/storefront/products?site=1.5`. | - HTTP 200, `{docs:[], totalDocs:0}`.<br>- Payload **không** được gọi. | High | [x] |
+| **TC-F08-831-07** | `US-831/Edge` | `Edge` | Negative site param trả về 200 empty | 1. `GET /api/storefront/products?site=-1`. | - HTTP 200, `{docs:[], totalDocs:0}`.<br>- Payload **không** được gọi (ID âm không hợp lệ). | High | [ ] |
+| **TC-F08-831-08** | `US-831/Sec` | `Sec` | SQL-injection-style param không gây lỗi | 1. `GET /api/storefront/products?site=1' OR '1'='1`. | - HTTP 200, `{docs:[], totalDocs:0}`.<br>- Không throw, không leak stack trace. | Blocker | [ ] |
+| **TC-F08-831-09** | `US-831/Edge` | `Edge` | Whitespace-padded site param trả về 200 empty | 1. `GET /api/storefront/products?site=%201%20` (URL-encoded space). | - HTTP 200, `{docs:[], totalDocs:0}`.<br>- Strict round-trip check reject `' 1 '` ≠ `'1'`. | Medium | [ ] |
+
+---
+
 ### Global AC & Dev-Killer Edge Cases (15 Cases)
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
