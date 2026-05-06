@@ -431,8 +431,8 @@ export const Products: CollectionConfig = {
             maxRows: 20,
             admin: { description: 'Dynamic key/value attributes for Storefront SEO/Rich Snippets' },
             fields: [
-                { name: 'key', type: 'text', required: true, admin: { placeholder: 'e.g., Material' } },
-                { name: 'value', type: 'text', required: true, admin: { placeholder: 'e.g., 100% Cotton' } },
+                { name: 'key', type: 'text', required: true, maxLength: 100, admin: { placeholder: 'e.g., Material' } },
+                { name: 'value', type: 'text', required: true, maxLength: 500, admin: { placeholder: 'e.g., 100% Cotton' } },
             ],
         },
         {

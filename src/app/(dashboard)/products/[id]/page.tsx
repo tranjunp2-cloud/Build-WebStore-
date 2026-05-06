@@ -107,6 +107,9 @@ export default function ProductEditPage() {
                         metaTitle: data.seo?.title || '',
                         metaDescription: data.seo?.description || '',
                         autoGenerateSeo: false, // UI default
+                        attributes: Array.isArray(data.attributes)
+                            ? data.attributes.map((a: any) => ({ key: a.key || '', value: a.value || '' }))
+                            : [],
                     }
                     setInitialData(mappedData)
                 } else {
@@ -155,11 +158,12 @@ export default function ProductEditPage() {
                     title: data.metaTitle,
                     description: data.metaDescription,
                 },
+                attributes: (data.attributes || [])
+                    .filter((a) => a.key?.trim() && a.value?.trim())
+                    .map((a) => ({ key: a.key.trim(), value: a.value.trim() })),
                 ...(isNew ? { status: 'draft' } : {}),
                 currency: 'MYR'
             }
-
-            const method = isNew ? 'POST' : 'PATCH'
 
             await saveProductAction(body, isNew ? undefined : productId)
 
