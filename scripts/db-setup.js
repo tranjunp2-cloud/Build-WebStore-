@@ -3747,6 +3747,11 @@ const MIGRATIONS = [
   { name: 'enum_sites_site_type.add_beauty',      sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'beauty';` },
   { name: 'pages_blocks_whatsapp_button.add_country_code', sql: `ALTER TABLE "pages_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS country_code varchar;` },
   { name: '_pages_v_blocks_whatsapp_button.add_country_code', sql: `ALTER TABLE "_pages_v_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS country_code varchar;` },
+  // GH-881 — FAQBlock fields subheadline + allowMultiple were missing from Payload schema
+  { name: 'pages_blocks_faq.add_subheadline', sql: `ALTER TABLE "pages_blocks_faq" ADD COLUMN IF NOT EXISTS subheadline varchar;` },
+  { name: 'pages_blocks_faq.add_allow_multiple', sql: `ALTER TABLE "pages_blocks_faq" ADD COLUMN IF NOT EXISTS allow_multiple boolean DEFAULT false;` },
+  { name: '_pages_v_blocks_faq.add_subheadline', sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS subheadline varchar;` },
+  { name: '_pages_v_blocks_faq.add_allow_multiple', sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS allow_multiple boolean DEFAULT false;` },
 ];
 
 async function runMigrations(pool) {

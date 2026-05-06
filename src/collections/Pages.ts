@@ -550,6 +550,8 @@ const FAQBlock = {
             ],
         },
         { name: 'headline', type: 'text', defaultValue: 'Frequently Asked Questions' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'allowMultiple', type: 'checkbox', defaultValue: false },
         {
             name: 'faqs',
             type: 'array',

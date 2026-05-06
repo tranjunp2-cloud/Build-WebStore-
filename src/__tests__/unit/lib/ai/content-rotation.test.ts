@@ -65,7 +65,7 @@ describe('buildBlockFromLibrary — testimonials/faq rotation (R5 fix)', () => {
         for (const name of TEST_NAMES) {
             const seed = hashBusinessName(name)
             const block = buildBlockFromLibrary('faq', 'beauty', { seed })
-            const items = block?.items as Array<{ question: string }> | undefined
+            const items = (block?.faqs ?? block?.items) as Array<{ question: string }> | undefined
             if (items?.[0]) firstQs.add(items[0].question)
         }
         expect(firstQs.size).toBeGreaterThanOrEqual(2)

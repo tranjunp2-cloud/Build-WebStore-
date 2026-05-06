@@ -15,10 +15,12 @@ import { BlockImageEditor } from './BlockImageEditor'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
+import FaqSettings from './FaqSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
+import type { FAQConfig } from '@/blocks/faq/config'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { useEditorStore } from '@/store/editorStore'
@@ -1623,6 +1625,15 @@ function SettingsPanelInner({
                                     </div>
                                 )
                             })()}
+
+                            {/* ─── FAQ Configuration ───────────────────────── */}
+                            {bt === 'faq' && block && (
+                                <FaqSettings
+                                    block={block as FAQConfig}
+                                    blockIndex={currentBlockIndex}
+                                    onBlockUpdate={onBlockUpdate}
+                                />
+                            )}
 
                             {bt === 'socialWidget' && (
                                 <div className={sectionCls}>

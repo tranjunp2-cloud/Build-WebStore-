@@ -282,6 +282,25 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
+### GH-881: FAQ Block Item Management — Stepper CRUD & Data Integrity (11 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F05-881-01** | `GH-881/AC1` | `UI` | Render stepper count + buttons enabled tại 4 items | 1. Mở FAQ Settings với 4 items. | - Stepper hiển thị "4".<br>- Nút − enabled, nút + enabled. | High | [x] |
+| **TC-F05-881-02** | `GH-881/Bound` | `Bound` | Nút + disabled tại 10 items | 1. FAQ Settings với 10 items. | - Nút + bị disabled (opacity-30).<br>- Nút − vẫn enabled. | High | [x] |
+| **TC-F05-881-03** | `GH-881/Bound` | `Bound` | Nút − disabled tại 3 items | 1. FAQ Settings với 3 items (minimum). | - Nút − bị disabled (opacity-30).<br>- Nút + vẫn enabled. | High | [x] |
+| **TC-F05-881-04** | `GH-881/AC2` | `Func` | Click + thêm placeholder Q/A mới | 1. Có 4 items.<br>2. Click nút + Increase. | - `onBlockUpdate` gọi với items.length = 5.<br>- Item mới: `{ question: 'Question 5', answer: 'Answer 5' }`. | Blocker | [x] |
+| **TC-F05-881-05** | `GH-881/AC2` | `Func` | Click − xóa item cuối cùng | 1. Có 4 items.<br>2. Click nút − Decrease. | - `onBlockUpdate` gọi với `items.slice(0, -1)` (3 items). | Blocker | [x] |
+| **TC-F05-881-06** | `GH-881/AC3` | `Func` | Edit question input + blur cập nhật item | 1. Click vào question input item 1.<br>2. Thay đổi text.<br>3. Blur field. | - `onBlockUpdate` gọi với item [0].question = text mới.<br>- Chỉ item [0] thay đổi, items khác giữ nguyên. | High | [x] |
+| **TC-F05-881-07** | `GH-881/AC3` | `Func` | Edit answer textarea + blur cập nhật item | 1. Click vào answer textarea item 1.<br>2. Thay đổi text.<br>3. Blur field. | - `onBlockUpdate` gọi với item [0].answer = text mới.<br>- Chỉ item [0] thay đổi, items khác giữ nguyên. | High | [x] |
+| **TC-F05-881-08** | `GH-881/AC4` | `Func` | Mount với items rỗng → pad tới 3 via useEffect | 1. Mount FaqSettings với `items: []`. | - useEffect dispatch `onBlockUpdate` với 3 placeholder items.<br>`items = [{ question: 'Question 1', answer: 'Answer 1' }, ...]`. | High | [x] |
+| **TC-F05-881-09** | `GH-881/AC4` | `Func` | Mount 1 item → pad tới 3, giữ nguyên item gốc | 1. Mount với `items: [{ question: 'Original', answer: 'Original' }]`. | - useEffect pad thêm 2 items.<br>- Item [0] giữ nguyên original.<br>- Items [1,2] là placeholder. | High | [x] |
+| **TC-F05-881-10** | `GH-881/AC5` | `Data` | Rich-text answer bảo toàn khi xóa item khác | 1. Item [1] có rich-text JSONContent answer.<br>2. Click − để xóa item [3].<br>3. Kiểm tra item [1].answer. | - Item [1].answer deep-equal với JSONContent gốc.<br>- Rich-text không bị serialize/mất format. | High | [x] |
+| **TC-F05-881-11** | `GH-881/AC5` | `Data` | Variant change không mutate items array | 1. Mount với variant=accordion, items=[Q1,Q2,Q3].<br>2. Re-render với variant=grid (items giữ nguyên).<br>3. Click + để thêm item. | - Items array vẫn chứa Q1,Q2,Q3 gốc (immutable).<br>- Không bị corrupt khi variant thay đổi. | High | [x] |
+| **TC-F05-881-12** | `GH-881/AC1` | `Data` | resolveItems đọc từ block.faqs khi không có items (Payload path) | 1. Mount FaqSettings với block có `faqs: [Q1..Q4]` nhưng không có `items`.<br>2. Kiểm tra count hiển thị.<br>3. Click + để thêm. | - Count hiển thị 4 (đọc từ faqs field).<br>- Click + gọi onBlockUpdate với `faqs` chứa 5 items.<br>- Q1 được giữ nguyên. | Critical | [x] |
+
+---
+
 ## 5. Tiêu Chí Đánh Giá Chất Lượng Phát Hành (Quality Gates)
 
 | Nhóm Kiểm Thử | Trạng Thái | Ghi Chú |
