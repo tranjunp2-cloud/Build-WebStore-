@@ -34,16 +34,10 @@ services:
       - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
       - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY}
       - VAPID_SUBJECT=${VAPID_SUBJECT:-mailto:adminprimeweb@yopmail.com}
-      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
-      - UNSPLASH_BLOCKS=${UNSPLASH_BLOCKS:-all}
-      - E2E_TEST_OTP_CODE=${E2E_TEST_OTP_CODE:-000000}
     volumes:
       - ./src:/app/src # Hot reload for source code
       - ./public:/app/public # Static assets
       - node_modules:/app/node_modules
-      - ./sentry.client.config.ts:/app/sentry.client.config.ts:ro
-      - ./sentry.server.config.ts:/app/sentry.server.config.ts:ro
-      - ./sentry.edge.config.ts:/app/sentry.edge.config.ts:ro
     depends_on:
       postgres:
         condition: service_healthy
