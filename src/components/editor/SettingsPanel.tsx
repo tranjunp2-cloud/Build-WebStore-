@@ -1449,6 +1449,39 @@ function SettingsPanelInner({
                                 </div>
                             )}
 
+                            {/* ─── CTA Block Secondary Button ──────────────── */}
+                            {bt === 'cta' && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">{s.secondaryButton}</label>
+                                    {block.secondaryCtaLabel ? (
+                                        <>
+                                            <div className="mt-2 space-y-2">
+                                                <Input defaultValue={stripHtmlForDisplay(block.secondaryCtaLabel as string)} key={`sec-lbl-${bk}`}
+                                                    placeholder={s.buttonText}
+                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'secondaryCtaLabel', e.target.value.trim())}
+                                                    variant="editor" className={editorInputClassName} />
+                                                <Input defaultValue={(block.secondaryCtaUrl as string) || ''} key={`sec-url-${bk}`}
+                                                    placeholder={s.buttonUrl}
+                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'secondaryCtaUrl', e.target.value.trim())}
+                                                    variant="editor" className={editorInputClassName} />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => onBlockUpdate(currentBlockIndex, { secondaryCtaLabel: '', secondaryCtaUrl: '' })}
+                                                aria-label="Remove secondary button"
+                                                className="mt-2 w-full rounded-lg bg-red-500/10 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors"
+                                            >✕ {s.removeButton}</button>
+                                        </>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => onBlockUpdate(currentBlockIndex, { secondaryCtaLabel: 'Learn More', secondaryCtaUrl: '#' })}
+                                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors"
+                                        >{s.addButton}</button>
+                                    )}
+                                </div>
+                            )}
+
                             {block.copyrightText !== undefined && (
                                 <div>
                                     <label className={labelCls}>{s.copyright}</label>
@@ -1460,9 +1493,12 @@ function SettingsPanelInner({
                             )}
 
                             {/* ─── Hero CTA Buttons ───────────────────────── */}
-                            {bt === 'hero' && ((block.ctaButtons || []) as CtaButton[]).length > 0 && (
+                            {bt === 'hero' && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">{s.ctaButtons}</label>
+                                    {((block.ctaButtons || []) as CtaButton[]).length === 0 && (
+                                        <p className="mt-2 text-xs text-gray-500 italic">{s.noButtons}</p>
+                                    )}
                                     {((block.ctaButtons || []) as CtaButton[]).map((btn, i) => (
                                         <div key={`cta-${btn.label}-${btn.url}-${i}`} className="mt-3 rounded-lg bg-white/5 p-3 space-y-2">
                                             <div className="flex items-center justify-between">
@@ -1479,8 +1515,12 @@ function SettingsPanelInner({
                                                 className={editorInputClassName} />
                                         </div>
                                     ))}
-                                    <button onClick={() => addArrayItem('ctaButtons', { label: 'New Button', url: '#' })}
-                                        className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addButton}</button>
+                                    <button
+                                        type="button"
+                                        onClick={() => addArrayItem('ctaButtons', { label: 'New Button', url: '#', style: 'primary' })}
+                                        disabled={((block.ctaButtons || []) as CtaButton[]).length >= 2}
+                                        className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >{s.addButton}</button>
                                 </div>
                             )}
 

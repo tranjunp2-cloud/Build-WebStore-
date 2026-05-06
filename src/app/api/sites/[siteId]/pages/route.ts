@@ -207,6 +207,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                     variant: 'centered',
                     headline: title,
                     subheadline: '',
+                    ctaButtons: [{ label: 'Get Started', url: '#contact', style: 'primary' }],
                 } as LayoutBlock)
                 if (footerBlock) {
                     defaultLayout.push(stripSystemFields(footerBlock) as LayoutBlock)
@@ -218,6 +219,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 variant: 'centered',
                 headline: title,
                 subheadline: '',
+                ctaButtons: [{ label: 'Get Started', url: '#contact', style: 'primary' }],
             } as LayoutBlock)
         }
 

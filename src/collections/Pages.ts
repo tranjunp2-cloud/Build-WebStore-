@@ -29,7 +29,7 @@ const HeroBlock = {
         {
             name: 'ctaButtons',
             type: 'array',
-            maxRows: 3,
+            maxRows: 2,
             fields: [
                 { name: 'label', type: 'text', required: true },
                 { name: 'url', type: 'text', required: true },
