@@ -864,7 +864,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
           { blockType: 'hero', variant: 'split-right' },
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'icon-grid' },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'stats', variant: 'counters' },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'pricing', variant: 'tiers' },
@@ -881,7 +881,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
           { blockType: 'hero', variant: 'split-left' },
           { blockType: 'features', variant: 'detailed' },
           { blockType: 'feature-comparison' },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'footer', variant: 'mega' },
         ],
@@ -953,7 +953,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'cards-overlay' },
           { blockType: 'features', variant: 'list' },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'stats', variant: 'counters' },
           { blockType: 'footer', variant: 'mega' },
         ],
@@ -1007,7 +1007,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'split-left' },
           { blockType: 'logo-cloud' },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'features', variant: 'icon-grid' },
           { blockType: 'pricing', variant: 'tiers' },
           { blockType: 'cta', variant: 'banner' },
@@ -1082,7 +1082,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
           { blockType: 'logo-cloud' },
           { blockType: 'features', variant: 'list' },
           { blockType: 'stats', variant: 'counters' },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'pricing', variant: 'simple' },
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'testimonials', variant: 'grid' },
@@ -1097,7 +1097,7 @@ export const BATCH1_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'minimal' },
           { blockType: 'features', variant: 'icon-grid' },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'footer', variant: 'mega' },
         ],

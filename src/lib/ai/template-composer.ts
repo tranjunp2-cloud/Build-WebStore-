@@ -1293,8 +1293,8 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
       return buildClassSchedule()
     case 'review-cards':
       return buildReviewCards(content)
-    case 'video-showcase':
-      return buildVideoShowcase()
+    // case 'video-showcase': // temporarily hidden (aiVisible: false, archived)
+    //   return buildVideoShowcase()
     case 'doctor-profile': {
       const items = Array.from({ length: 4 }, (_, i) => ({
         name: `Dr. ${['Aisha', 'Rahman', 'Mei Ling', 'Kumar', 'Siti', 'Jonathan'][i % 6]} ${['Tan', 'Lee', 'Wong', 'Patel', 'Ismail', 'Lim'][i % 6]}`,
@@ -1789,8 +1789,8 @@ function buildBlockFromSpec(
       return buildClassSchedule()
     case 'review-cards':
       return buildReviewCards(content)
-    case 'video-showcase':
-      return buildVideoShowcase()
+    // case 'video-showcase': // temporarily hidden (aiVisible: false, archived)
+    //   return buildVideoShowcase()
     // doctor-profile handled below (line ~1188) with items
     case 'property-card':
       return buildPropertyCard()
