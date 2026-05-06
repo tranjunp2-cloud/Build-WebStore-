@@ -56,6 +56,11 @@ export const BLOCK_MODIFIER_KEYWORDS: Record<string, string[]> = {
     'service-cards': ['service detail'],
     'product-card': ['product flatlay'],
     'before-after': ['transformation result'],
+    'property-card': ['luxury home interior', 'real estate modern'],
+    'doctor-profile': ['professional portrait headshot'],
+    'case-study': ['business project presentation'],
+    'event-card': ['event venue celebration'],
+    'blog-posts': ['writing desk journalism'],
     stats: ['data chart'],
     features: [],
 }
