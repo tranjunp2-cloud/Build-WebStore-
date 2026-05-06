@@ -861,7 +861,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'minimal' },
           { blockType: 'gallery', variant: 'masonry', count: 10 },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'footer', variant: 'mega' },
         ],
       },
@@ -1191,7 +1191,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CREATIVE (4 templates) — signature: portfolio-grid, gallery-masonry, video-showcase
+  // CREATIVE (4 templates) — signature: portfolio-grid, gallery-masonry
   // Pages: Home, Portfolio, About, Services, Contact
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1280,7 +1280,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'logo-cloud' },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'portfolio-grid', count: 6 },
           { blockType: 'features', variant: 'icon-grid', count: 4 },
           { blockType: 'cta', variant: 'banner' },
@@ -1296,7 +1296,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'centered' },
           { blockType: 'portfolio-grid', count: 9 },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'footer', variant: 'mega' },
         ],
       },
@@ -1354,7 +1354,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
           { blockType: 'logo-cloud' },
           { blockType: 'gallery', variant: 'masonry', count: 8 },
           { blockType: 'portfolio-grid', count: 4 },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'testimonials', variant: 'grid', count: 4 },
           { blockType: 'faq', variant: 'accordion', count: 4 },
@@ -1368,7 +1368,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'fullscreen' },
           { blockType: 'portfolio-grid', count: 12 },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'footer', variant: 'mega' },
         ],
       },
@@ -1425,7 +1425,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
           { blockType: 'portfolio-grid', count: 6 },
           { blockType: 'gallery', variant: 'masonry', count: 4 },
           { blockType: 'cta', variant: 'banner' },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'testimonials', variant: 'masonry', count: 5 },
           { blockType: 'faq', variant: 'accordion', count: 5 },
           { blockType: 'newsletter', variant: 'inline' },
@@ -1459,7 +1459,7 @@ export const BATCH2_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'minimal' },
           { blockType: 'features', variant: 'alternating', count: 4 },
-          { blockType: 'video-showcase' },
+          // { blockType: 'video-showcase' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'cta', variant: 'banner' },
           { blockType: 'footer', variant: 'mega' },
         ],
