@@ -3745,6 +3745,8 @@ const MIGRATIONS = [
   { name: 'enum_sites_site_type.add_fitness',     sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'fitness';` },
   { name: 'enum_sites_site_type.add_creative',    sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'creative';` },
   { name: 'enum_sites_site_type.add_beauty',      sql: `ALTER TYPE enum_sites_site_type ADD VALUE IF NOT EXISTS 'beauty';` },
+  { name: 'pages_blocks_whatsapp_button.add_country_code', sql: `ALTER TABLE "pages_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS country_code varchar;` },
+  { name: '_pages_v_blocks_whatsapp_button.add_country_code', sql: `ALTER TABLE "_pages_v_blocks_whatsapp_button" ADD COLUMN IF NOT EXISTS country_code varchar;` },
 ];
 
 async function runMigrations(pool) {

@@ -2624,6 +2624,7 @@
             "hidden": "Hidden",
             "visible": "Visible",
             "cartWidget": "Cart Widget",
+            "whatsappPosition": "Button Position",
             "checkoutBehavior": "Checkout Behavior",
             "checkoutDesc": "In preview, checkout falls back to a toast when storefront checkout is unavailable.",
             "buttonLabel": "Button Label",

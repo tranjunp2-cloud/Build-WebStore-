@@ -24,14 +24,17 @@ function sanitizeLabel(raw: string | undefined): string {
 
 export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<WhatsappButtonConfig>) {
     void _theme
-    const { variant = 'floating', phoneNumber, message, label: rawLabel = 'Chat with us', position = 'bottom-right' } = block
+    const { variant = 'floating', phoneNumber, countryCode, message, label: rawLabel = 'Chat with us', position = 'bottom-right' } = block
     const label = sanitizeLabel(rawLabel)
 
     const callback = useBlockEditCallback()
     const inContainer = useInFloatingContainer()
 
-    const cleanPhone = phoneNumber?.replace(/[^0-9]/g, '') || ''
-    const whatsappUrl = `https://wa.me/${cleanPhone}${message ? `?text=${encodeURIComponent(message)}` : ''}`
+    // Build full phone: if stored number already has country code prefix use it as-is, else prepend
+    const phoneDigits = (phoneNumber || '').replace(/[^0-9]/g, '')
+    const dialDigits = (countryCode || '+60').replace(/[^0-9]/g, '')
+    const fullPhone = phoneDigits.startsWith(dialDigits) ? phoneDigits : dialDigits + phoneDigits
+    const whatsappUrl = `https://wa.me/${fullPhone}${message ? `?text=${encodeURIComponent(message)}` : ''}`
 
     // ── Inline variant ─────────────────────────────────────────────────
     if (variant === 'inline') {
