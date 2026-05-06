@@ -75,9 +75,68 @@ const FOOTER_SOCIAL_PLATFORMS = [
 const HEADING_FONT_OPTIONS = [...THEME_ENUMS.fontHeading]
 const BODY_FONT_OPTIONS = [...THEME_ENUMS.fontBody]
 const labelCls = "text-[11px] font-medium text-slate-400"
+
+const PHONE_COUNTRIES = [
+    { code: '+60', flag: '🇲🇾', name: 'Malaysia', iso: 'my', placeholder: '+60 12 345 6789' },
+    { code: '+84', flag: '🇻🇳', name: 'Vietnam', iso: 'vn', placeholder: '+84 93 123 4567' },
+] as const
 const sectionCls = "border-t border-white/10 pt-4"
 // Hide newsletter variants from footer UI — feature not ready for users
 const FOOTER_HIDDEN_VARIANTS = new Set(['expanded', 'mega-footer'])
+
+/** Ensure phone number is displayed with country code prefix (e.g. "+60123456789"). */
+function preparePhoneForDisplay(phone: string, countryCode: string): string {
+    if (!phone) return ''
+    const digits = phone.replace(/[^0-9]/g, '')
+    const dialDigits = countryCode.replace(/[^0-9]/g, '')
+    if (!digits.startsWith(dialDigits)) return countryCode + digits
+    return '+' + digits
+}
+
+function PhoneCountryPicker({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+    const [open, setOpen] = React.useState(false)
+    const ref = React.useRef<HTMLDivElement>(null)
+    const selected = PHONE_COUNTRIES.find(c => c.code === value) ?? PHONE_COUNTRIES[0]
+
+    React.useEffect(() => {
+        if (!open) return
+        const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+        document.addEventListener('mousedown', close)
+        return () => document.removeEventListener('mousedown', close)
+    }, [open])
+
+    return (
+        <div ref={ref} className="relative flex h-8 shrink-0 items-center drop-shadow-[0px_1px_1px_rgba(0,0,0,0.1)]">
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                className="flex h-8 items-center gap-1.5 rounded-lg px-1 focus:outline-none"
+            >
+                <img src={`https://flagcdn.com/w40/${selected.iso}.png`} alt={selected.name} className="h-8 w-8 rounded-[7px] object-cover" />
+                <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-400 transition-transform', open && 'rotate-180')} />
+            </button>
+            {open && (
+                <div className="absolute left-0 top-[calc(100%+6px)] z-50 min-w-[140px] overflow-hidden rounded-xl border border-[rgba(59,130,246,0.2)] bg-[#0b1120] py-1 shadow-lg">
+                    {PHONE_COUNTRIES.map(c => (
+                        <button
+                            key={c.code}
+                            type="button"
+                            onClick={() => { onChange(c.code); setOpen(false) }}
+                            className={cn(
+                                'flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-white/5',
+                                c.code === value ? 'text-blue-400' : 'text-slate-200',
+                            )}
+                        >
+                            <img src={`https://flagcdn.com/w40/${c.iso}.png`} alt={c.name} className="h-5 w-5 rounded object-cover" />
+                            <span>{c.name}</span>
+                            <span className="ml-auto text-xs text-slate-500">{c.code}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
 
 type FieldBlurEvent = React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
 export type SettingsTab = 'global' | 'seo' | 'menu' | 'block'
@@ -1725,6 +1784,85 @@ function SettingsPanelInner({
                                                 </span>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ─── WhatsApp Button Settings ───────────────── */}
+                            {bt === 'whatsapp-button' && (
+                                <div className={sectionCls}>
+                                    <div className="space-y-3">
+                                        {/* Phone number with country picker */}
+                                        <div>
+                                            <label className={labelCls}>{s.phone}</label>
+                                            {(() => {
+                                                const waCode = (block.countryCode as string) || '+60'
+                                                const waCountry = PHONE_COUNTRIES.find(c => c.code === waCode) ?? PHONE_COUNTRIES[0]
+                                                return (
+                                                    <div className="mt-1.5 flex h-[44px] items-center gap-3 rounded-[10px] border border-[rgba(59,130,246,0.04)] bg-[#0b1120] px-[6px] py-[4px]">
+                                                        <PhoneCountryPicker
+                                                            value={waCode}
+                                                            onChange={code => {
+                                                                onBlockFieldChange(currentBlockIndex, 'countryCode', code)
+                                                                onBlockFieldChange(currentBlockIndex, 'phoneNumber', '')
+                                                            }}
+                                                        />
+                                                        <div className="h-[31px] w-px shrink-0 bg-white/10" />
+                                                        <input
+                                                            key={`wa-phone-${bk}-${waCode}`}
+                                                            defaultValue={preparePhoneForDisplay((block.phoneNumber as string) || '', waCode)}
+                                                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                                                const v = e.target.value.trim()
+                                                                if (v && /[a-zA-Z]/.test(v)) {
+                                                                    toast.error(t.editor.settingsValidation.invalidPhone)
+                                                                    return
+                                                                }
+                                                                onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
+                                                            }}
+                                                            className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#fafafa] placeholder:text-[#64748B] focus:outline-none"
+                                                            placeholder={waCountry.placeholder}
+                                                        />
+                                                    </div>
+                                                )
+                                            })()}
+                                        </div>
+                                        {/* Button text — inline only (issue #892) */}
+                                        {(block.variant || 'floating') === 'inline' && (
+                                            <div>
+                                                <label className={labelCls}>{s.buttonLabel}</label>
+                                                <Input
+                                                    defaultValue={(block.label as string) || 'Chat with us'}
+                                                    key={`wa-label-${bk}`}
+                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', sanitizeInput(e.target.value))}
+                                                    variant="editor"
+                                                    className={editorInputClassName}
+                                                    placeholder="Chat with us"
+                                                />
+                                            </div>
+                                        )}
+                                        {/* Position — floating only */}
+                                        {(block.variant || 'floating') === 'floating' && (
+                                            <div>
+                                                <label className={labelCls}>{s.whatsappPosition}</label>
+                                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                                    {(['bottom-right', 'bottom-left'] as const).map(pos => (
+                                                        <button
+                                                            key={pos}
+                                                            type="button"
+                                                            onClick={() => onBlockUpdate(currentBlockIndex, { position: pos })}
+                                                            className={cn(
+                                                                'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                                                                (block.position || 'bottom-right') === pos
+                                                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
+                                                            )}
+                                                        >
+                                                            {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

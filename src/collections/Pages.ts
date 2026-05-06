@@ -880,6 +880,7 @@ const WhatsappButtonBlock = {
             ],
         },
         { name: 'phoneNumber', type: 'text', required: true },
+        { name: 'countryCode', type: 'text', defaultValue: '+60' },
         { name: 'message', type: 'text' },
         { name: 'label', type: 'text', defaultValue: 'Chat with us' },
         {
