@@ -158,8 +158,12 @@ function renderGenericBlock(block: RenderBlock, t: TemplateTheme): string {
 
   if (bt === 'whatsapp-button') {
     const phone = (block.phoneNumber as string) || ''
+    const countryCode = (block.countryCode as string) || '+60'
     const msg = (block.message as string) || ''
-    const waUrl = 'https://wa.me/' + phone.replace(/[^0-9]/g, '') + (msg ? '?text=' + encodeURIComponent(msg) : '')
+    const phoneDigits = phone.replace(/[^0-9]/g, '')
+    const dialDigits = countryCode.replace(/[^0-9]/g, '')
+    const fullPhone = phoneDigits.startsWith(dialDigits) ? phoneDigits : dialDigits + phoneDigits
+    const waUrl = 'https://wa.me/' + fullPhone + (msg ? '?text=' + encodeURIComponent(msg) : '')
     const label = (block.label as string) || 'Chat on WhatsApp'
     if (variant === 'inline') {
       return '<section style="padding:40px 0;text-align:center"><div class="container"><a href="' + waUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#25D366;color:#fff;border-radius:12px;font-weight:600;font-size:16px;text-decoration:none">' + label + '</a></div></section>'
