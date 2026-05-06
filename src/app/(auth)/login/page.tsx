@@ -266,9 +266,13 @@ function LoginFormContent() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: userEmail }),
                 })
-                const otpData = await otpRes.json().catch(() => ({}))
-                if (otpData.emailSent === false) {
+                if (!otpRes.ok) {
                     otpEmailSent = false
+                } else {
+                    const otpData = await otpRes.json().catch(() => ({}))
+                    if (otpData.emailSent === false) {
+                        otpEmailSent = false
+                    }
                 }
             } catch {
                 otpEmailSent = false

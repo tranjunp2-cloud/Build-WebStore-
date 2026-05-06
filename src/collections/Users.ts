@@ -295,11 +295,15 @@ export const Users: CollectionConfig = {
                         temporaryPassword: tempPassword || undefined
                     })
 
-                    req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
+                    let emailSent = true
+                    try {
+                        await req.payload.sendEmail({ to: email, subject, html })
+                    } catch (err: unknown) {
+                        emailSent = false
                         console.error(`[StaffInvite] Failed to send email to ${email}:`, err)
-                    })
+                    }
 
-                    return Response.json({ message: 'Invitation sent successfully' })
+                    return Response.json({ message: 'Invitation sent successfully', emailSent })
                 } catch (error: any) {
                     console.error('[StaffInvite]', error)
                     return Response.json({ errors: [{ message: error.message || 'Server error' }] }, { status: 500 })
