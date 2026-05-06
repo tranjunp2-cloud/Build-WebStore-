@@ -148,6 +148,14 @@ export function withAuth<TContext extends { params: Promise<any> } = never>(
     }
 }
 
+/** Extract the primary tenant ID from an already-fetched user object. */
+export function extractTenantId(user: unknown): string | null {
+    const tenants = (user as { tenants?: Array<{ tenant: string | { id: string | number } }> }).tenants
+    if (!tenants || tenants.length === 0) return null
+    const first = tenants[0].tenant
+    return typeof first === 'string' ? first : first?.id != null ? String(first.id) : null
+}
+
 /**
  * Get the current user's primary tenant ID.
  * Most users only have 1 tenant (their store).
@@ -155,10 +163,5 @@ export function withAuth<TContext extends { params: Promise<any> } = never>(
 export async function getCurrentTenantId(): Promise<string | null> {
     const user = await getCurrentUser()
     if (!user) return null
-
-    const tenants = (user as unknown as { tenants?: Array<{ tenant: string | { id: string } }> }).tenants
-    if (!tenants || tenants.length === 0) return null
-
-    const firstTenant = tenants[0].tenant
-    return typeof firstTenant === 'string' ? firstTenant : firstTenant?.id || null
+    return extractTenantId(user)
 }
