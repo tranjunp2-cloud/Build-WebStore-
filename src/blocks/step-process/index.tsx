@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useRef } from 'react'
 import type { BlockProps } from '../types'
 import type { StepProcessConfig } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
@@ -52,21 +53,43 @@ function StepBadge({ size = 'md', children }: StepBadgeProps) {
     )
 }
 
-export function StepProcessBlock({ block }: BlockProps<StepProcessConfig>) {
-    const { headline, subheadline, steps = [], variant = 'vertical' } = block
+function HorizontalSlider({ steps, headline, subheadline }: Pick<StepProcessConfig, 'steps' | 'headline' | 'subheadline'>) {
+    const sliderRef = useRef<HTMLDivElement>(null)
+    const dragState = useRef({ isDown: false, startX: 0, scrollLeft: 0 })
 
-    if (variant === 'horizontal') {
-        return (
-            <StepProcessSection>
-                <StepProcessHeader headline={headline} subheadline={subheadline} />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative">
-                    {/* Connecting line */}
-                    <div
-                        className="hidden lg:block absolute top-8 left-[12.5%] right-[12.5%] h-0.5"
-                        style={{ background: `linear-gradient(90deg, rgba(var(--brand-primary-rgb), 0.251), rgba(var(--brand-primary-rgb), 0.125))` }}
-                    />
+    const onMouseDown = (e: React.MouseEvent) => {
+        const el = sliderRef.current
+        if (!el) return
+        dragState.current = { isDown: true, startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft }
+        el.style.cursor = 'grabbing'
+    }
+    const onMouseLeaveOrUp = () => {
+        dragState.current.isDown = false
+        if (sliderRef.current) sliderRef.current.style.cursor = 'grab'
+    }
+    const onMouseMove = (e: React.MouseEvent) => {
+        if (!dragState.current.isDown || !sliderRef.current) return
+        e.preventDefault()
+        const x = e.pageX - sliderRef.current.offsetLeft
+        const walk = (x - dragState.current.startX) * 1.5
+        sliderRef.current.scrollLeft = dragState.current.scrollLeft - walk
+    }
+
+    return (
+        <StepProcessSection>
+            <StepProcessHeader headline={headline} subheadline={subheadline} />
+            <div className="relative">
+                <div
+                    ref={sliderRef}
+                    className="flex overflow-x-auto gap-6 pb-2 snap-x snap-mandatory scrollbar-hide select-none"
+                    style={{ cursor: 'grab' }}
+                    onMouseDown={onMouseDown}
+                    onMouseLeave={onMouseLeaveOrUp}
+                    onMouseUp={onMouseLeaveOrUp}
+                    onMouseMove={onMouseMove}
+                >
                     {steps.map((step, i) => (
-                        <div key={i} className="relative text-center">
+                        <div key={i} className="shrink-0 w-[180px] snap-center text-center relative">
                             <div className="mx-auto mb-6 inline-block">
                                 <StepBadge size="lg">{step.icon || i + 1}</StepBadge>
                             </div>
@@ -75,8 +98,16 @@ export function StepProcessBlock({ block }: BlockProps<StepProcessConfig>) {
                         </div>
                     ))}
                 </div>
-            </StepProcessSection>
-        )
+            </div>
+        </StepProcessSection>
+    )
+}
+
+export function StepProcessBlock({ block }: BlockProps<StepProcessConfig>) {
+    const { headline, subheadline, steps = [], variant = 'vertical' } = block
+
+    if (variant === 'horizontal') {
+        return <HorizontalSlider steps={steps} headline={headline} subheadline={subheadline} />
     }
 
     if (variant === 'alternating') {
