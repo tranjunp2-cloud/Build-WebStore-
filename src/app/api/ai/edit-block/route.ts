@@ -422,15 +422,19 @@ IMPORTANT RULES for nested fields:
 }
 
 /** Normalize a service-cards services array so each item always has a non-empty title.
- *  Payload marks title as required=true — drafts save silently but publish fails validation. */
+ *  Payload marks title as required=true — drafts save silently but publish fails validation.
+ *  NOTE: booking-widget uses `name` (not `title`) as required — keep it out of this path. */
 function coerceServiceItems(services: unknown[]): Record<string, unknown>[] {
     return services.map(sv => {
         if (typeof sv === 'string') return { title: sv, description: '', icon: '⭐' }
         const svObj = (typeof sv === 'object' && sv !== null ? sv : {}) as Record<string, unknown>
+        const title = svObj.title || svObj.name || svObj.heading || 'Service'
+        // Only set description when absent — avoid overwriting valid descriptions with empty string
+        const description = svObj.description !== undefined ? svObj.description : (svObj.text || svObj.body || '')
         return {
             ...svObj,
-            title: String(svObj.title || svObj.name || svObj.heading || 'Service'),
-            description: String(svObj.description || svObj.text || svObj.body || ''),
+            title: String(title),
+            description: String(description),
         }
     })
 }
@@ -441,7 +445,12 @@ function normalizeChangesServices(
     existingBlock?: Record<string, unknown> | null,
 ): void {
     const blockType = (existingBlock?.blockType as string) ?? (changes.blockType as string)
-    if (blockType !== 'service-cards' && blockType !== 'booking-widget') return
+    // Only service-cards: its services[].title is required. booking-widget uses `name` (different schema).
+    if (blockType !== 'service-cards') return
+    if (!blockType) {
+        console.warn('[normalizeChangesServices] blockType undetermined — skipping service title normalization')
+        return
+    }
     if (Array.isArray(changes.services)) {
         changes.services = coerceServiceItems(changes.services)
     }
