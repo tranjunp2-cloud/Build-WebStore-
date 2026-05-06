@@ -67,6 +67,9 @@ export default function NewProductPage() {
                 title: data.metaTitle,
                 description: data.metaDescription,
             },
+            attributes: (data.attributes || [])
+                .filter((a) => a.key?.trim() && a.value?.trim())
+                .map((a) => ({ key: a.key.trim(), value: a.value.trim() })),
             status: 'draft',
             currency: 'MYR'
         }

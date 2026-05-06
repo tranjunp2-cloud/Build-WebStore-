@@ -13,6 +13,7 @@ import { GeneralInfoSection } from './GeneralInfoSection'
 import { VariantsInventorySection } from './VariantsInventorySection'
 import { ShippingDimensionsSection } from './ShippingDimensionsSection'
 import { DescriptionSeoSection } from './DescriptionSeoSection'
+import { AttributesSection } from './AttributesSection'
 import { useMemo } from 'react'
 
 interface ProductFormProps {
@@ -56,6 +57,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
             metaTitle: '',
             metaDescription: '',
             urlSlug: '',
+            attributes: [],
         }
     })
 
@@ -171,6 +173,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     <VariantsInventorySection />
                     <ShippingDimensionsSection />
                     <DescriptionSeoSection />
+                    <AttributesSection />
                 </div>
 
                 {/* Fixed Footer Actions */}

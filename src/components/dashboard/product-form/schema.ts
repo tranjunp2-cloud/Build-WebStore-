@@ -81,6 +81,12 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
         metaTitle: z.string().max(70, errorT.seoTitleMax || 'SEO Title should not exceed 70 characters').optional(),
         metaDescription: z.string().max(160, errorT.seoDescMax || 'SEO description should not exceed 160 characters').optional(),
         urlSlug: z.string().trim().regex(/^[a-z0-9-]+$/, errorT.urlSlugInvalid || 'Slug must be lowercase alphanumeric with hyphens').optional(),
+
+        // Attributes (key/value pairs, max 20)
+        attributes: z.array(z.object({
+            key: z.string().trim().min(1, errorT.attrKeyRequired || 'Attribute name is required').max(100, errorT.attrKeyLong || 'Attribute name is too long'),
+            value: z.string().trim().min(1, errorT.attrValueRequired || 'Attribute value is required').max(500, errorT.attrValueLong || 'Attribute value is too long'),
+        })).max(20, errorT.attrMax || 'Maximum 20 attributes allowed').optional(),
     }).superRefine((data, ctx) => {
         // Price required
         if (data.basePrice === undefined || data.basePrice === null) {
