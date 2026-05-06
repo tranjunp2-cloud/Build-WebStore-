@@ -666,9 +666,10 @@ export const Users: CollectionConfig = {
                     const otpHash = hashOTP(otp)
                     const otpExpiry = getOTPExpiry()
 
-                    // Store hashed OTP in database
-                    // overrideAccess bypasses field validation — staff users may have
-                    // permissions=[] which fails Payload validation on non-custom roles
+                    // Store hashed OTP in database.
+                    // Payload 3 validates the full merged document on update, not just the fields passed.
+                    // DB stores null (not []) for permissions when no rows exist in users_tenants_permissions.
+                    // normalizeTenants converts null → [] so Payload's select hasMany validator doesn't reject it.
                     await req.payload.update({
                         collection: 'users',
                         id: user.id,
@@ -677,6 +678,7 @@ export const Users: CollectionConfig = {
                             otpHash,
                             otpExpiresAt: otpExpiry.toISOString(),
                             otpAttempts: 0,
+                            tenants: normalizeTenants(user.tenants || []),
                         },
                     })
 
@@ -802,13 +804,13 @@ export const Users: CollectionConfig = {
                     }
                 }
 
-                // OTP valid — clear OTP fields and activate any pending tenant invites
-                const updatedTenants = (user.tenants || []).map((t: any) => {
-                    if (t.status === 'pending') {
-                        return { ...t, status: 'active' }
-                    }
-                    return t
-                })
+                // OTP valid — clear OTP fields and activate any pending tenant invites.
+                // Use normalizeTenants to sanitize null permissions before spreading,
+                // preventing the same select hasMany validation error as in send-otp.
+                const updatedTenants = normalizeTenants(user.tenants || []).map((t) => ({
+                    ...t,
+                    status: t.status === 'pending' ? 'active' : t.status,
+                }))
 
                 await req.payload.update({
                     collection: 'users',
