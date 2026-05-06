@@ -183,11 +183,15 @@ async function vercelFetch<T>(
  */
 export async function addProjectDomain(name: string): Promise<VercelDomain> {
     const { projectId } = assertVercelEnv()
+    // gitBranch routes the domain to the correct environment's latest deployment.
+    // VERCEL_GIT_COMMIT_REF is injected by Vercel at build time ('staging', 'main', etc.).
+    // Without this, Vercel defaults to production — causing DEPLOYMENT_NOT_FOUND on staging.
+    const gitBranch = process.env.VERCEL_GIT_COMMIT_REF ?? 'main'
     return vercelFetch<VercelDomain>(
         `/v10/projects/${encodeURIComponent(projectId)}/domains`,
         {
             method: 'POST',
-            body: JSON.stringify({ name }),
+            body: JSON.stringify({ name, gitBranch }),
         },
     )
 }
