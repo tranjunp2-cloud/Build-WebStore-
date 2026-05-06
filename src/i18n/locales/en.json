@@ -2794,6 +2794,7 @@
     },
     "settingsValidation": {
       "invalidPhone": "Please enter a valid phone number (digits, +, -, spaces)",
+      "phoneRequired": "Phone number is required",
       "primaryColorLabel": "Primary color picker",
       "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?"
     },

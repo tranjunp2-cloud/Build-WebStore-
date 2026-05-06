@@ -1798,31 +1798,43 @@ function SettingsPanelInner({
                                             {(() => {
                                                 const waCode = (block.countryCode as string) || '+60'
                                                 const waCountry = PHONE_COUNTRIES.find(c => c.code === waCode) ?? PHONE_COUNTRIES[0]
+                                                const phoneVal = (block.phoneNumber as string) || ''
+                                                const phoneEmpty = !phoneVal
                                                 return (
-                                                    <div className="mt-1.5 flex h-[44px] items-center gap-3 rounded-[10px] border border-[rgba(59,130,246,0.04)] bg-[#0b1120] px-[6px] py-[4px]">
-                                                        <PhoneCountryPicker
-                                                            value={waCode}
-                                                            onChange={code => {
-                                                                onBlockFieldChange(currentBlockIndex, 'countryCode', code)
-                                                                onBlockFieldChange(currentBlockIndex, 'phoneNumber', '')
-                                                            }}
-                                                        />
-                                                        <div className="h-[31px] w-px shrink-0 bg-white/10" />
-                                                        <input
-                                                            key={`wa-phone-${bk}-${waCode}`}
-                                                            defaultValue={preparePhoneForDisplay((block.phoneNumber as string) || '', waCode)}
-                                                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
-                                                                const v = e.target.value.trim()
-                                                                if (v && /[a-zA-Z]/.test(v)) {
-                                                                    toast.error(t.editor.settingsValidation.invalidPhone)
-                                                                    return
-                                                                }
-                                                                onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
-                                                            }}
-                                                            className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#fafafa] placeholder:text-[#64748B] focus:outline-none"
-                                                            placeholder={waCountry.placeholder}
-                                                        />
-                                                    </div>
+                                                    <>
+                                                        <div className={cn('mt-1.5 flex h-[44px] items-center gap-3 rounded-[10px] border bg-[#0b1120] px-[6px] py-[4px]', phoneEmpty ? 'border-red-500/50' : 'border-[rgba(59,130,246,0.04)]')}>
+                                                            <PhoneCountryPicker
+                                                                value={waCode}
+                                                                onChange={code => {
+                                                                    onBlockFieldChange(currentBlockIndex, 'countryCode', code)
+                                                                }}
+                                                            />
+                                                            <div className="h-[31px] w-px shrink-0 bg-white/10" />
+                                                            <input
+                                                                key={`wa-phone-${bk}-${waCode}`}
+                                                                defaultValue={preparePhoneForDisplay(phoneVal, waCode)}
+                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                                    const v = e.target.value.trim()
+                                                                    if (!v || !/[a-zA-Z]/.test(v)) {
+                                                                        onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
+                                                                    }
+                                                                }}
+                                                                onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                                                    const v = e.target.value.trim()
+                                                                    if (v && /[a-zA-Z]/.test(v)) {
+                                                                        toast.error(t.editor.settingsValidation.invalidPhone)
+                                                                        return
+                                                                    }
+                                                                    onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
+                                                                }}
+                                                                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#fafafa] placeholder:text-[#64748B] focus:outline-none"
+                                                                placeholder={waCountry.placeholder}
+                                                            />
+                                                        </div>
+                                                        {phoneEmpty && (
+                                                            <p className="mt-1 text-[11px] text-red-400">{t.editor.settingsValidation.phoneRequired}</p>
+                                                        )}
+                                                    </>
                                                 )
                                             })()}
                                         </div>

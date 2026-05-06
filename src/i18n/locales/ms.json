@@ -2794,6 +2794,7 @@
     },
     "settingsValidation": {
       "invalidPhone": "Sila masukkan nombor telefon yang sah (digit, +, -, ruang)",
+      "phoneRequired": "Nombor telefon diperlukan",
       "primaryColorLabel": "Pemilih warna utama",
       "seoConfirmReplace": "Meta sedia ada akan diganti:\n\nTajuk: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nPenerangan: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nGunakan perubahan?"
     },
