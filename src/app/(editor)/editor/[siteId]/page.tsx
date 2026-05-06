@@ -845,7 +845,30 @@ export default function EditorPage() {
             })
 
             if (!res.ok) {
-                throw new Error(`Server returned ${res.status}`)
+                const body = await res.json().catch(() => null) as {
+                    error?: {
+                        message?: string
+                        failures?: Array<{
+                            errName?: string
+                            errMsg?: string
+                            pgColumn?: string
+                            pgTable?: string
+                            causeMsg?: string
+                            validationErrors?: Array<{ path?: string; message?: string }>
+                        }>
+                    }
+                } | null
+                const firstFailure = body?.error?.failures?.[0]
+                const firstValidation = firstFailure?.validationErrors?.[0]
+                let detail: string | undefined
+                if (firstValidation?.path) {
+                    detail = `${firstValidation.path}: ${firstValidation.message || 'invalid'}`
+                } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
+                    detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
+                } else {
+                    detail = firstFailure?.causeMsg || firstFailure?.errMsg || body?.error?.message
+                }
+                throw new Error(detail || `Server returned ${res.status}`)
             }
 
             setPublishSuccess(true)
@@ -894,7 +917,9 @@ export default function EditorPage() {
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
             if (process.env.NODE_ENV === 'development') console.error('[Editor] Publish failed:', err)
+            const detail = err instanceof Error ? err.message : undefined
             toast.error(t.editor.toast.publishFailed, {
+                description: detail,
                 duration: 10000,
                 action: {
                     label: 'Retry',
