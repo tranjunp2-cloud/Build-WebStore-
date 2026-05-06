@@ -6,6 +6,7 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { AddToCartButton } from '@/components/storefront/AddToCartButton'
+import { ProductVariantSelector } from '@/components/storefront/ProductVariantSelector'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { TrackingManager } from '@/components/site-renderer/TrackingManager'
 import { getCurrentUser } from '@/lib/auth'
@@ -148,6 +149,14 @@ export default async function ProductDetailPage({ params }: Props) {
         attributes?: Array<{ key: string; value: string }>
         images?: Array<{ image?: { url: string }; alt?: string }>
         seo?: { title?: string; description?: string }
+        // Variants (US-F08-02)
+        hasVariants?: boolean
+        variants?: Array<{
+            name: string
+            price: number
+            compareAtPrice?: number | null
+            stock: number
+        }>
     }
 
     const p = product as ProductView
@@ -267,30 +276,40 @@ export default async function ProductDetailPage({ params }: Props) {
                         {p.name}
                     </h1>
 
-                    {/* Price */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                        <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)' }}>
-                            {formatPrice(p.price, p.currency || 'MYR')}
-                        </span>
-                        {hasDiscount && (
-                            <>
-                                <span style={{ fontSize: '18px', color: 'var(--text-muted, #999)', textDecoration: 'line-through' }}>
-                                    {formatPrice(p.compareAtPrice!, p.currency || 'MYR')}
+                    {/* Price + Variants/Stock — US-F08-02: selector owns price display for variant products */}
+                    {p.hasVariants && p.variants && p.variants.length > 0 ? (
+                        <ProductVariantSelector
+                            variants={p.variants}
+                            currency={p.currency || 'MYR'}
+                            primaryColor={primaryColor}
+                            basePrice={p.price}
+                            baseCompareAtPrice={p.compareAtPrice ?? null}
+                        />
+                    ) : (
+                        <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                                <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)' }}>
+                                    {formatPrice(p.price, p.currency || 'MYR')}
                                 </span>
-                                <span style={{ background: '#fef2f2', color: '#ef4444', fontSize: '13px', fontWeight: 600, padding: '4px 10px', borderRadius: '20px' }}>
-                                    -{discountPercent}%
-                                </span>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Stock */}
-                    <p style={{
-                        fontSize: '13px', marginBottom: '24px',
-                        color: p.inventory > 10 ? '#22c55e' : p.inventory > 0 ? '#f59e0b' : '#ef4444',
-                    }}>
-                        {p.inventory > 10 ? '✓ In Stock' : p.inventory > 0 ? `⚠ Only ${p.inventory} left` : '✕ Out of Stock'}
-                    </p>
+                                {hasDiscount && (
+                                    <>
+                                        <span style={{ fontSize: '18px', color: 'var(--text-muted, #999)', textDecoration: 'line-through' }}>
+                                            {formatPrice(p.compareAtPrice!, p.currency || 'MYR')}
+                                        </span>
+                                        <span style={{ background: '#fef2f2', color: '#ef4444', fontSize: '13px', fontWeight: 600, padding: '4px 10px', borderRadius: '20px' }}>
+                                            -{discountPercent}%
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                            <p style={{
+                                fontSize: '13px', marginBottom: '24px',
+                                color: p.inventory > 10 ? '#22c55e' : p.inventory > 0 ? '#f59e0b' : '#ef4444',
+                            }}>
+                                {p.inventory > 10 ? '✓ In Stock' : p.inventory > 0 ? `⚠ Only ${p.inventory} left` : '✕ Out of Stock'}
+                            </p>
+                        </>
+                    )}
 
                     {/* Add to Cart — hidden until checkout is implemented (gh-839) */}
                     {false && <AddToCartButton

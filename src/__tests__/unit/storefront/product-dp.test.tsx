@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import ProductDetailPage, { generateMetadata } from '../../../app/sites/[slug]/products/[productSlug]/page'
+import { getPayload } from 'payload'
 
 // Mock getPayload
 vi.mock('payload', () => ({
@@ -40,6 +41,15 @@ vi.mock('@payload-config', () => ({
 // Mock components
 vi.mock('@/components/storefront/AddToCartButton', () => ({
     AddToCartButton: () => <div data-testid="add-to-cart-button" />
+}))
+vi.mock('@/components/storefront/ProductVariantSelector', () => ({
+    ProductVariantSelector: ({ variants }: { variants: Array<{ name: string; stock: number }> }) => (
+        <div data-testid="variant-selector">
+            {variants.map(v => (
+                <button key={v.name} disabled={v.stock === 0}>{v.name}</button>
+            ))}
+        </div>
+    )
 }))
 vi.mock('@/components/storefront/CartDrawer', () => ({
     CartDrawer: () => <div data-testid="cart-drawer" />
@@ -112,5 +122,48 @@ describe('Storefront Product Detail Page (US-F08-06)', () => {
     it('generates correct metadata title with SEO fallback', async () => {
         const metadata = await generateMetadata({ params: Promise.resolve({ slug: 'demo', productSlug: 'ao-thun-test' }) })
         expect(metadata.title).toBe('Áo thun Test — Demo Site')
+    })
+
+    // TC-F08-02-10 — Variant selector integration (storefront)
+    it('TC-F08-02-10 — renders variant buttons when product hasVariants', async () => {
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+                if (collection === 'tenants') return { docs: [{ id: 't1', slug: 'demo' }] }
+                if (collection === 'sites') return { docs: [{ id: 's1', tenant: 't1', name: 'Demo', status: 'published', theme: {} }] }
+                if (collection === 'products') return {
+                    docs: [{
+                        id: 'p2', name: 'Áo thun Variant', slug: 'ao-thun-variant',
+                        status: 'active', price: 150000, inventory: 5, currency: 'MYR',
+                        hasVariants: true,
+                        variants: [
+                            { name: 'Trắng - M', price: 150000, stock: 5 },
+                            { name: 'Trắng - L', price: 150000, stock: 0 },
+                            { name: 'Đen - M', price: 155000, stock: 3 },
+                        ],
+                    }]
+                }
+                return { docs: [] }
+            })
+        } as any)
+
+        const jsx = await ProductDetailPage({ params: Promise.resolve({ slug: 'demo', productSlug: 'ao-thun-variant' }) })
+        const { getByTestId, getByRole } = render(jsx)
+
+        expect(getByTestId('variant-selector')).toBeInTheDocument()
+
+        // All three variant buttons rendered
+        expect(getByRole('button', { name: 'Trắng - M' })).toBeInTheDocument()
+        expect(getByRole('button', { name: 'Trắng - L' })).toBeInTheDocument()
+        expect(getByRole('button', { name: 'Đen - M' })).toBeInTheDocument()
+
+        // Out-of-stock variant is disabled
+        expect(getByRole('button', { name: 'Trắng - L' })).toBeDisabled()
+    })
+
+    it('TC-F08-02-11 — does not render variant selector when hasVariants=false', async () => {
+        const jsx = await ProductDetailPage({ params: Promise.resolve({ slug: 'demo', productSlug: 'ao-thun-test' }) })
+        const { queryByTestId } = render(jsx)
+
+        expect(queryByTestId('variant-selector')).not.toBeInTheDocument()
     })
 })

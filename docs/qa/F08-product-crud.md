@@ -72,6 +72,8 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-02-07** | `US-02/Sec` | `Race` | Tên Option trùng nhau | 1. Nhập 2 tầng Variants với cùng tên "Màu Sắc".<br>2. Nhấn Save. | - Frontend chặn, báo lỗi trùng tên Option.<br>- Không gửi API. | Priority | [x] |
 | **TC-F08-02-08** | `US-02/Opu` | `Bound` | Số lượng Option quá lớn (OOM) | 1. Thêm 100 giá trị vào 1 tầng Option. | - Validator chặn, hiển thị giới hạn tối đa.<br>- Không gây tràn bộ nhớ DOM. | Blocker | [ ] |
 | **TC-F08-02-09** | `US-02/Orph` | `Logic` | Cảnh báo khi đổi tên Option cha | 1. Đã có ma trận Variants.<br>2. Đổi tên tầng cha từ "Loại" thành "Mực". | - Hiển thị cảnh báo "Đổi tên sẽ xóa toàn bộ các giá trị con. Tiếp tục?"<br>- Tránh tạo dữ liệu mồ côi trong DB. | Blocker | [ ] |
+| **TC-F08-02-10** | `US-02/AC1` | `Func` | Storefront hiển thị variant selector khi hasVariants=true | 1. Mở trang sản phẩm có `hasVariants=true` với 3 variants (1 hết hàng).<br>2. Kiểm tra giao diện. | - Hiển thị `ProductVariantSelector` thay thế price block đơn.<br>- 3 variant button xuất hiện.<br>- Variant hết hàng (stock=0) bị disabled. | High | [x] |
+| **TC-F08-02-11** | `US-02/AC3` | `Func` | Storefront không hiển thị variant selector khi hasVariants=false | 1. Mở trang sản phẩm thường (không có variants).<br>2. Kiểm tra giao diện. | - Không có `variant-selector` element.<br>- Hiển thị price block và stock indicator bình thường. | High | [x] |
 
 ---
 
