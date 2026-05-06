@@ -94,7 +94,9 @@ function getUnsplashEnabledBlocks(): ReadonlySet<string> {
     if (env === 'all') return new Set(Object.keys(BLOCK_IMAGE_SPEC))
     return new Set(env.split(',').map((s) => s.trim()).filter(Boolean))
 }
-const UNSPLASH_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(['hero'])
+// Default: all blocks in BLOCK_IMAGE_SPEC. Use UNSPLASH_BLOCKS=hero to restrict
+// to hero-only (e.g. for free-plan Unsplash keys with 50 req/hr demo cap).
+const UNSPLASH_BLOCKS_DEFAULT: ReadonlySet<string> = new Set(Object.keys(BLOCK_IMAGE_SPEC))
 
 
 export interface ImageNeed {
