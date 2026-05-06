@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import * as Dialog from '@radix-ui/react-dialog'
 import { Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -157,6 +158,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     const [products, setProducts] = useState<ParsedProduct[]>([])
     const [hasParsed, setHasParsed] = useState(false)
     const [mounted, setMounted] = useState(false)
+    const [showExitConfirm, setShowExitConfirm] = useState(false)
 
     useEffect(() => {
         setMounted(true)
@@ -305,11 +307,19 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
         setProducts(prev => prev.map(p => ({ ...p, selected: checked })))
     }
 
+    const handleClose = () => {
+        if (hasParsed && products.length > 0 && !isSaving) {
+            setShowExitConfirm(true)
+            return
+        }
+        onClose()
+    }
+
     const selectedCount = products.filter(p => p.selected).length
 
     if (!mounted) return null
 
-    return createPortal(
+    const modal = createPortal(
         <div 
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-[#F8FAFC] antialiased"
             style={{ fontFamily: "'Inter', sans-serif" }}
@@ -413,8 +423,9 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                                     <td className="align-middle px-2">
                                                         <input
                                                             type="number"
+                                                            min="0"
                                                             value={p.price}
-                                                            onChange={(e) => updateProduct(p._id!, 'price', parseFloat(e.target.value) || 0)}
+                                                            onChange={(e) => updateProduct(p._id!, 'price', Math.max(0, parseFloat(e.target.value) || 0))}
                                                             className="w-[calc(100%-4px)] md:w-full h-[36px] bg-[#1E293B] border border-white/[0.08] rounded-xl px-3 py-2 text-[13px] md:text-[14px] text-[#F8FAFC] placeholder-gray-500 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-colors"
                                                         />
                                                     </td>
@@ -445,8 +456,8 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
 
                 {/* Footer Container 30963:11576 */}
                 <div className="flex w-full gap-[12px] p-[24px_24px_24px_24px] border-t border-white/[0.08]">
-                    <button 
-                        onClick={onClose}
+                    <button
+                        onClick={handleClose}
                         className="flex-1 h-[50px] rounded-2xl bg-transparent border border-solid border-[#F8FAFC]/30 text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 transition-colors"
                     >
                         {t.dashboard?.products?.bulkCreate?.cancel || 'Cancel'}
@@ -463,5 +474,49 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             </div>
         </div>,
         document.body
+    )
+
+    return (
+        <>
+            {modal}
+            <Dialog.Root open={showExitConfirm} onOpenChange={(open) => { if (!open) setShowExitConfirm(false) }}>
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm animate-in fade-in-0 duration-150" />
+                    <Dialog.Content
+                        className="fixed inset-0 z-[10001] flex items-center justify-center p-4 animate-in fade-in-0 zoom-in-95 duration-150 focus:outline-none"
+                        onPointerDownOutside={() => setShowExitConfirm(false)}
+                        onEscapeKeyDown={() => setShowExitConfirm(false)}
+                    >
+                        <div className="w-full max-w-[360px] rounded-[18px] border border-[rgba(59,130,246,0.16)] bg-[linear-gradient(180deg,rgba(20,30,48,0.98)_0%,rgba(11,17,32,0.98)_100%)] px-6 pb-6 pt-6 shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
+                            <div className="text-center">
+                                <Dialog.Title className="text-xl font-semibold text-white">
+                                    {t.dashboard?.products?.bulkCreate?.exitButton}?
+                                </Dialog.Title>
+                                <Dialog.Description className="mt-2 text-sm leading-6 text-[#CBD5E1]">
+                                    {t.dashboard?.products?.bulkCreate?.unsavedWarning}
+                                </Dialog.Description>
+                            </div>
+                            <div className="mt-6 grid grid-cols-2 gap-3">
+                                <Dialog.Close asChild>
+                                    <button
+                                        type="button"
+                                        className="flex h-11 items-center justify-center rounded-[10px] border border-[rgba(59,130,246,0.04)] bg-[rgba(255,255,255,0.05)] text-sm font-medium text-white transition-colors hover:bg-[rgba(255,255,255,0.08)]"
+                                    >
+                                        {t.dashboard?.products?.bulkCreate?.stayButton}
+                                    </button>
+                                </Dialog.Close>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowExitConfirm(false); onClose(); }}
+                                    className="flex h-11 items-center justify-center rounded-[10px] border border-[rgba(251,44,54,0.4)] bg-[#FF1F3D] text-sm font-medium text-white transition-colors hover:bg-[#ff3550]"
+                                >
+                                    {t.dashboard?.products?.bulkCreate?.exitButton}
+                                </button>
+                            </div>
+                        </div>
+                    </Dialog.Content>
+                </Dialog.Portal>
+            </Dialog.Root>
+        </>
     )
 }

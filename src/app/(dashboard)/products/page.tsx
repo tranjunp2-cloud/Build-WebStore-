@@ -727,7 +727,7 @@ export default function ProductsPage() {
                                                 {imgUrl ? (
                                                     <Image src={imgUrl} alt={product.name} fill className="object-cover" sizes="48px" />
                                                 ) : (
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-50"><Image src="/images/figma/fallback-img.svg" width={20} height={20} alt="Fallback" /></div>
+                                                    <ProductImageFallback size="sm" />
                                                 )}
                                             </div>
                                             
@@ -849,9 +849,7 @@ export default function ProductsPage() {
                                                 {imgUrl ? (
                                                     <Image src={imgUrl} alt={product.name} fill className="object-cover" sizes="64px" />
                                                 ) : (
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-50">
-                                                        <Image src="/images/figma/fallback-img.svg" width={32} height={32} alt="Fallback" />
-                                                    </div>
+                                                    <ProductImageFallback size="md" />
                                                 )}
                                             </div>
 
