@@ -65,9 +65,6 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
                     onChange={(ids) => setValue('categoryIds', ids, { shouldDirty: true, shouldValidate: true })}
                     error={errors.categoryIds?.message}
                 />
-                {errors.categoryIds && (
-                    <p className="text-xs text-red-500 mt-1">{errors.categoryIds.message}</p>
-                )}
             </div>
 
             {/* Images */}
