@@ -1396,6 +1396,7 @@ export default function EditorPage() {
 
             {!isCompactLayout && (
                 <EditorCoachMarks
+                    onEnterStep1={() => setActiveSidebarTab('pages')}
                     onEnterStep2={() => setSettingsRequestedTab({ tab: 'menu', key: Date.now() })}
                 />
             )}

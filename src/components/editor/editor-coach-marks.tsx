@@ -9,6 +9,8 @@ const CARD_WIDTH = 300
 type Step = 0 | 1 | 2
 
 interface Props {
+    /** Called when step 1 is about to show — parent switches left sidebar to pages tab */
+    onEnterStep1?: () => void
     /** Called when user enters step 2 — parent switches right panel to menu tab */
     onEnterStep2?: () => void
     /** Delay before showing step 1, to let editor layout settle */
@@ -42,18 +44,22 @@ function useAnchorRect(step: Step): DOMRect | null {
     return rect
 }
 
-export function EditorCoachMarks({ onEnterStep2, mountDelayMs = 300 }: Props) {
+export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 500 }: Props) {
     const { t } = useI18n()
     const cm = t.editor.coachMarks
     const [step, setStep] = useState<Step>(0)
     const rect = useAnchorRect(step)
 
-    // On mount: skip if already seen
+    // On mount: skip if already seen; otherwise switch sidebar to pages tab then show step 1
     useEffect(() => {
         if (typeof window === 'undefined') return
         if (window.localStorage.getItem(STORAGE_KEY) === 'true') return
-        const timer = window.setTimeout(() => setStep(1), mountDelayMs)
+        const timer = window.setTimeout(() => {
+            onEnterStep1?.()
+            setStep(1)
+        }, mountDelayMs)
         return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mountDelayMs])
 
     const finish = useCallback(() => {
