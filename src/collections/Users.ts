@@ -198,6 +198,11 @@ export const Users: CollectionConfig = {
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!email || !name || !tenantId || !role) return Response.json({ errors: [{ message: 'Missing required fields' }] }, { status: 400 })
 
+                // Payload postgres adapter uses integer IDs — coerce tenantId string → number
+                // so the relationship field validator can resolve it (string "5" !== integer 5 in strict mode)
+                const parsedTenantId = Number(tenantId)
+                const tenantIdForPayload: string | number = Number.isInteger(parsedTenantId) ? parsedTenantId : tenantId
+
                 // BUG-F19.08: Validate email length (RFC 5321)
                 if (typeof email !== 'string' || email.length > 254) {
                     return Response.json({ errors: [{ message: 'Email must not exceed 254 characters' }] }, { status: 400 })
@@ -259,7 +264,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 tenants: [
                                     ...normalizedExisting,
-                                    { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
+                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
                                 ]
                             }
                         })
@@ -277,7 +282,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 roles: ['tenant-owner'], // Default platform role
                                 tenants: [
-                                    { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
+                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
                                 ]
                             }
                         })
