@@ -17,6 +17,9 @@ import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<AnnouncementBarConfig>) {
     void _theme
     const { message, showLink, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor, paddingY = 12 } = block
+    const spacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
+    const paddingTop = spacing?.paddingTop ?? paddingY
+    const paddingBottom = spacing?.paddingBottom ?? paddingY
     const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
@@ -38,13 +41,13 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
     const resolvedTextColor = variant === 'minimal' ? (textColor ?? undefined) : (textColor || '#ffffff')
 
     return (
-        <section className="sticky top-0 z-50" role="banner">
+        <section className="sticky top-0 z-50" role="banner" data-no-text-edit>
             <div
                 className="px-6"
-                style={{ ...bgStyle, color: resolvedTextColor, paddingTop: paddingY, paddingBottom: paddingY }}
+                style={{ ...bgStyle, color: resolvedTextColor, paddingTop, paddingBottom }}
             >
                 <div className={`${CONTAINER.default} mx-auto flex items-center justify-center gap-3`}>
-                    <Body size="small" className="font-medium text-center">
+                    <Body size="small" className="font-medium text-center" data-text-editable>
                         {message}
                         {showLink !== false && linkText && linkText.trim() && linkUrl && (
                             <>

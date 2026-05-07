@@ -267,12 +267,14 @@ function SettingsPanelInner({
     const footerShowSocials = footerVariant !== 'minimal'
     const footerShowTagline = footerVariant === 'centered-stack' || footerVariant === 'dark-gradient'
 
-    const [localPaddingTop, setLocalPaddingTop] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? 32))
-    const [localPaddingBottom, setLocalPaddingBottom] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? 32))
+    const _spacingDefault = () => block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY ?? 12) : 32
+    const [localPaddingTop, setLocalPaddingTop] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? _spacingDefault()))
+    const [localPaddingBottom, setLocalPaddingBottom] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? _spacingDefault()))
     useEffect(() => {
-        setLocalPaddingTop(Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? 32))
-        setLocalPaddingBottom(Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? 32))
-    }, [block?.blockSpacing])
+        const def = block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY ?? 12) : 32
+        setLocalPaddingTop(Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? def))
+        setLocalPaddingBottom(Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? def))
+    }, [block?.blockSpacing, block?.blockType])
 
     // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
     const storeBlocks = useEditorStore(state => state.blocks)
@@ -1481,7 +1483,7 @@ function SettingsPanelInner({
                                     </div>
 
                                     {/* CTA Settings */}
-                                    <div className="mt-2 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
+                                    <div className="mt-4 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
                                         <button type="button" onClick={() => setIsAnnCtaOpen(v => !v)}
                                             className="flex w-full items-center justify-between h-11 px-3 hover:bg-white/[0.02] transition-colors">
                                             <span className="text-sm font-medium text-slate-100">CTA Settings</span>
@@ -1529,7 +1531,7 @@ function SettingsPanelInner({
                                                             >
                                                                 <option value="">— select page —</option>
                                                                 {pages?.map(p => (
-                                                                    <option key={p.slug} value={`/${p.slug}`}>{p.title || p.slug}</option>
+                                                                    <option key={p.slug} value={p.slug.startsWith('/') ? p.slug : `/${p.slug}`}>{p.title || p.slug}</option>
                                                                 ))}
                                                             </select>
                                                         ) : (
@@ -1544,7 +1546,7 @@ function SettingsPanelInner({
                                     </div>
 
                                     {/* Appearance */}
-                                    <div className="mt-2 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
+                                    <div className="mt-4 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
                                         <button type="button" onClick={() => setIsAnnAppearanceOpen(v => !v)}
                                             className="flex w-full items-center justify-between h-11 px-3 hover:bg-white/[0.02] transition-colors">
                                             <span className="text-sm font-medium text-slate-100">Appearance</span>
@@ -1560,11 +1562,13 @@ function SettingsPanelInner({
                                                             placeholder="#0ea5e9"
                                                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value.trim())}
                                                             variant="editor" className="h-8 text-[12px]" />
-                                                        <input type="color" key={`bgc1-${bk}`}
-                                                            value={(block.backgroundColor as string) || '#0ea5e9'}
-                                                            onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value)}
-                                                            aria-label="Pick background color"
-                                                            className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                                        <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[rgba(59,130,246,0.5)]" style={{ backgroundColor: (block.backgroundColor as string) || '#0ea5e9' }}>
+                                                            <input type="color" key={`bgc1-${bk}`}
+                                                                value={(block.backgroundColor as string) || '#0ea5e9'}
+                                                                onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value)}
+                                                                aria-label="Pick background color"
+                                                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                                                        </label>
                                                     </div>
                                                 </div>
                                                 {block.variant === 'gradient' && (
@@ -1576,11 +1580,13 @@ function SettingsPanelInner({
                                                                 placeholder="#d946ef"
                                                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value.trim())}
                                                                 variant="editor" className="h-8 text-[12px]" />
-                                                            <input type="color" key={`bgc2-${bk}`}
-                                                                value={(block.backgroundColor2 as string) || '#d946ef'}
-                                                                onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value)}
-                                                                aria-label="Pick gradient end color"
-                                                                className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                                            <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[rgba(59,130,246,0.5)]" style={{ backgroundColor: (block.backgroundColor2 as string) || '#d946ef' }}>
+                                                                <input type="color" key={`bgc2-${bk}`}
+                                                                    value={(block.backgroundColor2 as string) || '#d946ef'}
+                                                                    onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value)}
+                                                                    aria-label="Pick gradient end color"
+                                                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                                                            </label>
                                                         </div>
                                                     </div>
                                                 )}
@@ -1592,34 +1598,56 @@ function SettingsPanelInner({
                                                             placeholder="#ffffff"
                                                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value.trim())}
                                                             variant="editor" className="h-8 text-[12px]" />
-                                                        <input type="color" key={`tc-${bk}`}
-                                                            value={(block.textColor as string) || '#ffffff'}
-                                                            onChange={(e) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value)}
-                                                            aria-label="Pick text color"
-                                                            className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                                        <label className="relative h-8 w-12 shrink-0 cursor-pointer overflow-hidden rounded-[10px] border border-[rgba(59,130,246,0.5)]" style={{ backgroundColor: (block.textColor as string) || '#ffffff' }}>
+                                                            <input type="color" key={`tc-${bk}`}
+                                                                value={(block.textColor as string) || '#ffffff'}
+                                                                onChange={(e) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value)}
+                                                                aria-label="Pick text color"
+                                                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+                                                        </label>
                                                     </div>
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center justify-between">
-                                                        <span className={labelCls}>Vertical Padding</span>
-                                                        <span className="text-[10px] text-slate-500">{(block.paddingY as number) ?? 12}px</span>
-                                                    </div>
-                                                    <input type="range" min={4} max={32} step={2}
-                                                        defaultValue={(block.paddingY as number) ?? 12}
-                                                        key={`py-${bk}`}
-                                                        onPointerUp={(e) => onBlockUpdate(currentBlockIndex, { paddingY: Number((e.target as HTMLInputElement).value) })}
-                                                        className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]" />
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className={labelCls}>Dismissible</span>
-                                                    <input type="checkbox"
-                                                        checked={block.dismissible !== false}
-                                                        onChange={(e) => onBlockUpdate(currentBlockIndex, { dismissible: e.target.checked })}
-                                                        className="accent-blue-500"
-                                                    />
                                                 </div>
                                             </div>
                                         )}
+                                    </div>
+
+                                    {/* Layout & Spacing */}
+                                    <div className="mt-4">
+                                        <label className="text-xs font-medium uppercase text-gray-500 tracking-[0.6px]">Layout &amp; Spacing</label>
+                                        <div className="mt-3 space-y-3">
+                                            <div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={labelCls}>Top Spacing</span>
+                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
+                                                </div>
+                                                <input type="range" min={0} max={120} step={4}
+                                                    value={localPaddingTop}
+                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
+                                                    onPointerUp={(e) => {
+                                                        const val = Number((e.target as HTMLInputElement).value)
+                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
+                                                    }}
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={labelCls}>Bottom Spacing</span>
+                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
+                                                </div>
+                                                <input type="range" min={0} max={120} step={4}
+                                                    value={localPaddingBottom}
+                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
+                                                    onPointerUp={(e) => {
+                                                        const val = Number((e.target as HTMLInputElement).value)
+                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
+                                                    }}
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
