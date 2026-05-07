@@ -2,9 +2,9 @@
 
 import React, { useState, useMemo, useTransition } from 'react';
 import { useI18n } from '@/i18n';
-import { Users, Plus, UserPlus, Trash2, Shield, ShieldAlert, Loader2, Search, MoreHorizontal, Mail, Power, PowerOff, Edit2 } from 'lucide-react';
+import { Users, UserPlus, Trash2, Loader2, Search, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { removeStaff, bulkRemoveStaff, updateStaffStatus, resendInvite } from './actions';
+import { removeStaff } from './actions';
 import { StaffDrawer } from './StaffDrawer';
 import { RemoveStaffModal } from './RemoveStaffModal';
 
@@ -45,8 +45,6 @@ export function StaffDirectoryClient({
     const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
     const [userToRemove, setUserToRemove] = useState<StaffMember | null>(null);
     const [isPending, startTransition] = useTransition();
 
@@ -84,68 +82,15 @@ export function StaffDirectoryClient({
     const currentStaffPage = filteredStaff.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     // Handlers
-    const handleSelectAll = () => {
-        if (selectedIds.length === currentStaffPage.length && currentStaffPage.length > 0) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(currentStaffPage.map(s => s.id));
-        }
-    };
-
-    const handleSelectOne = (id: string) => {
-        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-    };
-
-    const handleBulkRemove = () => {
-        const confirmMsg = (t?.Staff?.bulkConfirm || 'Are you sure you want to remove {count} staff members?').replace('{count}', String(selectedIds.length));
-        if (!confirm(confirmMsg)) return;
-        startTransition(async () => {
-            const res = await bulkRemoveStaff(selectedIds);
-            if (res.success) {
-                setStaff(prev => prev.filter(s => !selectedIds.includes(s.id)));
-                setSelectedIds([]);
-                toast.success(t?.Staff?.toast?.removedBulk || 'Selected staff removed successfully');
-            } else {
-                toast.error(res.error || t?.Staff?.toast?.bulkRemoveFailed || 'Failed to remove staff');
-            }
-        });
-    };
-
     const handleRemove = (userId: string) => {
         const user = staff.find(s => s.id === userId);
         if (user) setUserToRemove(user);
     };
 
-    const handleToggleStatus = (userId: string, currentStatus: string) => {
-        const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
-        startTransition(async () => {
-            const res = await updateStaffStatus(userId, newStatus);
-            if (res.success) {
-                setStaff(prev => prev.map(s => s.id === userId ? { ...s, status: newStatus } : s));
-                toast.success(ti(t?.Staff?.toast?.updated || 'User marked as {status}', { status: newStatus }));
-                setOpenDropdownId(null);
-            } else {
-                toast.error(res.error || t?.Staff?.toast?.updateFailed || 'Failed to update status');
-            }
-        });
-    };
-
-    const handleResend = (userId: string) => {
-        startTransition(async () => {
-            const res = await resendInvite(userId);
-            if (res.success) {
-                toast.success(t?.Staff?.toast?.resent || 'Invitation email resent successfully');
-                setOpenDropdownId(null);
-            } else {
-                toast.error(res.error || t?.Staff?.toast?.resendFailed || 'Failed to resend invite');
-            }
-        });
-    };
-
     const getRoleLabel = (role: string) => {
         switch (role) {
             case 'owner': return t?.Staff?.table?.owner || 'Workspace Owner';
-            case 'admin': return t?.Staff?.drawer?.roles?.admin || 'Full Access';
+            case 'admin': return t?.Staff?.drawer?.roles?.admin || 'Manager';
             case 'viewer': return t?.Staff?.table?.viewer || 'Viewer';
             case 'custom': return t?.Staff?.table?.custom || 'Crew (Custom)';
             default: return role;
@@ -162,17 +107,6 @@ export function StaffDirectoryClient({
                 </div>
 
                 <div className="flex items-center gap-[12px]">
-                    {selectedIds.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={handleBulkRemove}
-                            disabled={isPending}
-                            className="flex items-center justify-center gap-2 h-[48px] px-[16px] rounded-[16px] bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors font-medium text-[14px]"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                            {ti(t?.Staff?.deleteSelected || 'Delete ({count})', { count: selectedIds.length })}
-                        </button>
-                    )}
                     {/* Invite Staff Button — Figma 31058:699 */}
                     <button
                         type="button"
@@ -261,7 +195,7 @@ export function StaffDirectoryClient({
                                                 </div>
                                             ) : (
                                                 <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(0,201,80,0.1)] border border-[rgba(0,201,80,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#05DF72] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.fullAccess || 'Full Access'}</span>
+                                                    <span className="text-[12px] font-semibold text-[#05DF72] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.fullAccess || 'Manager'}</span>
                                                 </div>
                                             )}
                                         </td>
@@ -375,7 +309,6 @@ export function StaffDirectoryClient({
                 user={userToRemove}
                 onSuccess={(userId) => {
                     setStaff(prev => prev.filter(s => s.id !== userId));
-                    setSelectedIds(prev => prev.filter(id => id !== userId));
                     setUserToRemove(null);
                 }}
             />

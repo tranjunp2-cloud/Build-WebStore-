@@ -12,7 +12,10 @@ export default async function StaffPage() {
     const user = await getCurrentUser();
     if (!user) return null;
 
-    const currentTenantInfo = user.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
+    const currentTenantInfo = user.tenants?.find((t: { tenant: string | number | { id: string | number }, role?: string }) => {
+        const tId = typeof t.tenant === 'object' && t.tenant !== null ? String(t.tenant.id) : String(t.tenant)
+        return tId === tenantId
+    });
     const currentUserRole = currentTenantInfo?.role || 'viewer';
     const currentUserId = String(user.id);
 
@@ -32,7 +35,10 @@ export default async function StaffPage() {
     });
 
     const staffMembers = usersRes.docs.map(u => {
-        const tenantInfo = u.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
+        const tenantInfo = u.tenants?.find((t: { tenant: string | number | { id: string | number }, role?: string, status?: string }) => {
+            const tId = typeof t.tenant === 'object' && t.tenant !== null ? String(t.tenant.id) : String(t.tenant)
+            return tId === tenantId
+        });
         return {
             id: String(u.id),
             email: u.email,
@@ -40,7 +46,7 @@ export default async function StaffPage() {
             lastName: u.lastName,
             avatar: typeof u.avatar === 'object' ? u.avatar?.url : null,
             role: tenantInfo?.role || 'viewer',
-            status: tenantInfo?.status || 'active',
+            status: tenantInfo?.status ?? 'active',
             permissions: tenantInfo?.permissions || [],
             lastLoginAt: u.lastLoginAt,
             createdAt: u.createdAt
