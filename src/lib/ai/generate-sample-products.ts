@@ -12,7 +12,8 @@ import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
-import { searchPhotos, buildImgixUrl, downloadPhotoBuffer, trackDownload } from './unsplash-client'
+import { searchPhotos, buildImgixUrl, trackDownload } from './unsplash-client'
+import { uploadImageUrl } from './upload-media'
 import { SAMPLE_PRODUCTS_BY_CATEGORY } from './content/sample-products'
 import { getGalleryImages } from '@/lib/images/industry-images'
 
@@ -134,23 +135,6 @@ function deriveFallbackKeyword(productName: string, category: string): string {
     const tail = words.slice(-2) // noun (product type) is last in English names
     const suffix = GENERIC_CATEGORIES.has(category.toLowerCase()) ? '' : ` ${category}`
     return `${tail.join(' ')}${suffix}`.trim()
-}
-
-/** Download an image URL and upload to Payload Media. Returns Media ID or undefined on failure. */
-async function uploadImageUrl(
-    imageUrl: string,
-    filename: string,
-    productName: string,
-    tenantId: string,
-    payload: BasePayload,
-): Promise<number | undefined> {
-    const { buffer, mimetype } = await downloadPhotoBuffer(imageUrl)
-    const doc = await payload.create({
-        collection: 'media',
-        data: { alt: productName, tenant: tenantId, aiGenerated: true },
-        file: { data: buffer, mimetype, name: filename, size: buffer.length },
-    })
-    return typeof doc.id === 'number' ? doc.id : parseInt(String(doc.id), 10)
 }
 
 /**
