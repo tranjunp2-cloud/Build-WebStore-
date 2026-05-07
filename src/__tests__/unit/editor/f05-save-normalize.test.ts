@@ -15,6 +15,8 @@
  *   TC-F05-save-11  → sanitizeBlockVariant: invalid variant for known block → coerced to defaultVariant
  *   TC-F05-save-12  → sanitizeBlockVariant: valid variant / missing block / empty variant → unchanged
  *   TC-F05-save-13  → normalizeBlocksForPersistence: blog-list with legacy "editorial" variant → coerced to "cards"
+ *   TC-F05-save-19  → normalizeBlocksForPersistence: service-cards empty/null/missing titles → coerced to 'Service' (GH-731)
+ *   TC-F05-save-19b → normalizeBlocksForPersistence: non-service-cards block services → NOT coerced
  *
  * Source:
  *   src/lib/block-normalization.ts
@@ -588,5 +590,44 @@ describe('normalizeBlocksForPersistence — footer variant aliases (PR #757 back
 
         // Assert — only contact block gets email coercion
         expect(result[0].email).toBe('')
+    })
+
+    // TC-F05-save-19: GH-731 — service-cards with empty service titles fail Payload
+    // required validation on publish. normalizeBlocksForPersistence must coerce to 'Service'.
+    it('TC-F05-save-19: service-cards with empty service titles → coerced to "Service" fallback', () => {
+        // Arrange — services with empty/null/missing title (simulate existing DB records)
+        const blocks = [{
+            blockType: 'service-cards',
+            variant: 'grid',
+            headline: 'Our Services',
+            services: [
+                { title: '', description: 'desc 1', icon: '🛠️' },
+                { title: null, description: 'desc 2', icon: '⭐' },
+                { description: 'desc 3', icon: '🔧' },
+                { title: 'Valid Title', description: 'desc 4', icon: '✅' },
+            ],
+        }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+        const services = result[0].services as Record<string, unknown>[]
+
+        // Assert — empty/null/missing titles get fallback; valid title unchanged
+        expect(services[0].title).toBe('Service')
+        expect(services[1].title).toBe('Service')
+        expect(services[2].title).toBe('Service')
+        expect(services[3].title).toBe('Valid Title')
+    })
+
+    it('TC-F05-save-19b: non-service-cards blocks with services array → NOT coerced', () => {
+        // Arrange — only service-cards should get title coercion
+        const blocks = [{ blockType: 'hero', variant: 'split', services: [{ title: '' }] }]
+
+        // Act
+        const result = normalizeBlocksForPersistence(blocks)
+        const services = result[0].services as Record<string, unknown>[]
+
+        // Assert — hero block services untouched
+        expect(services[0].title).toBe('')
     })
 })
