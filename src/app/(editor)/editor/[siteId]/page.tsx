@@ -75,6 +75,20 @@ type SaveOptions = {
     refreshPreview?: boolean
 }
 
+// Maps Payload field path segments → user-facing labels for publish error toasts.
+// These labels are WhatsApp-block-specific. If another block adds a `phoneNumber` field,
+// extend this map with a block-type-prefixed key (e.g. 'contactForm.phoneNumber').
+const FIELD_LABELS: Record<string, string> = {
+    phoneNumber: 'WhatsApp Phone Number',
+    countryCode: 'WhatsApp Country Code',
+}
+
+function friendlyValidationDetail(path: string, message?: string): string {
+    const field = path.split('.').pop() || path
+    const label = FIELD_LABELS[field] || field
+    return `${label}: ${message || 'invalid'}`
+}
+
 export default function EditorPage() {
     const params = useParams()
     const router = useRouter()
@@ -862,11 +876,13 @@ export default function EditorPage() {
                 const firstValidation = firstFailure?.validationErrors?.[0]
                 let detail: string | undefined
                 if (firstValidation?.path) {
-                    detail = `${firstValidation.path}: ${firstValidation.message || 'invalid'}`
+                    detail = friendlyValidationDetail(firstValidation.path, firstValidation.message)
                 } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
                     detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
                 } else {
-                    detail = firstFailure?.causeMsg || firstFailure?.errMsg || body?.error?.message
+                    const isDev = process.env.NODE_ENV === 'development'
+                    detail = (isDev ? (firstFailure?.causeMsg || firstFailure?.errMsg) : undefined)
+                        || body?.error?.message
                 }
                 throw new Error(detail || `Server returned ${res.status}`)
             }
@@ -971,12 +987,13 @@ export default function EditorPage() {
                 const firstValidation = firstFailure?.validationErrors?.[0]
                 let detail: string | undefined
                 if (firstValidation?.path) {
-                    // Payload validation error — richest signal for the user.
-                    detail = `${firstValidation.path}: ${firstValidation.message || 'invalid'}`
+                    detail = friendlyValidationDetail(firstValidation.path, firstValidation.message)
                 } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
                     detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
                 } else {
-                    detail = firstFailure?.causeMsg || firstFailure?.errMsg || body?.error?.message
+                    const isDev = process.env.NODE_ENV === 'development'
+                    detail = (isDev ? (firstFailure?.causeMsg || firstFailure?.errMsg) : undefined)
+                        || body?.error?.message
                 }
                 throw new Error(detail || `Server returned ${res.status}`)
             }
