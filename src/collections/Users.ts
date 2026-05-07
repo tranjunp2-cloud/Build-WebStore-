@@ -210,9 +210,9 @@ export const Users: CollectionConfig = {
 
                 // Check permissions of requester
                 const requesterTenant = req.user.tenants?.find((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 )
-                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                if (!requesterTenant || requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
 
@@ -231,7 +231,7 @@ export const Users: CollectionConfig = {
                     if (targetUser) {
                         // Check if already in tenant
                         const alreadyInTenant = targetUser.tenants?.find((t: any) =>
-                            (t.tenant?.id === tenantId || t.tenant === tenantId)
+                            String(t.tenant?.id ?? t.tenant) === String(tenantId)
                         )
                         if (alreadyInTenant) {
                             return Response.json({ errors: [{ message: 'User is already a member of this workspace' }] }, { status: 400 })
@@ -296,11 +296,17 @@ export const Users: CollectionConfig = {
                     })
 
                     let emailSent = true
-                    try {
-                        await req.payload.sendEmail({ to: email, subject, html })
-                    } catch (err: unknown) {
+                    // Empty string is also falsy — any non-empty value is trusted as valid transport
+                    if (!process.env.MAIL_HOST) {
                         emailSent = false
-                        console.error(`[StaffInvite] Failed to send email to ${email}:`, err)
+                        console.error('[StaffInvite] MAIL_HOST not set — email transport is streamTransport, no real email sent')
+                    } else {
+                        try {
+                            await req.payload.sendEmail({ to: email, subject, html })
+                        } catch (err: unknown) {
+                            emailSent = false
+                            console.error(`[StaffInvite] Failed to send email to ${email}:`, err)
+                        }
                     }
 
                     return Response.json({ message: 'Invitation sent successfully', emailSent })
@@ -323,7 +329,7 @@ export const Users: CollectionConfig = {
 
                 // Check requester permission
                 const requesterTenant = req.user.tenants?.find((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 )
                 if (!requesterTenant || requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Forbidden: Only owners can remove staff' }] }, { status: 403 })
@@ -337,7 +343,7 @@ export const Users: CollectionConfig = {
                 if (!targetUser) return Response.json({ errors: [{ message: 'User not found' }] }, { status: 404 })
 
                 const targetTenantIndex = targetUser.tenants?.findIndex((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 ) ?? -1
 
                 if (targetTenantIndex === -1) {
@@ -361,7 +367,7 @@ export const Users: CollectionConfig = {
                             limit: 1000
                         })
                         const activeOwners = allStaff.docs.filter((u: any) =>
-                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                            u.tenants?.find((t: any) => String(t.tenant?.id ?? t.tenant) === String(tenantId) && t.role === 'owner' && t.status === 'active')
                         )
 
                         if (activeOwners.length <= 1) {
@@ -396,7 +402,7 @@ export const Users: CollectionConfig = {
                 if (!userId || !tenantId || !role || !name) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
                 const requesterTenant = req.user.tenants?.find((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 )
                 if (!requesterTenant || requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Forbidden: Only owners can update staff' }] }, { status: 403 })
@@ -406,7 +412,7 @@ export const Users: CollectionConfig = {
                 if (!targetUser) return Response.json({ errors: [{ message: 'User not found' }] }, { status: 404 })
 
                 const targetTenantIndex = targetUser.tenants?.findIndex((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 ) ?? -1
 
                 if (targetTenantIndex === -1) {
@@ -436,7 +442,7 @@ export const Users: CollectionConfig = {
                             limit: 1000
                         })
                         const activeOwners = allStaff.docs.filter((u: any) =>
-                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                            u.tenants?.find((t: any) => String(t.tenant?.id ?? t.tenant) === String(tenantId) && t.role === 'owner' && t.status === 'active')
                         )
                         if (activeOwners.length <= 1) {
                             return Response.json({ errors: [{ message: 'Cannot demote the last workspace owner' }] }, { status: 400 })
@@ -473,9 +479,9 @@ export const Users: CollectionConfig = {
                 if (!userId || !tenantId || !status) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
                 const requesterTenant = req.user.tenants?.find((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 )
-                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                if (!requesterTenant || requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
 
@@ -483,7 +489,7 @@ export const Users: CollectionConfig = {
                 if (!targetUser) return Response.json({ errors: [{ message: 'User not found' }] }, { status: 404 })
 
                 const targetTenantIndex = targetUser.tenants?.findIndex((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 ) ?? -1
 
                 if (targetTenantIndex === -1) {
@@ -503,7 +509,7 @@ export const Users: CollectionConfig = {
                             limit: 1000
                         })
                         const activeOwners = allStaff.docs.filter((u: any) =>
-                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                            u.tenants?.find((t: any) => String(t.tenant?.id ?? t.tenant) === String(tenantId) && t.role === 'owner' && t.status === 'active')
                         )
                         if (activeOwners.length <= 1) {
                             return Response.json({ errors: [{ message: 'Cannot deactivate the last workspace owner' }] }, { status: 400 })
@@ -536,9 +542,9 @@ export const Users: CollectionConfig = {
                 if (!userId || !tenantId) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
                 const requesterTenant = req.user.tenants?.find((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 )
-                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                if (!requesterTenant || requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
 
@@ -555,9 +561,13 @@ export const Users: CollectionConfig = {
                     loginUrl
                 })
 
-                req.payload.sendEmail({ to: targetUser.email, subject, html }).catch((err: unknown) => {
-                    console.error(`[StaffInvite] Failed to resend email to ${targetUser.email}:`, err)
-                })
+                if (!process.env.MAIL_HOST) {
+                    console.error('[StaffInvite] MAIL_HOST not set — resend skipped, streamTransport would swallow it')
+                } else {
+                    req.payload.sendEmail({ to: targetUser.email, subject, html }).catch((err: unknown) => {
+                        console.error(`[StaffInvite] Failed to resend email to ${targetUser.email}:`, err)
+                    })
+                }
 
                 return Response.json({ message: 'Invitation resent successfully' })
             }
@@ -574,9 +584,9 @@ export const Users: CollectionConfig = {
                 if (!userIds || !tenantId || !Array.isArray(userIds)) return Response.json({ errors: [{ message: 'Missing or invalid fields' }] }, { status: 400 })
 
                 const requesterTenant = req.user.tenants?.find((t: any) =>
-                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                    String(t.tenant?.id ?? t.tenant) === String(tenantId)
                 )
-                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                if (!requesterTenant || requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
 
@@ -589,14 +599,14 @@ export const Users: CollectionConfig = {
                         if (!targetUser) continue;
 
                         const targetTenantIndex = targetUser.tenants?.findIndex((t: any) =>
-                            (t.tenant?.id === tenantId || t.tenant === tenantId)
+                            String(t.tenant?.id ?? t.tenant) === String(tenantId)
                         ) ?? -1
                         if (targetTenantIndex === -1) continue;
 
                         const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                         if (targetTenantRole === 'owner') {
                             const allStaff = await req.payload.find({ collection: 'users', where: { 'tenants.tenant': { equals: tenantId } }, limit: 1000 })
-                            const activeOwners = allStaff.docs.filter((u: any) => u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active'))
+                            const activeOwners = allStaff.docs.filter((u: any) => u.tenants?.find((t: any) => String(t.tenant?.id ?? t.tenant) === String(tenantId) && t.role === 'owner' && t.status === 'active'))
                             if (activeOwners.length <= 1) {
                                 errorCount++;
                                 continue;
@@ -696,6 +706,11 @@ export const Users: CollectionConfig = {
                     if (useDevBypass || useE2EBypass) {
                         // Dev/E2E: log metadata only, never log OTP code
                         console.log(`[DEV OTP] Bypass code sent for ${maskedEmail}`)
+                    } else if (!process.env.MAIL_HOST) {
+                        // Empty string is also falsy — any non-empty value is trusted as valid transport
+                        // MAIL_HOST not configured — streamTransport silently swallows the message
+                        emailSent = false
+                        console.error('[OTP] MAIL_HOST not set — email transport is streamTransport, no real email sent')
                     } else {
                         // Production: await real email send so we can report failures
                         const { subject, html } = otpVerificationEmail({ userName, otpCode: otp })

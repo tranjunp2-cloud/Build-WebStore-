@@ -1881,7 +1881,7 @@
         "qSettingsDns": "How to configure DNS records?",
         "aSettingsDns": "After adding your domain, the system shows the required DNS records:<ul><li><strong>A Record</strong> — Point your domain to the static IP address shown (e.g., 162.159.140.98)</li><li><strong>CNAME Record</strong> — Point to <strong>web-v2.dev.ecommercehub.my</strong></li></ul>DNS propagation typically takes 15 minutes to 48 hours depending on your registrar.",
         "qSettingsStaff": "How to invite admin staff?",
-        "aSettingsStaff": "Go to <strong>\"⚙️ Settings → Staff\"</strong>. Click <strong>\"Invite Staff\"</strong>, enter their email address, and select a role (Viewer or Full Access). They will receive an email invitation to join your workspace."
+        "aSettingsStaff": "Go to <strong>\"⚙️ Settings → Staff\"</strong>. Click <strong>\"Invite Staff\"</strong>, enter their email address, and select a role (Viewer or Manager). They will receive an email invitation to join your workspace."
       }
     }
   },
@@ -1942,7 +1942,7 @@
       "actions": "ACTIONS",
       "owner": "Owner",
       "custom": "Custom Features",
-      "fullAccess": "Full Access",
+      "fullAccess": "Manager",
       "viewer": "Viewer",
       "active": "Active",
       "suspended": "Suspended",

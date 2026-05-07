@@ -1,7 +1,7 @@
 /** Minimal shape of a user's tenant membership returned by Payload queries */
 export interface TenantMembership {
     id?: string
-    tenant: string | { id: string }
+    tenant: string | number | { id: string | number }
     role: string
     status?: string
     permissions?: string[]
