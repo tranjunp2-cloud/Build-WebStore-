@@ -1860,6 +1860,7 @@ function SettingsPanelInner({
                                                             <PhoneCountryPicker
                                                                 value={waCode}
                                                                 onChange={code => {
+                                                                    // Not clearing phoneNumber here — would trigger showPhoneError prematurely when user switches country.
                                                                     onBlockFieldChange(currentBlockIndex, 'countryCode', code)
                                                                 }}
                                                             />
@@ -1867,12 +1868,6 @@ function SettingsPanelInner({
                                                             <input
                                                                 key={`wa-phone-${bk}-${waCode}`}
                                                                 defaultValue={preparePhoneForDisplay(phoneVal, waCode)}
-                                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                                    const v = e.target.value.trim()
-                                                                    if (!v || !/[a-zA-Z]/.test(v)) {
-                                                                        onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
-                                                                    }
-                                                                }}
                                                                 onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
                                                                     const v = e.target.value.trim()
                                                                     setPhoneTouchedSet(prev => new Set(prev).add(bk))

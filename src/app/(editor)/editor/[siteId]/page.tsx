@@ -76,8 +76,6 @@ type SaveOptions = {
 }
 
 // Maps Payload field path segments → user-facing labels for publish error toasts.
-// These labels are WhatsApp-block-specific. If another block adds a `phoneNumber` field,
-// extend this map with a block-type-prefixed key (e.g. 'contactForm.phoneNumber').
 const FIELD_LABELS: Record<string, string> = {
     phoneNumber: 'WhatsApp Phone Number',
     countryCode: 'WhatsApp Country Code',

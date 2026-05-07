@@ -349,7 +349,9 @@ describe('Publish and Save Flows (TC-F05)', () => {
         })
     })
 
-    describe('TC-F05.61-63: Publish error body parsing (BUG-GH-881)', () => {
+    describe('TC-F05.61-63: Publish error body parsing (BUG-GH-892)', () => {
+        afterEach(() => vi.unstubAllEnvs())
+
         async function setupAndClickPublish() {
             render(<EditorPage />)
             await waitFor(() => expect(screen.getByTestId('toolbar')).toBeInTheDocument())
@@ -431,8 +433,6 @@ describe('Publish and Save Flows (TC-F05)', () => {
                 expect(publishFailCall).toBeDefined()
                 expect(publishFailCall[1]?.description).not.toContain('null value in column')
             })
-
-            vi.unstubAllEnvs()
         })
     })
 })
