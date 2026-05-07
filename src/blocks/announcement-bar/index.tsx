@@ -5,7 +5,8 @@ import type { BlockProps } from '../types'
 import type { AnnouncementBarConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 
-function getLinkAttrs(url: string): { target?: string; rel?: string } {
+function getLinkAttrs(url: string, isInternal?: boolean): { target?: string; rel?: string } {
+    if (isInternal) return {}
     if (url.startsWith('http://') || url.startsWith('https://')) {
         return { target: '_blank', rel: 'noopener noreferrer' }
     }
@@ -16,7 +17,7 @@ import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<AnnouncementBarConfig>) {
     void _theme
-    const { message, showLink, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor, paddingY = 12 } = block
+    const { message, showLink, linkText, linkUrl, linkIsInternal, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor, paddingY = 12 } = block
     const spacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
     const paddingTop = spacing?.paddingTop ?? paddingY
     const paddingBottom = spacing?.paddingBottom ?? paddingY
@@ -55,7 +56,7 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
                                 <a
                                     href={linkUrl}
                                     className="underline underline-offset-2 font-semibold hover:opacity-80 transition-opacity"
-                                    {...getLinkAttrs(linkUrl)}
+                                    {...getLinkAttrs(linkUrl, linkIsInternal)}
                                 >
                                     {linkText} &rarr;
                                 </a>

@@ -267,11 +267,11 @@ function SettingsPanelInner({
     const footerShowSocials = footerVariant !== 'minimal'
     const footerShowTagline = footerVariant === 'centered-stack' || footerVariant === 'dark-gradient'
 
-    const _spacingDefault = () => block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY ?? 12) : 32
+    const _spacingDefault = () => block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY || 12) : 32
     const [localPaddingTop, setLocalPaddingTop] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? _spacingDefault()))
     const [localPaddingBottom, setLocalPaddingBottom] = useState(() => Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? _spacingDefault()))
     useEffect(() => {
-        const def = block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY ?? 12) : 32
+        const def = block?.blockType === 'announcement-bar' ? Number((block as Record<string, unknown>)?.paddingY || 12) : 32
         setLocalPaddingTop(Number((block?.blockSpacing as Record<string, unknown>)?.paddingTop ?? def))
         setLocalPaddingBottom(Number((block?.blockSpacing as Record<string, unknown>)?.paddingBottom ?? def))
     }, [block?.blockSpacing, block?.blockType])
@@ -307,8 +307,9 @@ function SettingsPanelInner({
     const [annShowLink, setAnnShowLink] = useState(() => (block as Record<string, unknown>)?.showLink !== false && !!(block?.linkText || block?.linkUrl))
     useEffect(() => {
         const b = block as Record<string, unknown> | undefined
-        setAnnShowLink(b?.showLink === true || (b?.showLink === undefined && !!(b?.linkText || b?.linkUrl)))
-    }, [blockIndex])
+        const sl = b?.showLink
+        setAnnShowLink(sl === true || (sl === undefined && !!(b?.linkText || b?.linkUrl)))
+    }, [blockIndex, block?.showLink, block?.linkText, block?.linkUrl])
     const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false)
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
@@ -1536,7 +1537,16 @@ function SettingsPanelInner({
                                                             </select>
                                                         ) : (
                                                             <Input defaultValue={(block.linkUrl as string) || ''} key={`lu-${bk}`}
-                                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
+                                                                onBlur={(e: FieldBlurEvent) => {
+                                                                    const raw = e.target.value.trim()
+                                                                    if (!raw) { onBlockFieldChange(currentBlockIndex, 'linkUrl', ''); return }
+                                                                    if (containsHtml(raw) || !isValidUrl(raw)) {
+                                                                        toast.error('Invalid URL: only http/https allowed')
+                                                                        e.target.value = (block.linkUrl as string) || ''
+                                                                        return
+                                                                    }
+                                                                    onBlockFieldChange(currentBlockIndex, 'linkUrl', raw)
+                                                                }}
                                                                 variant="editor" className="mt-1" placeholder="https://example.com" />
                                                         )}
                                                     </>

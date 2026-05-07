@@ -853,7 +853,7 @@ const AnnouncementBarBlock = {
     labels: { singular: 'Announcement Bar', plural: 'Announcement Bars' },
     fields: [
         {
-            name: 'variant', type: 'select', defaultValue: 'solid',
+            name: 'variant', type: 'select', defaultValue: 'gradient',
             options: [
                 { label: 'Gradient', value: 'gradient' },
                 { label: 'Solid', value: 'solid' },
