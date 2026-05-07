@@ -102,10 +102,16 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
                 onClick={finish}
             />
 
-            {/* Spotlight ring around anchor element */}
+            {/* Spotlight ring — inset shadow avoids clipping at viewport edges */}
             <div
-                className="pointer-events-none fixed z-[65] rounded-xl ring-2 ring-cyan-400 ring-offset-2 ring-offset-black/5"
-                style={{ top: rect.top - 4, left: rect.left - 4, width: rect.width + 8, height: rect.height + 8 }}
+                className="pointer-events-none fixed z-[65] rounded-xl"
+                style={{
+                    top: rect.top,
+                    left: rect.left,
+                    width: rect.width,
+                    height: rect.height,
+                    boxShadow: 'inset 0 0 0 2px #22d3ee',
+                }}
                 aria-hidden="true"
             />
 
