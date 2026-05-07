@@ -152,8 +152,30 @@ function renderGenericBlock(block: RenderBlock, t: TemplateTheme): string {
   }
 
   if (bt === 'announcement-bar') {
-    const message = (block.message as string) || ''
-    return '<div style="background:' + t.primary + ';color:#fff;text-align:center;padding:10px 20px;font-size:13px;font-weight:600">' + message + '</div>'
+    const message = escapeAttr((block.message as string) || '')
+    const linkText = escapeAttr(((block.linkText as string) || '').trim())
+    const rawUrl = (block.linkUrl as string) || ''
+    const linkUrl = rawUrl.startsWith('/') ? escapeAttr(rawUrl) : sanitizeUrl(rawUrl)
+    const bg1 = (block.backgroundColor as string) || t.primary
+    const bg2 = (block.backgroundColor2 as string) || t.secondary
+    const paddingY = (block.paddingY as number) || 12
+
+    let bgStyle: string
+    let color = '#fff'
+    if (variant === 'gradient') {
+      bgStyle = 'background:linear-gradient(135deg,' + bg1 + ',' + bg2 + ')'
+    } else if (variant === 'minimal') {
+      bgStyle = 'background:transparent;border-bottom:1px solid ' + t.primary + '20'
+      color = t.text
+    } else {
+      bgStyle = 'background:' + bg1
+    }
+
+    const linkPart = linkText && rawUrl
+      ? ' <a href="' + linkUrl + '" style="color:inherit;text-decoration:underline;font-weight:600">' + linkText + ' &rarr;</a>'
+      : ''
+
+    return '<div style="' + bgStyle + ';color:' + color + ';text-align:center;padding:' + paddingY + 'px 20px;font-size:13px;font-weight:600">' + message + linkPart + '</div>'
   }
 
   if (bt === 'whatsapp-button') {

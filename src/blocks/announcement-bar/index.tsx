@@ -4,12 +4,19 @@ import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { AnnouncementBarConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
+
+function getLinkAttrs(url: string): { target?: string; rel?: string } {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return { target: '_blank', rel: 'noopener noreferrer' }
+    }
+    return {}
+}
 import { Body } from '../shared/Typography'
 import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<AnnouncementBarConfig>) {
     void _theme
-    const { message, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor } = block
+    const { message, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, paddingY = 12 } = block
     const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
@@ -18,7 +25,7 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
         const bg = backgroundColor || CSS_VARS.primary
         switch (variant) {
             case 'gradient':
-                return { background: `linear-gradient(135deg, ${bg}, ${CSS_VARS.secondary})` }
+                return { background: `linear-gradient(135deg, ${bg}, ${backgroundColor2 || CSS_VARS.secondary})` }
             case 'solid':
                 return { backgroundColor: bg }
             case 'minimal':
@@ -33,18 +40,19 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
     return (
         <section className="sticky top-0 z-50" role="banner">
             <div
-                className="py-3 px-6"
-                style={{ ...bgStyle, color: textColor }}
+                className="px-6"
+                style={{ ...bgStyle, color: textColor, paddingTop: paddingY, paddingBottom: paddingY }}
             >
                 <div className={`${CONTAINER.default} mx-auto flex items-center justify-center gap-3`}>
                     <Body size="small" className="font-medium text-center">
                         {message}
-                        {linkText && linkUrl && (
+                        {linkText && linkText.trim() && linkUrl && (
                             <>
                                 {' '}
                                 <a
                                     href={linkUrl}
                                     className="underline underline-offset-2 font-semibold hover:opacity-80 transition-opacity"
+                                    {...getLinkAttrs(linkUrl)}
                                 >
                                     {linkText} &rarr;
                                 </a>

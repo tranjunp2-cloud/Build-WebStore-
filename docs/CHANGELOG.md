@@ -15,6 +15,26 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### GH-899 — Announcement Bar: CTA Link Integration & Content Configuration
+
+**Features:**
+- Editor settings panel now exposes all announcement-bar fields: message, CTA link text/URL (external or internal page picker), dismissible toggle, color pickers (BG Color 1 + Color 2 for gradient), vertical padding slider (4–32px)
+- Gradient variant now supports independent Color 2 via `backgroundColor2` field
+- Vertical padding controlled via internal `paddingY` field (default 12px = py-3)
+- Preview renderer correctly branches gradient/solid/minimal variants
+
+**Bug fixes:**
+- CTA fields (`linkText`, `linkUrl`) were invisible in SettingsPanel — zero editable fields
+- Gradient Color 2 was hardcoded to `CSS_VARS.secondary` — now user-configurable
+- Padding slider had no effect (block is FLOATING_BLOCK_TYPE) — replaced with internal paddingY
+- Preview HTML renderer always showed solid background regardless of variant
+
+**Security:** HTML-escaped `message`/`linkText` in preview renderer; `rel="noopener noreferrer"` on external CTA links
+
+**Tests:** 16 unit TCs (all pass) in `src/__tests__/unit/blocks/announcement-bar.test.tsx` covering gradient/solid/minimal variants, CTA rendering, padding, and dismissible toggle.
+
+---
+
 ### Added
 - **F30 Hero Media Overlay (GH-12)** — inline hover overlay for hero blocks enabling live image/video swap without leaving the site renderer. Ships `src/lib/media/compress-image.ts` (canvas-based client compression: 1920px, 2MB cap, WebP 0.85), `src/components/site-renderer/BlockEditCallbackContext.tsx` (React context wiring `blockIndex` + `onFieldChange`), and `src/blocks/hero/hero-media-overlay.tsx` ("Change Image" + optional "Change Video" buttons, file-type validation, upload via `uploadMediaAction`, `VideoInputPopover` for URL entry, `positionClass` prop for background-image variants). Wired into 6 hero variants: split, magazine, cards-overlay, slideshow, video, split-video. QA doc `docs/qa/F30-hero-media-overlay.md` (10 TC-IDs); unit tests `src/__tests__/unit/blocks/hero-media-overlay.test.tsx` (9 tests, all pass). Branch: `fix/F05-12-image-upload-ai-gen`.
 

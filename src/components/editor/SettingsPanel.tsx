@@ -1281,7 +1281,7 @@ function SettingsPanelInner({
                             )}
 
                             {/* Layout & Spacing */}
-                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && (
+                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
                                     <div className="mt-3 space-y-3">
@@ -1445,6 +1445,102 @@ function SettingsPanelInner({
                                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaUrl', e.target.value)}
                                             variant="editor"
                                             className={editorInputClassName} placeholder={s.buttonUrl} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ─── Announcement Bar Settings ───────────────── */}
+                            {bt === 'announcement-bar' && (
+                                <div className={sectionCls}>
+                                    <label className="text-xs font-medium uppercase text-gray-500">Announcement Bar</label>
+
+                                    {/* Message */}
+                                    <div className="mt-2">
+                                        <label className={labelCls}>Message</label>
+                                        <Textarea defaultValue={(block.message as string) || ''} rows={2} key={`msg-${bk}`}
+                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'message', e.target.value)}
+                                            variant="editor" className={editorTextareaClassName}
+                                            placeholder="Free shipping on orders over $50" />
+                                    </div>
+
+                                    {/* CTA Link Group */}
+                                    <div className="mt-3 space-y-2">
+                                        <label className={labelCls}>Link Text (leave empty to hide)</label>
+                                        <Input defaultValue={(block.linkText as string) || ''} key={`lt-${bk}`}
+                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'linkText', e.target.value)}
+                                            variant="editor" className={editorInputClassName} placeholder="Shop now" />
+
+                                        {/* External / Internal toggle */}
+                                        <div className="flex gap-2 text-[11px]">
+                                            <button type="button"
+                                                onClick={() => onBlockUpdate(currentBlockIndex, { linkIsInternal: false })}
+                                                className={cn('rounded px-2 py-1 transition-colors', !block.linkIsInternal ? 'bg-blue-500/15 text-blue-400' : 'bg-white/5 text-gray-500 hover:bg-white/10')}
+                                            >External URL</button>
+                                            <button type="button"
+                                                onClick={() => onBlockUpdate(currentBlockIndex, { linkIsInternal: true })}
+                                                className={cn('rounded px-2 py-1 transition-colors', block.linkIsInternal ? 'bg-blue-500/15 text-blue-400' : 'bg-white/5 text-gray-500 hover:bg-white/10')}
+                                            >Internal Page</button>
+                                        </div>
+
+                                        {block.linkIsInternal ? (
+                                            <select
+                                                value={(block.linkUrl as string) || ''}
+                                                onChange={(e) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
+                                                className="mt-1.5 w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white border border-white/10 focus:outline-none focus:border-blue-500/50"
+                                            >
+                                                <option value="">— select page —</option>
+                                                {pages?.map(p => (
+                                                    <option key={p.slug} value={`/${p.slug}`}>{p.title || p.slug}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <Input defaultValue={(block.linkUrl as string) || ''} key={`lu-${bk}`}
+                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
+                                                variant="editor" className={editorInputClassName} placeholder="https://example.com" />
+                                        )}
+                                    </div>
+
+                                    {/* Dismissible toggle */}
+                                    <div className="mt-3 flex items-center justify-between">
+                                        <span className={labelCls}>Dismissible</span>
+                                        <input type="checkbox"
+                                            checked={block.dismissible !== false}
+                                            onChange={(e) => onBlockUpdate(currentBlockIndex, { dismissible: e.target.checked })}
+                                            className="accent-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Colors */}
+                                    <div className="mt-3 space-y-2">
+                                        <label className={labelCls}>Background Color {block.variant === 'gradient' ? '1' : ''}</label>
+                                        <input type="color"
+                                            defaultValue={(block.backgroundColor as string)?.startsWith('#') ? (block.backgroundColor as string) : '#0ea5e9'}
+                                            key={`bgc1-${bk}`}
+                                            onBlur={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value)}
+                                            className="mt-1 h-8 w-full cursor-pointer rounded border border-white/10" />
+                                        {block.variant === 'gradient' && (
+                                            <>
+                                                <label className={labelCls}>Background Color 2 (gradient end)</label>
+                                                <input type="color"
+                                                    defaultValue={(block.backgroundColor2 as string)?.startsWith('#') ? (block.backgroundColor2 as string) : '#d946ef'}
+                                                    key={`bgc2-${bk}`}
+                                                    onBlur={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value)}
+                                                    className="mt-1 h-8 w-full cursor-pointer rounded border border-white/10" />
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Vertical Padding */}
+                                    <div className="mt-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className={labelCls}>Vertical Padding</span>
+                                            <span className="text-[10px] text-slate-500">{(block.paddingY as number) ?? 12}px</span>
+                                        </div>
+                                        <input type="range" min={4} max={32} step={2}
+                                            defaultValue={(block.paddingY as number) ?? 12}
+                                            key={`py-${bk}`}
+                                            onPointerUp={(e) => onBlockUpdate(currentBlockIndex, { paddingY: Number((e.target as HTMLInputElement).value) })}
+                                            className="mt-1 w-full accent-blue-500" />
                                     </div>
                                 </div>
                             )}
