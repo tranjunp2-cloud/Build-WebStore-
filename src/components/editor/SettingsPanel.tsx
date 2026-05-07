@@ -16,11 +16,13 @@ import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
 import FaqSettings from './FaqSettings'
+import TeamSettings from './TeamSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
 import type { FAQConfig } from '@/blocks/faq/config'
+import type { TeamConfig } from '@/blocks/team/config'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { useEditorStore } from '@/store/editorStore'
@@ -311,6 +313,7 @@ function SettingsPanelInner({
 
     const breadcrumbSectionRef = React.useRef<HTMLDivElement>(null)
     const breadcrumbScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
@@ -1186,7 +1189,7 @@ function SettingsPanelInner({
     ]
 
     return (
-        <div className="flex h-full w-[320px] shrink-0 flex-col border-l border-white/5 bg-[#111827]">
+        <div data-coach="menu-settings" className="flex h-full w-[320px] shrink-0 flex-col border-l border-white/5 bg-[#111827]">
             <div className="border-b border-white/5 px-4 py-4">
                 <div className="grid grid-cols-2 gap-2">
                     {tabs.map(tab => (
@@ -1675,6 +1678,14 @@ function SettingsPanelInner({
                                 />
                             )}
 
+                            {bt === 'team' && block && (
+                                <TeamSettings
+                                    block={block as TeamConfig}
+                                    blockIndex={currentBlockIndex}
+                                    onBlockUpdate={onBlockUpdate}
+                                />
+                            )}
+
                             {bt === 'socialWidget' && (
                                 <div className={sectionCls}>
                                     {(() => {
@@ -1849,31 +1860,41 @@ function SettingsPanelInner({
                                             {(() => {
                                                 const waCode = (block.countryCode as string) || '+60'
                                                 const waCountry = PHONE_COUNTRIES.find(c => c.code === waCode) ?? PHONE_COUNTRIES[0]
+                                                const phoneVal = (block.phoneNumber as string) || ''
+                                                const phoneEmpty = !phoneVal
+                                                const phoneTouched = phoneTouchedSet.has(bk)
+                                                const showPhoneError = phoneEmpty && phoneTouched
                                                 return (
-                                                    <div className="mt-1.5 flex h-[44px] items-center gap-3 rounded-[10px] border border-[rgba(59,130,246,0.04)] bg-[#0b1120] px-[6px] py-[4px]">
-                                                        <PhoneCountryPicker
-                                                            value={waCode}
-                                                            onChange={code => {
-                                                                onBlockFieldChange(currentBlockIndex, 'countryCode', code)
-                                                                onBlockFieldChange(currentBlockIndex, 'phoneNumber', '')
-                                                            }}
-                                                        />
-                                                        <div className="h-[31px] w-px shrink-0 bg-white/10" />
-                                                        <input
-                                                            key={`wa-phone-${bk}-${waCode}`}
-                                                            defaultValue={preparePhoneForDisplay((block.phoneNumber as string) || '', waCode)}
-                                                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
-                                                                const v = e.target.value.trim()
-                                                                if (v && /[a-zA-Z]/.test(v)) {
-                                                                    toast.error(t.editor.settingsValidation.invalidPhone)
-                                                                    return
-                                                                }
-                                                                onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
-                                                            }}
-                                                            className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#fafafa] placeholder:text-[#64748B] focus:outline-none"
-                                                            placeholder={waCountry.placeholder}
-                                                        />
-                                                    </div>
+                                                    <>
+                                                        <div className={cn('mt-1.5 flex h-[44px] items-center gap-3 rounded-[10px] border bg-[#0b1120] px-[6px] py-[4px]', showPhoneError ? 'border-red-500/50' : 'border-[rgba(59,130,246,0.04)]')}>
+                                                            <PhoneCountryPicker
+                                                                value={waCode}
+                                                                onChange={code => {
+                                                                    // Not clearing phoneNumber here — would trigger showPhoneError prematurely when user switches country.
+                                                                    onBlockFieldChange(currentBlockIndex, 'countryCode', code)
+                                                                }}
+                                                            />
+                                                            <div className="h-[31px] w-px shrink-0 bg-white/10" />
+                                                            <input
+                                                                key={`wa-phone-${bk}-${waCode}`}
+                                                                defaultValue={preparePhoneForDisplay(phoneVal, waCode)}
+                                                                onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                                                    const v = e.target.value.trim()
+                                                                    setPhoneTouchedSet(prev => new Set(prev).add(bk))
+                                                                    if (v && /[a-zA-Z]/.test(v)) {
+                                                                        toast.error(t.editor.settingsValidation.invalidPhone)
+                                                                        return
+                                                                    }
+                                                                    onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
+                                                                }}
+                                                                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#fafafa] placeholder:text-[#64748B] focus:outline-none"
+                                                                placeholder={waCountry.placeholder}
+                                                            />
+                                                        </div>
+                                                        {showPhoneError && (
+                                                            <p className="mt-1 text-[11px] text-red-400">{t.editor.settingsValidation.phoneRequired}</p>
+                                                        )}
+                                                    </>
                                                 )
                                             })()}
                                         </div>
