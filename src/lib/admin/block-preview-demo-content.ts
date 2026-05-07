@@ -134,7 +134,7 @@ const DEMO_CONTENT_MAP: Record<string, (variant: string) => DemoContent> = {
     blockType: 'faq', variant,
     headline: 'Frequently Asked Questions',
     subheadline: 'Everything you need to know to get started',
-    items: [
+    faqs: [
       { question: 'How long does setup take?', answer: 'Most customers are live within 30 minutes. Our guided wizard walks you through every step.' },
       { question: 'Do I need coding skills?', answer: 'Not at all. Our visual editor requires zero technical knowledge.' },
       { question: 'Can I use my own domain?', answer: 'Yes. Connect any domain you own with a simple DNS change, or buy one directly through us.' },

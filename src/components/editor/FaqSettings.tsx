@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -33,20 +33,23 @@ export default function FaqSettings({ block, blockIndex, onBlockUpdate }: FaqSet
     const [isOpen, setIsOpen] = useState(true)
     // Incremented on every mid-list remove so item keys change → React remounts inputs with fresh defaultValue
     const [removeVersion, setRemoveVersion] = useState(0)
+    // Guard against infinite loop: only pad once per transition below 3
+    const paddedRef = useRef(false)
 
     const items = resolveItems(block)
     const count = items.length
 
-    // Pad to minimum 3 items on mount
+    // Pad to minimum 3 items on mount or when undo brings count below 3
     useEffect(() => {
-        if (items.length < 3) {
-            const padding: FAQItem[] = Array.from({ length: 3 - items.length }, (_, i) => ({
-                question: `Question ${items.length + i + 1}`,
-                answer: `Answer ${items.length + i + 1}`,
-            }))
-            onBlockUpdate(blockIndex, buildUpdate([...items, ...padding]))
-        }
-    }, [blockIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+        if (items.length >= 3) { paddedRef.current = false; return }
+        if (paddedRef.current) return
+        paddedRef.current = true
+        const padding: FAQItem[] = Array.from({ length: 3 - items.length }, (_, i) => ({
+            question: `Question ${items.length + i + 1}`,
+            answer: `Answer ${items.length + i + 1}`,
+        }))
+        onBlockUpdate(blockIndex, buildUpdate([...items, ...padding]))
+    }, [blockIndex, items.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleAdd = () => {
         const n = count + 1
@@ -139,11 +142,12 @@ export default function FaqSettings({ block, blockIndex, onBlockUpdate }: FaqSet
                                         onBlur={(e: FieldBlurEvent) => handleQuestionBlur(i, e)}
                                     />
                                     <Textarea
+                                        readOnly={typeof item.answer !== 'string'}
                                         defaultValue={typeof item.answer === 'string' ? item.answer : ''}
-                                        placeholder={s.answerPlaceholder}
+                                        placeholder={typeof item.answer !== 'string' ? '(Rich text — chỉnh sửa trong Admin Panel)' : s.answerPlaceholder}
                                         variant="editor"
-                                        className="mt-1.5 min-h-[96px]"
-                                        onBlur={(e: FieldBlurEvent) => handleAnswerBlur(i, e)}
+                                        className={cn('mt-1.5 min-h-[96px]', typeof item.answer !== 'string' && 'opacity-50 cursor-not-allowed')}
+                                        onBlur={typeof item.answer !== 'string' ? undefined : (e: FieldBlurEvent) => handleAnswerBlur(i, e)}
                                     />
                                 </div>
                             ))}

@@ -54,7 +54,7 @@ export const faqMeta = {
     icon: '❓',
     variants: FAQ_VARIANTS,
     defaultVariant: 'accordion' as const,
-    editableFields: ['headline', 'items', 'allowMultiple'],
+    editableFields: ['headline', 'faqs', 'allowMultiple'],
     quickActions: ['Add question', 'Rewrite answers', 'Generate FAQ'],
     category: 'content' as const,
 }

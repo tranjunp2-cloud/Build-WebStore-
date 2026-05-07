@@ -78,7 +78,10 @@ describe('FaqSettings — CRUD operations', () => {
     const onBlockUpdate = vi.fn()
     renderPanel(makeBlock({ items: [{ question: 'Q1', answer: 'A1' }, { question: 'Q2', answer: 'A2' }, { question: 'Q3', answer: 'A3' }, { question: 'Q4', answer: 'A4' }] }), onBlockUpdate)
     fireEvent.click(screen.getByLabelText('Decrease FAQ count'))
-    expect(onBlockUpdate).toHaveBeenCalledWith(0, expect.objectContaining({ items: expect.arrayContaining([{ question: 'Q1', answer: 'A1' }]) }))
+    const callArgs = onBlockUpdate.mock.calls[0][1]
+    expect(callArgs.items).toHaveLength(3)
+    expect(callArgs.items.map((i: { question: string }) => i.question)).not.toContain('Q4')
+    expect(callArgs.items[0]).toEqual({ question: 'Q1', answer: 'A1' })
   })
 
   // TC-F05-881-06
