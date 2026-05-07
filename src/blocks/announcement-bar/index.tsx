@@ -55,7 +55,7 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
                 <div className={`${CONTAINER.default} mx-auto flex items-center justify-center gap-3`}>
                     <Body size="small" className="font-medium text-center" data-text-editable>
                         {message}
-                        {showLink !== false && linkText && linkText.trim() && linkUrl && (
+                        {showLink !== false && linkText && linkText.trim() && linkUrl && !linkUrl.startsWith('javascript:') && (
                             <>
                                 {' '}
                                 <a

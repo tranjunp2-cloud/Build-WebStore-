@@ -152,20 +152,23 @@ function renderGenericBlock(block: RenderBlock, t: TemplateTheme): string {
   }
 
   if (bt === 'announcement-bar') {
+    // Use ?? 'gradient' (not ||) so null from Payload DB defaults correctly, matching index.tsx behaviour
+    const annVariant = ((block.variant as string | null | undefined) ?? 'gradient')
     const message = escapeHtml((block.message as string) || '')
     const linkText = escapeHtml(((block.linkText as string) || '').trim())
     const rawUrl = (block.linkUrl as string) || ''
-    const linkUrl = rawUrl.startsWith('/') ? escapeAttr(rawUrl) : sanitizeUrl(rawUrl)
+    // Reject protocol-relative URLs (//host) — route through sanitizeUrl not escapeAttr
+    const linkUrl = (rawUrl.startsWith('/') && !rawUrl.startsWith('//')) ? escapeAttr(rawUrl) : sanitizeUrl(rawUrl)
     const bg1 = escapeAttr((block.backgroundColor as string) || t.primary)
     const bg2 = escapeAttr((block.backgroundColor2 as string) || t.secondary)
-    const paddingY = (block.paddingY as number) || 12
+    const paddingY = typeof block.paddingY === 'number' ? Math.max(4, Math.min(32, block.paddingY)) : 12
     const customTextColor = escapeAttr((block.textColor as string) || '')
 
     let bgStyle: string
     let color = customTextColor || '#fff'
-    if (variant === 'gradient') {
+    if (annVariant === 'gradient') {
       bgStyle = 'background:linear-gradient(135deg,' + bg1 + ',' + bg2 + ')'
-    } else if (variant === 'minimal') {
+    } else if (annVariant === 'minimal') {
       bgStyle = 'background:transparent;border-bottom:1px solid ' + escapeAttr(t.primary) + '20'
       color = customTextColor || escapeAttr(t.text)
     } else {
