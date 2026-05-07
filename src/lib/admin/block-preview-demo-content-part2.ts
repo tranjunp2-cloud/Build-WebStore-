@@ -233,6 +233,9 @@ const PART2_MAP: Record<string, (variant: string) => DemoContent> = {
     linkText: 'Claim discount',
     linkUrl: '#',
     dismissible: true,
+    backgroundColor: '#0ea5e9',
+    backgroundColor2: variant === 'gradient' ? '#d946ef' : undefined,
+    paddingY: 12,
   }),
 
   'countdown-timer': (variant) => ({
