@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
+import { ProductImageWithFallback } from './ProductImageWithFallback'
 import { ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useI18n } from '@/i18n'
@@ -147,11 +148,11 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                     
                     {/* Main Image */}
                     <div className="flex flex-col bg-[#1D2026] rounded-[8px] w-full aspect-square shrink-0 overflow-hidden relative border border-white/5">
-                        <Image 
-                            src={displayImages[selectedImageIdx] || '/images/figma/quick-view-main.png'}
-                            alt={product.name || t.dashboard?.products?.quickView?.altMainProduct || "Main product"} 
-                            fill
-                            className="object-cover"
+                        <ProductImageWithFallback
+                            imgUrl={displayImages[selectedImageIdx] ?? null}
+                            alt={product.name || t.dashboard?.products?.quickView?.altMainProduct || "Main product"}
+                            size="lg"
+                            sizes="480px"
                         />
                     </div>
 
@@ -160,7 +161,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                         <div className="grid grid-cols-3 gap-[16px]">
                             {displayImages.slice(0, 3).map((imgUrl, idx) => (
                                 <button key={idx} onClick={() => setSelectedImageIdx(idx)} className={`relative w-full aspect-square rounded-[4px] overflow-hidden ${selectedImageIdx === idx ? 'border-2 border-[#44DDC1]' : 'opacity-60 hover:opacity-100 transition-opacity bg-[#1D2026] border border-white/5'}`}>
-                                    <Image src={imgUrl} alt={`Thumb ${idx + 1}`} fill className="object-cover" />
+                                    <ProductImageWithFallback imgUrl={imgUrl} alt={`Thumb ${idx + 1}`} size="sm" sizes="120px" />
                                 </button>
                             ))}
                         </div>

@@ -109,6 +109,13 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-04-13** | `US-04/Nav` | `Nav` | Cảnh báo khi thoát khỏi Grid chưa lưu | 1. AI sinh Grid 5 sản phẩm, chỉnh sửa tên.<br>2. Nhấn nút Back. | - Hiển thị modal "Sắp mất dữ liệu Grid. Bạn chắc chứ?<br>- Ngăn thoát khi chưa lưu. | High | [ ] |
 | **TC-F08-04-14** | `US-04/Val` | `Logic` | Xóa từng dòng trong Grid | 1. AI sinh 5 sản phẩm trong Grid.<br>2. Nhấn (X) xóa dòng số 2. | - Dòng 2 biến khỏi Grid ngay lập tức.<br>- Save chỉ lưu 4 sản phẩm còn lại. | High | [ ] |
 | **TC-F08-04-15** | `US-04/Edge` | `Edge` | Nhập giá âm trực tiếp trên Grid | 1. Click vào ô Giá trên Grid.<br>2. Nhập giá trị `-50`. | - Validator lớp Frontend chặn ngay tại ô.<br>- Backend cũng từ chối với Bad Request nếu bypass. | Blocker | [ ] |
+| **TC-F08-04-16** | `US-04/AC3` | `Unit` | repairStaleProductImageRefs — oldId≠newId → execute called | Unit test: oldId=5, newId=99. | - `drizzle.execute` called once with both ids in SQL params. | High | [x] |
+| **TC-F08-04-17** | `US-04/AC3` | `Unit` | repairStaleProductImageRefs — oldId=newId → guard prevents execute | Unit test: oldId=newId=5. | - `drizzle.execute` NOT called (no-op guard). | High | [x] |
+| **TC-F08-04-18** | `US-04/AC3` | `Unit` | repairStaleProductImageRefs — drizzle throws → warns, resolves normally | Unit test: execute throws. | - Function resolves (doesn't rethrow); `console.warn` called. | High | [x] |
+| **TC-F08-04-19** | `US-04/AC3` | `Unit` | Stale host → rename, recreate, repair called with correct ids | Unit test: existing doc with stale S3 host. | - `payload.update` (rename), `payload.create`, `repairStaleProductImageRefs(_, 5, 99)` called; result=99. | High | [x] |
+| **TC-F08-04-20** | `US-04/AC3` | `Unit` | First-create path → repair NOT called (no oldId) | Unit test: no existing doc. | - `payload.create` called; `repairStaleProductImageRefs` NOT called; result=99. | High | [x] |
+| **TC-F08-04-21** | `US-04/AC3` | `Unit` | Repair throws after recreate → action still returns newId (fire-and-forget) | Unit test: repair rejects. | - `payload.delete` still called; result=99 despite repair failure. | High | [x] |
+| **TC-F08-04-22** | `US-04/AC3` | `Unit` | Stale record rename fails → aborts recreate, returns existing id | Unit test: `payload.update` throws. | - `payload.create` NOT called; result=oldId (5); `console.warn` with `[Crate Carton]`. | High | [x] |
 
 ---
 ### US-05: Quản lý Danh mục (Categories) — Cây phân cấp (12 Cases)
