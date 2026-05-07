@@ -139,7 +139,7 @@ function pageFaqItems(page: PageForSeo): Array<{ question: string; answer: strin
   const blocks = (page.blocks ?? page.layout ?? []) as Array<Record<string, unknown>>
   const faq = blocks.find((b) => b.blockType === 'faq')
   if (!faq) return null
-  const items = faq.items as Array<{ question: string; answer: string }> | undefined
+  const items = (faq.faqs ?? faq.items) as Array<{ question: string; answer: string }> | undefined
   if (!items || items.length === 0) return null
   return items
 }

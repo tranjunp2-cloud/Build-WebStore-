@@ -121,7 +121,7 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
 
         it('TC-F01.SE.10: faq with 0 items → pads to at least 4 (default min)', () => {
             // Arrange
-            const blocks = [{ blockType: 'faq', items: [] as unknown[] }]
+            const blocks = [{ blockType: 'faq', faqs: [] as unknown[] }]
 
             // Act
             const result = enforceMinItems(blocks, 'unknown-cat')
@@ -129,7 +129,9 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
             // Assert
             const defaultMin = getCategoryRequirement('unknown-cat').minItems.faq ?? 0
             expect(defaultMin).toBeGreaterThanOrEqual(4)
-            expect((result[0]!.items as unknown[]).length).toBeGreaterThanOrEqual(defaultMin)
+            const faqResult = result[0]! as Record<string, unknown>
+            const faqItems = (faqResult.faqs ?? faqResult.items) as unknown[]
+            expect(faqItems.length).toBeGreaterThanOrEqual(defaultMin)
         })
 
         it('TC-F01.SE.11: service-cards with 0 services → pads to at least 3 (default min)', () => {
@@ -216,7 +218,7 @@ describe('structure-enforcer [plan-260414-unsplash]', () => {
                 features: 'features',
                 testimonials: 'testimonials',
                 team: 'members',
-                faq: 'items',
+                faq: 'faqs',
                 pricing: 'plans',
                 gallery: 'images',
                 'service-cards': 'services',

@@ -1610,8 +1610,9 @@ export function sanitizeBlockData(
     // ═══════════════════════════════════════════════════════════════════════
     // FAQ
     // ═══════════════════════════════════════════════════════════════════════
-    if (s.blockType === 'faq' && Array.isArray(s.items)) {
-        s.items = s.items.map((item: unknown) => {
+    if (s.blockType === 'faq' && (Array.isArray(s.faqs) || Array.isArray(s.items))) {
+        const arr = (s.faqs ?? s.items) as Array<unknown>
+        s.faqs = arr.map((item: unknown) => {
             if (typeof item === 'string') {
                 return { question: item, answer: '...' }
             }
@@ -1621,6 +1622,7 @@ export function sanitizeBlockData(
                 answer: String(iObj.answer || iObj.description || iObj.a || 'Answer.'),
             }
         })
+        delete s.items
     }
 
     // ═══════════════════════════════════════════════════════════════════════

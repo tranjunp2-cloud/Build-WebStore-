@@ -332,10 +332,11 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
     it('handles nulls or completely broken objects safely', () => {
         const input = { blockType: 'faq', items: [{ q: 'Huh?' }, 'What?', null] }
         const output = sanitizeBlockData(input)
-        const items = output.items as Array<{ question: string }>
-        expect(items[0].question).toBe('Huh?')
-        expect(items[1].question).toBe('What?')
-        // The null will be handled by our new type guards correctly if updated, or mapped to Question?
-        expect(items[2].question).toBe('Question?')
+        // normalizer writes canonical faqs field and removes legacy items
+        const faqs = output.faqs as Array<{ question: string }>
+        expect(faqs[0].question).toBe('Huh?')
+        expect(faqs[1].question).toBe('What?')
+        expect(faqs[2].question).toBe('Question?')
+        expect(output.items).toBeUndefined()
     })
 })

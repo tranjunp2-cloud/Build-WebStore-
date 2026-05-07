@@ -349,7 +349,7 @@ export const ITEM_FIELD_BY_BLOCK: Readonly<Record<string, string>> = {
     features: 'features',
     testimonials: 'testimonials',
     team: 'members',
-    faq: 'items',
+    faq: 'faqs',
     pricing: 'plans',
     gallery: 'images',
     'service-cards': 'services',
