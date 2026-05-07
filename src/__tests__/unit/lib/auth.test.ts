@@ -30,7 +30,7 @@ vi.mock('next/server', () => ({
     },
 }))
 
-import { getCurrentUser, withAuth, getCurrentTenantId } from '@/lib/auth'
+import { getCurrentUser, withAuth, getCurrentTenantId, extractTenantId } from '@/lib/auth'
 
 // ─── TC-F02.33: Auth middleware & role checks ─────────────────────────
 
@@ -240,6 +240,37 @@ describe('withAuth [TC-F02.33]', () => {
             expect.any(Request),
             expect.anything(),
         )
+    })
+})
+
+// ─── extractTenantId — pure sync, no mocks needed ────────────────────────────
+describe('extractTenantId [TC-F02.33]', () => {
+    it('returns null when user has no tenants array', () => {
+        expect(extractTenantId({ id: 1 })).toBeNull()
+    })
+
+    it('returns null when tenants is empty', () => {
+        expect(extractTenantId({ id: 1, tenants: [] })).toBeNull()
+    })
+
+    it('returns string tenant directly', () => {
+        expect(extractTenantId({ tenants: [{ tenant: 'tenant-abc' }] })).toBe('tenant-abc')
+    })
+
+    it('returns string id from tenant object', () => {
+        expect(extractTenantId({ tenants: [{ tenant: { id: 'tenant-xyz' } }] })).toBe('tenant-xyz')
+    })
+
+    it('coerces numeric tenant id to string', () => {
+        expect(extractTenantId({ tenants: [{ tenant: { id: 42 } }] })).toBe('42')
+    })
+
+    it('returns null when tenant object has no id', () => {
+        expect(extractTenantId({ tenants: [{ tenant: { id: undefined } }] })).toBeNull()
+    })
+
+    it('returns null when tenant object id is null', () => {
+        expect(extractTenantId({ tenants: [{ tenant: { id: null } }] })).toBeNull()
     })
 })
 
