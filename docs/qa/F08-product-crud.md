@@ -116,6 +116,9 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-04-20** | `US-04/AC3` | `Unit` | First-create path → repair NOT called (no oldId) | Unit test: no existing doc. | - `payload.create` called; `repairStaleProductImageRefs` NOT called; result=99. | High | [x] |
 | **TC-F08-04-21** | `US-04/AC3` | `Unit` | Repair throws after recreate → action still returns newId (fire-and-forget) | Unit test: repair rejects. | - `payload.delete` still called; result=99 despite repair failure. | High | [x] |
 | **TC-F08-04-22** | `US-04/AC3` | `Unit` | Stale record rename fails → aborts recreate, returns existing id | Unit test: `payload.update` throws. | - `payload.create` NOT called; result=oldId (5); `console.warn` with `[Crate Carton]`. | High | [x] |
+| **TC-F08-04-23** | `US-04/AC3` | `Unit` | Vercel: local file missing, CDN configured, CDN ok → fetches + creates | Unit test: `fs.existsSync`=false, `NEXT_PUBLIC_SERVER_URL` set, fetch ok. | - `fetch` called with `{SERVER_URL}/images/crate-carton.png`; `payload.create` called; result=99. | High | [x] |
+| **TC-F08-04-24** | `US-04/AC3` | `Unit` | Vercel: local file missing, CDN returns non-200 → returns null | Unit test: `fs.existsSync`=false, fetch returns `ok:false`. | - `payload.create` NOT called; result=null. | High | [x] |
+| **TC-F08-04-25** | `US-04/AC3` | `Unit` | Vercel: local file missing, CDN fetch throws network error → returns null | Unit test: `fs.existsSync`=false, fetch throws. | - `payload.create` NOT called; result=null; `console.error` with `[Crate Carton Seed] CDN fetch error:`. | High | [x] |
 
 ---
 ### US-05: Quản lý Danh mục (Categories) — Cây phân cấp (12 Cases)
