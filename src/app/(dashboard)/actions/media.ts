@@ -160,12 +160,33 @@ export async function getOrCreateCrateCartonIdAction() {
 
     // Upload from static file bundled with the app
     try {
+        // outputFileTracingIncludes bundles this file for product routes, but on Vercel
+        // serverless, public/ files are not at process.cwd() unless explicitly traced.
+        // Fall back to CDN fetch if local path is missing (e.g. server action routes
+        // that weren't covered by outputFileTracingIncludes).
         const filePath = path.join(process.cwd(), 'public', 'images', 'crate-carton.png')
-        if (!fs.existsSync(filePath)) {
-            console.error('[Crate Carton Seed] Local placeholder not found:', filePath)
-            return null
+        let fileData: Buffer | null = null
+        if (fs.existsSync(filePath)) {
+            fileData = fs.readFileSync(filePath)
+        } else {
+            const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL?.replace(/\/$/, '')
+            if (baseUrl) {
+                try {
+                    const res = await fetch(`${baseUrl}/images/crate-carton.png`)
+                    if (res.ok) {
+                        fileData = Buffer.from(await res.arrayBuffer())
+                    } else {
+                        console.error('[Crate Carton Seed] CDN fetch failed:', res.status)
+                    }
+                } catch (fetchErr) {
+                    console.error('[Crate Carton Seed] CDN fetch error:', fetchErr)
+                }
+            }
+            if (!fileData) {
+                console.error('[Crate Carton Seed] Local placeholder not found and CDN unavailable:', filePath)
+                return null
+            }
         }
-        const fileData = fs.readFileSync(filePath)
         const res = await payload.create({
             collection: 'media',
             data: { alt: altKey },

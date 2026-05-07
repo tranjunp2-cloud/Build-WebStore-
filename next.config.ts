@@ -36,6 +36,11 @@ const nextConfig: NextConfig = {
     '/test-harness/[fixtureId]/[slug]': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
     '/test-harness/ai/[category]': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
     '/test-harness/ai/[category]/[slug]': ['./.harness-out/**/*.json', './scripts/test-harness/rubric/*.json'],
+    // nft can't trace dynamic fs.readFileSync paths — include crate-carton placeholder
+    // for all product routes where getOrCreateCrateCartonIdAction is invoked as a server action
+    '/products': ['./public/images/crate-carton.png'],
+    '/products/new': ['./public/images/crate-carton.png'],
+    '/products/[id]': ['./public/images/crate-carton.png'],
   },
   eslint: {
     // CI runs lint separately — skip during build to save ~1 min

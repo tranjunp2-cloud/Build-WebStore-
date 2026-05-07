@@ -340,10 +340,11 @@ describe('getOrCreateCrateCartonIdAction', () => {
         expect(result).toBe(5)
     })
 
-    it('[TC-F08-04-04] local placeholder file not found → returns null, logs warning', async () => {
-        // Arrange
+    it('[TC-F08-04-04] local placeholder file not found, no CDN configured → returns null, logs warning', async () => {
+        // Arrange — no local file AND no NEXT_PUBLIC_SERVER_URL → must return null
         vi.stubEnv('NEXT_PUBLIC_S3_ENDPOINT', S3_ENDPOINT)
         vi.stubEnv('S3_BUCKET', BUCKET)
+        vi.stubEnv('NEXT_PUBLIC_SERVER_URL', '') // explicitly empty so CDN path is skipped
         mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
         mockExistsSync.mockReturnValue(false)
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -360,6 +361,88 @@ describe('getOrCreateCrateCartonIdAction', () => {
                 expect.any(String),
             )
         } finally {
+            consoleSpy.mockRestore()
+        }
+    })
+
+    it('[TC-F08-04-23] local file missing, NEXT_PUBLIC_SERVER_URL set, CDN ok → fetches + creates', async () => {
+        // Arrange — Vercel serverless: local file not found; fallback to CDN fetch succeeds
+        vi.stubEnv('NEXT_PUBLIC_S3_ENDPOINT', S3_ENDPOINT)
+        vi.stubEnv('S3_BUCKET', BUCKET)
+        vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://staging.example.com')
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
+        mockExistsSync.mockReturnValue(false)
+        const fetchedBuffer = Buffer.from('fetched-png-data')
+        const mockFetch = vi.spyOn(global, 'fetch').mockResolvedValue({
+            ok: true,
+            arrayBuffer: () => Promise.resolve(fetchedBuffer.buffer as ArrayBuffer),
+        } as Response)
+
+        try {
+            // Act
+            const result = await getOrCreateCrateCartonIdAction()
+
+            // Assert — CDN fetched and create called with fetched data
+            expect(mockFetch).toHaveBeenCalledWith('https://staging.example.com/images/crate-carton.png')
+            expect(mockCreate).toHaveBeenCalledOnce()
+            expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+                file: expect.objectContaining({ name: 'crate-carton-placeholder.png', mimetype: 'image/png' }),
+            }))
+            expect(result).toBe(99)
+        } finally {
+            mockFetch.mockRestore()
+        }
+    })
+
+    it('[TC-F08-04-24] local file missing, CDN returns non-200 → returns null', async () => {
+        // Arrange — CDN returns 404 for the placeholder
+        vi.stubEnv('NEXT_PUBLIC_S3_ENDPOINT', S3_ENDPOINT)
+        vi.stubEnv('S3_BUCKET', BUCKET)
+        vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://staging.example.com')
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
+        mockExistsSync.mockReturnValue(false)
+        const mockFetch = vi.spyOn(global, 'fetch').mockResolvedValue({
+            ok: false,
+            status: 404,
+        } as Response)
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        try {
+            // Act
+            const result = await getOrCreateCrateCartonIdAction()
+
+            // Assert
+            expect(mockCreate).not.toHaveBeenCalled()
+            expect(result).toBeNull()
+        } finally {
+            mockFetch.mockRestore()
+            consoleSpy.mockRestore()
+        }
+    })
+
+    it('[TC-F08-04-25] local file missing, CDN fetch throws network error → returns null', async () => {
+        // Arrange — network error during CDN fetch (e.g., DNS failure)
+        vi.stubEnv('NEXT_PUBLIC_S3_ENDPOINT', S3_ENDPOINT)
+        vi.stubEnv('S3_BUCKET', BUCKET)
+        vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://staging.example.com')
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0 })
+        mockExistsSync.mockReturnValue(false)
+        const mockFetch = vi.spyOn(global, 'fetch').mockRejectedValue(new Error('DNS lookup failed'))
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+        try {
+            // Act
+            const result = await getOrCreateCrateCartonIdAction()
+
+            // Assert
+            expect(mockCreate).not.toHaveBeenCalled()
+            expect(result).toBeNull()
+            expect(consoleSpy).toHaveBeenCalledWith(
+                expect.stringContaining('[Crate Carton Seed] CDN fetch error:'),
+                expect.any(Error),
+            )
+        } finally {
+            mockFetch.mockRestore()
             consoleSpy.mockRestore()
         }
     })
