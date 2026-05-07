@@ -18,8 +18,7 @@ interface FaqSettingsProps {
 
 // Mirror canvas resolution: Payload stores items as `faqs`, frontend config uses `items`
 function resolveItems(block: FAQConfig): FAQItem[] {
-    const rawFaqs = (block as Record<string, unknown>).faqs
-    return (Array.isArray(rawFaqs) ? rawFaqs as FAQItem[] : null) ?? block.items ?? []
+    return (Array.isArray(block.faqs) ? block.faqs : null) ?? block.items ?? []
 }
 
 // Write to both fields so canvas (reads `faqs`) and config (reads `items`) stay in sync

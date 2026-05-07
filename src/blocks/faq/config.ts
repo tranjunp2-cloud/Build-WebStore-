@@ -28,12 +28,13 @@ export type FAQConfig = {
     variant?: FAQVariant
     headline?: string
     subheadline?: string
+    faqs?: FAQItem[]  // Payload canonical field (GH-881)
     /**
      * Items array. UI stepper enforces [3, 10] range (GH-881).
      * Storage allows any length — variant render uses items as-is.
      * If items.length < 3 when opening settings panel, UI auto-pads to 3.
      */
-    items: FAQItem[]
+    items: FAQItem[]  // Legacy — resolveItems() bridges both
     allowMultiple?: boolean
 }
 
@@ -42,6 +43,7 @@ export const FAQConfigSchema = BaseBlockSchema.extend({
     variant: z.enum(['accordion', 'grid', 'simple', 'two-column-accordion', 'chat-bubbles', 'numbered']).default('accordion'),
     headline: z.string().optional(),
     subheadline: z.string().optional(),
+    faqs: z.array(z.object({ question: z.string(), answer: z.string() })).optional(),
     // UI stepper [3, 10]; storage unconstrained — see GH-881
     items: z.array(z.object({ question: z.string(), answer: z.string() })).default([]),
     allowMultiple: z.boolean().default(false),

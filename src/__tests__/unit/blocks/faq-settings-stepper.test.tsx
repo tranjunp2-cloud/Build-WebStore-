@@ -11,8 +11,8 @@ vi.mock('@/i18n', () => ({
           faqConfiguration: 'FAQ Configuration',
           numberOfFaqs: 'Number of FAQs',
           faqsMinMax: '(Min: 3, Max: 10)',
-          questionPlaceholder: 'Enter question...',
-          answerPlaceholder: 'Enter answer...',
+          questionPlaceholder: 'Question',
+          answerPlaceholder: 'Answer',
         },
       },
     },
@@ -88,7 +88,7 @@ describe('FaqSettings — CRUD operations', () => {
   it('editing question input on blur updates item at that index', () => {
     const onBlockUpdate = vi.fn()
     const { container } = renderPanel(makeBlock({ items: [{ question: 'Original Q1', answer: 'A1' }, { question: 'Q2', answer: 'A2' }, { question: 'Q3', answer: 'A3' }] }), onBlockUpdate)
-    const input = container.querySelector('input[placeholder="Enter question..."]') as HTMLInputElement
+    const input = container.querySelector('input[placeholder="Question"]') as HTMLInputElement
     fireEvent.blur(input, { target: { value: 'Updated Q1' } })
     expect(onBlockUpdate).toHaveBeenCalledWith(0, expect.objectContaining({ items: expect.arrayContaining([{ question: 'Updated Q1', answer: 'A1' }]) }))
   })
@@ -97,9 +97,22 @@ describe('FaqSettings — CRUD operations', () => {
   it('editing answer textarea on blur updates item at that index', () => {
     const onBlockUpdate = vi.fn()
     const { container } = renderPanel(makeBlock({ items: [{ question: 'Q1', answer: 'Original A1' }, { question: 'Q2', answer: 'A2' }, { question: 'Q3', answer: 'A3' }] }), onBlockUpdate)
-    const textarea = container.querySelector('textarea[placeholder="Enter answer..."]') as HTMLTextAreaElement
+    const textarea = container.querySelector('textarea[placeholder="Answer"]') as HTMLTextAreaElement
     fireEvent.blur(textarea, { target: { value: 'Updated A1' } })
     expect(onBlockUpdate).toHaveBeenCalledWith(0, expect.objectContaining({ items: expect.arrayContaining([{ question: 'Q1', answer: 'Updated A1' }]) }))
+  })
+
+  // TC-F05-881-13
+  it('clicking ✕ on mid-list item removes it and preserves neighbors', () => {
+    const onBlockUpdate = vi.fn()
+    renderPanel(makeBlock({ items: [{ question: 'Q1', answer: 'A1' }, { question: 'Q2', answer: 'A2' }, { question: 'Q3', answer: 'A3' }, { question: 'Q4', answer: 'A4' }] }), onBlockUpdate)
+    const removeButtons = screen.getAllByRole('button', { name: /Remove FAQ item/i })
+    fireEvent.click(removeButtons[1]) // remove index 1 (Q2)
+    const callArgs = onBlockUpdate.mock.calls[0][1]
+    expect(callArgs.items).toHaveLength(3)
+    expect(callArgs.items.map((i: { question: string }) => i.question)).not.toContain('Q2')
+    expect(callArgs.items[0]).toEqual({ question: 'Q1', answer: 'A1' })
+    expect(callArgs.items[1]).toEqual({ question: 'Q3', answer: 'A3' })
   })
 })
 
