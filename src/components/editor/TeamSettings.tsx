@@ -51,6 +51,7 @@ export default function TeamSettings({ block, blockIndex, onBlockUpdate }: TeamS
     const handleRemoveLast = () => {
         if (count <= 1) return
         onBlockUpdate(blockIndex, { members: members.slice(0, -1) })
+        setRemoveVersion(v => v + 1)
     }
 
     const handleRemoveAt = (i: number) => {
