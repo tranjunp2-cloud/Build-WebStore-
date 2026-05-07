@@ -104,6 +104,14 @@ export function mapBusinessInfo(info: BusinessInfoInput): Partial<BusinessSample
   const description = normalizeText(info.shortDescription)
   if (description) out.description = description
 
+  // Fallback hero copy derived from user input so canned baseBiz hero text
+  // never bleeds through when personalizeWithGPT times out (GH-912).
+  // GPT overrides these fields on success; this is the safe fallback only.
+  if (name) {
+    out.heroHeadline = name.slice(0, 100)
+    if (description) out.heroSubheadline = description.slice(0, 200)
+  }
+
   const explicitTagline = normalizeText(info.tagline)
   if (explicitTagline) {
     out.tagline = explicitTagline
