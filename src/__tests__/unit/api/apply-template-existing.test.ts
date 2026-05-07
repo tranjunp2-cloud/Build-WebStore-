@@ -6,6 +6,7 @@
  *   TC-F07.016 — Unauthorized access blocked (401/403)
  *   TC-F07.023 — New site creation from template (backward compat)
  *   TC-F07.022 — Rate limit protection (429)
+ *   TC-F07.050 — GH-731: service-cards empty titles coerced before payload.update on apply-template
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -827,6 +828,52 @@ describe('POST /api/ai/apply-template', () => {
             expect(templateFindCall).toBeDefined()
             expect(typeof templateFindCall[0].id).toBe('string')
             expect(templateFindCall[0].id).toBe('42')
+        })
+
+        // ── TC-F07.050: GH-731 service-cards empty titles coerced on apply ─────
+        it('TC-F07.050: service-cards with empty titles in existing layout are coerced before payload.update', async () => {
+            // Arrange — homepage has a service-cards block with empty service titles
+            // (simulates data written to DB before the AI gen sanitization fix)
+            mockHomepage = {
+                id: 201,
+                slug: 'home',
+                isHomepage: true,
+                layout: [
+                    { blockType: 'hero', variant: 'centered', headline: 'Hero' },
+                    {
+                        blockType: 'service-cards',
+                        variant: 'grid',
+                        headline: 'Our Services',
+                        services: [
+                            { title: '', description: 'desc 1', icon: '🛠️' },
+                            { title: null, description: 'desc 2', icon: '⭐' },
+                            { description: 'desc 3', icon: '🔧' },
+                            { title: 'Valid Title', description: 'desc 4', icon: '✅' },
+                        ],
+                    },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — payload.update for the page was called with coerced titles
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            const scBlock = layout.find(b => b.blockType === 'service-cards')
+            expect(scBlock).toBeDefined()
+            const services = scBlock!.services as Record<string, unknown>[]
+            // empty/null/missing titles must be coerced to 'Service'
+            expect(services[0].title).toBe('Service')
+            expect(services[1].title).toBe('Service')
+            expect(services[2].title).toBe('Service')
+            // valid title must be preserved
+            expect(services[3].title).toBe('Valid Title')
         })
 
         // ── TC-F07.049: multi-page template dedup ─────────────────────────────

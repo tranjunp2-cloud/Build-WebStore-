@@ -51,7 +51,7 @@ export type SupportedAddSectionType =
     | 'booking-widget'
     | 'class-schedule'
     | 'review-cards'
-    | 'video-showcase'
+    // | 'video-showcase' // temporarily hidden (aiVisible: false, archived)
     | 'doctor-profile'
     | 'property-card'
     | 'product-quick-view'
@@ -103,7 +103,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['contact', [/\bcontact\b/i, /\bform\b/i, /\breach\s*us\b/i]],
     ['pricing', [/\bpricing\b/i, /\bplan(s)?\b/i, /\bpackage\b/i]],
     ['stats', [/\bstat(s)?\b/i, /\bnumber(s)?\b/i, /\bcounter\b/i]],
-    ['video-showcase', [/\bvideo-showcase\b/i, /\bvideo\s+showcase\b/i]],
+    // ['video-showcase', [/\bvideo-showcase\b/i, /\bvideo\s+showcase\b/i]], // temporarily hidden (aiVisible: false, archived)
     ['video', [/\bvideo\b/i, /\byoutube\b/i, /\bembed\b/i]],
     ['blog-list', [/\bblog\b/i, /\barticle(s)?\b/i, /\bpost(s)?\b/i]],
     ['product-quick-view', [/\bproduct-quick-view\b/i, /\bquick[-\s]view\b/i]],
@@ -165,7 +165,7 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'booking-widget': 'booking widget',
     'class-schedule': 'class schedule',
     'review-cards': 'review cards',
-    'video-showcase': 'video showcase',
+    // 'video-showcase': 'video showcase', // temporarily hidden (aiVisible: false, archived)
     'doctor-profile': 'doctor profile',
     'property-card': 'property card',
     'product-quick-view': 'product quick view',
@@ -767,20 +767,20 @@ export function createAddSectionBlock({
                 ],
             }
 
-        case 'video-showcase':
-            return {
-                blockType: 'video-showcase',
-                variant: 'grid',
-                headline: `${brandName} in Action`,
-                subheadline: 'Watch our latest content.',
-                showCategories: true,
-                autoplay: false,
-                videos: [
-                    { title: 'Our Story', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'About', duration: '2:30', description: `How ${brandName} started and where we're going.` },
-                    { title: 'Product Demo', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'Product', duration: '3:45', description: 'See our flagship product in action.' },
-                    { title: 'Customer Story', videoUrl: 'https://www.youtube.com/watch?v=k2maqlyUuVw', category: 'Testimonial', duration: '1:20', description: 'Hear from one of our happiest customers.' },
-                ],
-            }
+        // case 'video-showcase': // temporarily hidden (aiVisible: false, archived)
+        //     return {
+        //         blockType: 'video-showcase',
+        //         variant: 'grid',
+        //         headline: `${brandName} in Action`,
+        //         subheadline: 'Watch our latest content.',
+        //         showCategories: true,
+        //         autoplay: false,
+        //         videos: [
+        //             { title: 'Our Story', videoUrl: '', category: 'About', duration: '2:30', description: `How ${brandName} started and where we're going.` },
+        //             { title: 'Product Demo', videoUrl: '', category: 'Product', duration: '3:45', description: 'See our flagship product in action.' },
+        //             { title: 'Customer Story', videoUrl: '', category: 'Testimonial', duration: '1:20', description: 'Hear from one of our happiest customers.' },
+        //         ],
+        //     }
 
         case 'doctor-profile':
             return {

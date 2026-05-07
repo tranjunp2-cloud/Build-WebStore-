@@ -309,7 +309,7 @@ export function buildBlockFromLibrary(
                 blockType: 'faq',
                 variant: 'accordion',
                 headline: 'Frequently Asked Questions',
-                items: faqSlice.slice(0, 5).map(mapFaq),
+                faqs: faqSlice.slice(0, 5).map(mapFaq),
             }
 
         case 'cta':

@@ -142,6 +142,84 @@ describe('Product Price Formatting', () => {
     })
 })
 
+// ── F08-06: Attributes Section Schema ────────────────────────────────────────
+
+describe('TC-F08-06: Attributes schema validation', () => {
+    const schema = getProductFormSchema({})
+    const base = () => ({
+        name: 'Valid Product Name',
+        categoryIds: ['cat-1'],
+        images: [],
+        hasVariants: false,
+        basePrice: 50,
+        baseSku: 'SKU-123',
+        baseInventory: 10,
+    })
+
+    it('TC-F08-06-01: passes when attributes is omitted (optional field)', () => {
+        const result = schema.safeParse(base())
+        expect(result.success).toBe(true)
+    })
+
+    it('TC-F08-06-01: passes with valid key/value rows', () => {
+        const result = schema.safeParse({
+            ...base(),
+            attributes: [{ key: 'Material', value: '100% Cotton' }],
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('TC-F08-06-02: fails when key is empty string', () => {
+        const result = schema.safeParse({
+            ...base(),
+            attributes: [{ key: '', value: 'Cotton' }],
+        })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors).toBeDefined()
+        }
+    })
+
+    it('TC-F08-06-02: fails when value is empty string', () => {
+        const result = schema.safeParse({
+            ...base(),
+            attributes: [{ key: 'Material', value: '' }],
+        })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-F08-06-02: fails when more than 20 rows provided', () => {
+        const rows = Array.from({ length: 21 }, (_, i) => ({ key: `k${i}`, value: `v${i}` }))
+        const result = schema.safeParse({ ...base(), attributes: rows })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.attributes?.[0]).toMatch(/Maximum 20/)
+        }
+    })
+
+    it('TC-F08-06-02: fails when key exceeds 100 chars', () => {
+        const result = schema.safeParse({
+            ...base(),
+            attributes: [{ key: 'a'.repeat(101), value: 'ok' }],
+        })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-F08-06-02: fails when value exceeds 500 chars', () => {
+        const result = schema.safeParse({
+            ...base(),
+            attributes: [{ key: 'ok', value: 'v'.repeat(501) }],
+        })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-F08-06-01: passes with exactly 20 rows', () => {
+        const rows = Array.from({ length: 20 }, (_, i) => ({ key: `key${i}`, value: `val${i}` }))
+        const result = schema.safeParse({ ...base(), attributes: rows })
+        expect(result.success).toBe(true)
+    })
+})
+
 // ── US-F08-04: Bulk AI Create ─────────────────────────────────────────────────
 
 describe('US-F08-04 — slugify utility', () => {

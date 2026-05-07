@@ -419,7 +419,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'centered' },
           { blockType: 'gallery', variant: 'grid', count: 12 },
-          { blockType: 'video-showcase', variant: 'featured' },
+          // { blockType: 'video-showcase', variant: 'featured' }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'footer', variant: 'mega' },
         ],
       },
@@ -563,7 +563,7 @@ export const BATCH3_PRESETS: TemplatePreset[] = [
           { blockType: 'navigation' },
           { blockType: 'hero', variant: 'centered' },
           { blockType: 'gallery', variant: 'carousel', count: 12 },
-          { blockType: 'video-showcase', variant: 'grid', count: 3 },
+          // { blockType: 'video-showcase', variant: 'grid', count: 3 }, // temporarily hidden (aiVisible: false, archived)
           { blockType: 'footer', variant: 'mega' },
         ],
       },

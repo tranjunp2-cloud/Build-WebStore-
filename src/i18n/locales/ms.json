@@ -944,7 +944,12 @@
                     "dimMin": "Dimensi mesti 0 atau lebih",
                     "dimMax": "Dimensi terlalu besar",
                     "maxTiers": "Maksimum 2 tahap variasi dibenarkan",
-                    "maxVariants": "Maksimum 900 variasi dibenarkan. Sila kurangkan pilihan."
+                    "maxVariants": "Maksimum 900 variasi dibenarkan. Sila kurangkan pilihan.",
+                    "attrKeyRequired": "Nama sifat diperlukan",
+                    "attrValueRequired": "Nilai sifat diperlukan",
+                    "attrMax": "Maksimum 20 sifat dibenarkan",
+                    "attrKeyLong": "Nama sifat terlalu panjang (maks 100 aksara)",
+                    "attrValueLong": "Nilai sifat terlalu panjang (maks 500 aksara)"
                 },
                 "categories": {
                     "select": "Pilih kategori...",
@@ -1059,7 +1064,11 @@
                     "urlSlug": "Slug URL",
                     "urlSlugHint": "Biarkan kosong untuk menjana secara automatik dari Tajuk",
                     "color": "Warna",
-                    "size": "Saiz"
+                    "size": "Saiz",
+                    "attributes": "Maklumat Lanjutan (Sifat)",
+                    "attributeKey": "Nama sifat",
+                    "attributeValue": "Nilai",
+                    "addAttribute": "Tambah maklumat"
                 }
             },
             "bulkCreate": {
@@ -2678,7 +2687,15 @@
             "breadcrumbSeparator": "Pemisah",
             "breadcrumbShowOnAllPages": "Tunjuk di Semua Halaman",
             "breadcrumbShowOnAllPagesDesc": "Papar roti di setiap halaman",
-            "breadcrumbPreview": "Pratonton"
+            "breadcrumbPreview": "Pratonton",
+            "noButtons": "Tiada butang lagi",
+            "secondaryButton": "Butang Kedua",
+            "removeButton": "Buang",
+            "faqConfiguration": "Konfigurasi FAQ",
+            "numberOfFaqs": "Bilangan FAQ",
+            "faqsMinMax": "(Min: 3 - Maks: 10)",
+            "questionPlaceholder": "Soalan",
+            "answerPlaceholder": "Jawapan"
         },
         "statusBar": {
             "connected": "Disambungkan",

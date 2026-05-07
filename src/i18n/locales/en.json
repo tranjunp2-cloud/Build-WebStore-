@@ -944,7 +944,12 @@
                     "dimMin": "Dimension must be 0 or greater",
                     "dimMax": "Dimension is too large",
                     "maxTiers": "Maximum 2 variant tiers allowed",
-                    "maxVariants": "Maximum 900 variants allowed. Please reduce options."
+                    "maxVariants": "Maximum 900 variants allowed. Please reduce options.",
+                    "attrKeyRequired": "Attribute name is required",
+                    "attrValueRequired": "Attribute value is required",
+                    "attrMax": "Maximum 20 attributes allowed",
+                    "attrKeyLong": "Attribute name is too long (max 100 chars)",
+                    "attrValueLong": "Attribute value is too long (max 500 chars)"
                 },
                 "categories": {
                     "select": "Select categories...",
@@ -1059,7 +1064,11 @@
                     "urlSlug": "URL Slug",
                     "urlSlugHint": "Leave blank to auto-generate from Title",
                     "color": "Color",
-                    "size": "Size"
+                    "size": "Size",
+                    "attributes": "Extended Information (Attributes)",
+                    "attributeKey": "Attribute name",
+                    "attributeValue": "Value",
+                    "addAttribute": "Add information"
                 }
             },
             "bulkCreate": {
@@ -2678,7 +2687,15 @@
             "breadcrumbSeparator": "Separator",
             "breadcrumbShowOnAllPages": "Show on All Pages",
             "breadcrumbShowOnAllPagesDesc": "Display breadcrumb on every page",
-            "breadcrumbPreview": "Preview"
+            "breadcrumbPreview": "Preview",
+            "noButtons": "No buttons yet",
+            "secondaryButton": "Secondary Button",
+            "removeButton": "Remove",
+            "faqConfiguration": "FAQ Configuration",
+            "numberOfFaqs": "Number of FAQs",
+            "faqsMinMax": "(Min: 3 - Max: 10)",
+            "questionPlaceholder": "Question",
+            "answerPlaceholder": "Answer"
         },
         "statusBar": {
             "connected": "Connected",

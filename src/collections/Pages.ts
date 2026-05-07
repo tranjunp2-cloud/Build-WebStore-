@@ -29,7 +29,7 @@ const HeroBlock = {
         {
             name: 'ctaButtons',
             type: 'array',
-            maxRows: 3,
+            maxRows: 2,
             fields: [
                 { name: 'label', type: 'text', required: true },
                 { name: 'url', type: 'text', required: true },
@@ -550,6 +550,8 @@ const FAQBlock = {
             ],
         },
         { name: 'headline', type: 'text', defaultValue: 'Frequently Asked Questions' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'allowMultiple', type: 'checkbox', defaultValue: false },
         {
             name: 'faqs',
             type: 'array',

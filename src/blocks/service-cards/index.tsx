@@ -35,7 +35,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
     const renderGridCard = (service: ServiceItem, i: number) => (
         <div
             key={`${service.title}-${i}`}
-            className={`${CARD_PADDING.lg} rounded-2xl transition-all duration-300 hover:shadow-lg group`}
+            className={`min-w-0 ${CARD_PADDING.lg} rounded-2xl transition-all duration-300 hover:shadow-lg group`}
             style={{ background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
         >
             <div
@@ -45,9 +45,9 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
             >
                 {service.icon}
             </div>
-            <Heading level={3} className="mb-3">{service.title}</Heading>
+            <Heading level={3} className="mb-3 break-words">{service.title}</Heading>
             {/* Lỗi D — opacity-50 fail WCAG contrast → opacity-70 */}
-            <Body size="small" className="opacity-70 leading-relaxed mb-4">{service.description}</Body>
+            <Body size="small" className="opacity-70 leading-relaxed mb-4 break-words">{service.description}</Body>
             {service.price && (
                 <p className="text-xl sm:text-2xl font-bold mb-1 break-words" style={{ color: 'var(--brand-primary)' }}>
                     <RichText text={service.price} as="span" />
@@ -71,9 +71,9 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
             >
                 {service.icon}
             </div>
-            <div className="flex-1 text-center sm:text-left min-w-0">
-                <Heading level={3} className="mb-2">{service.title}</Heading>
-                <Body size="small" className="opacity-70 leading-relaxed">{service.description}</Body>
+            <div className="flex-1 w-full sm:w-auto text-center sm:text-left min-w-0">
+                <Heading level={3} className="mb-2 break-words">{service.title}</Heading>
+                <Body size="small" className="opacity-70 leading-relaxed break-words">{service.description}</Body>
                 <ServiceCTA cta={service.cta} />
             </div>
             {service.price && (
@@ -101,8 +101,8 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                     >
                         {featured.icon}
                     </div>
-                    <Heading level={2} className="mb-4">{featured.title}</Heading>
-                    <Body size="lg" className="opacity-60 leading-relaxed max-w-xl mb-4">{featured.description}</Body>
+                    <Heading level={2} className="mb-4 break-words">{featured.title}</Heading>
+                    <Body size="lg" className="opacity-60 leading-relaxed max-w-xl mb-4 break-words">{featured.description}</Body>
                     {featured.price && (
                         <p className="text-3xl font-bold mb-2" style={{ color: 'var(--brand-primary)' }}>
                             <RichText text={featured.price} as="span" />

@@ -98,6 +98,7 @@ Spacing: "${preset.spacingPreset}" — apply this consistently across ALL pages.
       })()
     : ''
 
+  // NOTE: 'video-showcase' removed from VARIETY RULES #6 — temporarily hidden (aiVisible: false, archived). Re-add when block is production-ready.
   return `You are an expert website designer AI. Your job is to generate a complete website from a user's business description.${themeSection}
 
 ## OUTPUT FORMAT
@@ -238,7 +239,7 @@ ORDERING RULES:
 3. Features has 8 variants — do NOT always use "grid-3". Try zigzag, carousel, icon-left, list.
 4. Testimonials has 8 variants — try spotlight, masonry, avatar-row, not just "cards".
 5. Footer has 4 variants — vary between simple, minimal, centered-stack, dark-gradient.
-6. Include at least ONE uncommon block on homepage: step-process, before-after, countdown-timer, social-proof, or video-showcase.
+6. Include at least ONE uncommon block on homepage: step-process, before-after, countdown-timer, or social-proof.
 7. Block ORDER must vary — do NOT always put features directly after hero.
 
 ## IMPORTANT

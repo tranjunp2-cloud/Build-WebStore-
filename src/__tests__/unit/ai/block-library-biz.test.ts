@@ -210,7 +210,7 @@ describe('buildBlockFromLibrary — Plan 07 biz threading', () => {
       }) as Record<string, unknown>
 
       expect((testimonials.testimonials as unknown[])?.length).toBeGreaterThan(0)
-      expect((faq.items as unknown[])?.length).toBeGreaterThan(0)
+      expect((faq.faqs as unknown[])?.length).toBeGreaterThan(0)
     })
   })
 })
