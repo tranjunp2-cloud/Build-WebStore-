@@ -303,6 +303,9 @@ function SettingsPanelInner({
     const [isAnnCtaOpen, setIsAnnCtaOpen] = useState(true)
     const [isAnnAppearanceOpen, setIsAnnAppearanceOpen] = useState(true)
     const [annShowLink, setAnnShowLink] = useState(() => !!(block?.linkText || block?.linkUrl))
+    useEffect(() => {
+        setAnnShowLink(!!(block?.linkText || block?.linkUrl))
+    }, [blockIndex])
     const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false)
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
