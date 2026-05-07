@@ -326,10 +326,11 @@ describe('sanitizeBlockData — faq items [TC-F01.08]', () => {
         // Act
         const output = sanitizeBlockData(input)
 
-        // Assert
-        const items = output.items as Array<{ question: string; answer: string }>
-        expect(items[0].question).toBe('Do you deliver?')
-        expect(items[0].answer).toBe('Yes, nationwide.')
+        // Assert — normalizer writes canonical `faqs` field and removes legacy `items`
+        const faqs = output.faqs as Array<{ question: string; answer: string }>
+        expect(faqs[0].question).toBe('Do you deliver?')
+        expect(faqs[0].answer).toBe('Yes, nationwide.')
+        expect(output.items).toBeUndefined()
     })
 
     it('uses "Question?" and "Answer." as fallback for empty FAQ objects [TC-F01.08]', () => {
@@ -342,9 +343,10 @@ describe('sanitizeBlockData — faq items [TC-F01.08]', () => {
         // Act
         const output = sanitizeBlockData(input)
 
-        // Assert
-        const items = output.items as Array<{ question: string; answer: string }>
-        expect(items[0]).toEqual({ question: 'Question?', answer: 'Answer.' })
+        // Assert — normalizer writes canonical `faqs` field and removes legacy `items`
+        const faqs = output.faqs as Array<{ question: string; answer: string }>
+        expect(faqs[0]).toEqual({ question: 'Question?', answer: 'Answer.' })
+        expect(output.items).toBeUndefined()
     })
 })
 
