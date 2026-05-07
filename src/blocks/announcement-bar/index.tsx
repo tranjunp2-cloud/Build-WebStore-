@@ -17,8 +17,10 @@ import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<AnnouncementBarConfig>) {
     void _theme
-    const { message, showLink, linkText, linkUrl, linkIsInternal, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor, paddingY = 12 } = block
+    const { message, showLink, linkText, linkUrl, linkIsInternal, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor } = block
     const spacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
+    // Use ?? (not destructuring default) to guard against null returned by Payload for unset DB columns
+    const paddingY = ((block as Record<string, unknown>).paddingY as number | null | undefined) ?? 12
     const paddingTop = spacing?.paddingTop ?? paddingY
     const paddingBottom = spacing?.paddingBottom ?? paddingY
     const [dismissed, setDismissed] = useState(false)
