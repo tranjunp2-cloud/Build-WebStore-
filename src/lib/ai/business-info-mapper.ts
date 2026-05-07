@@ -108,7 +108,7 @@ export function mapBusinessInfo(info: BusinessInfoInput): Partial<BusinessSample
   // never bleeds through when personalizeWithGPT times out (GH-912).
   // GPT overrides these fields on success; this is the safe fallback only.
   if (name) {
-    out.heroHeadline = name
+    out.heroHeadline = name.slice(0, 100)
     if (description) out.heroSubheadline = description.slice(0, 200)
   }
 
