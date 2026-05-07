@@ -16,6 +16,7 @@ import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { mergeUserContent } from '@/lib/ai/merge-user-content'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
  *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
@@ -377,8 +378,13 @@ export const POST = withAuth(async (user, req) => {
                     const cleanLayout = (stripSystemFields(newLayout) as Record<string, unknown>[])
                         .filter(b => b.blockType !== 'google-maps')
 
-                    // Sanitize blocks with required fields that may be empty/invalid
-                    for (const block of cleanLayout) {
+                    // Normalize required fields: coerces service-cards titles, upload fields,
+                    // contact email, footer variant aliases, etc. Covers data from currentBlocks
+                    // (user's existing DB content) which may predate AI gen sanitization fixes.
+                    const normalizedLayout = normalizeBlocksForPersistence(cleanLayout)
+
+                    // Additional block-specific sanitization not covered by normalizeBlocksForPersistence
+                    for (const block of normalizedLayout) {
                         // Contact: formFields array items need fieldName + label + fieldType
                         if (block.blockType === 'contact' && Array.isArray(block.formFields)) {
                             block.formFields = (block.formFields as Record<string, unknown>[]).filter(f =>
@@ -405,7 +411,7 @@ export const POST = withAuth(async (user, req) => {
                     await payload.update({
                         collection: 'pages',
                         id: page.id,
-                        data: { layout: cleanLayout },
+                        data: { layout: normalizedLayout },
                     })
                     _createdPagesCount++
                 }
