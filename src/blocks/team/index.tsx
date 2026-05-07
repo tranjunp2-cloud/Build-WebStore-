@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { TeamConfig, TeamMember } from './config'
@@ -238,9 +239,9 @@ function GridVariant({
     return (
         <TeamSection>
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
-            <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <StaggerGrid key={members.length} className="flex flex-wrap justify-center gap-6">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`} className="h-full">
+                    <StaggerItem key={`${m.name}-${i}`} className="basis-full sm:basis-[calc(50%-12px)] md:basis-[calc(33.333%-16px)] max-w-sm h-full">
                         <HoverCard
                             className={`text-center ${CARD_PADDING.md} transition-shadow h-full flex flex-col`}
                             style={{
@@ -279,7 +280,7 @@ function ListVariant({
     return (
         <TeamSection container="4xl">
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
-            <StaggerGrid className="flex flex-col gap-4">
+            <StaggerGrid key={members.length} className="flex flex-col gap-4">
                 {members.map((m, i) => (
                     <StaggerItem
                         key={`${m.name}-${i}`}
@@ -328,9 +329,9 @@ function CardsHoverRevealVariant({
     return (
         <TeamSection decorative={<LayeredShapes color={CSS_VARS.primary} opacity={0.08} />}>
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
-            <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <StaggerGrid key={members.length} className="flex flex-wrap justify-center gap-6">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`}>
+                    <StaggerItem key={`${m.name}-${i}`} className="basis-full sm:basis-[calc(50%-12px)] md:basis-[calc(33.333%-16px)] max-w-sm">
                         <article
                             className="group relative overflow-hidden rounded-2xl aspect-[3/4] cursor-default"
                             aria-label={`${m.name}, ${m.role}`}
@@ -436,7 +437,10 @@ function BioModalVariant({
     members: TeamMember[]
 }) {
     const [active, setActive] = useState<TeamMember | null>(null)
+    const [mounted, setMounted] = useState(false)
     const dialogRef = useRef<HTMLDialogElement>(null)
+
+    useEffect(() => setMounted(true), [])
 
     useEffect(() => {
         const dialog = dialogRef.current
@@ -448,9 +452,9 @@ function BioModalVariant({
     return (
         <TeamSection decorative={<NoiseTexture opacity={0.05} />}>
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
-            <StaggerGrid className="flex flex-wrap justify-center gap-4">
+            <StaggerGrid key={members.length} className="flex flex-wrap justify-center gap-4">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`} className="h-full w-[calc(50%-8px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(16.666%-14px)]">
+                    <StaggerItem key={`${m.name}-${i}`} className="h-full w-[calc(50%-8px)] sm:w-[calc(33.333%-11px)] md:w-[calc(33.333%-11px)]">
                         <button
                             type="button"
                             onClick={() => setActive(m)}
@@ -470,38 +474,41 @@ function BioModalVariant({
                     </StaggerItem>
                 ))}
             </StaggerGrid>
-            <dialog
-                ref={dialogRef}
-                onClose={() => setActive(null)}
-                onClick={(e) => {
-                    if (e.target === dialogRef.current) setActive(null)
-                }}
-                className="rounded-2xl p-0 max-w-md w-[92vw] backdrop:bg-black/50"
-            >
-                {active && (
-                    <div className="p-6 relative" style={{ background: CSS_VARS.surface, color: CSS_VARS.text }}>
-                        <button
-                            type="button"
-                            onClick={() => setActive(null)}
-                            className={`absolute top-3 right-3 p-2 rounded-full opacity-60 hover:opacity-100 ${TOUCH_TARGET.min} flex items-center justify-center`}
-                            aria-label="Close bio"
-                        >
-                            <X size={18} />
-                        </button>
-                        <div className="text-center">
-                            <MemberAvatar member={active} />
-                            <Heading level={4} className="font-bold mb-1">{active.name}</Heading>
-                            <Body size="small" className="mb-4" style={{ color: CSS_VARS.primary }}>{active.role}</Body>
-                            {active.bio && (
-                                <Body size="small" className="text-left" style={{ color: CSS_VARS.muted }}>
-                                    {active.bio}
-                                </Body>
-                            )}
-                            <SocialLinks socials={active.socials} name={active.name} />
+            {mounted && createPortal(
+                <dialog
+                    ref={dialogRef}
+                    onClose={() => setActive(null)}
+                    onClick={(e) => {
+                        if (e.target === dialogRef.current) setActive(null)
+                    }}
+                    className="rounded-2xl p-0 max-w-md w-[92vw] backdrop:bg-black/50"
+                >
+                    {active && (
+                        <div className="p-6 relative" style={{ background: CSS_VARS.surface, color: CSS_VARS.text }}>
+                            <button
+                                type="button"
+                                onClick={() => setActive(null)}
+                                className={`absolute top-3 right-3 p-2 rounded-full opacity-60 hover:opacity-100 ${TOUCH_TARGET.min} flex items-center justify-center`}
+                                aria-label="Close bio"
+                            >
+                                <X size={18} />
+                            </button>
+                            <div className="text-center">
+                                <MemberAvatar member={active} />
+                                <Heading level={4} className="font-bold mb-1">{active.name}</Heading>
+                                <Body size="small" className="mb-4" style={{ color: CSS_VARS.primary }}>{active.role}</Body>
+                                {active.bio && (
+                                    <Body size="small" className="text-left" style={{ color: CSS_VARS.muted }}>
+                                        {active.bio}
+                                    </Body>
+                                )}
+                                <SocialLinks socials={active.socials} name={active.name} />
+                            </div>
                         </div>
-                    </div>
-                )}
-            </dialog>
+                    )}
+                </dialog>,
+                document.body
+            )}
         </TeamSection>
     )
 }
