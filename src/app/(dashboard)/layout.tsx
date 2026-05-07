@@ -17,14 +17,21 @@ export default async function DashboardLayout({
     const user = await getCurrentUser()
     // Extract tenantId from user directly — avoid 2nd getCurrentUser() call
     const typedUser = user as PlatformUser | null
-    const tenants = typedUser?.tenants as Array<{ tenant: string | { id: string }, role?: string }> | undefined
+    const tenants = typedUser?.tenants as Array<{ tenant: string | number | { id: string | number }, role?: string }> | undefined
     const firstTenant = tenants?.[0]?.tenant
-    const tenantId = typeof firstTenant === 'string' ? firstTenant : firstTenant?.id || null
+    // Normalize to string: handles depth=0 (number ID), depth=1 (object), or string
+    const tenantId = typeof firstTenant === 'string' ? firstTenant
+        : typeof firstTenant === 'number' ? String(firstTenant)
+        : firstTenant?.id != null ? String(firstTenant.id)
+        : null
     const userName = typedUser?.firstName || typedUser?.email?.split('@')[0] || 'User'
     const userEmail = typedUser?.email || ''
     const userInitial = userName.charAt(0).toUpperCase()
-    
-    const currentTenantInfo = typedUser?.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId)
+
+    const currentTenantInfo = typedUser?.tenants?.find((t: { tenant: string | number | { id: string | number }, role?: string }) => {
+        const tId = typeof t.tenant === 'object' && t.tenant !== null ? String(t.tenant.id) : String(t.tenant)
+        return tId === tenantId
+    })
     const currentUserRole = currentTenantInfo?.role || 'viewer'
     const isSuperAdmin = Boolean(typedUser?.roles?.includes('super-admin'))
 
