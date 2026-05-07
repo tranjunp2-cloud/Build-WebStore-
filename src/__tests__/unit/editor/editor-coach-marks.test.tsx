@@ -35,10 +35,16 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
     beforeEach(() => {
         vi.useFakeTimers()
         localStorage.clear()
+        // jsdom always returns zero DOMRects; mock non-zero dims so the rect.width guard passes
+        vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+            top: 0, left: 0, right: 280, bottom: 600, width: 280, height: 600,
+            x: 0, y: 0, toJSON: () => ({}),
+        } as DOMRect)
     })
 
     afterEach(() => {
         vi.useRealTimers()
+        vi.restoreAllMocks()
     })
 
     it('TC-F05-02-16a: renders nothing when localStorage flag already set', async () => {

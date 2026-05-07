@@ -71,10 +71,14 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
 
     // Guard against rapid double-click advancing step twice before React re-renders
     const isSteppingRef = useRef(false)
+    const stepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    // Cleanup step-debounce timer on unmount
+    useEffect(() => () => { if (stepTimerRef.current) clearTimeout(stepTimerRef.current) }, [])
     const next = useCallback(() => {
         if (isSteppingRef.current) return
         isSteppingRef.current = true
-        setTimeout(() => { isSteppingRef.current = false }, 200)
+        if (stepTimerRef.current) clearTimeout(stepTimerRef.current)
+        stepTimerRef.current = setTimeout(() => { isSteppingRef.current = false }, 200)
         if (step === 1) {
             onEnterStep2?.()
             setStep(2)
@@ -91,7 +95,8 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
         return () => window.removeEventListener('keydown', handler)
     }, [step, finish])
 
-    if (step === 0 || !rect) return null
+    // rect.width === 0 means element is hidden (display:none) — avoid rendering at 0,0
+    if (step === 0 || !rect || rect.width === 0) return null
 
     // Position popover: step 1 (left panel) → to the right; step 2 (right panel) → to the left
     const popoverLeft = step === 1
