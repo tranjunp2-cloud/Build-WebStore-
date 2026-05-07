@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/i18n'
 
 const STORAGE_KEY = 'editor:coach-marks:v1:seen'
@@ -53,7 +53,9 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
     // On mount: skip if already seen; otherwise switch sidebar to pages tab then show step 1
     useEffect(() => {
         if (typeof window === 'undefined') return
-        if (window.localStorage.getItem(STORAGE_KEY) === 'true') return
+        let alreadySeen = false
+        try { alreadySeen = window.localStorage.getItem(STORAGE_KEY) === 'true' } catch { /* private/incognito */ }
+        if (alreadySeen) return
         const timer = window.setTimeout(() => {
             onEnterStep1?.()
             setStep(1)
@@ -67,7 +69,12 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
         setStep(0)
     }, [])
 
+    // Guard against rapid double-click advancing step twice before React re-renders
+    const isSteppingRef = useRef(false)
     const next = useCallback(() => {
+        if (isSteppingRef.current) return
+        isSteppingRef.current = true
+        setTimeout(() => { isSteppingRef.current = false }, 200)
         if (step === 1) {
             onEnterStep2?.()
             setStep(2)

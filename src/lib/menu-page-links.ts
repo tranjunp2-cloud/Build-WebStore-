@@ -8,18 +8,19 @@ function normalizeSlug(s: string): string {
     return trimmed.startsWith('/') ? trimmed.slice(1) : trimmed
 }
 
-/** Walk raw nav tree and collect page-type link slugs (normalized) */
+/** Walk raw nav tree and collect page-type link slugs (normalized). Depth-capped at 10 to guard against circular refs in malformed data. */
 function collectLinkedSlugs(links: RawNavLink[]): Set<string> {
     const out = new Set<string>()
-    const walk = (items: RawNavLink[]) => {
+    const walk = (items: RawNavLink[], depth: number) => {
+        if (depth > 10) return
         for (const link of items) {
             if (link.type === 'page' && typeof link.url === 'string' && link.url) {
                 out.add(normalizeSlug(link.url))
             }
-            if (Array.isArray(link.children)) walk(link.children as RawNavLink[])
+            if (Array.isArray(link.children)) walk(link.children as RawNavLink[], depth + 1)
         }
     }
-    walk(links)
+    walk(links, 0)
     return out
 }
 
