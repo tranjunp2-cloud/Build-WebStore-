@@ -101,6 +101,8 @@ describe('TC-F01-W.01 — mapBusinessInfo', () => {
       expect(result).toEqual({
         name: 'Ramen Ichiban',
         description: 'Authentic Japanese ramen shop in KL.',
+        heroHeadline: 'Ramen Ichiban',
+        heroSubheadline: 'Authentic Japanese ramen shop in KL.',
         tagline: 'Tokyo flavor in every bowl',
         phone: '+60 12-345 6789',
         email: 'hello@ramen.my',
@@ -129,13 +131,14 @@ describe('TC-F01-W.01 — mapBusinessInfo', () => {
         shortDescription: '',
       })
 
-      expect(result).toEqual({ name: 'Solo' })
+      expect(result).toEqual({ name: 'Solo', heroHeadline: 'Solo' })
       expect('phone' in result).toBe(false)
       expect('email' in result).toBe(false)
       expect('address' in result).toBe(false)
       expect('products' in result).toBe(false)
       expect('description' in result).toBe(false)
       expect('tagline' in result).toBe(false)
+      expect('heroSubheadline' in result).toBe(false)
     })
 
     it('omits empty products gracefully', () => {
