@@ -308,6 +308,33 @@ describe('F19 Domain Management (DomainsClient)', () => {
         expect(screen.getByText('Pending Verification')).toBeInTheDocument();
     });
 
+    // TC-U-14 — vercelVerification from DB must survive page refresh.
+    // Root cause: page.tsx was dropping vercelVerification when building customDomains,
+    // so verifications state init was always empty → TxtChallengeCard vanished on reload.
+    it('[TC-U-14] TxtChallengeCard renders on page load when vercelVerification is in props', () => {
+        const verification = [
+            {
+                type: 'TXT' as const,
+                domain: '_vercel.reload-test.com',
+                value: 'vc-domain-verify-abc123',
+                reason: 'missing_txt',
+            },
+        ];
+
+        render(<DomainsClient
+            tenantId="tenant-1"
+            tenantSlug="mywebstore"
+            customDomains={[
+                { domain: 'reload-test.com', status: 'pending', isPrimary: false, vercelVerification: verification },
+            ]}
+        />);
+
+        // TxtChallengeCard should render immediately (no add action required)
+        expect(screen.getByRole('region', { name: /Verify domain ownership/i })).toBeInTheDocument();
+        expect(screen.getByText('_vercel.reload-test.com')).toBeInTheDocument();
+        expect(screen.getByText('vc-domain-verify-abc123')).toBeInTheDocument();
+    });
+
     // SSL provisioning state — when status flips to active after verify,
     // the client sets sslProvisioningDomains[domain] and shows the success toast.
     // The SslProvisioningBanner component exists but is not yet rendered; the

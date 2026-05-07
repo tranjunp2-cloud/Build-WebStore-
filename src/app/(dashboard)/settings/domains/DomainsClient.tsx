@@ -12,7 +12,7 @@ const DNS_A_RECORD = process.env.NEXT_PUBLIC_VERCEL_APEX_IP ?? '76.76.21.21';
 const DNS_CNAME = process.env.NEXT_PUBLIC_VERCEL_CNAME_TARGET ?? 'cname.vercel-dns.com';
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'primeweb.app';
 
-type DomainEntry = { domain: string; status: string; isPrimary?: boolean | null };
+type DomainEntry = { domain: string; status: string; isPrimary?: boolean | null; vercelVerification?: VercelDomainVerification[] | null };
 
 // ── Select Primary Domain — Right-Side Panel ────────────────────────────────
 function SelectPrimaryPanel({
@@ -305,7 +305,13 @@ export function DomainsClient({
     const [verifyErrors, setVerifyErrors] = useState<Record<string, string>>({});
     const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
     const [removingDomain, setRemovingDomain] = useState<string | null>(null);
-    const [verifications, setVerifications] = useState<Record<string, VercelDomainVerification[]>>({});
+    const [verifications, setVerifications] = useState<Record<string, VercelDomainVerification[]>>(() =>
+        Object.fromEntries(
+            customDomains
+                .filter(d => d.vercelVerification?.length)
+                .map(d => [d.domain, d.vercelVerification!])
+        )
+    );
     const [lastCheckedAt, setLastCheckedAt] = useState<Record<string, number>>({});
     const [sslProvisioningDomains, setSslProvisioningDomains] = useState<Record<string, number>>({});
     const lastVerifyClickRef = useRef<Record<string, number>>({});

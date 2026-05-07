@@ -440,6 +440,12 @@
 - **Steps:** Render component
 - **Expected:** Text "Last checked: 2m ago" visible
 
+#### TC-U-14: TxtChallengeCard persists after page refresh
+- **Priority:** P1 | **Type:** Unit | **Regression:** yes
+- **Precondition:** Domain in DB with `status='pending'` and `vercelVerification` array populated
+- **Steps:** Render DomainsClient with `vercelVerification` in props (simulates page.tsx SSR)
+- **Expected:** TxtChallengeCard renders immediately; TXT name + value visible without any add action
+
 ---
 
 ## 4. Traceability Matrix
@@ -454,7 +460,7 @@
 | **AC-04** | DNS instructions card with correct A/CNAME (psl detect) | TC-A-13, TC-E-02, TC-E-03, TC-U-12 | ✅ Full |
 | **AC-05** | Verify trước khi set DNS → return error, status pending | TC-E-02 (manual extension) | ⚠️ Partial — add explicit TC |
 | **AC-06** | Vercel 400 → fetch fresh verification + persist | TC-U-02, TC-U-07, TC-U-09, TC-A-03, TC-A-08, TC-E-04 | ✅ Full |
-| **AC-07** | TxtChallengeCard renders verification rows | TC-A-03, TC-U-11, TC-E-04 | ✅ Full |
+| **AC-07** | TxtChallengeCard renders verification rows | TC-A-03, TC-U-11, TC-U-14, TC-E-04 | ✅ Full |
 | **AC-08** | Verify Now → flip pending → active | TC-A-07, TC-U-06, TC-E-04 | ✅ Full |
 | **AC-09** | Remove → Vercel removeProjectDomain + idempotent 404 | TC-A-10, TC-A-11, TC-U-08, TC-E-05 | ✅ Full |
 | **AC-10** | Backfill iterate all rows + populate vercelDomainId | TC-B-01, TC-B-03 | ✅ Full |
