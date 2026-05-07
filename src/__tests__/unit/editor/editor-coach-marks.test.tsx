@@ -50,8 +50,8 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         await advanceCoachMarkTimers()
 
         // Assert — nothing from coach marks should appear
-        expect(screen.queryByText(/Bước 1/)).not.toBeInTheDocument()
-        expect(screen.queryByText(/Bước 2/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Step 1/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Step 2/)).not.toBeInTheDocument()
     })
 
     it('TC-F05-02-16b: renders step 1 after mountDelayMs when flag absent', async () => {
@@ -61,10 +61,10 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         await advanceCoachMarkTimers()
 
         // Assert — step 1 title and body visible
-        expect(screen.getByText('Bước 1: Tạo trang tại đây')).toBeInTheDocument()
-        expect(screen.getByText(/nội bộ của website/)).toBeInTheDocument()
-        expect(screen.getByText('Bỏ qua')).toBeInTheDocument()
-        expect(screen.getByText('Tiếp theo')).toBeInTheDocument()
+        expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
+        expect(screen.getByText(/internal pages/)).toBeInTheDocument()
+        expect(screen.getByText('Skip')).toBeInTheDocument()
+        expect(screen.getByText('Next')).toBeInTheDocument()
     })
 
     it('TC-F05-02-16c: clicking Tiếp theo calls onEnterStep2 and advances to step 2', async () => {
@@ -74,42 +74,42 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         await advanceCoachMarkTimers()
 
         // Act
-        fireEvent.click(screen.getByText('Tiếp theo'))
+        fireEvent.click(screen.getByText('Next'))
         await advanceCoachMarkTimers()
 
         // Assert
         expect(onEnterStep2).toHaveBeenCalledOnce()
-        expect(screen.getByText('Bước 2: Quản lý hiển thị menu tại đây')).toBeInTheDocument()
-        expect(screen.getByText('Hoàn tất')).toBeInTheDocument()
+        expect(screen.getByText('Step 2: Control menu visibility here')).toBeInTheDocument()
+        expect(screen.getByText('Done')).toBeInTheDocument()
     })
 
-    it('TC-F05-02-16d: clicking Hoàn tất writes localStorage flag and unmounts UI', async () => {
+    it('TC-F05-02-16d: clicking Done writes localStorage flag and unmounts UI', async () => {
         // Arrange
         render(<Wrapper />)
         await advanceCoachMarkTimers()
 
         // Go to step 2 first
-        fireEvent.click(screen.getByText('Tiếp theo'))
+        fireEvent.click(screen.getByText('Next'))
         await advanceCoachMarkTimers()
 
         // Act — finish
-        fireEvent.click(screen.getByText('Hoàn tất'))
+        fireEvent.click(screen.getByText('Done'))
 
         // Assert — UI gone and flag persisted
-        expect(screen.queryByText(/Bước/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Step /)).not.toBeInTheDocument()
         expect(localStorage.getItem(STORAGE_KEY)).toBe('true')
     })
 
-    it('TC-F05-02-16e: clicking Bỏ qua at step 1 writes flag and closes', async () => {
+    it('TC-F05-02-16e: clicking Skip at step 1 writes flag and closes', async () => {
         // Arrange
         render(<Wrapper />)
         await advanceCoachMarkTimers()
 
         // Act
-        fireEvent.click(screen.getByText('Bỏ qua'))
+        fireEvent.click(screen.getByText('Skip'))
 
         // Assert
-        expect(screen.queryByText(/Bước/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Step /)).not.toBeInTheDocument()
         expect(localStorage.getItem(STORAGE_KEY)).toBe('true')
     })
 
@@ -122,7 +122,7 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         fireEvent.keyDown(window, { key: 'Escape' })
 
         // Assert
-        expect(screen.queryByText(/Bước/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Step /)).not.toBeInTheDocument()
         expect(localStorage.getItem(STORAGE_KEY)).toBe('true')
     })
 
@@ -136,6 +136,6 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         fireEvent.click(backdrop)
 
         // Assert
-        expect(screen.queryByText(/Bước/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Step /)).not.toBeInTheDocument()
     })
 })

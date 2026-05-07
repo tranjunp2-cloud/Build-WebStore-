@@ -80,7 +80,7 @@ describe('PageManagerPanel', () => {
         // Arrange & Act
         render(<TestWrapper />)
         // Assert — micro-copy from i18n key pageManagerPanel.description
-        expect(screen.getByText(/biên tập nội bộ/)).toBeInTheDocument()
+        expect(screen.getByText(/internal editing/)).toBeInTheDocument()
     })
 
     it('TC-F05-02-14c: search input is NOT present (removed per GH-864)', () => {

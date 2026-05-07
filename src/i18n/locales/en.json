@@ -2285,13 +2285,13 @@
             "statusDraft": "Draft"
         },
         "coachMarks": {
-            "step1Title": "Bước 1: Tạo trang tại đây",
-            "step1Body": "Dùng Page Library để tạo và quản lý các trang nội bộ của website.",
-            "step2Title": "Bước 2: Quản lý hiển thị menu tại đây",
-            "step2Body": "Sau khi tạo trang, thêm chúng vào Menu Settings để hiển thị trên website.",
-            "skip": "Bỏ qua",
-            "next": "Tiếp theo",
-            "finish": "Hoàn tất"
+            "step1Title": "Step 1: Create pages here",
+            "step1Body": "Use Page Library to create and manage your website's internal pages.",
+            "step2Title": "Step 2: Control menu visibility here",
+            "step2Body": "After creating a page, add it to Menu Settings so it appears on your website.",
+            "skip": "Skip",
+            "next": "Next",
+            "finish": "Done"
         },
         "aiChat": {
             "welcomeMessage": "Hello! What would you like to edit?",
@@ -2776,13 +2776,13 @@
         },
         "pageManagerPanel": {
             "title": "Page Library",
-            "description": "Các trang ở đây dùng để biên tập nội bộ. Để đưa lên website, hãy add chúng vào Menu Settings bên phải.",
+            "description": "Pages here are for internal editing. To publish them on your website, add them to Menu Settings on the right.",
             "createError": "Error creating page",
             "slugConflict": "Page slug already exists in this site",
             "noPagesFound": "No pages found",
             "noPagesSuggestion": "Create your first page to get started.",
-            "tooltipLive": "Trang đã được add vào Menu và đã publish.",
-            "tooltipDraft": "Trang mới tạo, chưa được add vào menu hoặc đã bị xóa khỏi menu."
+            "tooltipLive": "This page is published and linked in the menu — it's live on your website.",
+            "tooltipDraft": "This page is not linked in the menu or not published — it won't appear on your website."
         },
         "navigationValidation": {
             "labelRequired": "Link label is required",
