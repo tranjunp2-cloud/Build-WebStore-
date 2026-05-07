@@ -1,7 +1,7 @@
 'use client'
 
 import { ShoppingCart } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { BlockProps } from '../types'
 import type { CartWidgetConfig } from './config'
 import { useCartStore } from '@/store/cartStore'
@@ -13,7 +13,7 @@ import { useInFloatingContainer } from '@/components/site-renderer/FloatingConta
 
 export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartWidgetConfig>) {
     void _theme
-    const count = useCartStore(state => state.items.reduce((sum, item) => sum + item.quantity, 0))
+    const storeCount = useCartStore(state => state.items.reduce((sum, item) => sum + item.quantity, 0))
     const openCart = useCartStore(state => state.openCart)
     const callback = useBlockEditCallback()
     const inContainer = useInFloatingContainer()
@@ -21,6 +21,13 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
     // tenantSlug is injected by both storefront page ({ ...site, tenantSlug: slug }) and
     // preview page ({ ...site, tenantSlug: tenant.slug }). Sites collection has no slug field.
     const siteSlug = String((site as Record<string, unknown>)?.tenantSlug || '')
+
+    // Defer cart count to client-only to prevent SSR/hydration mismatch.
+    // Server always has count=0 (no localStorage), client reads from localStorage.
+    const [count, setCount] = useState(0)
+    useEffect(() => {
+        setCount(storeCount)
+    }, [storeCount])
 
     useEffect(() => {
         if (siteSlug) {
