@@ -143,10 +143,11 @@ function SocialLinks({ socials, name }: { socials: TeamMember['socials']; name: 
                 const Icon = getSocialIcon(s.platform)
                 const ariaLabel = getSocialAriaLabel(s.platform, name)
                 const isExternal = s.url?.startsWith('http')
+                const safeHref = /^(https?:|mailto:|tel:)/i.test(s.url ?? '') ? s.url : undefined
                 return (
                     <a
                         key={`${s.platform}-${i}`}
-                        href={s.url}
+                        href={safeHref}
                         target={isExternal ? '_blank' : undefined}
                         rel={isExternal ? 'noopener noreferrer' : undefined}
                         aria-label={ariaLabel}
@@ -517,6 +518,32 @@ function BioModalVariant({
  * compact-row: dense single-row layout per member (small avatar + name + role +
  * 1-line bio). Like a LinkedIn search result. No decorative — minimal aesthetic.
  */
+function CompactAvatar({ member, imageIndex }: { member: TeamMember; imageIndex: number }) {
+    const [imgError, setImgError] = useState(false)
+    if (!member.image?.url || imgError) {
+        return (
+            <div
+                className="w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                style={{ background: `hsl(${hashHue(member.name)}, 55%, 50%)` }}
+                aria-hidden="true"
+                data-image-index={imageIndex}
+            >
+                {getInitials(member.name)}
+            </div>
+        )
+    }
+    return (
+        <img
+            src={member.image.url}
+            alt={member.image.alt || `${member.name} portrait`}
+            className="w-12 h-12 rounded-full object-cover"
+            loading="lazy"
+            onError={() => setImgError(true)}
+            data-image-index={imageIndex}
+        />
+    )
+}
+
 function CompactRowVariant({
     sectionLabel,
     headline,
@@ -539,24 +566,7 @@ function CompactRowVariant({
                         style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.08)' }}
                     >
                         <div className="flex-shrink-0 w-12 h-12">
-                            {m.image?.url ? (
-                                <img
-                                    src={m.image.url}
-                                    alt={m.image.alt || `${m.name} portrait`}
-                                    className="w-12 h-12 rounded-full object-cover"
-                                    loading="lazy"
-                                    data-image-index={i}
-                                />
-                            ) : (
-                                <div
-                                    className="w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                    style={{ background: `hsl(${hashHue(m.name)}, 55%, 50%)` }}
-                                    aria-hidden="true"
-                                    data-image-index={i}
-                                >
-                                    {getInitials(m.name)}
-                                </div>
-                            )}
+                            <CompactAvatar member={m} imageIndex={i} />
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-baseline gap-x-2">
