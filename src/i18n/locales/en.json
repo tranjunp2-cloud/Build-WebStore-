@@ -2695,7 +2695,14 @@
       "numberOfFaqs": "Number of FAQs",
       "faqsMinMax": "(Min: 3 - Max: 10)",
       "questionPlaceholder": "Question",
-      "answerPlaceholder": "Answer"
+      "answerPlaceholder": "Answer",
+      "teamConfiguration": "Team Configuration",
+      "numberOfMembers": "Number of Members",
+      "membersMinMax": "(Min: 1 - Max: 6)",
+      "memberLabel": "Member",
+      "memberNamePlaceholder": "Member name",
+      "memberRolePlaceholder": "Role / title",
+      "memberBioPlaceholder": "Short bio"
     },
     "statusBar": {
       "connected": "Connected",

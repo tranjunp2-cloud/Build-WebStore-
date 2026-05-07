@@ -2695,7 +2695,14 @@
       "numberOfFaqs": "Bilangan FAQ",
       "faqsMinMax": "(Min: 3 - Maks: 10)",
       "questionPlaceholder": "Soalan",
-      "answerPlaceholder": "Jawapan"
+      "answerPlaceholder": "Jawapan",
+      "teamConfiguration": "Konfigurasi Pasukan",
+      "numberOfMembers": "Bilangan Ahli",
+      "membersMinMax": "(Min: 1 - Maks: 6)",
+      "memberLabel": "Ahli",
+      "memberNamePlaceholder": "Nama ahli",
+      "memberRolePlaceholder": "Peranan / jawatan",
+      "memberBioPlaceholder": "Bio ringkas"
     },
     "statusBar": {
       "connected": "Disambungkan",
