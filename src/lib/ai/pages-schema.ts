@@ -242,6 +242,17 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
         })
     }
 
+    // Special-case: service-cards.services[].title is required by Payload on publish.
+    // Drafts save without validation, so empty titles reach publish and fail.
+    // booking-widget is intentionally excluded — its required field is `name`, not `title`.
+    if (block.blockType === 'service-cards' && Array.isArray(block.services)) {
+        block.services = (block.services as Array<Record<string, unknown>>).map((svc) => {
+            if (!svc || typeof svc !== 'object') return svc
+            if (!svc.title) return { ...svc, title: 'Service' }
+            return svc
+        })
+    }
+
     // Special-case: pricing.plans[].features may be string[] or object[].
     // Normalize to the Payload-required {text, included} shape.
     if (block.blockType === 'pricing' && Array.isArray(block.plans)) {

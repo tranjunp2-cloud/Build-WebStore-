@@ -247,6 +247,7 @@ Common nested field schemas:
 - steps: [{title:string, description:string, icon?:string}]
 - columns (footer): [{title:string, links:[{label:string, url:string}]}]
 - images/gallery: [{url:string, alt?:string, caption?:string}]
+- services (service-cards): [{title:string, description:string, icon?:string, price?:string, priceUnit?:string}] — title is REQUIRED, never omit it
 
 IMPORTANT RULES for nested fields:
 1. Always use the EXACT field name from CURRENT PAGE BLOCKS or SELECTED BLOCK FULL DATA (e.g., "ctaButtons" not "buttonText" or "cta")
@@ -348,6 +349,20 @@ IMPORTANT RULES for nested fields:
         return result
     }
 
+    // Coerce service-cards services items — AI may omit `title` which is required by Payload on publish.
+    if (result.action === 'update_block' && result.changes) {
+        const targetBlock = allBlocks?.[result.blockIndex ?? blockIndex] ?? block
+        normalizeChangesServices(result.changes, targetBlock)
+    }
+    if (result.action === 'update_multiple_blocks' && Array.isArray(result.updates)) {
+        for (const update of result.updates) {
+            if (update.changes) {
+                const targetBlock = allBlocks?.[update.blockIndex] ?? null
+                normalizeChangesServices(update.changes, targetBlock)
+            }
+        }
+    }
+
     // Filter out-of-bounds blockIndex entries for multi-block updates.
     // AI occasionally returns indices past the page length — frontend silently
     // skips them, leaving the user's "Updated N sections" message misleading.
@@ -404,6 +419,41 @@ IMPORTANT RULES for nested fields:
 
     result.message = describeAction(result)
     return result
+}
+
+/** Normalize a service-cards services array so each item always has a non-empty title.
+ *  Payload marks title as required=true — drafts save silently but publish fails validation.
+ *  NOTE: booking-widget uses `name` (not `title`) as required — keep it out of this path. */
+function coerceServiceItems(services: unknown[]): Record<string, unknown>[] {
+    return services.map(sv => {
+        if (typeof sv === 'string') return { title: sv, description: '', icon: '⭐' }
+        const svObj = (typeof sv === 'object' && sv !== null ? sv : {}) as Record<string, unknown>
+        const title = svObj.title || svObj.name || svObj.heading || 'Service'
+        // Only set description when absent — avoid overwriting valid descriptions with empty string
+        const description = svObj.description !== undefined ? svObj.description : (svObj.text || svObj.body || '')
+        return {
+            ...svObj,
+            title: String(title),
+            description: String(description),
+        }
+    })
+}
+
+/** Walk changes and coerce service-cards services items to have a required title. */
+function normalizeChangesServices(
+    changes: Record<string, unknown>,
+    existingBlock?: Record<string, unknown> | null,
+): void {
+    const blockType = (existingBlock?.blockType as string) ?? (changes.blockType as string)
+    // Only service-cards: its services[].title is required. booking-widget uses `name` (different schema).
+    if (blockType !== 'service-cards') return
+    if (!blockType) {
+        console.warn('[normalizeChangesServices] blockType undetermined — skipping service title normalization')
+        return
+    }
+    if (Array.isArray(changes.services)) {
+        changes.services = coerceServiceItems(changes.services)
+    }
 }
 
 function createSSEMessage(event: string, data: unknown) {
