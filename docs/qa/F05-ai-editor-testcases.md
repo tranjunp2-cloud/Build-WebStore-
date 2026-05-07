@@ -59,6 +59,10 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-02-10** | `US-02/AC3` | `Logic` | Xóa mềm trang (Soft Delete) | 1. Xác nhận lệnh xóa trang. | - Trường `deletedAt` được set.<br>- Trang biến khỏi danh sách. | High | [x] |
 | **TC-F05-02-11** | `US-02/Undo` | `Recov` | Hủy thao tác xóa (Undo) | 1. Nhấn "Hoàn tác" ngay tại Toast sau khi xóa. | - `deletedAt` bị xóa.<br>- Trang quay lại đúng vị trí cũ trong danh sách. | Blocker | [x] |
 | **TC-F05-02-12** | `US-02/AC4` | `Flow` | Ẩn/Hiện trang (Hide/Unhide) | 1. Dùng Toggle để ẩn trang. | - Trường `isVisible` thay đổi.<br>- Người dùng ngoài truy cập trang nhận lỗi 404. | Blocker | [x] |
+| **TC-F05-02-13** | `GH-864/menu-link` | `Logic` | `collectMenuPageIds` — liên kết trang-menu | 1. Gọi `collectMenuPageIds(links, pages)` với các trường hợp: rỗng, homepage, slug khớp, external link, children lồng nhau, trùng slug. | - Set trả về đúng page ID.<br>- Homepage luôn được include.<br>- External link không match.<br>- Slug normalize (/) đúng. | High | [x] |
+| **TC-F05-02-14** | `GH-864/panel-ux` | `UX` | Page Library — đổi tên, micro-copy, badge Live/Draft theo menu | 1. Mở Page Library panel. | - Title hiển thị "Page Library".<br>- Micro-copy mô tả biên tập nội bộ hiện ngay dưới tiêu đề.<br>- Không có ô tìm kiếm.<br>- Trang published + in-menu + site-published → badge "Live"; ngược lại → "Draft". | High | [x] |
+| **TC-F05-02-15** | `GH-864/badge` | `Logic` | Badge Live/Draft đúng với 4 kịch bản menu-linkage | 1. Test badge với: (a) in-menu + published site → Live; (b) not-in-menu + published site → Draft; (c) in-menu + draft site → Draft; (d) homepage → luôn in-menu. | - Mỗi kịch bản trả về badge đúng. | High | [x] |
+| **TC-F05-02-16** | `GH-864/coach` | `UX` | EditorCoachMarks — 2-bước overlay cho first-time user | 1. Xóa localStorage flag. Mở Editor. | - Sau delay, Step 1 popup hiển thị tại Page Library anchor.<br>- Nhấn "Tiếp theo" → Step 2 tại Menu Settings.<br>- Nhấn "Hoàn tất" / "Bỏ qua" / ESC / click backdrop → đóng, ghi flag localStorage.<br>- Lần sau mở lại → không hiển thị lại. | High | [x] |
 
 ---
 
@@ -251,6 +255,29 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-13-12** | `US-13/AC2` | `Race` | Spam click "✨ Tự động Tối ưu SEO" | 1. Click nhanh 3–5 lần vào nút AI generate. | - Nút disabled + spinner sau lần click đầu.<br>- Chỉ gọi API 1 lần.<br>- Kết quả điền đúng, không bị ghi đè bởi response chậm. | Blocker | [ ] |
 | **TC-F05-13-13** | `US-13/AC1` | `UI` | Google preview snippet cập nhật realtime | 1. Gõ Meta Title + Description từng ký tự. | - Google preview bên dưới cập nhật realtime (không cần save).<br>- Format: Title (xanh dương), URL (xanh lá), Description (xám). | High | [ ] |
 | **TC-F05-13-14** | `US-13/AC2` | `UI` | Loading state khi AI đang generate | 1. Click "✨ Tự động Tối ưu SEO". | - Nút chuyển sang loading spinner + "Đang tối ưu...".<br>- Input fields disabled.<br>- Sau khi AI trả về: fields điền data, nút enable lại. | High | [ ] |
+
+---
+
+## TC-F05-899 — Announcement Bar CTA & Content (GH-899)
+
+| TC-ID | Layer | Description | Status |
+|-------|-------|-------------|--------|
+| TC-F05-899-01 | Unit | Gradient variant renders linear-gradient | [x] |
+| TC-F05-899-02 | Unit | backgroundColor2 applied to gradient Color 2 | [x] |
+| TC-F05-899-03 | Unit | Solid variant no linear-gradient | [x] |
+| TC-F05-899-04 | Unit | Minimal variant transparent bg + border | [x] |
+| TC-F05-899-05 | Unit | Whitespace-only linkText hides link | [x] |
+| TC-F05-899-06 | Unit | CTA link renders with correct href | [x] |
+| TC-F05-899-07 | Unit | paddingY=24 applied to inline style | [x] |
+| TC-F05-899-08 | Unit | paddingY defaults to 12 | [x] |
+| TC-F05-899-09 | Unit | dismissible=false hides close button | [x] |
+| TC-F05-899-10 | Unit | Schema parses new optional fields | [x] |
+| TC-F05-899-11 | Unit | Schema rejects paddingY > 32 | [x] |
+| TC-F05-899-12 | Unit | Preview gradient HTML contains linear-gradient | [x] |
+| TC-F05-899-13 | Unit | Preview solid HTML no linear-gradient | [x] |
+| TC-F05-899-14 | Unit | Preview minimal HTML background:transparent | [x] |
+| TC-F05-899-15 | Unit | Preview empty linkText no anchor tag | [x] |
+| TC-F05-899-16 | Unit | Meta has all required fields | [x] |
 
 ---
 

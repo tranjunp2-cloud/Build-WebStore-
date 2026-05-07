@@ -1881,7 +1881,7 @@
         "qSettingsDns": "How to configure DNS records?",
         "aSettingsDns": "After adding your domain, the system shows the required DNS records:<ul><li><strong>A Record</strong> — Point your domain to the static IP address shown (e.g., 162.159.140.98)</li><li><strong>CNAME Record</strong> — Point to <strong>web-v2.dev.ecommercehub.my</strong></li></ul>DNS propagation typically takes 15 minutes to 48 hours depending on your registrar.",
         "qSettingsStaff": "How to invite admin staff?",
-        "aSettingsStaff": "Go to <strong>\"⚙️ Settings → Staff\"</strong>. Click <strong>\"Invite Staff\"</strong>, enter their email address, and select a role (Viewer or Full Access). They will receive an email invitation to join your workspace."
+        "aSettingsStaff": "Go to <strong>\"⚙️ Settings → Staff\"</strong>. Click <strong>\"Invite Staff\"</strong>, enter their email address, and select a role (Viewer or Manager). They will receive an email invitation to join your workspace."
       }
     }
   },
@@ -1942,7 +1942,7 @@
       "actions": "ACTIONS",
       "owner": "Owner",
       "custom": "Custom Features",
-      "fullAccess": "Full Access",
+      "fullAccess": "Manager",
       "viewer": "Viewer",
       "active": "Active",
       "suspended": "Suspended",
@@ -2293,6 +2293,15 @@
       "statusLive": "Live",
       "statusDraft": "Draft"
     },
+    "coachMarks": {
+      "step1Title": "Step 1: Create pages here",
+      "step1Body": "Use Page Library to create and manage your website's internal pages.",
+      "step2Title": "Step 2: Control menu visibility here",
+      "step2Body": "After creating a page, add it to Menu Settings so it appears on your website.",
+      "skip": "Skip",
+      "next": "Next",
+      "finish": "Done"
+    },
     "aiChat": {
       "welcomeMessage": "Hello! What would you like to edit?",
       "drafting": "AI is drafting...",
@@ -2607,9 +2616,6 @@
       "label": "Label",
       "url": "URL",
       "addButton": "+ Add Button",
-      "noButtons": "No buttons yet",
-      "secondaryButton": "Secondary Button",
-      "removeButton": "Remove",
       "features": "Features",
       "title": "Title",
       "icon": "Icon (emoji)",
@@ -2681,7 +2687,22 @@
       "breadcrumbSeparator": "Separator",
       "breadcrumbShowOnAllPages": "Show on All Pages",
       "breadcrumbShowOnAllPagesDesc": "Display breadcrumb on every page",
-      "breadcrumbPreview": "Preview"
+      "breadcrumbPreview": "Preview",
+      "noButtons": "No buttons yet",
+      "secondaryButton": "Secondary Button",
+      "removeButton": "Remove",
+      "faqConfiguration": "FAQ Configuration",
+      "numberOfFaqs": "Number of FAQs",
+      "faqsMinMax": "(Min: 3 - Max: 10)",
+      "questionPlaceholder": "Question",
+      "answerPlaceholder": "Answer",
+      "teamConfiguration": "Team Configuration",
+      "numberOfMembers": "Number of Members",
+      "membersMinMax": "(Min: 1 - Max: 6)",
+      "memberLabel": "Member",
+      "memberNamePlaceholder": "Member name",
+      "memberRolePlaceholder": "Role / title",
+      "memberBioPlaceholder": "Short bio"
     },
     "statusBar": {
       "connected": "Connected",
@@ -2778,12 +2799,14 @@
       "aiContextLocked": "AI Generation context locked to: {blockType}"
     },
     "pageManagerPanel": {
-      "title": "Page Manager",
-      "description": "Create, select, hide, and soft-delete pages for this site.",
+      "title": "Page Library",
+      "description": "Pages here are for internal editing. To publish them on your website, add them to Menu Settings on the right.",
       "createError": "Error creating page",
       "slugConflict": "Page slug already exists in this site",
       "noPagesFound": "No pages found",
-      "noPagesSuggestion": "Create a new page or try a different search keyword."
+      "noPagesSuggestion": "Create your first page to get started.",
+      "tooltipLive": "This page is published and linked in the menu — it's live on your website.",
+      "tooltipDraft": "This page is not linked in the menu or not published — it won't appear on your website."
     },
     "navigationValidation": {
       "labelRequired": "Link label is required",
@@ -2798,7 +2821,8 @@
     "settingsValidation": {
       "invalidPhone": "Please enter a valid phone number (digits, +, -, spaces)",
       "primaryColorLabel": "Primary color picker",
-      "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?"
+      "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?",
+      "phoneRequired": "Phone number is required"
     },
     "menuDrawer": {
       "defaultUserName": "User"

@@ -550,6 +550,8 @@ const FAQBlock = {
             ],
         },
         { name: 'headline', type: 'text', defaultValue: 'Frequently Asked Questions' },
+        { name: 'subheadline', type: 'textarea' },
+        { name: 'allowMultiple', type: 'checkbox', defaultValue: false },
         {
             name: 'faqs',
             type: 'array',
@@ -853,7 +855,7 @@ const AnnouncementBarBlock = {
     labels: { singular: 'Announcement Bar', plural: 'Announcement Bars' },
     fields: [
         {
-            name: 'variant', type: 'select', defaultValue: 'solid',
+            name: 'variant', type: 'select', defaultValue: 'gradient',
             options: [
                 { label: 'Gradient', value: 'gradient' },
                 { label: 'Solid', value: 'solid' },
@@ -861,10 +863,15 @@ const AnnouncementBarBlock = {
             ],
         },
         { name: 'message', type: 'text', required: true },
+        { name: 'showLink', type: 'checkbox' },
         { name: 'linkText', type: 'text' },
         { name: 'linkUrl', type: 'text' },
+        { name: 'linkIsInternal', type: 'checkbox' },
         { name: 'dismissible', type: 'checkbox', defaultValue: true },
         { name: 'backgroundColor', type: 'text' },
+        { name: 'backgroundColor2', type: 'text' },
+        { name: 'textColor', type: 'text' },
+        { name: 'paddingY', type: 'number', min: 4, max: 32 },
     ],
 }
 

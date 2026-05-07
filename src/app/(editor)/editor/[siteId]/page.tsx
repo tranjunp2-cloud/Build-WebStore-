@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
+import { collectMenuPageIds } from '@/lib/menu-page-links'
+import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
 import { EditorMenuDrawer } from '@/components/editor/EditorMenuDrawer'
@@ -73,6 +75,18 @@ import type { PageData, BlockData } from '@/store/editorStore'
 type SaveOptions = {
     showToast?: boolean
     refreshPreview?: boolean
+}
+
+// Maps Payload field path segments → user-facing labels for publish error toasts.
+const FIELD_LABELS: Record<string, string> = {
+    phoneNumber: 'WhatsApp Phone Number',
+    countryCode: 'WhatsApp Country Code',
+}
+
+function friendlyValidationDetail(path: string, message?: string): string {
+    const field = path.split('.').pop() || path
+    const label = FIELD_LABELS[field] || field
+    return `${label}: ${message || 'invalid'}`
 }
 
 export default function EditorPage() {
@@ -147,6 +161,11 @@ export default function EditorPage() {
     const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
     const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
+
+    const menuPageIds = useMemo(() => {
+        const rawLinks = ((headerBlock as Record<string, unknown> | null)?.links as Array<Record<string, unknown>>) ?? []
+        return collectMenuPageIds(rawLinks, pages)
+    }, [headerBlock, pages])
 
     const currentBlock = useMemo(
         () => (selectedBlock !== null ? blocks[selectedBlock] || null : null),
@@ -845,7 +864,32 @@ export default function EditorPage() {
             })
 
             if (!res.ok) {
-                throw new Error(`Server returned ${res.status}`)
+                const body = await res.json().catch(() => null) as {
+                    error?: {
+                        message?: string
+                        failures?: Array<{
+                            errName?: string
+                            errMsg?: string
+                            pgColumn?: string
+                            pgTable?: string
+                            causeMsg?: string
+                            validationErrors?: Array<{ path?: string; message?: string }>
+                        }>
+                    }
+                } | null
+                const firstFailure = body?.error?.failures?.[0]
+                const firstValidation = firstFailure?.validationErrors?.[0]
+                let detail: string | undefined
+                if (firstValidation?.path) {
+                    detail = friendlyValidationDetail(firstValidation.path, firstValidation.message)
+                } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
+                    detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
+                } else {
+                    const isDev = process.env.NODE_ENV === 'development'
+                    detail = (isDev ? (firstFailure?.causeMsg || firstFailure?.errMsg) : undefined)
+                        || body?.error?.message
+                }
+                throw new Error(detail || `Server returned ${res.status}`)
             }
 
             setPublishSuccess(true)
@@ -894,7 +938,9 @@ export default function EditorPage() {
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
             if (process.env.NODE_ENV === 'development') console.error('[Editor] Publish failed:', err)
+            const detail = err instanceof Error ? err.message : undefined
             toast.error(t.editor.toast.publishFailed, {
+                description: detail,
                 duration: 10000,
                 action: {
                     label: 'Retry',
@@ -946,12 +992,13 @@ export default function EditorPage() {
                 const firstValidation = firstFailure?.validationErrors?.[0]
                 let detail: string | undefined
                 if (firstValidation?.path) {
-                    // Payload validation error — richest signal for the user.
-                    detail = `${firstValidation.path}: ${firstValidation.message || 'invalid'}`
+                    detail = friendlyValidationDetail(firstValidation.path, firstValidation.message)
                 } else if (firstFailure?.pgColumn && firstFailure?.pgTable) {
                     detail = `${firstFailure.pgTable}.${firstFailure.pgColumn} missing — run \`npm run db:migrate\``
                 } else {
-                    detail = firstFailure?.causeMsg || firstFailure?.errMsg || body?.error?.message
+                    const isDev = process.env.NODE_ENV === 'development'
+                    detail = (isDev ? (firstFailure?.causeMsg || firstFailure?.errMsg) : undefined)
+                        || body?.error?.message
                 }
                 throw new Error(detail || `Server returned ${res.status}`)
             }
@@ -1122,6 +1169,7 @@ export default function EditorPage() {
                     siteId={siteId}
                     currentPageId={currentPageId}
                     siteStatus={site?.status}
+                    menuPageIds={menuPageIds}
                     onPageSelected={handlePageSelected}
                     onPagesChanged={() => setIframeKey(key => key + 1)}
                     onEditPage={() => setActiveSidebarTab('chat')}
@@ -1385,6 +1433,13 @@ export default function EditorPage() {
                 onUnpublish={handlePublish}
                 isPublishing={isPublishing}
             />
+
+            {!isCompactLayout && (
+                <EditorCoachMarks
+                    onEnterStep1={() => setActiveSidebarTab('pages')}
+                    onEnterStep2={() => setSettingsRequestedTab({ tab: 'menu', key: Date.now() })}
+                />
+            )}
 
             <EditorTemplateModal
                 isOpen={isTemplateModalOpen}

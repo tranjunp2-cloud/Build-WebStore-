@@ -7,9 +7,25 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { Body } from '../shared/Typography'
 import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
+function getLinkAttrs(url: string, isInternal?: boolean): { target?: string; rel?: string } {
+    if (isInternal) return {}
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return { target: '_blank', rel: 'noopener noreferrer' }
+    }
+    return {}
+}
+
 export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<AnnouncementBarConfig>) {
     void _theme
-    const { message, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor } = block
+    const { message, showLink, linkText, linkUrl, linkIsInternal, backgroundColor, backgroundColor2, textColor } = block
+    const spacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
+    // Use ?? (not destructuring default) — Payload returns null (not undefined) for unset DB columns,
+    // which makes destructuring defaults ineffective for boolean/enum/number fields.
+    const dismissible = ((block as Record<string, unknown>).dismissible as boolean | null | undefined) ?? true
+    const variant = ((block as Record<string, unknown>).variant as string | null | undefined) ?? 'gradient'
+    const paddingY = ((block as Record<string, unknown>).paddingY as number | null | undefined) ?? 12
+    const paddingTop = spacing?.paddingTop ?? paddingY
+    const paddingBottom = spacing?.paddingBottom ?? paddingY
     const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
@@ -18,7 +34,7 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
         const bg = backgroundColor || CSS_VARS.primary
         switch (variant) {
             case 'gradient':
-                return { background: `linear-gradient(135deg, ${bg}, ${CSS_VARS.secondary})` }
+                return { background: `linear-gradient(135deg, ${bg}, ${backgroundColor2 || CSS_VARS.secondary})` }
             case 'solid':
                 return { backgroundColor: bg }
             case 'minimal':
@@ -28,23 +44,24 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
         }
     })()
 
-    const textColor = variant === 'minimal' ? undefined : '#ffffff'
+    const resolvedTextColor = variant === 'minimal' ? (textColor ?? undefined) : (textColor || '#ffffff')
 
     return (
-        <section className="sticky top-0 z-50" role="banner">
+        <section className="sticky top-0 z-50" role="banner" data-no-text-edit>
             <div
-                className="py-3 px-6"
-                style={{ ...bgStyle, color: textColor }}
+                className="px-6"
+                style={{ ...bgStyle, color: resolvedTextColor, paddingTop, paddingBottom }}
             >
                 <div className={`${CONTAINER.default} mx-auto flex items-center justify-center gap-3`}>
-                    <Body size="small" className="font-medium text-center">
+                    <Body size="small" className="font-medium text-center" data-text-editable>
                         {message}
-                        {linkText && linkUrl && (
+                        {showLink !== false && linkText && linkText.trim() && linkUrl && !linkUrl.startsWith('javascript:') && (
                             <>
                                 {' '}
                                 <a
                                     href={linkUrl}
                                     className="underline underline-offset-2 font-semibold hover:opacity-80 transition-opacity"
+                                    {...getLinkAttrs(linkUrl, linkIsInternal)}
                                 >
                                     {linkText} &rarr;
                                 </a>

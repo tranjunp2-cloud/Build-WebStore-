@@ -96,7 +96,7 @@ describe('F19 Staff Management (StaffDirectoryClient & StaffDrawer)', () => {
             
             // Badges
             expect(screen.getByText('Owner')).toBeInTheDocument();
-            expect(screen.getByText('Full Access')).toBeInTheDocument();
+            expect(screen.getByText('Manager')).toBeInTheDocument();
             expect(screen.getByText('Custom Features')).toBeInTheDocument();
 
             // Statuses

@@ -84,9 +84,9 @@ function callComposerBuilder(
         case 'features':
             return composerBuildFeatures(biz, category)
         case 'testimonials':
-            return content ? composerBuildTestimonials(content) : null
+            return content ? composerBuildTestimonials(content, biz.name) : null
         case 'faq':
-            return content ? composerBuildFAQ(content) : null
+            return content ? composerBuildFAQ(content, biz.name) : null
         case 'about':
             return composerBuildAbout(biz)
         case 'cta':

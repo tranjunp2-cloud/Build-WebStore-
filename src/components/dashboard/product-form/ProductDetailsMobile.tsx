@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DetailedProduct } from '../ProductQuickViewModal';
 import { ArrowLeft, Package, Trash2, Edit2 } from 'lucide-react';
 import Image from 'next/image';
+import { ProductImageWithFallback } from '../ProductImageWithFallback';
 import { useI18n } from '@/i18n';
 
 interface ProductDetailsMobileProps {
@@ -75,34 +76,27 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                 {/* Visuals Section (Edge-to-Edge) */}
                 <div className="flex flex-col w-full relative mb-2">
                     <div className="relative w-full aspect-[4/5] max-h-[500px] bg-[#1D2026]">
-                        {displayImages.length > 0 ? (
-                            <Image 
-                                src={displayImages[activeIdx] || displayImages[0]} 
-                                alt={product.name || 'Product Image'}
-                                fill
-                                className="object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-2 opacity-50 border-y border-white/10">
-                                <Package className="w-12 h-12 text-white" />
-                                <span className="text-sm">{t.dashboard?.products?.mobile?.noImage || 'No Image'}</span>
-                            </div>
-                        )}
+                        <ProductImageWithFallback
+                            imgUrl={displayImages[activeIdx] ?? displayImages[0] ?? null}
+                            alt={product.name || 'Product Image'}
+                            size="lg"
+                            sizes="100vw"
+                        />
                     </div>
                     {/* Thumbnails Overlay */}
                     {displayImages.length > 1 && (
                         <div className="relative flex items-center gap-2 overflow-x-auto px-4 scrollbar-none z-10 -mt-10 pb-2">
                             {displayImages.map((imgUrl, idx) => (
-                                <button 
-                                    key={idx} 
+                                <button
+                                    key={idx}
                                     onClick={() => setActiveIdx(idx)}
                                     className={`w-16 h-16 shrink-0 rounded overflow-hidden relative transition-all shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] bg-[#10131A] ${
-                                        activeIdx === idx 
-                                            ? 'border-2 border-[#ADC7FF]' 
+                                        activeIdx === idx
+                                            ? 'border-2 border-[#ADC7FF]'
                                             : 'border-2 border-transparent'
                                     }`}
                                 >
-                                    <Image src={imgUrl} alt="Thumbnail" fill className="object-cover" />
+                                    <ProductImageWithFallback imgUrl={imgUrl} alt="Thumbnail" size="sm" sizes="64px" />
                                 </button>
                             ))}
                         </div>

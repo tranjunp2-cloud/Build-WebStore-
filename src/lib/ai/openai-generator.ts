@@ -37,6 +37,14 @@ import {
     type ContentLang,
 } from './content-rules'
 
+// Unique seed from user contact fields to reduce hash collision across users
+// with the same business name (GH-912). Degrades to name-only when optional
+// fields are absent (graceful — no crashes, just wider collision window).
+function computeGenSeed(info: BusinessInfoInput): number {
+    const parts = [info.businessName, info.email, info.phone].filter(Boolean)
+    return hashBusinessName(parts.join('|'))
+}
+
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
     if (!key) return null
@@ -161,7 +169,7 @@ export async function generateSiteWithAI(
         // from 3 curated recipes per category (story-first/menu-first/...).
         // Without this, GPT reverts to its prior and every site rhymes.
         const presetCategory = resolveComposerCategory(promptText)
-        const themeSeed = hashBusinessName(businessInfo.businessName)
+        const themeSeed = computeGenSeed(businessInfo)
         const { preset: themePreset, mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
         const layoutRecipe = pickRecipe(presetCategory, themeSeed)
         console.log(
@@ -1610,8 +1618,9 @@ export function sanitizeBlockData(
     // ═══════════════════════════════════════════════════════════════════════
     // FAQ
     // ═══════════════════════════════════════════════════════════════════════
-    if (s.blockType === 'faq' && Array.isArray(s.items)) {
-        s.items = s.items.map((item: unknown) => {
+    if (s.blockType === 'faq' && (Array.isArray(s.faqs) || Array.isArray(s.items))) {
+        const arr = (s.faqs ?? s.items) as Array<unknown>
+        s.faqs = arr.map((item: unknown) => {
             if (typeof item === 'string') {
                 return { question: item, answer: '...' }
             }
@@ -1621,6 +1630,7 @@ export function sanitizeBlockData(
                 answer: String(iObj.answer || iObj.description || iObj.a || 'Answer.'),
             }
         })
+        delete s.items
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -2012,7 +2022,7 @@ async function generateTemplateFirst(
     events.push({ event: 'step', data: { step: 'composing', label: 'Building from templates...', progress: 15 } })
 
     const presetCategory = resolveComposerCategory(promptText)
-    const themeSeed = hashBusinessName(businessInfo.businessName)
+    const themeSeed = computeGenSeed(businessInfo)
     const { preset: themePreset } = pickCategoryThemeWithMood(presetCategory, themeSeed)
     const resolvedLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
 

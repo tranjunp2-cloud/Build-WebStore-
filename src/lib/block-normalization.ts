@@ -149,6 +149,17 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             b.email = null
         }
 
+        // service-cards: services[].title is required=true in Payload schema.
+        // Drafts bypass validation, so existing pages may have empty titles that
+        // fail on publish. Coerce to 'Service' fallback before payload.update().
+        if (b.blockType === 'service-cards' && Array.isArray(b.services)) {
+            b.services = (b.services as Record<string, unknown>[]).map((svc) => {
+                if (!svc || typeof svc !== 'object') return svc
+                if (!svc.title) return { ...svc, title: 'Service' }
+                return svc
+            })
+        }
+
         if (b.blockType === 'socialWidget') {
             b = normalizeSocialWidgetConfig(b) as Record<string, unknown>
         }
