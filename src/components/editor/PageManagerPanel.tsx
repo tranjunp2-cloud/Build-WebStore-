@@ -1,9 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, FileText, House, Loader2, Plus, Search, Settings2, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, Eye, EyeOff, FileText, House, Loader2, Plus, Settings2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useEditorStore } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
@@ -14,6 +15,7 @@ interface PageManagerPanelProps {
     siteId: string
     currentPageId: string | null
     siteStatus?: string
+    menuPageIds?: Set<string>
     onPageSelected: (pageId: string) => void
     onPageCreated?: (pageId: string) => void
     onPagesChanged?: () => void
@@ -36,16 +38,22 @@ function getPagePath(page: PageData) {
     return page.slug.startsWith('/') ? page.slug : `/${page.slug}`
 }
 
-function getStatusBadge(page: PageData, labels: { live: string; draft: string }, siteStatus?: string) {
-    // A page is only truly "Live" if BOTH the page is published AND the site is published.
-    // Pages generated with _status:'published' should show "Draft" if the site hasn't been published yet.
-    const isPageLive = page.status === 'published' && siteStatus === 'published'
+function getStatusBadge(
+    page: PageData,
+    labels: { live: string; draft: string; tooltipLive: string; tooltipDraft: string },
+    siteStatus?: string,
+    menuPageIds?: Set<string>,
+) {
+    // Live requires: page published + site published + page linked in menu (homepage always counts)
+    const inMenu = page.isHomepage || menuPageIds?.has(String(page.id)) || false
+    const isPageLive = page.status === 'published' && siteStatus === 'published' && inMenu
 
     if (isPageLive) {
         return {
             label: labels.live,
             className: 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]',
             dotClassName: 'bg-[#00c950]',
+            tooltip: labels.tooltipLive,
         }
     }
 
@@ -53,6 +61,7 @@ function getStatusBadge(page: PageData, labels: { live: string; draft: string },
         label: labels.draft,
         className: 'border border-[rgba(106,114,130,0.3)] bg-[rgba(106,114,130,0.2)] text-[#d1d5dc]',
         dotClassName: '',
+        tooltip: labels.tooltipDraft,
     }
 }
 
@@ -60,6 +69,7 @@ export function PageManagerPanel({
     siteId,
     currentPageId,
     siteStatus,
+    menuPageIds,
     onPageSelected,
     onPageCreated,
     onPagesChanged,
@@ -72,7 +82,6 @@ export function PageManagerPanel({
     const addPageToState = useEditorStore(state => state.addPageToState)
     const updatePageInState = useEditorStore(state => state.updatePageInState)
 
-    const [searchQuery, setSearchQuery] = useState('')
     const [isAdding, setIsAdding] = useState(false)
     const [newPageTitle, setNewPageTitle] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -81,25 +90,12 @@ export function PageManagerPanel({
     const [is404SectionOpen, setIs404SectionOpen] = useState(false)
 
     const { regularPages, page404 } = useMemo(() => {
-        const normalizedQuery = searchQuery.trim().toLowerCase()
         const visiblePages = pages.filter(page => !page.deletedAt)
-        const matchesQuery = (page: PageData) =>
-            !normalizedQuery ||
-            page.title.toLowerCase().includes(normalizedQuery) ||
-            page.slug.toLowerCase().includes(normalizedQuery)
-
         return {
-            regularPages: visiblePages.filter(
-                page => !SYSTEM_PAGE_SLUGS.has(page.slug) && matchesQuery(page),
-            ),
-            page404:
-                visiblePages.find(
-                    page =>
-                        (page.slug === '404' || page.slug === '/404') &&
-                        matchesQuery(page),
-                ) ?? null,
+            regularPages: visiblePages.filter(page => !SYSTEM_PAGE_SLUGS.has(page.slug)),
+            page404: visiblePages.find(page => page.slug === '404' || page.slug === '/404') ?? null,
         }
-    }, [pages, searchQuery])
+    }, [pages])
 
     const handleCreatePage = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -237,7 +233,8 @@ export function PageManagerPanel({
     const isEmptyState = regularPages.length === 0 && !page404
 
     return (
-        <div className="relative flex h-full flex-col">
+        <TooltipProvider delayDuration={150}>
+        <div data-coach="page-library" className="relative flex h-full flex-col">
             <div className="border-b border-white/10 px-4 py-4">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -292,16 +289,6 @@ export function PageManagerPanel({
                     </form>
                 )}
 
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                    <Input
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        placeholder={pm.searchPlaceholder}
-                        variant="editor"
-                        className="pl-9"
-                    />
-                </div>
             </div>
 
             <div className="min-h-0 flex-1 p-4">
@@ -320,7 +307,12 @@ export function PageManagerPanel({
                         {regularPages.map(page => {
                             const isCurrent = page.id === currentPageId
                             const isProtectedPage = Boolean(page.isHomepage) || SYSTEM_PAGE_SLUGS.has(page.slug)
-                            const statusBadge = getStatusBadge(page, { live: pm.statusLive, draft: pm.statusDraft }, siteStatus)
+                            const statusBadge = getStatusBadge(
+                                    page,
+                                    { live: pm.statusLive, draft: pm.statusDraft, tooltipLive: t.editor.pageManagerPanel.tooltipLive, tooltipDraft: t.editor.pageManagerPanel.tooltipDraft },
+                                    siteStatus,
+                                    menuPageIds,
+                                )
 
                             return (
                                 <div
@@ -358,12 +350,17 @@ export function PageManagerPanel({
                                                             {pm.editing}
                                                         </span>
                                                     ) : (
-                                                        <span className={cn('inline-flex items-center gap-1 rounded-[4px] px-2 py-[3px] text-[12px] font-semibold leading-4', statusBadge.className)}>
-                                                            {statusBadge.dotClassName ? (
-                                                                <span className={cn('h-1.5 w-1.5 rounded-full', statusBadge.dotClassName)} />
-                                                            ) : null}
-                                                            {statusBadge.label}
-                                                        </span>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <span className={cn('inline-flex cursor-default items-center gap-1 rounded-[4px] px-2 py-[3px] text-[12px] font-semibold leading-4', statusBadge.className)}>
+                                                                    {statusBadge.dotClassName ? (
+                                                                        <span className={cn('h-1.5 w-1.5 rounded-full', statusBadge.dotClassName)} />
+                                                                    ) : null}
+                                                                    {statusBadge.label}
+                                                                </span>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="top">{statusBadge.tooltip}</TooltipContent>
+                                                        </Tooltip>
                                                     )}
                                                 </div>
                                                 <div className="mt-1 flex items-center gap-2 text-xs leading-4 text-[#94A3B8]">
@@ -537,5 +534,6 @@ export function PageManagerPanel({
                 </div>
             ) : null}
         </div>
+        </TooltipProvider>
     )
 }

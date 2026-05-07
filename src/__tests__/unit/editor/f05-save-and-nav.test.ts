@@ -408,9 +408,12 @@ type PageData = {
 /**
  * Local mirror of PageManagerPanel's getStatusBadge() for unit isolation.
  * Must stay in sync with src/components/editor/PageManagerPanel.tsx.
+ * Updated for GH-864: Live requires page published + site published + page in menu.
  */
-function getStatusBadge(page: PageData) {
-    if (page.status === 'published') {
+function getStatusBadge(page: PageData, siteStatus?: string, menuPageIds?: Set<string>) {
+    const inMenu = page.isHomepage || menuPageIds?.has(String(page.id)) || false
+    const isPageLive = page.status === 'published' && siteStatus === 'published' && inMenu
+    if (isPageLive) {
         return {
             label: 'Live',
             className: 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]',
@@ -450,7 +453,7 @@ describe('PageManagerPanel — badge rendering logic', () => {
 
         // Act
         const isEditing = shouldShowEditingBadge(page, currentPageId)
-        const statusBadge = getStatusBadge(page)
+        const statusBadge = getStatusBadge(page, 'published', new Set(['page-1']))
 
         // Assert — when editing, the Editing badge replaces the status badge
         expect(isEditing).toBe(true)
@@ -469,7 +472,7 @@ describe('PageManagerPanel — badge rendering logic', () => {
 
         // Act
         const isEditing = shouldShowEditingBadge(publishedPage, currentPageId)
-        const statusBadge = getStatusBadge(publishedPage)
+        const statusBadge = getStatusBadge(publishedPage, 'published', new Set(['page-2']))
 
         // Assert
         expect(isEditing).toBe(false)
@@ -485,7 +488,7 @@ describe('PageManagerPanel — badge rendering logic', () => {
 
         // Act
         const isEditing = shouldShowEditingBadge(draftPage, currentPageId)
-        const statusBadge = getStatusBadge(draftPage)
+        const statusBadge = getStatusBadge(draftPage, 'published', new Set(['page-3']))
 
         // Assert
         expect(isEditing).toBe(false)
@@ -532,6 +535,44 @@ describe('PageManagerPanel — badge rendering logic', () => {
 
         // Assert
         expect(anyShowingEditButton).toBe(false)
+    })
+
+    // TC-F05-02-15: menu-link condition (GH-864)
+    it('TC-F05-02-15: published page NOT in menu shows "Draft"', () => {
+        // Arrange
+        const page: PageData = { ...basePage, id: 'page-5', status: 'published' }
+        // Act — empty menuPageIds means no page is linked
+        const badge = getStatusBadge(page, 'published', new Set())
+        // Assert
+        expect(badge.label).toBe('Draft')
+    })
+
+    it('TC-F05-02-15b: published page in menu + site published shows "Live"', () => {
+        // Arrange
+        const page: PageData = { ...basePage, id: 'page-6', status: 'published' }
+        // Act
+        const badge = getStatusBadge(page, 'published', new Set(['page-6']))
+        // Assert
+        expect(badge.label).toBe('Live')
+        expect(badge.dotClassName).toBe('bg-[#00c950]')
+    })
+
+    it('TC-F05-02-15c: homepage always Live when published + site published', () => {
+        // Arrange — homepage is always treated as in-menu
+        const homepage: PageData = { ...basePage, id: 'hp', status: 'published', isHomepage: true }
+        // Act — no menuPageIds needed for homepage
+        const badge = getStatusBadge(homepage, 'published', new Set())
+        // Assert
+        expect(badge.label).toBe('Live')
+    })
+
+    it('TC-F05-02-15d: page in menu but site draft shows "Draft"', () => {
+        // Arrange
+        const page: PageData = { ...basePage, id: 'page-7', status: 'published' }
+        // Act
+        const badge = getStatusBadge(page, 'draft', new Set(['page-7']))
+        // Assert
+        expect(badge.label).toBe('Draft')
     })
 })
 
