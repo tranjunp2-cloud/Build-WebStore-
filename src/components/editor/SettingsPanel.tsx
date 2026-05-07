@@ -40,10 +40,11 @@ function containsHtml(value: string): boolean {
     return /<[^>]*>/i.test(value)
 }
 
-/** Validate URL format — allow http/https and relative paths (/ or #) */
+/** Validate URL format — allow http/https and relative paths (/ or #), reject protocol-relative (//host) */
 function isValidUrl(value: string): boolean {
     if (!value) return true
-    if (value.startsWith('/') || value.startsWith('#')) return true
+    if (value.startsWith('#')) return true
+    if (value.startsWith('/') && !value.startsWith('//')) return true
     try {
         const url = new URL(value)
         return url.protocol === 'http:' || url.protocol === 'https:'
@@ -1511,7 +1512,11 @@ function SettingsPanelInner({
                                                         <div>
                                                             <label className={labelCls}>Link Text:</label>
                                                             <Input defaultValue={(block.linkText as string) || ''} key={`lt-${bk}`}
-                                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'linkText', e.target.value)}
+                                                                onBlur={(e: FieldBlurEvent) => {
+                                                                    const val = e.target.value
+                                                                    if (containsHtml(val)) { e.target.value = (block.linkText as string) || ''; return }
+                                                                    onBlockFieldChange(currentBlockIndex, 'linkText', val)
+                                                                }}
                                                                 variant="editor" className={editorInputClassName} placeholder="Shop Now →" />
                                                         </div>
                                                         <div>
