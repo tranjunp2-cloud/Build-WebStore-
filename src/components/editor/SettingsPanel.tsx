@@ -1511,29 +1511,54 @@ function SettingsPanelInner({
                                     </div>
 
                                     {/* Colors */}
-                                    <div className="mt-3 space-y-2">
-                                        <label className={labelCls}>Background Color {block.variant === 'gradient' ? '1' : ''}</label>
-                                        <input type="color"
-                                            defaultValue={(block.backgroundColor as string)?.startsWith('#') ? (block.backgroundColor as string) : '#0ea5e9'}
-                                            key={`bgc1-${bk}`}
-                                            onBlur={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value)}
-                                            className="mt-1 h-8 w-full cursor-pointer rounded border border-white/10" />
+                                    <div className="mt-3 space-y-3">
+                                        <div>
+                                            <label className={labelCls}>Background Color {block.variant === 'gradient' ? '1 (Start)' : ''}</label>
+                                            <div className="mt-1.5 flex gap-2">
+                                                <Input key={`bgc1-text-${bk}`}
+                                                    defaultValue={(block.backgroundColor as string) || '#0ea5e9'}
+                                                    placeholder="#0ea5e9"
+                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value.trim())}
+                                                    variant="editor" className="h-8 text-[12px]" />
+                                                <input type="color" key={`bgc1-${bk}`}
+                                                    value={(block.backgroundColor as string) || '#0ea5e9'}
+                                                    onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value)}
+                                                    aria-label="Pick background color"
+                                                    className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                            </div>
+                                        </div>
                                         {block.variant === 'gradient' && (
-                                            <>
-                                                <label className={labelCls}>Background Color 2 (gradient end)</label>
-                                                <input type="color"
-                                                    defaultValue={(block.backgroundColor2 as string)?.startsWith('#') ? (block.backgroundColor2 as string) : '#d946ef'}
-                                                    key={`bgc2-${bk}`}
-                                                    onBlur={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value)}
-                                                    className="mt-1 h-8 w-full cursor-pointer rounded border border-white/10" />
-                                            </>
+                                            <div>
+                                                <label className={labelCls}>Background Color 2 (End)</label>
+                                                <div className="mt-1.5 flex gap-2">
+                                                    <Input key={`bgc2-text-${bk}`}
+                                                        defaultValue={(block.backgroundColor2 as string) || '#d946ef'}
+                                                        placeholder="#d946ef"
+                                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value.trim())}
+                                                        variant="editor" className="h-8 text-[12px]" />
+                                                    <input type="color" key={`bgc2-${bk}`}
+                                                        value={(block.backgroundColor2 as string) || '#d946ef'}
+                                                        onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value)}
+                                                        aria-label="Pick gradient end color"
+                                                        className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                                </div>
+                                            </div>
                                         )}
-                                        <label className={labelCls}>Text Color</label>
-                                        <input type="color"
-                                            defaultValue={(block.textColor as string)?.startsWith('#') ? (block.textColor as string) : '#ffffff'}
-                                            key={`tc-${bk}`}
-                                            onBlur={(e) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value)}
-                                            className="mt-1 h-8 w-full cursor-pointer rounded border border-white/10" />
+                                        <div>
+                                            <label className={labelCls}>Text Color</label>
+                                            <div className="mt-1.5 flex gap-2">
+                                                <Input key={`tc-text-${bk}`}
+                                                    defaultValue={(block.textColor as string) || '#ffffff'}
+                                                    placeholder="#ffffff"
+                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value.trim())}
+                                                    variant="editor" className="h-8 text-[12px]" />
+                                                <input type="color" key={`tc-${bk}`}
+                                                    value={(block.textColor as string) || '#ffffff'}
+                                                    onChange={(e) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value)}
+                                                    aria-label="Pick text color"
+                                                    className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Vertical Padding */}
