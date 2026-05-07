@@ -73,9 +73,9 @@ export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
         minBlocks: 10,
         mandatoryBlocks: ['navigation', 'hero', 'features', 'pricing', 'testimonials', 'faq', 'cta', 'footer'],
         dnaMandatoryGroups: [['pricing', 'pricing-table'], ['features']],
-        signatureBlocks: ['pricing', 'features', 'feature-comparison', 'video-showcase'],
+        signatureBlocks: ['pricing', 'features', 'feature-comparison', /* 'video-showcase' */], // temporarily hidden (aiVisible: false, archived)
         recommendedBlocks: ['about', 'stats', 'team', 'logo-cloud'],
-        industryBlocks: ['feature-comparison', 'pricing-table', 'video-showcase'],
+        industryBlocks: ['feature-comparison', 'pricing-table', /* 'video-showcase' */], // temporarily hidden
         ctaIsMandatory: true,
     },
     health: {
@@ -93,7 +93,7 @@ export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
         dnaMandatoryGroups: [['class-schedule', 'features', 'service-cards'], ['faq']],
         signatureBlocks: ['class-schedule', 'pricing'],
         recommendedBlocks: ['about', 'team', 'stats', 'pricing', 'gallery'],
-        industryBlocks: ['class-schedule', 'video-showcase', 'review-cards'],
+        industryBlocks: ['class-schedule', /* 'video-showcase', */ 'review-cards'], // temporarily hidden
         ctaIsMandatory: true,
     },
     realestate: {
@@ -118,9 +118,9 @@ export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
         minBlocks: 10,
         mandatoryBlocks: ['navigation', 'hero', 'gallery', 'about', 'testimonials', 'contact', 'footer'],
         dnaMandatoryGroups: [['gallery', 'gallery-masonry', 'portfolio-grid'], ['testimonials']],
-        signatureBlocks: ['portfolio-grid', 'gallery-masonry', 'video-showcase'],
+        signatureBlocks: ['portfolio-grid', 'gallery-masonry', /* 'video-showcase' */], // temporarily hidden (aiVisible: false, archived)
         recommendedBlocks: ['stats', 'features', 'cta', 'team'],
-        industryBlocks: ['portfolio-grid', 'video-showcase', 'review-cards'],
+        industryBlocks: ['portfolio-grid', /* 'video-showcase', */ 'review-cards'], // temporarily hidden
         ctaIsMandatory: false,
     },
     business: {
@@ -156,7 +156,7 @@ export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
         dnaMandatoryGroups: [['gallery', 'gallery-masonry'], ['features', 'service-cards']],
         signatureBlocks: ['gallery', 'features'],
         recommendedBlocks: ['about', 'stats', 'faq', 'team'],
-        industryBlocks: ['booking-widget', 'review-cards', 'video-showcase'],
+        industryBlocks: ['booking-widget', 'review-cards', /* 'video-showcase' */], // temporarily hidden
         ctaIsMandatory: true,
     },
 }

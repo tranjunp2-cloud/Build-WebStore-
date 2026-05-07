@@ -101,7 +101,7 @@ async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
     const inferredSectionType = inferAddSectionType(instruction)
     const defaultAfterIndex = Math.max(-1, (allBlocks?.length || 0) - 1)
 
-    const blockMetas = blockRegistry.getAllMeta()
+    const blockMetas = blockRegistry.getAllMeta().filter(m => m.aiVisible !== false)
     const availableTypes = blockMetas.map(m => `${m.type} (${m.name}): variants=[${m.variants.join(',')}]`).join('\n')
 
     // Build a concise block summary so AI knows the page structure and current content

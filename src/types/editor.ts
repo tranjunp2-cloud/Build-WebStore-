@@ -15,7 +15,7 @@ export type AIAction = {
     updates?: { blockIndex: number; changes: Record<string, unknown> }[]
 }
 
-export type CtaButton = { label?: string; url?: string; variant?: string }
+export type CtaButton = { label?: string; url?: string; style?: 'primary' | 'secondary' | 'outline' | 'ghost' }
 export type NavLink = { label?: string; url?: string }
 export type FeatureItem = { title?: string; description?: string; icon?: string }
 export type TestimonialItem = { name?: string; title?: string; quote?: string; rating?: number }

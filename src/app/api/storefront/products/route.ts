@@ -22,11 +22,17 @@ export async function GET(req: Request) {
             return NextResponse.json({ docs: [], totalDocs: 0 })
         }
 
+        // Reject non-numeric site IDs to prevent Payload from throwing on integer-cast
+        const siteIdNum = parseInt(siteId, 10)
+        if (!Number.isInteger(siteIdNum) || siteIdNum <= 0 || String(siteIdNum) !== siteId) {
+            return NextResponse.json({ docs: [], totalDocs: 0 })
+        }
+
         const payload = await getPayload({ config })
 
         const where: Where = {
             and: [
-                { site: { equals: siteId } },
+                { site: { equals: siteIdNum } },
                 { status: { equals: 'active' } },
                 { deletedAt: { exists: false } },
             ],
