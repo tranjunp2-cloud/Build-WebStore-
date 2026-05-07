@@ -444,12 +444,12 @@ export function buildFeatures(biz: BusinessSample, category: string): Record<str
   }
 }
 
-export function buildTestimonials(content: CategoryContent): Record<string, unknown> {
+export function buildTestimonials(content: CategoryContent, bizName?: string): Record<string, unknown> {
   // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
   return {
     blockType: 'testimonials',
     variant: 'cards',
-    headline: 'What Our Customers Say',
+    headline: bizName ? `What Our Customers Say About ${bizName}` : 'What Our Customers Say',
     testimonials: content.testimonials.slice(0, 6).map((t) => ({
       quote: t.quote,
       name: t.name,
@@ -633,11 +633,11 @@ function buildGallery(biz: BusinessSample): Record<string, unknown> {
   }
 }
 
-export function buildFAQ(content: CategoryContent): Record<string, unknown> {
+export function buildFAQ(content: CategoryContent, bizName?: string): Record<string, unknown> {
   return {
     blockType: 'faq',
     variant: 'accordion',
-    headline: 'Frequently Asked Questions',
+    headline: bizName ? `${bizName} — FAQ` : 'Frequently Asked Questions',
     items: content.faqItems.map((f) => ({ question: f.question, answer: f.answer })),
   }
 }
@@ -1423,10 +1423,10 @@ function buildHomePage(
   // Testimonials
   const testimonialsVariant = getVariant('testimonials', 'cards')
   const finalTestimonialsVariant = enforceMinContent('testimonials', testimonialsVariant, content.testimonials.length)
-  middleBlocks.push({ ...buildTestimonials(content), variant: finalTestimonialsVariant })
+  middleBlocks.push({ ...buildTestimonials(content, biz.name), variant: finalTestimonialsVariant })
 
   if (variant === 'professional' || variant === 'premium') {
-    middleBlocks.push({ ...buildFAQ(content), variant: getVariant('faq', 'accordion') })
+    middleBlocks.push({ ...buildFAQ(content, biz.name), variant: getVariant('faq', 'accordion') })
     middleBlocks.push({ ...buildCTA(biz), variant: getVariant('cta', 'banner') })
   }
 
@@ -1496,7 +1496,7 @@ function buildAboutPage(biz: BusinessSample, content: CategoryContent, category:
       buildAbout(biz),
       buildStats(category),
       buildTeam(category),
-      buildTestimonials(content),
+      buildTestimonials(content, biz.name),
       buildCTA(biz, category),
       buildFooter(biz, pages),
     ],
@@ -1546,7 +1546,7 @@ function buildServicesPage(biz: BusinessSample, content: CategoryContent, catego
   }
 
   blocks.push(buildPricing(category))
-  blocks.push(buildFAQ(content))
+  blocks.push(buildFAQ(content, biz.name))
   blocks.push(buildCTA(biz))
   blocks.push(buildFooter(biz, pages))
 
@@ -1756,7 +1756,7 @@ function buildBlockFromSpec(
       return { ...fb, ...(finalVariant ? { variant: finalVariant } : {}) }
     }
     case 'testimonials':
-      return { ...buildTestimonials(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
+      return { ...buildTestimonials(content, biz.name), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
     case 'contact':
       return { ...buildContact(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'footer':
@@ -1766,7 +1766,7 @@ function buildBlockFromSpec(
     case 'gallery':
       return { ...buildGallery(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'faq':
-      return { ...buildFAQ(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildFAQ(content, biz.name), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'cta':
       return { ...buildCTA(biz, category, mood), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'about':

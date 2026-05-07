@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ProductsSkeleton } from '@/components/dashboard/ProductsSkeleton'
 import { ProductImageFallback } from '@/components/dashboard/ProductImageFallback'
+import { ProductImageWithFallback } from '@/components/dashboard/ProductImageWithFallback'
 import { ProductsEmptyState } from '@/components/dashboard/ProductsEmptyState'
 import { BulkCreateModal } from '@/components/dashboard/BulkCreateModal'
 import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/ProductQuickViewModal'
@@ -724,11 +725,7 @@ export default function ProductsPage() {
                                         <div key={product.id} onClick={() => setQuickViewProduct(product as DetailedProduct)} className="group grid grid-cols-[80px_minmax(250px,2fr)_minmax(120px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_120px_100px] gap-4 px-6 py-4 items-center hover:bg-white/[0.02] cursor-pointer transition-colors">
                                             {/* IMG */}
                                             <div className="h-[48px] w-[48px] rounded-[12px] bg-[#0B1120] border border-white/[0.08] relative shrink-0 overflow-hidden">
-                                                {imgUrl ? (
-                                                    <Image src={imgUrl} alt={product.name} fill className="object-cover" sizes="48px" />
-                                                ) : (
-                                                    <ProductImageFallback size="sm" />
-                                                )}
+                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="sm" sizes="48px" />
                                             </div>
                                             
                                             {/* Name & Variants */}
@@ -846,11 +843,7 @@ export default function ProductsPage() {
                                         <div className="flex items-start gap-[12px]">
                                             {/* Thumbnail 64×64 */}
                                             <div className="relative h-[64px] w-[64px] shrink-0 rounded-[12px] bg-[#0B1120] border border-white/[0.08] overflow-hidden">
-                                                {imgUrl ? (
-                                                    <Image src={imgUrl} alt={product.name} fill className="object-cover" sizes="64px" />
-                                                ) : (
-                                                    <ProductImageFallback size="md" />
-                                                )}
+                                                <ProductImageWithFallback imgUrl={imgUrl} alt={product.name} size="md" sizes="64px" />
                                             </div>
 
                                             {/* Text Information Block */}
