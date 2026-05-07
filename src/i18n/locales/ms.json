@@ -2293,6 +2293,15 @@
       "statusLive": "Aktif",
       "statusDraft": "Draf"
     },
+    "coachMarks": {
+      "step1Title": "Langkah 1: Cipta halaman di sini",
+      "step1Body": "Gunakan Page Library untuk mencipta dan mengurus halaman dalaman laman web anda.",
+      "step2Title": "Langkah 2: Urus paparan menu di sini",
+      "step2Body": "Selepas mencipta halaman, tambahkan ke Menu Settings untuk memaparkannya di laman web.",
+      "skip": "Langkau",
+      "next": "Seterusnya",
+      "finish": "Selesai"
+    },
     "aiChat": {
       "welcomeMessage": "Hai! Apa yang anda ingin ubah?",
       "drafting": "AI sedang merangka...",
@@ -2607,9 +2616,6 @@
       "label": "Label",
       "url": "URL",
       "addButton": "+ Tambah Butang",
-      "noButtons": "Tiada butang lagi",
-      "secondaryButton": "Butang Kedua",
-      "removeButton": "Buang",
       "features": "Ciri-ciri",
       "title": "Tajuk",
       "icon": "Ikon (emoji)",
@@ -2628,11 +2634,6 @@
       "stepConfiguration": "Konfigurasi Langkah",
       "numberOfSteps": "Bilangan langkah",
       "stepsMinMax": "(Min: 3 - Maks: 10)",
-      "faqConfiguration": "Konfigurasi FAQ",
-      "numberOfFaqs": "Bilangan FAQ",
-      "faqsMinMax": "(Min: 3 - Maks: 10)",
-      "questionPlaceholder": "Soalan",
-      "answerPlaceholder": "Jawapan",
       "socialWidget": "Widget Sosial",
       "stayConnected": "Kekal berhubung",
       "displayStyle": "Gaya Paparan",
@@ -2686,7 +2687,15 @@
       "breadcrumbSeparator": "Pemisah",
       "breadcrumbShowOnAllPages": "Tunjuk di Semua Halaman",
       "breadcrumbShowOnAllPagesDesc": "Papar roti di setiap halaman",
-      "breadcrumbPreview": "Pratonton"
+      "breadcrumbPreview": "Pratonton",
+      "noButtons": "Tiada butang lagi",
+      "secondaryButton": "Butang Kedua",
+      "removeButton": "Buang",
+      "faqConfiguration": "Konfigurasi FAQ",
+      "numberOfFaqs": "Bilangan FAQ",
+      "faqsMinMax": "(Min: 3 - Maks: 10)",
+      "questionPlaceholder": "Soalan",
+      "answerPlaceholder": "Jawapan"
     },
     "statusBar": {
       "connected": "Disambungkan",
@@ -2783,12 +2792,14 @@
       "aiContextLocked": "Konteks penjanaan AI dikunci ke: {blockType}"
     },
     "pageManagerPanel": {
-      "title": "Pengurus Halaman",
-      "description": "Cipta, pilih, sembunyikan dan padam halaman untuk laman ini.",
+      "title": "Perpustakaan Halaman",
+      "description": "Halaman di sini digunakan untuk pengeditan dalaman. Untuk memaparkan di laman web, tambahkan ia ke Menu Settings di sebelah kanan.",
       "createError": "Ralat mencipta halaman",
       "slugConflict": "Slug halaman sudah wujud dalam laman ini",
       "noPagesFound": "Tiada halaman dijumpai",
-      "noPagesSuggestion": "Cipta halaman baru atau cuba kata kunci carian lain."
+      "noPagesSuggestion": "Cipta halaman pertama anda untuk bermula.",
+      "tooltipLive": "Halaman telah ditambah ke Menu dan telah diterbitkan.",
+      "tooltipDraft": "Halaman baru dibuat, belum ditambah ke menu atau telah dibuang dari menu."
     },
     "navigationValidation": {
       "labelRequired": "Label pautan diperlukan",
@@ -2802,9 +2813,9 @@
     },
     "settingsValidation": {
       "invalidPhone": "Sila masukkan nombor telefon yang sah (digit, +, -, ruang)",
-      "phoneRequired": "Nombor telefon diperlukan",
       "primaryColorLabel": "Pemilih warna utama",
-      "seoConfirmReplace": "Meta sedia ada akan diganti:\n\nTajuk: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nPenerangan: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nGunakan perubahan?"
+      "seoConfirmReplace": "Meta sedia ada akan diganti:\n\nTajuk: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nPenerangan: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nGunakan perubahan?",
+      "phoneRequired": "Nombor telefon diperlukan"
     },
     "menuDrawer": {
       "defaultUserName": "Pengguna"

@@ -2293,6 +2293,15 @@
       "statusLive": "Live",
       "statusDraft": "Draft"
     },
+    "coachMarks": {
+      "step1Title": "Step 1: Create pages here",
+      "step1Body": "Use Page Library to create and manage your website's internal pages.",
+      "step2Title": "Step 2: Control menu visibility here",
+      "step2Body": "After creating a page, add it to Menu Settings so it appears on your website.",
+      "skip": "Skip",
+      "next": "Next",
+      "finish": "Done"
+    },
     "aiChat": {
       "welcomeMessage": "Hello! What would you like to edit?",
       "drafting": "AI is drafting...",
@@ -2607,9 +2616,6 @@
       "label": "Label",
       "url": "URL",
       "addButton": "+ Add Button",
-      "noButtons": "No buttons yet",
-      "secondaryButton": "Secondary Button",
-      "removeButton": "Remove",
       "features": "Features",
       "title": "Title",
       "icon": "Icon (emoji)",
@@ -2628,11 +2634,6 @@
       "stepConfiguration": "Step Configuration",
       "numberOfSteps": "Number of steps",
       "stepsMinMax": "(Min: 3 - Max: 10)",
-      "faqConfiguration": "FAQ Configuration",
-      "numberOfFaqs": "Number of FAQs",
-      "faqsMinMax": "(Min: 3 - Max: 10)",
-      "questionPlaceholder": "Question",
-      "answerPlaceholder": "Answer",
       "socialWidget": "Social Widget",
       "stayConnected": "Stay connected",
       "displayStyle": "Display Style",
@@ -2686,7 +2687,15 @@
       "breadcrumbSeparator": "Separator",
       "breadcrumbShowOnAllPages": "Show on All Pages",
       "breadcrumbShowOnAllPagesDesc": "Display breadcrumb on every page",
-      "breadcrumbPreview": "Preview"
+      "breadcrumbPreview": "Preview",
+      "noButtons": "No buttons yet",
+      "secondaryButton": "Secondary Button",
+      "removeButton": "Remove",
+      "faqConfiguration": "FAQ Configuration",
+      "numberOfFaqs": "Number of FAQs",
+      "faqsMinMax": "(Min: 3 - Max: 10)",
+      "questionPlaceholder": "Question",
+      "answerPlaceholder": "Answer"
     },
     "statusBar": {
       "connected": "Connected",
@@ -2783,12 +2792,14 @@
       "aiContextLocked": "AI Generation context locked to: {blockType}"
     },
     "pageManagerPanel": {
-      "title": "Page Manager",
-      "description": "Create, select, hide, and soft-delete pages for this site.",
+      "title": "Page Library",
+      "description": "Pages here are for internal editing. To publish them on your website, add them to Menu Settings on the right.",
       "createError": "Error creating page",
       "slugConflict": "Page slug already exists in this site",
       "noPagesFound": "No pages found",
-      "noPagesSuggestion": "Create a new page or try a different search keyword."
+      "noPagesSuggestion": "Create your first page to get started.",
+      "tooltipLive": "This page is published and linked in the menu — it's live on your website.",
+      "tooltipDraft": "This page is not linked in the menu or not published — it won't appear on your website."
     },
     "navigationValidation": {
       "labelRequired": "Link label is required",
@@ -2802,9 +2813,9 @@
     },
     "settingsValidation": {
       "invalidPhone": "Please enter a valid phone number (digits, +, -, spaces)",
-      "phoneRequired": "Phone number is required",
       "primaryColorLabel": "Primary color picker",
-      "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?"
+      "seoConfirmReplace": "Existing meta will be replaced:\n\nTitle: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nDescription: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nApply changes?",
+      "phoneRequired": "Phone number is required"
     },
     "menuDrawer": {
       "defaultUserName": "User"

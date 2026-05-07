@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
+import { collectMenuPageIds } from '@/lib/menu-page-links'
+import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
 import { EditorMenuDrawer } from '@/components/editor/EditorMenuDrawer'
@@ -159,6 +161,11 @@ export default function EditorPage() {
     const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
     const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
+
+    const menuPageIds = useMemo(() => {
+        const rawLinks = ((headerBlock as Record<string, unknown> | null)?.links as Array<Record<string, unknown>>) ?? []
+        return collectMenuPageIds(rawLinks, pages)
+    }, [headerBlock, pages])
 
     const currentBlock = useMemo(
         () => (selectedBlock !== null ? blocks[selectedBlock] || null : null),
@@ -1162,6 +1169,7 @@ export default function EditorPage() {
                     siteId={siteId}
                     currentPageId={currentPageId}
                     siteStatus={site?.status}
+                    menuPageIds={menuPageIds}
                     onPageSelected={handlePageSelected}
                     onPagesChanged={() => setIframeKey(key => key + 1)}
                     onEditPage={() => setActiveSidebarTab('chat')}
@@ -1425,6 +1433,13 @@ export default function EditorPage() {
                 onUnpublish={handlePublish}
                 isPublishing={isPublishing}
             />
+
+            {!isCompactLayout && (
+                <EditorCoachMarks
+                    onEnterStep1={() => setActiveSidebarTab('pages')}
+                    onEnterStep2={() => setSettingsRequestedTab({ tab: 'menu', key: Date.now() })}
+                />
+            )}
 
             <EditorTemplateModal
                 isOpen={isTemplateModalOpen}
