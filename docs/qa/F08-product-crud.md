@@ -223,3 +223,43 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 > **Khuyến Nghị Release:** P0 Blockers phải đạt **100% pass**. Tổng pass rate yêu cầu **≥ 98%** trước khi triển khai Beta lên server Public Live.
 
+---
+
+## 6. Blog Auto-Seed AI Helpers (GH-871++) — TC-F08-BG
+
+> Unit tests: `src/__tests__/unit/lib/ai/generate-blog-seeds.test.ts`
+
+### isQuotaExhausted
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-BG.01** | Non-Error value (string/number/null) | returns false | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.02** | Plain Error without status field | returns false | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.03** | status=429, no code field | returns false | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.04** | status=429, code=rate_limit_exceeded | returns false | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.05** | status=429, code=insufficient_quota | returns **true** | `generate-blog-seeds.test.ts` |
+
+### generateBlogSeedsAI
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-BG.06** | OPENAI_API_KEY unset | throws 'OPENAI_API_KEY not set' | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.07** | Happy path — valid AI response | returns 3 BlogSeedAI items with all fields | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.08** | AI returns title>70 / excerpt>160 | truncated to limits | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.09** | AI returns slug with spaces/special chars | slugified to kebab-case | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.10** | businessName >100 chars | max 100 chars injected into prompt | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.11** | industry >50 chars | max 50 chars injected into prompt | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.12** | AI returns empty posts array | throws 'AI returned empty or invalid posts array' | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.13** | AI returns non-JSON string | throws SyntaxError | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.18** | 10 products passed | only first 6 appear in prompt | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.19** | product string >60 chars | truncated to 60 chars in prompt | `generate-blog-seeds.test.ts` |
+
+### generateBlogPostContent
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-BG.14** | OPENAI_API_KEY unset | throws 'OPENAI_API_KEY not set' | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.15** | Happy path — valid AI response | returns HTML string | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.16** | AI response missing content field | throws 'No content in response' | `generate-blog-seeds.test.ts` |
+| **TC-F08-BG.17** | businessName>100 / industry>50 | truncated in user prompt | `generate-blog-seeds.test.ts` |
+

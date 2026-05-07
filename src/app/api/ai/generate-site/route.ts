@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 // Gateway Timeout (staging run 00:42:15 2026-04-14 `[Theme] Using category…`).
 // Vercel Pro / Fluid Compute allows up to 800s; 300s leaves comfortable headroom.
 export const maxDuration = 300
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
@@ -34,6 +34,7 @@ import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 
 
@@ -1108,6 +1109,25 @@ export async function POST(req: NextRequest) {
             }
         } catch (err) {
             console.warn('[generate-site] sample products skipped (non-fatal):', (err as Error).message)
+        }
+
+        // Seed 3 blog posts after response is sent (non-fatal, skips on regenerate).
+        // after() runs post-response on Vercel; falls back to fire-and-forget outside request scope (tests).
+        const _blogSeedTask = () =>
+            seedBlogPosts(
+                payload,
+                resolvedTenantId,
+                site.id as string | number,
+                resolveComposerCategory(businessInfo.industry),
+                businessInfo.businessName,
+                user.id,
+                parseProductsString(businessInfo.products),
+                businessInfo.industry,
+            ).catch(err => console.warn('[generate-site] blog seed failed (non-fatal):', (err as Error).message))
+        try {
+            after(_blogSeedTask)
+        } catch {
+            void _blogSeedTask()
         }
 
         const timeMs = Date.now() - startTime

@@ -4,9 +4,10 @@ export const Blogs: CollectionConfig = {
     slug: 'blogs',
     hooks: {
         afterChange: [
-            async ({ doc, previousDoc, operation, req }) => {
+            async ({ doc, previousDoc, req, context }) => {
                 const isPublishing = doc.status === 'published' && previousDoc?.status !== 'published'
                 if (!isPublishing) return doc
+                if (context?.skipPublishNotify) return doc
                 // Fire-and-forget: notify tenant owners of published blog
                 import('@/lib/notifications/notify-tenant-owners')
                     .then(({ notifyTenantOwners }) => {
