@@ -299,6 +299,10 @@ function SettingsPanelInner({
     const [isFooterBrandOpen, setIsFooterBrandOpen] = useState(false)
     const [isFooterSocialOpen, setIsFooterSocialOpen] = useState(false)
     const [isStepConfigOpen, setIsStepConfigOpen] = useState(false)
+    const [isAnnContentOpen, setIsAnnContentOpen] = useState(true)
+    const [isAnnCtaOpen, setIsAnnCtaOpen] = useState(true)
+    const [isAnnAppearanceOpen, setIsAnnAppearanceOpen] = useState(true)
+    const [annShowLink, setAnnShowLink] = useState(() => !!(block?.linkText || block?.linkUrl))
     const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false)
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
@@ -1454,124 +1458,167 @@ function SettingsPanelInner({
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">Announcement Bar</label>
 
-                                    {/* Message */}
-                                    <div className="mt-2">
-                                        <label className={labelCls}>Message</label>
-                                        <Textarea defaultValue={(block.message as string) || ''} rows={2} key={`msg-${bk}`}
-                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'message', e.target.value)}
-                                            variant="editor" className={editorTextareaClassName}
-                                            placeholder="Free shipping on orders over $50" />
-                                    </div>
-
-                                    {/* CTA Link Group */}
-                                    <div className="mt-3 space-y-2">
-                                        <label className={labelCls}>Link Text (leave empty to hide)</label>
-                                        <Input defaultValue={(block.linkText as string) || ''} key={`lt-${bk}`}
-                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'linkText', e.target.value)}
-                                            variant="editor" className={editorInputClassName} placeholder="Shop now" />
-
-                                        {/* External / Internal toggle */}
-                                        <div className="flex gap-2 text-[11px]">
-                                            <button type="button"
-                                                onClick={() => onBlockUpdate(currentBlockIndex, { linkIsInternal: false })}
-                                                className={cn('rounded px-2 py-1 transition-colors', !block.linkIsInternal ? 'bg-blue-500/15 text-blue-400' : 'bg-white/5 text-gray-500 hover:bg-white/10')}
-                                            >External URL</button>
-                                            <button type="button"
-                                                onClick={() => onBlockUpdate(currentBlockIndex, { linkIsInternal: true })}
-                                                className={cn('rounded px-2 py-1 transition-colors', block.linkIsInternal ? 'bg-blue-500/15 text-blue-400' : 'bg-white/5 text-gray-500 hover:bg-white/10')}
-                                            >Internal Page</button>
-                                        </div>
-
-                                        {block.linkIsInternal ? (
-                                            <select
-                                                value={(block.linkUrl as string) || ''}
-                                                onChange={(e) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
-                                                className="mt-1.5 w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white border border-white/10 focus:outline-none focus:border-blue-500/50"
-                                            >
-                                                <option value="">— select page —</option>
-                                                {pages?.map(p => (
-                                                    <option key={p.slug} value={`/${p.slug}`}>{p.title || p.slug}</option>
-                                                ))}
-                                            </select>
-                                        ) : (
-                                            <Input defaultValue={(block.linkUrl as string) || ''} key={`lu-${bk}`}
-                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
-                                                variant="editor" className={editorInputClassName} placeholder="https://example.com" />
+                                    {/* Content Configuration */}
+                                    <div className="mt-3 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
+                                        <button type="button" onClick={() => setIsAnnContentOpen(v => !v)}
+                                            className="flex w-full items-center justify-between h-11 px-3 hover:bg-white/[0.02] transition-colors">
+                                            <span className="text-sm font-medium text-slate-100">Content Configuration</span>
+                                            <ChevronDown className={cn('h-4 w-4 text-slate-500 transition-transform', isAnnContentOpen && 'rotate-180')} />
+                                        </button>
+                                        {isAnnContentOpen && (
+                                            <div className="px-3 pb-3">
+                                                <label className={labelCls}>Message:</label>
+                                                <Textarea defaultValue={(block.message as string) || ''} rows={3} key={`msg-${bk}`}
+                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'message', e.target.value)}
+                                                    variant="editor" className={editorTextareaClassName}
+                                                    placeholder="Free shipping on all orders this week!" />
+                                            </div>
                                         )}
                                     </div>
 
-                                    {/* Dismissible toggle */}
-                                    <div className="mt-3 flex items-center justify-between">
-                                        <span className={labelCls}>Dismissible</span>
-                                        <input type="checkbox"
-                                            checked={block.dismissible !== false}
-                                            onChange={(e) => onBlockUpdate(currentBlockIndex, { dismissible: e.target.checked })}
-                                            className="accent-blue-500"
-                                        />
+                                    {/* CTA Settings */}
+                                    <div className="mt-2 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
+                                        <button type="button" onClick={() => setIsAnnCtaOpen(v => !v)}
+                                            className="flex w-full items-center justify-between h-11 px-3 hover:bg-white/[0.02] transition-colors">
+                                            <span className="text-sm font-medium text-slate-100">CTA Settings</span>
+                                            <ChevronDown className={cn('h-4 w-4 text-slate-500 transition-transform', isAnnCtaOpen && 'rotate-180')} />
+                                        </button>
+                                        {isAnnCtaOpen && (
+                                            <div className="px-3 pb-3 space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className={labelCls}>Show Link/CTA:</span>
+                                                    <button type="button"
+                                                        onClick={() => {
+                                                            if (annShowLink) {
+                                                                setAnnShowLink(false)
+                                                                onBlockUpdate(currentBlockIndex, { linkText: '', linkUrl: '' })
+                                                            } else {
+                                                                setAnnShowLink(true)
+                                                            }
+                                                        }}
+                                                        className={cn('relative h-6 w-11 rounded-full transition-colors', annShowLink ? 'bg-blue-500' : 'bg-slate-700')}
+                                                    >
+                                                        <span className={cn('absolute top-1 h-4 w-4 rounded-full bg-white transition-all', annShowLink ? 'left-6' : 'left-1')} />
+                                                    </button>
+                                                </div>
+                                                {annShowLink && (
+                                                    <>
+                                                        <div>
+                                                            <label className={labelCls}>Link Text:</label>
+                                                            <Input defaultValue={(block.linkText as string) || ''} key={`lt-${bk}`}
+                                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'linkText', e.target.value)}
+                                                                variant="editor" className={editorInputClassName} placeholder="Shop Now →" />
+                                                        </div>
+                                                        <div>
+                                                            <label className={labelCls}>Action:</label>
+                                                            <select
+                                                                value={(block.linkIsInternal as boolean) ? 'internal' : 'external'}
+                                                                onChange={(e) => onBlockUpdate(currentBlockIndex, { linkIsInternal: e.target.value === 'internal' })}
+                                                                className="mt-1.5 w-full rounded-lg bg-[#0b1120] border border-[rgba(59,130,246,0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                                                            >
+                                                                <option value="external">Style: External</option>
+                                                                <option value="internal">Style: Internal Page</option>
+                                                            </select>
+                                                        </div>
+                                                        {block.linkIsInternal ? (
+                                                            <select
+                                                                value={(block.linkUrl as string) || ''}
+                                                                onChange={(e) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
+                                                                className="w-full rounded-lg bg-[#0b1120] border border-[rgba(59,130,246,0.1)] px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
+                                                            >
+                                                                <option value="">— select page —</option>
+                                                                {pages?.map(p => (
+                                                                    <option key={p.slug} value={`/${p.slug}`}>{p.title || p.slug}</option>
+                                                                ))}
+                                                            </select>
+                                                        ) : (
+                                                            <Input defaultValue={(block.linkUrl as string) || ''} key={`lu-${bk}`}
+                                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'linkUrl', e.target.value)}
+                                                                variant="editor" className="mt-1" placeholder="https://example.com" />
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Colors */}
-                                    <div className="mt-3 space-y-3">
-                                        <div>
-                                            <label className={labelCls}>Background Color {block.variant === 'gradient' ? '1 (Start)' : ''}</label>
-                                            <div className="mt-1.5 flex gap-2">
-                                                <Input key={`bgc1-text-${bk}`}
-                                                    defaultValue={(block.backgroundColor as string) || '#0ea5e9'}
-                                                    placeholder="#0ea5e9"
-                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value.trim())}
-                                                    variant="editor" className="h-8 text-[12px]" />
-                                                <input type="color" key={`bgc1-${bk}`}
-                                                    value={(block.backgroundColor as string) || '#0ea5e9'}
-                                                    onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value)}
-                                                    aria-label="Pick background color"
-                                                    className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
-                                            </div>
-                                        </div>
-                                        {block.variant === 'gradient' && (
-                                            <div>
-                                                <label className={labelCls}>Background Color 2 (End)</label>
-                                                <div className="mt-1.5 flex gap-2">
-                                                    <Input key={`bgc2-text-${bk}`}
-                                                        defaultValue={(block.backgroundColor2 as string) || '#d946ef'}
-                                                        placeholder="#d946ef"
-                                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value.trim())}
-                                                        variant="editor" className="h-8 text-[12px]" />
-                                                    <input type="color" key={`bgc2-${bk}`}
-                                                        value={(block.backgroundColor2 as string) || '#d946ef'}
-                                                        onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value)}
-                                                        aria-label="Pick gradient end color"
-                                                        className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                    {/* Appearance */}
+                                    <div className="mt-2 rounded-xl overflow-hidden border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.3)]">
+                                        <button type="button" onClick={() => setIsAnnAppearanceOpen(v => !v)}
+                                            className="flex w-full items-center justify-between h-11 px-3 hover:bg-white/[0.02] transition-colors">
+                                            <span className="text-sm font-medium text-slate-100">Appearance</span>
+                                            <ChevronDown className={cn('h-4 w-4 text-slate-500 transition-transform', isAnnAppearanceOpen && 'rotate-180')} />
+                                        </button>
+                                        {isAnnAppearanceOpen && (
+                                            <div className="px-3 pb-3 space-y-3">
+                                                <div>
+                                                    <label className={labelCls}>Bar Background Color {block.variant === 'gradient' ? '1 (Start):' : ':'}</label>
+                                                    <div className="mt-1.5 flex gap-2">
+                                                        <Input key={`bgc1-text-${bk}`}
+                                                            defaultValue={(block.backgroundColor as string) || '#0ea5e9'}
+                                                            placeholder="#0ea5e9"
+                                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value.trim())}
+                                                            variant="editor" className="h-8 text-[12px]" />
+                                                        <input type="color" key={`bgc1-${bk}`}
+                                                            value={(block.backgroundColor as string) || '#0ea5e9'}
+                                                            onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor', e.target.value)}
+                                                            aria-label="Pick background color"
+                                                            className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                                    </div>
+                                                </div>
+                                                {block.variant === 'gradient' && (
+                                                    <div>
+                                                        <label className={labelCls}>Bar Background Color 2 (End):</label>
+                                                        <div className="mt-1.5 flex gap-2">
+                                                            <Input key={`bgc2-text-${bk}`}
+                                                                defaultValue={(block.backgroundColor2 as string) || '#d946ef'}
+                                                                placeholder="#d946ef"
+                                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value.trim())}
+                                                                variant="editor" className="h-8 text-[12px]" />
+                                                            <input type="color" key={`bgc2-${bk}`}
+                                                                value={(block.backgroundColor2 as string) || '#d946ef'}
+                                                                onChange={(e) => onBlockFieldChange(currentBlockIndex, 'backgroundColor2', e.target.value)}
+                                                                aria-label="Pick gradient end color"
+                                                                className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <label className={labelCls}>Text Color:</label>
+                                                    <div className="mt-1.5 flex gap-2">
+                                                        <Input key={`tc-text-${bk}`}
+                                                            defaultValue={(block.textColor as string) || '#ffffff'}
+                                                            placeholder="#ffffff"
+                                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value.trim())}
+                                                            variant="editor" className="h-8 text-[12px]" />
+                                                        <input type="color" key={`tc-${bk}`}
+                                                            value={(block.textColor as string) || '#ffffff'}
+                                                            onChange={(e) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value)}
+                                                            aria-label="Pick text color"
+                                                            className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className={labelCls}>Vertical Padding</span>
+                                                        <span className="text-[10px] text-slate-500">{(block.paddingY as number) ?? 12}px</span>
+                                                    </div>
+                                                    <input type="range" min={4} max={32} step={2}
+                                                        defaultValue={(block.paddingY as number) ?? 12}
+                                                        key={`py-${bk}`}
+                                                        onPointerUp={(e) => onBlockUpdate(currentBlockIndex, { paddingY: Number((e.target as HTMLInputElement).value) })}
+                                                        className="mt-1 w-full accent-blue-500" />
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={labelCls}>Dismissible</span>
+                                                    <input type="checkbox"
+                                                        checked={block.dismissible !== false}
+                                                        onChange={(e) => onBlockUpdate(currentBlockIndex, { dismissible: e.target.checked })}
+                                                        className="accent-blue-500"
+                                                    />
                                                 </div>
                                             </div>
                                         )}
-                                        <div>
-                                            <label className={labelCls}>Text Color</label>
-                                            <div className="mt-1.5 flex gap-2">
-                                                <Input key={`tc-text-${bk}`}
-                                                    defaultValue={(block.textColor as string) || '#ffffff'}
-                                                    placeholder="#ffffff"
-                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value.trim())}
-                                                    variant="editor" className="h-8 text-[12px]" />
-                                                <input type="color" key={`tc-${bk}`}
-                                                    value={(block.textColor as string) || '#ffffff'}
-                                                    onChange={(e) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value)}
-                                                    aria-label="Pick text color"
-                                                    className="h-8 w-12 shrink-0 cursor-pointer rounded border border-blue-500/30 bg-transparent p-0.5" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Vertical Padding */}
-                                    <div className="mt-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className={labelCls}>Vertical Padding</span>
-                                            <span className="text-[10px] text-slate-500">{(block.paddingY as number) ?? 12}px</span>
-                                        </div>
-                                        <input type="range" min={4} max={32} step={2}
-                                            defaultValue={(block.paddingY as number) ?? 12}
-                                            key={`py-${bk}`}
-                                            onPointerUp={(e) => onBlockUpdate(currentBlockIndex, { paddingY: Number((e.target as HTMLInputElement).value) })}
-                                            className="mt-1 w-full accent-blue-500" />
                                     </div>
                                 </div>
                             )}
