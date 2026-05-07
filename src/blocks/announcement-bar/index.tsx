@@ -16,7 +16,7 @@ import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<AnnouncementBarConfig>) {
     void _theme
-    const { message, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor, paddingY = 12 } = block
+    const { message, showLink, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor, paddingY = 12 } = block
     const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
@@ -46,7 +46,7 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
                 <div className={`${CONTAINER.default} mx-auto flex items-center justify-center gap-3`}>
                     <Body size="small" className="font-medium text-center">
                         {message}
-                        {linkText && linkText.trim() && linkUrl && (
+                        {showLink !== false && linkText && linkText.trim() && linkUrl && (
                             <>
                                 {' '}
                                 <a

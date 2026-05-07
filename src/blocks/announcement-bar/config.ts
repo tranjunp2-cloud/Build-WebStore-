@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { BaseBlockSchema } from '../types'
 
-export type AnnouncementBarConfig = { blockType: 'announcement-bar'; variant?: 'gradient' | 'solid' | 'minimal'; message: string; linkText?: string; linkUrl?: string; linkIsInternal?: boolean; dismissible?: boolean; backgroundColor?: string; backgroundColor2?: string; textColor?: string; paddingY?: number }
+export type AnnouncementBarConfig = { blockType: 'announcement-bar'; variant?: 'gradient' | 'solid' | 'minimal'; message: string; showLink?: boolean; linkText?: string; linkUrl?: string; linkIsInternal?: boolean; dismissible?: boolean; backgroundColor?: string; backgroundColor2?: string; textColor?: string; paddingY?: number }
 export const AnnouncementBarConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('announcement-bar'), variant: z.enum(['gradient', 'solid', 'minimal']).default('gradient'),
-    message: z.string(), linkText: z.string().optional(), linkUrl: z.string().optional(),
+    message: z.string(), showLink: z.boolean().optional(), linkText: z.string().optional(), linkUrl: z.string().optional(),
     linkIsInternal: z.boolean().optional(),
     dismissible: z.boolean().default(true), backgroundColor: z.string().optional(),
     backgroundColor2: z.string().optional(),

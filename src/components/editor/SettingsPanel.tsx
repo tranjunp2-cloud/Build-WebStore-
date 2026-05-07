@@ -302,9 +302,10 @@ function SettingsPanelInner({
     const [isAnnContentOpen, setIsAnnContentOpen] = useState(true)
     const [isAnnCtaOpen, setIsAnnCtaOpen] = useState(true)
     const [isAnnAppearanceOpen, setIsAnnAppearanceOpen] = useState(true)
-    const [annShowLink, setAnnShowLink] = useState(() => !!(block?.linkText || block?.linkUrl))
+    const [annShowLink, setAnnShowLink] = useState(() => (block as Record<string, unknown>)?.showLink !== false && !!(block?.linkText || block?.linkUrl))
     useEffect(() => {
-        setAnnShowLink(!!(block?.linkText || block?.linkUrl))
+        const b = block as Record<string, unknown> | undefined
+        setAnnShowLink(b?.showLink === true || (b?.showLink === undefined && !!(b?.linkText || b?.linkUrl)))
     }, [blockIndex])
     const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false)
     const footerLogoRef = React.useRef<HTMLInputElement>(null)
@@ -1492,12 +1493,9 @@ function SettingsPanelInner({
                                                     <span className={labelCls}>Show Link/CTA:</span>
                                                     <button type="button"
                                                         onClick={() => {
-                                                            if (annShowLink) {
-                                                                setAnnShowLink(false)
-                                                                onBlockUpdate(currentBlockIndex, { linkText: '', linkUrl: '' })
-                                                            } else {
-                                                                setAnnShowLink(true)
-                                                            }
+                                                            const next = !annShowLink
+                                                            setAnnShowLink(next)
+                                                            onBlockUpdate(currentBlockIndex, { showLink: next })
                                                         }}
                                                         className={cn('relative h-6 w-11 rounded-full transition-colors', annShowLink ? 'bg-blue-500' : 'bg-slate-700')}
                                                     >

@@ -172,7 +172,8 @@ function renderGenericBlock(block: RenderBlock, t: TemplateTheme): string {
       bgStyle = 'background:' + bg1
     }
 
-    const linkPart = linkText && rawUrl
+    const showLink = (block.showLink as boolean | undefined) !== false
+    const linkPart = showLink && linkText && rawUrl
       ? ' <a href="' + linkUrl + '" style="color:inherit;text-decoration:underline;font-weight:600">' + linkText + ' &rarr;</a>'
       : ''
 
