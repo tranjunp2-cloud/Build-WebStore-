@@ -2,22 +2,13 @@
 
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
-import { getCurrentUser } from '@/lib/auth'
-
-type TenantEntry = { tenant: { id: string } | string; role?: string }
-type UserWithTenants = { id: string; tenants?: TenantEntry[] }
-
-function getTenantId(user: UserWithTenants): string | undefined {
-    const entry = user.tenants?.[0]
-    if (!entry?.tenant) return undefined
-    return typeof entry.tenant === 'object' ? entry.tenant?.id : entry.tenant
-}
+import { getCurrentUser, extractTenantId } from '@/lib/auth'
 
 export async function getProductsAction() {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
-    const tenantId = getTenantId(user as UserWithTenants)
+    const tenantId = extractTenantId(user)
     const payload = await getPayload({ config: configPromise })
     const res = await payload.find({
         collection: 'products',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, type ReactNode, type CSSProperties } from 'react'
+import { useState, useCallback, useRef, type ReactNode, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { PricingConfig } from './config'
@@ -571,17 +571,19 @@ function PricingToggle({ block, theme: _theme }: { block: BlockProps<PricingConf
                     role="switch"
                     aria-checked={isYearly}
                     onClick={() => setIsYearly(!isYearly)}
-                    className={`relative w-14 h-7 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${TOUCH_TARGET.min}`}
-                    style={{
-                        background: isYearly ? 'var(--brand-primary)' : 'rgba(var(--brand-primary-rgb), 0.2)',
-                    }}
+                    className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2`}
                 >
+                    <span
+                        className="relative w-14 h-7 rounded-full transition-colors duration-200 block"
+                        style={{ background: isYearly ? 'var(--brand-primary)' : 'rgba(var(--brand-primary-rgb), 0.2)' }}
+                    >
                         <motion.div
                             className="absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow"
                             animate={{ x: isYearly ? 28 : 0 }}
                             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                         />
-                    </button>
+                    </span>
+                </button>
                     <span className={`text-sm font-medium transition-opacity ${isYearly ? 'opacity-100' : 'opacity-50'}`}>
                         Yearly
                         {yearlyDiscount > 0 && (
@@ -708,12 +710,13 @@ function PricingMinimal({ block, theme: _theme }: { block: BlockProps<PricingCon
 function PricingSlider({ block, theme: _theme }: { block: BlockProps<PricingConfig>['block']; theme: BlockProps<PricingConfig>['theme'] }) {
     void _theme
     const { headline, subheadline, plans = [] } = block
-    const [currentIndex, setCurrentIndex] = useState(0)
+    const [slider, setSlider] = useState<{ index: number; direction: 1 | -1 }>({ index: 0, direction: 1 })
+    const { index: currentIndex, direction } = slider
+    const touchStartX = useRef<number | null>(null)
 
-    const goTo = useCallback((idx: number) => {
-        if (idx < 0) setCurrentIndex(plans.length - 1)
-        else if (idx >= plans.length) setCurrentIndex(0)
-        else setCurrentIndex(idx)
+    const goTo = useCallback((idx: number, dir: 1 | -1 = 1) => {
+        const newIndex = idx < 0 ? plans.length - 1 : idx >= plans.length ? 0 : idx
+        setSlider({ index: newIndex, direction: dir })
     }, [plans.length])
 
     if (plans.length === 0) return null
@@ -729,7 +732,7 @@ function PricingSlider({ block, theme: _theme }: { block: BlockProps<PricingConf
                     <>
                         <button
                             type="button"
-                            onClick={() => goTo(currentIndex - 1)}
+                            onClick={() => goTo(currentIndex - 1, -1)}
                             className={`absolute -left-4 md:-left-12 top-1/2 -translate-y-1/2 z-20 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full border transition-opacity duration-200 hover:opacity-80`}
                             style={{
                                 background: 'var(--surface)',
@@ -742,7 +745,7 @@ function PricingSlider({ block, theme: _theme }: { block: BlockProps<PricingConf
                         </button>
                         <button
                             type="button"
-                            onClick={() => goTo(currentIndex + 1)}
+                            onClick={() => goTo(currentIndex + 1, 1)}
                             className={`absolute -right-4 md:-right-12 top-1/2 -translate-y-1/2 z-20 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full border transition-opacity duration-200 hover:opacity-80`}
                             style={{
                                 background: 'var(--surface)',
@@ -759,11 +762,21 @@ function PricingSlider({ block, theme: _theme }: { block: BlockProps<PricingConf
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={currentIndex}
-                        initial={{ opacity: 0, x: 60 }}
+                        initial={{ opacity: 0, x: direction * 60 }}
                         animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -60 }}
+                        exit={{ opacity: 0, x: direction * -60 }}
                         transition={{ duration: 0.3 }}
                         className="p-10 rounded-2xl text-center"
+                        onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
+                        onTouchEnd={(e) => {
+                            if (touchStartX.current === null) return
+                            const delta = touchStartX.current - e.changedTouches[0].clientX
+                            if (Math.abs(delta) > 50) {
+                                const dir = delta > 0 ? 1 : -1
+                                goTo(currentIndex + dir, dir)
+                            }
+                            touchStartX.current = null
+                        }}
                         style={{
                             border: plan.highlighted
                                 ? '2px solid var(--brand-primary)'
@@ -799,7 +812,7 @@ function PricingSlider({ block, theme: _theme }: { block: BlockProps<PricingConf
                             <button
                                 key={i}
                                 type="button"
-                                onClick={() => setCurrentIndex(i)}
+                                onClick={() => { if (i !== currentIndex) goTo(i, i > currentIndex ? 1 : -1) }}
                                 className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full transition-all duration-200`}
                                 aria-label={`View plan ${i + 1}`}
                                 aria-current={i === currentIndex}

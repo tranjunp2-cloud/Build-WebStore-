@@ -6,6 +6,7 @@ import { Plus, X, Wand2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 import { useI18n } from '@/i18n'
+import { SkuMatrixMobile } from './SkuMatrixMobile'
 
 export function VariantsInventorySection() {
     const { register, watch, setValue, getValues, control, formState, trigger } = useFormContext<ProductFormValues>()
@@ -293,7 +294,7 @@ export function VariantsInventorySection() {
                                 <div className="px-4 py-3 border-b border-white/[0.08] bg-[#1E293B]/50">
                                     <h3 className="text-[14px] font-medium text-[#F8FAFC]">{t.dashboard.products.form.sections?.skuMatrix || 'SKU Matrix Table'}</h3>
                                 </div>
-                                <div className="overflow-x-auto">
+                                <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full text-left text-sm border-spacing-y-2 border-separate -mt-2">
                                         <thead className="text-[12px] uppercase text-[#F8FAFC]/60 font-medium whitespace-nowrap">
                                             <tr>
@@ -359,6 +360,9 @@ export function VariantsInventorySection() {
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+                                <div className="md:hidden">
+                                    <SkuMatrixMobile variants={variants} />
                                 </div>
                             </div>
                         )}
