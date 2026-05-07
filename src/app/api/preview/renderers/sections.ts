@@ -159,14 +159,15 @@ function renderGenericBlock(block: RenderBlock, t: TemplateTheme): string {
     const bg1 = (block.backgroundColor as string) || t.primary
     const bg2 = (block.backgroundColor2 as string) || t.secondary
     const paddingY = (block.paddingY as number) || 12
+    const customTextColor = (block.textColor as string) || ''
 
     let bgStyle: string
-    let color = '#fff'
+    let color = customTextColor || '#fff'
     if (variant === 'gradient') {
       bgStyle = 'background:linear-gradient(135deg,' + bg1 + ',' + bg2 + ')'
     } else if (variant === 'minimal') {
       bgStyle = 'background:transparent;border-bottom:1px solid ' + t.primary + '20'
-      color = t.text
+      color = customTextColor || t.text
     } else {
       bgStyle = 'background:' + bg1
     }

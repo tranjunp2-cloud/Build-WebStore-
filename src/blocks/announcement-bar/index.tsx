@@ -16,7 +16,7 @@ import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<AnnouncementBarConfig>) {
     void _theme
-    const { message, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, paddingY = 12 } = block
+    const { message, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor, paddingY = 12 } = block
     const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
@@ -35,13 +35,13 @@ export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<Announ
         }
     })()
 
-    const textColor = variant === 'minimal' ? undefined : '#ffffff'
+    const resolvedTextColor = variant === 'minimal' ? (textColor ?? undefined) : (textColor || '#ffffff')
 
     return (
         <section className="sticky top-0 z-50" role="banner">
             <div
                 className="px-6"
-                style={{ ...bgStyle, color: textColor, paddingTop: paddingY, paddingBottom: paddingY }}
+                style={{ ...bgStyle, color: resolvedTextColor, paddingTop: paddingY, paddingBottom: paddingY }}
             >
                 <div className={`${CONTAINER.default} mx-auto flex items-center justify-center gap-3`}>
                     <Body size="small" className="font-medium text-center">

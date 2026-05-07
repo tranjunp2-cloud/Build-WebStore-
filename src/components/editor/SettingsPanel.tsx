@@ -1528,6 +1528,12 @@ function SettingsPanelInner({
                                                     className="mt-1 h-8 w-full cursor-pointer rounded border border-white/10" />
                                             </>
                                         )}
+                                        <label className={labelCls}>Text Color</label>
+                                        <input type="color"
+                                            defaultValue={(block.textColor as string)?.startsWith('#') ? (block.textColor as string) : '#ffffff'}
+                                            key={`tc-${bk}`}
+                                            onBlur={(e) => onBlockFieldChange(currentBlockIndex, 'textColor', e.target.value)}
+                                            className="mt-1 h-8 w-full cursor-pointer rounded border border-white/10" />
                                     </div>
 
                                     {/* Vertical Padding */}
