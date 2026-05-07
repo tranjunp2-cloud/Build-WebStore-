@@ -4,6 +4,8 @@ import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { AnnouncementBarConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { Body } from '../shared/Typography'
+import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 function getLinkAttrs(url: string, isInternal?: boolean): { target?: string; rel?: string } {
     if (isInternal) return {}
@@ -12,14 +14,15 @@ function getLinkAttrs(url: string, isInternal?: boolean): { target?: string; rel
     }
     return {}
 }
-import { Body } from '../shared/Typography'
-import { CONTAINER, TOUCH_TARGET } from '@/lib/design-tokens'
 
 export function AnnouncementBarBlock({ block, theme: _theme }: BlockProps<AnnouncementBarConfig>) {
     void _theme
-    const { message, showLink, linkText, linkUrl, linkIsInternal, dismissible = true, variant = 'gradient', backgroundColor, backgroundColor2, textColor } = block
+    const { message, showLink, linkText, linkUrl, linkIsInternal, backgroundColor, backgroundColor2, textColor } = block
     const spacing = (block as Record<string, unknown>).blockSpacing as { paddingTop?: number; paddingBottom?: number } | undefined
-    // Use ?? (not destructuring default) to guard against null returned by Payload for unset DB columns
+    // Use ?? (not destructuring default) — Payload returns null (not undefined) for unset DB columns,
+    // which makes destructuring defaults ineffective for boolean/enum/number fields.
+    const dismissible = ((block as Record<string, unknown>).dismissible as boolean | null | undefined) ?? true
+    const variant = ((block as Record<string, unknown>).variant as string | null | undefined) ?? 'gradient'
     const paddingY = ((block as Record<string, unknown>).paddingY as number | null | undefined) ?? 12
     const paddingTop = spacing?.paddingTop ?? paddingY
     const paddingBottom = spacing?.paddingBottom ?? paddingY

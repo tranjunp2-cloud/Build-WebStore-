@@ -869,7 +869,7 @@ const AnnouncementBarBlock = {
         { name: 'backgroundColor', type: 'text' },
         { name: 'backgroundColor2', type: 'text' },
         { name: 'textColor', type: 'text' },
-        { name: 'paddingY', type: 'number' },
+        { name: 'paddingY', type: 'number', min: 4, max: 32 },
     ],
 }
 

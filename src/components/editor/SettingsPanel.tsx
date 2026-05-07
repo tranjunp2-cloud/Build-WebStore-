@@ -40,9 +40,10 @@ function containsHtml(value: string): boolean {
     return /<[^>]*>/i.test(value)
 }
 
-/** Validate URL format — only allow http/https */
+/** Validate URL format — allow http/https and relative paths (/ or #) */
 function isValidUrl(value: string): boolean {
     if (!value) return true
+    if (value.startsWith('/') || value.startsWith('#')) return true
     try {
         const url = new URL(value)
         return url.protocol === 'http:' || url.protocol === 'https:'
