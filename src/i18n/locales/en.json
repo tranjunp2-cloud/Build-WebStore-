@@ -2284,6 +2284,15 @@
             "statusLive": "Live",
             "statusDraft": "Draft"
         },
+        "coachMarks": {
+            "step1Title": "Bước 1: Tạo trang tại đây",
+            "step1Body": "Dùng Page Library để tạo và quản lý các trang nội bộ của website.",
+            "step2Title": "Bước 2: Quản lý hiển thị menu tại đây",
+            "step2Body": "Sau khi tạo trang, thêm chúng vào Menu Settings để hiển thị trên website.",
+            "skip": "Bỏ qua",
+            "next": "Tiếp theo",
+            "finish": "Hoàn tất"
+        },
         "aiChat": {
             "welcomeMessage": "Hello! What would you like to edit?",
             "drafting": "AI is drafting...",
@@ -2766,12 +2775,14 @@
             "aiContextLocked": "AI Generation context locked to: {blockType}"
         },
         "pageManagerPanel": {
-            "title": "Page Manager",
-            "description": "Create, select, hide, and soft-delete pages for this site.",
+            "title": "Page Library",
+            "description": "Các trang ở đây dùng để biên tập nội bộ. Để đưa lên website, hãy add chúng vào Menu Settings bên phải.",
             "createError": "Error creating page",
             "slugConflict": "Page slug already exists in this site",
             "noPagesFound": "No pages found",
-            "noPagesSuggestion": "Create a new page or try a different search keyword."
+            "noPagesSuggestion": "Create your first page to get started.",
+            "tooltipLive": "Trang đã được add vào Menu và đã publish.",
+            "tooltipDraft": "Trang mới tạo, chưa được add vào menu hoặc đã bị xóa khỏi menu."
         },
         "navigationValidation": {
             "labelRequired": "Link label is required",

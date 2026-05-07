@@ -1184,7 +1184,7 @@ function SettingsPanelInner({
     ]
 
     return (
-        <div className="flex h-full w-[320px] shrink-0 flex-col border-l border-white/5 bg-[#111827]">
+        <div data-coach="menu-settings" className="flex h-full w-[320px] shrink-0 flex-col border-l border-white/5 bg-[#111827]">
             <div className="border-b border-white/5 px-4 py-4">
                 <div className="grid grid-cols-2 gap-2">
                     {tabs.map(tab => (

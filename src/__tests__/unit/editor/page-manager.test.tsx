@@ -68,6 +68,74 @@ describe('PageManagerPanel', () => {
         expect(screen.getByText('Draft')).toBeInTheDocument() // Page 2
     })
 
+    // TC-F05-02-14: GH-864 panel header + micro-copy + no search
+    it('TC-F05-02-14a: panel title reads "Page Library" (renamed from Page Manager)', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+        // Assert — title must reflect rename
+        expect(screen.getByText('Page Library')).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-14b: micro-copy description is visible below the title', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+        // Assert — micro-copy from i18n key pageManagerPanel.description
+        expect(screen.getByText(/biên tập nội bộ/)).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-14c: search input is NOT present (removed per GH-864)', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+        // Assert — search input must be gone
+        expect(screen.queryByPlaceholderText(/[Ss]earch/)).not.toBeInTheDocument()
+    })
+
+    it('TC-F05-02-14d: page in menu + published + site published shows Live badge', () => {
+        // Arrange — page-2 in menu, set status to published
+        useEditorStore.getState().setPages([
+            { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
+            { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+        const menuPageIds = new Set(['page-1', 'page-2'])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-99"
+                    siteStatus="published"
+                    menuPageIds={menuPageIds}
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+        // Assert — both pages qualify as Live
+        const liveBadges = screen.getAllByText('Live')
+        expect(liveBadges.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('TC-F05-02-14e: published page NOT in menu shows Draft badge', () => {
+        // Arrange — page-2 published but empty menuPageIds
+        useEditorStore.getState().setPages([
+            { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-99"
+                    siteStatus="published"
+                    menuPageIds={new Set()}
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+        // Assert — not in menu → Draft despite being published
+        expect(screen.getByText('Draft')).toBeInTheDocument()
+        expect(screen.queryByText('Live')).not.toBeInTheDocument()
+    })
+
     it('TC-F05.07: Adds a new page and syncs state', async () => {
         // Arrange
         const mockResponse = {
