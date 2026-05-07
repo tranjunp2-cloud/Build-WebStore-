@@ -344,8 +344,95 @@ describe('Publish and Save Flows (TC-F05)', () => {
             const saveCalls = (global.fetch as any).mock.calls.filter((c: any) => c[0].toString().includes('/save'))
             expect(saveCalls.length).toBe(1)
             // It might fail toast check if toast is not shown, but wait, the handleSave options showToast: false by default for autosave?
-            // Actually manual save does show it depending on EditorToolbar? Let's bypass the strict toast check 
+            // Actually manual save does show it depending on EditorToolbar? Let's bypass the strict toast check
             // since we're verifying the API race condition lockout.
+        })
+    })
+
+    describe('TC-F05.61-63: Publish error body parsing (BUG-GH-892)', () => {
+        afterEach(() => vi.unstubAllEnvs())
+
+        async function setupAndClickPublish() {
+            render(<EditorPage />)
+            await waitFor(() => expect(screen.getByTestId('toolbar')).toBeInTheDocument())
+            fireEvent.click(screen.getByTestId('publish-btn'))
+            await waitFor(() => screen.getByRole('button', { name: /Publish now/i }))
+            fireEvent.click(screen.getByRole('button', { name: /Publish now/i }))
+        }
+
+        it('TC-F05.61: shows friendly field label when Payload returns validationErrors on publish 500', async () => {
+            ;(global.fetch as any).mockImplementation((url: string) => {
+                if (url.includes('/publish')) {
+                    return Promise.resolve({
+                        ok: false, status: 500,
+                        json: async () => ({
+                            error: {
+                                failures: [{
+                                    validationErrors: [{ path: 'blocks.0.phoneNumber', message: 'This field is required' }]
+                                }]
+                            }
+                        })
+                    })
+                }
+                return Promise.resolve({ ok: true, json: async () => ({}) })
+            })
+
+            await setupAndClickPublish()
+
+            await waitFor(() => {
+                expect(toast.error).toHaveBeenCalledWith(
+                    'Publish thất bại',
+                    expect.objectContaining({ description: 'WhatsApp Phone Number: This field is required' })
+                )
+            })
+        })
+
+        it('TC-F05.62: falls back to generic message when Payload returns non-JSON 500', async () => {
+            ;(global.fetch as any).mockImplementation((url: string) => {
+                if (url.includes('/publish')) {
+                    return Promise.resolve({
+                        ok: false, status: 500,
+                        json: async () => { throw new Error('not json') }
+                    })
+                }
+                return Promise.resolve({ ok: true, json: async () => ({}) })
+            })
+
+            await setupAndClickPublish()
+
+            await waitFor(() => {
+                expect(toast.error).toHaveBeenCalledWith(
+                    'Publish thất bại',
+                    expect.objectContaining({ description: 'Server returned 500' })
+                )
+            })
+        })
+
+        it('TC-F05.63: hides raw errMsg from toast description in production', async () => {
+            vi.stubEnv('NODE_ENV', 'production')
+
+            ;(global.fetch as any).mockImplementation((url: string) => {
+                if (url.includes('/publish')) {
+                    return Promise.resolve({
+                        ok: false, status: 500,
+                        json: async () => ({
+                            error: {
+                                failures: [{ errMsg: 'null value in column "phone_number"' }]
+                            }
+                        })
+                    })
+                }
+                return Promise.resolve({ ok: true, json: async () => ({}) })
+            })
+
+            await setupAndClickPublish()
+
+            await waitFor(() => {
+                const calls = (toast.error as any).mock.calls
+                const publishFailCall = calls.find((c: any[]) => c[0] === 'Publish thất bại')
+                expect(publishFailCall).toBeDefined()
+                expect(publishFailCall[1]?.description).not.toContain('null value in column')
+            })
         })
     })
 })
