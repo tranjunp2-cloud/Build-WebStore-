@@ -105,9 +105,9 @@ describe('F19 Domain Management (DomainsClient)', () => {
         await waitFor(() => {
             expect(actions.addCustomDomain).toHaveBeenCalledWith('newstore.com');
             // Without verification[] in the response, the client treats it as
-            // immediately active and shows the SSL-provisioning toast.
+            // immediately active and shows the DNS setup toast (not SSL-provisioning).
             expect(toast.success).toHaveBeenCalledWith(
-                expect.stringContaining('Domain active. SSL provisioning'),
+                expect.stringContaining('Domain connected! Configure DNS records below'),
             );
         });
     });
