@@ -1898,7 +1898,15 @@ function buildBlockFromSpec(
       }
     }
     case 'social-proof':
-      return { blockType: 'social-proof', variant: resolvedVariant ?? 'counter' }
+      return {
+        blockType: 'social-proof',
+        variant: resolvedVariant ?? 'cards',
+        reviews: content.testimonials.slice(0, 3).map((t) => ({
+          author: t.name,
+          content: t.quote ?? '',
+          rating: t.rating ?? 5,
+        })),
+      }
     case 'products-grid': {
       // Generate placeholder items — previously this returned only {variant, count}
       // with no items array, causing render to show empty grid (Ben-Ben class bug).
