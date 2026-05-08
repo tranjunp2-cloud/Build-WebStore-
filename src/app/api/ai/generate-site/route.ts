@@ -1821,6 +1821,127 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             delete sanitized.zoom
         }
 
+        // ── Service Cards: services[].title is required ──
+        if (sanitized.blockType === 'service-cards' && Array.isArray(sanitized.services)) {
+            sanitized.services = (sanitized.services as AIBlock[]).map((svc: AIBlock) => ({
+                ...svc,
+                title: String(svc.title || svc.name || svc.heading || 'Service'),
+            }))
+        }
+
+        // ── Portfolio Grid: projects[].title is required ──
+        // AI gen with large counts (e.g. 12) may produce null titles for later items.
+        if (sanitized.blockType === 'portfolio-grid' && Array.isArray(sanitized.projects)) {
+            sanitized.projects = (sanitized.projects as AIBlock[]).map((proj: AIBlock, i: number) => ({
+                ...proj,
+                title: String(proj.title || proj.name || proj.heading || `Project ${i + 1}`),
+            }))
+        }
+
+        // ── Social Proof: reviews[].author and reviews[].content are required ──
+        if (sanitized.blockType === 'social-proof' && Array.isArray(sanitized.reviews)) {
+            sanitized.reviews = (sanitized.reviews as AIBlock[]).map((rev: AIBlock) => ({
+                ...rev,
+                author: String(rev.author || rev.name || rev.customer || 'Customer'),
+                content: String(rev.content || rev.text || rev.review || rev.quote || 'Great service!'),
+            }))
+        }
+
+        // ── Step Process: steps[].title and steps[].description are required ──
+        if (sanitized.blockType === 'step-process' && Array.isArray(sanitized.steps)) {
+            sanitized.steps = (sanitized.steps as AIBlock[]).map((step: AIBlock, i: number) => ({
+                ...step,
+                title: String(step.title || step.name || step.heading || `Step ${i + 1}`),
+                description: String(step.description || step.content || step.text || ''),
+            }))
+        }
+
+        // ── Class Schedule: classes[].name is required ──
+        if (sanitized.blockType === 'class-schedule' && Array.isArray(sanitized.classes)) {
+            sanitized.classes = (sanitized.classes as AIBlock[]).map((cls: AIBlock, i: number) => ({
+                ...cls,
+                name: String(cls.name || cls.title || cls.className || `Class ${i + 1}`),
+            }))
+        }
+
+        // ── Doctor Profile: doctors[].name is required ──
+        if (sanitized.blockType === 'doctor-profile' && Array.isArray(sanitized.doctors)) {
+            sanitized.doctors = (sanitized.doctors as AIBlock[]).map((doc: AIBlock, i: number) => ({
+                ...doc,
+                name: String(doc.name || doc.fullName || doc.title || `Doctor ${i + 1}`),
+            }))
+        }
+
+        // ── Property Card: properties[].title is required ──
+        if (sanitized.blockType === 'property-card' && Array.isArray(sanitized.properties)) {
+            sanitized.properties = (sanitized.properties as AIBlock[]).map((prop: AIBlock, i: number) => ({
+                ...prop,
+                title: String(prop.title || prop.name || prop.address || `Property ${i + 1}`),
+            }))
+        }
+
+        // ── Video Showcase: videos[].title and videos[].videoUrl are required ──
+        // Drop items missing videoUrl — an empty/fake URL breaks the player.
+        if (sanitized.blockType === 'video-showcase' && Array.isArray(sanitized.videos)) {
+            sanitized.videos = (sanitized.videos as AIBlock[])
+                .filter((vid: AIBlock) => vid.videoUrl || vid.url || vid.src)
+                .map((vid: AIBlock, i: number) => ({
+                    ...vid,
+                    title: String(vid.title || vid.name || vid.heading || `Video ${i + 1}`),
+                    videoUrl: String(vid.videoUrl || vid.url || vid.src),
+                }))
+        }
+
+        // ── Product Quick View: products[].name is required ──
+        if (sanitized.blockType === 'product-quick-view' && Array.isArray(sanitized.products)) {
+            sanitized.products = (sanitized.products as AIBlock[]).map((prod: AIBlock, i: number) => ({
+                ...prod,
+                name: String(prod.name || prod.title || `Product ${i + 1}`),
+            }))
+        }
+
+        // ── Feature Comparison: products[].name and features[].name are required ──
+        if (sanitized.blockType === 'feature-comparison') {
+            if (Array.isArray(sanitized.products)) {
+                sanitized.products = (sanitized.products as AIBlock[]).map((p: AIBlock, i: number) => ({
+                    ...p,
+                    name: String(p.name || p.title || `Option ${i + 1}`),
+                }))
+            }
+            if (Array.isArray(sanitized.features)) {
+                sanitized.features = (sanitized.features as AIBlock[]).map((f: AIBlock, i: number) => ({
+                    ...f,
+                    name: String(f.name || f.title || f.label || `Feature ${i + 1}`),
+                }))
+            }
+        }
+
+        // ── Booking Widget: services[].name is required ──
+        if (sanitized.blockType === 'booking-widget' && Array.isArray(sanitized.services)) {
+            sanitized.services = (sanitized.services as AIBlock[]).map((svc: AIBlock, i: number) => ({
+                ...svc,
+                name: String(svc.name || svc.title || `Service ${i + 1}`),
+            }))
+        }
+
+        // ── Menu Food: categories[].name and categories[].items[].name/.price are required ──
+        if (sanitized.blockType === 'menu-food' && Array.isArray(sanitized.categories)) {
+            sanitized.categories = (sanitized.categories as AIBlock[]).map((cat: AIBlock, ci: number) => {
+                const items = Array.isArray(cat.items)
+                    ? (cat.items as AIBlock[]).map((item: AIBlock, ii: number) => ({
+                        ...item,
+                        name: String(item.name || item.title || `Item ${ii + 1}`),
+                        price: String(item.price || item.cost || 'RM 0'),
+                    }))
+                    : []
+                return {
+                    ...cat,
+                    name: String(cat.name || cat.title || cat.category || `Category ${ci + 1}`),
+                    items,
+                }
+            })
+        }
+
         // ── Remove non-schema fields that AI might add ──
         delete sanitized.id
         delete sanitized.order
