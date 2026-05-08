@@ -2920,5 +2920,75 @@
       "title": "Page Not Found",
       "backHome": "Back to Homepage"
     }
+  },
+  "profile": {
+    "title": "My Profile",
+    "accountSettings": "Account Settings",
+    "tabs": {
+      "general": "General Info",
+      "security": "Security"
+    },
+    "banner": {
+      "roleOwner": "Owner",
+      "roleStaff": "Staff",
+      "uploadAvatar": "Click to upload avatar",
+      "status": "Status",
+      "activeNow": "Active Now"
+    },
+    "general": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "emailReadonly": "Email cannot be changed (Login identity)",
+      "phone": "Phone Number",
+      "save": "Save Change",
+      "saving": "Saving...",
+      "saved": "Profile updated",
+      "cancel": "Cancel"
+    },
+    "security": {
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "changePassword": "Change Password",
+      "updatePassword": "Update Password",
+      "changing": "Changing...",
+      "changed": "Password changed successfully",
+      "lastLogin": "Last Login",
+      "ruleMinLength": "At least 8 characters",
+      "ruleUppercase": "One uppercase letter",
+      "ruleLowercase": "One lowercase letter",
+      "ruleNumber": "One number",
+      "ruleSpecial": "One special character"
+    },
+    "sso": {
+      "notice": "Owner accounts are managed via Single Sign-On. Update your profile and password in the SSO portal.",
+      "manageButton": "Manage Account in SSO",
+      "urlMissing": "SSO portal URL is not configured. Contact admin.",
+      "generalTitle": "🔒 Information managed by SSO",
+      "generalNotice": "Personal information fields are synchronized from the SSO system. You cannot edit them here.",
+      "generalLink": "To make changes, please visit the SSO portal",
+      "securityTitle": "🛡️ SSO Protected Account",
+      "securityNotice": "Your password and security settings are managed by the Single Sign-On (SSO) system. To change your password, enable two-factor authentication (2FA), or update any security settings, please visit the SSO management portal.",
+      "securityLink": "Manage SSO Account"
+    },
+    "errors": {
+      "invalidPhone": "Please enter a valid phone number",
+      "passwordMinLength": "Password must be at least 8 characters",
+      "passwordUpper": "Password must contain an uppercase letter",
+      "passwordLower": "Password must contain a lowercase letter",
+      "passwordNumber": "Password must contain a number",
+      "passwordSpecial": "Password must contain a special character",
+      "passwordsMismatch": "Passwords do not match",
+      "currentPasswordIncorrect": "Current password is incorrect",
+      "newPasswordSameAsCurrent": "New password must differ from current password",
+      "avatarTooLarge": "Avatar must be 2MB or smaller",
+      "avatarWrongType": "Avatar must be JPG or PNG",
+      "ownerForbidden": "Owner accounts must update profile via SSO",
+      "uploadFailed": "Avatar upload failed",
+      "saveFailed": "Failed to save profile",
+      "networkError": "Network error. Please try again.",
+      "unsavedChanges": "You have unsaved changes. Leave this tab?"
+    }
   }
 }

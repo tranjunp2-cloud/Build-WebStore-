@@ -6,17 +6,19 @@ import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { TopHeader } from '@/components/dashboard/TopHeader'
 import { Toaster } from '@/components/ui/sonner'
 import { TenantAccessWatcher } from '@/components/dashboard/TenantAccessWatcher'
+import { UserAvatarProvider } from '@/providers/UserAvatarContext'
 
 type CMSLayoutClientProps = {
     userName: string
     userInitial: string
     userEmail: string
+    userAvatarUrl?: string | null
     currentUserRole?: string
     isSuperAdmin?: boolean
     children: React.ReactNode
 }
 
-export function CMSLayoutClient({ userName, userInitial, userEmail, currentUserRole = 'viewer', isSuperAdmin = false, children }: CMSLayoutClientProps) {
+export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUrl = null, currentUserRole = 'viewer', isSuperAdmin = false, children }: CMSLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const pathname = usePathname()
 
@@ -28,6 +30,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, currentUserR
     }, [pathname])
 
     return (
+        <UserAvatarProvider initialUrl={userAvatarUrl}>
         <div className="min-h-screen bg-[#0B1120] flex flex-col overflow-x-hidden">
             <TenantAccessWatcher />
             <TopHeader
@@ -66,5 +69,6 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, currentUserR
                 }}
             />
         </div>
+        </UserAvatarProvider>
     )
 }

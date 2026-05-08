@@ -1,6 +1,8 @@
 import { AppShell } from '@/components/AppShell'
 import { I18nProvider } from '@/i18n'
 import { getCurrentUser } from '@/lib/auth'
+import { getPayload } from 'payload'
+import configPromise from '@payload-config'
 import type { PlatformUser } from '@/types/user'
 import { CMSLayoutClient } from './_components/CMSLayoutClient'
 import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
@@ -28,6 +30,17 @@ export default async function DashboardLayout({
     const userEmail = typedUser?.email || ''
     const userInitial = userName.charAt(0).toUpperCase()
 
+    // Fetch avatar URL (depth=1 to expand media relationship)
+    let userAvatarUrl: string | null = null
+    if (user) {
+        try {
+            const payload = await getPayload({ config: configPromise })
+            const full = await payload.findByID({ collection: 'users', id: user.id, depth: 1 }) as Record<string, unknown>
+            const av = full?.avatar as { url?: string } | null | undefined
+            if (av && typeof av === 'object' && av.url) userAvatarUrl = av.url
+        } catch (err) { console.warn('[layout] avatar fetch failed:', err) }
+    }
+
     const currentTenantInfo = typedUser?.tenants?.find((t: { tenant: string | number | { id: string | number }, role?: string }) => {
         const tId = typeof t.tenant === 'object' && t.tenant !== null ? String(t.tenant.id) : String(t.tenant)
         return tId === tenantId
@@ -39,7 +52,7 @@ export default async function DashboardLayout({
         <AppShell>
             <I18nProvider defaultLocale="en">
                 <TooltipProvider delayDuration={300}>
-                    <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
+                    <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
                         {children}
                     </CMSLayoutClient>
                     {typedUser && (

@@ -4,6 +4,7 @@ export type PlatformUser = {
     email: string
     firstName?: string
     lastName?: string
+    phone?: string
     roles?: ('super-admin' | 'tenant-owner' | 'editor' | 'viewer')[]
     tenants?: Array<{
         tenant: string | { id: string; name?: string; slug?: string }
