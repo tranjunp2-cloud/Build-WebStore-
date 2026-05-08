@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { profilePatchSchema } from '@/lib/profile/schemas'
-import { blockOwner } from '@/lib/profile/role-guard'
+import { blockOwner, type UserLike } from '@/lib/profile/role-guard'
 
 export const runtime = 'nodejs'
 
@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest) {
             collection: 'users',
             id: user.id,
             depth: 1,
-        }) as any
+        }) as unknown as Record<string, unknown>
 
         return NextResponse.json({
             id: doc.id,
@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const guard = blockOwner(user as any)
+        const guard = blockOwner(user as UserLike)
         if (guard) return guard
 
         const body = await req.json()
@@ -63,7 +63,7 @@ export async function PATCH(req: NextRequest) {
             collection: 'users',
             id: user.id,
             data: parsed.data,
-        }) as any
+        }) as unknown as Record<string, unknown>
 
         return NextResponse.json({
             id: updated.id,

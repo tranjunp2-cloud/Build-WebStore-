@@ -3,7 +3,8 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { passwordChangeSchema } from '@/lib/profile/schemas'
-import { blockOwner } from '@/lib/profile/role-guard'
+import { blockOwner, type UserLike } from '@/lib/profile/role-guard'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
 
@@ -14,8 +15,14 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const guard = blockOwner(user as any)
+        const guard = blockOwner(user as UserLike)
         if (guard) return guard
+
+        // Independent rate limit: 3 attempts / 5 min per user (separate from Payload's lockout)
+        const rl = await checkRateLimit(`pwd:${user.id}`, 3, 5 * 60_000)
+        if (!rl.allowed) {
+            return NextResponse.json({ error: 'tooManyAttempts' }, { status: 429 })
+        }
 
         const body = await req.json()
         const parsed = passwordChangeSchema.safeParse(body)
@@ -35,7 +42,7 @@ export async function POST(req: NextRequest) {
         try {
             await payload.login({
                 collection: 'users',
-                data: { email: (user as any).email, password: currentPassword },
+                data: { email: user.email, password: currentPassword },
             })
         } catch {
             return NextResponse.json(

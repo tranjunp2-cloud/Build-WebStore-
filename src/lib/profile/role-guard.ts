@@ -3,7 +3,7 @@ import { isOwner } from './role-utils'
 
 export { isOwner } from './role-utils'
 
-type UserLike = {
+export type UserLike = {
     roles?: string[]
     tenants?: Array<{ role?: string }>
 }

@@ -24,11 +24,19 @@ export async function POST(req: NextRequest) {
         if (file.size > AVATAR_MAX_BYTES) {
             return NextResponse.json({ error: 'avatarTooLarge' }, { status: 413 })
         }
+        // Early reject by client-supplied MIME before reading the buffer
         if (!(AVATAR_ALLOWED_MIME as readonly string[]).includes(file.type)) {
             return NextResponse.json({ error: 'avatarWrongType' }, { status: 415 })
         }
 
         const buffer = Buffer.from(await file.arrayBuffer())
+
+        // Verify actual file content via magic bytes (client MIME is untrusted)
+        const isJpeg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF
+        const isPng  = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47
+        if (!isJpeg && !isPng) {
+            return NextResponse.json({ error: 'avatarWrongType' }, { status: 415 })
+        }
         const payload = await getPayload({ config: configPromise })
 
         const ext = file.type === 'image/png' ? 'png' : 'jpg'

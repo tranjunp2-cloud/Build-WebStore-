@@ -4,7 +4,7 @@ export const profilePatchSchema = z.object({
     firstName: z.string().min(2).max(50).optional(),
     lastName: z.string().min(2).max(50).optional(),
     phone: z.string().regex(/^\+?[0-9\s\-\(\)]{7,20}$/, 'invalidPhone').optional(),
-})
+}).refine(d => Object.keys(d).length > 0, { message: 'atLeastOneFieldRequired' })
 
 export const passwordBaseSchema = z.object({
     currentPassword: z.string().min(1),
