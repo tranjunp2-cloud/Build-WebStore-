@@ -1900,7 +1900,7 @@ function buildBlockFromSpec(
         variant: resolvedVariant ?? 'cards',
         reviews: content.testimonials.slice(0, 3).map((t) => ({
           author: t.name,
-          content: t.quote,
+          content: t.quote ?? '',
           rating: t.rating ?? 5,
         })),
       }
