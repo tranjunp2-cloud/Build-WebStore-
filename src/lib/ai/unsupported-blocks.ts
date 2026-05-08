@@ -50,6 +50,7 @@ export const BLOCKS_TEMP_HIDDEN: ReadonlySet<string> = new Set([
     'doctor-profile',
     'gallery-masonry',
     'before-after',
+    'property-card',
 ])
 
 /**
