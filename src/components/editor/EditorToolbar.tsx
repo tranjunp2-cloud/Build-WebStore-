@@ -343,7 +343,7 @@ export function EditorToolbar({
 
     return (
         <>
-        <header className="relative flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-5">
+        <header className="relative flex h-12 shrink-0 items-center justify-between gap-3 overflow-hidden border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-5">
             <div className="flex min-w-0 items-center gap-3">
                 <button
                     type="button"
@@ -357,16 +357,17 @@ export function EditorToolbar({
 
                 <div className="inline-flex h-8 items-center gap-2 rounded-lg bg-white/[0.04] px-3">
                     <CurrentPageIcon className="h-3.5 w-3.5 text-slate-400" />
-                    <span className="max-w-[120px] truncate text-[12px] font-medium text-slate-300">{currentPageTitle}</span>
+                    <span className="hidden min-[1200px]:inline max-w-[120px] truncate text-[12px] font-medium text-slate-300">{currentPageTitle}</span>
                 </div>
 
                 <button
                     type="button"
                     onClick={onOpenTemplates}
                     className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
+                    title={et.templates}
                 >
                     <span className="text-base leading-none">🎨</span>
-                    {et.templates}
+                    <span className="hidden min-[1200px]:inline">{et.templates}</span>
                 </button>
 
                 <div className="mx-1.5 h-4 w-px bg-white/[0.08]" />
@@ -396,7 +397,7 @@ export function EditorToolbar({
                 <div className="mx-1.5 h-4 w-px bg-white/[0.08]" />
             </div>
 
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 lg:block">
                 <div className="flex h-[38px] items-center rounded-full border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.8)] px-[5px] py-px">
                     <button
                         type="button"
@@ -427,7 +428,7 @@ export function EditorToolbar({
                 </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex min-w-0 shrink-0 items-center gap-2.5">
                 <WorkspaceLayoutControls />
 
                 <div className="h-4 w-px bg-white/[0.08]" />
@@ -462,9 +463,10 @@ export function EditorToolbar({
                         href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        title={et.preview}
                     >
                         <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-                        {et.preview}
+                        <span className="hidden min-[1200px]:inline">{et.preview}</span>
                     </a>
                 </Button>
 
