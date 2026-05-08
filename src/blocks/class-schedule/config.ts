@@ -50,7 +50,7 @@ export const classScheduleMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'classes', 'showCapacity', 'highlightToday'],
     quickActions: ['Add class', 'Update schedule', 'Change instructor'],
-    aiVisible: true,
+    aiVisible: false, // hidden: in BLOCKS_REQUIRE_MEDIA_PIPELINE (not production-ready, GH-820)
     category: 'content' as const,
 }
 
