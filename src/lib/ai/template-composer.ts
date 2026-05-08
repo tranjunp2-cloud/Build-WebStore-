@@ -62,6 +62,14 @@ export const BROKEN_VARIANTS: Record<string, string[]> = {
   testimonials: ['grid', 'single'],
 }
 
+// feat/fix-broken-block-variants: entire block types temporarily hidden from AI generation.
+// To re-enable a block, remove its entry from this set.
+// Mirror: also listed in EDITOR_HIDDEN_BLOCKS (block-registry-reader.ts).
+export const TEMP_HIDDEN_BLOCK_TYPES = new Set([
+  'step-process',   // temporarily hidden
+  'booking-widget', // temporarily hidden
+])
+
 function simpleHash(str: string): number {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -1284,6 +1292,8 @@ function getPageNames(variant: 'starter' | 'professional' | 'premium'): string[]
 }
 
 function buildIndustryBlock(blockType: string, content: CategoryContent, biz: BusinessSample, category: string): Record<string, unknown> | null {
+  // Guard: temporarily hidden block types — return null so callers skip them cleanly
+  if (TEMP_HIDDEN_BLOCK_TYPES.has(blockType)) return null
   switch (blockType) {
     case 'menu-display':
       return buildMenuDisplay(content)
@@ -2102,10 +2112,13 @@ export function composeFromBlueprint(
     return {
       title: page.name,
       slug: page.slug,
-      layout: specs.map((spec) => {
-        const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood, disabledSet)
-        return applyContentValidation(block, templateLang)
-      }),
+      layout: specs
+        // Filter out temporarily hidden block types before building
+        .filter((spec) => !TEMP_HIDDEN_BLOCK_TYPES.has(spec.blockType))
+        .map((spec) => {
+          const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood, disabledSet)
+          return applyContentValidation(block, templateLang)
+        }),
     }
   })
 
