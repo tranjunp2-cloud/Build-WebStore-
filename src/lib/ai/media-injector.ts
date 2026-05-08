@@ -129,8 +129,13 @@ function roleForBlock(blockType: string): ImageRole {
         case 'products-grid':
         case 'products-featured':
         case 'product-quick-view':
-        case 'property-card':
             return 'product'
+        case 'property-card':
+            // Real-estate photos are landscape; square bucket (6 photos) yields poor
+            // squarish Unsplash results. Shares landscape bucket with gallery — seeds
+            // differ per block type so picks are shuffled differently, but cross-block
+            // photo duplication is possible when both appear on the same template.
+            return 'gallery'
         default:
             return 'any'
     }
@@ -456,7 +461,37 @@ export async function fulfillImageNeeds(
                                 `[Media Injector] ${blockType}: ${result.failures.length} pool photo(s) failed`,
                             )
                         }
-                        return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                        // Pool may be smaller than totalCount (multi-page templates exhaust
+                        // the bucket). Fall through to legacy search to fill the deficit
+                        // instead of leaving later pages without images.
+                        if (result.mediaIds.length >= totalCount) {
+                            return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                        }
+                        console.warn(
+                            `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${totalCount}) — supplementing with legacy search`,
+                        )
+                        // Supplement pool result with legacy search for the deficit.
+                        const deficit = totalCount - result.mediaIds.length
+                        const keywords = deriveKeywords(category, blockType, {
+                            businessName: ctx.businessName,
+                            industry: ctx.category,
+                            language: ctx.language,
+                            products: ctx.products,
+                            mood: ctx.mood,
+                            englishKeywords: ctx.englishKeywords,
+                        })
+                        try {
+                            const legacyResult = await getMediaForBlock(blockType, keywords, deficit, ctx, payload)
+                            return {
+                                blockType,
+                                groupNeeds,
+                                ids: [...result.mediaIds, ...legacyResult.mediaIds],
+                                succeeded: 0,
+                                failed: 0,
+                            }
+                        } catch {
+                            return { blockType, groupNeeds, ids: result.mediaIds, succeeded: 0, failed: 0 }
+                        }
                     } catch (err) {
                         const msg = err instanceof Error ? err.message : String(err)
                         console.warn(`[Media Injector] ${blockType} pool path failed, falling back to search: ${msg}`)
