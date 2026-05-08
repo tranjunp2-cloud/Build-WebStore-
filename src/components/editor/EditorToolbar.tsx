@@ -79,6 +79,9 @@ function WorkspaceLayoutControls() {
     const toggleRight = useWorkspaceStore((s) => s.toggleRight)
     const applyPreset = useWorkspaceStore((s) => s.applyPreset)
 
+    const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+    const mod = isMac ? '⌘' : 'Ctrl+'
+
     const iconCls = (active: boolean) =>
         cn(
             'inline-flex h-8 w-8 items-center justify-center rounded-[10px] transition-colors',
@@ -131,7 +134,7 @@ function WorkspaceLayoutControls() {
                 type="button"
                 onClick={toggleLeft}
                 className={iconCls(leftVisible)}
-                title={leftVisible ? 'Hide left sidebar' : 'Show left sidebar'}
+                title={`${leftVisible ? 'Hide' : 'Show'} left sidebar (${mod}B)`}
                 aria-pressed={leftVisible}
             >
                 {leftVisible ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
@@ -141,7 +144,7 @@ function WorkspaceLayoutControls() {
                 type="button"
                 onClick={toggleRight}
                 className={iconCls(rightVisible)}
-                title={rightVisible ? 'Hide right sidebar' : 'Show right sidebar'}
+                title={`${rightVisible ? 'Hide' : 'Show'} right sidebar (${mod}J)`}
                 aria-pressed={rightVisible}
             >
                 {rightVisible ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}

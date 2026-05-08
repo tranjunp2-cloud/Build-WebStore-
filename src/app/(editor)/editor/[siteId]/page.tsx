@@ -17,6 +17,7 @@ import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
+import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
 import { EDITOR_SIDEBAR_WIDTH, SETTINGS_PANEL_WIDTH } from '@/components/editor/layout-constants'
 import type { AIAction } from '@/types/editor'
 import { useI18n } from '@/i18n'
@@ -122,6 +123,7 @@ export default function EditorPage() {
     // Workspace layout (left/right sidebar visibility, persisted in localStorage)
     const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
     const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
+    useWorkspaceShortcuts()
     const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string } | null>(null)
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
