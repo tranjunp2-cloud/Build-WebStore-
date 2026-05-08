@@ -1,5 +1,5 @@
 import type { BusinessInfoInput } from './system-prompt'
-import { hashBusinessName } from './category-theme-picker'
+import { hashString } from './seeded-random'
 
 /**
  * Compound seed mixing user contact fields (name|email|phone) to break the
@@ -11,5 +11,5 @@ import { hashBusinessName } from './category-theme-picker'
  */
 export function computeGenSeed(info: Pick<BusinessInfoInput, 'businessName' | 'email' | 'phone'>): number {
     const parts = [info.businessName, info.email, info.phone].filter(Boolean)
-    return hashBusinessName(parts.join('|'))
+    return hashString(parts.join('|'))
 }
