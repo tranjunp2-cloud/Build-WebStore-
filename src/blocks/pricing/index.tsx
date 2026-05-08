@@ -567,7 +567,7 @@ function SectionHeader({ headline, subheadline }: { headline?: string; subheadli
 // ── Toggle sub-component ──────────────────────────────────────────────────
 function PricingToggle({ block, theme: _theme }: { block: BlockProps<PricingConfig>['block']; theme: BlockProps<PricingConfig>['theme'] }) {
     void _theme
-    const { headline, subheadline, plans = [], yearlyDiscount = 20 } = block
+    const { headline, subheadline, plans = [], yearlyDiscount = 0, billingCycle1 = 'Monthly', billingCycle2 = 'Yearly' } = block
     const [isYearly, setIsYearly] = useState(false)
 
     const getPrice = useCallback((priceStr: string) => {
@@ -587,7 +587,7 @@ function PricingToggle({ block, theme: _theme }: { block: BlockProps<PricingConf
 
             {/* Toggle switch — visual 28px wrapped in 44px hit area for WCAG */}
             <div className="flex items-center justify-center gap-4 mb-12">
-                <span className={`text-sm font-medium transition-opacity ${!isYearly ? 'opacity-100' : 'opacity-50'}`}>Monthly</span>
+                <span className={`text-sm font-medium transition-opacity ${!isYearly ? 'opacity-100' : 'opacity-50'}`}>{billingCycle1}</span>
                 <button
                     type="button"
                     role="switch"
@@ -607,7 +607,7 @@ function PricingToggle({ block, theme: _theme }: { block: BlockProps<PricingConf
                     </span>
                 </button>
                     <span className={`text-sm font-medium transition-opacity ${isYearly ? 'opacity-100' : 'opacity-50'}`}>
-                        Yearly
+                        {billingCycle2}
                         {yearlyDiscount > 0 && (
                             <span
                                 className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold"

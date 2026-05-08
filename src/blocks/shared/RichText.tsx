@@ -26,8 +26,13 @@ export function RichText({ text, as: Tag = 'span', className, style }: RichTextP
     if (!text) return null
 
     if (!hasInlineFormatting(text)) {
-        if (Tag === 'span' && !className && !style) return <>{text}</>
-        return <Tag className={className} style={style}>{text}</Tag>
+        // Decode common HTML entities stored by the inline editor (&nbsp; etc.)
+        // Use string replacement + React text nodes (NOT dangerouslySetInnerHTML) to stay XSS-safe
+        const decoded = text.includes('&')
+            ? text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+            : text
+        if (Tag === 'span' && !className && !style) return <>{decoded}</>
+        return <Tag className={className} style={style}>{decoded}</Tag>
     }
 
     const sanitized = sanitizeInlineHtml(text)

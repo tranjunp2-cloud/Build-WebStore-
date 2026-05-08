@@ -40,6 +40,12 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
         .map(f => (typeof f === 'string' ? f : f.text))
         .join('\n')
 
+    // Strip HTML tags and decode entities so the input shows plain text
+    const ctaLabelText = (plan.ctaLabel ?? 'Get Started')
+        .replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+        .trim() || 'Get Started'
+
     const handleFeaturesBlur = (e: FieldBlurEvent) => {
         const lines = e.target.value.split('\n').filter(l => l.trim())
         onChange('features', lines.map(text => ({ text, included: true })))
@@ -122,7 +128,7 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
                         <div className="space-y-1.5">
                             <FieldLabel>{s.pricingLinkText}</FieldLabel>
                             <Input
-                                defaultValue={plan.ctaLabel ?? 'Get Started'}
+                                defaultValue={ctaLabelText}
                                 placeholder={s.pricingLinkTextPlaceholder}
                                 variant="editor"
                                 onBlur={(e: FieldBlurEvent) => onChange('ctaLabel', e.target.value)}

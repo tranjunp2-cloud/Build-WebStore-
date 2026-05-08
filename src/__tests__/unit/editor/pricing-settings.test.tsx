@@ -25,16 +25,21 @@ vi.mock('@/i18n', async () => {
 
 // ── Mock UI components used by PlanFields ──────────────────────────────────
 vi.mock('@/components/ui/input', () => ({
-    Input: ({ defaultValue, placeholder, onBlur, className, variant }: any) => (
-        <input
-            type="text"
-            defaultValue={defaultValue}
-            placeholder={placeholder}
-            onBlur={onBlur}
-            className={className}
-            data-variant={variant}
-        />
-    ),
+    Input: ({ defaultValue, value, placeholder, onBlur, onChange, className, variant, type, min, max }: any) => {
+        const controlled = value !== undefined ? { value, onChange } : { defaultValue }
+        return (
+            <input
+                type={type ?? 'text'}
+                {...controlled}
+                placeholder={placeholder}
+                onBlur={onBlur}
+                className={className}
+                data-variant={variant}
+                min={min}
+                max={max}
+            />
+        )
+    },
 }))
 
 vi.mock('@/components/ui/textarea', () => ({
@@ -259,7 +264,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
                 expect(blockIdx).toBe(0)
                 expect(update.plans).toHaveLength(2)
                 expect(update.plans[0].highlighted).toBe(false)
-                expect(update.plans[1].highlighted).toBe(true)
+                expect(update.plans[1].highlighted).toBe(false) // new plan inherits EMPTY_PLAN.highlighted = false
             })
         })
 
@@ -319,7 +324,7 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
                 expect(update.plans[0].name).toBe('Starter')
                 expect(update.plans[0].highlighted).toBe(false)
                 expect(update.plans[1].name).toBe('Pro')
-                expect(update.plans[1].highlighted).toBe(true)
+                expect(update.plans[1].highlighted).toBe(false) // preserved from original data, not auto-set
             })
         })
     })
@@ -566,112 +571,106 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             })
         })
 
-        it('TC-F05-891.68: discount checkbox unchecked when discountPercent === 0', () => {
+        it('TC-F05-891.68: discount % section always visible for toggle (no checkbox)', () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 0,
+                yearlyDiscount: 0,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            // Discount Percentage: label is visible, and checkbox is unchecked when discountPercent=0
+            // No checkbox — section is always visible; discount input shows 0
             expect(screen.getByText('Discount Percentage:')).toBeVisible()
-            const checkboxes = screen.getAllByRole('checkbox')
-            const discountCheckbox = checkboxes[0] // First checkbox is the discount toggle
-            expect(discountCheckbox).not.toBeChecked()
+            expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+            const numberInputs = screen.getAllByRole('spinbutton')
+            expect(numberInputs).toHaveLength(1)
+            expect(numberInputs[0]).toHaveValue(0)
         })
 
-        it('TC-F05-891.69: discount checkbox checked when discountPercent > 0', () => {
+        it('TC-F05-891.69: discount % input shows yearlyDiscount value', () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 15,
+                yearlyDiscount: 15,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            // Discount Percentage: label is visible, and checkbox is checked when discountPercent>0
             expect(screen.getByText('Discount Percentage:')).toBeVisible()
-            const checkboxes = screen.getAllByRole('checkbox')
-            const discountCheckbox = checkboxes[0]
-            expect(discountCheckbox).toBeChecked()
+            const numberInput = screen.getByRole('spinbutton')
+            expect(numberInput).toHaveValue(15)
         })
 
-        it('TC-F05-891.70: checking discount checkbox calls onBlockUpdate({ discountPercent: 10 })', async () => {
+        it('TC-F05-891.70: changing discount % input calls onBlockUpdate({ yearlyDiscount: N })', async () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 0,
+                yearlyDiscount: 0,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const checkboxes = screen.getAllByRole('checkbox')
-            const discountCheckbox = checkboxes[0]
-            fireEvent.click(discountCheckbox)
+            const numberInput = screen.getByRole('spinbutton')
+            fireEvent.change(numberInput, { target: { value: '10' } })
 
             await waitFor(() => {
-                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { discountPercent: 10 })
+                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { yearlyDiscount: 10 })
             })
         })
 
-        it('TC-F05-891.71: unchecking discount checkbox calls onBlockUpdate({ discountPercent: 0 })', async () => {
+        it('TC-F05-891.71: changing discount % to 0 calls onBlockUpdate({ yearlyDiscount: 0 })', async () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 15,
+                yearlyDiscount: 15,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const checkboxes = screen.getAllByRole('checkbox')
-            const discountCheckbox = checkboxes[0]
-            fireEvent.click(discountCheckbox)
+            const numberInput = screen.getByRole('spinbutton')
+            fireEvent.change(numberInput, { target: { value: '0' } })
 
             await waitFor(() => {
-                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { discountPercent: 0 })
+                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { yearlyDiscount: 0 })
             })
         })
 
-        it('TC-F05-891.72: discount % input only visible when discountPercent > 0', () => {
+        it('TC-F05-891.72: discount % input always visible for toggle variant', () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 0,
+                yearlyDiscount: 0,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            // When discount is 0, input should not be visible
-            const numberInputs = screen.queryAllByRole('spinbutton')
-            expect(numberInputs).toHaveLength(0)
+            const numberInputs = screen.getAllByRole('spinbutton')
+            expect(numberInputs).toHaveLength(1)
+            expect(numberInputs[0]).toBeVisible()
         })
 
-        it('TC-F05-891.73: discount % input visible when discountPercent > 0', () => {
+        it('TC-F05-891.73: discount % input reflects yearlyDiscount value', () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 15,
+                yearlyDiscount: 15,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            // The input is rendered as a text input with type="number"
-            const inputs = screen.getAllByDisplayValue('15')
-            expect(inputs.length).toBeGreaterThan(0)
-            expect(inputs[0]).toBeVisible()
+            const numberInput = screen.getByRole('spinbutton')
+            expect(numberInput).toHaveValue(15)
+            expect(numberInput).toBeVisible()
         })
 
-        it('TC-F05-891.74: discount % input calls onBlockUpdate on blur with clamped value', async () => {
+        it('TC-F05-891.74: discount % input calls onBlockUpdate on change with clamped value', async () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 15,
+                yearlyDiscount: 15,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const inputs = screen.getAllByDisplayValue('15')
-            const numberInput = inputs[0]
+            const numberInput = screen.getByRole('spinbutton')
             fireEvent.change(numberInput, { target: { value: '25' } })
-            fireEvent.blur(numberInput)
 
             await waitFor(() => {
-                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { discountPercent: 25 })
+                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { yearlyDiscount: 25 })
             })
         })
 
@@ -679,17 +678,15 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 15,
+                yearlyDiscount: 15,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const inputs = screen.getAllByDisplayValue('15')
-            const numberInput = inputs[0]
+            const numberInput = screen.getByRole('spinbutton')
             fireEvent.change(numberInput, { target: { value: '150' } })
-            fireEvent.blur(numberInput)
 
             await waitFor(() => {
-                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { discountPercent: 100 })
+                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { yearlyDiscount: 100 })
             })
         })
 
@@ -697,17 +694,15 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 15,
+                yearlyDiscount: 15,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            const inputs = screen.getAllByDisplayValue('15')
-            const numberInput = inputs[0]
+            const numberInput = screen.getByRole('spinbutton')
             fireEvent.change(numberInput, { target: { value: '-5' } })
-            fireEvent.blur(numberInput)
 
             await waitFor(() => {
-                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { discountPercent: 0 })
+                expect(mockOnBlockUpdate).toHaveBeenCalledWith(0, { yearlyDiscount: 0 })
             })
         })
 
@@ -723,19 +718,18 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 
-        it('TC-F05-891.78: discountPercent is managed in PricingSettings toggle section', () => {
+        it('TC-F05-891.78: yearlyDiscount value is reflected in spinbutton for toggle variant', () => {
             const blockWithToggle = {
                 ...mockBlock,
                 variant: 'toggle' as const,
-                discountPercent: 15,
+                yearlyDiscount: 15,
             }
             render(<PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />)
 
-            // With discountPercent > 0, the billing cycle section should show the discount checkbox as checked
-            expect(screen.getByText('Discount Percentage:')).toBeVisible()
-            const checkboxes = screen.getAllByRole('checkbox')
-            const discountCheckbox = checkboxes[0]
-            expect(discountCheckbox).toBeChecked()
+            // Discount spinbutton always visible for toggle variant and reflects yearlyDiscount value
+            const spinbutton = screen.getByRole('spinbutton')
+            expect(spinbutton).toBeVisible()
+            expect(spinbutton).toHaveValue(15)
         })
     })
 
