@@ -3731,6 +3731,18 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_booking_widget.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_booking_widget" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: 'pages_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "pages_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_gallery_masonry.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_gallery_masonry" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+
+  // ── GH-899: announcement-bar CTA fields ──────────────────────────────────
+  { name: 'pages_blocks_announcement_bar.add_show_link', sql: `ALTER TABLE "pages_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS show_link boolean;` },
+  { name: 'pages_blocks_announcement_bar.add_link_is_internal', sql: `ALTER TABLE "pages_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS link_is_internal boolean;` },
+  { name: 'pages_blocks_announcement_bar.add_background_color2', sql: `ALTER TABLE "pages_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS background_color2 varchar;` },
+  { name: 'pages_blocks_announcement_bar.add_text_color', sql: `ALTER TABLE "pages_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS text_color varchar;` },
+  { name: 'pages_blocks_announcement_bar.add_padding_y', sql: `ALTER TABLE "pages_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS padding_y integer;` },
+  { name: '_pages_v_blocks_announcement_bar.add_show_link', sql: `ALTER TABLE "_pages_v_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS show_link boolean;` },
+  { name: '_pages_v_blocks_announcement_bar.add_link_is_internal', sql: `ALTER TABLE "_pages_v_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS link_is_internal boolean;` },
+  { name: '_pages_v_blocks_announcement_bar.add_background_color2', sql: `ALTER TABLE "_pages_v_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS background_color2 varchar;` },
+  { name: '_pages_v_blocks_announcement_bar.add_text_color', sql: `ALTER TABLE "_pages_v_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS text_color varchar;` },
+  { name: '_pages_v_blocks_announcement_bar.add_padding_y', sql: `ALTER TABLE "_pages_v_blocks_announcement_bar" ADD COLUMN IF NOT EXISTS padding_y integer;` },
   { name: 'pages_blocks_property_card_properties.add_image_id', sql: `ALTER TABLE "pages_blocks_property_card_properties" ADD COLUMN IF NOT EXISTS image_id integer;` },
   { name: '_pages_v_blocks_property_card_properties.add_image_id', sql: `ALTER TABLE "_pages_v_blocks_property_card_properties" ADD COLUMN IF NOT EXISTS image_id integer;` },
 

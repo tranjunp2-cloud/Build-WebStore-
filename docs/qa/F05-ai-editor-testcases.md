@@ -258,6 +258,29 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ---
 
+## TC-F05-899 — Announcement Bar CTA & Content (GH-899)
+
+| TC-ID | Layer | Description | Status |
+|-------|-------|-------------|--------|
+| TC-F05-899-01 | Unit | Gradient variant renders linear-gradient | [x] |
+| TC-F05-899-02 | Unit | backgroundColor2 applied to gradient Color 2 | [x] |
+| TC-F05-899-03 | Unit | Solid variant no linear-gradient | [x] |
+| TC-F05-899-04 | Unit | Minimal variant transparent bg + border | [x] |
+| TC-F05-899-05 | Unit | Whitespace-only linkText hides link | [x] |
+| TC-F05-899-06 | Unit | CTA link renders with correct href | [x] |
+| TC-F05-899-07 | Unit | paddingY=24 applied to inline style | [x] |
+| TC-F05-899-08 | Unit | paddingY defaults to 12 | [x] |
+| TC-F05-899-09 | Unit | dismissible=false hides close button | [x] |
+| TC-F05-899-10 | Unit | Schema parses new optional fields | [x] |
+| TC-F05-899-11 | Unit | Schema rejects paddingY > 32 | [x] |
+| TC-F05-899-12 | Unit | Preview gradient HTML contains linear-gradient | [x] |
+| TC-F05-899-13 | Unit | Preview solid HTML no linear-gradient | [x] |
+| TC-F05-899-14 | Unit | Preview minimal HTML background:transparent | [x] |
+| TC-F05-899-15 | Unit | Preview empty linkText no anchor tag | [x] |
+| TC-F05-899-16 | Unit | Meta has all required fields | [x] |
+
+---
+
 ### US-14: Mobile Web UX — Adaptive Editor Interface (10 Cases)
 
 | ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |

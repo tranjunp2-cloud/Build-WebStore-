@@ -152,8 +152,35 @@ function renderGenericBlock(block: RenderBlock, t: TemplateTheme): string {
   }
 
   if (bt === 'announcement-bar') {
-    const message = (block.message as string) || ''
-    return '<div style="background:' + t.primary + ';color:#fff;text-align:center;padding:10px 20px;font-size:13px;font-weight:600">' + message + '</div>'
+    // Use ?? 'gradient' (not ||) so null from Payload DB defaults correctly, matching index.tsx behaviour
+    const annVariant = ((block.variant as string | null | undefined) ?? 'gradient')
+    const message = escapeHtml((block.message as string) || '')
+    const linkText = escapeHtml(((block.linkText as string) || '').trim())
+    const rawUrl = (block.linkUrl as string) || ''
+    // Reject protocol-relative URLs (//host) — route through sanitizeUrl not escapeAttr
+    const linkUrl = (rawUrl.startsWith('/') && !rawUrl.startsWith('//')) ? escapeAttr(rawUrl) : sanitizeUrl(rawUrl)
+    const bg1 = escapeAttr((block.backgroundColor as string) || t.primary)
+    const bg2 = escapeAttr((block.backgroundColor2 as string) || t.secondary)
+    const paddingY = typeof block.paddingY === 'number' ? Math.max(4, Math.min(32, block.paddingY)) : 12
+    const customTextColor = escapeAttr((block.textColor as string) || '')
+
+    let bgStyle: string
+    let color = customTextColor || '#fff'
+    if (annVariant === 'gradient') {
+      bgStyle = 'background:linear-gradient(135deg,' + bg1 + ',' + bg2 + ')'
+    } else if (annVariant === 'minimal') {
+      bgStyle = 'background:transparent;border-bottom:1px solid ' + escapeAttr(t.primary) + '20'
+      color = customTextColor || escapeAttr(t.text)
+    } else {
+      bgStyle = 'background:' + bg1
+    }
+
+    const showLink = (block.showLink as boolean | undefined) !== false
+    const linkPart = showLink && linkText && rawUrl
+      ? ' <a href="' + linkUrl + '" style="color:inherit;text-decoration:underline;font-weight:600">' + linkText + ' &rarr;</a>'
+      : ''
+
+    return '<div style="' + bgStyle + ';color:' + color + ';text-align:center;padding:' + paddingY + 'px 20px;font-size:13px;font-weight:600">' + message + linkPart + '</div>'
   }
 
   if (bt === 'whatsapp-button') {
@@ -212,6 +239,11 @@ function renderGenericBlock(block: RenderBlock, t: TemplateTheme): string {
 
 function escapeAttr(str: string) {
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/** Escape for HTML text content (between tags) — avoids over-encoding quotes */
+function escapeHtml(str: string) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function sanitizeUrl(raw: string): string {
