@@ -926,7 +926,9 @@ function PreviewFrameInner({
                         while (currentArray.length <= idx) {
                             currentArray.push({} as Record<string, unknown>)
                         }
-                        currentArray[idx] = { ...currentArray[idx], [arrayConfig.imageSubField]: newMediaId }
+                        // Store { id, url } so the preview iframe can render the new image immediately.
+                        // normalizeUploadField extracts the numeric id before persistence.
+                        currentArray[idx] = { ...currentArray[idx], [arrayConfig.imageSubField]: { id: newMediaId, url: newUrl } }
                         updateBlock(blockIndex, { [arrayConfig.arrayField]: currentArray })
                         matched = true
                     }

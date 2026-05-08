@@ -177,7 +177,7 @@ export function EditorToolbar({
                                 type="button"
                                 size="sm"
                                 onClick={onRepublish}
-                                disabled={isPublishing}
+                                disabled={isPublishing || isSaving}
                                 className="h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
                             >
                                 {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>}
@@ -348,7 +348,7 @@ export function EditorToolbar({
                                 type="button"
                                 size="sm"
                                 onClick={onRepublish}
-                                disabled={isPublishing}
+                                disabled={isPublishing || isSaving}
                                 className="h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95"
                             >
                                 {isPublishing ? (
