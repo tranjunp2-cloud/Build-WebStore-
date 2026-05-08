@@ -406,30 +406,11 @@ type PageData = {
 }
 
 /**
- * Local mirror of PageManagerPanel's getStatusBadge() for unit isolation.
- * Must stay in sync with src/components/editor/PageManagerPanel.tsx.
- * Updated for GH-864: Live requires page published + site published + page in menu.
- */
-function getStatusBadge(page: PageData, siteStatus?: string, menuPageIds?: Set<string>) {
-    const inMenu = page.isHomepage || menuPageIds?.has(String(page.id)) || false
-    const isPageLive = page.status === 'published' && siteStatus === 'published' && inMenu
-    if (isPageLive) {
-        return {
-            label: 'Live',
-            className: 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]',
-            dotClassName: 'bg-[#00c950]',
-        }
-    }
-    return {
-        label: 'Draft',
-        className: 'border border-[rgba(106,114,130,0.3)] bg-[rgba(106,114,130,0.2)] text-[#d1d5dc]',
-        dotClassName: '',
-    }
-}
-
-/**
- * Local mirror of PageManagerPanel's isCurrent check and Editing badge logic.
- * Returns whether a page should show the Editing badge (vs its status badge).
+ * Local mirror of `isCurrent` from PageManagerPanel (not exported).
+ * Exception to "never re-implement logic in tests": this is a 1-line identity check
+ * that can never silently diverge — any change to the source breaks TC-F05.06 first.
+ * TC-F05-PM-03/03b test multi-page Edit-button visibility which has no equivalent
+ * integration test in page-manager.test.tsx.
  */
 function shouldShowEditingBadge(page: PageData, currentPageId: string | null): boolean {
     return page.id === currentPageId
@@ -453,48 +434,34 @@ describe('PageManagerPanel — badge rendering logic', () => {
 
         // Act
         const isEditing = shouldShowEditingBadge(page, currentPageId)
-        const statusBadge = getStatusBadge(page, 'published', new Set(['page-1']))
 
-        // Assert — when editing, the Editing badge replaces the status badge
+        // Assert — current page should show Editing badge; badge value verified via integration tests
         expect(isEditing).toBe(true)
-        // The status badge still resolves (used as fallback for non-current), but
-        // the component renders "Editing" label exclusively for the current page
-        expect(statusBadge.label).toBe('Draft') // correct status badge value
-        // In component: isCurrent ? <Editing badge> : <statusBadge>
-        // So for this page, the rendered label must be "Editing", not "Draft"
     })
 
     // TC-F05-PM-02
-    it('TC-F05-PM-02: non-current published page shows "Live" badge', () => {
+    it('TC-F05-PM-02: non-current page is not marked as editing', () => {
         // Arrange
-        const currentPageId = 'page-99' // different page is current
+        const currentPageId = 'page-99'
         const publishedPage: PageData = { ...basePage, id: 'page-2', status: 'published' }
 
         // Act
         const isEditing = shouldShowEditingBadge(publishedPage, currentPageId)
-        const statusBadge = getStatusBadge(publishedPage, 'published', new Set(['page-2']))
 
-        // Assert
+        // Assert — badge label (Live/Draft) covered by page-manager.test.tsx integration tests
         expect(isEditing).toBe(false)
-        expect(statusBadge.label).toBe('Live')
-        expect(statusBadge.dotClassName).toBe('bg-[#00c950]')
-        expect(statusBadge.className).toContain('rgba(0,201,80')
     })
 
-    it('TC-F05-PM-02b: non-current draft page shows "Draft" badge', () => {
+    it('TC-F05-PM-02b: non-current draft page is not marked as editing', () => {
         // Arrange
         const currentPageId = 'page-99'
         const draftPage: PageData = { ...basePage, id: 'page-3', status: 'draft' }
 
         // Act
         const isEditing = shouldShowEditingBadge(draftPage, currentPageId)
-        const statusBadge = getStatusBadge(draftPage, 'published', new Set(['page-3']))
 
         // Assert
         expect(isEditing).toBe(false)
-        expect(statusBadge.label).toBe('Draft')
-        expect(statusBadge.dotClassName).toBe('')
-        expect(statusBadge.className).toContain('rgba(106,114,130')
     })
 
     // TC-F05-PM-03
@@ -537,43 +504,6 @@ describe('PageManagerPanel — badge rendering logic', () => {
         expect(anyShowingEditButton).toBe(false)
     })
 
-    // TC-F05-02-15: menu-link condition (GH-864)
-    it('TC-F05-02-15: published page NOT in menu shows "Draft"', () => {
-        // Arrange
-        const page: PageData = { ...basePage, id: 'page-5', status: 'published' }
-        // Act — empty menuPageIds means no page is linked
-        const badge = getStatusBadge(page, 'published', new Set())
-        // Assert
-        expect(badge.label).toBe('Draft')
-    })
-
-    it('TC-F05-02-15b: published page in menu + site published shows "Live"', () => {
-        // Arrange
-        const page: PageData = { ...basePage, id: 'page-6', status: 'published' }
-        // Act
-        const badge = getStatusBadge(page, 'published', new Set(['page-6']))
-        // Assert
-        expect(badge.label).toBe('Live')
-        expect(badge.dotClassName).toBe('bg-[#00c950]')
-    })
-
-    it('TC-F05-02-15c: homepage always Live when published + site published', () => {
-        // Arrange — homepage is always treated as in-menu
-        const homepage: PageData = { ...basePage, id: 'hp', status: 'published', isHomepage: true }
-        // Act — no menuPageIds needed for homepage
-        const badge = getStatusBadge(homepage, 'published', new Set())
-        // Assert
-        expect(badge.label).toBe('Live')
-    })
-
-    it('TC-F05-02-15d: page in menu but site draft shows "Draft"', () => {
-        // Arrange
-        const page: PageData = { ...basePage, id: 'page-7', status: 'published' }
-        // Act
-        const badge = getStatusBadge(page, 'draft', new Set(['page-7']))
-        // Assert
-        expect(badge.label).toBe('Draft')
-    })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

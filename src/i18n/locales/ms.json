@@ -2298,7 +2298,7 @@
       "step1Body": "Gunakan Page Library untuk mencipta dan mengurus halaman dalaman laman web anda.",
       "step2Title": "Langkah 2: Urus paparan menu di sini",
       "step2Body": "Selepas mencipta halaman, tambahkan ke Menu Settings untuk memaparkannya di laman web.",
-      "skip": "Langkau",
+      "back": "Kembali",
       "next": "Seterusnya",
       "finish": "Selesai"
     },
@@ -2805,8 +2805,8 @@
       "slugConflict": "Slug halaman sudah wujud dalam laman ini",
       "noPagesFound": "Tiada halaman dijumpai",
       "noPagesSuggestion": "Cipta halaman pertama anda untuk bermula.",
-      "tooltipLive": "Halaman telah ditambah ke Menu dan telah diterbitkan.",
-      "tooltipDraft": "Halaman baru dibuat, belum ditambah ke menu atau telah dibuang dari menu."
+      "tooltipLive": "Halaman ini telah diterbitkan dan laman web anda aktif — ia dapat dilihat oleh pengunjung.",
+      "tooltipDraft": "Halaman ini tidak akan muncul di laman web anda. Sama ada halaman ini masih dalam draf atau laman web anda belum diterbitkan."
     },
     "navigationValidation": {
       "labelRequired": "Label pautan diperlukan",

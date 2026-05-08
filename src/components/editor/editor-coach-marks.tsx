@@ -24,11 +24,14 @@ function useAnchorRect(step: Step): DOMRect | null {
         if (step === 0) { setRect(null); return }
 
         const selector = step === 1 ? '[data-coach="page-library"]' : '[data-coach="menu-settings"]'
-        // Small defer so React can finish rendering the anchored element
+        // Step 2 anchor is inside a conditionally-rendered tab (renderMenuContent).
+        // onEnterStep2 triggers requestedTab → SettingsPanel useEffect → setActiveTab → re-render.
+        // That is 2 React flush cycles; 150ms covers the worst-case tab-switch commit latency.
+        const delay = step === 2 ? 150 : 50
         const timer = window.setTimeout(() => {
             const el = document.querySelector<HTMLElement>(selector)
             setRect(el ? el.getBoundingClientRect() : null)
-        }, 50)
+        }, delay)
 
         const handleResize = () => {
             const el = document.querySelector<HTMLElement>(selector)
@@ -87,13 +90,10 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
         }
     }, [step, finish, onEnterStep2])
 
-    // ESC key closes coach marks
-    useEffect(() => {
-        if (step === 0) return
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') finish() }
-        window.addEventListener('keydown', handler)
-        return () => window.removeEventListener('keydown', handler)
-    }, [step, finish])
+    const back = useCallback(() => {
+        onEnterStep1?.()
+        setStep(1)
+    }, [onEnterStep1])
 
     // rect.width === 0 means element is hidden (display:none) — avoid rendering at 0,0
     if (step === 0 || !rect || rect.width === 0) return null
@@ -107,11 +107,17 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
 
     return (
         <>
-            {/* Dimmed backdrop — click to dismiss */}
+            {/* 4-panel backdrop: blurs/dims outside spotlight, leaves spotlight area clear */}
+            <div className="fixed z-[60] bg-black/60 backdrop-blur-[2px]" style={{ top: 0, left: 0, right: 0, height: rect.top }} aria-hidden="true" />
+            <div className="fixed z-[60] bg-black/60 backdrop-blur-[2px]" style={{ top: rect.bottom, left: 0, right: 0, bottom: 0 }} aria-hidden="true" />
+            <div className="fixed z-[60] bg-black/60 backdrop-blur-[2px]" style={{ top: rect.top, left: 0, width: rect.left, height: rect.height }} aria-hidden="true" />
+            <div className="fixed z-[60] bg-black/60 backdrop-blur-[2px]" style={{ top: rect.top, left: rect.right, right: 0, height: rect.height }} aria-hidden="true" />
+
+            {/* Transparent click-blocker over spotlight — prevents interaction with underlying UI */}
             <div
-                className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]"
+                className="fixed z-[62]"
+                style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }}
                 aria-hidden="true"
-                onClick={finish}
             />
 
             {/* Spotlight ring — inset shadow avoids clipping at viewport edges */}
@@ -143,13 +149,15 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
                     {step === 1 ? cm.step1Body : cm.step2Body}
                 </p>
                 <div className="mt-4 flex items-center justify-between">
-                    <button
-                        type="button"
-                        onClick={finish}
-                        className="text-xs text-gray-400 transition-colors hover:text-white"
-                    >
-                        {cm.skip}
-                    </button>
+                    {step === 2 ? (
+                        <button
+                            type="button"
+                            onClick={back}
+                            className="text-xs text-gray-400 transition-colors hover:text-white"
+                        >
+                            {cm.back}
+                        </button>
+                    ) : <span />}
                     <button
                         type="button"
                         onClick={next}

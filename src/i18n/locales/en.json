@@ -2298,7 +2298,7 @@
       "step1Body": "Use Page Library to create and manage your website's internal pages.",
       "step2Title": "Step 2: Control menu visibility here",
       "step2Body": "After creating a page, add it to Menu Settings so it appears on your website.",
-      "skip": "Skip",
+      "back": "Back",
       "next": "Next",
       "finish": "Done"
     },
@@ -2805,8 +2805,8 @@
       "slugConflict": "Page slug already exists in this site",
       "noPagesFound": "No pages found",
       "noPagesSuggestion": "Create your first page to get started.",
-      "tooltipLive": "This page is published and linked in the menu — it's live on your website.",
-      "tooltipDraft": "This page is not linked in the menu or not published — it won't appear on your website."
+      "tooltipLive": "This page is published and your site is live — it's visible to visitors.",
+      "tooltipDraft": "This page won't appear on your website. Either the page is still a draft or your site hasn't been published yet."
     },
     "navigationValidation": {
       "labelRequired": "Link label is required",
