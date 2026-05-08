@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useI18n } from '@/i18n'
 
 const STORAGE_KEY = 'editor:coach-marks:v1:seen'
 const CARD_WIDTH = 300
+const VIEWPORT_MARGIN = 16
 
 type Step = 0 | 1 | 2
 
@@ -24,11 +25,14 @@ function useAnchorRect(step: Step): DOMRect | null {
         if (step === 0) { setRect(null); return }
 
         const selector = step === 1 ? '[data-coach="page-library"]' : '[data-coach="menu-settings"]'
-        // Small defer so React can finish rendering the anchored element
+        // Step 2 anchor is inside a conditionally-rendered tab (renderMenuContent).
+        // onEnterStep2 triggers requestedTab → SettingsPanel useEffect → setActiveTab → re-render.
+        // That is 2 React flush cycles; 150ms covers the worst-case tab-switch commit latency.
+        const delay = step === 2 ? 150 : 50
         const timer = window.setTimeout(() => {
             const el = document.querySelector<HTMLElement>(selector)
             setRect(el ? el.getBoundingClientRect() : null)
-        }, 50)
+        }, delay)
 
         const handleResize = () => {
             const el = document.querySelector<HTMLElement>(selector)
@@ -87,13 +91,19 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
         }
     }, [step, finish, onEnterStep2])
 
-    // ESC key closes coach marks
-    useEffect(() => {
-        if (step === 0) return
-        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') finish() }
-        window.addEventListener('keydown', handler)
-        return () => window.removeEventListener('keydown', handler)
-    }, [step, finish])
+    const back = useCallback(() => {
+        onEnterStep1?.()
+        setStep(1)
+    }, [onEnterStep1])
+
+    // Measure rendered card height so we can clamp position into viewport — long
+    // content (translations, future edits) would otherwise overflow off-screen.
+    const cardRef = useRef<HTMLDivElement | null>(null)
+    const [cardHeight, setCardHeight] = useState(0)
+    useLayoutEffect(() => {
+        if (!cardRef.current) return
+        setCardHeight(cardRef.current.offsetHeight)
+    }, [step, rect])
 
     // rect.width === 0 means element is hidden (display:none) — avoid rendering at 0,0
     if (step === 0 || !rect || rect.width === 0) return null
@@ -103,15 +113,31 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
         ? rect.right + 16
         : rect.left - CARD_WIDTH - 16
 
-    const popoverTop = rect.top + rect.height / 2
+    // Clamp vertical position so card (after translateY -50%) fits in viewport.
+    // Falls back to anchor-center on first render before cardHeight is measured.
+    const viewportH = typeof window !== 'undefined' ? window.innerHeight : 0
+    const anchorCenter = rect.top + rect.height / 2
+    const halfH = cardHeight / 2
+    const popoverTop = cardHeight === 0 || viewportH === 0
+        ? anchorCenter
+        : Math.min(
+            Math.max(anchorCenter, halfH + VIEWPORT_MARGIN),
+            viewportH - halfH - VIEWPORT_MARGIN,
+        )
 
     return (
         <>
-            {/* Dimmed backdrop — click to dismiss */}
+            {/* 4-panel backdrop: blurs/dims outside spotlight, leaves spotlight area clear */}
+            <div className="fixed z-[60] bg-black/60 backdrop-blur-[2px]" style={{ top: 0, left: 0, right: 0, height: rect.top }} aria-hidden="true" />
+            <div className="fixed z-[60] bg-black/60 backdrop-blur-[2px]" style={{ top: rect.bottom, left: 0, right: 0, bottom: 0 }} aria-hidden="true" />
+            <div className="fixed z-[60] bg-black/60 backdrop-blur-[2px]" style={{ top: rect.top, left: 0, width: rect.left, height: rect.height }} aria-hidden="true" />
+            <div className="fixed z-[60] bg-black/60 backdrop-blur-[2px]" style={{ top: rect.top, left: rect.right, right: 0, height: rect.height }} aria-hidden="true" />
+
+            {/* Transparent click-blocker over spotlight — prevents interaction with underlying UI */}
             <div
-                className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-[2px]"
+                className="fixed z-[62]"
+                style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }}
                 aria-hidden="true"
-                onClick={finish}
             />
 
             {/* Spotlight ring — inset shadow avoids clipping at viewport edges */}
@@ -129,11 +155,17 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
 
             {/* Popover card */}
             <div
+                ref={cardRef}
                 role="dialog"
                 aria-modal="false"
                 aria-label={step === 1 ? cm.step1Title : cm.step2Title}
-                className="fixed z-[70] w-[300px] rounded-xl border border-white/10 bg-[#1e293b] p-4 shadow-2xl"
-                style={{ top: popoverTop, left: popoverLeft, transform: 'translateY(-50%)' }}
+                className="fixed z-[70] w-[300px] overflow-y-auto rounded-xl border border-white/10 bg-[#1e293b] p-4 shadow-2xl"
+                style={{
+                    top: popoverTop,
+                    left: popoverLeft,
+                    transform: 'translateY(-50%)',
+                    maxHeight: `calc(100vh - ${VIEWPORT_MARGIN * 2}px)`,
+                }}
             >
                 <p className="text-[11px] font-medium uppercase tracking-wide text-cyan-400">{step}/2</p>
                 <p className="mt-1 text-sm font-semibold text-white">
@@ -143,13 +175,15 @@ export function EditorCoachMarks({ onEnterStep1, onEnterStep2, mountDelayMs = 50
                     {step === 1 ? cm.step1Body : cm.step2Body}
                 </p>
                 <div className="mt-4 flex items-center justify-between">
-                    <button
-                        type="button"
-                        onClick={finish}
-                        className="text-xs text-gray-400 transition-colors hover:text-white"
-                    >
-                        {cm.skip}
-                    </button>
+                    {step === 2 ? (
+                        <button
+                            type="button"
+                            onClick={back}
+                            className="text-xs text-gray-400 transition-colors hover:text-white"
+                        >
+                            {cm.back}
+                        </button>
+                    ) : <span />}
                     <button
                         type="button"
                         onClick={next}

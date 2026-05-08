@@ -84,12 +84,13 @@ const NAV_ITEMS: NavItemConfig[] = [
         href: '/customers',
     },
     {
-        label: { en: 'Site Settings', ms: 'Tetapan Laman' },
+        label: { en: 'Store Config', ms: 'Konfigurasi Stor' },
         icon: Settings,
         href: '/settings',
         children: [
             { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
             { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff' },
+            { label: { en: 'Account profile', ms: 'Profil Akaun' }, href: '/settings/profile' },
         ],
     },
     {
@@ -143,10 +144,11 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     return {
                         ...item,
                         children: item.children.filter(child => {
-                            // Only owner can see the Staff menu
+                            // Only owner can see Staff menu
                             if (child.href === '/settings/staff') {
                                 return currentUserRole === 'owner';
                             }
+
                             return true;
                         })
                     }

@@ -31,15 +31,18 @@ export function useTabAuthority(siteId: string) {
             createdAt: createdAtRef.current,
         } satisfies TabMessage)
 
+        const tabId = tabIdRef.current
+        const createdAt = createdAtRef.current
+
         channel.onmessage = (e: MessageEvent<TabMessage>) => {
             const msg = e.data
             if (msg.siteId !== siteId) return
 
-            if (msg.type === 'CLAIM_AUTHORITY' && msg.tabId !== tabIdRef.current) {
+            if (msg.type === 'CLAIM_AUTHORITY' && msg.tabId !== tabId) {
                 // Deterministic: newer tab (higher createdAt) wins
                 // Tie-break by tabId string compare
-                const theyWin = msg.createdAt > createdAtRef.current
-                    || (msg.createdAt === createdAtRef.current && msg.tabId > tabIdRef.current)
+                const theyWin = msg.createdAt > createdAt
+                    || (msg.createdAt === createdAt && msg.tabId > tabId)
                 if (theyWin) {
                     setIsMaster(false)
                 }
@@ -50,8 +53,8 @@ export function useTabAuthority(siteId: string) {
             channel.postMessage({
                 type: 'YIELD_AUTHORITY',
                 siteId,
-                tabId: tabIdRef.current,
-                createdAt: createdAtRef.current,
+                tabId,
+                createdAt,
             } satisfies TabMessage)
             channel.close()
             channelRef.current = null

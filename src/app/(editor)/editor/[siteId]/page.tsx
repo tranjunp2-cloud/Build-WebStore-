@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
-import { collectMenuPageIds } from '@/lib/menu-page-links'
 import { EditorCoachMarks } from '@/components/editor/editor-coach-marks'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
@@ -16,6 +15,9 @@ import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
+import { useWorkspaceStore } from '@/store/workspaceStore'
+import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
+import { EDITOR_SIDEBAR_WIDTH, SETTINGS_PANEL_WIDTH } from '@/components/editor/layout-constants'
 import type { AIAction } from '@/types/editor'
 import { useI18n } from '@/i18n'
 import { PrePublishModal } from '@/components/editor/PrePublishModal'
@@ -116,6 +118,11 @@ export default function EditorPage() {
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
+
+    // Workspace layout (left/right sidebar visibility, persisted in localStorage)
+    const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
+    const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
+    useWorkspaceShortcuts()
     const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string } | null>(null)
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
@@ -161,11 +168,6 @@ export default function EditorPage() {
     const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
     const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
-
-    const menuPageIds = useMemo(() => {
-        const rawLinks = ((headerBlock as Record<string, unknown> | null)?.links as Array<Record<string, unknown>>) ?? []
-        return collectMenuPageIds(rawLinks, pages)
-    }, [headerBlock, pages])
 
     const currentBlock = useMemo(
         () => (selectedBlock !== null ? blocks[selectedBlock] || null : null),
@@ -843,6 +845,40 @@ export default function EditorPage() {
         }, 0)
     }, [canRedo, redo])
 
+    // Wait for any in-flight save to complete, then save if there are pending changes.
+    // Prevents publish from reading a stale draft when the user clicks Publish
+    // immediately after a variant/block change (race: saveWithRetry is async/fire-and-forget).
+    const flushSavesBeforePublish = useCallback(async (): Promise<boolean> => {
+        // Poll until in-flight save finishes (max 10s)
+        if (isSavingRef.current) {
+            await new Promise<void>((resolve) => {
+                const deadline = Date.now() + 10_000
+                const check = setInterval(() => {
+                    if (!isSavingRef.current || Date.now() > deadline) {
+                        clearInterval(check)
+                        resolve()
+                    }
+                }, 100)
+            })
+        }
+        // Save any remaining unsaved changes
+        if (useEditorStore.getState().hasUnsavedChanges) {
+            const saved = await handleSave({ showToast: false, refreshPreview: false })
+            if (!saved) return false
+            // Wait for that save to finish too
+            await new Promise<void>((resolve) => {
+                const deadline = Date.now() + 10_000
+                const check = setInterval(() => {
+                    if (!isSavingRef.current || Date.now() > deadline) {
+                        clearInterval(check)
+                        resolve()
+                    }
+                }, 100)
+            })
+        }
+        return true
+    }, [handleSave])
+
     const handlePublish = useCallback(async () => {
         if (!siteId || isPublishing) return
 
@@ -850,12 +886,10 @@ export default function EditorPage() {
         const currentlyPublished = site?.status === 'published'
 
         try {
-            if (hasUnsavedChanges) {
-                const saved = await handleSave({ showToast: false, refreshPreview: true })
-                if (!saved) {
-                    setIsPublishing(false)
-                    return
-                }
+            const flushed = await flushSavesBeforePublish()
+            if (!flushed) {
+                setIsPublishing(false)
+                return
             }
 
             const res = await fetch(`/api/sites/${siteId}/publish`, {
@@ -950,7 +984,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, setPages, site?.status, siteId, siteName])
+    }, [flushSavesBeforePublish, isPublishing, markPublished, setPages, site?.status, siteId, siteName])
 
     // Re-publish: always PATCH (never DELETE). Used by "Update" button on published sites.
     const handleRepublish = useCallback(async () => {
@@ -958,12 +992,10 @@ export default function EditorPage() {
 
         setIsPublishing(true)
         try {
-            if (hasUnsavedChanges) {
-                const saved = await handleSave({ showToast: false, refreshPreview: true })
-                if (!saved) {
-                    setIsPublishing(false)
-                    return
-                }
+            const flushed = await flushSavesBeforePublish()
+            if (!flushed) {
+                setIsPublishing(false)
+                return
             }
 
             const res = await fetch(`/api/sites/${siteId}/publish`, {
@@ -1048,7 +1080,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, setPages, siteId])
+    }, [flushSavesBeforePublish, isPublishing, markPublished, setPages, siteId])
 
     const handlePageSelected = useCallback(async (pageId: string) => {
         const store = useEditorStore.getState()
@@ -1169,7 +1201,6 @@ export default function EditorPage() {
                     siteId={siteId}
                     currentPageId={currentPageId}
                     siteStatus={site?.status}
-                    menuPageIds={menuPageIds}
                     onPageSelected={handlePageSelected}
                     onPagesChanged={() => setIframeKey(key => key + 1)}
                     onEditPage={() => setActiveSidebarTab('chat')}
@@ -1318,13 +1349,21 @@ export default function EditorPage() {
                 </div>
             ) : (
                 <div className="flex flex-1 overflow-hidden">
-                    <EditorSidebar
-                        tabs={sidebarTabs}
-                        activeTab={activeSidebarTab}
-                        onTabChange={setActiveSidebarTab}
+                    <div
+                        className="shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out"
+                        style={{
+                            width: leftSidebarVisible ? EDITOR_SIDEBAR_WIDTH : 0,
+                            opacity: leftSidebarVisible ? 1 : 0,
+                        }}
                     >
-                        {sidebarContent}
-                    </EditorSidebar>
+                        <EditorSidebar
+                            tabs={sidebarTabs}
+                            activeTab={activeSidebarTab}
+                            onTabChange={setActiveSidebarTab}
+                        >
+                            {sidebarContent}
+                        </EditorSidebar>
+                    </div>
 
                     <div className={cn("flex flex-1 flex-col transition-opacity duration-300", isTransitioning && "opacity-0")}>
                         <PreviewFrame
@@ -1385,36 +1424,44 @@ export default function EditorPage() {
                         />
                     </div>
 
-                    <SettingsPanel
-                        block={currentBlock}
-                        blockIndex={selectedBlock}
-                        theme={theme}
-                        site={site}
-                        siteName={siteName || site?.name || ''}
-                        siteStatus={site?.status || 'draft'}
-                        headerBlock={headerBlock}
-                        footerBlock={footerBlock}
-                        pages={pages}
-                        currentPageId={currentPageId}
-                        onThemeChange={handleThemeChange}
-                        onBlockFieldChange={handleBlockFieldChange}
-                        onBlockUpdate={handleBlockUpdate}
-                        onHeaderUpdate={(changes) => {
-                            updateHeaderBlock(changes)
-                            const updatedHeader = useEditorStore.getState().headerBlock
-                            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
-                            void saveWithRetry({ showToast: false, refreshPreview: false })
+                    <div
+                        className="shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out"
+                        style={{
+                            width: rightSidebarVisible ? SETTINGS_PANEL_WIDTH : 0,
+                            opacity: rightSidebarVisible ? 1 : 0,
                         }}
-                        onFooterUpdate={(changes) => {
-                            updateFooterBlock(changes)
-                            const updatedFooter = useEditorStore.getState().footerBlock
-                            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
-                            void saveWithRetry({ showToast: false, refreshPreview: false })
-                        }}
-                        onSiteSettingsChange={handleSiteSettingsChange}
-                        onPageUpdate={handlePageUpdate}
-                        requestedTab={settingsRequestedTab}
-                    />
+                    >
+                        <SettingsPanel
+                            block={currentBlock}
+                            blockIndex={selectedBlock}
+                            theme={theme}
+                            site={site}
+                            siteName={siteName || site?.name || ''}
+                            siteStatus={site?.status || 'draft'}
+                            headerBlock={headerBlock}
+                            footerBlock={footerBlock}
+                            pages={pages}
+                            currentPageId={currentPageId}
+                            onThemeChange={handleThemeChange}
+                            onBlockFieldChange={handleBlockFieldChange}
+                            onBlockUpdate={handleBlockUpdate}
+                            onHeaderUpdate={(changes) => {
+                                updateHeaderBlock(changes)
+                                const updatedHeader = useEditorStore.getState().headerBlock
+                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
+                                void saveWithRetry({ showToast: false, refreshPreview: false })
+                            }}
+                            onFooterUpdate={(changes) => {
+                                updateFooterBlock(changes)
+                                const updatedFooter = useEditorStore.getState().footerBlock
+                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                                void saveWithRetry({ showToast: false, refreshPreview: false })
+                            }}
+                            onSiteSettingsChange={handleSiteSettingsChange}
+                            onPageUpdate={handlePageUpdate}
+                            requestedTab={settingsRequestedTab}
+                        />
+                    </div>
                 </div>
             )}
 

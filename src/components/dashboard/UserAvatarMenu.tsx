@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, LogOut, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
+import { useUserAvatar } from '@/providers/UserAvatarContext'
 
 type UserAvatarMenuProps = {
     userName: string
@@ -15,9 +17,12 @@ type UserAvatarMenuProps = {
 
 export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarMenuProps) {
     const [open, setOpen] = useState(false)
+    const [imgFailed, setImgFailed] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const router = useRouter()
     const { t } = useI18n()
+    const { avatarUrl } = useUserAvatar()
+    const showImage = avatarUrl && !imgFailed
 
     // Close on click outside
     useEffect(() => {
@@ -56,8 +61,17 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
                 aria-haspopup="true"
                 aria-expanded={open}
             >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white shadow-[0_0_0_2px_rgba(59,130,246,0.3)]">
-                    {userInitial}
+                <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white shadow-[0_0_0_2px_rgba(59,130,246,0.3)] overflow-hidden">
+                    {showImage ? (
+                        <Image
+                            src={avatarUrl}
+                            alt={userName}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                            onError={() => setImgFailed(true)}
+                        />
+                    ) : userInitial}
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-400" />
             </button>
@@ -79,7 +93,7 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
 
                     {/* Profile */}
                     <button
-                        onClick={() => { setOpen(false); router.push('/dashboard/settings') }}
+                        onClick={() => { setOpen(false); router.push('/settings/profile') }}
                         className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 bg-transparent border-none outline-none hover:bg-white/5 cursor-pointer transition-colors text-left text-[14px] font-normal leading-[1.43] text-[#F8FAFC]"
                     >
                         <User className="h-4 w-4" />

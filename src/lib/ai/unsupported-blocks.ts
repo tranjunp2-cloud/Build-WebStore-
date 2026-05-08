@@ -41,12 +41,24 @@ export const BLOCKS_NOT_IN_PAYLOAD: ReadonlySet<string> = new Set([
     'review-cards',
 ])
 
+// feat/fix-broken-block-variants: blocks hidden until render/variant issues are resolved.
+// Re-enable: remove entry here + from TEMP_HIDDEN_BLOCK_TYPES (template-composer.ts) + EDITOR_HIDDEN_BLOCKS (block-registry-reader.ts).
+// PR #836 accidentally re-enabled doctor-profile, gallery-masonry, before-after — re-hidden 260508.
+export const BLOCKS_TEMP_HIDDEN: ReadonlySet<string> = new Set([
+    'step-process',
+    'booking-widget',
+    'doctor-profile',
+    'gallery-masonry',
+    'before-after',
+    'property-card',
+])
+
 /**
  * Returns true if the given blockType should be dropped before reaching Payload.
- * Both lists OR'd together — the union is what ends up being rejected.
+ * All lists OR'd together — the union is what ends up being rejected.
  */
 export function isUnsupportedBlock(blockType: string): boolean {
-    return BLOCKS_REQUIRE_MEDIA_PIPELINE.has(blockType) || BLOCKS_NOT_IN_PAYLOAD.has(blockType)
+    return BLOCKS_REQUIRE_MEDIA_PIPELINE.has(blockType) || BLOCKS_NOT_IN_PAYLOAD.has(blockType) || BLOCKS_TEMP_HIDDEN.has(blockType)
 }
 
 /**

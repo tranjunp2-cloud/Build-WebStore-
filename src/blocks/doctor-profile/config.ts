@@ -46,7 +46,7 @@ export const doctorProfileMeta = {
     defaultVariant: 'cards',
     editableFields: ['headline', 'subheadline', 'doctors'],
     quickActions: ['Add doctor', 'Update availability', 'Edit qualifications'],
-    aiVisible: true,
+    aiVisible: false, // hidden: not supported by harness (re-hidden 260508 after PR #836 accidentally re-enabled)
     category: 'content' as const,
 }
 

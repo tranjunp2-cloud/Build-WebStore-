@@ -493,7 +493,7 @@ const MIDDLE_BLOCK_POOL = ['about', 'features', 'stats', 'testimonials', 'faq', 
 const INDUSTRY_BLOCKS_FALLBACK: Record<BusinessIntent['type'], string[]> = {
     business: [],
     ecommerce: ['products-grid', 'review-cards'],
-    restaurant: ['menu-display', 'booking-widget', 'review-cards'],
+    restaurant: ['menu-display', /* 'booking-widget', */ 'review-cards'], // feat/fix-broken-block-variants: temporarily hidden
     portfolio: ['portfolio-grid'],
     blog: ['blog-list'],
 }
