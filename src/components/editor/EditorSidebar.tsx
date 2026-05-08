@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { EDITOR_SIDEBAR_WIDTH } from './layout-constants'
 
 export type EditorSidebarTabId = 'chat' | 'components' | 'pages'
 
@@ -65,7 +66,10 @@ export function EditorSidebar({
     }
 
     return (
-        <aside className="flex h-full w-[360px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0F172A]">
+        <aside
+            className="flex h-full shrink-0 flex-col border-r border-white/[0.06] bg-[#0F172A]"
+            style={{ width: EDITOR_SIDEBAR_WIDTH }}
+        >
             <div className="border-b border-white/[0.06] bg-[#0B1120]/60">
                 <div className="flex items-stretch px-2 pt-1">
                     {tabs.map(tab => {

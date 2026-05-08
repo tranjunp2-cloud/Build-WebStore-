@@ -17,6 +17,7 @@ import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
+import { EDITOR_SIDEBAR_WIDTH, SETTINGS_PANEL_WIDTH } from '@/components/editor/layout-constants'
 import type { AIAction } from '@/types/editor'
 import { useI18n } from '@/i18n'
 import { PrePublishModal } from '@/components/editor/PrePublishModal'
@@ -1324,10 +1325,11 @@ export default function EditorPage() {
             ) : (
                 <div className="flex flex-1 overflow-hidden">
                     <div
-                        className={cn(
-                            'shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out',
-                            leftSidebarVisible ? 'w-[360px] opacity-100' : 'w-0 opacity-0',
-                        )}
+                        className="shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out"
+                        style={{
+                            width: leftSidebarVisible ? EDITOR_SIDEBAR_WIDTH : 0,
+                            opacity: leftSidebarVisible ? 1 : 0,
+                        }}
                     >
                         <EditorSidebar
                             tabs={sidebarTabs}
@@ -1398,10 +1400,11 @@ export default function EditorPage() {
                     </div>
 
                     <div
-                        className={cn(
-                            'shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out',
-                            rightSidebarVisible ? 'w-[320px] opacity-100' : 'w-0 opacity-0',
-                        )}
+                        className="shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out"
+                        style={{
+                            width: rightSidebarVisible ? SETTINGS_PANEL_WIDTH : 0,
+                            opacity: rightSidebarVisible ? 1 : 0,
+                        }}
                     >
                         <SettingsPanel
                             block={currentBlock}

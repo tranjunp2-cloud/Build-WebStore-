@@ -23,6 +23,7 @@ import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, Testimonial
 import type { StepItem } from '@/blocks/step-process/config'
 import type { FAQConfig } from '@/blocks/faq/config'
 import type { TeamConfig } from '@/blocks/team/config'
+import { SETTINGS_PANEL_WIDTH } from './layout-constants'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { useEditorStore } from '@/store/editorStore'
@@ -1206,7 +1207,11 @@ function SettingsPanelInner({
     ]
 
     return (
-        <div data-coach="menu-settings" className="flex h-full w-[320px] shrink-0 flex-col border-l border-white/5 bg-[#111827]">
+        <div
+            data-coach="menu-settings"
+            className="flex h-full shrink-0 flex-col border-l border-white/5 bg-[#111827]"
+            style={{ width: SETTINGS_PANEL_WIDTH }}
+        >
             <div className="border-b border-white/5 px-4 py-4">
                 <div className="grid grid-cols-2 gap-2">
                     {tabs.map(tab => (
