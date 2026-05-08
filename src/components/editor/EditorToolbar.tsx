@@ -91,7 +91,7 @@ function WorkspaceLayoutControls() {
         )
 
     return (
-        <div className="flex items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-0.5">
             <Popover>
                 <PopoverTrigger asChild>
                     <button type="button" className={iconCls(false)} title="Layout presets">
@@ -357,7 +357,7 @@ export function EditorToolbar({
 
                 <div className="inline-flex h-8 items-center gap-2 rounded-lg bg-white/[0.04] px-3">
                     <CurrentPageIcon className="h-3.5 w-3.5 text-slate-400" />
-                    <span className="hidden min-[1200px]:inline max-w-[120px] truncate text-[12px] font-medium text-slate-300">{currentPageTitle}</span>
+                    <span className="hidden min-[1500px]:inline max-w-[120px] truncate text-[12px] font-medium text-slate-300">{currentPageTitle}</span>
                 </div>
 
                 <button
@@ -367,7 +367,7 @@ export function EditorToolbar({
                     title={et.templates}
                 >
                     <span className="text-base leading-none">🎨</span>
-                    <span className="hidden min-[1200px]:inline">{et.templates}</span>
+                    <span className="hidden min-[1500px]:inline">{et.templates}</span>
                 </button>
 
                 <div className="mx-1.5 h-4 w-px bg-white/[0.08]" />
@@ -380,7 +380,7 @@ export function EditorToolbar({
                     title={et.undoShortcut}
                 >
                     <Undo2 className="h-4 w-4" />
-                    {et.undo}
+                    <span className="hidden min-[1500px]:inline">{et.undo}</span>
                 </button>
 
                 <button
@@ -391,7 +391,7 @@ export function EditorToolbar({
                     title={et.redoShortcut}
                 >
                     <Redo2 className="h-4 w-4" />
-                    {et.redo}
+                    <span className="hidden min-[1500px]:inline">{et.redo}</span>
                 </button>
 
                 <div className="mx-1.5 h-4 w-px bg-white/[0.08]" />
@@ -410,7 +410,7 @@ export function EditorToolbar({
                         )}
                     >
                         <span className="text-[15px] leading-none">💻</span>
-                        {et.desktop}
+                        <span className="hidden min-[1400px]:inline">{et.desktop}</span>
                     </button>
                     <button
                         type="button"
@@ -423,7 +423,7 @@ export function EditorToolbar({
                         )}
                     >
                         <span className="text-[15px] leading-none">📱</span>
-                        {et.mobile}
+                        <span className="hidden min-[1400px]:inline">{et.mobile}</span>
                     </button>
                 </div>
             </div>
@@ -442,18 +442,24 @@ export function EditorToolbar({
 
                 {(() => {
                     const ps = derivePublishState({ isPublished, isPublishing, hasUnsavedChanges, hasUnpublishedChanges })
-                    const badgeConfig: Record<PublishState, { label: string; cls: string }> = {
+                    const badgeConfig: Record<PublishState, { label: string; cls: string; dot?: string }> = {
                         draft: { label: et.draft, cls: 'bg-white/[0.06] text-slate-400' },
-                        publishing: { label: et.publishing, cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
-                        live: { label: et.live, cls: 'bg-emerald-500/15 text-emerald-400' },
-                        'live-dirty': { label: et.changesPending, cls: 'bg-amber-500/15 text-amber-400' },
-                        updating: { label: et.updating || 'Updating...', cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
+                        publishing: { label: et.publishing, cls: 'bg-blue-500/15 text-blue-400 animate-pulse', dot: 'bg-blue-400' },
+                        live: { label: et.live, cls: 'bg-emerald-500/15 text-emerald-400', dot: 'bg-emerald-400' },
+                        'live-dirty': { label: et.changesPending, cls: 'bg-amber-500/15 text-amber-400', dot: 'bg-amber-400 animate-pulse' },
+                        updating: { label: et.updating || 'Updating...', cls: 'bg-blue-500/15 text-blue-400 animate-pulse', dot: 'bg-blue-400' },
                     }
-                    const { label, cls } = badgeConfig[ps]
+                    const { label, cls, dot } = badgeConfig[ps]
+                    // Below 1300px the draft badge collapses entirely (no actionable info);
+                    // other states keep a colored dot so the user still sees status at a glance.
+                    const wrapperVisibility = ps === 'draft' ? 'hidden min-[1300px]:inline-flex' : 'inline-flex'
                     return (
-                        <div className={cn('inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider', cls)}>
-                            {ps === 'live' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
-                            {label}
+                        <div
+                            className={cn(wrapperVisibility, 'h-6 items-center gap-1.5 rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider', cls)}
+                            title={label}
+                        >
+                            {dot && <span className={cn('h-1.5 w-1.5 rounded-full', dot)} />}
+                            <span className="hidden min-[1300px]:inline">{label}</span>
                         </div>
                     )
                 })()}
@@ -466,7 +472,7 @@ export function EditorToolbar({
                         title={et.preview}
                     >
                         <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-                        <span className="hidden min-[1200px]:inline">{et.preview}</span>
+                        <span className="hidden min-[1300px]:inline">{et.preview}</span>
                     </a>
                 </Button>
 
