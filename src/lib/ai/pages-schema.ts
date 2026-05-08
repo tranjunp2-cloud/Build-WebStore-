@@ -253,6 +253,16 @@ function sanitizeNestedItems(block: Record<string, unknown>): void {
         })
     }
 
+    // Special-case: portfolio-grid.projects[].title is required by Payload.
+    // AI gen with large project counts (e.g. 12) may produce null/empty titles for later items.
+    if (block.blockType === 'portfolio-grid' && Array.isArray(block.projects)) {
+        block.projects = (block.projects as Array<Record<string, unknown>>).map((proj, i) => {
+            if (!proj || typeof proj !== 'object') return proj
+            if (!proj.title) return { ...proj, title: `Project ${i + 1}` }
+            return proj
+        })
+    }
+
     // Special-case: pricing.plans[].features may be string[] or object[].
     // Normalize to the Payload-required {text, included} shape.
     if (block.blockType === 'pricing' && Array.isArray(block.plans)) {
