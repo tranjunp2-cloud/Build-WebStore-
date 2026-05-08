@@ -13,9 +13,14 @@ import {
     FileText,
     Globe,
     Home,
+    LayoutGrid,
     Loader2,
     Menu,
     Monitor,
+    PanelLeftClose,
+    PanelLeftOpen,
+    PanelRightClose,
+    PanelRightOpen,
     RefreshCw,
     ShoppingBag,
     Smartphone,
@@ -27,9 +32,123 @@ import {
     Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import type { PageData } from '@/store/editorStore'
+import { useWorkspaceStore, type WorkspacePreset } from '@/store/workspaceStore'
+
+// ── Workspace layout controls ────────────────────────────────────────────
+// Three header icons: layout-preset popover, left-sidebar toggle, right-sidebar toggle.
+// State lives in workspaceStore (Zustand + localStorage persist).
+
+const PRESETS: Array<{
+    id: WorkspacePreset
+    label: string
+    cells: ('rail' | 'preview')[]
+}> = [
+    { id: 'default', label: 'Default', cells: ['rail', 'preview', 'rail'] },
+    { id: 'focus', label: 'Focus', cells: ['preview'] },
+    { id: 'structure', label: 'Structure', cells: ['rail', 'preview'] },
+    { id: 'content', label: 'Content', cells: ['preview', 'rail'] },
+]
+
+function PresetThumb({ cells }: { cells: ('rail' | 'preview')[] }) {
+    return (
+        <div className="flex h-8 w-full items-center gap-0.5 rounded-md border border-white/[0.08] bg-[#0B1120] p-1">
+            {cells.map((cell, i) => (
+                <div
+                    key={i}
+                    className={cn(
+                        'h-full rounded-sm',
+                        cell === 'preview'
+                            ? 'flex-1 bg-gradient-to-r from-[#3B82F6]/40 to-[#2DD4BF]/40'
+                            : 'w-3 bg-white/[0.08]',
+                    )}
+                />
+            ))}
+        </div>
+    )
+}
+
+function WorkspaceLayoutControls() {
+    const leftVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
+    const rightVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
+    const preset = useWorkspaceStore((s) => s.preset)
+    const toggleLeft = useWorkspaceStore((s) => s.toggleLeft)
+    const toggleRight = useWorkspaceStore((s) => s.toggleRight)
+    const applyPreset = useWorkspaceStore((s) => s.applyPreset)
+
+    const iconCls = (active: boolean) =>
+        cn(
+            'inline-flex h-8 w-8 items-center justify-center rounded-[10px] transition-colors',
+            active
+                ? 'bg-white/[0.08] text-[#F8FAFC] hover:bg-white/[0.12]'
+                : 'text-slate-500 hover:bg-white/5 hover:text-[#F8FAFC]',
+        )
+
+    return (
+        <div className="flex items-center gap-0.5">
+            <Popover>
+                <PopoverTrigger asChild>
+                    <button type="button" className={iconCls(false)} title="Layout presets">
+                        <LayoutGrid className="h-4 w-4" />
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent
+                    align="start"
+                    sideOffset={8}
+                    className="w-56 rounded-xl border border-white/[0.08] bg-[#1E293B] p-2 text-slate-200 shadow-2xl"
+                >
+                    <div className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        Workspace
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {PRESETS.map((p) => {
+                            const active = preset === p.id
+                            return (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => applyPreset(p.id)}
+                                    className={cn(
+                                        'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors',
+                                        active
+                                            ? 'border-[#3B82F6]/60 bg-[#3B82F6]/10'
+                                            : 'border-white/[0.06] bg-transparent hover:bg-white/[0.04]',
+                                    )}
+                                >
+                                    <PresetThumb cells={p.cells} />
+                                    <span className="text-[11px] font-medium text-slate-200">{p.label}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </PopoverContent>
+            </Popover>
+
+            <button
+                type="button"
+                onClick={toggleLeft}
+                className={iconCls(leftVisible)}
+                title={leftVisible ? 'Hide left sidebar' : 'Show left sidebar'}
+                aria-pressed={leftVisible}
+            >
+                {leftVisible ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </button>
+
+            <button
+                type="button"
+                onClick={toggleRight}
+                className={iconCls(rightVisible)}
+                title={rightVisible ? 'Hide right sidebar' : 'Show right sidebar'}
+                aria-pressed={rightVisible}
+            >
+                {rightVisible ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+            </button>
+        </div>
+    )
+}
 
 export type PublishState = 'draft' | 'publishing' | 'live' | 'live-dirty' | 'updating'
 
@@ -270,6 +389,8 @@ export function EditorToolbar({
                     <Redo2 className="h-4 w-4" />
                     {et.redo}
                 </button>
+
+                <div className="mx-1.5 h-4 w-px bg-white/[0.08]" />
             </div>
 
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -304,6 +425,10 @@ export function EditorToolbar({
             </div>
 
             <div className="flex items-center gap-2.5">
+                <WorkspaceLayoutControls />
+
+                <div className="h-4 w-px bg-white/[0.08]" />
+
                 <div className="inline-flex items-center gap-1.5 text-[11px]">
                     <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
                     <span className="text-slate-400">{isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
