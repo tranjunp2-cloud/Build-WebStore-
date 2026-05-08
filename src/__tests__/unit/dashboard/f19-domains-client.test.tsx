@@ -105,9 +105,9 @@ describe('F19 Domain Management (DomainsClient)', () => {
         await waitFor(() => {
             expect(actions.addCustomDomain).toHaveBeenCalledWith('newstore.com');
             // Without verification[] in the response, the client treats it as
-            // immediately active and shows the SSL-provisioning toast.
+            // immediately active and shows the DNS setup toast (not SSL-provisioning).
             expect(toast.success).toHaveBeenCalledWith(
-                expect.stringContaining('Domain active. SSL provisioning'),
+                expect.stringContaining('Domain connected! Configure DNS records below'),
             );
         });
     });
@@ -306,6 +306,33 @@ describe('F19 Domain Management (DomainsClient)', () => {
         // instructions render below it.
         expect(screen.getByText('pending.com')).toBeInTheDocument();
         expect(screen.getByText('Pending Verification')).toBeInTheDocument();
+    });
+
+    // TC-U-14 — vercelVerification from DB must survive page refresh.
+    // Root cause: page.tsx was dropping vercelVerification when building customDomains,
+    // so verifications state init was always empty → TxtChallengeCard vanished on reload.
+    it('[TC-U-14] TxtChallengeCard renders on page load when vercelVerification is in props', () => {
+        const verification = [
+            {
+                type: 'TXT' as const,
+                domain: '_vercel.reload-test.com',
+                value: 'vc-domain-verify-abc123',
+                reason: 'missing_txt',
+            },
+        ];
+
+        render(<DomainsClient
+            tenantId="tenant-1"
+            tenantSlug="mywebstore"
+            customDomains={[
+                { domain: 'reload-test.com', status: 'pending', isPrimary: false, vercelVerification: verification },
+            ]}
+        />);
+
+        // TxtChallengeCard should render immediately (no add action required)
+        expect(screen.getByRole('region', { name: /Verify domain ownership/i })).toBeInTheDocument();
+        expect(screen.getByText('_vercel.reload-test.com')).toBeInTheDocument();
+        expect(screen.getByText('vc-domain-verify-abc123')).toBeInTheDocument();
     });
 
     // SSL provisioning state — when status flips to active after verify,

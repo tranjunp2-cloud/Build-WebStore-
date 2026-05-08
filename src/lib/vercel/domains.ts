@@ -185,13 +185,16 @@ export async function addProjectDomain(name: string): Promise<VercelDomain> {
     const { projectId } = assertVercelEnv()
     // gitBranch routes the domain to the correct environment's latest deployment.
     // VERCEL_GIT_COMMIT_REF is injected by Vercel at build time ('staging', 'main', etc.).
-    // Without this, Vercel defaults to production — causing DEPLOYMENT_NOT_FOUND on staging.
-    const gitBranch = process.env.VERCEL_GIT_COMMIT_REF ?? 'main'
+    // Without it (local dev), omit gitBranch entirely — Vercel defaults to the project's
+    // production branch and avoids "cannot_set_production_branch_as_preview" 400 errors.
+    const gitBranch = process.env.VERCEL_GIT_COMMIT_REF
+    const body: Record<string, string> = { name }
+    if (gitBranch) body.gitBranch = gitBranch
     return vercelFetch<VercelDomain>(
         `/v10/projects/${encodeURIComponent(projectId)}/domains`,
         {
             method: 'POST',
-            body: JSON.stringify({ name, gitBranch }),
+            body: JSON.stringify(body),
         },
     )
 }

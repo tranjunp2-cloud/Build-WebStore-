@@ -116,7 +116,9 @@ describe('addProjectDomain', () => {
             `https://api.vercel.com/v10/projects/${PROJECT_ID}/domains?teamId=${TEAM_ID}`,
         )
         expect(init.method).toBe('POST')
-        expect(init.body).toBe(JSON.stringify({ name: 'example.com', gitBranch: 'main' }))
+        // VERCEL_GIT_COMMIT_REF not set in test env → gitBranch omitted to avoid
+        // "cannot_set_production_branch_as_preview" 400 from Vercel.
+        expect(init.body).toBe(JSON.stringify({ name: 'example.com' }))
         const headers = init.headers as Record<string, string>
         expect(headers.Authorization).toBe(`Bearer ${TOKEN}`)
         expect(headers['Content-Type']).toBe('application/json')
