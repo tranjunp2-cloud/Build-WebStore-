@@ -227,14 +227,14 @@ type NavCTAButtonProps = {
     onClick?: () => void
 }
 
-/** Desktop CTA button — gradient bg, flex-centered text. */
+/** Desktop CTA button — gradient bg + min-h 44px (WCAG 2.5.5). */
 function NavCTAButton({
     href = '#',
     label,
     className = 'hidden sm:inline-flex px-5 py-2.5',
     onClick,
 }: NavCTAButtonProps) {
-    const cls = `${className} rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 flex items-center justify-center`.trim()
+    const cls = `${className} rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
     return (
         <motion.a
             href={href}
@@ -911,7 +911,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                     {ctaButton?.show && (
                         <a
                             href={ctaButton.url || '#'}
-                            className={`hidden sm:inline-flex px-4 py-2 rounded-full text-sm font-semibold text-white text-center transition-all duration-200 items-center justify-center`}
+                            className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
                             style={{ background: CTA_GRADIENT_BACKGROUND }}
                         >
                             {ctaButton.label}
