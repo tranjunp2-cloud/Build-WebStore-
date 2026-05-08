@@ -32,6 +32,14 @@ vi.mock('@/lib/images/industry-images', () => ({
     ]),
 }))
 
+vi.mock('@/lib/images/blog-thumbnail-images', () => ({
+    getBlogThumbnails: vi.fn().mockReturnValue([
+        'https://images.unsplash.com/thumb-0',
+        'https://images.unsplash.com/thumb-1',
+        'https://images.unsplash.com/thumb-2',
+    ] as [string, string, string]),
+}))
+
 vi.mock('@/lib/ai/unsplash-client', () => ({
     searchPhotos: vi.fn().mockResolvedValue([
         {
@@ -51,6 +59,7 @@ const getUploadImageUrl = async () => (await import('@/lib/ai/upload-media')).up
 const getSearchPhotos = async () => (await import('@/lib/ai/unsplash-client')).searchPhotos
 const getBuildImgixUrl = async () => (await import('@/lib/ai/unsplash-client')).buildImgixUrl
 const getGalleryImagesMock = async () => (await import('@/lib/images/industry-images')).getGalleryImages
+const getBlogThumbnailsMock = async () => (await import('@/lib/images/blog-thumbnail-images')).getBlogThumbnails
 
 const makePayload = (countDocs = 0) => ({
     count: vi.fn().mockResolvedValue({ totalDocs: countDocs }),
@@ -234,18 +243,18 @@ describe('TC-F08-BS.08b — no thumbnail field when uploadImageUrl returns undef
     })
 })
 
-describe('TC-F08-BS.09 — Tier C fallback: searchPhotos returns []; gallery URL used', () => {
-    it('uses gallery[i] URL when searchPhotos returns empty; thumbnail still attached', async () => {
+describe('TC-F08-BS.09 — Tier B fallback: searchPhotos returns []; getBlogThumbnails URL used', () => {
+    it('uses getBlogThumbnails[i] URL when searchPhotos returns empty; thumbnail still attached', async () => {
         const searchPhotos = await getSearchPhotos()
-        const getGalleryImages = await getGalleryImagesMock()
+        const getBlogThumbnails = await getBlogThumbnailsMock()
         const uploadImageUrl = await getUploadImageUrl()
 
         vi.mocked(searchPhotos).mockResolvedValue([])
-        vi.mocked(getGalleryImages).mockReturnValue([
-            'https://images.unsplash.com/gallery-c-0',
-            'https://images.unsplash.com/gallery-c-1',
-            'https://images.unsplash.com/gallery-c-2',
-        ])
+        vi.mocked(getBlogThumbnails).mockReturnValue([
+            'https://images.unsplash.com/thumb-c-0',
+            'https://images.unsplash.com/thumb-c-1',
+            'https://images.unsplash.com/thumb-c-2',
+        ] as [string, string, string])
         vi.mocked(uploadImageUrl).mockResolvedValue(400)
 
         const payload = makePayload(0)
@@ -253,11 +262,11 @@ describe('TC-F08-BS.09 — Tier C fallback: searchPhotos returns []; gallery URL
 
         expect(result).toBe(3)
 
-        // uploadImageUrl called with gallery URLs at indices 0, 1, 2
+        // uploadImageUrl called with thumbnail URLs at indices 0, 1, 2
         const uploadCalls = vi.mocked(uploadImageUrl).mock.calls
-        expect(uploadCalls[0][0]).toBe('https://images.unsplash.com/gallery-c-0')
-        expect(uploadCalls[1][0]).toBe('https://images.unsplash.com/gallery-c-1')
-        expect(uploadCalls[2][0]).toBe('https://images.unsplash.com/gallery-c-2')
+        expect(uploadCalls[0][0]).toBe('https://images.unsplash.com/thumb-c-0')
+        expect(uploadCalls[1][0]).toBe('https://images.unsplash.com/thumb-c-1')
+        expect(uploadCalls[2][0]).toBe('https://images.unsplash.com/thumb-c-2')
 
         // All posts have thumbnails
         const createCalls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
@@ -422,6 +431,58 @@ describe('TC-F08-BS.19 — generateBlogPostContent failure → fallback to excer
         const calls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
         for (const [arg] of calls) {
             expect(arg.data.content).toMatch(/^<p>.*<\/p>$/)
+        }
+    })
+})
+
+describe('TC-F08-BS.20 — Tier B: getBlogThumbnails called with category; indices cycle correctly', () => {
+    it('calls getBlogThumbnails with seeding category and assigns distinct URL per post index', async () => {
+        const searchPhotos = await getSearchPhotos()
+        const getBlogThumbnails = await getBlogThumbnailsMock()
+        const uploadImageUrl = await getUploadImageUrl()
+
+        vi.mocked(searchPhotos).mockResolvedValue([])
+        vi.mocked(getBlogThumbnails).mockReturnValue([
+            'https://images.unsplash.com/thumb-r-0',
+            'https://images.unsplash.com/thumb-r-1',
+            'https://images.unsplash.com/thumb-r-2',
+        ] as [string, string, string])
+        vi.mocked(uploadImageUrl).mockResolvedValue(500)
+
+        const payload = makePayload(0)
+        const result = await seedBlogPosts(payload, 1, 2, 'restaurant', 'DineBiz', 3)
+
+        expect(result).toBe(3)
+        expect(getBlogThumbnails).toHaveBeenCalledWith('restaurant')
+
+        const uploadCalls = vi.mocked(uploadImageUrl).mock.calls
+        expect(uploadCalls[0][0]).toBe('https://images.unsplash.com/thumb-r-0')
+        expect(uploadCalls[1][0]).toBe('https://images.unsplash.com/thumb-r-1')
+        expect(uploadCalls[2][0]).toBe('https://images.unsplash.com/thumb-r-2')
+
+        const createCalls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
+        for (const [arg] of createCalls) {
+            expect(arg.data.thumbnail).toBe(500)
+        }
+    })
+})
+
+describe('TC-F08-BS.21 — Tier B: uploadImageUrl rejects → post created without thumbnail (graceful)', () => {
+    it('creates all 3 posts even when Tier B upload fails; thumbnail key omitted', async () => {
+        const searchPhotos = await getSearchPhotos()
+        const uploadImageUrl = await getUploadImageUrl()
+
+        vi.mocked(searchPhotos).mockResolvedValue([])
+        vi.mocked(uploadImageUrl).mockRejectedValue(new Error('S3 down'))
+
+        const payload = makePayload(0)
+        const result = await seedBlogPosts(payload, 1, 2, 'unknowncategory', 'Biz', 3)
+
+        expect(result).toBe(3)
+        const createCalls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
+        expect(createCalls).toHaveLength(3)
+        for (const [arg] of createCalls) {
+            expect(arg.data).not.toHaveProperty('thumbnail')
         }
     })
 })
