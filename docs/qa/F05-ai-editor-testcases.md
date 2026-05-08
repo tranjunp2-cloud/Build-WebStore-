@@ -1,5 +1,5 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F05 - AI Editor (Split Screen)
-> **Phiên bản:** 14.0 (Formal Traceability Matrix) | **Cập nhật:** 2026-04-06 | **Thực hiện:** QA Team
+> **Phiên bản:** 15.0 (Formal Traceability Matrix) | **Cập nhật:** 2026-05-08 | **Thực hiện:** QA Team
 > **Tài liệu tham chiếu PRD:** [F05-ai-editor.md](../prd/F05-ai-editor.md) | **User Stories (13 US):** [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md)
 
 ---
@@ -60,9 +60,9 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-02-11** | `US-02/Undo` | `Recov` | Hủy thao tác xóa (Undo) | 1. Nhấn "Hoàn tác" ngay tại Toast sau khi xóa. | - `deletedAt` bị xóa.<br>- Trang quay lại đúng vị trí cũ trong danh sách. | Blocker | [x] |
 | **TC-F05-02-12** | `US-02/AC4` | `Flow` | Ẩn/Hiện trang (Hide/Unhide) | 1. Dùng Toggle để ẩn trang. | - Trường `isVisible` thay đổi.<br>- Người dùng ngoài truy cập trang nhận lỗi 404. | Blocker | [x] |
 | **TC-F05-02-13** | `GH-864/menu-link` | `Logic` | `collectMenuPageIds` — liên kết trang-menu | 1. Gọi `collectMenuPageIds(links, pages)` với các trường hợp: rỗng, homepage, slug khớp, external link, children lồng nhau, trùng slug. | - Set trả về đúng page ID.<br>- Homepage luôn được include.<br>- External link không match.<br>- Slug normalize (/) đúng. | High | [x] |
-| **TC-F05-02-14** | `GH-864/panel-ux` | `UX` | Page Library — đổi tên, micro-copy, badge Live/Draft theo menu | 1. Mở Page Library panel. | - Title hiển thị "Page Library".<br>- Micro-copy mô tả biên tập nội bộ hiện ngay dưới tiêu đề.<br>- Không có ô tìm kiếm.<br>- Trang published + in-menu + site-published → badge "Live"; ngược lại → "Draft". | High | [x] |
-| **TC-F05-02-15** | `GH-864/badge` | `Logic` | Badge Live/Draft đúng với 4 kịch bản menu-linkage | 1. Test badge với: (a) in-menu + published site → Live; (b) not-in-menu + published site → Draft; (c) in-menu + draft site → Draft; (d) homepage → luôn in-menu. | - Mỗi kịch bản trả về badge đúng. | High | [x] |
-| **TC-F05-02-16** | `GH-864/coach` | `UX` | EditorCoachMarks — 2-bước overlay cho first-time user | 1. Xóa localStorage flag. Mở Editor. | - Sau delay, Step 1 popup hiển thị tại Page Library anchor.<br>- Nhấn "Tiếp theo" → Step 2 tại Menu Settings.<br>- Nhấn "Hoàn tất" / "Bỏ qua" / ESC / click backdrop → đóng, ghi flag localStorage.<br>- Lần sau mở lại → không hiển thị lại. | High | [x] |
+| **TC-F05-02-14** | `GH-864/panel-ux` | `UX` | Page Library — đổi tên, micro-copy, badge Live/Draft | 1. Mở Page Library panel. | - Title hiển thị "Page Library".<br>- Micro-copy mô tả biên tập nội bộ hiện ngay dưới tiêu đề.<br>- Không có ô tìm kiếm.<br>- Trang published + site published → badge "Live"; trang draft hoặc site chưa publish → badge "Draft". | High | [x] |
+| **TC-F05-02-15** | `GH-864/badge` | `Logic` | Badge Live/Draft đúng với 4 kịch bản page × site status | 1. Test badge với: (a) page published + site published → Live; (b) page draft + site published → Draft; (c) page published + site draft/unpublished → Draft; (d) page hidden (`isVisible=false`) → Draft. | - Mỗi kịch bản trả về badge đúng.<br>- Badge không phụ thuộc vào menu-linkage (điều kiện `inMenu` đã bỏ theo GH-864). | High | [x] |
+| **TC-F05-02-16** | `GH-864/coach` | `UX` | EditorCoachMarks — 2-bước overlay cho first-time user | 1. Xóa localStorage flag. Mở Editor. | - Sau delay, Step 1 popup hiển thị tại Page Library anchor; không có nút "Back" ở bước 1.<br>- Nhấn "Next" → Step 2 tại Menu Settings anchor; có nút "Back" và "Done".<br>- Nhấn "Back" ở bước 2 → quay về bước 1 (không ghi flag).<br>- Nhấn "Done" → đóng overlay, ghi flag localStorage.<br>- ESC và click backdrop KHÔNG đóng overlay (GH-864).<br>- Lần sau mở lại → không hiển thị lại. | High | [x] |
 
 ---
 
