@@ -38,7 +38,7 @@ export function StorefrontBlogList({ tenantId, siteBasePath, tenantSlug }: Store
     const basePath = typeof siteBasePath === 'string'
         ? siteBasePath
         : tenantSlug ? `/sites/${tenantSlug}` : ''
-    const blogBasePath = `${basePath}/blogs`
+    const blogBasePath = `${basePath}/blog`
 
     // Restore scroll position when returning from blog detail
     useEffect(() => {

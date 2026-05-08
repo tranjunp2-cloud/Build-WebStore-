@@ -2298,7 +2298,7 @@
       "step1Body": "Gunakan Page Library untuk mencipta dan mengurus halaman dalaman laman web anda.",
       "step2Title": "Langkah 2: Urus paparan menu di sini",
       "step2Body": "Selepas mencipta halaman, tambahkan ke Menu Settings untuk memaparkannya di laman web.",
-      "skip": "Langkau",
+      "back": "Kembali",
       "next": "Seterusnya",
       "finish": "Selesai"
     },
@@ -2702,7 +2702,47 @@
       "memberLabel": "Ahli",
       "memberNamePlaceholder": "Nama ahli",
       "memberRolePlaceholder": "Peranan / jawatan",
-      "memberBioPlaceholder": "Bio ringkas"
+      "memberBioPlaceholder": "Bio ringkas",
+      "pricingManagement": "Pengurusan Pelan",
+      "pricingNumberOfPlans": "Bilangan pelan:",
+      "pricingPlansMinMax": "(Min: 1 - Maks: 3)",
+      "pricingDecreasePlanCount": "Kurangkan bilangan pelan",
+      "pricingIncreasePlanCount": "Tambah bilangan pelan",
+      "pricingDiscountPercentage": "Peratusan Diskaun:",
+      "pricingCycle1": "Kitaran 1:",
+      "pricingCycle2": "Kitaran 2:",
+      "pricingCycle1Placeholder": "Bulanan",
+      "pricingCycle2Placeholder": "Tahunan",
+      "pricingDiscountPercent": "Diskaun %:",
+      "pricingPlanTab": "Pelan {n}",
+      "pricingEditFeatures": "Edit Ciri (Satu setiap baris)",
+      "pricingPlanName": "Nama Pelan:",
+      "pricingPlanNamePlaceholder": "cth. Pemula",
+      "pricingPriceUnit": "Harga & Unit:",
+      "pricingPriceUnitPlaceholder": "cth. RM29/bulan",
+      "pricingDescription": "Penerangan:",
+      "pricingDescriptionPlaceholder": "Penerangan ringkas",
+      "pricingFeatures": "Ciri (Satu setiap baris):",
+      "pricingFeaturesPlaceholder": "5 Projek\nSokongan Asas\n...",
+      "pricingCtaSettings": "Tetapan CTA",
+      "pricingLinkText": "Teks Pautan:",
+      "pricingLinkTextPlaceholder": "Teks butang",
+      "pricingAction": "Tindakan:",
+      "pricingActionExternal": "Gaya: Luaran",
+      "pricingActionInternal": "Gaya: Dalaman",
+      "pricingSelectPage": "— pilih halaman —",
+      "pricingFeatureModalTitle": "Edit Kandungan Harga",
+      "pricingFeatureModalSubtitle": "Urus matriks ciri harga anda. Klik sel untuk togol antara ikon (Semak/Silang).",
+      "pricingFeatureNameCol": "Nama Ciri",
+      "pricingFeatureNamePlaceholder": "Nama ciri",
+      "pricingAddFeatureRow": "Tambah Baris Ciri",
+      "pricingSaveChanges": "Simpan Perubahan",
+      "pricingDiscardPrompt": "Buang perubahan yang belum disimpan?",
+      "pricingKeepEditing": "Teruskan edit",
+      "pricingYesDiscard": "Ya, buang",
+      "pricingIncludedToggle": "Disertakan — klik untuk kecualikan",
+      "pricingExcludedToggle": "Dikecualikan — klik untuk sertakan",
+      "pricingDeleteRow": "Padam baris {n}"
     },
     "statusBar": {
       "connected": "Disambungkan",
@@ -2805,8 +2845,8 @@
       "slugConflict": "Slug halaman sudah wujud dalam laman ini",
       "noPagesFound": "Tiada halaman dijumpai",
       "noPagesSuggestion": "Cipta halaman pertama anda untuk bermula.",
-      "tooltipLive": "Halaman telah ditambah ke Menu dan telah diterbitkan.",
-      "tooltipDraft": "Halaman baru dibuat, belum ditambah ke menu atau telah dibuang dari menu."
+      "tooltipLive": "Halaman ini telah diterbitkan dan laman web anda aktif — ia dapat dilihat oleh pengunjung.",
+      "tooltipDraft": "Halaman ini tidak akan muncul di laman web anda. Sama ada halaman ini masih dalam draf atau laman web anda belum diterbitkan."
     },
     "navigationValidation": {
       "labelRequired": "Label pautan diperlukan",
@@ -2919,6 +2959,76 @@
       "code": "404",
       "title": "Halaman Tidak Ditemui",
       "backHome": "Kembali ke Laman Utama"
+    }
+  },
+  "profile": {
+    "title": "Profil Saya",
+    "accountSettings": "Tetapan Akaun",
+    "tabs": {
+      "general": "Maklumat Umum",
+      "security": "Keselamatan"
+    },
+    "banner": {
+      "roleOwner": "Pemilik",
+      "roleStaff": "Kakitangan",
+      "uploadAvatar": "Klik untuk muat naik avatar",
+      "status": "Status",
+      "activeNow": "Aktif Sekarang"
+    },
+    "general": {
+      "firstName": "Nama Pertama",
+      "lastName": "Nama Akhir",
+      "email": "Alamat E-mel",
+      "emailReadonly": "E-mel tidak boleh diubah (identiti log masuk)",
+      "phone": "Nombor Telefon",
+      "save": "Simpan Perubahan",
+      "saving": "Menyimpan...",
+      "saved": "Profil dikemas kini",
+      "cancel": "Batal"
+    },
+    "security": {
+      "currentPassword": "Kata Laluan Semasa",
+      "newPassword": "Kata Laluan Baharu",
+      "confirmPassword": "Sahkan Kata Laluan Baharu",
+      "changePassword": "Tukar Kata Laluan",
+      "updatePassword": "Kemaskini Kata Laluan",
+      "changing": "Menukar...",
+      "changed": "Kata laluan berjaya ditukar",
+      "lastLogin": "Log Masuk Terakhir",
+      "ruleMinLength": "Sekurang-kurangnya 8 aksara",
+      "ruleUppercase": "Satu huruf besar",
+      "ruleLowercase": "Satu huruf kecil",
+      "ruleNumber": "Satu nombor",
+      "ruleSpecial": "Satu aksara khas"
+    },
+    "sso": {
+      "notice": "Akaun pemilik diuruskan melalui Single Sign-On. Kemas kini profil dan kata laluan anda di portal SSO.",
+      "manageButton": "Urus Akaun dalam SSO",
+      "urlMissing": "URL portal SSO tidak dikonfigurasi. Hubungi pentadbir.",
+      "generalTitle": "🔒 Maklumat diuruskan oleh SSO",
+      "generalNotice": "Medan maklumat peribadi disegerakkan daripada sistem SSO. Anda tidak boleh mengeditnya di sini.",
+      "generalLink": "Untuk membuat perubahan, sila lawati portal SSO",
+      "securityTitle": "🛡️ Akaun Dilindungi SSO",
+      "securityNotice": "Kata laluan dan tetapan keselamatan anda diuruskan oleh sistem Single Sign-On (SSO). Untuk menukar kata laluan, mendayakan pengesahan dua faktor (2FA), atau mengemas kini sebarang tetapan keselamatan, sila lawati portal pengurusan SSO.",
+      "securityLink": "Urus Akaun SSO"
+    },
+    "errors": {
+      "invalidPhone": "Sila masukkan nombor telefon yang sah",
+      "passwordMinLength": "Kata laluan mesti sekurang-kurangnya 8 aksara",
+      "passwordUpper": "Kata laluan mesti mengandungi huruf besar",
+      "passwordLower": "Kata laluan mesti mengandungi huruf kecil",
+      "passwordNumber": "Kata laluan mesti mengandungi nombor",
+      "passwordSpecial": "Kata laluan mesti mengandungi aksara khas",
+      "passwordsMismatch": "Kata laluan tidak sepadan",
+      "currentPasswordIncorrect": "Kata laluan semasa tidak betul",
+      "newPasswordSameAsCurrent": "Kata laluan baharu mesti berbeza daripada kata laluan semasa",
+      "avatarTooLarge": "Avatar mestilah 2MB atau lebih kecil",
+      "avatarWrongType": "Avatar mestilah JPG atau PNG",
+      "ownerForbidden": "Akaun pemilik mesti mengemas kini profil melalui SSO",
+      "uploadFailed": "Muat naik avatar gagal",
+      "saveFailed": "Gagal menyimpan profil",
+      "networkError": "Ralat rangkaian. Sila cuba lagi.",
+      "unsavedChanges": "Anda mempunyai perubahan yang belum disimpan. Tinggalkan tab ini?"
     }
   }
 }

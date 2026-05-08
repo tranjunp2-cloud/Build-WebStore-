@@ -50,7 +50,7 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
 
     // Wait until it becomes active and seo title is empty
     if ((isPublishingUpdate || isActiveCreate) && !doc.seo?.title) {
-        const siteId = typeof doc.site === 'object' ? doc.site.id : doc.site
+        const siteId = doc.site && typeof doc.site === 'object' ? doc.site.id : doc.site
 
         // Check if auto meta generation is enabled for this site
         try {
@@ -74,7 +74,7 @@ export const lowStockHook: CollectionAfterChangeHook = async ({ doc, previousDoc
     if (prevInventory >= LOW_STOCK_THRESHOLD && currInventory < LOW_STOCK_THRESHOLD && currInventory >= 0) {
         import('@/lib/notifications/notify-tenant-owners')
             .then(({ notifyTenantOwners }) => {
-                const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                const tenantId = doc.tenant && typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
                 return notifyTenantOwners(req.payload, tenantId, {
                     type: 'PRODUCT_LOW_STOCK',
                     title: 'Low Stock Alert',

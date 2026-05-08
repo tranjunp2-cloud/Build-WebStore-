@@ -2,7 +2,7 @@ import type { BasePayload } from 'payload'
 import { getBlogSeeds } from './content/blog-seeds'
 import { generateBlogSeedsAI, generateBlogPostContent, isQuotaExhausted, type BlogSeedAI } from './generate-blog-seeds'
 import { uploadImageUrl } from './upload-media'
-import { getGalleryImages } from '@/lib/images/industry-images'
+import { getBlogThumbnails } from '@/lib/images/blog-thumbnail-images'
 import { searchPhotos, buildImgixUrl, trackDownload, type UnsplashPhoto } from './unsplash-client'
 import type { BlogPost } from './content/types'
 
@@ -26,6 +26,7 @@ export async function seedBlogPosts(
     userId: number | string,
     products?: string[],
     industry?: string,
+    seed?: number,
 ): Promise<number> {
     try {
         const existing = await payload.count({
@@ -53,10 +54,14 @@ export async function seedBlogPosts(
         if (seeds.length < 3) {
             const need = 3 - seeds.length
             const usedSlugs = new Set(seeds.map((s) => s.slug.toLowerCase()))
-            const fill = getBlogSeeds(category, {
-                name: businessName,
-                ...(products?.length ? { products } : {}),
-            })
+            const fill = getBlogSeeds(
+                category,
+                {
+                    name: businessName,
+                    ...(products?.length ? { products } : {}),
+                },
+                seed,
+            )
                 .filter((s) => !usedSlugs.has(s.slug.toLowerCase()))
                 .slice(0, need)
             seeds = [...seeds, ...fill]
@@ -64,14 +69,15 @@ export async function seedBlogPosts(
 
         seeds = disambiguateSlugs(seeds)
 
-        const galleryUrls = getGalleryImages(category, 3)
+        // Per-category landscape fallbacks (1200×630) — one distinct image per seed index.
+        const blogThumbnails = getBlogThumbnails(category)
 
         // Run all 3 posts in parallel: cuts wall time from ~90s serial to ~30s (M3)
         const results = await Promise.allSettled(
             seeds.map(async (seed, i) => {
                 let thumbnailId: number | undefined
                 try {
-                    let imageUrl: string | undefined
+                    let imageUrl: string
                     const keyword =
                         ('imageKeyword' in seed && seed.imageKeyword) ||
                         ('category' in seed && seed.category) ||
@@ -82,12 +88,11 @@ export async function seedBlogPosts(
                         imageUrl = buildImgixUrl(photo.urls.raw, { w: 1200, h: 630, fit: 'crop' })
                         trackDownload(photo.links.download_location)
                     } else {
-                        imageUrl = galleryUrls.length > 0 ? galleryUrls[i % galleryUrls.length] : undefined
+                        // Tier B: per-category curated landscape fallback, distinct per seed index
+                        imageUrl = blogThumbnails[i % blogThumbnails.length]
                     }
-                    if (imageUrl) {
-                        const filename = `blog-${tenantId}-${seed.slug}.jpg`
-                        thumbnailId = await uploadImageUrl(imageUrl, filename, seed.title, tenantId, payload)
-                    }
+                    const filename = `blog-${tenantId}-${seed.slug}.jpg`
+                    thumbnailId = await uploadImageUrl(imageUrl, filename, seed.title, tenantId, payload)
                 } catch (err) {
                     console.warn(`[seed-blog-posts] thumbnail "${seed.slug}" failed (non-fatal):`, (err as Error).message)
                 }

@@ -17,12 +17,14 @@ import { BreadcrumbEditor } from './BreadcrumbEditor'
 import { FooterLinkEditor } from './footer-link-editor'
 import FaqSettings from './FaqSettings'
 import TeamSettings from './TeamSettings'
+import PricingSettings from './PricingSettings'
 import { SOCIAL_ICONS } from '@/blocks/shared/social-icons'
 import { THEME_ENUMS } from '@/lib/theme/enums'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { StepItem } from '@/blocks/step-process/config'
 import type { FAQConfig } from '@/blocks/faq/config'
 import type { TeamConfig } from '@/blocks/team/config'
+import type { PricingConfig } from '@/blocks/pricing/config'
 import { SETTINGS_PANEL_WIDTH } from './layout-constants'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
@@ -919,7 +921,7 @@ function SettingsPanelInner({
                 </div>
 
                 {/* Navigation Editor (AC-1) */}
-                <div className={sectionCls}>
+                <div className={sectionCls} data-coach="menu-settings">
                     <NavigationEditor
                         links={resolvedNavLinks}
                         onUpdate={(links) => onHeaderUpdate?.({ links })}
@@ -1208,7 +1210,6 @@ function SettingsPanelInner({
 
     return (
         <div
-            data-coach="menu-settings"
             className="flex h-full shrink-0 flex-col border-l border-white/5 bg-[#111827]"
             style={{ width: SETTINGS_PANEL_WIDTH }}
         >
@@ -1308,7 +1309,7 @@ function SettingsPanelInner({
                             )}
 
                             {/* Layout & Spacing */}
-                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && (
+                            {block.blockType !== 'navigation' && block.blockType !== 'footer' && block.blockType !== 'announcement-bar' && block.blockType !== 'pricing' && (
                                 <div className={sectionCls}>
                                     <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
                                     <div className="mt-3 space-y-3">
@@ -1896,6 +1897,59 @@ function SettingsPanelInner({
                                     </div>
                                 )
                             })()}
+
+                            {bt === 'pricing' && block && (
+                                <>
+                                    <PricingSettings
+                                        block={block as PricingConfig}
+                                        blockIndex={currentBlockIndex}
+                                        onBlockUpdate={onBlockUpdate}
+                                        pages={pages}
+                                    />
+                                    {/* Layout & Spacing — pricing-specific position (after Plans Management) */}
+                                    <div className={sectionCls}>
+                                        <label className="text-xs font-medium uppercase text-gray-500">Layout & Spacing</label>
+                                        <div className="mt-3 space-y-3">
+                                            <div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={labelCls}>Top Spacing</span>
+                                                    <span className="text-[10px] text-slate-500">{localPaddingTop}px</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min={0} max={120} step={4}
+                                                    value={localPaddingTop}
+                                                    onChange={(e) => setLocalPaddingTop(Number(e.target.value))}
+                                                    onPointerUp={(e) => {
+                                                        const val = Number((e.target as HTMLInputElement).value)
+                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingTop: val } })
+                                                    }}
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={labelCls}>Bottom Spacing</span>
+                                                    <span className="text-[10px] text-slate-500">{localPaddingBottom}px</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min={0} max={120} step={4}
+                                                    value={localPaddingBottom}
+                                                    onChange={(e) => setLocalPaddingBottom(Number(e.target.value))}
+                                                    onPointerUp={(e) => {
+                                                        const val = Number((e.target as HTMLInputElement).value)
+                                                        const prevSpacing = ((block.blockSpacing as Record<string, unknown>) || {})
+                                                        onBlockUpdate(currentBlockIndex, { blockSpacing: { ...prevSpacing, paddingBottom: val } })
+                                                    }}
+                                                    className="mt-2 w-full cursor-pointer appearance-none bg-transparent border-0 outline-none p-0 [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-xl [&::-webkit-slider-runnable-track]:bg-[#1e293b] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:-mt-[1.5px] [&::-webkit-slider-thumb]:size-[11px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2dd4bf] [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-xl [&::-moz-range-track]:bg-[#1e293b] [&::-moz-range-thumb]:size-[11px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#2dd4bf]"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
 
                             {/* ─── FAQ Configuration ───────────────────────── */}
                             {bt === 'faq' && block && (
