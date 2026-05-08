@@ -1207,7 +1207,7 @@ function PreviewFrameInner({
         <>
             <div
                 ref={setContainerElement}
-                className="relative flex-1 overflow-hidden bg-[#111827] p-6"
+                className="relative flex-1 overflow-hidden bg-[#111827]"
             >
                 <div
                     ref={setScrollContainerElement}
