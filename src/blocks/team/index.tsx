@@ -37,14 +37,8 @@ function TeamSection({
     decorative?: ReactNode
 }) {
     if (decorative) {
-        // Wrap manually so decorative sits as sibling of SectionWrapper inside
-        // AnimatedSection — absolute children fill the full section, not just
-        // the inner content box.
         return (
-            <AnimatedSection
-                className="relative overflow-hidden"
-                style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
-            >
+            <AnimatedSection className="relative overflow-hidden" style={{ color: CSS_VARS.text }}>
                 {decorative}
                 <SectionWrapper
                     as="div"
@@ -64,41 +58,29 @@ function TeamSection({
             padding="default"
             container="default"
             innerClassName={container === '4xl' ? '!max-w-4xl' : ''}
-            style={{ color: CSS_VARS.text, background: CSS_VARS.background }}
+            style={{ color: CSS_VARS.text }}
         >
             {children}
         </SectionWrapper>
     )
 }
 
-/**
- * Plan 260415 Lỗi B — InitialsAvatar giờ lấy 2 ký tự đầu + sinh hue từ hash
- * tên để mỗi member có màu khác nhau. Deterministic per name (cùng tên → cùng
- * màu) để avoid flash giữa renders.
- */
-function getInitials(name: string): string {
+function getInitials(name: string | null | undefined): string {
+    if (!name) return '?'
     const words = name.split(/\s+/).filter(Boolean)
     if (words.length === 0) return '?'
     if (words.length === 1) return words[0]!.charAt(0).toUpperCase()
     return (words[0]!.charAt(0) + words[words.length - 1]!.charAt(0)).toUpperCase()
 }
 
-function hashHue(name: string): number {
-    let hash = 0
-    for (let i = 0; i < name.length; i++) {
-        hash = (hash * 31 + name.charCodeAt(i)) % 360
-    }
-    return hash
-}
 
 function InitialsAvatar({ name, size = 'md', imageIndex }: { name: string; size?: 'sm' | 'md' | 'lg'; imageIndex?: number }) {
     const initials = getInitials(name)
-    const hue = hashHue(name)
     const sizeCls = size === 'lg' ? 'w-32 h-32 text-3xl' : size === 'sm' ? 'w-16 h-16 text-base' : 'w-24 h-24 text-2xl'
     return (
         <div
             className={`${sizeCls} rounded-full mx-auto mb-4 flex items-center justify-center font-bold text-white`}
-            style={{ background: `hsl(${hue}, 55%, 50%)` }}
+            style={{ background: CSS_VARS.primary }}
             aria-hidden="true"
             data-image-index={imageIndex}
         >
@@ -142,8 +124,8 @@ function SocialLinks({ socials, name }: { socials: TeamMember['socials']; name: 
             {socials.map((s, i) => {
                 const Icon = getSocialIcon(s.platform)
                 const ariaLabel = getSocialAriaLabel(s.platform, name)
-                const isExternal = s.url?.startsWith('http')
                 const safeHref = /^(https?:|mailto:|tel:)/i.test(s.url ?? '') ? s.url : undefined
+                const isExternal = safeHref != null && /^https?:/i.test(safeHref)
                 return (
                     <a
                         key={`${s.platform}-${i}`}
@@ -242,7 +224,7 @@ function GridVariant({
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
             <StaggerGrid key={members.length} className="flex flex-wrap justify-center gap-6">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`} className="basis-full sm:basis-[calc(50%-12px)] md:basis-[calc(33.333%-16px)] max-w-sm h-full">
+                    <StaggerItem key={i} className="basis-full sm:basis-[calc(50%-12px)] md:basis-[calc(33.333%-16px)] max-w-sm h-full">
                         <HoverCard
                             className={`text-center ${CARD_PADDING.md} transition-shadow h-full flex flex-col`}
                             style={{
@@ -284,7 +266,7 @@ function ListVariant({
             <StaggerGrid key={members.length} className="flex flex-col gap-4">
                 {members.map((m, i) => (
                     <StaggerItem
-                        key={`${m.name}-${i}`}
+                        key={i}
                         className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-5 transition-shadow hover:shadow-md"
                         style={{
                             background: CSS_VARS.surface,
@@ -332,7 +314,7 @@ function CardsHoverRevealVariant({
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
             <StaggerGrid key={members.length} className="flex flex-wrap justify-center gap-6">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`} className="basis-full sm:basis-[calc(50%-12px)] md:basis-[calc(33.333%-16px)] max-w-sm">
+                    <StaggerItem key={i} className="basis-full sm:basis-[calc(50%-12px)] md:basis-[calc(33.333%-16px)] max-w-sm">
                         <article
                             className="group relative overflow-hidden rounded-2xl aspect-[3/4] cursor-default"
                             aria-label={`${m.name}, ${m.role}`}
@@ -398,7 +380,7 @@ function HorizontalScrollVariant({
                 <div className="flex gap-6 w-fit mx-auto">
                 {members.map((m, i) => (
                     <article
-                        key={`${m.name}-${i}`}
+                        key={i}
                         className={`shrink-0 w-72 snap-center text-center ${CARD_PADDING.md} flex flex-col justify-between`}
                         style={{
                             background: CSS_VARS.surface,
@@ -455,7 +437,7 @@ function BioModalVariant({
             <SectionHeader sectionLabel={sectionLabel} headline={headline} subheadline={subheadline} />
             <StaggerGrid key={members.length} className="flex flex-wrap justify-center gap-4">
                 {members.map((m, i) => (
-                    <StaggerItem key={`${m.name}-${i}`} className="h-full w-[calc(50%-8px)] sm:w-[calc(33.333%-11px)] md:w-[calc(33.333%-11px)]">
+                    <StaggerItem key={i} className="h-full w-[calc(50%-8px)] sm:w-[calc(33.333%-11px)] md:w-[calc(33.333%-11px)]">
                         <button
                             type="button"
                             onClick={() => setActive(m)}
@@ -524,7 +506,7 @@ function CompactAvatar({ member, imageIndex }: { member: TeamMember; imageIndex:
         return (
             <div
                 className="w-12 h-12 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                style={{ background: `hsl(${hashHue(member.name)}, 55%, 50%)` }}
+                style={{ background: CSS_VARS.primary }}
                 aria-hidden="true"
                 data-image-index={imageIndex}
             >
@@ -561,7 +543,7 @@ function CompactRowVariant({
             <ul className="flex flex-col divide-y" style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.08)' }}>
                 {members.map((m, i) => (
                     <li
-                        key={`${m.name}-${i}`}
+                        key={i}
                         className="flex items-center gap-4 py-4"
                         style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.08)' }}
                     >
@@ -592,14 +574,17 @@ function CompactRowVariant({
  * Giờ return null nhưng log dev warning để admin biết block đang rỗng.
  */
 function useEmptyWarning(count: number) {
-    if (typeof window !== 'undefined' && count === 0 && process.env.NODE_ENV === 'development') {
-        console.warn('[team] members array is empty — block rendered nothing')
-    }
+    useEffect(() => {
+        if (count === 0 && process.env.NODE_ENV === 'development') {
+            console.warn('[team] members array is empty — block rendered nothing')
+        }
+    }, [count])
 }
 
 export function TeamBlock({ block }: BlockProps<TeamConfig>) {
     const { headline, subheadline, members: rawMembers = [], variant = 'grid' } = block
-    const members = rawMembers.length > 0 ? rawMembers : FALLBACK_MEMBERS
+    const validMembers = (Array.isArray(rawMembers) ? rawMembers : []).filter((m): m is TeamMember => !!m && typeof m === 'object')
+    const members = validMembers.length > 0 ? validMembers : FALLBACK_MEMBERS
     const sectionLabel = getSectionLabel(block)
 
     useEmptyWarning(members.length)

@@ -515,6 +515,7 @@ function PreviewFrameInner({
                 if (isEditingRef.current) {
                     setIsEditing(false)
                 }
+                setImageClickData(null)
             } else if (e.data?.type === 'BLOCK_CONTAINER_CLICKED') {
                 const blockIndex = Number(e.data.blockIndex)
                 const blockType = e.data.layout?.blockType as string | undefined
@@ -603,6 +604,7 @@ function PreviewFrameInner({
                 const scrollY = e.data.scrollY ?? 0
                 setIframeScrollY(scrollY)
                 savedScrollYRef.current = scrollY
+                setImageClickData(null)
             } else if (e.data?.type === 'REQUEST_STOP_EDITING') {
                 setTimeout(() => {
                     const activeEl = document.activeElement

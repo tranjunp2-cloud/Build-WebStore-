@@ -11,6 +11,10 @@ import { useI18n } from '@/i18n'
 
 type FieldBlurEvent = React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
 
+function stripHtml(value: string): string {
+    return value.replace(/<[^>]*>/g, '')
+}
+
 interface TeamSettingsProps {
     block: TeamConfig
     blockIndex: number
@@ -61,7 +65,10 @@ export default function TeamSettings({ block, blockIndex, onBlockUpdate }: TeamS
     }
 
     const handleFieldBlur = (i: number, field: 'name' | 'role' | 'bio', value: string) => {
-        if ((members[i]?.[field] ?? '') === value) return
+        const current = String(members[i]?.[field] ?? '')
+        // Skip if value unchanged — compare against both raw and HTML-stripped form
+        // so sidebar blur doesn't clobber inline-edited HTML formatting.
+        if (current === value || stripHtml(current) === value) return
         const updated = members.map((m, idx) => idx === i ? { ...m, [field]: value } : m)
         onBlockUpdate(blockIndex, { members: updated })
     }
@@ -138,21 +145,21 @@ export default function TeamSettings({ block, blockIndex, onBlockUpdate }: TeamS
                                         onAltTextChange={(alt) => handleAltChange(i, alt)}
                                     />
                                     <Input
-                                        defaultValue={member.name}
+                                        defaultValue={stripHtml(member.name)}
                                         placeholder={s.memberNamePlaceholder}
                                         variant="editor"
                                         className="mt-1.5"
                                         onBlur={(e: FieldBlurEvent) => handleFieldBlur(i, 'name', e.target.value)}
                                     />
                                     <Input
-                                        defaultValue={member.role}
+                                        defaultValue={stripHtml(member.role)}
                                         placeholder={s.memberRolePlaceholder}
                                         variant="editor"
                                         className="mt-1.5"
                                         onBlur={(e: FieldBlurEvent) => handleFieldBlur(i, 'role', e.target.value)}
                                     />
                                     <Textarea
-                                        defaultValue={member.bio ?? ''}
+                                        defaultValue={stripHtml(member.bio ?? '')}
                                         placeholder={s.memberBioPlaceholder}
                                         variant="editor"
                                         className="mt-1.5 min-h-[72px]"
