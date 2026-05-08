@@ -36,7 +36,7 @@ export const stepProcessMeta = {
     defaultVariant: 'vertical',
     editableFields: ['headline', 'subheadline', 'steps'],
     quickActions: ['Add step', 'Rewrite steps', 'Change layout'],
-    aiVisible: true,
+    aiVisible: false, // hidden: in BLOCKS_TEMP_HIDDEN (render/variant issues unresolved)
     category: 'basics' as const,
 }
 

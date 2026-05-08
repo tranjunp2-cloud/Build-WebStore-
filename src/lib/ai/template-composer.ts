@@ -66,8 +66,11 @@ export const BROKEN_VARIANTS: Record<string, string[]> = {
 // To re-enable a block, remove its entry from this set.
 // Mirror: also listed in EDITOR_HIDDEN_BLOCKS (block-registry-reader.ts).
 export const TEMP_HIDDEN_BLOCK_TYPES = new Set([
-  'step-process',   // temporarily hidden
-  'booking-widget', // temporarily hidden
+  'step-process',     // temporarily hidden
+  'booking-widget',   // temporarily hidden
+  'doctor-profile',   // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
+  'gallery-masonry',  // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
+  'before-after',     // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
 ])
 
 function simpleHash(str: string): number {
