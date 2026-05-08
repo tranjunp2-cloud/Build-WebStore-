@@ -402,10 +402,8 @@ export function EditorToolbar({
             {/* Spacer 1 — flex-grows to keep CENTER centered. Shrinks first when narrowing. */}
             <div className="min-w-2 flex-1" />
 
-            {/* CENTER: layout icons + device toggle. Text collapses at tier 1 (< 1366px). */}
+            {/* CENTER: device toggle + layout icons. Text collapses at tier 1 (< 1366px). */}
             <div className="flex shrink-0 items-center gap-2">
-                <WorkspaceLayoutControls />
-
                 <div className="hidden h-[38px] items-center rounded-full border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.8)] px-[5px] py-px lg:flex">
                     <button
                         type="button"
@@ -436,6 +434,8 @@ export function EditorToolbar({
                         <span className="hidden min-[1366px]:inline">{et.mobile}</span>
                     </button>
                 </div>
+
+                <WorkspaceLayoutControls />
             </div>
 
             {/* Spacer 2 — symmetric counterpart so CENTER lands at the visual midpoint. */}
