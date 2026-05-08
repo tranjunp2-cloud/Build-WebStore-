@@ -131,8 +131,10 @@ function roleForBlock(blockType: string): ImageRole {
         case 'product-quick-view':
             return 'product'
         case 'property-card':
-            // Real-estate photos are landscape by nature; square bucket is
-            // too small (6 photos) and yields poor squarish Unsplash results.
+            // Real-estate photos are landscape; square bucket (6 photos) yields poor
+            // squarish Unsplash results. Shares landscape bucket with gallery — seeds
+            // differ per block type so picks are shuffled differently, but cross-block
+            // photo duplication is possible when both appear on the same template.
             return 'gallery'
         default:
             return 'any'
@@ -468,7 +470,7 @@ export async function fulfillImageNeeds(
                         console.warn(
                             `[Media Injector] ${blockType} pool partial (${result.mediaIds.length}/${totalCount}) — supplementing with legacy search`,
                         )
-                        // Fall through to legacy search; merge IDs after.
+                        // Supplement pool result with legacy search for the deficit.
                         const deficit = totalCount - result.mediaIds.length
                         const keywords = deriveKeywords(category, blockType, {
                             businessName: ctx.businessName,
