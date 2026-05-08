@@ -87,6 +87,10 @@ const VI_NAME_MAP: Record<string, string> = {
 // TODO: remove when the block is production-ready
 const EDITOR_HIDDEN_BLOCKS = new Set([
     'class-schedule', // not production-ready — temporarily hidden from editor
+    // feat/fix-broken-block-variants: temporarily hidden — re-enable by removing from this set
+    'step-process',
+    'booking-widget',
+    'cartWidget',
 ])
 
 // ── Module-level cache (process lifetime) ────────────────────────────────────
