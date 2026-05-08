@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { RotateCcw, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { useI18n } from '@/i18n'
+import { useI18n, type Translations } from '@/i18n'
 import { profilePatchSchema } from '@/lib/profile/schemas'
 import type { PlatformUser } from '@/types/user'
 import { PhoneInput } from './phone-input'
@@ -41,8 +41,7 @@ export function GeneralInfoTab({ user, role, ssoUrl, onUserUpdate }: Props) {
 type StaffFormProps = {
     user: Pick<PlatformUser, 'firstName' | 'lastName' | 'phone' | 'email'>
     onUserUpdate: (partial: Partial<PlatformUser>) => void
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    t: any
+    t: Translations
 }
 
 function StaffGeneralInfoForm({ user, onUserUpdate, t }: StaffFormProps) {
