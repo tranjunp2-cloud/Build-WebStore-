@@ -76,11 +76,16 @@ export function HeroMediaOverlay({
         if (!parent) return
         const onEnter = () => setIsHovered(true)
         const onLeave = () => setIsHovered(false)
+        // When the native file picker opens the browser window loses focus but mouseleave
+        // never fires on the parent, so the overlay gets stuck visible. Reset on blur.
+        const onWindowBlur = () => setIsHovered(false)
         parent.addEventListener('mouseenter', onEnter)
         parent.addEventListener('mouseleave', onLeave)
+        window.addEventListener('blur', onWindowBlur)
         return () => {
             parent.removeEventListener('mouseenter', onEnter)
             parent.removeEventListener('mouseleave', onLeave)
+            window.removeEventListener('blur', onWindowBlur)
         }
     }, [isOwner, callback])
 
