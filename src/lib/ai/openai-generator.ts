@@ -17,7 +17,8 @@ import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems, enforceGridAlignment } from './structure-enforcer'
 import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
-import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
+import { pickCategoryThemeWithMood } from './category-theme-picker'
+import { computeGenSeed } from './gen-seed'
 import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { startCapture, finishCapture } from './capture-generation'
@@ -36,14 +37,6 @@ import {
     MIN_BLOCKS_PER_PAGE,
     type ContentLang,
 } from './content-rules'
-
-// Unique seed from user contact fields to reduce hash collision across users
-// with the same business name (GH-912). Degrades to name-only when optional
-// fields are absent (graceful — no crashes, just wider collision window).
-function computeGenSeed(info: BusinessInfoInput): number {
-    const parts = [info.businessName, info.email, info.phone].filter(Boolean)
-    return hashBusinessName(parts.join('|'))
-}
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -400,6 +393,7 @@ export async function generateSiteWithAI(
                         enforcerBizOverride,
                         detectedCategory,
                         themeMood,
+                        themeSeed,
                     )
                     pageBlocks = swapResult.blocks as typeof pageBlocks
                     swapTelemetry.push(...swapResult.telemetry)
@@ -513,6 +507,7 @@ export async function generateSiteWithAI(
                     enforcerBizOverride,
                     detectedCategory,
                     themeMood,
+                    themeSeed,
                 )
                 validBlocks = swapResult.blocks as typeof validBlocks
                 swapTelemetry.push(...swapResult.telemetry)

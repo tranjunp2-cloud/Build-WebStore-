@@ -1553,11 +1553,13 @@ function buildServicesPage(biz: BusinessSample, content: CategoryContent, catego
   return { title: 'Services', slug: '/services', layout: blocks }
 }
 
-function buildBlogPage(biz: BusinessSample, category: string, pages: string[]): TemplatePage {
+function buildBlogPage(biz: BusinessSample, category: string, pages: string[], seed?: number): TemplatePage {
   // Plan 260414-2249 phase-05: seed blog-list with category-appropriate
   // posts so the Blog sub-page never renders with a single empty heading.
   // Plan 07: pass biz so seed titles substitute `{business}` + `{product}`.
-  const seeds = getBlogSeeds(category, biz)
+  // GH-912: thread compositionSeed so two same-category users get different
+  // post ordering instead of identical hardcoded sequences.
+  const seeds = getBlogSeeds(category, biz, seed)
   const items = seeds.slice(0, 6).map((post) => ({
     title: post.title,
     excerpt: post.excerpt,
@@ -1941,6 +1943,7 @@ function enrichSubPages(
   pages: TemplatePage[],
   biz: BusinessSample,
   category: string,
+  seed?: number,
 ): void {
   const getPage = (title: string): TemplatePage | undefined =>
     pages.find((p) => p.title?.toLowerCase() === title.toLowerCase())
@@ -2000,7 +2003,7 @@ function enrichSubPages(
   // ── Blog: append if missing, with seeded posts ─────────────────────
   const blogPage = getPage('Blog')
   if (!blogPage) {
-    const blogTemplate = buildBlogPage(biz, category, pageNames)
+    const blogTemplate = buildBlogPage(biz, category, pageNames, seed)
     pages.push(blogTemplate)
   } else {
     // Existing Blog page — ensure blog-list has seeded items if empty
@@ -2011,7 +2014,7 @@ function enrichSubPages(
       const blogList = blogPage.layout[blogListIdx] as Record<string, unknown>
       const existingItems = (blogList.items as unknown[] | undefined) ?? []
       if (existingItems.length === 0) {
-        const seeds = getBlogSeeds(category, biz).slice(0, 6).map((post) => ({
+        const seeds = getBlogSeeds(category, biz, seed).slice(0, 6).map((post) => ({
           title: post.title,
           excerpt: post.excerpt,
           slug: post.slug,
@@ -2111,7 +2114,7 @@ export function composeFromBlueprint(
   // - Ensure About page hero subheadline weaves user biz.description when present
   // - Ensure Contact page has google-maps + opening-hours FAQ when user provides address
   // Mutates `pages` in place via helper — adds missing pages, updates existing.
-  enrichSubPages(pages, biz, preset.category)
+  enrichSubPages(pages, biz, preset.category, seed)
 
   // Plan 260415 — rotate navigation / contact / footer variants from the
   // curated per-category pools so same-category businesses ship different
@@ -2173,7 +2176,7 @@ export function composeTemplate(input: ComposerInput, disabledSet?: Set<string>)
 
   if (input.variant === 'premium') {
     templatePages.push(buildServicesPage(biz, content, input.category, pages))
-    templatePages.push(buildBlogPage(biz, input.category, pages))
+    templatePages.push(buildBlogPage(biz, input.category, pages, input.compositionSeed))
   }
 
   // Build the template name

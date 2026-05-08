@@ -26,6 +26,7 @@ export async function seedBlogPosts(
     userId: number | string,
     products?: string[],
     industry?: string,
+    seed?: number,
 ): Promise<number> {
     try {
         const existing = await payload.count({
@@ -53,10 +54,14 @@ export async function seedBlogPosts(
         if (seeds.length < 3) {
             const need = 3 - seeds.length
             const usedSlugs = new Set(seeds.map((s) => s.slug.toLowerCase()))
-            const fill = getBlogSeeds(category, {
-                name: businessName,
-                ...(products?.length ? { products } : {}),
-            })
+            const fill = getBlogSeeds(
+                category,
+                {
+                    name: businessName,
+                    ...(products?.length ? { products } : {}),
+                },
+                seed,
+            )
                 .filter((s) => !usedSlugs.has(s.slug.toLowerCase()))
                 .slice(0, need)
             seeds = [...seeds, ...fill]

@@ -12,6 +12,7 @@ import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
+import { computeGenSeed } from './gen-seed'
 import { searchPhotos, buildImgixUrl, trackDownload } from './unsplash-client'
 import { uploadImageUrl } from './upload-media'
 import { SAMPLE_PRODUCTS_BY_CATEGORY } from './content/sample-products'
@@ -107,7 +108,7 @@ function getFallbackProducts(businessInfo: BusinessInfoInput): Array<SampleProdu
         `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products}`,
     )
     const pool = SAMPLE_PRODUCTS_BY_CATEGORY[category] ?? SAMPLE_PRODUCTS_BY_CATEGORY['business'] ?? []
-    const seed = hashString(businessInfo.businessName)
+    const seed = computeGenSeed(businessInfo)
     const shuffled = seededShuffle(pool, seed)
     return shuffled.slice(0, 6).map((t) => ({
         name: t.name,
