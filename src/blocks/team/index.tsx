@@ -207,7 +207,7 @@ function MemberMeta({ member, align = 'center' }: { member: TeamMember; align?: 
     return (
         <>
             <Heading level={4} className="font-bold break-words" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
-                {member.name}
+                <RichText text={member.name} as="span" />
             </Heading>
             <Body size="small" className="mb-2 break-words" style={{ color: CSS_VARS.primary }}>{member.role}</Body>
             {member.bio && (
@@ -496,7 +496,7 @@ function BioModalVariant({
                             </button>
                             <div className="text-center">
                                 <MemberAvatar member={active} />
-                                <Heading level={4} className="font-bold mb-1">{active.name}</Heading>
+                                <Heading level={4} className="font-bold mb-1"><RichText text={active.name} as="span" /></Heading>
                                 <Body size="small" className="mb-4" style={{ color: CSS_VARS.primary }}>{active.role}</Body>
                                 {active.bio && (
                                     <Body size="small" className="text-left" style={{ color: CSS_VARS.muted }}>
