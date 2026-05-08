@@ -263,3 +263,12 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-BG.16** | AI response missing content field | throws 'No content in response' | `generate-blog-seeds.test.ts` |
 | **TC-F08-BG.17** | businessName>100 / industry>50 | truncated in user prompt | `generate-blog-seeds.test.ts` |
 
+### Regression — GH-909: null site / null tenant guard
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-REG.01** | `afterChangeHook` — `doc.site` is null | Hook resolves without TypeError; no crash on `null.id` | `notification-triggers.test.ts` |
+| **TC-F08-REG.02** | `afterChangeHook` — `doc.site` is scalar string | `findByID` called with string id (behavior unchanged) | `notification-triggers.test.ts` |
+| **TC-F08-REG.03** | `afterChangeHook` — `doc.site` is populated object | `findByID` called with `site.id` (behavior unchanged) | `notification-triggers.test.ts` |
+| **TC-F08-REG.04** | `lowStockHook` — `doc.tenant` is null | Hook returns doc without throwing; notification called with null tenantId | `notification-triggers.test.ts` |
+
