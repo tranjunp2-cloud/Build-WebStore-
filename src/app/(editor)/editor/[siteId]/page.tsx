@@ -837,6 +837,40 @@ export default function EditorPage() {
         }, 0)
     }, [canRedo, redo])
 
+    // Wait for any in-flight save to complete, then save if there are pending changes.
+    // Prevents publish from reading a stale draft when the user clicks Publish
+    // immediately after a variant/block change (race: saveWithRetry is async/fire-and-forget).
+    const flushSavesBeforePublish = useCallback(async (): Promise<boolean> => {
+        // Poll until in-flight save finishes (max 10s)
+        if (isSavingRef.current) {
+            await new Promise<void>((resolve) => {
+                const deadline = Date.now() + 10_000
+                const check = setInterval(() => {
+                    if (!isSavingRef.current || Date.now() > deadline) {
+                        clearInterval(check)
+                        resolve()
+                    }
+                }, 100)
+            })
+        }
+        // Save any remaining unsaved changes
+        if (useEditorStore.getState().hasUnsavedChanges) {
+            const saved = await handleSave({ showToast: false, refreshPreview: false })
+            if (!saved) return false
+            // Wait for that save to finish too
+            await new Promise<void>((resolve) => {
+                const deadline = Date.now() + 10_000
+                const check = setInterval(() => {
+                    if (!isSavingRef.current || Date.now() > deadline) {
+                        clearInterval(check)
+                        resolve()
+                    }
+                }, 100)
+            })
+        }
+        return true
+    }, [handleSave])
+
     const handlePublish = useCallback(async () => {
         if (!siteId || isPublishing) return
 
@@ -844,12 +878,10 @@ export default function EditorPage() {
         const currentlyPublished = site?.status === 'published'
 
         try {
-            if (hasUnsavedChanges) {
-                const saved = await handleSave({ showToast: false, refreshPreview: true })
-                if (!saved) {
-                    setIsPublishing(false)
-                    return
-                }
+            const flushed = await flushSavesBeforePublish()
+            if (!flushed) {
+                setIsPublishing(false)
+                return
             }
 
             const res = await fetch(`/api/sites/${siteId}/publish`, {
@@ -944,7 +976,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, setPages, site?.status, siteId, siteName])
+    }, [flushSavesBeforePublish, isPublishing, markPublished, setPages, site?.status, siteId, siteName])
 
     // Re-publish: always PATCH (never DELETE). Used by "Update" button on published sites.
     const handleRepublish = useCallback(async () => {
@@ -952,12 +984,10 @@ export default function EditorPage() {
 
         setIsPublishing(true)
         try {
-            if (hasUnsavedChanges) {
-                const saved = await handleSave({ showToast: false, refreshPreview: true })
-                if (!saved) {
-                    setIsPublishing(false)
-                    return
-                }
+            const flushed = await flushSavesBeforePublish()
+            if (!flushed) {
+                setIsPublishing(false)
+                return
             }
 
             const res = await fetch(`/api/sites/${siteId}/publish`, {
@@ -1042,7 +1072,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, setPages, siteId])
+    }, [flushSavesBeforePublish, isPublishing, markPublished, setPages, siteId])
 
     const handlePageSelected = useCallback(async (pageId: string) => {
         const store = useEditorStore.getState()
