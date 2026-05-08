@@ -105,7 +105,7 @@ function PlanCTA({ href, label, highlighted = false, fullWidth = false, classNam
             className={`${widthCls} px-6 py-3 rounded-xl font-semibold text-sm text-center transition-all duration-200 hover:opacity-90 ${TOUCH_TARGET.min} flex items-center justify-center ${highlighted ? 'text-white' : ''} ${className}`.trim()}
             style={baseStyle}
         >
-            {label}
+            <RichText text={label} />
         </a>
     )
 }
