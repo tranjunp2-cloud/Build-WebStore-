@@ -80,7 +80,7 @@ vi.mock('payload', () => {
 
 // Mock sample products — prevent real OpenAI/Unsplash calls in API-level tests
 vi.mock('@/lib/ai/generate-sample-products', () => ({
-    generateSampleProducts: vi.fn().mockResolvedValue([]),
+    generateSampleProducts: vi.fn().mockResolvedValue({ products: [], stats: { rateLimited: 0, uploadFailed: 0, noImage: 0 } }),
 }))
 
 // Mock AI Generator (SSE logic)

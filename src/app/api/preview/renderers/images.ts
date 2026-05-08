@@ -13,6 +13,7 @@ export interface IndustryImages {
     about: string
     team: string[]
     features: string[]
+    products: string[] // squarish 800×800, product-focused
 }
 
 function u(id: string, w = 800, h = 600): string {
@@ -48,6 +49,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1498654896293-37aacf113fd9', 400, 300),
             u('photo-1414235077428-338989a2e8c0', 400, 300),
         ],
+        products: [
+            u('photo-1476224203421-9ac39bcb3327', 800, 800), // pasta dish
+            u('photo-1565299624946-b28f40a0ae38', 800, 800), // pizza on plate
+            u('photo-1540189549336-e6e99c3679fe', 800, 800), // colorful bowl
+            u('photo-1504674900247-0877df9cc836', 800, 800), // steak
+            u('photo-1551218808-94e220e084d2', 800, 800),    // ramen bowl
+            u('photo-1555396273-367ea4eb4db5', 800, 800),    // seafood platter
+        ],
     },
 
     ecommerce: {
@@ -77,6 +86,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1556742049-0cfed4f6a45d', 400, 300),
             u('photo-1441986300917-64674bd600d8', 400, 300),
             u('photo-1472851294608-062f824d29cc', 400, 300),
+        ],
+        products: [
+            u('photo-1491553895911-0055eca6402d', 800, 800), // running shoes
+            u('photo-1542291026-7eec264c27ff', 800, 800),    // red sneakers
+            u('photo-1523381210434-271e8be1f52b', 800, 800), // clothing
+            u('photo-1445205170230-053b83016050', 800, 800), // apparel
+            u('photo-1556905055-8f358a7a47b2', 800, 800),    // sportswear
+            u('photo-1579586337278-3befd40fd17a', 800, 800), // shopping bag
         ],
     },
 
@@ -108,6 +125,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1560750588-73207b1ef5b8', 400, 300),
             u('photo-1570172619644-dfd03ed5d881', 400, 300),
         ],
+        products: [
+            u('photo-1596755389378-c31d21fd1273', 800, 800), // beauty products
+            u('photo-1598440947619-2c35fc9aa908', 800, 800), // skincare
+            u('photo-1487412912498-0447578fcca8', 800, 800), // makeup products
+            u('photo-1512290923902-8a9f81dc236c', 800, 800), // lipstick
+            u('photo-1522335789203-aabd1fc54bc9', 800, 800), // makeup brushes
+            u('photo-1570172619644-dfd03ed5d881', 800, 800), // skincare bottle
+        ],
     },
 
     tech: {
@@ -137,6 +162,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1451187580459-43490279c0fa', 400, 300),
             u('photo-1518770660439-4636190af475', 400, 300),
             u('photo-1550751827-4bd374c3f58b', 400, 300),
+        ],
+        products: [
+            u('photo-1531297484001-80022131f5a1', 800, 800), // laptop
+            u('photo-1555949963-aa79dcee981c', 800, 800),    // keyboard
+            u('photo-1518770660439-4636190af475', 800, 800), // circuit board
+            u('photo-1519389950473-47ba0277781c', 800, 800), // devices
+            u('photo-1535223289827-42f1e9919769', 800, 800), // smartwatch
+            u('photo-1550751827-4bd374c3f58b', 800, 800),    // gadget accessory
         ],
     },
 
@@ -168,6 +201,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1538108149393-fbbd81895907', 400, 300),
             u('photo-1519494026892-80bbd2d6fd0d', 400, 300),
         ],
+        products: [
+            u('photo-1607619056574-7b8d3ee536b2', 800, 800), // supplement bottles
+            u('photo-1584308666744-24d5c474f2ae', 800, 800), // medicine
+            u('photo-1631217868264-e5b90bb7e133', 800, 800), // stethoscope
+            u('photo-1576765608535-5f04d1e3f289', 800, 800), // medical tools
+            u('photo-1559757175-5700dde675bc', 800, 800),    // pills
+            u('photo-1584820927498-cfe5211fd8bf', 800, 800), // health product
+        ],
     },
 
     education: {
@@ -194,6 +235,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1544717305-2782549b5136', 200, 200),
         ],
         features: [],
+        products: [
+            u('photo-1497633762265-9d179a990aa6', 800, 800), // books stack
+            u('photo-1456324504439-367cee3b3c32', 800, 800), // desk workspace
+            u('photo-1434030216411-0b793f4b4173', 800, 800), // writing
+            u('photo-1503676260728-1c00da094a0b', 800, 800), // school books
+            u('photo-1519682337058-a94d519337bc', 800, 800), // pens notebook
+            u('photo-1488190211105-8b0e65b80b4e', 800, 800), // reading
+        ],
     },
 
     realestate: {
@@ -220,6 +269,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1519085360753-af0119f7cbe7', 200, 200),
         ],
         features: [],
+        products: [
+            u('photo-1556909114-f6e7ad7d3136', 800, 800), // kitchen interior
+            u('photo-1560448204-e02f11c3d0e2', 800, 800), // living room
+            u('photo-1513694203232-719a280e022f', 800, 800), // bedroom
+            u('photo-1505691938895-1758d7feb511', 800, 800), // home decor
+            u('photo-1484154218962-a197022b5858', 800, 800), // kitchen accessories
+            u('photo-1600585154526-990dced4db0d', 800, 800), // house exterior
+        ],
     },
 
     fitness: {
@@ -246,6 +303,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1548690312-e3b507d8c110', 200, 200),
         ],
         features: [],
+        products: [
+            u('photo-1517836357463-d25dfeac3438', 800, 800), // dumbbells
+            u('photo-1571019613454-1cb2f99b2d8b', 800, 800), // fitness equipment
+            u('photo-1526506118085-60ce8714f8c5', 800, 800), // boxing gloves
+            u('photo-1518611012118-696072aa579a', 800, 800), // yoga mat
+            u('photo-1540497077202-7c8a3999166f', 800, 800), // gym equipment
+            u('photo-1576678927484-cc907957088c', 800, 800), // swim gear
+        ],
     },
 
     creative: {
@@ -272,6 +337,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1534528741775-53994a69daeb', 200, 200),
         ],
         features: [],
+        products: [
+            u('photo-1513364776144-60967b0f800f', 800, 800), // sketchbook
+            u('photo-1545235617-9465d2a55698', 800, 800),    // art tools
+            u('photo-1558655146-9f40138edfeb', 800, 800),    // design work
+            u('photo-1561070791-2526d30994b5', 800, 800),    // design project
+            u('photo-1452587925148-ce544e77e70d', 800, 800), // camera
+            u('photo-1494438639946-1ebd1d20bf85', 800, 800), // creative tools
+        ],
     },
 
     business: {
@@ -298,6 +371,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1519085360753-af0119f7cbe7', 200, 200),
         ],
         features: [],
+        products: [
+            u('photo-1553877522-43269d4ea984', 800, 800), // business charts
+            u('photo-1454165804606-c3d57bc86b40', 800, 800), // desk paperwork
+            u('photo-1497366216548-37526070297c', 800, 800), // office supplies
+            u('photo-1518455027359-f3f8164ba6bd', 800, 800), // stationery
+            u('photo-1522202176988-66273c2fd55f', 800, 800), // whiteboard
+            u('photo-1521737711867-e3b97375f902', 800, 800), // workspace
+        ],
     },
 
     // ── NEW CATEGORIES ──────────────────────────────────────────────────────
@@ -330,6 +411,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1509440159596-0249088772ff', 400, 300),
             u('photo-1517433670267-08bbd4be890f', 400, 300),
         ],
+        products: [
+            u('photo-1495474472287-4d71bcdd2085', 800, 800), // coffee cup
+            u('photo-1509440159596-0249088772ff', 800, 800), // artisan bread
+            u('photo-1551024506-0bccd828d307', 800, 800),    // cake slice
+            u('photo-1556679343-c7306c1976bc', 800, 800),    // bubble tea
+            u('photo-1514066558159-fc8c737ef259', 800, 800), // pastry
+            u('photo-1608198093002-ad4e005484ec', 800, 800), // packaged snack
+        ],
     },
 
     events: {
@@ -359,6 +448,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1519167758481-83f550bb49b3', 400, 300),
             u('photo-1475721027785-f74eccf877e2', 400, 300),
             u('photo-1530103862676-de8c9debad1d', 400, 300),
+        ],
+        products: [
+            u('photo-1511795409834-ef04bbd61622', 800, 800), // flower arrangement
+            u('photo-1530103862676-de8c9debad1d', 800, 800), // birthday cake
+            u('photo-1478146059778-26028b07395a', 800, 800), // table setup
+            u('photo-1519741497674-611481863552', 800, 800), // ballroom decor
+            u('photo-1464366400600-7168b8af9bc3', 800, 800), // outdoor decoration
+            u('photo-1519167758481-83f550bb49b3', 800, 800), // wedding flowers
         ],
     },
 
@@ -390,6 +487,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1499750310107-5fef28a66643', 400, 300),
             u('photo-1486312338219-ce68d2c6f44d', 400, 300),
         ],
+        products: [
+            u('photo-1455390582262-044cdead277a', 800, 800), // journal desk
+            u('photo-1471107340929-a87cd0f5b5f3', 800, 800), // notebook pen
+            u('photo-1456324504439-367cee3b3c32', 800, 800), // workspace
+            u('photo-1499750310107-5fef28a66643', 800, 800), // laptop coffee
+            u('photo-1434030216411-0b793f4b4173', 800, 800), // writing
+            u('photo-1488190211105-8b0e65b80b4e', 800, 800), // reading
+        ],
     },
 
     travel: {
@@ -420,6 +525,14 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
             u('photo-1464822759023-fed622ff2c3b', 400, 300),
             u('photo-1528181304800-259b08848526', 400, 300),
         ],
+        products: [
+            u('photo-1553413077-190dd305871c', 800, 800), // passport wallet
+            u('photo-1436491865332-7a61a109cc05', 800, 800), // luggage suitcase
+            u('photo-1496950866446-3253e1470e8e', 800, 800), // travel accessories
+            u('photo-1504598318550-17eba1008a68', 800, 800), // travel market
+            u('photo-1476514525535-07fb3b4ae5f1', 800, 800), // beach scene
+            u('photo-1552733407-5d5c46c3bb3b', 800, 800),    // sunset view
+        ],
     },
 }
 
@@ -444,4 +557,9 @@ export function getTeamAvatar(category: string, index = 0): string {
 
 export function getAboutImage(category: string): string {
     return getIndustryImages(category).about
+}
+
+export function getProductImages(category: string, count = 6): string[] {
+    const images = getIndustryImages(category)
+    return images.products.slice(0, count)
 }

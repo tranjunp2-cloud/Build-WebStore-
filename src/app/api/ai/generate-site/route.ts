@@ -34,6 +34,7 @@ import { enforcePageVariety } from '@/lib/ai/page-variety'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { withPayloadRetry } from '@/lib/payload-retry'
 import { generateSampleProducts } from '@/lib/ai/generate-sample-products'
+import { uploadImageUrl } from '@/lib/ai/upload-media'
 import { seedBlogPosts } from '@/lib/ai/seed-blog-posts'
 import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 
@@ -1050,8 +1051,10 @@ export async function POST(req: NextRequest) {
                 || (code === '23503' && /products_images_image_id_media_id_fk|image_id/i.test(constraint + msg))
         }
         let productsCreatedCount = 0
+        let productImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
         try {
-            const sampleProducts = await sampleProductsPromise
+            const { products: sampleProducts, stats: imgStats } = await sampleProductsPromise
+            productImageStats = imgStats
             for (const product of sampleProducts) {
                 // Guard: name must be at least 3 chars (Products schema minLength)
                 const name = product.name?.trim()
@@ -1091,14 +1094,51 @@ export async function POST(req: NextRequest) {
                     productsCreatedCount++
                 } catch (err) {
                     if (safeImageId != null && isStaleMediaFk(err)) {
-                        // FK violation on products_images_image_id_media_id_fk — media row
-                        // was deleted between pre-check and create. Retry without image.
-                        try {
-                            await payload.create({ collection: 'products', data: baseData })
-                            productsCreatedCount++
-                            console.warn(`[generate-site] STALE_MEDIA_FK product="${name}" imageId=${safeImageId} created without image`)
-                        } catch (retryErr) {
-                            console.warn('[generate-site] sample product write failed after FK-strip retry (non-fatal):', (retryErr as Error).message)
+                        // FK violation: media row deleted between pre-check and create.
+                        // Attempt one re-upload from gallery URL to get a fresh media row.
+                        const galleryUrl = product.galleryUrl
+                        if (galleryUrl) {
+                            let retryImageId: number | undefined
+                            try {
+                                retryImageId = await uploadImageUrl(
+                                    galleryUrl,
+                                    `sample-product-retry-${site.id}-${Date.now()}.jpg`,
+                                    name,
+                                    resolvedTenantId,
+                                    payload,
+                                )
+                            } catch {
+                                // re-upload failed — fall through to create without image
+                            }
+                            if (retryImageId != null) {
+                                try {
+                                    await payload.create({
+                                        collection: 'products',
+                                        data: { ...baseData, images: [{ image: retryImageId }] },
+                                    })
+                                    productsCreatedCount++
+                                    console.info(`[generate-site] STALE_MEDIA_FK_RETRY_OK product="${name}" oldId=${safeImageId} newId=${retryImageId}`)
+                                } catch {
+                                    // retry with new id also failed — give up gracefully
+                                    try {
+                                        await payload.create({ collection: 'products', data: baseData })
+                                        productsCreatedCount++
+                                    } catch { /* non-fatal */ }
+                                    console.warn(`[generate-site] STALE_MEDIA_FK_GIVE_UP product="${name}" oldId=${safeImageId} reason=retry_fk`)
+                                }
+                            } else {
+                                try {
+                                    await payload.create({ collection: 'products', data: baseData })
+                                    productsCreatedCount++
+                                } catch { /* non-fatal */ }
+                                console.warn(`[generate-site] STALE_MEDIA_FK_RETRY_FAIL product="${name}" oldId=${safeImageId} reason=reupload_fail`)
+                            }
+                        } else {
+                            try {
+                                await payload.create({ collection: 'products', data: baseData })
+                                productsCreatedCount++
+                            } catch { /* non-fatal */ }
+                            console.warn(`[generate-site] STALE_MEDIA_FK_NO_FALLBACK product="${name}" imageId=${safeImageId}`)
                         }
                     } else {
                         // Non-FK error or no image attached — do NOT silently retry without image
@@ -1140,7 +1180,7 @@ export async function POST(req: NextRequest) {
             timeMs - (phaseTimings.ai ?? 0) - (phaseTimings.media ?? 0) - (phaseTimings.db ?? 0),
         )
         console.info(
-            `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'}`,
+            `[generate-site] DONE total=${timeMs}ms ai=${phaseTimings.ai ?? 0}ms media=${phaseTimings.media ?? 0}ms db=${phaseTimings.db ?? 0}ms other=${phaseOther}ms pages=${createdPages.length} failures=${pageFailures.length} gen_mode=${process.env.GEN_MODE?.trim() || 'template-first'} unsplash_rl=${productImageStats.rateLimited} images_failed=${productImageStats.uploadFailed} products_no_image=${productImageStats.noImage}`,
         )
 
         // ── SSE Streaming Response ──
