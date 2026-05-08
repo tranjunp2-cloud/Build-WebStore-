@@ -314,34 +314,42 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {allFeatures.map((feature, fi) => (
-                                    <tr
-                                        key={fi}
-                                        className="border-t"
-                                        style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.06)' }}
-                                    >
-                                        <td className="p-4 text-sm"><RichText text={feature} as="span" /></td>
-                                        {plans.map((plan, pi) => {
-                                            // Plan 260415 Lỗi F — compare bằng text string thay vì reference
-                                            const hasFeature = plan.features.some(
-                                                f => (typeof f === 'string' ? f : f.text) === feature,
-                                            )
-                                            return (
+                                {/* Prefer featureMatrix when available; fall back to aggregated plan features */}
+                                {(() => {
+                                    const rows = block.featureMatrix?.length ? block.featureMatrix : allFeatures.map(text => ({
+                                        featureName: text,
+                                        values: plans.map(plan => ({ included: plan.features.some(f => (typeof f === 'string' ? f : f.text) === text) })),
+                                    }))
+                                    if (rows.length === 0) return (
+                                        <tr>
+                                            <td colSpan={plans.length + 1} className="p-8 text-center text-sm opacity-40">
+                                                Add a plan to get started
+                                            </td>
+                                        </tr>
+                                    )
+                                    return rows.map((row, fi) => (
+                                        <tr
+                                            key={fi}
+                                            className="border-t"
+                                            style={{ borderColor: 'rgba(var(--brand-primary-rgb), 0.06)' }}
+                                        >
+                                            <td className="p-4 text-sm"><RichText text={row.featureName} as="span" /></td>
+                                            {plans.map((plan, pi) => (
                                                 <td
                                                     key={pi}
                                                     className="p-4 text-center"
                                                     style={plan.highlighted ? { background: 'rgba(var(--brand-primary-rgb), 0.04)' } : {}}
                                                 >
-                                                    {hasFeature ? (
+                                                    {row.values[pi]?.included ? (
                                                         <span className="text-lg" style={{ color: 'var(--brand-primary)' }}>&#10003;</span>
                                                     ) : (
                                                         <span className="opacity-40" aria-label="not included">&mdash;</span>
                                                     )}
                                                 </td>
-                                            )
-                                        })}
-                                    </tr>
-                                ))}
+                                            ))}
+                                        </tr>
+                                    ))
+                                })()}
                             </tbody>
                             <tfoot>
                                 <tr>
@@ -417,36 +425,50 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                                 ))}
                             </div>
 
-                            {/* Feature rows */}
-                            {allFeatureTexts.map((featureText, fi) => (
-                                <div
-                                    key={fi}
-                                    className="grid items-center gap-px"
-                                    style={{
-                                        gridTemplateColumns: `minmax(180px, 1.5fr) repeat(${plans.length}, 1fr)`,
-                                        borderTop: '1px solid rgba(var(--brand-primary-rgb), 0.06)',
-                                    }}
-                                >
-                                    <div className="p-4 text-sm opacity-80"><RichText text={featureText} as="span" /></div>
-                                    {plans.map((plan, pi) => (
-                                        <div
-                                            key={pi}
-                                            className="p-4 text-center"
-                                            style={{
-                                                background: plan.highlighted
-                                                    ? 'rgba(var(--brand-primary-rgb), 0.04)'
-                                                    : 'transparent',
-                                            }}
-                                        >
-                                            {planHasFeature(plan, featureText) ? (
-                                                <span className="text-lg" style={{ color: 'var(--brand-primary)' }}>&#10003;</span>
-                                            ) : (
-                                                <span className="opacity-20">&times;</span>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            ))}
+                            {/* Feature rows — prefer featureMatrix when available; fall back to plan features */}
+                            {(() => {
+                                const rows = block.featureMatrix?.length ? block.featureMatrix : allFeatureTexts.map(text => ({
+                                    featureName: text,
+                                    values: plans.map(plan => ({ included: planHasFeature(plan, text) })),
+                                }))
+                                if (rows.length === 0) return (
+                                    <div
+                                        className="p-8 text-center text-sm opacity-40"
+                                        style={{ borderTop: '1px solid rgba(var(--brand-primary-rgb), 0.06)' }}
+                                    >
+                                        Add a plan to get started
+                                    </div>
+                                )
+                                return rows.map((row, fi) => (
+                                    <div
+                                        key={fi}
+                                        className="grid items-center gap-px"
+                                        style={{
+                                            gridTemplateColumns: `minmax(180px, 1.5fr) repeat(${plans.length}, 1fr)`,
+                                            borderTop: '1px solid rgba(var(--brand-primary-rgb), 0.06)',
+                                        }}
+                                    >
+                                        <div className="p-4 text-sm opacity-80"><RichText text={row.featureName} as="span" /></div>
+                                        {plans.map((plan, pi) => (
+                                            <div
+                                                key={pi}
+                                                className="p-4 text-center"
+                                                style={{
+                                                    background: plan.highlighted
+                                                        ? 'rgba(var(--brand-primary-rgb), 0.04)'
+                                                        : 'transparent',
+                                                }}
+                                            >
+                                                {row.values[pi]?.included ? (
+                                                    <span className="text-lg" style={{ color: 'var(--brand-primary)' }}>&#10003;</span>
+                                                ) : (
+                                                    <span className="opacity-20">&times;</span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))
+                            })()}
 
                             {/* CTA row */}
                             <div

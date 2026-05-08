@@ -1,6 +1,8 @@
 import { AppShell } from '@/components/AppShell'
 import { I18nProvider } from '@/i18n'
 import { getCurrentUser } from '@/lib/auth'
+import { getPayload } from 'payload'
+import configPromise from '@payload-config'
 import type { PlatformUser } from '@/types/user'
 import { CMSLayoutClient } from './_components/CMSLayoutClient'
 import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
@@ -17,14 +19,32 @@ export default async function DashboardLayout({
     const user = await getCurrentUser()
     // Extract tenantId from user directly — avoid 2nd getCurrentUser() call
     const typedUser = user as PlatformUser | null
-    const tenants = typedUser?.tenants as Array<{ tenant: string | { id: string }, role?: string }> | undefined
+    const tenants = typedUser?.tenants as Array<{ tenant: string | number | { id: string | number }, role?: string }> | undefined
     const firstTenant = tenants?.[0]?.tenant
-    const tenantId = typeof firstTenant === 'string' ? firstTenant : firstTenant?.id || null
+    // Normalize to string: handles depth=0 (number ID), depth=1 (object), or string
+    const tenantId = typeof firstTenant === 'string' ? firstTenant
+        : typeof firstTenant === 'number' ? String(firstTenant)
+        : firstTenant?.id != null ? String(firstTenant.id)
+        : null
     const userName = typedUser?.firstName || typedUser?.email?.split('@')[0] || 'User'
     const userEmail = typedUser?.email || ''
     const userInitial = userName.charAt(0).toUpperCase()
-    
-    const currentTenantInfo = typedUser?.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId)
+
+    // Fetch avatar URL (depth=1 to expand media relationship)
+    let userAvatarUrl: string | null = null
+    if (user) {
+        try {
+            const payload = await getPayload({ config: configPromise })
+            const full = await payload.findByID({ collection: 'users', id: user.id, depth: 1 }) as Record<string, unknown>
+            const av = full?.avatar as { url?: string } | null | undefined
+            if (av && typeof av === 'object' && av.url) userAvatarUrl = av.url
+        } catch (err) { console.warn('[layout] avatar fetch failed:', err) }
+    }
+
+    const currentTenantInfo = typedUser?.tenants?.find((t: { tenant: string | number | { id: string | number }, role?: string }) => {
+        const tId = typeof t.tenant === 'object' && t.tenant !== null ? String(t.tenant.id) : String(t.tenant)
+        return tId === tenantId
+    })
     const currentUserRole = currentTenantInfo?.role || 'viewer'
     const isSuperAdmin = Boolean(typedUser?.roles?.includes('super-admin'))
 
@@ -32,7 +52,7 @@ export default async function DashboardLayout({
         <AppShell>
             <I18nProvider defaultLocale="en">
                 <TooltipProvider delayDuration={300}>
-                    <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
+                    <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
                         {children}
                     </CMSLayoutClient>
                     {typedUser && (

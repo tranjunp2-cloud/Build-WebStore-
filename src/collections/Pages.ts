@@ -517,6 +517,8 @@ const PricingBlock = {
             fields: [
                 { name: 'name', type: 'text', required: true },
                 { name: 'price', type: 'text', required: true },
+                { name: 'period', type: 'text' },
+                { name: 'yearlyPrice', type: 'text' },
                 { name: 'description', type: 'textarea' },
                 {
                     name: 'features',
@@ -527,8 +529,34 @@ const PricingBlock = {
                     ],
                 },
                 { name: 'isPopular', type: 'checkbox', defaultValue: false },
+                { name: 'highlighted', type: 'checkbox', defaultValue: false },
                 { name: 'ctaLabel', type: 'text', defaultValue: 'Get Started' },
                 { name: 'ctaUrl', type: 'text' },
+                {
+                    name: 'ctaActionType', type: 'select', defaultValue: 'external',
+                    options: [{ label: 'External', value: 'external' }, { label: 'Internal', value: 'internal' }],
+                },
+                {
+                    name: 'ctaStyle', type: 'select', defaultValue: 'primary',
+                    options: [{ label: 'Primary', value: 'primary' }, { label: 'Outline', value: 'outline' }, { label: 'Ghost', value: 'ghost' }],
+                },
+            ],
+        },
+        { name: 'billingCycle1', type: 'text', defaultValue: 'Monthly' },
+        { name: 'billingCycle2', type: 'text', defaultValue: 'Yearly' },
+        { name: 'discountPercent', type: 'number' },
+        {
+            name: 'featureMatrix',
+            type: 'array',
+            fields: [
+                { name: 'featureName', type: 'text', required: true },
+                {
+                    name: 'values',
+                    type: 'array',
+                    fields: [
+                        { name: 'included', type: 'checkbox', defaultValue: false },
+                    ],
+                },
             ],
         },
     ],
@@ -855,7 +883,7 @@ const AnnouncementBarBlock = {
     labels: { singular: 'Announcement Bar', plural: 'Announcement Bars' },
     fields: [
         {
-            name: 'variant', type: 'select', defaultValue: 'solid',
+            name: 'variant', type: 'select', defaultValue: 'gradient',
             options: [
                 { label: 'Gradient', value: 'gradient' },
                 { label: 'Solid', value: 'solid' },
@@ -863,10 +891,15 @@ const AnnouncementBarBlock = {
             ],
         },
         { name: 'message', type: 'text', required: true },
+        { name: 'showLink', type: 'checkbox' },
         { name: 'linkText', type: 'text' },
         { name: 'linkUrl', type: 'text' },
+        { name: 'linkIsInternal', type: 'checkbox' },
         { name: 'dismissible', type: 'checkbox', defaultValue: true },
         { name: 'backgroundColor', type: 'text' },
+        { name: 'backgroundColor2', type: 'text' },
+        { name: 'textColor', type: 'text' },
+        { name: 'paddingY', type: 'number', min: 4, max: 32 },
     ],
 }
 

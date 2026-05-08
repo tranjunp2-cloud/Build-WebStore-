@@ -9,6 +9,11 @@ vi.mock('@/lib/notifications/notify-tenant-owners', () => ({
     notifyTenantOwners: (...args: any[]) => mockNotifyTenantOwners(...args),
 }))
 
+const mockQueueSEO = vi.fn()
+vi.mock('@/lib/ai/seo-queue', () => ({
+    queueSEOAutoGeneration: (...args: any[]) => mockQueueSEO(...args),
+}))
+
 // Must import AFTER vi.mock
 import { Orders } from '@/collections/Orders'
 import { Products, lowStockHook } from '@/collections/Products'
@@ -235,5 +240,68 @@ describe('[TC-F16.14] BLOG_PUBLISHED trigger — Blogs.afterChange', () => {
 
         await hook({ doc, previousDoc, operation: 'update', req: makeReq() } as any)
         await vi.waitFor(() => expect(mockNotifyTenantOwners).toHaveBeenCalled())
+    })
+})
+
+// ── GH-909 regression: null site / null tenant guard ─────────────────────
+
+describe('[TC-F08-REG.01-03] afterChangeHook — null site guard (GH-909)', () => {
+    const hook = Products.hooks!.afterChange![0]
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F08-REG.01: doc.site is null → hook resolves without TypeError', async () => {
+        const req = { payload: { findByID: vi.fn().mockRejectedValue(new Error('no site')) } } as any
+        await expect(hook({
+            doc: { id: '1', status: 'active', name: 'Orphan Product', site: null },
+            previousDoc: { status: 'draft' },
+            operation: 'update',
+            req,
+        } as any)).resolves.not.toThrow()
+    })
+
+    it('TC-F08-REG.02: doc.site is scalar string → findByID called with string id', async () => {
+        const req = { payload: { findByID: vi.fn().mockResolvedValue({ seo: { autoMetaEnabled: true } }) } } as any
+        await hook({
+            doc: { id: '1', status: 'active', name: 'Test', site: 'site-abc' },
+            previousDoc: { status: 'draft' },
+            operation: 'update',
+            req,
+        } as any)
+        expect(req.payload.findByID).toHaveBeenCalledWith(expect.objectContaining({ id: 'site-abc' }))
+    })
+
+    it('TC-F08-REG.03: doc.site is populated object → findByID called with site.id', async () => {
+        const req = { payload: { findByID: vi.fn().mockResolvedValue({ seo: { autoMetaEnabled: true } }) } } as any
+        await hook({
+            doc: { id: '1', status: 'active', name: 'Test', site: { id: 'site-xyz' } },
+            previousDoc: { status: 'draft' },
+            operation: 'update',
+            req,
+        } as any)
+        expect(req.payload.findByID).toHaveBeenCalledWith(expect.objectContaining({ id: 'site-xyz' }))
+    })
+})
+
+describe('[TC-F08-REG.04] lowStockHook — null tenant guard (GH-909)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F08-REG.04: doc.tenant is null → hook resolves without TypeError', async () => {
+        const doc = { id: '1', name: 'Orphan Product', inventory: 5, tenant: null }
+        const previousDoc = { inventory: 15 }
+        const result = await lowStockHook({
+            doc, previousDoc, operation: 'update', req: makeReq(),
+        } as any)
+        // hook must return doc without throwing
+        expect(result).toBe(doc)
+        // notification called with null tenantId — not a crash, notifyTenantOwners handles it
+        await vi.waitFor(() => expect(mockNotifyTenantOwners).toHaveBeenCalled())
+        expect(mockNotifyTenantOwners).toHaveBeenCalledWith(mockPayload, null, expect.objectContaining({
+            type: 'PRODUCT_LOW_STOCK',
+        }))
     })
 })

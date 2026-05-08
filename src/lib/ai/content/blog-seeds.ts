@@ -11,6 +11,7 @@
  */
 
 import type { BlogPost, BusinessSample } from './types'
+import { seededShuffle } from '../seeded-random'
 
 export const BLOG_SEEDS_BY_CATEGORY: Record<string, BlogPost[]> = {
   restaurant: [
@@ -126,14 +127,18 @@ function substitutePlaceholders(str: string, biz: Partial<BusinessSample> | unde
 export function getBlogSeeds(
   category: string,
   biz?: Partial<BusinessSample>,
+  seed?: number,
 ): BlogPost[] {
   const key = category.toLowerCase().replace(/[\s_-]+/g, '')
-  const seeds = BLOG_SEEDS_BY_CATEGORY[key] ?? BLOG_SEEDS_BY_CATEGORY['business'] ?? []
+  const baseSeeds = BLOG_SEEDS_BY_CATEGORY[key] ?? BLOG_SEEDS_BY_CATEGORY['business'] ?? []
+  // GH-912: when seed provided, rotate ordering so two same-category users
+  // with different contact info get different "which 3 posts" + ordering.
+  const seeds = seed !== undefined ? seededShuffle(baseSeeds, seed) : baseSeeds
   if (!biz) return seeds
-  return seeds.map((seed) => ({
-    ...seed,
-    title: substitutePlaceholders(seed.title, biz),
-    excerpt: substitutePlaceholders(seed.excerpt, biz),
+  return seeds.map((s) => ({
+    ...s,
+    title: substitutePlaceholders(s.title, biz),
+    excerpt: substitutePlaceholders(s.excerpt, biz),
   }))
 }
 

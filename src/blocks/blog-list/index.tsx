@@ -34,14 +34,19 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     const [posts, setPosts] = useState<BlogPost[]>([])
     const [loading, setLoading] = useState(true)
 
-    // BUG-F05-06: build blog links using site base path injected server-side.
-    // `siteBasePath` is '' on subdomain/custom-domain, '/sites/<slug>' on local
-    // direct access. Fallback to tenantSlug if siteBasePath not provided.
+    // Build blog base path with 3-tier fallback:
+    //   1. siteBasePath  — enriched by [[...path]]/page.tsx (canonical path)
+    //   2. tenantSlug    — flat prop (legacy enrichment)
+    //   3. site.tenant.slug — populated relation (editor preview / test harness)
     const siteRec = site as Record<string, unknown>
-    const siteBasePath = typeof siteRec?.siteBasePath === 'string'
-        ? (siteRec.siteBasePath as string)
-        : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
-    const blogBasePath = `${siteBasePath}/blogs`
+    const explicitBase = typeof siteRec?.siteBasePath === 'string' ? (siteRec.siteBasePath as string) : null
+    const tenantSlugRaw =
+        siteRec?.tenantSlug ??
+        (siteRec?.tenant && typeof siteRec.tenant === 'object'
+            ? (siteRec.tenant as Record<string, unknown>).slug
+            : null)
+    const siteBasePath = explicitBase ?? (typeof tenantSlugRaw === 'string' && tenantSlugRaw ? `/sites/${tenantSlugRaw}` : '')
+    const blogBasePath = `${siteBasePath}/blog`
 
     useEffect(() => {
         const tenantId = site?.tenant

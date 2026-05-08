@@ -16,9 +16,9 @@ describe('generateBlocks — output structure [TC-F01.08]', () => {
     })
 
     it('returns 6-12 blocks (dynamic pool + industry blocks)', () => {
-        // Restaurant gets 3 industry blocks (menu-display, booking-widget,
-        // review-cards) prepended before the 3-4 generic middle blocks.
-        // Range: nav + hero + 0-3 industry + 3-4 middle + contact + footer = 7-12
+        // Restaurant gets industry blocks (menu-display + review-cards) prepended before generic middle blocks.
+        // booking-widget temporarily hidden (feat/fix-broken-block-variants).
+        // Range: nav + hero + 0-2 industry + 3-4 middle + contact + footer = 6-11
         expect(result.blocks.length).toBeGreaterThanOrEqual(6)
         expect(result.blocks.length).toBeLessThanOrEqual(12)
     })
@@ -234,11 +234,12 @@ describe('generateBlocks — Payload field name compliance', () => {
 
 // ─── Industry-aware fallback: category-specific blocks ──────────────────
 describe('generateBlocks — industry-aware block selection', () => {
-    it('restaurant fallback includes menu-display + booking-widget', () => {
+    // feat/fix-broken-block-variants: booking-widget temporarily hidden — test updated to match
+    it('restaurant fallback includes menu-display', () => {
         const result = generateBlocks('Create a website for "Ben Ben" restaurant', 12345)
         const blockTypes = result.blocks.map(b => b.blockType)
         expect(blockTypes).toContain('menu-display')
-        expect(blockTypes).toContain('booking-widget')
+        expect(blockTypes).not.toContain('booking-widget') // temporarily hidden
     })
 
     it('restaurant menu-display has non-empty categories with items', () => {

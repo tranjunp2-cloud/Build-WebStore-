@@ -3,6 +3,8 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 
+export const runtime = 'nodejs'
+
 export async function PATCH(req: NextRequest) {
     try {
         const user = await getCurrentUser()

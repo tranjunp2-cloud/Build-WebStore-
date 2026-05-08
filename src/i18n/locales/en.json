@@ -1881,7 +1881,7 @@
         "qSettingsDns": "How to configure DNS records?",
         "aSettingsDns": "After adding your domain, the system shows the required DNS records:<ul><li><strong>A Record</strong> — Point your domain to the static IP address shown (e.g., 162.159.140.98)</li><li><strong>CNAME Record</strong> — Point to <strong>web-v2.dev.ecommercehub.my</strong></li></ul>DNS propagation typically takes 15 minutes to 48 hours depending on your registrar.",
         "qSettingsStaff": "How to invite admin staff?",
-        "aSettingsStaff": "Go to <strong>\"⚙️ Settings → Staff\"</strong>. Click <strong>\"Invite Staff\"</strong>, enter their email address, and select a role (Viewer or Full Access). They will receive an email invitation to join your workspace."
+        "aSettingsStaff": "Go to <strong>\"⚙️ Settings → Staff\"</strong>. Click <strong>\"Invite Staff\"</strong>, enter their email address, and select a role (Viewer or Manager). They will receive an email invitation to join your workspace."
       }
     }
   },
@@ -1942,7 +1942,7 @@
       "actions": "ACTIONS",
       "owner": "Owner",
       "custom": "Custom Features",
-      "fullAccess": "Full Access",
+      "fullAccess": "Manager",
       "viewer": "Viewer",
       "active": "Active",
       "suspended": "Suspended",
@@ -2298,7 +2298,7 @@
       "step1Body": "Use Page Library to create and manage your website's internal pages.",
       "step2Title": "Step 2: Control menu visibility here",
       "step2Body": "After creating a page, add it to Menu Settings so it appears on your website.",
-      "skip": "Skip",
+      "back": "Back",
       "next": "Next",
       "finish": "Done"
     },
@@ -2702,7 +2702,47 @@
       "memberLabel": "Member",
       "memberNamePlaceholder": "Member name",
       "memberRolePlaceholder": "Role / title",
-      "memberBioPlaceholder": "Short bio"
+      "memberBioPlaceholder": "Short bio",
+      "pricingManagement": "Plans Management",
+      "pricingNumberOfPlans": "Number of plans:",
+      "pricingPlansMinMax": "(Min: 1 - Max: 3)",
+      "pricingDecreasePlanCount": "Decrease plan count",
+      "pricingIncreasePlanCount": "Increase plan count",
+      "pricingDiscountPercentage": "Discount Percentage:",
+      "pricingCycle1": "Cycle 1:",
+      "pricingCycle2": "Cycle 2:",
+      "pricingCycle1Placeholder": "Monthly",
+      "pricingCycle2Placeholder": "Yearly",
+      "pricingDiscountPercent": "Discount %:",
+      "pricingPlanTab": "Plan {n}",
+      "pricingEditFeatures": "Edit Features (One per line)",
+      "pricingPlanName": "Plan Name:",
+      "pricingPlanNamePlaceholder": "e.g. Starter",
+      "pricingPriceUnit": "Price & Unit:",
+      "pricingPriceUnitPlaceholder": "e.g. $29/mo",
+      "pricingDescription": "Description:",
+      "pricingDescriptionPlaceholder": "Short description",
+      "pricingFeatures": "Features (One per line):",
+      "pricingFeaturesPlaceholder": "5 Projects\nBasic Support\n...",
+      "pricingCtaSettings": "CTA Settings",
+      "pricingLinkText": "Link Text:",
+      "pricingLinkTextPlaceholder": "Button text",
+      "pricingAction": "Action:",
+      "pricingActionExternal": "Style: External",
+      "pricingActionInternal": "Style: Internal",
+      "pricingSelectPage": "— select page —",
+      "pricingFeatureModalTitle": "Edit Pricing Content",
+      "pricingFeatureModalSubtitle": "Manage your pricing feature matrix. Click on cells to toggle between icons (Check/Cross).",
+      "pricingFeatureNameCol": "Feature Name",
+      "pricingFeatureNamePlaceholder": "Feature name",
+      "pricingAddFeatureRow": "Add Feature Row",
+      "pricingSaveChanges": "Save Changes",
+      "pricingDiscardPrompt": "Discard unsaved changes?",
+      "pricingKeepEditing": "Keep editing",
+      "pricingYesDiscard": "Yes, discard",
+      "pricingIncludedToggle": "Included — click to exclude",
+      "pricingExcludedToggle": "Excluded — click to include",
+      "pricingDeleteRow": "Delete row {n}"
     },
     "statusBar": {
       "connected": "Connected",
@@ -2805,8 +2845,8 @@
       "slugConflict": "Page slug already exists in this site",
       "noPagesFound": "No pages found",
       "noPagesSuggestion": "Create your first page to get started.",
-      "tooltipLive": "This page is published and linked in the menu — it's live on your website.",
-      "tooltipDraft": "This page is not linked in the menu or not published — it won't appear on your website."
+      "tooltipLive": "This page is published and your site is live — it's visible to visitors.",
+      "tooltipDraft": "This page won't appear on your website. Either the page is still a draft or your site hasn't been published yet."
     },
     "navigationValidation": {
       "labelRequired": "Link label is required",
@@ -2919,6 +2959,76 @@
       "code": "404",
       "title": "Page Not Found",
       "backHome": "Back to Homepage"
+    }
+  },
+  "profile": {
+    "title": "My Profile",
+    "accountSettings": "Account Settings",
+    "tabs": {
+      "general": "General Info",
+      "security": "Security"
+    },
+    "banner": {
+      "roleOwner": "Owner",
+      "roleStaff": "Staff",
+      "uploadAvatar": "Click to upload avatar",
+      "status": "Status",
+      "activeNow": "Active Now"
+    },
+    "general": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email Address",
+      "emailReadonly": "Email cannot be changed (Login identity)",
+      "phone": "Phone Number",
+      "save": "Save Change",
+      "saving": "Saving...",
+      "saved": "Profile updated",
+      "cancel": "Cancel"
+    },
+    "security": {
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "changePassword": "Change Password",
+      "updatePassword": "Update Password",
+      "changing": "Changing...",
+      "changed": "Password changed successfully",
+      "lastLogin": "Last Login",
+      "ruleMinLength": "At least 8 characters",
+      "ruleUppercase": "One uppercase letter",
+      "ruleLowercase": "One lowercase letter",
+      "ruleNumber": "One number",
+      "ruleSpecial": "One special character"
+    },
+    "sso": {
+      "notice": "Owner accounts are managed via Single Sign-On. Update your profile and password in the SSO portal.",
+      "manageButton": "Manage Account in SSO",
+      "urlMissing": "SSO portal URL is not configured. Contact admin.",
+      "generalTitle": "🔒 Information managed by SSO",
+      "generalNotice": "Personal information fields are synchronized from the SSO system. You cannot edit them here.",
+      "generalLink": "To make changes, please visit the SSO portal",
+      "securityTitle": "🛡️ SSO Protected Account",
+      "securityNotice": "Your password and security settings are managed by the Single Sign-On (SSO) system. To change your password, enable two-factor authentication (2FA), or update any security settings, please visit the SSO management portal.",
+      "securityLink": "Manage SSO Account"
+    },
+    "errors": {
+      "invalidPhone": "Please enter a valid phone number",
+      "passwordMinLength": "Password must be at least 8 characters",
+      "passwordUpper": "Password must contain an uppercase letter",
+      "passwordLower": "Password must contain a lowercase letter",
+      "passwordNumber": "Password must contain a number",
+      "passwordSpecial": "Password must contain a special character",
+      "passwordsMismatch": "Passwords do not match",
+      "currentPasswordIncorrect": "Current password is incorrect",
+      "newPasswordSameAsCurrent": "New password must differ from current password",
+      "avatarTooLarge": "Avatar must be 2MB or smaller",
+      "avatarWrongType": "Avatar must be JPG or PNG",
+      "ownerForbidden": "Owner accounts must update profile via SSO",
+      "uploadFailed": "Avatar upload failed",
+      "saveFailed": "Failed to save profile",
+      "networkError": "Network error. Please try again.",
+      "unsavedChanges": "You have unsaved changes. Leave this tab?"
     }
   }
 }

@@ -90,13 +90,12 @@ describe('PageManagerPanel', () => {
         expect(screen.queryByPlaceholderText(/[Ss]earch/)).not.toBeInTheDocument()
     })
 
-    it('TC-F05-02-14d: page in menu + published + site published shows Live badge', () => {
-        // Arrange — page-2 in menu, set status to published
+    it('TC-F05-02-14d: multiple published pages on published site all show Live badge', () => {
+        // Arrange — two published pages; menu membership is irrelevant to badge logic
         useEditorStore.getState().setPages([
             { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
             { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
         ])
-        const menuPageIds = new Set(['page-1', 'page-2'])
 
         render(
             <I18nProvider defaultLocale="en">
@@ -104,18 +103,17 @@ describe('PageManagerPanel', () => {
                     siteId="site-123"
                     currentPageId="page-99"
                     siteStatus="published"
-                    menuPageIds={menuPageIds}
                     onPageSelected={vi.fn()}
                 />
             </I18nProvider>,
         )
-        // Assert — both pages qualify as Live
+        // Assert — all published pages show Live when site is published
         const liveBadges = screen.getAllByText('Live')
         expect(liveBadges.length).toBeGreaterThanOrEqual(1)
     })
 
-    it('TC-F05-02-14e: published page NOT in menu shows Draft badge', () => {
-        // Arrange — page-2 published but empty menuPageIds
+    it('TC-F05-02-14e: published page on published site shows Live badge regardless of menu', () => {
+        // Arrange — page-2 published, site published; menu membership is irrelevant to status
         useEditorStore.getState().setPages([
             { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
         ])
@@ -126,12 +124,31 @@ describe('PageManagerPanel', () => {
                     siteId="site-123"
                     currentPageId="page-99"
                     siteStatus="published"
-                    menuPageIds={new Set()}
                     onPageSelected={vi.fn()}
                 />
             </I18nProvider>,
         )
-        // Assert — not in menu → Draft despite being published
+        // Assert — page.status=published + siteStatus=published → Live (menu state does not affect badge)
+        expect(screen.getByText('Live')).toBeInTheDocument()
+        expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+    })
+
+    it('TC-F05-02-15d: published page on unpublished site shows Draft badge', () => {
+        // Arrange — page published but site not yet published
+        useEditorStore.getState().setPages([
+            { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-99"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+        // Assert — site not published → Draft even if page.status is published
         expect(screen.getByText('Draft')).toBeInTheDocument()
         expect(screen.queryByText('Live')).not.toBeInTheDocument()
     })

@@ -45,6 +45,7 @@ export type AITask =
     | 'seo-generation'
     | 'content-rewrite'
     | 'product-description'
+    | 'blog-seed'
     | 'url-extraction'
     | 'bulk-parse'
 
@@ -75,6 +76,7 @@ const DEFAULT_MODELS: Record<AITask, AIModel> = {
     'seo-generation':     'gpt-4.1-nano',
     'content-rewrite':    'gpt-4.1-nano',
     'product-description': 'gpt-4.1-nano',
+    'blog-seed':          'gpt-4.1-nano',
     'url-extraction':     'gpt-4.1-nano',
     // phase-04: hardcoded gpt-4o → gpt-4.1-nano for bulk product CSV parsing
     // (structured extraction, low creativity, 50x cheaper)
@@ -95,6 +97,7 @@ const ENV_KEY: Record<AITask, string> = {
     'seo-generation':     'AI_MODEL_SEO',
     'content-rewrite':    'AI_MODEL_REWRITE',
     'product-description': 'AI_MODEL_PRODUCT_DESC',
+    'blog-seed':          'AI_MODEL_BLOG_SEED',
     'url-extraction':     'AI_MODEL_URL_EXTRACT',
     'bulk-parse':         'AI_MODEL_BULK_PARSE',
 }
@@ -137,6 +140,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 3,         // per day
         'content-rewrite': 5,        // per day
         'product-description': 5,    // per day
+        'blog-seed': 5,              // per day
         'url-extraction': 10,        // per day
         'bulk-parse': 5,             // per day
     },
@@ -148,6 +152,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 10,        // per day
         'content-rewrite': 20,       // per day
         'product-description': 20,   // per day
+        'blog-seed': 20,             // per day
         'url-extraction': 30,        // per day
         'bulk-parse': 20,            // per day
     },
@@ -159,6 +164,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 50,        // per day
         'content-rewrite': 100,      // per day
         'product-description': 100,  // per day
+        'blog-seed': 100,            // per day
         'url-extraction': 100,       // per day
         'bulk-parse': 100,           // per day
     },
@@ -170,6 +176,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 999999,
         'content-rewrite': 999999,
         'product-description': 999999,
+        'blog-seed': 999999,
         'url-extraction': 999999,
         'bulk-parse': 999999,
     },
@@ -236,6 +243,7 @@ export const ESTIMATED_COSTS: Record<AITask, number> = {
     'seo-generation': 0.0004,     // GPT-4o-mini, ~800 in + 400 out
     'content-rewrite': 0.0003,    // GPT-4o-mini, ~600 in + 300 out
     'product-description': 0.0003,
+    'blog-seed': 0.0026,           // nano, 1 seed call + 3 content calls per site gen
     'url-extraction': 0.001,      // GPT-4o-mini, ~2.3K in + 500 out
     'bulk-parse': 0.001,          // GPT-4o-mini, ~2K in + 1K out
 }

@@ -348,6 +348,7 @@ export const SERVICE_CARDS_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]
 export const ITEM_FIELD_BY_BLOCK: Readonly<Record<string, string>> = {
     features: 'features',
     testimonials: 'testimonials',
+    'social-proof': 'reviews',
     team: 'members',
     faq: 'faqs',
     pricing: 'plans',

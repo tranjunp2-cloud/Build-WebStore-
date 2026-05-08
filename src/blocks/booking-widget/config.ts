@@ -50,7 +50,7 @@ export const bookingWidgetMeta = {
     defaultVariant: 'inline',
     editableFields: ['headline', 'subheadline', 'services', 'availableDays', 'timeSlotInterval', 'startTime', 'endTime', 'bookingUrl', 'showPrice'],
     quickActions: ['Add service', 'Change time slots', 'Update availability'],
-    aiVisible: true,
+    aiVisible: false, // hidden: in BLOCKS_TEMP_HIDDEN (render/variant issues unresolved)
     category: 'widgets' as const,
 }
 

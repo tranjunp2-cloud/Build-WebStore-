@@ -112,6 +112,7 @@ describe('OTP Verification Endpoints', () => {
         })
 
         it('returns emailSent: true when sendEmail succeeds [TC-F02.40]', async () => {
+            process.env.MAIL_HOST = 'smtp.test.com'
             mockPayload.find.mockResolvedValue({
                 docs: [{ id: 1, email: 'test@test.com' }]
             })
@@ -121,11 +122,13 @@ describe('OTP Verification Endpoints', () => {
             const res = await sendOtpHandler!(req) as Response
             const data = await res.json()
 
+            delete process.env.MAIL_HOST
             expect(res.status).toBe(200)
             expect(data.emailSent).toBe(true)
         })
 
         it('returns emailSent: false when sendEmail throws [TC-F02.41]', async () => {
+            process.env.MAIL_HOST = 'smtp.test.com'
             mockPayload.find.mockResolvedValue({
                 docs: [{ id: 1, email: 'test@test.com' }]
             })
@@ -135,6 +138,7 @@ describe('OTP Verification Endpoints', () => {
             const res = await sendOtpHandler!(req) as Response
             const data = await res.json()
 
+            delete process.env.MAIL_HOST
             expect(res.status).toBe(200)
             expect(data.emailSent).toBe(false)
         })

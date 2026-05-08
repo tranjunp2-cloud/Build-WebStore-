@@ -12,13 +12,13 @@ const STORAGE_KEY = 'editor:coach-marks:v1:seen'
  * Wrapper that provides anchor elements the coach marks query via document.querySelector.
  * Renders both data-coach anchors so step 1 + step 2 can resolve their rects.
  */
-function Wrapper({ onEnterStep2 = vi.fn() }: { onEnterStep2?: () => void }) {
+function Wrapper({ onEnterStep1 = vi.fn(), onEnterStep2 = vi.fn() }: { onEnterStep1?: () => void; onEnterStep2?: () => void }) {
     return (
         <I18nProvider defaultLocale="en">
             {/* Anchor elements used by EditorCoachMarks */}
             <div data-coach="page-library" style={{ position: 'fixed', top: 0, left: 0, width: 280, height: 600 }} />
             <div data-coach="menu-settings" style={{ position: 'fixed', top: 0, right: 0, width: 320, height: 600 }} />
-            <EditorCoachMarks mountDelayMs={0} onEnterStep2={onEnterStep2} />
+            <EditorCoachMarks mountDelayMs={0} onEnterStep1={onEnterStep1} onEnterStep2={onEnterStep2} />
         </I18nProvider>
     )
 }
@@ -27,7 +27,7 @@ function Wrapper({ onEnterStep2 = vi.fn() }: { onEnterStep2?: () => void }) {
 async function advanceCoachMarkTimers() {
     // First pass: fires mountDelayMs timer → setStep(1)
     await act(async () => { vi.runAllTimers() })
-    // Second pass: fires the 50ms anchor-rect setTimeout inside useAnchorRect
+    // Second pass: fires the anchor-rect setTimeout (50ms for step 1, 150ms for step 2)
     await act(async () => { vi.runAllTimers() })
 }
 
@@ -66,14 +66,15 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         render(<Wrapper />)
         await advanceCoachMarkTimers()
 
-        // Assert — step 1 title and body visible
+        // Assert — step 1 title and body visible; no skip/back at step 1
         expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
         expect(screen.getByText(/internal pages/)).toBeInTheDocument()
-        expect(screen.getByText('Skip')).toBeInTheDocument()
+        expect(screen.queryByText('Skip')).not.toBeInTheDocument()
+        expect(screen.queryByText('Back')).not.toBeInTheDocument()
         expect(screen.getByText('Next')).toBeInTheDocument()
     })
 
-    it('TC-F05-02-16c: clicking Tiếp theo calls onEnterStep2 and advances to step 2', async () => {
+    it('TC-F05-02-16c: clicking Next calls onEnterStep2 and advances to step 2', async () => {
         // Arrange
         const onEnterStep2 = vi.fn()
         render(<Wrapper onEnterStep2={onEnterStep2} />)
@@ -106,42 +107,52 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         expect(localStorage.getItem(STORAGE_KEY)).toBe('true')
     })
 
-    it('TC-F05-02-16e: clicking Skip at step 1 writes flag and closes', async () => {
-        // Arrange
-        render(<Wrapper />)
+    it('TC-F05-02-16e: Back button at step 2 navigates back to step 1 and calls onEnterStep1', async () => {
+        // Arrange — advance to step 2
+        const onEnterStep1 = vi.fn()
+        render(<Wrapper onEnterStep1={onEnterStep1} />)
         await advanceCoachMarkTimers()
+        fireEvent.click(screen.getByText('Next'))
+        await advanceCoachMarkTimers()
+        expect(screen.getByText('Step 2: Control menu visibility here')).toBeInTheDocument()
+        onEnterStep1.mockClear() // clear calls from mount
 
         // Act
-        fireEvent.click(screen.getByText('Skip'))
+        fireEvent.click(screen.getByText('Back'))
+        await advanceCoachMarkTimers()
 
-        // Assert
-        expect(screen.queryByText(/Step /)).not.toBeInTheDocument()
-        expect(localStorage.getItem(STORAGE_KEY)).toBe('true')
+        // Assert — callback fired, back at step 1, no Back button, flag NOT written
+        expect(onEnterStep1).toHaveBeenCalledOnce()
+        expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
+        expect(screen.queryByText('Back')).not.toBeInTheDocument()
+        expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
     })
 
-    it('TC-F05-02-16f: ESC key dismisses and writes flag', async () => {
+    it('TC-F05-02-16f: ESC key does NOT dismiss coach marks (removed per GH-864)', async () => {
         // Arrange
         render(<Wrapper />)
         await advanceCoachMarkTimers()
+        expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
 
         // Act
         fireEvent.keyDown(window, { key: 'Escape' })
 
-        // Assert
-        expect(screen.queryByText(/Step /)).not.toBeInTheDocument()
-        expect(localStorage.getItem(STORAGE_KEY)).toBe('true')
+        // Assert — still visible; ESC no longer closes coach marks
+        expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
+        expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
     })
 
-    it('TC-F05-02-16g: backdrop click dismisses coach marks', async () => {
+    it('TC-F05-02-16g: backdrop area does NOT dismiss coach marks (removed per GH-864)', async () => {
         // Arrange
         render(<Wrapper />)
         await advanceCoachMarkTimers()
+        expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
 
-        // Act — click the backdrop div (first fixed overlay, has onClick handler)
-        const backdrop = document.querySelector('.fixed.inset-0') as HTMLElement
-        fireEvent.click(backdrop)
+        // Act — attempt to click any backdrop panel (4-panel approach, no onClick)
+        const backdrops = document.querySelectorAll('.fixed[aria-hidden="true"]')
+        backdrops.forEach(el => fireEvent.click(el as HTMLElement))
 
-        // Assert
-        expect(screen.queryByText(/Step /)).not.toBeInTheDocument()
+        // Assert — still visible; backdrop click no longer closes coach marks
+        expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
     })
 })

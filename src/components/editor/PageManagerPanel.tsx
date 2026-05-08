@@ -15,7 +15,6 @@ interface PageManagerPanelProps {
     siteId: string
     currentPageId: string | null
     siteStatus?: string
-    menuPageIds?: Set<string>
     onPageSelected: (pageId: string) => void
     onPageCreated?: (pageId: string) => void
     onPagesChanged?: () => void
@@ -42,11 +41,8 @@ function getStatusBadge(
     page: PageData,
     labels: { live: string; draft: string; tooltipLive: string; tooltipDraft: string },
     siteStatus?: string,
-    menuPageIds?: Set<string>,
 ) {
-    // Live requires: page published + site published + page linked in menu (homepage always counts)
-    const inMenu = page.isHomepage || menuPageIds?.has(String(page.id)) || false
-    const isPageLive = page.status === 'published' && siteStatus === 'published' && inMenu
+    const isPageLive = page.status === 'published' && siteStatus === 'published'
 
     if (isPageLive) {
         return {
@@ -69,7 +65,6 @@ export function PageManagerPanel({
     siteId,
     currentPageId,
     siteStatus,
-    menuPageIds,
     onPageSelected,
     onPageCreated,
     onPagesChanged,
@@ -236,14 +231,11 @@ export function PageManagerPanel({
         <TooltipProvider delayDuration={150}>
         <div data-coach="page-library" className="relative flex h-full flex-col">
             <div className="border-b border-white/10 px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
-                    <div>
-                        <p className="text-sm font-semibold text-white">{t.editor.pageManagerPanel.title}</p>
-                        <p className="mt-1 text-xs text-gray-500">
-                            {t.editor.pageManagerPanel.description}
-                        </p>
-                    </div>
-                    <FileText className="h-4 w-4 text-blue-400" />
+                <div>
+                    <p className="text-sm font-semibold text-white">{t.editor.pageManagerPanel.title}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                        {t.editor.pageManagerPanel.description}
+                    </p>
                 </div>
             </div>
 
@@ -311,7 +303,6 @@ export function PageManagerPanel({
                                     page,
                                     { live: pm.statusLive, draft: pm.statusDraft, tooltipLive: t.editor.pageManagerPanel.tooltipLive, tooltipDraft: t.editor.pageManagerPanel.tooltipDraft },
                                     siteStatus,
-                                    menuPageIds,
                                 )
 
                             return (

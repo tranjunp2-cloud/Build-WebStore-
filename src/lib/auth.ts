@@ -150,10 +150,13 @@ export function withAuth<TContext extends { params: Promise<any> } = never>(
 
 /** Extract the primary tenant ID from an already-fetched user object. */
 export function extractTenantId(user: unknown): string | null {
-    const tenants = (user as { tenants?: Array<{ tenant: string | { id: string | number } }> }).tenants
+    const tenants = (user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> }).tenants
     if (!tenants || tenants.length === 0) return null
     const first = tenants[0].tenant
-    return typeof first === 'string' ? first : first?.id != null ? String(first.id) : null
+    if (typeof first === 'string') return first
+    if (typeof first === 'number') return String(first)
+    if (first?.id != null) return String(first.id)
+    return null
 }
 
 /**

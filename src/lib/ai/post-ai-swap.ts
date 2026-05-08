@@ -16,11 +16,17 @@
 
 import type { BusinessSample, CategoryContent } from './content'
 import { getCategoryContent } from './content'
+import { seededPick } from './seeded-random'
 
-/** Hydrate a Partial<BusinessSample> into a full BusinessSample for composer consumption. */
-function hydrateBiz(partial: Partial<BusinessSample>, category: string): BusinessSample {
+/**
+ * Hydrate a Partial<BusinessSample> into a full BusinessSample for composer
+ * consumption. Seeds across `pack.businesses` so two users in the same
+ * category whose partial is missing the same field get different canned
+ * baselines (GH-912 — addresses leak of `businesses[0]` phone/address/etc.).
+ */
+function hydrateBiz(partial: Partial<BusinessSample>, category: string, seed: number): BusinessSample {
     const pack = getCategoryContent(category) ?? getCategoryContent('business')
-    const fallback = pack?.businesses[0]
+    const fallback = seededPick(pack?.businesses ?? [], seed)
     return {
         name: partial.name ?? fallback?.name ?? 'Our Business',
         tagline: partial.tagline ?? fallback?.tagline ?? 'Serving you with care',
@@ -107,13 +113,14 @@ export function postAISwapStep(
     bizPartial: Partial<BusinessSample>,
     category: string,
     mood?: ThemeMood,
+    seed: number = 0,
 ): PostAISwapResult {
     const telemetry: SwapTelemetry[] = []
     const content = getCategoryContent(category) ?? null
     // Composer builders require a full BusinessSample — hydrate defaults from
     // category pack so AI gen path (which passes Partial from BusinessInfoInput)
     // never crashes the swap step.
-    const biz = hydrateBiz(bizPartial, category)
+    const biz = hydrateBiz(bizPartial, category, seed)
 
     const swapped = blocks.map((block) => {
         const bt = typeof block.blockType === 'string' ? block.blockType : ''

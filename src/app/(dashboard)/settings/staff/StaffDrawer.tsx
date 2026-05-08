@@ -182,7 +182,7 @@ export function StaffDrawer({
                         </label>
                         <div className="flex flex-col gap-[12px]">
                             
-                            {/* Full Access Option */}
+                            {/* Manager Option */}
                             <div 
                                 onClick={() => { if(!isRoleDisabled) setRole('admin'); }}
                                 className={`flex items-start px-[18px] py-[18px] min-h-[76px] rounded-[12px] border-2 border-solid transition-all ${
@@ -197,7 +197,7 @@ export function StaffDrawer({
                                     {role === 'admin' && <div className="w-[10px] h-[10px] rounded-full bg-blue-500" />}
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className={`text-[15px] font-medium leading-tight mb-[6px] ${role === 'admin' ? 'text-slate-50' : 'text-slate-50/80'}`}>{t?.Staff?.drawer?.roles?.admin || 'Full Access'}</span>
+                                    <span className={`text-[15px] font-medium leading-tight mb-[6px] ${role === 'admin' ? 'text-slate-50' : 'text-slate-50/80'}`}>{t?.Staff?.drawer?.roles?.admin || 'Manager'}</span>
                                     <span className="text-[13px] text-slate-50/50">{t?.Staff?.drawer?.roles?.adminDesc || 'Can manage everything except delete the store.'}</span>
                                 </div>
                             </div>
