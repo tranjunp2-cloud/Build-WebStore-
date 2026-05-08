@@ -27,7 +27,7 @@ function Wrapper({ onEnterStep1 = vi.fn(), onEnterStep2 = vi.fn() }: { onEnterSt
 async function advanceCoachMarkTimers() {
     // First pass: fires mountDelayMs timer → setStep(1)
     await act(async () => { vi.runAllTimers() })
-    // Second pass: fires the 50ms anchor-rect setTimeout inside useAnchorRect
+    // Second pass: fires the anchor-rect setTimeout (50ms for step 1, 150ms for step 2)
     await act(async () => { vi.runAllTimers() })
 }
 
@@ -74,7 +74,7 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         expect(screen.getByText('Next')).toBeInTheDocument()
     })
 
-    it('TC-F05-02-16c: clicking Tiếp theo calls onEnterStep2 and advances to step 2', async () => {
+    it('TC-F05-02-16c: clicking Next calls onEnterStep2 and advances to step 2', async () => {
         // Arrange
         const onEnterStep2 = vi.fn()
         render(<Wrapper onEnterStep2={onEnterStep2} />)
@@ -121,10 +121,11 @@ describe('EditorCoachMarks — TC-F05-02-16', () => {
         fireEvent.click(screen.getByText('Back'))
         await advanceCoachMarkTimers()
 
-        // Assert — callback fired, back at step 1, no Back button
+        // Assert — callback fired, back at step 1, no Back button, flag NOT written
         expect(onEnterStep1).toHaveBeenCalledOnce()
         expect(screen.getByText('Step 1: Create pages here')).toBeInTheDocument()
         expect(screen.queryByText('Back')).not.toBeInTheDocument()
+        expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
     })
 
     it('TC-F05-02-16f: ESC key does NOT dismiss coach marks (removed per GH-864)', async () => {
