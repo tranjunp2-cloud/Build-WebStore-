@@ -67,7 +67,7 @@ export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<Whatsap
                 rel="noopener noreferrer"
                 onClick={callback ? e => e.preventDefault() : undefined}
                 data-no-text-edit
-                className="group flex items-center gap-3 bg-[#25D366] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                className="relative group flex items-center gap-3 bg-[#25D366] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 aria-label={label}
             >
                 {/* Pulse animation ring — hidden in editor to avoid obscuring selection border */}
