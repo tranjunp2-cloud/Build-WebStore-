@@ -305,7 +305,7 @@ const EDUCATION_RECIPES: CategoryRecipe[] = [
     rhythm: 'demo-first',
     blocks: ['hero', /* 'video-showcase', */ 'features', /* 'step-process', */ 'testimonials', 'cta', 'footer'],
     required: ['hero', /* 'video-showcase' */], // 'step-process' temporarily hidden
-    middleShuffleRange: [2, 4],
+    middleShuffleRange: [2, 3], // reduced from [2,4]: step-process hidden, 5 active blocks → max end = blocks.length-2 = 3
     description: 'Show the classroom experience. Best for online courses + bootcamps.',
   },
 ]

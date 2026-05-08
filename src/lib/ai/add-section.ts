@@ -92,7 +92,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['announcement-bar', [/\bannouncement\b/i, /\bbanner\s*bar\b/i, /\btop\s*bar\b/i]],
     ['client-logos', [/\bclient\s*logo\b/i, /\bpartner\s*logo\b/i, /\blogo\s*cloud\b/i, /\btrust\s*badge\b/i]],
     ['accordion', [/\baccordion\b/i, /\bcollapsible\b/i, /\bexpandable\b/i]],
-    ['step-process', [/\bstep\b/i, /\bprocess\b/i, /\bhow\s*it\s*works\b/i, /\btimeline\b/i]],
+    // ['step-process', [/\bstep\b/i, /\bprocess\b/i, /\bhow\s*it\s*works\b/i, /\btimeline\b/i]], // feat/fix-broken-block-variants: temporarily hidden
     ['portfolio-grid', [/\bportfolio\b/i, /\bproject\b/i, /\bshowcase\b/i, /\bwork\b/i]],
     ['menu-display', [/\bmenu-display\b/i, /\bmenu\s+display\b/i]],
     ['menu-food', [/\bmenu\b/i, /\bfood\b/i, /\brestaurant\b/i, /\bdish\b/i]],
@@ -107,7 +107,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['video', [/\bvideo\b/i, /\byoutube\b/i, /\bembed\b/i]],
     ['blog-list', [/\bblog\b/i, /\barticle(s)?\b/i, /\bpost(s)?\b/i]],
     ['product-quick-view', [/\bproduct-quick-view\b/i, /\bquick[-\s]view\b/i]],
-    ['booking-widget', [/\bbooking(-widget)?\b/i, /\bbook\s+appointment\b/i, /\bappointment\b/i]],
+    // ['booking-widget', [/\bbooking(-widget)?\b/i, /\bbook\s+appointment\b/i, /\bappointment\b/i]], // feat/fix-broken-block-variants: temporarily hidden
     ['class-schedule', [/\bclass(-schedule)?\b/i, /\bclass\s+schedule\b/i, /\bschedule\b/i, /\btimetable\b/i]],
     ['doctor-profile', [/\bdoctor(-profile)?\b/i, /\bphysician\b/i, /\bdentist\b/i]],
     ['property-card', [/\bproperty(-card)?\b/i, /\breal[-\s]estate\b/i, /\blisting\b/i]],
