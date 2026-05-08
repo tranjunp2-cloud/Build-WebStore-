@@ -3764,6 +3764,27 @@ const MIGRATIONS = [
   { name: 'pages_blocks_faq.add_allow_multiple', sql: `ALTER TABLE "pages_blocks_faq" ADD COLUMN IF NOT EXISTS allow_multiple boolean DEFAULT false;` },
   { name: '_pages_v_blocks_faq.add_subheadline', sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS subheadline varchar;` },
   { name: '_pages_v_blocks_faq.add_allow_multiple', sql: `ALTER TABLE "_pages_v_blocks_faq" ADD COLUMN IF NOT EXISTS allow_multiple boolean DEFAULT false;` },
+  // GH-891 — PricingBlock phase 01: per-plan fields + billing globals + featureMatrix
+  { name: 'pages_blocks_pricing_plans.add_period', sql: `ALTER TABLE "pages_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS period varchar;` },
+  { name: 'pages_blocks_pricing_plans.add_highlighted', sql: `ALTER TABLE "pages_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS highlighted boolean DEFAULT false;` },
+  { name: 'pages_blocks_pricing_plans.add_yearly_price', sql: `ALTER TABLE "pages_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS yearly_price varchar;` },
+  { name: 'pages_blocks_pricing_plans.add_cta_action_type', sql: `ALTER TABLE "pages_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS cta_action_type varchar DEFAULT 'external';` },
+  { name: 'pages_blocks_pricing_plans.add_cta_style', sql: `ALTER TABLE "pages_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS cta_style varchar DEFAULT 'primary';` },
+  { name: 'pages_blocks_pricing.add_billing_cols', sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS billing_cycle1 varchar DEFAULT 'Monthly', ADD COLUMN IF NOT EXISTS billing_cycle2 varchar DEFAULT 'Yearly', ADD COLUMN IF NOT EXISTS discount_percent integer;` },
+  { name: 'pages_blocks_pricing_feature_matrix.create_table', sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing_feature_matrix" (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL, _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, feature_name varchar);` },
+  { name: 'pages_blocks_pricing_feature_matrix_values.create_table', sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing_feature_matrix_values" (id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text, _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL, _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, included boolean DEFAULT false);` },
+  // Versioned mirrors for GH-891
+  { name: '_pages_v_blocks_pricing_plans.add_period', sql: `ALTER TABLE "_pages_v_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS period varchar;` },
+  { name: '_pages_v_blocks_pricing_plans.add_highlighted', sql: `ALTER TABLE "_pages_v_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS highlighted boolean DEFAULT false;` },
+  { name: '_pages_v_blocks_pricing_plans.add_yearly_price', sql: `ALTER TABLE "_pages_v_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS yearly_price varchar;` },
+  { name: '_pages_v_blocks_pricing_plans.add_cta_action_type', sql: `ALTER TABLE "_pages_v_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS cta_action_type varchar DEFAULT 'external';` },
+  { name: '_pages_v_blocks_pricing_plans.add_cta_style', sql: `ALTER TABLE "_pages_v_blocks_pricing_plans" ADD COLUMN IF NOT EXISTS cta_style varchar DEFAULT 'primary';` },
+  { name: '_pages_v_blocks_pricing.add_billing_cols', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS billing_cycle1 varchar DEFAULT 'Monthly', ADD COLUMN IF NOT EXISTS billing_cycle2 varchar DEFAULT 'Yearly', ADD COLUMN IF NOT EXISTS discount_percent integer;` },
+  { name: '_pages_v_blocks_pricing_feature_matrix.create_table', sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_feature_matrix" (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, feature_name varchar);` },
+  { name: '_pages_v_blocks_pricing_feature_matrix_values.create_table', sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_feature_matrix_values" (id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL, _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text, included boolean DEFAULT false);` },
+  // Rename billing_cycle_1/2 → billing_cycle1/2 to match Payload Drizzle naming (no underscore before digit)
+  { name: 'pages_blocks_pricing.rename_billing_cycle_cols', sql: `ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1; ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;` },
+  { name: '_pages_v_blocks_pricing.rename_billing_cycle_cols', sql: `ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1; ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;` },
 ];
 
 async function runMigrations(pool) {
