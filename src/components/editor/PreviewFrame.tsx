@@ -8,6 +8,8 @@ import { ImageToolbar } from './ImageToolbar'
 import { BlockActionBar } from './BlockActionBar'
 import { DeleteBlockConfirm } from './DeleteBlockConfirm'
 import { useEditorStore } from '@/store/editorStore'
+import { useWorkspaceStore } from '@/store/workspaceStore'
+import { cn } from '@/lib/utils'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -231,6 +233,8 @@ function PreviewFrameInner({
 }: PreviewFrameProps) {
     const { t } = useI18n()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
+    const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
+    const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
     const blocksRef = useRef(blocks)
     useEffect(() => { blocksRef.current = blocks }, [blocks])
     const onInlineEditSaveRef = useRef(onInlineEditSave)
@@ -1203,6 +1207,10 @@ function PreviewFrameInner({
     // toolbar/popover anchored to the element as the user scrolls.
     const scrollOffset = textEditingData ? iframeScrollY - textEditingData.scrollYAtStart : 0
 
+    // Full-Screen mode = both sidebars hidden (Focus preset). Strip padding,
+    // rounding, and the desktop max-width so the preview spans edge-to-edge.
+    const isFullScreen = !leftSidebarVisible && !rightSidebarVisible
+
     return (
         <>
             <div
@@ -1211,14 +1219,19 @@ function PreviewFrameInner({
             >
                 <div
                     ref={setScrollContainerElement}
-                    className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4"
+                    className={cn(
+                        'flex h-full items-start overflow-auto border border-white/10 bg-[#0F172A]',
+                        isFullScreen
+                            ? 'rounded-none'
+                            : 'justify-center rounded-[28px] p-4',
+                    )}
                 >
                     <div
                         ref={setCanvasElement}
                         className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
                         style={{
                             width: viewport === 'mobile' ? 'min(390px, 100%)' : '100%',
-                            maxWidth: viewport === 'mobile' ? 390 : 1280,
+                            maxWidth: viewport === 'mobile' ? 390 : isFullScreen ? undefined : 1280,
                         }}
                     >
                         <iframe

@@ -13,9 +13,14 @@ import {
     FileText,
     Globe,
     Home,
+    LayoutGrid,
     Loader2,
     Menu,
     Monitor,
+    PanelLeftClose,
+    PanelLeftOpen,
+    PanelRightClose,
+    PanelRightOpen,
     RefreshCw,
     ShoppingBag,
     Smartphone,
@@ -27,9 +32,126 @@ import {
     Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import type { PageData } from '@/store/editorStore'
+import { useWorkspaceStore, type WorkspacePreset } from '@/store/workspaceStore'
+
+// ── Workspace layout controls ────────────────────────────────────────────
+// Three header icons: layout-preset popover, left-sidebar toggle, right-sidebar toggle.
+// State lives in workspaceStore (Zustand + localStorage persist).
+
+const PRESETS: Array<{
+    id: WorkspacePreset
+    label: string
+    cells: ('rail' | 'preview')[]
+}> = [
+    { id: 'default', label: 'Default', cells: ['rail', 'preview', 'rail'] },
+    { id: 'focus', label: 'Focus', cells: ['preview'] },
+    { id: 'structure', label: 'Structure', cells: ['rail', 'preview'] },
+    { id: 'content', label: 'Content', cells: ['preview', 'rail'] },
+]
+
+function PresetThumb({ cells }: { cells: ('rail' | 'preview')[] }) {
+    return (
+        <div className="flex h-8 w-full items-center gap-0.5 rounded-md border border-white/[0.08] bg-[#0B1120] p-1">
+            {cells.map((cell, i) => (
+                <div
+                    key={i}
+                    className={cn(
+                        'h-full rounded-sm',
+                        cell === 'preview'
+                            ? 'flex-1 bg-gradient-to-r from-[#3B82F6]/40 to-[#2DD4BF]/40'
+                            : 'w-3 bg-white/[0.08]',
+                    )}
+                />
+            ))}
+        </div>
+    )
+}
+
+function WorkspaceLayoutControls() {
+    const leftVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
+    const rightVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
+    const preset = useWorkspaceStore((s) => s.preset)
+    const toggleLeft = useWorkspaceStore((s) => s.toggleLeft)
+    const toggleRight = useWorkspaceStore((s) => s.toggleRight)
+    const applyPreset = useWorkspaceStore((s) => s.applyPreset)
+
+    const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform)
+    const mod = isMac ? '⌘' : 'Ctrl+'
+
+    const iconCls = (active: boolean) =>
+        cn(
+            'inline-flex h-8 w-8 items-center justify-center rounded-[10px] transition-colors',
+            active
+                ? 'bg-white/[0.08] text-[#F8FAFC] hover:bg-white/[0.12]'
+                : 'text-slate-500 hover:bg-white/5 hover:text-[#F8FAFC]',
+        )
+
+    return (
+        <div className="flex shrink-0 items-center gap-0.5">
+            <Popover>
+                <PopoverTrigger asChild>
+                    <button type="button" className={iconCls(false)} title="Layout presets">
+                        <LayoutGrid className="h-4 w-4" />
+                    </button>
+                </PopoverTrigger>
+                <PopoverContent
+                    align="start"
+                    sideOffset={8}
+                    className="w-56 rounded-xl border border-white/[0.08] bg-[#1E293B] p-2 text-slate-200 shadow-2xl"
+                >
+                    <div className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                        Workspace
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        {PRESETS.map((p) => {
+                            const active = preset === p.id
+                            return (
+                                <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => applyPreset(p.id)}
+                                    className={cn(
+                                        'flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors',
+                                        active
+                                            ? 'border-[#3B82F6]/60 bg-[#3B82F6]/10'
+                                            : 'border-white/[0.06] bg-transparent hover:bg-white/[0.04]',
+                                    )}
+                                >
+                                    <PresetThumb cells={p.cells} />
+                                    <span className="text-[11px] font-medium text-slate-200">{p.label}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </PopoverContent>
+            </Popover>
+
+            <button
+                type="button"
+                onClick={toggleLeft}
+                className={iconCls(leftVisible)}
+                title={`${leftVisible ? 'Hide' : 'Show'} left sidebar (${mod}B)`}
+                aria-pressed={leftVisible}
+            >
+                {leftVisible ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </button>
+
+            <button
+                type="button"
+                onClick={toggleRight}
+                className={iconCls(rightVisible)}
+                title={`${rightVisible ? 'Hide' : 'Show'} right sidebar (${mod}J)`}
+                aria-pressed={rightVisible}
+            >
+                {rightVisible ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+            </button>
+        </div>
+    )
+}
 
 export type PublishState = 'draft' | 'publishing' | 'live' | 'live-dirty' | 'updating'
 
@@ -221,122 +343,149 @@ export function EditorToolbar({
 
     return (
         <>
-        <header className="relative flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-5">
-            <div className="flex min-w-0 items-center gap-3">
+        <header className="flex h-12 shrink-0 items-center overflow-hidden border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-5">
+            {/* LEFT: page tools. Text labels collapse only at tier 2 (< 1024px). */}
+            <div className="flex shrink-0 items-center gap-2">
                 <button
                     type="button"
                     onClick={onOpenMenu}
-                    className="inline-flex h-8 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
+                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-xl px-2 text-sm font-medium text-[#F8FAFC] transition-all hover:bg-white/5 lg:gap-2 lg:px-3"
                     title={et.openMenu}
                 >
-                    <Menu className="h-4 w-4" />
-                    {et.menu}
+                    <Menu className="h-4 w-4 shrink-0" />
+                    <span className="hidden lg:inline">{et.menu}</span>
                 </button>
 
-                <div className="inline-flex h-8 items-center gap-2 rounded-lg bg-white/[0.04] px-3">
-                    <CurrentPageIcon className="h-3.5 w-3.5 text-slate-400" />
-                    <span className="max-w-[120px] truncate text-[12px] font-medium text-slate-300">{currentPageTitle}</span>
+                <div
+                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-lg bg-white/[0.04] px-2 transition-all lg:gap-2 lg:px-3"
+                    title={currentPageTitle}
+                >
+                    <CurrentPageIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span className="hidden lg:inline max-w-[120px] truncate text-[12px] font-medium text-slate-300">{currentPageTitle}</span>
                 </div>
 
                 <button
                     type="button"
                     onClick={onOpenTemplates}
-                    className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
+                    className="inline-flex h-9 shrink-0 items-center gap-0 rounded-xl px-2 text-sm font-medium text-[#F8FAFC] transition-all hover:bg-white/5 lg:gap-2 lg:px-3"
+                    title={et.templates}
                 >
                     <span className="text-base leading-none">🎨</span>
-                    {et.templates}
+                    <span className="hidden lg:inline">{et.templates}</span>
                 </button>
 
-                <div className="mx-1.5 h-4 w-px bg-white/[0.08]" />
+                <div className="mx-1 h-4 w-px shrink-0 bg-white/[0.08]" />
 
                 <button
                     type="button"
                     onClick={onUndo}
                     disabled={!canUndo}
-                    className="inline-flex h-8 items-center gap-2 rounded-[10px] px-2.5 text-xs font-medium text-[#F8FAFC] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[#F8FAFC] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
                     title={et.undoShortcut}
                 >
-                    <Undo2 className="h-4 w-4" />
-                    {et.undo}
+                    <Undo2 className="h-4 w-4 shrink-0" />
+                    <span className="hidden lg:inline">{et.undo}</span>
                 </button>
 
                 <button
                     type="button"
                     onClick={onRedo}
                     disabled={!canRedo}
-                    className="inline-flex h-8 items-center gap-2 rounded-[10px] px-2.5 text-xs font-medium text-[#F8FAFC] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-8 shrink-0 items-center gap-0 rounded-[10px] px-2 text-xs font-medium text-[#F8FAFC] transition-all hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 lg:gap-2 lg:px-2.5"
                     title={et.redoShortcut}
                 >
-                    <Redo2 className="h-4 w-4" />
-                    {et.redo}
+                    <Redo2 className="h-4 w-4 shrink-0" />
+                    <span className="hidden lg:inline">{et.redo}</span>
                 </button>
             </div>
 
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                <div className="flex h-[38px] items-center rounded-full border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.8)] px-[5px] py-px">
+            {/* Spacer 1 — flex-grows to keep CENTER centered. Shrinks first when narrowing. */}
+            <div className="min-w-2 flex-1" />
+
+            {/* CENTER: device toggle + layout icons. Text collapses at tier 1 (< 1366px). */}
+            <div className="flex shrink-0 items-center gap-2">
+                <div className="hidden h-[38px] items-center rounded-full border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.8)] px-[5px] py-px lg:flex">
                     <button
                         type="button"
                         onClick={() => onViewportChange('desktop')}
                         className={cn(
-                            'inline-flex h-7 min-w-[104px] items-center justify-center gap-2 rounded-full px-4 text-xs transition-colors',
+                            'inline-flex h-7 shrink-0 items-center justify-center gap-0 rounded-full px-2 text-xs transition-all min-[1366px]:min-w-[104px] min-[1366px]:gap-2 min-[1366px]:px-4',
                             viewport === 'desktop'
                                 ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] font-semibold text-white'
                                 : 'font-medium text-white/70 hover:text-white',
                         )}
+                        title={et.desktop}
                     >
                         <span className="text-[15px] leading-none">💻</span>
-                        {et.desktop}
+                        <span className="hidden min-[1366px]:inline">{et.desktop}</span>
                     </button>
                     <button
                         type="button"
                         onClick={() => onViewportChange('mobile')}
                         className={cn(
-                            'inline-flex h-7 min-w-[94px] items-center justify-center gap-2 rounded-full px-4 text-xs transition-colors',
+                            'inline-flex h-7 shrink-0 items-center justify-center gap-0 rounded-full px-2 text-xs transition-all min-[1366px]:min-w-[94px] min-[1366px]:gap-2 min-[1366px]:px-4',
                             viewport === 'mobile'
                                 ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] font-semibold text-white'
                                 : 'font-medium text-white/70 hover:text-white',
                         )}
+                        title={et.mobile}
                     >
                         <span className="text-[15px] leading-none">📱</span>
-                        {et.mobile}
+                        <span className="hidden min-[1366px]:inline">{et.mobile}</span>
                     </button>
                 </div>
+
+                <WorkspaceLayoutControls />
             </div>
 
-            <div className="flex items-center gap-2.5">
-                <div className="inline-flex items-center gap-1.5 text-[11px]">
-                    <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
-                    <span className="text-slate-400">{isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
+            {/* Spacer 2 — symmetric counterpart so CENTER lands at the visual midpoint. */}
+            <div className="min-w-2 flex-1" />
+
+            {/* RIGHT: status + actions. Text collapses at tier 1 (< 1366px). */}
+            <div className="flex shrink-0 items-center gap-2.5">
+                <div
+                    className="inline-flex shrink-0 items-center gap-0 text-[11px] transition-all min-[1366px]:gap-1.5"
+                    title={isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}
+                >
+                    <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
+                    <span className="hidden text-slate-400 min-[1366px]:inline">{isSaving ? et.saving : hasUnsavedChanges ? et.unsaved : et.saved}</span>
                 </div>
 
-                <div className="h-4 w-px bg-white/[0.08]" />
+                <div className="hidden h-4 w-px shrink-0 bg-white/[0.08] min-[1366px]:block" />
 
                 {(() => {
                     const ps = derivePublishState({ isPublished, isPublishing, hasUnsavedChanges, hasUnpublishedChanges })
-                    const badgeConfig: Record<PublishState, { label: string; cls: string }> = {
+                    const badgeConfig: Record<PublishState, { label: string; cls: string; dot?: string }> = {
                         draft: { label: et.draft, cls: 'bg-white/[0.06] text-slate-400' },
-                        publishing: { label: et.publishing, cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
-                        live: { label: et.live, cls: 'bg-emerald-500/15 text-emerald-400' },
-                        'live-dirty': { label: et.changesPending, cls: 'bg-amber-500/15 text-amber-400' },
-                        updating: { label: et.updating || 'Updating...', cls: 'bg-blue-500/15 text-blue-400 animate-pulse' },
+                        publishing: { label: et.publishing, cls: 'bg-blue-500/15 text-blue-400 animate-pulse', dot: 'bg-blue-400' },
+                        live: { label: et.live, cls: 'bg-emerald-500/15 text-emerald-400', dot: 'bg-emerald-400' },
+                        'live-dirty': { label: et.changesPending, cls: 'bg-amber-500/15 text-amber-400', dot: 'bg-amber-400 animate-pulse' },
+                        updating: { label: et.updating || 'Updating...', cls: 'bg-blue-500/15 text-blue-400 animate-pulse', dot: 'bg-blue-400' },
                     }
-                    const { label, cls } = badgeConfig[ps]
+                    const { label, cls, dot } = badgeConfig[ps]
+                    // Below tier 2 (< 1024px) the draft badge collapses entirely (no actionable info);
+                    // other states keep a colored dot so the user still sees status at a glance.
+                    const wrapperVisibility = ps === 'draft' ? 'hidden lg:inline-flex' : 'inline-flex'
                     return (
-                        <div className={cn('inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider', cls)}>
-                            {ps === 'live' && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />}
-                            {label}
+                        <div
+                            className={cn(wrapperVisibility, 'h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider transition-all', cls)}
+                            title={label}
+                        >
+                            {dot && <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dot)} />}
+                            <span className="hidden min-[1366px]:inline">{label}</span>
                         </div>
                     )
                 })()}
 
-                <Button variant="ghost" size="sm" asChild className="h-8 rounded-lg border border-white/[0.08] px-3 text-[11px] font-medium text-slate-300 hover:bg-white/[0.06] hover:text-white">
+                <Button variant="ghost" size="sm" asChild className="h-8 shrink-0 rounded-lg border border-white/[0.08] px-2 text-[11px] font-medium text-slate-300 transition-all hover:bg-white/[0.06] hover:text-white min-[1366px]:px-3">
                     <a
                         href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        title={et.preview}
                     >
-                        <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-                        {et.preview}
+                        <SquareArrowOutUpRight className="h-3.5 w-3.5 shrink-0" />
+                        <span className="hidden min-[1366px]:inline">{et.preview}</span>
                     </a>
                 </Button>
 

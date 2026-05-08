@@ -15,6 +15,9 @@ import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
+import { useWorkspaceStore } from '@/store/workspaceStore'
+import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
+import { EDITOR_SIDEBAR_WIDTH, SETTINGS_PANEL_WIDTH } from '@/components/editor/layout-constants'
 import type { AIAction } from '@/types/editor'
 import { useI18n } from '@/i18n'
 import { PrePublishModal } from '@/components/editor/PrePublishModal'
@@ -115,6 +118,11 @@ export default function EditorPage() {
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
+
+    // Workspace layout (left/right sidebar visibility, persisted in localStorage)
+    const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
+    const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
+    useWorkspaceShortcuts()
     const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number; section?: string } | null>(null)
     const [isTransitioning, setIsTransitioning] = useState(false)
     const [templateApplied, setTemplateApplied] = useState(false)
@@ -1311,13 +1319,21 @@ export default function EditorPage() {
                 </div>
             ) : (
                 <div className="flex flex-1 overflow-hidden">
-                    <EditorSidebar
-                        tabs={sidebarTabs}
-                        activeTab={activeSidebarTab}
-                        onTabChange={setActiveSidebarTab}
+                    <div
+                        className="shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out"
+                        style={{
+                            width: leftSidebarVisible ? EDITOR_SIDEBAR_WIDTH : 0,
+                            opacity: leftSidebarVisible ? 1 : 0,
+                        }}
                     >
-                        {sidebarContent}
-                    </EditorSidebar>
+                        <EditorSidebar
+                            tabs={sidebarTabs}
+                            activeTab={activeSidebarTab}
+                            onTabChange={setActiveSidebarTab}
+                        >
+                            {sidebarContent}
+                        </EditorSidebar>
+                    </div>
 
                     <div className={cn("flex flex-1 flex-col transition-opacity duration-300", isTransitioning && "opacity-0")}>
                         <PreviewFrame
@@ -1378,36 +1394,44 @@ export default function EditorPage() {
                         />
                     </div>
 
-                    <SettingsPanel
-                        block={currentBlock}
-                        blockIndex={selectedBlock}
-                        theme={theme}
-                        site={site}
-                        siteName={siteName || site?.name || ''}
-                        siteStatus={site?.status || 'draft'}
-                        headerBlock={headerBlock}
-                        footerBlock={footerBlock}
-                        pages={pages}
-                        currentPageId={currentPageId}
-                        onThemeChange={handleThemeChange}
-                        onBlockFieldChange={handleBlockFieldChange}
-                        onBlockUpdate={handleBlockUpdate}
-                        onHeaderUpdate={(changes) => {
-                            updateHeaderBlock(changes)
-                            const updatedHeader = useEditorStore.getState().headerBlock
-                            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
-                            void saveWithRetry({ showToast: false, refreshPreview: false })
+                    <div
+                        className="shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out"
+                        style={{
+                            width: rightSidebarVisible ? SETTINGS_PANEL_WIDTH : 0,
+                            opacity: rightSidebarVisible ? 1 : 0,
                         }}
-                        onFooterUpdate={(changes) => {
-                            updateFooterBlock(changes)
-                            const updatedFooter = useEditorStore.getState().footerBlock
-                            previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
-                            void saveWithRetry({ showToast: false, refreshPreview: false })
-                        }}
-                        onSiteSettingsChange={handleSiteSettingsChange}
-                        onPageUpdate={handlePageUpdate}
-                        requestedTab={settingsRequestedTab}
-                    />
+                    >
+                        <SettingsPanel
+                            block={currentBlock}
+                            blockIndex={selectedBlock}
+                            theme={theme}
+                            site={site}
+                            siteName={siteName || site?.name || ''}
+                            siteStatus={site?.status || 'draft'}
+                            headerBlock={headerBlock}
+                            footerBlock={footerBlock}
+                            pages={pages}
+                            currentPageId={currentPageId}
+                            onThemeChange={handleThemeChange}
+                            onBlockFieldChange={handleBlockFieldChange}
+                            onBlockUpdate={handleBlockUpdate}
+                            onHeaderUpdate={(changes) => {
+                                updateHeaderBlock(changes)
+                                const updatedHeader = useEditorStore.getState().headerBlock
+                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: updatedHeader })
+                                void saveWithRetry({ showToast: false, refreshPreview: false })
+                            }}
+                            onFooterUpdate={(changes) => {
+                                updateFooterBlock(changes)
+                                const updatedFooter = useEditorStore.getState().footerBlock
+                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                                void saveWithRetry({ showToast: false, refreshPreview: false })
+                            }}
+                            onSiteSettingsChange={handleSiteSettingsChange}
+                            onPageUpdate={handlePageUpdate}
+                            requestedTab={settingsRequestedTab}
+                        />
+                    </div>
                 </div>
             )}
 
