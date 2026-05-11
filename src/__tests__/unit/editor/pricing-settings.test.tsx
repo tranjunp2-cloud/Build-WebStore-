@@ -731,6 +731,76 @@ describe('[TC-F05-891] PricingSettings — Stepper & Tab Management', () => {
             expect(spinbutton).toBeVisible()
             expect(spinbutton).toHaveValue(15)
         })
+
+        it('TC-F05-891.79: guard skips user-echo then clears — subsequent external change still applies', async () => {
+            // Two-phase contract for discountUserValueRef guard:
+            // Phase 1 — user types X, store echoes X back: guard skips the useEffect reset
+            //            (ref === block.yearlyDiscount → skip branch), input stays at X.
+            // Phase 2 — guard clears (ref = null) on next different-value change:
+            //            an external change to Y must be applied (not silently swallowed).
+            const blockWithToggle = {
+                ...mockBlock,
+                variant: 'toggle' as const,
+                yearlyDiscount: 0,
+            }
+            const { rerender } = render(
+                <PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />
+            )
+            const spinbutton = screen.getByRole('spinbutton')
+
+            // Phase 1: user types "10" — sets discountUserValueRef = 10
+            fireEvent.change(spinbutton, { target: { value: '10' } })
+            expect(spinbutton).toHaveValue(10)
+
+            // Store echoes user's change (ref === block.yearlyDiscount → guard skips reset)
+            rerender(
+                <PricingSettings
+                    block={{ ...blockWithToggle, yearlyDiscount: 10 }}
+                    blockIndex={0}
+                    onBlockUpdate={mockOnBlockUpdate}
+                />
+            )
+            expect(spinbutton).toHaveValue(10)
+
+            // Phase 2: external change arrives with a different value — guard must clear and apply it
+            rerender(
+                <PricingSettings
+                    block={{ ...blockWithToggle, yearlyDiscount: 3 }}
+                    blockIndex={0}
+                    onBlockUpdate={mockOnBlockUpdate}
+                />
+            )
+            await waitFor(() => expect(spinbutton).toHaveValue(3))
+        })
+
+        it('TC-F05-891.80: input IS reset when block rerenders with a different yearlyDiscount (external change)', async () => {
+            // Verifies that an external change (e.g., undo) correctly overrides localDiscount
+            const blockWithToggle = {
+                ...mockBlock,
+                variant: 'toggle' as const,
+                yearlyDiscount: 10,
+            }
+            const { rerender } = render(
+                <PricingSettings block={blockWithToggle} blockIndex={0} onBlockUpdate={mockOnBlockUpdate} />
+            )
+
+            const numberInput = screen.getByRole('spinbutton')
+            fireEvent.change(numberInput, { target: { value: '15' } })
+
+            // Simulate an external change that sets yearlyDiscount to a different value
+            rerender(
+                <PricingSettings
+                    block={{ ...blockWithToggle, yearlyDiscount: 5 }}
+                    blockIndex={0}
+                    onBlockUpdate={mockOnBlockUpdate}
+                />
+            )
+
+            await waitFor(() => {
+                // Input should reset to the externally-provided value
+                expect(screen.getByRole('spinbutton')).toHaveValue(5)
+            })
+        })
     })
 
     // ── TC-F05-891 Phase 4+5: Feature Editor Modal Integration ──────────────

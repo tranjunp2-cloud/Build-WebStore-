@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { sanitizeInlineHtml, hasInlineFormatting, extractHeadingWrapper } from '@/lib/utils/rich-text-render'
+import { sanitizeInlineHtml, hasInlineFormatting, extractHeadingWrapper, decodeHtmlEntities } from '@/lib/utils/rich-text-render'
 
 interface RichTextProps {
     text: string | undefined | null
@@ -26,11 +26,7 @@ export function RichText({ text, as: Tag = 'span', className, style }: RichTextP
     if (!text) return null
 
     if (!hasInlineFormatting(text)) {
-        // Decode common HTML entities stored by the inline editor (&nbsp; etc.)
-        // Use string replacement + React text nodes (NOT dangerouslySetInnerHTML) to stay XSS-safe
-        const decoded = text.includes('&')
-            ? text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-            : text
+        const decoded = decodeHtmlEntities(text)
         if (Tag === 'span' && !className && !style) return <>{decoded}</>
         return <Tag className={className} style={style}>{decoded}</Tag>
     }

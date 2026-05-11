@@ -3785,6 +3785,9 @@ const MIGRATIONS = [
   // Rename billing_cycle_1/2 → billing_cycle1/2 to match Payload Drizzle naming (no underscore before digit)
   { name: 'pages_blocks_pricing.rename_billing_cycle_cols', sql: `ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1; ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;` },
   { name: '_pages_v_blocks_pricing.rename_billing_cycle_cols', sql: `ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1; ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;` },
+  // GH-891: yearlyDiscount field was missing from Payload PricingBlock.fields — add column so saves persist
+  { name: 'pages_blocks_pricing.add_yearly_discount', sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS yearly_discount numeric;` },
+  { name: '_pages_v_blocks_pricing.add_yearly_discount', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS yearly_discount numeric;` },
 ];
 
 async function runMigrations(pool) {

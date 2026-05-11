@@ -5,6 +5,18 @@
  */
 import type React from 'react'
 
+/** Decode HTML entities stored by the inline editor. &amp; must be last to avoid double-decode. */
+export function decodeHtmlEntities(text: string): string {
+    if (!text.includes('&')) return text
+    return text
+        .replace(/&nbsp;/g, '\u00a0')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&amp;/g, '&')
+}
+
 const ALLOWED_TAGS = new Set(['b', 'i', 'u', 'strong', 'em', 'br', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 's', 'del'])
 
 // Each entry: [regex to match the property declaration, CSS property name]

@@ -536,7 +536,7 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
             render(<PlanFields plan={mockPlan} onChange={mockOnChange} variant="toggle" />)
 
             // Toggle variant now uses the same unified price field as other variants
-            // Toggle variant pricing is managed via discountPercent in PricingSettings
+            // Toggle variant pricing is managed via yearlyDiscount in PricingSettings
             const priceInput = screen.getByPlaceholderText('e.g. $29/mo')
             expect(priceInput).toBeVisible()
         })
@@ -586,110 +586,45 @@ describe('[TC-F05-891] PlanFields — Form Inputs & Validation', () => {
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 
-        it('TC-F05-891.86: auto-calc hint shown when discountPercent > 0 AND plan.price is numeric', () => {
+        it('TC-F05-891.86: toggle variant renders price input with numeric price', () => {
             const planWithNumericPrice = { ...mockPlan, price: '29' }
-            render(
-                <PlanFields
-                    plan={planWithNumericPrice}
-                    onChange={mockOnChange}
-                    variant="toggle"
-                    discountPercent={15}
-                />
-            )
-
-            // Auto-calc functionality is handled in PricingSettings level for toggle variant
-            // Verify component renders without error with these props
+            render(<PlanFields plan={planWithNumericPrice} onChange={mockOnChange} variant="toggle" />)
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 
-        it('TC-F05-891.87: auto-calc hint NOT shown when discountPercent === 0', () => {
-            const planWithNumericPrice = { ...mockPlan, price: '29' }
-            render(
-                <PlanFields
-                    plan={planWithNumericPrice}
-                    onChange={mockOnChange}
-                    variant="toggle"
-                    discountPercent={0}
-                />
-            )
-
-            // Component should render normally
+        it('TC-F05-891.87: toggle variant renders price input when price is 0', () => {
+            const planWithNumericPrice = { ...mockPlan, price: '0' }
+            render(<PlanFields plan={planWithNumericPrice} onChange={mockOnChange} variant="toggle" />)
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 
-        it('TC-F05-891.88: auto-calc hint NOT shown when discountPercent is undefined', () => {
-            const planWithNumericPrice = { ...mockPlan, price: '29' }
-            render(
-                <PlanFields
-                    plan={planWithNumericPrice}
-                    onChange={mockOnChange}
-                    variant="toggle"
-                    discountPercent={undefined}
-                />
-            )
-
-            // Component should render normally
+        it('TC-F05-891.88: toggle variant renders price input with large price value', () => {
+            const planWithLargePrice = { ...mockPlan, price: '9999999' }
+            render(<PlanFields plan={planWithLargePrice} onChange={mockOnChange} variant="toggle" />)
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 
-        it('TC-F05-891.89: auto-calc hint NOT shown when plan.price is empty string', () => {
+        it('TC-F05-891.89: toggle variant renders price input when price is empty string', () => {
             const planWithEmptyPrice = { ...mockPlan, price: '' }
-            render(
-                <PlanFields
-                    plan={planWithEmptyPrice}
-                    onChange={mockOnChange}
-                    variant="toggle"
-                    discountPercent={15}
-                />
-            )
-
-            // Component should render with empty price (validation handled elsewhere)
+            render(<PlanFields plan={planWithEmptyPrice} onChange={mockOnChange} variant="toggle" />)
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 
-        it('TC-F05-891.90: auto-calc hint NOT shown when plan.price is non-numeric (NaN guard)', () => {
+        it('TC-F05-891.90: toggle variant renders price input when price is non-numeric', () => {
             const planWithNonNumericPrice = { ...mockPlan, price: '$29/mo' }
-            render(
-                <PlanFields
-                    plan={planWithNonNumericPrice}
-                    onChange={mockOnChange}
-                    variant="toggle"
-                    discountPercent={15}
-                />
-            )
-
-            // Component should render normally
+            render(<PlanFields plan={planWithNonNumericPrice} onChange={mockOnChange} variant="toggle" />)
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 
-        it('TC-F05-891.91: auto-calc hint calculates correct discount value', () => {
+        it('TC-F05-891.91: toggle variant renders price input with integer price', () => {
             const planWithPrice = { ...mockPlan, price: '100' }
-            render(
-                <PlanFields
-                    plan={planWithPrice}
-                    onChange={mockOnChange}
-                    variant="toggle"
-                    discountPercent={20}
-                />
-            )
-
-            // Auto-calc logic moved to PricingSettings level
-            // PlanFields just renders price input
+            render(<PlanFields plan={planWithPrice} onChange={mockOnChange} variant="toggle" />)
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 
-        it('TC-F05-891.92: auto-calc hint with decimal price', () => {
+        it('TC-F05-891.92: toggle variant renders price input with decimal price', () => {
             const planWithDecimalPrice = { ...mockPlan, price: '29.99' }
-            render(
-                <PlanFields
-                    plan={planWithDecimalPrice}
-                    onChange={mockOnChange}
-                    variant="toggle"
-                    discountPercent={10}
-                />
-            )
-
-            // Component renders correctly with decimal price
+            render(<PlanFields plan={planWithDecimalPrice} onChange={mockOnChange} variant="toggle" />)
             expect(screen.getByPlaceholderText('e.g. $29/mo')).toBeVisible()
         })
 

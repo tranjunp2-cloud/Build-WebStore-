@@ -9,6 +9,7 @@ import type { PricingPlan } from '@/blocks/pricing/config'
 import { isMatrixVariant } from '@/blocks/pricing/variant-data-mapping'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
+import { decodeHtmlEntities } from '@/lib/utils/rich-text-render'
 
 type FieldBlurEvent = React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
 
@@ -40,11 +41,7 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
         .map(f => (typeof f === 'string' ? f : f.text))
         .join('\n')
 
-    // Strip HTML tags and decode entities so the input shows plain text
-    const ctaLabelText = (plan.ctaLabel ?? 'Get Started')
-        .replace(/<[^>]*>/g, '')
-        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-        .trim() || 'Get Started'
+    const ctaLabelText = decodeHtmlEntities((plan.ctaLabel ?? 'Get Started').replace(/<[^>]*>/g, '')).trim() || 'Get Started'
 
     const handleFeaturesBlur = (e: FieldBlurEvent) => {
         const lines = e.target.value.split('\n').filter(l => l.trim())
