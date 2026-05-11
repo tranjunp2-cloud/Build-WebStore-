@@ -48,7 +48,9 @@ export function VariantsInventorySection() {
         if (dups.size) duplicateOptionIndices[tIdx] = dups
     })
 
-    const isGenerateDisabled = watchedTiers.length === 0 || watchedTiers.some(
+    const hasDuplicates = Object.keys(duplicateOptionIndices).length > 0
+
+    const isGenerateDisabled = watchedTiers.length === 0 || hasDuplicates || watchedTiers.some(
         t => !t.name?.trim() || (t.options || []).filter(o => o?.trim()).length === 0
     )
 
