@@ -12,11 +12,11 @@ import { selectModel } from './config'
 import type { BusinessInfoInput } from './system-prompt'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { hashString, seededShuffle } from './seeded-random'
-import { computeGenSeed } from './gen-seed'
-import { searchPhotos, buildImgixUrl, trackDownload } from './unsplash-client'
+import { searchPhotos, buildImgixUrl, trackDownload, UnsplashError } from './unsplash-client'
 import { uploadImageUrl } from './upload-media'
+import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import { SAMPLE_PRODUCTS_BY_CATEGORY } from './content/sample-products'
-import { getGalleryImages } from '@/lib/images/industry-images'
+import { getProductImages } from '@/lib/images/industry-images'
 
 export interface SampleProduct {
     name: string
@@ -25,7 +25,21 @@ export interface SampleProduct {
     descriptionBM?: string
     price: number
     imageId?: number // Payload Media ID — undefined if image fetch failed
+    galleryUrl?: string // Tier-C CDN URL used; carried to route.ts for FK-violation re-upload
     status: 'active'
+}
+
+type ImageFailReason = 'rate_limited' | 'no_results' | 'gallery_failed' | 'upload_failed'
+
+export interface ProductImageStats {
+    rateLimited: number  // unsplash_rl in summary log
+    uploadFailed: number // images_failed in summary log (Tier-A upload errors + gallery_failed)
+    noImage: number      // products_no_image in summary log
+}
+
+export interface GeneratedProductsResult {
+    products: SampleProduct[]
+    stats: ProductImageStats
 }
 
 
@@ -108,7 +122,9 @@ function getFallbackProducts(businessInfo: BusinessInfoInput): Array<SampleProdu
         `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products}`,
     )
     const pool = SAMPLE_PRODUCTS_BY_CATEGORY[category] ?? SAMPLE_PRODUCTS_BY_CATEGORY['business'] ?? []
-    const seed = computeGenSeed(businessInfo)
+    // businessName-only seed is intentional: curated fallback products are generic
+    // (not user-specific), so same-name collisions are acceptable here.
+    const seed = hashString(businessInfo.businessName)
     const shuffled = seededShuffle(pool, seed)
     return shuffled.slice(0, 6).map((t) => ({
         name: t.name,
@@ -146,7 +162,8 @@ function deriveFallbackKeyword(productName: string, category: string): string {
  *             e.g. "rainbow teddy bear" → "teddy bear" → "bear"
  *   Tier B2 — name-derived keyword as final text-search attempt
  *   Tier C  — direct gallery URL (bypasses search API entirely)
- * Returns Media ID or undefined — never throws.
+ * Never throws — returns imageId (may be undefined) and optional failure reason.
+ * skipSearch=true jumps directly to Tier C (used when quota is exhausted or UNSPLASH_FALLBACK_ONLY=1).
  */
 async function fetchProductImage(
     keyword: string,
@@ -157,46 +174,60 @@ async function fetchProductImage(
     payload: BasePayload,
     tenantId: string,
     galleryFallbackUrl?: string,
-): Promise<number | undefined> {
+    skipSearch = false,
+): Promise<{ imageId: number | undefined; reason?: ImageFailReason }> {
     const filename = `sample-product-${siteKey}-${index}.jpg`
-    try {
-        // Tier A: exact AI keyword
-        let photos = await searchPhotos(keyword, 1, { orientation: 'squarish' })
+    let wasRateLimited = false
+    let tierAUploadFailed = false
 
-        // Tier B: drop leading adjectives one by one until we get results
-        // "rainbow teddy bear" → "teddy bear" → "bear"
-        if (!photos.length) {
-            const words = keyword.trim().split(/\s+/)
-            for (let drop = 1; drop < words.length && !photos.length; drop++) {
-                const simplified = words.slice(drop).join(' ')
-                console.warn(`[sample-products] "${keyword}" → 0, trying simplified "${simplified}"`)
-                photos = await searchPhotos(simplified, 1, { orientation: 'squarish' })
+    if (!skipSearch) {
+        try {
+            // Tier A: exact AI keyword
+            let photos = await searchPhotos(keyword, 1, { orientation: 'squarish' })
+
+            // Tier B: drop leading adjectives one by one until we get results
+            if (!photos.length) {
+                const words = keyword.trim().split(/\s+/)
+                for (let drop = 1; drop < words.length && !photos.length; drop++) {
+                    const simplified = words.slice(drop).join(' ')
+                    console.warn(`[sample-products] "${keyword}" → 0, trying simplified "${simplified}"`)
+                    photos = await searchPhotos(simplified, 1, { orientation: 'squarish' })
+                }
+            }
+
+            // Tier B2: keyword variants exhausted — derive fresh keyword from product name
+            if (!photos.length) {
+                const nameKeyword = deriveFallbackKeyword(productName, category)
+                console.warn(`[sample-products] all "${keyword}" variants → 0, trying name-derived "${nameKeyword}"`)
+                photos = await searchPhotos(nameKeyword, 1, { orientation: 'squarish' })
+            }
+
+            if (photos.length) {
+                const photo = photos[0]!
+                const url = buildImgixUrl(photo.urls.raw, { w: 800, h: 800, fit: 'crop' })
+                trackDownload(photo.links.download_location)
+                try {
+                    const id = await uploadImageUrl(url, filename, productName, tenantId, payload)
+                    if (id != null) {
+                        // Verify row still exists — orphan stripper may delete unreferenced media.
+                        const exists = await payload.findByID({ collection: 'media', id, depth: 0 }).catch(() => null)
+                        if (exists) return { imageId: id }
+                        console.warn(`[sample-products] imageId=${id} deleted by orphan stripper, retrying with gallery URL`)
+                        // Fall through to Tier C
+                    }
+                } catch {
+                    tierAUploadFailed = true
+                    // Upload failed — fall through to Tier C
+                }
+            }
+        } catch (err) {
+            if (err instanceof UnsplashError && err.code === 'RATE_LIMITED') {
+                wasRateLimited = true
+                // fall through to Tier C; outer loop will skip search for subsequent products
+            } else {
+                console.warn(`[sample-products] Unsplash search failed for "${keyword}":`, (err as Error).message)
             }
         }
-
-        // Tier B2: keyword variants exhausted — derive fresh keyword from product name
-        if (!photos.length) {
-            const nameKeyword = deriveFallbackKeyword(productName, category)
-            console.warn(`[sample-products] all "${keyword}" variants → 0, trying name-derived "${nameKeyword}"`)
-            photos = await searchPhotos(nameKeyword, 1, { orientation: 'squarish' })
-        }
-
-        if (photos.length) {
-            const photo = photos[0]!
-            const url = buildImgixUrl(photo.urls.raw, { w: 800, h: 800, fit: 'crop' })
-            trackDownload(photo.links.download_location)
-            const id = await uploadImageUrl(url, filename, productName, tenantId, payload)
-            if (id != null) {
-                // Verify row still exists — orphan stripper (running in parallel with site gen)
-                // may delete media that isn't yet referenced by any Products record.
-                const exists = await payload.findByID({ collection: 'media', id, depth: 0 }).catch(() => null)
-                if (exists) return id
-                console.warn(`[sample-products] imageId=${id} deleted by orphan stripper, retrying with gallery URL`)
-                // Fall through to Tier C to re-upload from gallery
-            }
-        }
-    } catch (err) {
-        console.warn(`[sample-products] Unsplash search failed for "${keyword}":`, (err as Error).message)
     }
 
     // Tier C: direct gallery URL (bypasses search API — works even when key is invalid/rate-limited)
@@ -205,21 +236,38 @@ async function fetchProductImage(
             const id = await uploadImageUrl(galleryFallbackUrl, filename, productName, tenantId, payload)
             if (id != null) {
                 const exists = await payload.findByID({ collection: 'media', id, depth: 0 }).catch(() => null)
-                if (exists) return id
-                console.warn(`[sample-products] gallery imageId=${id} also deleted, product will have no image`)
+                if (exists) return { imageId: id, ...(wasRateLimited ? { reason: 'rate_limited' as ImageFailReason } : {}) }
+                console.warn(`[sample-products] gallery imageId=${id} also deleted, falling through to Tier D`)
             }
         } catch {
-            // non-fatal
+            // non-fatal — fall through to Tier D
         }
     }
 
-    return undefined
+    // Tier D: static carton-box placeholder — last resort when all CDN-dependent tiers fail
+    const cartonResult = await findOrCreateCartonMedia(payload, tenantId).catch(() => null)
+    if (cartonResult) {
+        console.warn(`[sample-products] Tier D carton fallback used for "${productName}"`)
+        return { imageId: cartonResult.id, reason: wasRateLimited ? 'rate_limited' : tierAUploadFailed ? 'upload_failed' : 'no_results' }
+    }
+
+    return {
+        imageId: undefined,
+        reason: wasRateLimited
+            ? 'rate_limited'
+            : tierAUploadFailed
+                ? 'upload_failed'
+                : galleryFallbackUrl
+                    ? 'gallery_failed'
+                    : 'no_results',
+    }
 }
 
 /**
  * Generate 6 sample products for a newly created site.
  * Tier 1: AI. Tier 2: curated library. Images: Unsplash fetched sequentially to avoid rate limits.
  * Never throws — returns whatever was successfully generated (may be []).
+ * Set UNSPLASH_FALLBACK_ONLY=1 to skip search entirely and use gallery URLs only.
  */
 export async function generateSampleProducts(
     businessInfo: BusinessInfoInput,
@@ -227,7 +275,7 @@ export async function generateSampleProducts(
     tenantId: string,
     payload: BasePayload,
     siteId?: string | number,
-): Promise<SampleProduct[]> {
+): Promise<GeneratedProductsResult> {
     const MAX_RETRIES = 3
     let rawProducts: Array<SampleProduct & { _imageKeyword: string }> = []
     let aiSucceeded = false
@@ -278,24 +326,38 @@ export async function generateSampleProducts(
     const category = resolveComposerCategory(
         `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products ?? ''}`
     )
-    // Pre-fetch gallery URLs as Tier-C fallback (direct download, no search API needed)
+    // Pre-fetch product URLs as Tier-C fallback (direct download, no search API needed)
     // Seed-shuffle the fixed industry pool (6 items) so each product gets a distinct URL
-    const galleryPool = getGalleryImages(category)
-    if (galleryPool.length === 0) console.warn(`[sample-products] no gallery images for category="${category}", Tier C disabled`)
-    const galleryUrls = seededShuffle(galleryPool, hashString(siteKey))
+    const productImagePool = getProductImages(category)
+    const productUrls = seededShuffle(productImagePool, hashString(siteKey))
     const withImages: SampleProduct[] = []
+    const stats: ProductImageStats = { rateLimited: 0, uploadFailed: 0, noImage: 0 }
+    // Set to true after first 429 — no point searching for remaining products this gen
+    let searchRateLimited = false
+    const fallbackOnly = process.env.UNSPLASH_FALLBACK_ONLY === '1'
 
     for (let i = 0; i < rawProducts.length; i++) {
         const p = rawProducts[i]!
         if (i > 0) await new Promise(resolve => setTimeout(resolve, 500))
-        const imageId = await fetchProductImage(
+        const skipSearch = fallbackOnly || searchRateLimited
+        const { imageId, reason } = await fetchProductImage(
             p._imageKeyword, i, siteKey, p.name, category, payload, tenantId,
-            galleryUrls[i % galleryUrls.length],
+            productUrls[i % productUrls.length],
+            skipSearch,
         )
-        console.log(`[sample-products] product ${i + 1}/${rawProducts.length} "${p.name}" → imageId=${imageId ?? 'none'}`)
+        if (reason === 'rate_limited') {
+            stats.rateLimited++
+            searchRateLimited = true
+        }
+        if (reason === 'upload_failed' || reason === 'gallery_failed') {
+            stats.uploadFailed++
+        }
+        if (!imageId) stats.noImage++
+        const reasonStr = reason ? ` reason=${reason}` : ''
+        console.log(`[sample-products] product ${i + 1}/${rawProducts.length} "${p.name}" → imageId=${imageId ?? 'none'}${reasonStr}`)
         const { _imageKeyword: _, ...product } = p
-        withImages.push({ ...product, imageId })
+        withImages.push({ ...product, imageId, galleryUrl: productUrls[i % productUrls.length] })
     }
 
-    return withImages
+    return { products: withImages, stats }
 }
