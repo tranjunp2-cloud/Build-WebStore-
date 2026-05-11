@@ -519,6 +519,7 @@ function PreviewFrameInner({
                 if (isEditingRef.current) {
                     setIsEditing(false)
                 }
+                setImageClickData(null)
             } else if (e.data?.type === 'BLOCK_CONTAINER_CLICKED') {
                 const blockIndex = Number(e.data.blockIndex)
                 const blockType = e.data.layout?.blockType as string | undefined
@@ -607,6 +608,7 @@ function PreviewFrameInner({
                 const scrollY = e.data.scrollY ?? 0
                 setIframeScrollY(scrollY)
                 savedScrollYRef.current = scrollY
+                setImageClickData(null)
             } else if (e.data?.type === 'REQUEST_STOP_EDITING') {
                 setTimeout(() => {
                     const activeEl = document.activeElement
@@ -690,9 +692,11 @@ function PreviewFrameInner({
             if (target.closest('[data-inline-edit-popover]')) return
             if (target.closest('[data-inline-edit-trigger]')) return
             if (target.closest('[data-wysiwyg-toolbar]')) return // Don't close if clicking toolbar!
+            if (target.closest('[data-image-toolbar]')) return // Don't close if clicking image toolbar!
 
             setIsEditing(false)
             setTextEditingData(null) // Clean up WYSIWYG if clicking outside
+            setImageClickData(null) // Close image toolbar if clicking outside
             // Tell iframe to stop editing too
             frameElementRef.current?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, window.location.origin)
         }
@@ -908,8 +912,9 @@ function PreviewFrameInner({
                 }
 
                 // Strategy 7: Universal array-image handler for all other blocks with imageIndex.
-                // All use upload fields (numeric Payload media ID) — imageUrl string fields were a mismatch
-                // vs Pages.ts schema which defines image: upload for carousel and portfolio-grid items.
+                // Store populated object { id, url, alt } so in-memory rendering works immediately
+                // (components read .url) while persistence works via .id (normalizeUploadField keeps
+                // objects that have an .id, strips those that don't).
                 if (!matched && imageClickData.imageIndex !== undefined) {
                     const ARRAY_IMAGE_CONFIG: Record<string, { arrayField: string; imageSubField: string }> = {
                         carousel: { arrayField: 'items', imageSubField: 'image' },
@@ -930,9 +935,14 @@ function PreviewFrameInner({
                         while (currentArray.length <= idx) {
                             currentArray.push({} as Record<string, unknown>)
                         }
-                        // Store { id, url } so the preview iframe can render the new image immediately.
-                        // normalizeUploadField extracts the numeric id before persistence.
-                        currentArray[idx] = { ...currentArray[idx], [arrayConfig.imageSubField]: { id: newMediaId, url: newUrl } }
+                        // Store populated object so components reading .url render the new image immediately
+                        // without a full reload. Preserves existing alt text. normalizeUploadField
+                        // extracts the numeric id before persistence.
+                        const existingItem = currentArray[idx] as Record<string, unknown>
+                        const existingAlt = typeof existingItem[arrayConfig.imageSubField] === 'object' && existingItem[arrayConfig.imageSubField] !== null
+                            ? String((existingItem[arrayConfig.imageSubField] as Record<string, unknown>).alt ?? '')
+                            : ''
+                        currentArray[idx] = { ...existingItem, [arrayConfig.imageSubField]: { id: newMediaId, url: newUrl, alt: existingAlt } }
                         updateBlock(blockIndex, { [arrayConfig.arrayField]: currentArray })
                         matched = true
                     }
@@ -1572,6 +1582,7 @@ function PreviewFrameInner({
 
                     return (
                         <div
+                            data-image-toolbar
                             className="absolute z-[100]"
                             style={{
                                 top: topPos,
@@ -1581,7 +1592,6 @@ function PreviewFrameInner({
                             <ImageToolbar
                                 onImageSelect={handleImageReplace}
                                 isProcessing={isImageProcessing}
-
                             />
                         </div>
                     )
