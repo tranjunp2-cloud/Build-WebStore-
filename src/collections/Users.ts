@@ -388,6 +388,9 @@ export const Users: CollectionConfig = {
                 const removeData: Record<string, unknown> = { tenants: normalizedTenants }
 
                 // Strip 'tenant-owner' platform role if removed user was an owner and has no owner tenancy elsewhere.
+                // Note: the last-active-owner guard above (line ~365) is status-gated (active only), but this sync
+                // is intentionally not status-gated — it checks all remaining tenancies regardless of status so
+                // that inactive owners don't retain the platform role after removal.
                 if (targetTenantRole === 'owner') {
                     const stillOwnerAnywhere = normalizedTenants.some(t => t.role === 'owner')
                     if (!stillOwnerAnywhere) {
@@ -472,6 +475,9 @@ export const Users: CollectionConfig = {
 
                 // Sync platform roles when owner status changes.
                 // 'tenant-owner' gates login redirect (login/page.tsx) and password reset flow (check-reset-flow).
+                // Demotion safety: normalizedTenants[targetTenantIndex].role is already set to the new role above,
+                // so stillOwnerAnywhere reflects post-update state. This is safe because the last-active-owner guard
+                // above (line ~443) guarantees at least one other owner exists before we reach this block.
                 const wasOwner = targetTenantRole === 'owner'
                 const becomesOwner = role === 'owner'
                 const currentRoles: string[] = (targetUser.roles as string[]) || []
