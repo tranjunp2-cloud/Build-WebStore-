@@ -15,6 +15,7 @@ export function normalizeTenants(tenants: TenantMembership[]): TenantMembership[
         tenant: (t.tenant && typeof t.tenant === 'object') ? t.tenant.id : t.tenant,
         role: t.role,
         status: t.status,
-        permissions: t.permissions || [],
+        // Filter null/undefined items that DB can store when value column has no NOT NULL constraint
+        permissions: (t.permissions ?? []).filter((p): p is string => typeof p === 'string'),
     }))
 }

@@ -112,6 +112,14 @@ describe('normalizeTenants [TC-F19.28]', () => {
         const result = normalizeTenants(noPerms)
         expect(result[0].permissions).toEqual([])
     })
+
+    it('filters null items within permissions array (GH-905 regression)', () => {
+        const withNullPerms: TenantMembership[] = [
+            { tenant: '1', role: 'custom', status: 'active', permissions: [null as unknown as string, 'products', null as unknown as string] },
+        ]
+        const result = normalizeTenants(withNullPerms)
+        expect(result[0].permissions).toEqual(['products'])
+    })
 })
 
 describe('cross-tenant owner check [TC-F19.29]', () => {
