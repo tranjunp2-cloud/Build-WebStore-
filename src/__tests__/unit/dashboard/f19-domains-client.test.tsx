@@ -104,10 +104,9 @@ describe('F19 Domain Management (DomainsClient)', () => {
 
         await waitFor(() => {
             expect(actions.addCustomDomain).toHaveBeenCalledWith('newstore.com');
-            // Without verification[] in the response, the client treats it as
-            // immediately active and shows the DNS setup toast (not SSL-provisioning).
+            // BUG-F19 fix: always pending after add — single toast regardless of verification[].
             expect(toast.success).toHaveBeenCalledWith(
-                expect.stringContaining('Domain connected! Configure DNS records below'),
+                expect.stringContaining('Domain added. Point your DNS records below, then click Verify'),
             );
         });
     });
@@ -271,12 +270,9 @@ describe('F19 Domain Management (DomainsClient)', () => {
 
     // TC-U-11 — When add returns verification[], the client should:
     //   1. Keep the domain in pending state (not auto-active)
-    //   2. Show the "Add the TXT record below" toast (per DomainsClient handleAddDomain)
-    // NOTE: The TxtChallengeCard component exists in DomainsClient.tsx but is
-    // not yet wired into the render tree (Phase 04 gap — tracked separately).
-    // Once wired, assert on role="region" + aria-labelledby="txt-challenge-*"
-    // plus the TXT name/value/reason rows.
-    it('[TC-U-11] Add with verification[] surfaces TXT challenge toast and keeps domain pending', async () => {
+    //   2. Show the unified pending toast (same message regardless of verification presence)
+    //   3. Render TxtChallengeCard below the pending DNS card
+    it('[TC-U-11] Add with verification[] keeps domain pending and shows unified toast', async () => {
         const verification = [
             {
                 type: 'TXT' as const,
@@ -298,7 +294,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
         await waitFor(() => {
             expect(actions.addCustomDomain).toHaveBeenCalledWith('pending.com');
             expect(toast.success).toHaveBeenCalledWith(
-                expect.stringContaining('Add the TXT record below'),
+                expect.stringContaining('Domain added. Point your DNS records below, then click Verify'),
             );
         });
 

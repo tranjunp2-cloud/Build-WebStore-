@@ -417,19 +417,12 @@ export function DomainsClient({
             if (res.success) {
                 setIsAddModalOpen(false);
                 setNewDomainInput('');
-                const hasVerification = !!(res.verification && res.verification.length > 0);
-                setDomains(prev => [
-                    ...prev,
-                    { domain: domainValue, status: hasVerification ? 'pending' : 'active' },
-                ]);
-                if (hasVerification) {
+                // Always pending — Verify button must be clicked after pointing DNS.
+                setDomains(prev => [...prev, { domain: domainValue, status: 'pending' }]);
+                if (res.verification && res.verification.length > 0) {
                     setVerifications(prev => ({ ...prev, [domainValue]: res.verification! }));
-                    toast.success('Add the TXT record below, then click Verify.');
-                } else {
-                    setSslProvisioningDomains(prev => ({ ...prev, [domainValue]: Date.now() }));
-                    setDnsSetupDomains(prev => new Set(prev).add(domainValue));
-                    toast.success('Domain connected! Configure DNS records below to point your domain to this store.');
                 }
+                toast.success('Domain added. Point your DNS records below, then click Verify.');
                 if (res.warning) {
                     toast.warning(res.warning);
                 }
@@ -729,6 +722,9 @@ export function DomainsClient({
                                             </div>
                                         </div>
                                     </div>
+                                    <p className="text-[12px] text-[rgba(248,250,252,0.4)]">
+                                        {t?.Domains?.cloudflareTip || 'Using Cloudflare? Disable the proxy (orange cloud → grey cloud) before verifying.'}
+                                    </p>
                                 </div>
 
                                 {/* Error banner */}

@@ -182,15 +182,14 @@ export async function addCustomDomain(rawDomain: string): Promise<DomainActionRe
         };
     }
 
-    // Step 3: persist Vercel result. Two branches:
-    //   a) verified=true + no verification → active immediately.
-    //   b) otherwise → keep pending, store verification[] (may be empty if DNS not pointed).
-    const isActive = vercelDomain.verified === true && !vercelDomain.verification?.length;
+    // Step 3: always save as pending — user must verify DNS pointing via Verify button.
+    // Even if Vercel returns verified=true (domain already in team), DNS may not be pointed yet.
+    // Domain only becomes active after hard DNS check passes in verifyCustomDomain.
     const finalRow: DomainEntry = {
         domain,
-        status: isActive ? 'active' : 'pending',
+        status: 'pending',
         vercelDomainId: vercelDomain.name,
-        vercelVerification: vercelDomain.verification ?? null,
+        vercelVerification: vercelDomain.verification?.length ? vercelDomain.verification : null,
     };
     const finalList: DomainEntry[] = [...current, finalRow];
 
@@ -218,7 +217,7 @@ export async function addCustomDomain(rawDomain: string): Promise<DomainActionRe
     revalidatePath('/settings/domains');
     return {
         success: true,
-        verification: vercelDomain.verification,
+        verification: vercelDomain.verification?.length ? vercelDomain.verification : undefined,
     };
 }
 
@@ -318,27 +317,44 @@ export async function verifyCustomDomain(rawDomain: string): Promise<DomainActio
         return { success: true };
     }
 
-    // Soft DNS pre-flight — log-only, never hard-fails. Vercel is the source of truth.
-    try {
+    // Hard DNS pre-flight — domain must be pointing to Vercel before marking active.
+    // Skipped in local dev mock mode (no VERCEL_TOKEN) so UI can be tested without real DNS.
+    const isMockMode = !process.env.VERCEL_TOKEN && process.env.NODE_ENV === 'development';
+    if (!isMockMode) {
         if (isApexDomain(domain)) {
-            const addresses = await dns.resolve4(domain);
+            let addresses: string[] = [];
+            try {
+                addresses = await dns.resolve4(domain);
+            } catch {
+                return {
+                    success: false,
+                    error: 'DNS records not detected yet. Please add the A record above and try again. DNS changes can take a few minutes to propagate.',
+                };
+            }
             if (!addresses.includes(VERCEL_APEX_IP)) {
-                console.warn(
-                    `[verifyCustomDomain] ${domain} apex does not yet point at ${VERCEL_APEX_IP}; resolved: ${addresses.join(', ')}`,
-                );
+                return {
+                    success: false,
+                    error: `Your domain is not yet pointing to our servers. Expected A record: ${VERCEL_APEX_IP} — currently resolves to: ${addresses.join(', ')}. Please update your DNS and try again.`,
+                };
             }
         } else {
-            const cnames = await dns.resolveCname(domain);
+            let cnames: string[] = [];
+            try {
+                cnames = await dns.resolveCname(domain);
+            } catch {
+                return {
+                    success: false,
+                    error: 'DNS records not detected yet. Please add the CNAME record above and try again. DNS changes can take a few minutes to propagate.',
+                };
+            }
             const normalized = cnames.map((c) => c.replace(/\.$/, '').toLowerCase());
             if (!normalized.includes(VERCEL_CNAME.toLowerCase())) {
-                console.warn(
-                    `[verifyCustomDomain] ${domain} CNAME does not yet point at ${VERCEL_CNAME}; resolved: ${cnames.join(', ')}`,
-                );
+                return {
+                    success: false,
+                    error: `Your domain is not yet pointing to our servers. Expected CNAME: ${VERCEL_CNAME} — currently resolves to: ${cnames.join(', ')}. Please update your DNS and try again.`,
+                };
             }
         }
-    } catch (dnsErr) {
-        console.warn(`[verifyCustomDomain] DNS pre-flight failed for ${domain}:`, dnsErr);
-        // Continue anyway — Vercel will confirm.
     }
 
     // Call Vercel verify.
