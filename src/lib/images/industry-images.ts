@@ -12,6 +12,7 @@ import {
     getAboutImage as _getAboutImage,
     getTeamAvatar as _getTeamAvatar,
     getGalleryImages as _getGalleryImages,
+    getProductImages as _getProductImages,
     getIndustryImages,
     IMAGE_LIBRARY,
 } from '@/app/api/preview/renderers/images'
@@ -47,4 +48,8 @@ export function getTeamAvatar(category: string, index = 0, s3Map?: S3Map): strin
     const cdnUrl = _getTeamAvatar(category, index)
     const teamLen = (IMAGE_LIBRARY[category] ?? IMAGE_LIBRARY['business']!).team.length
     return preferS3(`team[${index % teamLen}]`, cdnUrl, s3Map)
+}
+
+export function getProductImages(category: string, count = 6): string[] {
+    return _getProductImages(category, count)
 }
