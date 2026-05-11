@@ -75,9 +75,9 @@ export default function TeamSettings({ block, blockIndex, onBlockUpdate }: TeamS
         onBlockUpdate(blockIndex, { members: updated })
     }
 
-    const handleImageChange = (i: number, url: string) => {
+    const handleImageChange = (i: number, id: number, url: string) => {
         const updated = members.map((m, idx) =>
-            idx === i ? { ...m, image: { url, alt: m.image?.alt ?? '' } } : m
+            idx === i ? { ...m, image: { id, url, alt: m.image?.alt ?? '' } } : m
         )
         onBlockUpdate(blockIndex, { members: updated })
     }
@@ -143,7 +143,7 @@ export default function TeamSettings({ block, blockIndex, onBlockUpdate }: TeamS
                                     <BlockImageEditor
                                         imageUrl={member.image?.url ?? ''}
                                         altText={member.image?.alt ?? ''}
-                                        onImageChange={(url) => handleImageChange(i, url)}
+                                        onImageChange={(id, url) => handleImageChange(i, id, url)}
                                         onAltTextChange={(alt) => handleAltChange(i, alt)}
                                     />
                                     <Input
