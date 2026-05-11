@@ -1219,9 +1219,11 @@ function PreviewFrameInner({
     // toolbar/popover anchored to the element as the user scrolls.
     const scrollOffset = textEditingData ? iframeScrollY - textEditingData.scrollYAtStart : 0
 
-    // Full-Screen mode = both sidebars hidden (Focus preset). Strip padding,
-    // rounding, and the desktop max-width so the preview spans edge-to-edge.
-    const isFullScreen = !leftSidebarVisible && !rightSidebarVisible
+    // Expanded preview = any sidebar hidden (Focus / Structure / Content presets).
+    // Strip padding, rounding, and the desktop max-width so the preview spans
+    // edge-to-edge. Mobile viewport always centers its 390px canvas regardless.
+    const isExpanded = !leftSidebarVisible || !rightSidebarVisible
+    const isMobile = viewport === 'mobile'
 
     return (
         <>
@@ -1233,8 +1235,8 @@ function PreviewFrameInner({
                     ref={setScrollContainerElement}
                     className={cn(
                         'flex h-full items-start overflow-auto border border-white/10 bg-[#0F172A]',
-                        isFullScreen
-                            ? 'rounded-none'
+                        isExpanded
+                            ? cn('rounded-none', isMobile && 'justify-center')
                             : 'justify-center rounded-[28px] p-4',
                     )}
                 >
@@ -1242,8 +1244,8 @@ function PreviewFrameInner({
                         ref={setCanvasElement}
                         className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
                         style={{
-                            width: viewport === 'mobile' ? 'min(390px, 100%)' : '100%',
-                            maxWidth: viewport === 'mobile' ? 390 : isFullScreen ? undefined : 1280,
+                            width: isMobile ? 'min(390px, 100%)' : '100%',
+                            maxWidth: isMobile ? 390 : isExpanded ? undefined : 1280,
                         }}
                     >
                         <iframe
