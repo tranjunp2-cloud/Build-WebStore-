@@ -48,6 +48,18 @@ describe('isOwner', () => {
         const result = isOwner(user)
         expect(result).toBe(false)
     })
+
+    // TC-F23-05-09: Staff user with wrongly assigned tenant-owner platform role (GH-905 regression)
+    // invite-staff historically assigned roles: ['tenant-owner'] to all new users.
+    // When tenant membership is present, tenant role is authoritative and platform role is ignored.
+    it('returns false for staff with tenant-owner platform role but non-owner tenant role', () => {
+        const user = {
+            roles: ['tenant-owner'],
+            tenants: [{ role: 'admin' }],
+        }
+        const result = isOwner(user)
+        expect(result).toBe(false)
+    })
 })
 
 describe('blockOwner', () => {
