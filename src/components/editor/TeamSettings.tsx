@@ -66,8 +66,10 @@ export default function TeamSettings({ block, blockIndex, onBlockUpdate }: TeamS
 
     const handleFieldBlur = (i: number, field: 'name' | 'role' | 'bio', value: string) => {
         const current = String(members[i]?.[field] ?? '')
-        // Skip if value unchanged — compare against both raw and HTML-stripped form
-        // so sidebar blur doesn't clobber inline-edited HTML formatting.
+        // Skip if value unchanged. The stripHtml comparison intentionally preserves inline-edited
+        // HTML formatting: if user typed "Alice" in sidebar but store has "<b>Alice</b>", we treat
+        // them as equal and don't overwrite — inline formatting takes priority over sidebar plain text.
+        // Known trade-off: user cannot remove HTML formatting by retyping the same text in sidebar.
         if (current === value || stripHtml(current) === value) return
         const updated = members.map((m, idx) => idx === i ? { ...m, [field]: value } : m)
         onBlockUpdate(blockIndex, { members: updated })
