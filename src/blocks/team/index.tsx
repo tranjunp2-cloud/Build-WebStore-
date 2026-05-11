@@ -38,7 +38,7 @@ function TeamSection({
 }) {
     if (decorative) {
         return (
-            <AnimatedSection className="relative overflow-hidden" style={{ color: CSS_VARS.text }}>
+            <AnimatedSection className="relative overflow-hidden" style={{ color: CSS_VARS.text, background: CSS_VARS.surfacePrimary }}>
                 {decorative}
                 <SectionWrapper
                     as="div"
