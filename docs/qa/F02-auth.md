@@ -113,6 +113,7 @@ Hệ thống được kiểm định qua 6 nhóm nghiệp vụ:
 | **TC-F02.40** | `Perf` | Thời gian phản hồi API Login < 3 giây | 1. Mở DevTools Network trên trình duyệt.<br>2. Thực hiện đăng nhập (`POST /api/users/login`).<br>3. Ghi lại thời gian response. | - Response time < 3.0 giây. | High |
 | **TC-F02.41** | `Load` | Hệ thống chịu 50 user đăng nhập đồng thời | 1. Cấu hình K6 với 50 Virtual Users gọi `POST /api/users/login` đồng thời.<br>2. Chạy script, ghi lại kết quả. | - P95 response trong ngưỡng chấp nhận.<br>- Error rate < 0.5%.<br>- Không xảy ra DB Pool Dead-Lock. | Khẩn |
 | **TC-F02.42** | `Sec` | Rate Limit endpoint Quên Mật Khẩu chống spam | 1. Chạy script gửi 40 request liên tiếp tới endpoint Quên MK với cùng 1 email.<br>2. Quan sát response từ request vượt ngưỡng. | - Server trả `HTTP 429 Too Many Requests`.<br>- IP/tài khoản bị khóa tạm thời. | Medium |
+| **TC-F02.43** | `Reg` | send-otp không lỗi 500 với multi-tenant user có null permissions (GH-905) | 1. Tạo staff user thuộc 2 tenant.<br>2. Insert null vào `users_tenants_permissions.value` cho tenant thứ 2 qua psql.<br>3. Gọi `POST /api/users/send-otp` với email của staff. | - Response `200` với `{ message: "If the email exists..." }`.<br>- Không có log `[Users] send-otp error` trong server console. | Blocker |
 
 ---
 

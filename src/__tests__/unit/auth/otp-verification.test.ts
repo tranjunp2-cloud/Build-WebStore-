@@ -142,6 +142,31 @@ describe('OTP Verification Endpoints', () => {
             expect(res.status).toBe(200)
             expect(data.emailSent).toBe(false)
         })
+
+        it('normalizes null permission items in multi-tenant user tenants before update [TC-F02.43]', async () => {
+            mockPayload.find.mockResolvedValue({
+                docs: [{
+                    id: 1,
+                    email: 'staff@test.com',
+                    tenants: [
+                        { id: 'ut-1', tenant: 1, role: 'editor', status: 'active', permissions: [] },
+                        { id: 'ut-2', tenant: 2, role: 'custom', status: 'active', permissions: [null, 'products'] },
+                    ],
+                }]
+            })
+            const req = createMockRequest({ email: 'staff@test.com' })
+
+            const res = await sendOtpHandler!(req) as Response
+
+            expect(res.status).toBe(200)
+            expect(mockPayload.update).toHaveBeenCalledWith(expect.objectContaining({
+                data: expect.objectContaining({
+                    tenants: expect.arrayContaining([
+                        expect.objectContaining({ id: 'ut-2', permissions: ['products'] }),
+                    ]),
+                }),
+            }))
+        })
     })
 
     describe('POST /verify-otp', () => {
