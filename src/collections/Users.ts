@@ -264,7 +264,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 tenants: [
                                     ...normalizedExisting,
-                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
+                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : [] }
                                 ]
                             }
                         })
@@ -282,7 +282,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 roles: ['tenant-owner'], // Default platform role
                                 tenants: [
-                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
+                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : [] }
                                 ]
                             }
                         })
@@ -457,7 +457,7 @@ export const Users: CollectionConfig = {
 
                 const normalizedTenants = normalizeTenants(targetUser.tenants || [])
                 normalizedTenants[targetTenantIndex].role = role
-                normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []) : []
+                normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : []
 
                 await req.payload.update({
                     collection: 'users',
@@ -566,15 +566,20 @@ export const Users: CollectionConfig = {
                     loginUrl
                 })
 
+                let emailSent = true
                 if (!process.env.MAIL_HOST) {
+                    emailSent = false
                     console.error('[StaffInvite] MAIL_HOST not set — resend skipped, streamTransport would swallow it')
                 } else {
-                    req.payload.sendEmail({ to: targetUser.email, subject, html }).catch((err: unknown) => {
+                    try {
+                        await req.payload.sendEmail({ to: targetUser.email, subject, html })
+                    } catch (err: unknown) {
+                        emailSent = false
                         console.error(`[StaffInvite] Failed to resend email to ${targetUser.email}:`, err)
-                    })
+                    }
                 }
 
-                return Response.json({ message: 'Invitation resent successfully' })
+                return Response.json({ message: 'Invitation resent successfully', emailSent })
             }
         },
         {

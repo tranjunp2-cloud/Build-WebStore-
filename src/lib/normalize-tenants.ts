@@ -14,7 +14,8 @@ export function normalizeTenants(tenants: TenantMembership[]): TenantMembership[
         ...(t.id ? { id: t.id } : {}),
         tenant: (t.tenant && typeof t.tenant === 'object') ? t.tenant.id : t.tenant,
         role: t.role,
-        status: t.status,
+        // Default null status to 'active' (schema defaultValue) — same null-in-DB risk as permissions
+        status: t.status ?? 'active',
         // Filter null/undefined items that DB can store when value column has no NOT NULL constraint
         permissions: (t.permissions ?? []).filter((p): p is string => typeof p === 'string'),
     }))

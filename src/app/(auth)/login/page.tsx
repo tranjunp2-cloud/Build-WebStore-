@@ -258,7 +258,7 @@ function LoginFormContent() {
             // Get correct post-login destination (e.g. /onboarding for new users)
             const actualReturnUrl = user ? getRedirectByRole(user, returnUrl) : returnUrl
 
-            // Trigger OTP send and check if email was actually delivered
+            // Trigger OTP send — distinguish server error (OTP not stored) from delivery failure (OTP stored)
             let otpEmailSent = true
             try {
                 const otpRes = await fetch('/api/users/send-otp', {
@@ -267,15 +267,19 @@ function LoginFormContent() {
                     body: JSON.stringify({ email: userEmail }),
                 })
                 if (!otpRes.ok) {
+                    // Server error — OTP was NOT stored, user cannot proceed to verify-otp
+                    toast.error(t.auth.errors.connection)
+                    return
+                }
+                const otpData = await otpRes.json().catch(() => ({}))
+                if (otpData.emailSent === false) {
+                    // OTP stored but email delivery failed — still allow verify-otp with warning
                     otpEmailSent = false
-                } else {
-                    const otpData = await otpRes.json().catch(() => ({}))
-                    if (otpData.emailSent === false) {
-                        otpEmailSent = false
-                    }
                 }
             } catch {
-                otpEmailSent = false
+                // Network error — OTP not sent
+                toast.error(t.auth.errors.connection)
+                return
             }
 
             // Clear previous OTP countdowns so verify-otp starts fresh
