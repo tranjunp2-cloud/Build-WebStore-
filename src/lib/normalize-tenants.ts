@@ -14,7 +14,9 @@ export function normalizeTenants(tenants: TenantMembership[]): TenantMembership[
         ...(t.id ? { id: t.id } : {}),
         tenant: (t.tenant && typeof t.tenant === 'object') ? t.tenant.id : t.tenant,
         role: t.role,
-        // Default null status to 'active' (schema defaultValue) — same null-in-DB risk as permissions
+        // Null/undefined status → 'active' (schema defaultValue). ?? only applies when null/undefined;
+        // 'pending' and 'suspended' pass through unchanged. Omitting the field instead doesn't help
+        // because Payload merges with the existing document (which has null) before validating.
         status: t.status ?? 'active',
         // Filter null/undefined items that DB can store when value column has no NOT NULL constraint
         permissions: (t.permissions ?? []).filter((p): p is string => typeof p === 'string'),
