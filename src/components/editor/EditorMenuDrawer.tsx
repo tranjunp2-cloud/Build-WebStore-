@@ -93,6 +93,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 children: [
                     { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
                     { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff', roleFilter: (role) => role === 'owner' },
+                    { label: { en: 'Account Profile', ms: 'Profil Akaun' }, href: '/settings/profile' },
                 ],
             },
             { label: { en: 'Help Center', ms: 'Pusat Bantuan' }, href: '/help', icon: Headphones },
@@ -248,7 +249,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 <div className="flex flex-col gap-3 border-t border-white/[0.08] px-3 pt-[17px]" style={{ height: 182 }}>
                     {/* User info + Notification bell */}
                     <div className="flex items-center gap-3">
-                        <Link href="/dashboard/settings" onClick={guardedNavigate('/dashboard/settings')} className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
+                        <Link href="/settings/profile" onClick={guardedNavigate('/settings/profile')} className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0)] shadow-[0_0_0_2px_rgba(59,130,246,0.3)] text-[12px] font-bold text-white overflow-hidden">
                                 {userInitial || '?'}
                             </div>

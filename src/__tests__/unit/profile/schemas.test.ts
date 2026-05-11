@@ -156,31 +156,11 @@ describe('passwordChangeSchema', () => {
         expect(result.success).toBe(false)
     })
 
-    // TC-F23-04-16: Password missing lowercase fails
-    it('rejects newPassword without lowercase letter', () => {
-        const data = {
-            currentPassword: 'OldPass1!',
-            newPassword: 'AA1!AAAA',
-        }
-        const result = passwordChangeSchema.safeParse(data)
-        expect(result.success).toBe(false)
-    })
-
     // TC-F23-04-17: Password missing digit fails
     it('rejects newPassword without number', () => {
         const data = {
             currentPassword: 'OldPass1!',
             newPassword: 'Aa!aaaaa',
-        }
-        const result = passwordChangeSchema.safeParse(data)
-        expect(result.success).toBe(false)
-    })
-
-    // TC-F23-04-18: Password missing special char fails
-    it('rejects newPassword without special character', () => {
-        const data = {
-            currentPassword: 'OldPass1!',
-            newPassword: 'Aa1aaaaa',
         }
         const result = passwordChangeSchema.safeParse(data)
         expect(result.success).toBe(false)

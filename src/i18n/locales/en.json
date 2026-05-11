@@ -2997,9 +2997,7 @@
       "lastLogin": "Last Login",
       "ruleMinLength": "At least 8 characters",
       "ruleUppercase": "One uppercase letter",
-      "ruleLowercase": "One lowercase letter",
-      "ruleNumber": "One number",
-      "ruleSpecial": "One special character"
+      "ruleNumber": "One number"
     },
     "sso": {
       "notice": "Owner accounts are managed via Single Sign-On. Update your profile and password in the SSO portal.",

@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import { useI18n } from '@/i18n'
 import { isOwner } from '@/lib/profile/role-utils'
+import { isStaging } from '@/lib/env'
 import type { PlatformUser } from '@/types/user'
 import { ProfileBanner } from './profile-banner'
 import { GeneralInfoTab } from './general-info-tab'
 import { SecurityTab } from './security-tab'
+import { ResetAccountCard } from '@/app/(dashboard)/dashboard/settings/ResetAccountCard'
 
 type Props = {
     initialUser: PlatformUser
@@ -80,6 +82,8 @@ export function AccountSettingsClient({ initialUser, ssoUrl }: Props) {
                     />
                 )}
             </div>
+
+            {isStaging() && <ResetAccountCard />}
         </div>
     )
 }
