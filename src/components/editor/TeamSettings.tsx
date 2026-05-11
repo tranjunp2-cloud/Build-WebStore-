@@ -84,7 +84,7 @@ export default function TeamSettings({ block, blockIndex, onBlockUpdate }: TeamS
 
     const handleAltChange = (i: number, alt: string) => {
         const updated = members.map((m, idx) =>
-            idx === i ? { ...m, image: { url: m.image?.url ?? '', alt } } : m
+            idx === i ? { ...m, image: { ...m.image, alt } } : m
         )
         onBlockUpdate(blockIndex, { members: updated })
     }
