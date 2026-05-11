@@ -11,9 +11,7 @@ export const passwordBaseSchema = z.object({
     newPassword: z.string()
         .min(8, 'passwordMinLength')
         .regex(/[A-Z]/, 'passwordUpper')
-        .regex(/[a-z]/, 'passwordLower')
-        .regex(/[0-9]/, 'passwordNumber')
-        .regex(/[^A-Za-z0-9]/, 'passwordSpecial'),
+        .regex(/[0-9]/, 'passwordNumber'),
 })
 
 export const passwordChangeSchema = passwordBaseSchema.refine(

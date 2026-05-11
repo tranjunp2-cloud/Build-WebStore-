@@ -54,9 +54,7 @@ export function PasswordChangeForm() {
     const newPassword = watch('newPassword') ?? ''
     const hasMinLength  = newPassword.length >= 8
     const hasUppercase  = /[A-Z]/.test(newPassword)
-    const hasLowercase  = /[a-z]/.test(newPassword)
     const hasNumber     = /\d/.test(newPassword)
-    const hasSpecial    = /[^A-Za-z0-9]/.test(newPassword)
 
     async function onSubmit(values: FormValues) {
         try {
@@ -168,11 +166,9 @@ export function PasswordChangeForm() {
 
             {/* Password rules — horizontal checklist */}
             <div className="flex gap-6 flex-wrap">
-                <PasswordRule met={hasMinLength}  label={t.profile.security.ruleMinLength} />
-                <PasswordRule met={hasUppercase}  label={t.profile.security.ruleUppercase} />
-                <PasswordRule met={hasLowercase}  label={t.profile.security.ruleLowercase} />
-                <PasswordRule met={hasNumber}     label={t.profile.security.ruleNumber} />
-                <PasswordRule met={hasSpecial}    label={t.profile.security.ruleSpecial} />
+                <PasswordRule met={hasMinLength} label={t.profile.security.ruleMinLength} />
+                <PasswordRule met={hasUppercase} label={t.profile.security.ruleUppercase} />
+                <PasswordRule met={hasNumber}    label={t.profile.security.ruleNumber} />
             </div>
 
             {/* Action bar — only visible when dirty */}

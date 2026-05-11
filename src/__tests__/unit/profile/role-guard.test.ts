@@ -3,13 +3,13 @@ import { isOwner, blockOwner } from '@/lib/profile/role-guard'
 import { NextResponse } from 'next/server'
 
 describe('isOwner', () => {
-    // TC-F23-05-01: Owner detected via roles array
-    it('returns true when roles contains tenant-owner', () => {
+    // TC-F23-05-01: Platform role alone does not determine owner — tenant role is authoritative
+    it('returns false when roles contains tenant-owner but no owner tenant role', () => {
         const user = {
             roles: ['tenant-owner'],
         }
         const result = isOwner(user)
-        expect(result).toBe(true)
+        expect(result).toBe(false)
     })
 
     // TC-F23-05-02: Owner detected via tenants role
