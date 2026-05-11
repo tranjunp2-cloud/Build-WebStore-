@@ -22,8 +22,8 @@ vi.mock('@/i18n', () => ({
 }))
 
 vi.mock('@/components/editor/BlockImageEditor', () => ({
-  BlockImageEditor: ({ onImageChange }: { onImageChange: (url: string) => void }) => (
-    <button onClick={() => onImageChange('mock-image-url.jpg')} type="button">
+  BlockImageEditor: ({ onImageChange }: { onImageChange: (id: number, url: string) => void }) => (
+    <button onClick={() => onImageChange(99, 'mock-image-url.jpg')} type="button">
       Mock Upload
     </button>
   ),
@@ -219,7 +219,7 @@ describe('TeamSettings — image handling', () => {
       members: expect.arrayContaining([
         expect.objectContaining({
           name: 'Member',
-          image: expect.objectContaining({ url: 'mock-image-url.jpg' }),
+          image: expect.objectContaining({ id: 99, url: 'mock-image-url.jpg' }),
         }),
       ]),
     }))
