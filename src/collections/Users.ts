@@ -280,7 +280,7 @@ export const Users: CollectionConfig = {
                                 email,
                                 firstName: name,
                                 password: tempPassword,
-                                roles: ['tenant-owner'], // Default platform role
+                                roles: role === 'owner' ? ['tenant-owner'] : [],
                                 tenants: [
                                     { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : [] }
                                 ]

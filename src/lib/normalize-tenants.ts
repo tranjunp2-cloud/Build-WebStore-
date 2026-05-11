@@ -18,7 +18,9 @@ export function normalizeTenants(tenants: TenantMembership[]): TenantMembership[
         // 'pending' and 'suspended' pass through unchanged. Omitting the field instead doesn't help
         // because Payload merges with the existing document (which has null) before validating.
         status: t.status ?? 'active',
-        // Filter null/undefined items that DB can store when value column has no NOT NULL constraint
-        permissions: (t.permissions ?? []).filter((p): p is string => typeof p === 'string'),
+        // Filter null/non-string items (value column has no NOT NULL constraint) and deduplicate.
+        // Payload's select hasMany update appends rows without deleting old ones when no FK CASCADE
+        // is in place, so the same value can appear multiple times in the DB.
+        permissions: [...new Set((t.permissions ?? []).filter((p): p is string => typeof p === 'string'))],
     }))
 }
