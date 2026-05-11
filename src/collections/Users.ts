@@ -385,11 +385,22 @@ export const Users: CollectionConfig = {
                 const normalizedTenants = normalizeTenants(targetUser.tenants || [])
                 normalizedTenants.splice(targetTenantIndex, 1)
 
+                const removeData: Record<string, unknown> = { tenants: normalizedTenants }
+
+                // Strip 'tenant-owner' platform role if removed user was an owner and has no owner tenancy elsewhere.
+                if (targetTenantRole === 'owner') {
+                    const stillOwnerAnywhere = normalizedTenants.some(t => t.role === 'owner')
+                    if (!stillOwnerAnywhere) {
+                        const currentRoles: string[] = (targetUser.roles as string[]) || []
+                        removeData.roles = currentRoles.filter(r => r !== 'tenant-owner')
+                    }
+                }
+
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
                     overrideAccess: true,
-                    data: { tenants: normalizedTenants }
+                    data: removeData
                 })
 
                 return Response.json({ message: 'User removed from workspace successfully' })
@@ -459,14 +470,29 @@ export const Users: CollectionConfig = {
                 normalizedTenants[targetTenantIndex].role = role
                 normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : []
 
+                // Sync platform roles when owner status changes.
+                // 'tenant-owner' gates login redirect (login/page.tsx) and password reset flow (check-reset-flow).
+                const wasOwner = targetTenantRole === 'owner'
+                const becomesOwner = role === 'owner'
+                const currentRoles: string[] = (targetUser.roles as string[]) || []
+                let updatedRoles: string[] | undefined
+                if (becomesOwner && !currentRoles.includes('tenant-owner')) {
+                    updatedRoles = [...currentRoles, 'tenant-owner']
+                } else if (wasOwner && !becomesOwner) {
+                    const stillOwnerAnywhere = normalizedTenants.some(t => t.role === 'owner')
+                    if (!stillOwnerAnywhere) {
+                        updatedRoles = currentRoles.filter(r => r !== 'tenant-owner')
+                    }
+                }
+
+                const updateData: Record<string, unknown> = { firstName: name, tenants: normalizedTenants }
+                if (updatedRoles !== undefined) updateData.roles = updatedRoles
+
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
                     overrideAccess: true,
-                    data: {
-                        firstName: name,
-                        tenants: normalizedTenants
-                    }
+                    data: updateData
                 })
 
                 return Response.json({ message: 'User updated successfully' })
