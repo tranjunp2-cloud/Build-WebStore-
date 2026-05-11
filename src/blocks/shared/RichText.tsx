@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { sanitizeInlineHtml, hasInlineFormatting, extractHeadingWrapper } from '@/lib/utils/rich-text-render'
+import { sanitizeInlineHtml, hasInlineFormatting, extractHeadingWrapper, decodeHtmlEntities } from '@/lib/utils/rich-text-render'
 
 interface RichTextProps {
     text: string | undefined | null
@@ -26,8 +26,9 @@ export function RichText({ text, as: Tag = 'span', className, style }: RichTextP
     if (!text) return null
 
     if (!hasInlineFormatting(text)) {
-        if (Tag === 'span' && !className && !style) return <>{text}</>
-        return <Tag className={className} style={style}>{text}</Tag>
+        const decoded = decodeHtmlEntities(text)
+        if (Tag === 'span' && !className && !style) return <>{decoded}</>
+        return <Tag className={className} style={style}>{decoded}</Tag>
     }
 
     const sanitized = sanitizeInlineHtml(text)

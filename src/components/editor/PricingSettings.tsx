@@ -38,8 +38,28 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
 
     const plans = block.plans ?? []
     const count = Math.max(plans.length, 1)
-    const discountEnabled = (block.discountPercent ?? 0) > 0
     const isMatrix = isMatrixVariant(block.variant)
+
+    // Local state for cycle/discount inputs — allows free typing; syncs from block only when not focused
+    const [localDiscount, setLocalDiscount] = useState<string>(String(block.yearlyDiscount ?? 0))
+    const [localCycle1, setLocalCycle1] = useState(block.billingCycle1 ?? 'Monthly')
+    const [localCycle2, setLocalCycle2] = useState(block.billingCycle2 ?? 'Yearly')
+    // Focus guard: prevents external prop changes from resetting cycle inputs while user is typing.
+    // Safe invariant: cycle inputs only render under `block.variant === 'toggle'`, so a variant
+    // switch unmounts and remounts them — resetting these refs to false automatically.
+    // If cycle inputs are ever rendered unconditionally, replace this with value-comparison guards.
+    const cycle1FocusRef = useRef(false)
+    const cycle2FocusRef = useRef(false)
+    // Tracks last value set by user input; useEffect skips reset when block update is user-initiated
+    const discountUserValueRef = useRef<number | null>(null)
+    useEffect(() => {
+        if (discountUserValueRef.current !== (block.yearlyDiscount ?? 0)) {
+            setLocalDiscount(String(block.yearlyDiscount ?? 0))
+            discountUserValueRef.current = null
+        }
+    }, [block.yearlyDiscount])
+    useEffect(() => { if (!cycle1FocusRef.current) setLocalCycle1(block.billingCycle1 ?? 'Monthly') }, [block.billingCycle1])
+    useEffect(() => { if (!cycle2FocusRef.current) setLocalCycle2(block.billingCycle2 ?? 'Yearly') }, [block.billingCycle2])
 
     // Run data-shape mapping when variant changes (Standard ↔ Matrix conversion)
     useEffect(() => {
@@ -50,10 +70,8 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
         if (Object.keys(changes).length > 0) onBlockUpdate(blockIndex, changes)
     }, [block.variant]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Recomputes highlighted = last plan index, then propagates to parent
     const updatePlans = (next: PricingPlan[]) => {
-        const updated = next.map((p, i) => ({ ...p, highlighted: i === next.length - 1 }))
-        onBlockUpdate(blockIndex, { plans: updated })
+        onBlockUpdate(blockIndex, { plans: next })
     }
 
     const handleDecrement = () => {
@@ -115,62 +133,66 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                         </div>
                     </div>
 
-                    {/* Billing Cycle section — toggle variant only, after stepper */}
+                    {/* Discount section — toggle variant only, always visible */}
                     {block.variant === 'toggle' && (
                         <>
-                            {/* Discount Percentage checkbox */}
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={discountEnabled}
-                                    onChange={e => onBlockUpdate(blockIndex, { discountPercent: e.target.checked ? 10 : 0 })}
-                                    className="accent-blue-500"
-                                />
-                                <span className="text-[12px] font-medium text-[#94a3b8]">{s.pricingDiscountPercentage}</span>
-                            </label>
-                            {/* Cycle 1 / Cycle 2 — two-column */}
+                            <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingDiscountPercentage}</p>
                             <div className="flex gap-3">
                                 <div className="flex-1 space-y-1.5">
                                     <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingCycle1}</p>
                                     <Input
-                                        defaultValue={block.billingCycle1 ?? 'Monthly'}
+                                        value={localCycle1}
                                         placeholder={s.pricingCycle1Placeholder}
                                         variant="editor"
-                                        onBlur={e => onBlockUpdate(blockIndex, { billingCycle1: e.target.value })}
+                                        onFocus={() => { cycle1FocusRef.current = true }}
+                                        onChange={e => setLocalCycle1(e.target.value)}
+                                        onBlur={e => { cycle1FocusRef.current = false; onBlockUpdate(blockIndex, { billingCycle1: e.target.value }) }}
                                     />
                                 </div>
                                 <div className="flex-1 space-y-1.5">
                                     <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingCycle2}</p>
                                     <Input
-                                        defaultValue={block.billingCycle2 ?? 'Yearly'}
+                                        value={localCycle2}
                                         placeholder={s.pricingCycle2Placeholder}
                                         variant="editor"
-                                        onBlur={e => onBlockUpdate(blockIndex, { billingCycle2: e.target.value })}
+                                        onFocus={() => { cycle2FocusRef.current = true }}
+                                        onChange={e => setLocalCycle2(e.target.value)}
+                                        onBlur={e => { cycle2FocusRef.current = false; onBlockUpdate(blockIndex, { billingCycle2: e.target.value }) }}
                                     />
                                 </div>
                             </div>
-                            {/* Discount % input — only when enabled */}
-                            {discountEnabled && (
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center gap-1">
-                                        <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingDiscountPercent}</p>
-                                        <Info className="w-3 h-3 text-gray-500" />
-                                    </div>
-                                    <div className="relative">
-                                        <Input
-                                            key={discountEnabled ? 'on' : 'off'}
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            defaultValue={block.discountPercent ?? 10}
-                                            variant="editor"
-                                            className="pr-8"
-                                            onBlur={e => onBlockUpdate(blockIndex, { discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
-                                        />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
-                                    </div>
+                            <div className="space-y-1.5">
+                                <div className="flex items-center gap-1">
+                                    <p className="text-[12px] font-medium text-[#94a3b8]">{s.pricingDiscountPercent}</p>
+                                    <Info className="w-3 h-3 text-gray-500" />
                                 </div>
-                            )}
+                                <div className="relative">
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={localDiscount}
+                                        variant="editor"
+                                        className="pr-8"
+                                        onChange={e => {
+                                            setLocalDiscount(e.target.value)
+                                            if (e.target.value === '') return
+                                            const v = Math.min(100, Math.max(0, Number(e.target.value) || 0))
+                                            discountUserValueRef.current = v
+                                            onBlockUpdate(blockIndex, { yearlyDiscount: v })
+                                        }}
+                                        onBlur={e => {
+                                            const v = Math.min(100, Math.max(0, Number(e.target.value) || 0))
+                                            setLocalDiscount(String(v))
+                                            if (v !== (block.yearlyDiscount ?? 0)) {
+                                                discountUserValueRef.current = v
+                                                onBlockUpdate(blockIndex, { yearlyDiscount: v })
+                                            }
+                                        }}
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                                </div>
+                            </div>
                         </>
                     )}
                 </div>
@@ -200,7 +222,7 @@ export default function PricingSettings({ block, blockIndex, onBlockUpdate, page
                 <div className="p-3">
                     {plans[activeTab] && (
                         <PlanFields
-                            key={`${activeTab}-${removeVersion}`}
+                            key={`${activeTab}-${removeVersion}-${plans[activeTab]?.ctaLabel ?? ''}`}
                             plan={plans[activeTab]}
                             onChange={handlePlanFieldChange}
                             variant={block.variant}

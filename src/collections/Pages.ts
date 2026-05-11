@@ -544,7 +544,7 @@ const PricingBlock = {
         },
         { name: 'billingCycle1', type: 'text', defaultValue: 'Monthly' },
         { name: 'billingCycle2', type: 'text', defaultValue: 'Yearly' },
-        { name: 'discountPercent', type: 'number' },
+        { name: 'yearlyDiscount', type: 'number' },
         {
             name: 'featureMatrix',
             type: 'array',

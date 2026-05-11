@@ -9,6 +9,7 @@ import type { PricingPlan } from '@/blocks/pricing/config'
 import { isMatrixVariant } from '@/blocks/pricing/variant-data-mapping'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
+import { decodeHtmlEntities } from '@/lib/utils/rich-text-render'
 
 type FieldBlurEvent = React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
 
@@ -39,6 +40,8 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
     const featureText = (plan.features ?? [])
         .map(f => (typeof f === 'string' ? f : f.text))
         .join('\n')
+
+    const ctaLabelText = decodeHtmlEntities((plan.ctaLabel ?? 'Get Started').replace(/<[^>]*>/g, '')).trim() || 'Get Started'
 
     const handleFeaturesBlur = (e: FieldBlurEvent) => {
         const lines = e.target.value.split('\n').filter(l => l.trim())
@@ -122,7 +125,7 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
                         <div className="space-y-1.5">
                             <FieldLabel>{s.pricingLinkText}</FieldLabel>
                             <Input
-                                defaultValue={plan.ctaLabel ?? 'Get Started'}
+                                defaultValue={ctaLabelText}
                                 placeholder={s.pricingLinkTextPlaceholder}
                                 variant="editor"
                                 onBlur={(e: FieldBlurEvent) => onChange('ctaLabel', e.target.value)}
