@@ -29,11 +29,11 @@ export interface SampleProduct {
     status: 'active'
 }
 
-type ImageFailReason = 'rate_limited' | 'no_results' | 'upload_failed' | 'gallery_failed'
+type ImageFailReason = 'rate_limited' | 'no_results' | 'gallery_failed' | 'upload_failed'
 
 export interface ProductImageStats {
     rateLimited: number  // unsplash_rl in summary log
-    uploadFailed: number // images_failed in summary log
+    uploadFailed: number // images_failed in summary log (Tier-A upload errors + gallery_failed)
     noImage: number      // products_no_image in summary log
 }
 
@@ -122,6 +122,8 @@ function getFallbackProducts(businessInfo: BusinessInfoInput): Array<SampleProdu
         `${businessInfo.industry} ${businessInfo.businessName} ${businessInfo.products}`,
     )
     const pool = SAMPLE_PRODUCTS_BY_CATEGORY[category] ?? SAMPLE_PRODUCTS_BY_CATEGORY['business'] ?? []
+    // businessName-only seed is intentional: curated fallback products are generic
+    // (not user-specific), so same-name collisions are acceptable here.
     const seed = hashString(businessInfo.businessName)
     const shuffled = seededShuffle(pool, seed)
     return shuffled.slice(0, 6).map((t) => ({
@@ -176,6 +178,7 @@ async function fetchProductImage(
 ): Promise<{ imageId: number | undefined; reason?: ImageFailReason }> {
     const filename = `sample-product-${siteKey}-${index}.jpg`
     let wasRateLimited = false
+    let tierAUploadFailed = false
 
     if (!skipSearch) {
         try {
@@ -213,6 +216,7 @@ async function fetchProductImage(
                         // Fall through to Tier C
                     }
                 } catch {
+                    tierAUploadFailed = true
                     // Upload failed — fall through to Tier C
                 }
             }
@@ -244,10 +248,19 @@ async function fetchProductImage(
     const cartonResult = await findOrCreateCartonMedia(payload, tenantId).catch(() => null)
     if (cartonResult) {
         console.warn(`[sample-products] Tier D carton fallback used for "${productName}"`)
-        return { imageId: cartonResult.id, reason: wasRateLimited ? 'rate_limited' : 'no_results' }
+        return { imageId: cartonResult.id, reason: wasRateLimited ? 'rate_limited' : tierAUploadFailed ? 'upload_failed' : 'no_results' }
     }
 
-    return { imageId: undefined, reason: wasRateLimited ? 'rate_limited' : (galleryFallbackUrl ? 'gallery_failed' : 'no_results') }
+    return {
+        imageId: undefined,
+        reason: wasRateLimited
+            ? 'rate_limited'
+            : tierAUploadFailed
+                ? 'upload_failed'
+                : galleryFallbackUrl
+                    ? 'gallery_failed'
+                    : 'no_results',
+    }
 }
 
 /**

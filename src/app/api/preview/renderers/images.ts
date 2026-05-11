@@ -490,10 +490,10 @@ export const IMAGE_LIBRARY: Record<string, IndustryImages> = {
         products: [
             u('photo-1455390582262-044cdead277a', 800, 800), // journal desk
             u('photo-1471107340929-a87cd0f5b5f3', 800, 800), // notebook pen
-            u('photo-1456324504439-367cee3b3c32', 800, 800), // workspace
+            u('photo-1507842217343-583bb7270b66', 800, 800), // bookshelf
             u('photo-1499750310107-5fef28a66643', 800, 800), // laptop coffee
-            u('photo-1434030216411-0b793f4b4173', 800, 800), // writing
-            u('photo-1488190211105-8b0e65b80b4e', 800, 800), // reading
+            u('photo-1486312338219-ce68d2c6f44d', 800, 800), // macbook typing
+            u('photo-1522202176988-66273c2fd55f', 800, 800), // writers
         ],
     },
 

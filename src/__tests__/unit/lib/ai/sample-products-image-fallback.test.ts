@@ -198,4 +198,43 @@ describe('[TC-F05-908] fetchProductImage tier fallback chain', () => {
         expect(products[0]!.imageId).toBe(100)
         expect(mockFindOrCreateCartonMedia).toHaveBeenCalled()
     })
+
+    it('[TC-F05-908-08] Tier A upload throws + Tier D rescues with carton → imageId set, stats.uploadFailed increments', async () => {
+        // Arrange — Tier A finds photo but upload throws; Tier C also fails; Tier D carton succeeds
+        mockSearchPhotos.mockResolvedValue([{
+            urls: { raw: 'https://unsplash.com/photo.jpg' },
+            links: { download_location: 'https://unsplash.com/dl' },
+        }])
+        mockUploadImageUrl.mockRejectedValue(new Error('S3 upload failed')) // Tier A + Tier C throw
+        mockFindOrCreateCartonMedia.mockResolvedValue({ id: 99 })            // Tier D rescues
+
+        // Act
+        const { products, stats } = await generateSampleProducts(businessInfo, 'en', 'tenant-1', mockPayload, 'site-1')
+
+        // Assert — product gets carton imageId; upload failure counted even though product has an image
+        expect(products[0]!.imageId).toBe(99)
+        expect(stats.noImage).toBe(0)          // product has an image (carton)
+        expect(stats.uploadFailed).toBeGreaterThan(0) // but Tier A upload error is counted
+    })
+
+    it('[TC-F05-908-07] Tier A photo found + upload throws + Tier C fails + Tier D fails → reason=upload_failed', async () => {
+        // Arrange — search returns photo but ALL uploads fail; Tier D also unavailable
+        const logSpy = vi.spyOn(console, 'log')
+        mockSearchPhotos.mockResolvedValue([{
+            urls: { raw: 'https://unsplash.com/photo.jpg' },
+            links: { download_location: 'https://unsplash.com/dl' },
+        }])
+        mockUploadImageUrl.mockRejectedValue(new Error('S3 upload failed')) // Tier A + Tier C both throw
+        mockFindOrCreateCartonMedia.mockResolvedValue(null)                  // Tier D unavailable
+
+        // Act
+        const { products, stats } = await generateSampleProducts(businessInfo, 'en', 'tenant-1', mockPayload, 'site-1')
+
+        // Assert — tierAUploadFailed flag wins over gallery_failed in reason precedence
+        expect(products[0]!.imageId).toBeUndefined()
+        expect(stats.uploadFailed).toBeGreaterThan(0)
+        expect(stats.noImage).toBeGreaterThan(0)
+        // Pin the exact reason code — ensures tierAUploadFailed path, not gallery_failed
+        expect(logSpy.mock.calls.some(args => String(args[0]).includes('reason=upload_failed'))).toBe(true)
+    })
 })
