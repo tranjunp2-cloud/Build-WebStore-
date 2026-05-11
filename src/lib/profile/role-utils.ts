@@ -1,5 +1,4 @@
 type UserLike = {
-    roles?: string[]
     tenants?: Array<{ role?: string }>
 }
 

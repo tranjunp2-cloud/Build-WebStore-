@@ -2997,9 +2997,7 @@
       "lastLogin": "Log Masuk Terakhir",
       "ruleMinLength": "Sekurang-kurangnya 8 aksara",
       "ruleUppercase": "Satu huruf besar",
-      "ruleLowercase": "Satu huruf kecil",
-      "ruleNumber": "Satu nombor",
-      "ruleSpecial": "Satu aksara khas"
+      "ruleNumber": "Satu nombor"
     },
     "sso": {
       "notice": "Akaun pemilik diuruskan melalui Single Sign-On. Kemas kini profil dan kata laluan anda di portal SSO.",
