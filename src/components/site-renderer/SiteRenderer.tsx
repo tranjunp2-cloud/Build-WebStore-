@@ -235,12 +235,16 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             }
         })
     }
-    // All slugs of hidden/deleted pages (normalized to /slug).
+    // All slugs + IDs of hidden/deleted pages.
+    // warnSlugs: normalized /slug — used for live-site URL matching.
+    // warnPageIds: page IDs — used for editor preview URLs (/preview/...?pageId=xxx).
     const warnSlugs = new Set<string>()
+    const warnPageIds = new Set<string>()
     for (const p of pages) {
         if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '')) {
             const raw = (p.slug ?? '').trim()
             warnSlugs.add(!raw || raw === '/' ? '/' : (raw.startsWith('/') ? raw : `/${raw}`))
+            warnPageIds.add(String(p.id))
         }
     }
     // For visitors: filter hidden/deleted slugs out of nav. Owners/editors see all links.
@@ -423,7 +427,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     })
 
     return (
-        <HiddenSlugsProvider value={isEditor ? warnSlugs : new Set()}>
+        <HiddenSlugsProvider value={isEditor ? { slugs: warnSlugs, pageIds: warnPageIds } : { slugs: new Set(), pageIds: new Set() }}>
         <OwnerProvider value={!!isOwner}>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`
