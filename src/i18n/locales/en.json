@@ -334,8 +334,7 @@
       "heading": "Password Changed",
       "subheading": "Your account password was updated",
       "greeting": "Hi",
-      "body": "Your PrimeWeb account password has been successfully changed. For your reference, your new password is shown below.",
-      "newPasswordLabel": "New Password",
+      "body": "Your PrimeWeb account password has been successfully changed.",
       "warning": "If you didn't make this change, contact your workspace admin immediately and reset your password.",
       "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
     },

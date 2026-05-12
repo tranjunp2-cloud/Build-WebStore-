@@ -34,7 +34,8 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
 
     function handleRestChange(e: React.ChangeEvent<HTMLInputElement>) {
         const rest = e.target.value.replace(/\D/g, '')
-        onChange(rest ? `${code}${rest}` : '')
+        // Keep country code when user clears the number — schema allows code-only
+        onChange(rest ? `${code}${rest}` : code)
     }
 
     const inputBase = 'bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-[8px] h-[48px] text-[14px] text-white outline-none focus:border-blue-500/50 transition-colors shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'

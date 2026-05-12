@@ -15,15 +15,13 @@ function escapeHtml(str: string): string {
 
 interface PasswordChangedEmailData {
     userName: string
-    newPassword: string
     locale?: EmailLocale
 }
 
 export function passwordChangedEmail(data: PasswordChangedEmailData): { subject: string; html: string } {
-    const { userName, newPassword, locale = 'en' } = data
+    const { userName, locale = 'en' } = data
     const t = (locales[locale] || locales.en).passwordChanged
     const safeUserName = escapeHtml(userName)
-    const safePassword = escapeHtml(newPassword)
 
     return {
         subject: t.subject,
@@ -45,12 +43,6 @@ export function passwordChangedEmail(data: PasswordChangedEmailData): { subject:
             <div style="padding: 32px;">
                 <p style="font-size: 16px; font-weight: 500; color: #1a1a1a; margin: 0 0 16px;">${t.greeting} <strong>${safeUserName}</strong>,</p>
                 <p style="font-size: 14px; color: #555555; line-height: 1.7; margin: 0 0 24px;">${t.body}</p>
-
-                <!-- New password block -->
-                <div style="background: #f3f4f6; border-left: 4px solid #6366f1; padding: 16px 20px; border-radius: 8px; margin-bottom: 24px;">
-                    <p style="margin: 0 0 8px; font-size: 13px; color: #6b7280; font-weight: 500;">${t.newPasswordLabel}</p>
-                    <p style="margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 20px; color: #4f46e5; letter-spacing: 2px; font-weight: 700;">${safePassword}</p>
-                </div>
 
                 <!-- Warning -->
                 <div style="background: #fef3c7; border-radius: 8px; padding: 12px 16px;">

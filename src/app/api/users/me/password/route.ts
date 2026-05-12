@@ -6,6 +6,7 @@ import { passwordChangeSchema } from '@/lib/profile/schemas'
 import { blockOwner, type UserLike } from '@/lib/profile/role-guard'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { passwordChangedEmail } from '@/lib/email/templates'
+import type { PlatformUser } from '@/types/user'
 
 export const runtime = 'nodejs'
 
@@ -59,11 +60,11 @@ export async function POST(req: NextRequest) {
             overrideAccess: true,
         })
 
-        const u = user as unknown as import('@/types/user').PlatformUser
+        const u = user as unknown as PlatformUser
         const userName = [u.firstName, u.lastName].filter(Boolean).join(' ') || user.email
         const locale = u.prefer_lang ?? 'en'
 
-        const { subject, html } = passwordChangedEmail({ userName, newPassword, locale })
+        const { subject, html } = passwordChangedEmail({ userName, locale })
         payload.sendEmail({ to: user.email, subject, html })
             .catch((err: unknown) => payload.logger.error({ err }, '[users/me/password] notify email failed'))
 

@@ -167,12 +167,12 @@ describe('POST /api/users/me/password', () => {
         const body = await res.json()
         expect(body).toHaveProperty('success', true)
 
-        // Verify notification email was fired (fire-and-forget)
+        // Verify notification email was fired (fire-and-forget) — no password in body
         expect(mockPayload.sendEmail).toHaveBeenCalledWith(
             expect.objectContaining({
                 to: 'staff@test.com',
                 subject: expect.stringContaining('password'),
-                html: expect.stringContaining(newPassword),
+                html: expect.not.stringContaining(newPassword),
             }),
         )
     })
