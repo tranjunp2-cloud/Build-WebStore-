@@ -41,10 +41,13 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
 
     return (
         <div className="flex flex-wrap gap-4">
-            {buttons.map((btn, i) => (
+            {buttons.map((btn, i) => {
+                const isExternal = !!btn?.url && (btn.url.startsWith('http://') || btn.url.startsWith('https://'))
+                return (
                 <BrokenLinkWarning key={i} url={btn?.url} rounded="rounded-xl">
                 <motion.a
                     href={btn?.url}
+                    {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     onClick={() => {
                         if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' }, isOwner })
                     }}
@@ -81,7 +84,8 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
                     <RichText text={btn.label} as="span" />
                 </motion.a>
                 </BrokenLinkWarning>
-            ))}
+                )
+            })}
         </div>
     )
 }

@@ -21,9 +21,9 @@ export function BrokenLinkWarning({ url, children, rounded = 'rounded-lg' }: Pro
     if (!isHidden) return <>{children}</>
 
     return (
-        <span className="relative inline-flex">
+        <span className={`blw relative inline-flex w-fit ${rounded} ring-2 ring-red-500`}>
             <span
-                className={`pointer-events-none absolute inset-0 ${rounded} ring-2 ring-red-500`}
+                className="pointer-events-none absolute inset-0 rounded-[inherit]"
                 aria-hidden="true"
             />
             <span

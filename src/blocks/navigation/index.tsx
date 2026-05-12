@@ -239,10 +239,12 @@ function NavCTAButton({
     onClick,
 }: NavCTAButtonProps) {
     const cls = `${className} rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
+    const isExternal = href.startsWith('http://') || href.startsWith('https://')
     return (
         <BrokenLinkWarning url={href}>
             <motion.a
                 href={href}
+                {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 whileHover={{ scale: 1.04, y: -1 }}
                 whileTap={{ scale: 0.97 }}
                 className={cls}
@@ -686,11 +688,13 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                             <DropdownLink key={i} link={link} i={i} />
                         ))}
                         {ctaButton?.show && (
-                            <NavCTAButton
-                                href={ctaButton.url || '#'}
-                                label={ctaButton.label}
-                                className="ml-2 inline-flex px-5 py-2.5"
-                            />
+                            <span className="ml-2">
+                                <NavCTAButton
+                                    href={ctaButton.url || '#'}
+                                    label={ctaButton.label}
+                                    className="inline-flex px-5 py-2.5"
+                                />
+                            </span>
                         )}
                     </div>
                 </div>
