@@ -7,7 +7,6 @@ import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, EyeOff } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
-import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
@@ -240,18 +239,16 @@ function NavCTAButton({
 }: NavCTAButtonProps) {
     const cls = `${className} rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
     return (
-        <BrokenLinkWarning url={href}>
-            <motion.a
-                href={href}
-                whileHover={{ scale: 1.04, y: -1 }}
-                whileTap={{ scale: 0.97 }}
-                className={cls}
-                style={CTA_GRADIENT_STYLE}
-                onClick={onClick}
-            >
-                {label}
-            </motion.a>
-        </BrokenLinkWarning>
+        <motion.a
+            href={href}
+            whileHover={{ scale: 1.04, y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            className={cls}
+            style={CTA_GRADIENT_STYLE}
+            onClick={onClick}
+        >
+            {label}
+        </motion.a>
     )
 }
 

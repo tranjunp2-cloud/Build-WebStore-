@@ -7,7 +7,6 @@ import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
-import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 
 // Token shortcut: hero containers consume CONTAINER.default + INNER_PADDING.
 export const HERO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -42,45 +41,44 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
     return (
         <div className="flex flex-wrap gap-4">
             {buttons.map((btn, i) => (
-                <BrokenLinkWarning key={i} url={btn?.url}>
-                    <motion.a
-                        href={btn?.url}
-                        onClick={() => {
-                            if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' }, isOwner })
-                        }}
-                        whileHover={{ scale: 1.03, y: -2 }}
-                        whileTap={{ scale: 0.98 }}
-                        className={`px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300 ${TOUCH_TARGET.min} inline-flex items-center justify-center`}
-                        style={btn.style === 'outline'
-                            ? variant === 'glass'
-                                ? {
-                                    border: '2px solid rgba(255,255,255,0.3)',
-                                    color: '#fff',
-                                    background: 'rgba(255,255,255,0.05)',
-                                    backdropFilter: 'blur(8px)',
-                                }
-                                : {
-                                    border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`,
-                                    color: 'var(--brand-primary)',
-                                    background: `rgba(var(--brand-primary-rgb), 0.031)`,
-                                }
-                            : variant === 'glass'
-                                ? {
-                                    background: 'rgba(255,255,255,0.15)',
-                                    backdropFilter: 'blur(12px)',
-                                    color: '#fff',
-                                    border: '1px solid rgba(255,255,255,0.2)',
-                                    boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
-                                }
-                                : {
-                                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                    color: '#fff',
-                                    boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)`,
-                                }}
-                    >
-                        <RichText text={btn.label} as="span" />
-                    </motion.a>
-                </BrokenLinkWarning>
+                <motion.a
+                    key={i}
+                    href={btn?.url}
+                    onClick={() => {
+                        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' }, isOwner })
+                    }}
+                    whileHover={{ scale: 1.03, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300 ${TOUCH_TARGET.min} inline-flex items-center justify-center`}
+                    style={btn.style === 'outline'
+                        ? variant === 'glass'
+                            ? {
+                                border: '2px solid rgba(255,255,255,0.3)',
+                                color: '#fff',
+                                background: 'rgba(255,255,255,0.05)',
+                                backdropFilter: 'blur(8px)',
+                            }
+                            : {
+                                border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`,
+                                color: 'var(--brand-primary)',
+                                background: `rgba(var(--brand-primary-rgb), 0.031)`,
+                            }
+                        : variant === 'glass'
+                            ? {
+                                background: 'rgba(255,255,255,0.15)',
+                                backdropFilter: 'blur(12px)',
+                                color: '#fff',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+                            }
+                            : {
+                                background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
+                                color: '#fff',
+                                boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)`,
+                            }}
+                >
+                    <RichText text={btn.label} as="span" />
+                </motion.a>
             ))}
         </div>
     )
