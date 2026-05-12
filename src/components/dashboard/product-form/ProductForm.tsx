@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ProductFormValues, getProductFormSchema } from './schema'
+import { isNonEmptyTier } from './variant-utils'
 import Link from 'next/link'
 import { ChevronLeft, Save, Trash2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -93,9 +94,14 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
 
     const onSubmit = async (data: ProductFormValues) => {
         setIsSaving(true)
+        // Strip fully-empty optional tiers before sending to API
+        const payload = {
+            ...data,
+            tiers: (data.tiers || []).filter(isNonEmptyTier),
+        }
         try {
             if (onSubmitForm) {
-                await onSubmitForm(data);
+                await onSubmitForm(payload);
             } else {
                 console.log('Form data:', data)
                 toast.success(t.dashboard.products.form.draftSaved)
