@@ -53,7 +53,11 @@ function checkHiddenPageUrl(url: string | undefined, pages?: PageData[]): 'hidde
     const trimmed = url.trim()
     if (!trimmed || trimmed === '#' || trimmed.startsWith('http')) return false
     const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
-    const match = pages.find(p => (p.slug ?? '').replace(/^\/?/, '/') === normalized)
+    const match = pages.find(p => {
+        const s = (p.slug ?? '').trim()
+        const pagePath = ((p as { isHomepage?: boolean }).isHomepage || !s || s === '/' || s === 'home') ? '/' : (s.startsWith('/') ? s : `/${s}`)
+        return pagePath === normalized
+    })
     if (!match) return 'not-found'
     if (match.deletedAt != null && match.deletedAt !== '') return 'deleted'
     if (match.isVisible === false) return 'hidden'
