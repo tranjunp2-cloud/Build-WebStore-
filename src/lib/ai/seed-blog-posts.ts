@@ -3,10 +3,81 @@ import { getBlogSeeds } from './content/blog-seeds'
 import { generateBlogSeedsAI, generateBlogPostContent, isQuotaExhausted, type BlogSeedAI } from './generate-blog-seeds'
 import { uploadImageUrl } from './upload-media'
 import { getBlogThumbnails } from '@/lib/images/blog-thumbnail-images'
-import { searchPhotos, buildImgixUrl, trackDownload, type UnsplashPhoto } from './unsplash-client'
+import { searchPhotos, buildImgixUrl, trackDownload, UnsplashError } from './unsplash-client'
+import { findOrCreateCartonMedia } from '@/lib/media/carton-placeholder'
 import type { BlogPost } from './content/types'
 
 type AnyBlogSeed = BlogSeedAI | BlogPost
+
+async function isValidMedia(id: number, payload: BasePayload): Promise<boolean> {
+    const m = await payload.findByID({ collection: 'media', id, depth: 0 }).catch(() => null)
+    return (
+        m != null &&
+        typeof m.filename === 'string' && m.filename.length > 0 &&
+        typeof m.mimeType === 'string' && m.mimeType.length > 0 &&
+        typeof m.filesize === 'number' && m.filesize > 0
+    )
+}
+
+async function fetchBlogThumbnail(
+    seed: AnyBlogSeed,
+    i: number,
+    blogThumbnails: string[],
+    tenantId: number | string,
+    category: string,
+    searchRateLimited: boolean,
+    payload: BasePayload,
+): Promise<{ thumbnailId: number | undefined; wasRateLimited: boolean }> {
+    const filename = `blog-${tenantId}-${seed.slug}.jpg`
+    const keyword =
+        ('imageKeyword' in seed && seed.imageKeyword) ||
+        ('category' in seed && seed.category) ||
+        category
+    let wasRateLimited = false
+
+    // Tier A: Unsplash search
+    if (!searchRateLimited) {
+        try {
+            const photos = await searchPhotos(keyword, 1, { orientation: 'landscape' })
+            if (photos.length > 0) {
+                const photo = photos[0]!
+                const url = buildImgixUrl(photo.urls.raw, { w: 1200, h: 630, fit: 'crop' })
+                trackDownload(photo.links.download_location)
+                const id = await uploadImageUrl(url, filename, seed.title, tenantId, payload)
+                if (id !== undefined && await isValidMedia(id, payload)) return { thumbnailId: id, wasRateLimited }
+                console.warn(`[seed-blog-posts] Tier A orphan for "${seed.slug}", falling to Tier B`)
+            }
+        } catch (err) {
+            if (err instanceof UnsplashError && err.code === 'RATE_LIMITED') {
+                wasRateLimited = true
+                console.warn(`[seed-blog-posts] Unsplash rate-limited for "${seed.slug}", using curated URL`)
+            } else {
+                console.warn(`[seed-blog-posts] Tier A failed for "${seed.slug}":`, (err as Error).message)
+            }
+        }
+    }
+
+    // Tier B: curated CDN URL (stable, bypasses search API)
+    try {
+        const fallbackUrl = blogThumbnails[i % blogThumbnails.length]!
+        const id = await uploadImageUrl(fallbackUrl, filename, seed.title, tenantId, payload)
+        if (id !== undefined && await isValidMedia(id, payload)) return { thumbnailId: id, wasRateLimited }
+        console.warn(`[seed-blog-posts] Tier B orphan for "${seed.slug}", falling to Tier C`)
+    } catch (err) {
+        console.warn(`[seed-blog-posts] Tier B failed for "${seed.slug}":`, (err as Error).message)
+    }
+
+    // Tier C: carton placeholder — local file, zero external dependency
+    const carton = await findOrCreateCartonMedia(payload, tenantId).catch(() => null)
+    if (carton) {
+        console.warn(`[seed-blog-posts] Tier C carton used for "${seed.slug}"`)
+        return { thumbnailId: carton.id, wasRateLimited }
+    }
+
+    console.warn(`[seed-blog-posts] all tiers failed for "${seed.slug}"`)
+    return { thumbnailId: undefined, wasRateLimited }
+}
+
 function disambiguateSlugs(seeds: AnyBlogSeed[]): AnyBlogSeed[] {
     const counts = new Map<string, number>()
     return seeds.map((seed) => {
@@ -72,78 +143,61 @@ export async function seedBlogPosts(
         // Per-category landscape fallbacks (1200×630) — one distinct image per seed index.
         const blogThumbnails = getBlogThumbnails(category)
 
-        // Run all 3 posts in parallel: cuts wall time from ~90s serial to ~30s (M3)
-        const results = await Promise.allSettled(
-            seeds.map(async (seed, i) => {
-                let thumbnailId: number | undefined
-                try {
-                    let imageUrl: string
-                    const keyword =
-                        ('imageKeyword' in seed && seed.imageKeyword) ||
-                        ('category' in seed && seed.category) ||
-                        category
-                    const photos: UnsplashPhoto[] = await searchPhotos(keyword, 1, { orientation: 'landscape' }).catch(() => [])
-                    if (photos.length > 0) {
-                        const photo = photos[0]!
-                        imageUrl = buildImgixUrl(photo.urls.raw, { w: 1200, h: 630, fit: 'crop' })
-                        trackDownload(photo.links.download_location)
-                    } else {
-                        // Tier B: per-category curated landscape fallback, distinct per seed index
-                        imageUrl = blogThumbnails[i % blogThumbnails.length]
-                    }
-                    const filename = `blog-${tenantId}-${seed.slug}.jpg`
-                    thumbnailId = await uploadImageUrl(imageUrl, filename, seed.title, tenantId, payload)
-                } catch (err) {
-                    console.warn(`[seed-blog-posts] thumbnail "${seed.slug}" failed (non-fatal):`, (err as Error).message)
-                }
+        let count = 0
+        let searchRateLimited = false
 
-                let richContent: string | undefined
-                try {
-                    richContent = await generateBlogPostContent(seed.title, businessName, industry ?? category)
-                } catch {
-                    // non-fatal: falls back to excerpt below
-                }
+        for (let i = 0; i < seeds.length; i++) {
+            const seed = seeds[i]!
+            if (i > 0) await new Promise(r => setTimeout(r, 500))
 
-                // Guard against re-seed slug collision (tenant deleted all posts and regenerated)
-                let finalSlug = `${tenantId}-${seed.slug}`
-                try {
-                    const slugCheck = await payload.find({
-                        collection: 'blogs',
-                        where: { slug: { equals: finalSlug } },
-                        limit: 1,
-                    })
-                    if (slugCheck.totalDocs > 0) {
-                        finalSlug = `${finalSlug}-${Math.random().toString(36).slice(2, 5)}`
-                    }
-                } catch {
-                    // proceed with original slug; create will surface the error
-                }
+            const { thumbnailId, wasRateLimited } = await fetchBlogThumbnail(
+                seed, i, blogThumbnails, tenantId, category, searchRateLimited, payload,
+            )
+            if (wasRateLimited) searchRateLimited = true
 
-                try {
-                    await payload.create({
-                        collection: 'blogs',
-                        data: {
-                            tenant: tenantId,
-                            site: siteId,
-                            title: seed.title,
-                            slug: finalSlug,
-                            content: richContent ?? `<p>${seed.excerpt}</p>`,
-                            status: 'published',
-                            publishedAt: new Date().toISOString(),
-                            author: userId,
-                            ...(thumbnailId !== undefined ? { thumbnail: thumbnailId } : {}),
-                        },
-                        context: { skipPublishNotify: true },
-                    })
-                    return 1
-                } catch (err) {
-                    console.warn(`[seed-blog-posts] post "${seed.slug}" failed (non-fatal):`, (err as Error).message)
-                    return 0
-                }
-            })
-        )
+            console.log(`[seed-blog-posts] blog ${i + 1}/${seeds.length} "${seed.slug}" → thumbnailId=${thumbnailId ?? 'none'}`)
 
-        return results.reduce<number>((acc, r) => acc + (r.status === 'fulfilled' ? r.value : 0), 0)
+            let richContent: string | undefined
+            try {
+                richContent = await generateBlogPostContent(seed.title, businessName, industry ?? category)
+            } catch {
+                // non-fatal
+            }
+
+            // Guard against re-seed slug collision (tenant deleted all posts and regenerated)
+            let finalSlug = `${tenantId}-${seed.slug}`
+            try {
+                const slugCheck = await payload.find({
+                    collection: 'blogs',
+                    where: { slug: { equals: finalSlug } },
+                    limit: 1,
+                })
+                if (slugCheck.totalDocs > 0) finalSlug = `${finalSlug}-${Math.random().toString(36).slice(2, 8)}`
+            } catch { /* proceed with original slug */ }
+
+            try {
+                await payload.create({
+                    collection: 'blogs',
+                    data: {
+                        tenant: tenantId,
+                        site: siteId,
+                        title: seed.title,
+                        slug: finalSlug,
+                        content: richContent ?? `<p>${seed.excerpt}</p>`,
+                        status: 'published',
+                        publishedAt: new Date().toISOString(),
+                        author: userId,
+                        ...(thumbnailId !== undefined ? { thumbnail: thumbnailId } : {}),
+                    },
+                    context: { skipPublishNotify: true },
+                })
+                count++
+            } catch (err) {
+                console.warn(`[seed-blog-posts] post "${seed.slug}" failed (non-fatal):`, (err as Error).message)
+            }
+        }
+
+        return count
     } catch (err) {
         console.warn('[seed-blog-posts] skipped (non-fatal):', (err as Error).message)
         return 0

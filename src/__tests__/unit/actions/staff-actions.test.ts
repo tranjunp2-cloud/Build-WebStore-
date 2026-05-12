@@ -120,6 +120,14 @@ describe('normalizeTenants [TC-F19.28]', () => {
         const result = normalizeTenants(withNullPerms)
         expect(result[0].permissions).toEqual(['products'])
     })
+
+    it('deduplicates repeated permission values accumulated by missing FK cascade (GH-905)', () => {
+        const withDupes: TenantMembership[] = [
+            { tenant: '1', role: 'custom', status: 'active', permissions: ['blog', 'blog', 'blog', 'settings', 'settings', 'settings'] },
+        ]
+        const result = normalizeTenants(withDupes)
+        expect(result[0].permissions).toEqual(['blog', 'settings'])
+    })
 })
 
 describe('cross-tenant owner check [TC-F19.29]', () => {

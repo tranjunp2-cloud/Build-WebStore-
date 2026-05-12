@@ -40,15 +40,33 @@ vi.mock('@/lib/images/blog-thumbnail-images', () => ({
     ] as [string, string, string]),
 }))
 
-vi.mock('@/lib/ai/unsplash-client', () => ({
-    searchPhotos: vi.fn().mockResolvedValue([
-        {
-            urls: { raw: 'https://images.unsplash.com/photo-raw' },
-            links: { download_location: 'https://api.unsplash.com/photos/abc/download' },
-        } satisfies Partial<UnsplashPhoto>,
-    ]),
-    buildImgixUrl: vi.fn((_url: string) => 'https://images.unsplash.com/photo-raw?w=1200&h=630'),
-    trackDownload: vi.fn(),
+vi.mock('@/lib/ai/unsplash-client', () => {
+    class UnsplashError extends Error {
+        constructor(
+            public readonly code: string,
+            public readonly status: number,
+            public readonly retryable: boolean,
+            message?: string,
+        ) {
+            super(message ?? `[Unsplash] ${code}`)
+            this.name = 'UnsplashError'
+        }
+    }
+    return {
+        searchPhotos: vi.fn().mockResolvedValue([
+            {
+                urls: { raw: 'https://images.unsplash.com/photo-raw' },
+                links: { download_location: 'https://api.unsplash.com/photos/abc/download' },
+            } satisfies Partial<UnsplashPhoto>,
+        ]),
+        buildImgixUrl: vi.fn((_url: string) => 'https://images.unsplash.com/photo-raw?w=1200&h=630'),
+        trackDownload: vi.fn(),
+        UnsplashError,
+    }
+})
+
+vi.mock('@/lib/media/carton-placeholder', () => ({
+    findOrCreateCartonMedia: vi.fn().mockResolvedValue({ id: 777 }),
 }))
 
 // Lazy imports resolved after vi.mock hoisting
@@ -60,11 +78,17 @@ const getSearchPhotos = async () => (await import('@/lib/ai/unsplash-client')).s
 const getBuildImgixUrl = async () => (await import('@/lib/ai/unsplash-client')).buildImgixUrl
 const getGalleryImagesMock = async () => (await import('@/lib/images/industry-images')).getGalleryImages
 const getBlogThumbnailsMock = async () => (await import('@/lib/images/blog-thumbnail-images')).getBlogThumbnails
+const getFindOrCreateCartonMedia = async () => (await import('@/lib/media/carton-placeholder')).findOrCreateCartonMedia
+
+// Valid media stub returned by default for payload.findByID (used by isValidMedia)
+const validMediaStub = { filename: 'test.jpg', mimeType: 'image/jpeg', filesize: 1000 }
+const orphanMediaStub = { filename: '', mimeType: '', filesize: 0 }
 
 const makePayload = (countDocs = 0) => ({
     count: vi.fn().mockResolvedValue({ totalDocs: countDocs }),
     find: vi.fn().mockResolvedValue({ docs: [], totalDocs: 0 }),
     create: vi.fn().mockResolvedValue({ id: 1 }),
+    findByID: vi.fn().mockResolvedValue(validMediaStub),
 }) as unknown as BasePayload
 
 // vi.clearAllMocks clears call history but NOT mockResolvedValueOnce queues.
@@ -164,24 +188,24 @@ describe('TC-F08-BS.06 — thumbnail attached when upload succeeds', () => {
     })
 })
 
-describe('TC-F08-BS.07 — thumbnail upload failure is non-fatal', () => {
-    it('post without thumbnail is still created; sibling posts continue with thumbnails', async () => {
+describe('TC-F08-BS.07 — Tier A upload failure falls through to Tier B', () => {
+    it('Tier A rejection cascades to Tier B; all 3 posts still get thumbnails', async () => {
         const uploadImageUrl = await getUploadImageUrl()
         vi.mocked(uploadImageUrl)
-            .mockRejectedValueOnce(new Error('network error'))
+            .mockRejectedValueOnce(new Error('network error')) // one Tier A fails
             .mockResolvedValueOnce(202)
             .mockResolvedValueOnce(203)
+            // rejected post gets Tier B (default mock = 99)
 
         const payload = makePayload(0)
         const result = await seedBlogPosts(payload, 7, 20, 'restaurant', 'FoodBiz', 4)
 
         expect(result).toBe(3)
-        const calls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
-        // post 0: upload failed → no thumbnail field
-        expect(calls[0][0].data.thumbnail).toBeUndefined()
-        // post 1+2: upload succeeded → thumbnail present
-        expect(calls[1][0].data.thumbnail).toBe(202)
-        expect(calls[2][0].data.thumbnail).toBe(203)
+        // Parallel execution means create-call order ≠ seed order; sort for deterministic check
+        const thumbnails = (payload.create as ReturnType<typeof vi.fn>).mock.calls
+            .map(([arg]) => arg.data.thumbnail as number)
+            .sort((a, b) => a - b)
+        expect(thumbnails).toEqual([99, 202, 203])
     })
 })
 
@@ -227,10 +251,12 @@ describe('TC-F08-BS.08 — Tier A: searchPhotos called with AI imageKeyword; gal
     })
 })
 
-describe('TC-F08-BS.08b — no thumbnail field when uploadImageUrl returns undefined', () => {
-    it('omits thumbnail key entirely when uploadImageUrl resolves undefined', async () => {
+describe('TC-F08-BS.08b — all tiers fail: uploadImageUrl undefined + carton null → no thumbnail', () => {
+    it('omits thumbnail key entirely when upload always returns undefined and carton also fails', async () => {
         const uploadImageUrl = await getUploadImageUrl()
         vi.mocked(uploadImageUrl).mockResolvedValue(undefined)
+        const findOrCreateCartonMedia = await getFindOrCreateCartonMedia()
+        vi.mocked(findOrCreateCartonMedia).mockResolvedValue(null)
 
         const payload = makePayload(0)
         await seedBlogPosts(payload, 3, 6, 'beauty', 'NullBiz', 2)
@@ -467,13 +493,65 @@ describe('TC-F08-BS.20 — Tier B: getBlogThumbnails called with category; indic
     })
 })
 
-describe('TC-F08-BS.21 — Tier B: uploadImageUrl rejects → post created without thumbnail (graceful)', () => {
-    it('creates all 3 posts even when Tier B upload fails; thumbnail key omitted', async () => {
+describe('TC-F08-BS.22 — orphan media: Tier A+B upload IDs invalid (filesize=0) → Tier C carton', () => {
+    it('falls to Tier C carton when both Tier A and Tier B uploads produce orphan media rows', async () => {
+        // Must explicitly set searchPhotos to return a photo so Tier A is actually attempted
+        // (prior tests may have set it to []  — clearAllMocks resets call counts but not implementations)
+        const searchPhotos = await getSearchPhotos()
+        vi.mocked(searchPhotos).mockResolvedValue([{
+            urls: { raw: 'https://images.unsplash.com/photo-raw' },
+            links: { download_location: 'https://api.unsplash.com/photos/abc/download' },
+        } as UnsplashPhoto])
+
+        const findOrCreateCartonMedia = await getFindOrCreateCartonMedia()
+        vi.mocked(findOrCreateCartonMedia).mockResolvedValue({ id: 888 } as never)
+
+        const payload = makePayload(0)
+        // All findByID calls return orphan (filesize=0) — uploadImageUrl returns IDs but S3 row is invalid
+        ;(payload.findByID as ReturnType<typeof vi.fn>).mockResolvedValue(orphanMediaStub)
+
+        const result = await seedBlogPosts(payload, 5, 10, 'restaurant', 'Biz', 3)
+
+        expect(result).toBe(3)
+        const createCalls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
+        for (const [arg] of createCalls) {
+            expect(arg.data.thumbnail).toBe(888)
+        }
+    })
+})
+
+describe('TC-F08-BS.23 — Unsplash 429 on seed 1 → searchRateLimited set, seeds 2+3 skip Tier A', () => {
+    it('calls searchPhotos once when first seed hits RATE_LIMITED; remaining seeds use Tier B directly', async () => {
+        const UnsplashErrorClass = (await import('@/lib/ai/unsplash-client')).UnsplashError
         const searchPhotos = await getSearchPhotos()
         const uploadImageUrl = await getUploadImageUrl()
 
+        vi.mocked(searchPhotos).mockRejectedValue(new UnsplashErrorClass('RATE_LIMITED', 429, false))
+        vi.mocked(uploadImageUrl).mockResolvedValue(555)
+
+        const payload = makePayload(0)
+        const result = await seedBlogPosts(payload, 5, 10, 'beauty', 'Biz', 3)
+
+        expect(result).toBe(3)
+        // searchPhotos called only for seed 0; seeds 1+2 skip Tier A due to searchRateLimited flag
+        expect(searchPhotos).toHaveBeenCalledTimes(1)
+        // All posts get thumbnails from Tier B (upload 555)
+        const createCalls = (payload.create as ReturnType<typeof vi.fn>).mock.calls
+        for (const [arg] of createCalls) {
+            expect(arg.data.thumbnail).toBe(555)
+        }
+    })
+})
+
+describe('TC-F08-BS.21 — all tiers fail: Tier A/B uploads reject + carton null → no thumbnail', () => {
+    it('creates all 3 posts without thumbnail when all upload tiers and carton fail', async () => {
+        const searchPhotos = await getSearchPhotos()
+        const uploadImageUrl = await getUploadImageUrl()
+        const findOrCreateCartonMedia = await getFindOrCreateCartonMedia()
+
         vi.mocked(searchPhotos).mockResolvedValue([])
         vi.mocked(uploadImageUrl).mockRejectedValue(new Error('S3 down'))
+        vi.mocked(findOrCreateCartonMedia).mockResolvedValue(null)
 
         const payload = makePayload(0)
         const result = await seedBlogPosts(payload, 1, 2, 'unknowncategory', 'Biz', 3)

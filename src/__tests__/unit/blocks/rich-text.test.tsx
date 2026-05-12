@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { RichText } from '@/blocks/shared/RichText'
+import { decodeHtmlEntities } from '@/lib/utils/rich-text-render'
 
 describe('[TC-F05-richtext] RichText component', () => {
     it('TC-F05-rt-01: renders plain text without wrapper when as=span', () => {
@@ -73,5 +74,41 @@ describe('[TC-F05-richtext] RichText component', () => {
         const b = container.querySelector('b')
         expect(b).not.toBeNull()
         expect(b!.getAttribute('onclick')).toBeNull()
+    })
+})
+
+describe('[TC-F05-rte] decodeHtmlEntities', () => {
+    it('TC-F05-rte-01: string without & returns unchanged (fast path)', () => {
+        expect(decodeHtmlEntities('Hello world')).toBe('Hello world')
+        expect(decodeHtmlEntities('')).toBe('')
+    })
+
+    it('TC-F05-rte-02: decodes basic entities individually', () => {
+        expect(decodeHtmlEntities('&lt;')).toBe('<')
+        expect(decodeHtmlEntities('&gt;')).toBe('>')
+        expect(decodeHtmlEntities('&quot;')).toBe('"')
+        expect(decodeHtmlEntities('&#39;')).toBe("'")
+        expect(decodeHtmlEntities('&amp;')).toBe('&')
+    })
+
+    it('TC-F05-rte-03: &nbsp; decodes to NBSP (\\u00a0), not ASCII space', () => {
+        const result = decodeHtmlEntities('&nbsp;')
+        expect(result).toBe('\u00a0')
+        expect(result.charCodeAt(0)).toBe(160)
+    })
+
+    it('TC-F05-rte-04: &amp;lt; → &lt; — &amp; is decoded last, not double-decoded', () => {
+        // Old buggy order would yield '<'; correct order yields '&lt;'
+        expect(decodeHtmlEntities('&amp;lt;')).toBe('&lt;')
+        // Standalone &lt; still decodes normally
+        expect(decodeHtmlEntities('&lt;b&gt;')).toBe('<b>')
+    })
+
+    it('TC-F05-rte-05: &amp;amp; → &amp; (single decode)', () => {
+        expect(decodeHtmlEntities('&amp;amp;')).toBe('&amp;')
+    })
+
+    it('TC-F05-rte-06: mixed string with multiple entities', () => {
+        expect(decodeHtmlEntities('Price &amp; Quality &lt;100&gt;')).toBe('Price & Quality <100>')
     })
 })

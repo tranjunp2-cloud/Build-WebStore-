@@ -280,7 +280,7 @@ export const Users: CollectionConfig = {
                                 email,
                                 firstName: name,
                                 password: tempPassword,
-                                roles: ['tenant-owner'], // Default platform role
+                                roles: role === 'owner' ? ['tenant-owner'] : [],
                                 tenants: [
                                     { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : [] }
                                 ]
@@ -385,11 +385,25 @@ export const Users: CollectionConfig = {
                 const normalizedTenants = normalizeTenants(targetUser.tenants || [])
                 normalizedTenants.splice(targetTenantIndex, 1)
 
+                const removeData: Record<string, unknown> = { tenants: normalizedTenants }
+
+                // Strip 'tenant-owner' platform role if removed user was an owner and has no owner tenancy elsewhere.
+                // Note: the last-active-owner guard above (line ~365) is status-gated (active only), but this sync
+                // is intentionally not status-gated — it checks all remaining tenancies regardless of status so
+                // that inactive owners don't retain the platform role after removal.
+                if (targetTenantRole === 'owner') {
+                    const stillOwnerAnywhere = normalizedTenants.some(t => t.role === 'owner')
+                    if (!stillOwnerAnywhere) {
+                        const currentRoles: string[] = (targetUser.roles as string[]) || []
+                        removeData.roles = currentRoles.filter(r => r !== 'tenant-owner')
+                    }
+                }
+
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
                     overrideAccess: true,
-                    data: { tenants: normalizedTenants }
+                    data: removeData
                 })
 
                 return Response.json({ message: 'User removed from workspace successfully' })
@@ -459,14 +473,32 @@ export const Users: CollectionConfig = {
                 normalizedTenants[targetTenantIndex].role = role
                 normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : []
 
+                // Sync platform roles when owner status changes.
+                // 'tenant-owner' gates login redirect (login/page.tsx) and password reset flow (check-reset-flow).
+                // Demotion safety: normalizedTenants[targetTenantIndex].role is already set to the new role above,
+                // so stillOwnerAnywhere reflects post-update state. This is safe because the last-active-owner guard
+                // above (line ~443) guarantees at least one other owner exists before we reach this block.
+                const wasOwner = targetTenantRole === 'owner'
+                const becomesOwner = role === 'owner'
+                const currentRoles: string[] = (targetUser.roles as string[]) || []
+                let updatedRoles: string[] | undefined
+                if (becomesOwner && !currentRoles.includes('tenant-owner')) {
+                    updatedRoles = [...currentRoles, 'tenant-owner']
+                } else if (wasOwner && !becomesOwner) {
+                    const stillOwnerAnywhere = normalizedTenants.some(t => t.role === 'owner')
+                    if (!stillOwnerAnywhere) {
+                        updatedRoles = currentRoles.filter(r => r !== 'tenant-owner')
+                    }
+                }
+
+                const updateData: Record<string, unknown> = { firstName: name, tenants: normalizedTenants }
+                if (updatedRoles !== undefined) updateData.roles = updatedRoles
+
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
                     overrideAccess: true,
-                    data: {
-                        firstName: name,
-                        tenants: normalizedTenants
-                    }
+                    data: updateData
                 })
 
                 return Response.json({ message: 'User updated successfully' })

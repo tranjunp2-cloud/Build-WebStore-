@@ -3785,6 +3785,23 @@ const MIGRATIONS = [
   // Rename billing_cycle_1/2 → billing_cycle1/2 to match Payload Drizzle naming (no underscore before digit)
   { name: 'pages_blocks_pricing.rename_billing_cycle_cols', sql: `ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1; ALTER TABLE "pages_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;` },
   { name: '_pages_v_blocks_pricing.rename_billing_cycle_cols', sql: `ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_1 TO billing_cycle1; ALTER TABLE "_pages_v_blocks_pricing" RENAME COLUMN billing_cycle_2 TO billing_cycle2;` },
+  // GH-891: yearlyDiscount field was missing from Payload PricingBlock.fields — add column so saves persist
+  { name: 'pages_blocks_pricing.add_yearly_discount', sql: `ALTER TABLE "pages_blocks_pricing" ADD COLUMN IF NOT EXISTS yearly_discount numeric;` },
+  { name: '_pages_v_blocks_pricing.add_yearly_discount', sql: `ALTER TABLE "_pages_v_blocks_pricing" ADD COLUMN IF NOT EXISTS yearly_discount numeric;` },
+  // GH-905 — users_tenants_permissions data integrity
+  // 1. Remove rows whose parent_id no longer exists in users_tenants (orphaned by old update paths
+  //    that re-created array items without id, causing users_tenants_permissions rows to be left behind).
+  { name: 'users_tenants_permissions.cleanup_orphans', sql: `DELETE FROM users_tenants_permissions WHERE parent_id NOT IN (SELECT id FROM users_tenants);` },
+  // 2. Deduplicate: keep one row per (parent_id, value). Old code accumulated duplicates because
+  //    Payload's hasMany update inserts new rows without deleting old ones when updating by id.
+  { name: 'users_tenants_permissions.dedup_values', sql: `DELETE FROM users_tenants_permissions WHERE id NOT IN (SELECT MIN(id) FROM users_tenants_permissions GROUP BY parent_id, value);` },
+  // 3. Add FK → users_tenants so future deletes cascade and orphaned rows can't accumulate.
+  //    DO block makes this idempotent (safe to run on DBs that already have the constraint).
+  { name: 'users_tenants_permissions.add_fk_parent', sql: `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_tenants_permissions_parent_fk') THEN ALTER TABLE users_tenants_permissions ADD CONSTRAINT users_tenants_permissions_parent_fk FOREIGN KEY (parent_id) REFERENCES users_tenants(id) ON DELETE CASCADE; END IF; END $$;` },
+  // GH-905 follow-up — invite-staff assigned 'tenant-owner' platform role to all new users including staff.
+  // Remove 'tenant-owner' from users_roles for users who have tenant memberships but are not an owner
+  // in any of them. Owners (users_tenants.role = 'owner') are unaffected.
+  { name: 'users_roles.strip_tenant_owner_from_non_owners', sql: `DELETE FROM users_roles WHERE value = 'tenant-owner' AND parent_id IN (SELECT DISTINCT u.id FROM users u WHERE EXISTS (SELECT 1 FROM users_tenants ut WHERE ut._parent_id = u.id) AND NOT EXISTS (SELECT 1 FROM users_tenants ut WHERE ut._parent_id = u.id AND ut.role = 'owner'));` },
 ];
 
 async function runMigrations(pool) {

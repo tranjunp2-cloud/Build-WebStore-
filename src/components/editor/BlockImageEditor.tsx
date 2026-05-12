@@ -9,7 +9,7 @@ import { compressImage } from '@/lib/media/compress-image'
 interface BlockImageEditorProps {
     imageUrl: string
     altText: string
-    onImageChange: (url: string) => void
+    onImageChange: (id: number, url: string) => void
     onAltTextChange: (alt: string) => void
 }
 
@@ -34,7 +34,7 @@ export function BlockImageEditor({ imageUrl, altText, onImageChange, onAltTextCh
             formData.append('alt', altText || 'Block image')
 
             const uploaded = await uploadMediaAction(formData)
-            onImageChange(uploaded.url)
+            onImageChange(uploaded.id, uploaded.url)
             toast.success('Image updated')
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Failed to upload image'

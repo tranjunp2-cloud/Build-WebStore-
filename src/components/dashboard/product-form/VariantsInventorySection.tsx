@@ -29,6 +29,31 @@ export function VariantsInventorySection() {
 
     const [newOptionInputs, setNewOptionInputs] = useState<Record<number, string>>({})
 
+    const watchedTiers = watch('tiers') || []
+
+    const isAllTiersEmpty = watchedTiers.every(
+        t => !t.name?.trim() && (t.options || []).every(o => !o?.trim())
+    )
+
+    const duplicateOptionIndices: Record<number, Set<number>> = {}
+    watchedTiers.forEach((tier, tIdx) => {
+        const seen = new Map<string, number>()
+        const dups = new Set<number>()
+        ;(tier.options || []).forEach((opt, oIdx) => {
+            const norm = (opt || '').trim().toLowerCase()
+            if (!norm) return
+            if (seen.has(norm)) dups.add(oIdx)
+            else seen.set(norm, oIdx)
+        })
+        if (dups.size) duplicateOptionIndices[tIdx] = dups
+    })
+
+    const hasDuplicates = Object.keys(duplicateOptionIndices).length > 0
+
+    const isGenerateDisabled = watchedTiers.length === 0 || hasDuplicates || watchedTiers.some(
+        t => !t.name?.trim() || (t.options || []).filter(o => o?.trim()).length === 0
+    )
+
     const generateSkuTable = async () => {
         // Evaluate master fields validation before generating matrix
         const isValid = await trigger(['basePrice', 'compareAtPrice', 'baseSku', 'baseInventory']);
@@ -197,66 +222,108 @@ export function VariantsInventorySection() {
                     /* Multiple Variants UI */
                     <div className="space-y-6 pt-6 border-t border-white/[0.08]">
                         
+                        {isAllTiersEmpty && (
+                            <p className="text-[13px] text-[#F8FAFC]/60 m-0">
+                                {t.dashboard.products.form.sections?.emptyVariantState || 'Add options like Color, Size to create product variants'}
+                            </p>
+                        )}
+
                         {/* Tiers List */}
                         <div className="space-y-4" id="tiers">
                             {tiers.map((tier, index) => (
-                                <div key={tier.id} className="flex flex-col gap-4 relative group">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-[14px] font-medium text-[#F8FAFC] m-0">
-                                            {t.dashboard.products.form.sections?.tierFormat?.replace('{level}', String(index + 1)).replace('{example}', index === 0 ? (t.dashboard.products.form.sections?.color || 'Color') : (t.dashboard.products.form.sections?.size || 'Size')) || `Tier ${index + 1} (Example: ${index === 0 ? 'Color' : 'Size'})`}
-                                        </label>
-                                    </div>
-                                    <div className="flex flex-col gap-1 w-full">
-                                        <input
-                                            {...register(`tiers.${index}.name`)}
-                                            placeholder={index === 0 ? (t.dashboard.products.form.sections?.tierPlaceholderColor || "e.g. Color") : (t.dashboard.products.form.sections?.tierPlaceholderSize || "e.g. Size")}
-                                            className={cn("w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                errors.tiers?.[index]?.name ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
-                                            )}
-                                        />
-                                        {errors.tiers?.[index]?.name && <span className="text-[12px] text-red-500">{errors.tiers[index]?.name?.message}</span>}
-                                    </div>
-                                    
-                                    <div className="flex flex-col gap-3">
-                                        {tier.options.map((opt, oIdx) => (
-                                            <div key={oIdx} className="flex flex-col gap-1 w-full">
-                                                <div className="flex items-center gap-3">
-                                                    <input
-                                                        {...register(`tiers.${index}.options.${oIdx}` as const)}
-                                                        placeholder={index === 0 ? (t.dashboard.products.form.sections?.optionPlaceholderRed || "e.g. Red") : (t.dashboard.products.form.sections?.optionPlaceholderSmall || "e.g. Small")}
-                                                        className={cn("w-full rounded-xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] outline-none focus:ring-1 focus:ring-white transition-colors",
-                                                            errors.tiers?.[index]?.options?.[oIdx] ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
-                                                        )}
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const liveTier = getValues(`tiers.${index}`) || tier
-                                                            const newOptions = [...(liveTier.options || [])]
-                                                            newOptions.splice(oIdx, 1)
-                                                            updateTier(index, { ...liveTier, options: newOptions })
-                                                        }}
-                                                        className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-red-500/10 bg-red-500/10 text-red-500/80 hover:bg-red-500/20 hover:text-red-400 transition-colors"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                                {errors.tiers?.[index]?.options?.[oIdx] && <span className="text-[12px] text-red-500">{errors.tiers[index]?.options?.[oIdx]?.message as string}</span>}
-                                            </div>
-                                        ))}
+                                <div key={tier.id} className="flex flex-col gap-[10px] relative group">
+                                    {/* Tier label — outside card, per Figma */}
+                                    <label className="text-[14px] font-medium text-[#F8FAFC] m-0">
+                                        {t.dashboard.products.form.sections?.tierFormat
+                                            ?.replace('{level}', String(index + 1))
+                                            .replace('{example}', index === 0
+                                                ? (t.dashboard.products.form.sections?.color || 'Color')
+                                                : (t.dashboard.products.form.sections?.size || 'Size'))
+                                            || `Option ${index + 1} (Example: ${index === 0 ? 'Color' : 'Size'})`}
+                                    </label>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const liveTier = getValues(`tiers.${index}`) || tier
-                                                const newOptions = [...(liveTier.options || []), '']
-                                                updateTier(index, { ...liveTier, options: newOptions })
-                                            }}
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-solid border-white/10 bg-transparent py-3 text-[14px] font-medium text-[#F8FAFC]/60 hover:bg-white/5 transition-colors"
-                                        >
-                                            <Plus className="h-4 w-4" />
-                                            {t.dashboard.products.form.sections?.addOption || 'Add option'}
-                                        </button>
+                                    {/* Card */}
+                                    <div className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-[#0B1120]/50 p-[17px]">
+                                        {/* Option name sub-label + input */}
+                                        <div className="flex flex-col gap-2 w-full">
+                                            <span className="text-[14px] font-medium text-[#F8FAFC] m-0">
+                                                {t.dashboard.products.form.sections?.optionNameLabel || 'Option name:'}
+                                            </span>
+                                            <input
+                                                {...register(`tiers.${index}.name`)}
+                                                placeholder={index === 0 ? (t.dashboard.products.form.sections?.tierPlaceholderColor || 'e.g. Color') : (t.dashboard.products.form.sections?.tierPlaceholderSize || 'e.g. Size')}
+                                                className={cn(
+                                                    'w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 outline-none focus:ring-1 focus:ring-white transition-colors',
+                                                    errors.tiers?.[index]?.name ? 'border-red-500 focus:border-red-500' : 'border-white/[0.08] focus:border-white'
+                                                )}
+                                            />
+                                            {errors.tiers?.[index]?.name && (
+                                                <span className="text-[12px] text-red-500">{errors.tiers[index]?.name?.message}</span>
+                                            )}
+                                        </div>
+
+                                        {/* Values sub-label + inputs */}
+                                        <div className="flex flex-col gap-2">
+                                            <span className="text-[14px] font-medium text-[#F8FAFC] m-0">
+                                                {t.dashboard.products.form.sections?.valuesLabel || 'Values:'}
+                                            </span>
+                                            <div className="flex flex-col gap-3">
+                                                {tier.options.map((opt, oIdx) => {
+                                                    const isDup = duplicateOptionIndices[index]?.has(oIdx)
+                                                    const hasZodErr = !!errors.tiers?.[index]?.options?.[oIdx]
+                                                    const showRed = isDup || hasZodErr
+                                                    return (
+                                                        <div key={oIdx} className="flex flex-col gap-1 w-full">
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    {...register(`tiers.${index}.options.${oIdx}` as const)}
+                                                                    placeholder={index === 0 ? (t.dashboard.products.form.sections?.optionPlaceholderRed || 'e.g. Red') : (t.dashboard.products.form.sections?.optionPlaceholderSmall || 'e.g. Small')}
+                                                                    className={cn(
+                                                                        'flex-1 rounded-xl border bg-[#0B1120] px-4 py-[10px] text-[14px] text-[#F8FAFC] outline-none focus:ring-1 focus:ring-white transition-colors',
+                                                                        showRed ? 'border-red-500 focus:border-red-500' : 'border-white/[0.08] focus:border-white'
+                                                                    )}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const liveTier = getValues(`tiers.${index}`) || tier
+                                                                        const newOptions = [...(liveTier.options || [])]
+                                                                        newOptions.splice(oIdx, 1)
+                                                                        updateTier(index, { ...liveTier, options: newOptions })
+                                                                    }}
+                                                                    className="flex h-[44px] w-[38px] shrink-0 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-500/80 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </button>
+                                                            </div>
+                                                            {hasZodErr && (
+                                                                <span className="text-[12px] text-red-500">
+                                                                    {errors.tiers?.[index]?.options?.[oIdx]?.message as string}
+                                                                </span>
+                                                            )}
+                                                            {!hasZodErr && isDup && (
+                                                                <span className="text-[12px] text-red-500">
+                                                                    {t.dashboard.products.form.sections?.duplicateValue || 'Duplicate value'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const liveTier = getValues(`tiers.${index}`) || tier
+                                                        const newOptions = [...(liveTier.options || []), '']
+                                                        updateTier(index, { ...liveTier, options: newOptions })
+                                                    }}
+                                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.12] bg-transparent py-3 text-[14px] font-medium text-blue-500 hover:bg-blue-500/5 transition-colors"
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                    {t.dashboard.products.form.sections?.addOption || 'Add values'}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -273,17 +340,21 @@ export function VariantsInventorySection() {
                             </button>
                         )}
 
-
-
                         {hasVariants && (
                             <div className="pt-2">
                                 <button
                                     type="button"
                                     onClick={generateSkuTable}
-                                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-[14px] font-medium text-blue-500 hover:bg-blue-500/20 transition-colors"
+                                    disabled={isGenerateDisabled}
+                                    className={cn(
+                                        'flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-[14px] font-medium transition-colors',
+                                        isGenerateDisabled
+                                            ? 'border-white/[0.08] bg-white/[0.04] text-[#F8FAFC]/40 cursor-not-allowed'
+                                            : 'border-blue-500/20 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'
+                                    )}
                                 >
                                     <Wand2 className="h-4 w-4" />
-                                    {t.dashboard.products.form.sections?.createSkuTable || 'Create SKU Table'}
+                                    {t.dashboard.products.form.sections?.createSkuTable || 'Generate variants'}
                                 </button>
                             </div>
                         )}

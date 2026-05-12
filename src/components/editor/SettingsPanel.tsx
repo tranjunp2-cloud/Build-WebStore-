@@ -2228,11 +2228,12 @@ function SettingsPanelInner({
                                     <label className="text-xs font-medium uppercase text-gray-500">Image</label>
                                     <div className="mt-2">
                                         <BlockImageEditor
-                                            imageUrl={String(block.image || block.backgroundImage || block.heroImage || '')}
+                                            imageUrl={(() => { const v = block.image || block.backgroundImage || block.heroImage; return v && typeof v === 'object' && 'url' in (v as Record<string,unknown>) ? String((v as Record<string,unknown>).url) : String(v || '') })()}
                                             altText={String(block.imageAlt || block.alt || '')}
-                                            onImageChange={(url) => {
+                                            onImageChange={(id, url) => {
                                                 const field = block.image ? 'image' : block.backgroundImage ? 'backgroundImage' : 'heroImage'
-                                                onBlockFieldChange(currentBlockIndex, field, url)
+                                                const altField = block.imageAlt !== undefined ? 'imageAlt' : 'alt'
+                                                onBlockUpdate(currentBlockIndex, { [field]: { id, url }, [altField]: String(block.imageAlt || block.alt || '') })
                                             }}
                                             onAltTextChange={(alt) => {
                                                 const field = block.imageAlt !== undefined ? 'imageAlt' : 'alt'

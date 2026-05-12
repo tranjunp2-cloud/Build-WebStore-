@@ -65,12 +65,6 @@ const INPUT_STYLE = {
     boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
 } as const
 
-const CHECKBOX_STYLE = {
-    background: 'rgba(30, 41, 59, 0.4)',
-    border: '1px solid rgba(59, 130, 246, 0.07)',
-    boxShadow: '0px 1px 2px rgba(0,0,0,0.05)',
-} as const
-
 function LoginFormContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -80,7 +74,6 @@ function LoginFormContent() {
     }
     const [showPassword, setShowPassword] = useState(false)
     const [checkingReset, setCheckingReset] = useState(false)
-    const [rememberMe, setRememberMe] = useState(false)
     const { t } = useI18n()
 
     useEffect(() => {
@@ -411,32 +404,8 @@ function LoginFormContent() {
                     )}
                 </div>
 
-                {/* ─── Remember me / Forgot password row ─── */}
-                <div className="flex flex-wrap items-center justify-between gap-2" style={{ marginTop: 16 }}>
-                    <label className="flex items-center gap-2 cursor-pointer select-none" style={{ background: 'transparent' }}>
-                        <input
-                            type="checkbox"
-                            className="hidden"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                        />
-                        <div
-                            className="flex h-4 w-4 items-center justify-center rounded-[4px] transition-colors border-none p-0 cursor-pointer"
-                            style={{
-                                ...CHECKBOX_STYLE,
-                                background: rememberMe ? '#2DD4BF' : 'rgba(30, 41, 59, 0.4)',
-                            }}
-                        >
-                            {rememberMe && (
-                                <svg className="h-3 w-3 text-[#0B1120]" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="2 6 5 9 10 3" />
-                                </svg>
-                            )}
-                        </div>
-                        <span className="text-sm font-medium text-[#94A3B8]" style={{ lineHeight: '1.43' }}>
-                            {t.auth.rememberMe}
-                        </span>
-                    </label>
+                {/* ─── Forgot password row ─── */}
+                <div className="flex flex-wrap items-center justify-end gap-2" style={{ marginTop: 16 }}>
                     <button
                         type="button"
                         onClick={handleForgotPassword}
