@@ -37,27 +37,62 @@ function getPagePath(page: PageData) {
     return page.slug.startsWith('/') ? page.slug : `/${page.slug}`
 }
 
+/** Collect slugs (normalized to /slug) from a nav links tree (recursive). */
+function collectNavSlugs(links: unknown): Set<string> {
+    const slugs = new Set<string>()
+    if (!Array.isArray(links)) return slugs
+    for (const link of links) {
+        if (!link || typeof link !== 'object') continue
+        const l = link as { url?: string; children?: unknown }
+        const url = (l.url ?? '').trim()
+        if (url && url !== '#') slugs.add(url.startsWith('/') ? url : `/${url}`)
+        if (l.children) for (const s of collectNavSlugs(l.children)) slugs.add(s)
+    }
+    return slugs
+}
+
+/** Return IDs of pages whose slug appears in the nav links tree. */
+function collectMenuPageIds(links: unknown, pages: PageData[]): Set<string> {
+    const navSlugs = collectNavSlugs(links)
+    const ids = new Set<string>()
+    for (const page of pages) {
+        const pagePath =
+            page.isHomepage || page.slug === 'home' || page.slug === ''
+                ? '/'
+                : page.slug.startsWith('/') ? page.slug : `/${page.slug}`
+        if (navSlugs.has(pagePath)) ids.add(page.id)
+    }
+    return ids
+}
+
 function getStatusBadge(
     page: PageData,
-    labels: { live: string; draft: string; tooltipLive: string; tooltipDraft: string },
+    labels: { live: string; draft: string; tooltipLive: string; tooltipLiveHidden: string; tooltipLiveNoLink: string; tooltipDraft: string; tooltipDraftSite: string },
     siteStatus?: string,
+    menuPageIds?: Set<string>,
 ) {
     const isPageLive = page.status === 'published' && siteStatus === 'published'
+    const liveCls = 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]'
+    const liveDot = 'bg-[#00c950]'
 
     if (isPageLive) {
-        return {
-            label: labels.live,
-            className: 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]',
-            dotClassName: 'bg-[#00c950]',
-            tooltip: labels.tooltipLive,
+        if (page.isVisible === false) {
+            return { label: labels.live, sublabel: 'Hidden' as const, className: liveCls, dotClassName: liveDot, tooltip: labels.tooltipLiveHidden }
         }
+        if (menuPageIds && !menuPageIds.has(page.id)) {
+            return { label: labels.live, sublabel: 'No Link' as const, className: liveCls, dotClassName: liveDot, tooltip: labels.tooltipLiveNoLink }
+        }
+        return { label: labels.live, sublabel: null, className: liveCls, dotClassName: liveDot, tooltip: labels.tooltipLive }
     }
 
+    // Draft: distinguish page-level draft vs site unpublished
+    const draftBecauseSite = page.status === 'published' && siteStatus !== 'published'
     return {
         label: labels.draft,
+        sublabel: null,
         className: 'border border-[rgba(106,114,130,0.3)] bg-[rgba(106,114,130,0.2)] text-[#d1d5dc]',
         dotClassName: '',
-        tooltip: labels.tooltipDraft,
+        tooltip: draftBecauseSite ? labels.tooltipDraftSite : labels.tooltipDraft,
     }
 }
 
@@ -76,6 +111,12 @@ export function PageManagerPanel({
     const setPages = useEditorStore(state => state.setPages)
     const addPageToState = useEditorStore(state => state.addPageToState)
     const updatePageInState = useEditorStore(state => state.updatePageInState)
+    const headerBlock = useEditorStore(state => state.headerBlock)
+
+    const menuPageIds = useMemo(
+        () => collectMenuPageIds((headerBlock as { links?: unknown } | null)?.links, pages),
+        [headerBlock, pages],
+    )
 
     const [isAdding, setIsAdding] = useState(false)
     const [newPageTitle, setNewPageTitle] = useState('')
@@ -301,8 +342,17 @@ export function PageManagerPanel({
                             const isProtectedPage = Boolean(page.isHomepage) || SYSTEM_PAGE_SLUGS.has(page.slug)
                             const statusBadge = getStatusBadge(
                                     page,
-                                    { live: pm.statusLive, draft: pm.statusDraft, tooltipLive: t.editor.pageManagerPanel.tooltipLive, tooltipDraft: t.editor.pageManagerPanel.tooltipDraft },
+                                    {
+                                        live: pm.statusLive,
+                                        draft: pm.statusDraft,
+                                        tooltipLive: t.editor.pageManagerPanel.tooltipLive,
+                                        tooltipLiveHidden: t.editor.pageManagerPanel.tooltipLiveHidden,
+                                        tooltipLiveNoLink: t.editor.pageManagerPanel.tooltipLiveNoLink,
+                                        tooltipDraft: t.editor.pageManagerPanel.tooltipDraft,
+                                        tooltipDraftSite: t.editor.pageManagerPanel.tooltipDraftSite,
+                                    },
                                     siteStatus,
+                                    menuPageIds,
                                 )
 
                             return (
@@ -343,11 +393,18 @@ export function PageManagerPanel({
                                                     ) : (
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>
-                                                                <span className={cn('inline-flex cursor-default items-center gap-1 rounded-[4px] px-2 py-[3px] text-[12px] font-semibold leading-4', statusBadge.className)}>
-                                                                    {statusBadge.dotClassName ? (
-                                                                        <span className={cn('h-1.5 w-1.5 rounded-full', statusBadge.dotClassName)} />
-                                                                    ) : null}
-                                                                    {statusBadge.label}
+                                                                <span className="inline-flex cursor-default items-center gap-1">
+                                                                    <span className={cn('inline-flex items-center gap-1 rounded-[4px] px-2 py-[3px] text-[12px] font-semibold leading-4', statusBadge.className)}>
+                                                                        {statusBadge.dotClassName ? (
+                                                                            <span className={cn('h-1.5 w-1.5 rounded-full', statusBadge.dotClassName)} />
+                                                                        ) : null}
+                                                                        {statusBadge.label}
+                                                                    </span>
+                                                                    {statusBadge.sublabel && (
+                                                                        <span className="inline-flex items-center rounded-[4px] border border-amber-500/30 bg-amber-500/15 px-2 py-[3px] text-[11px] font-semibold leading-4 text-amber-300">
+                                                                            {statusBadge.sublabel}
+                                                                        </span>
+                                                                    )}
                                                                 </span>
                                                             </TooltipTrigger>
                                                             <TooltipContent side="top">{statusBadge.tooltip}</TooltipContent>

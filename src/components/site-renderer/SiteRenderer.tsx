@@ -234,17 +234,38 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             }
         })
     }
+    // Slugs (normalized to /slug) of pages hidden from visitor nav (isVisible=false or soft-deleted).
+    // Owners and editor preview always see the full menu.
+    const hiddenSlugs = new Set<string>()
+    if (!isEditor && !isOwner) {
+        for (const p of pages) {
+            if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '')) {
+                const raw = (p.slug ?? '').trim()
+                hiddenSlugs.add(!raw || raw === '/' ? '/' : (raw.startsWith('/') ? raw : `/${raw}`))
+            }
+        }
+    }
+
     const rewriteNavLinks = (links: unknown): unknown => {
         if (!Array.isArray(links)) return links
-        return links.map((l) => {
-            if (!l || typeof l !== 'object') return l
-            const link = l as { url?: string; children?: unknown; [k: string]: unknown }
-            return {
-                ...link,
-                url: rewriteUrl(link.url),
-                children: link.children ? rewriteNavLinks(link.children) : undefined,
-            }
-        })
+        return links
+            .filter((l) => {
+                if (!hiddenSlugs.size || !l || typeof l !== 'object') return true
+                const link = l as { url?: string }
+                const url = (link.url ?? '').trim()
+                if (!url || url === '#') return true
+                const normalized = url.startsWith('/') ? url : `/${url}`
+                return !hiddenSlugs.has(normalized)
+            })
+            .map((l) => {
+                if (!l || typeof l !== 'object') return l
+                const link = l as { url?: string; children?: unknown; [k: string]: unknown }
+                return {
+                    ...link,
+                    url: rewriteUrl(link.url),
+                    children: link.children ? rewriteNavLinks(link.children) : undefined,
+                }
+            })
     }
 
     const blocks = rawBlocks.map((b) => {
@@ -463,12 +484,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     return null
                 }
 
-                // Nav always renders every link the user authored, even when
-                // a target page is `isVisible=false`. Hiding only affects
-                // direct routing (public route query already returns 404 for
-                // hidden pages); the nav menu itself stays stable so users
-                // never see menu items disappear mid-session as they click
-                // around.
                 const normalizedBlock = block
 
                 const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)

@@ -253,6 +253,90 @@ describe('PageManagerPanel', () => {
         expect(useEditorStore.getState().pages.find(p => p.id === 'page-2')?.deletedAt).toBeTruthy()
     })
 
+    it('TC-F05-02-15e: published page with isVisible=false on live site shows Live badge + Hidden sublabel', () => {
+        // Arrange — page published + visible:false; site published
+        useEditorStore.getState().setPages([
+            { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
+            { id: 'page-2', title: 'Secret', slug: 'secret', status: 'published', isVisible: false, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-1"
+                    siteStatus="published"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+
+        // Assert — Live badge present AND Hidden sublabel (amber badge) next to it.
+        // Note: pm.hidden ("Hidden") also appears as the toggle button text, so use getAllByText.
+        expect(screen.getByText('Live')).toBeInTheDocument()
+        const hiddenElements = screen.getAllByText('Hidden')
+        // At least 2: the amber sublabel badge + the visibility toggle button text
+        expect(hiddenElements.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('TC-F05-02-15f: published page not in nav menu on live site shows Live badge + No Link sublabel', () => {
+        // Arrange — page published + visible; site published; header has no links to page-2
+        useEditorStore.getState().setPages([
+            { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
+            { id: 'page-2', title: 'Unlisted', slug: 'unlisted', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+        // headerBlock with links only pointing to Home (slug-based, actual data format)
+        useEditorStore.getState().init(
+            'site-123',
+            [],
+            {},
+            'Test Site',
+            { blockType: 'navigation', links: [{ label: 'Home', url: '/' }] },
+        )
+        useEditorStore.getState().setPages([
+            { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
+            { id: 'page-2', title: 'Unlisted', slug: 'unlisted', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-1"
+                    siteStatus="published"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+
+        // Assert — Live badge present AND No Link sublabel for page-2
+        const liveCount = screen.getAllByText('Live').length
+        expect(liveCount).toBeGreaterThanOrEqual(1)
+        expect(screen.getByText('No Link')).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-15g: published page on unpublished site shows Draft badge with site-specific tooltip', () => {
+        // Arrange — page published but site not published
+        useEditorStore.getState().setPages([
+            { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-99"
+                    siteStatus="draft"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+
+        // Assert — shows Draft (not Live) since site is unpublished
+        expect(screen.getByText('Draft')).toBeInTheDocument()
+        expect(screen.queryByText('Live')).not.toBeInTheDocument()
+    })
+
     it('TC-F05.10: Toggling Visibility flag (Hide Page)', async () => {
         // Arrange
         const mockResponse = { ok: true }

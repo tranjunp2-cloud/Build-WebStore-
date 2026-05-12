@@ -14,14 +14,23 @@ type SiteLayoutShellProps = {
     children: React.ReactNode
 }
 
-/** Rewrite all `url` fields in nav links array recursively. */
-function rewriteNavLinks(links: unknown, rewriteUrl: (u: string | undefined) => string): unknown {
+/** Rewrite all `url` fields in nav links array recursively; filter hidden/deleted page slugs for visitors. */
+function rewriteNavLinks(links: unknown, rewriteUrl: (u: string | undefined) => string, hiddenSlugs: Set<string>): unknown {
     if (!Array.isArray(links)) return links
-    return links.map((l) => {
-        if (!l || typeof l !== 'object') return l
-        const link = l as { url?: string; children?: unknown; [k: string]: unknown }
-        return { ...link, url: rewriteUrl(link.url), children: link.children ? rewriteNavLinks(link.children, rewriteUrl) : undefined }
-    })
+    return links
+        .filter((l) => {
+            if (!hiddenSlugs.size || !l || typeof l !== 'object') return true
+            const link = l as { url?: string }
+            const url = (link.url ?? '').trim()
+            if (!url || url === '#') return true
+            const normalized = url.startsWith('/') ? url : `/${url}`
+            return !hiddenSlugs.has(normalized)
+        })
+        .map((l) => {
+            if (!l || typeof l !== 'object') return l
+            const link = l as { url?: string; children?: unknown; [k: string]: unknown }
+            return { ...link, url: rewriteUrl(link.url), children: link.children ? rewriteNavLinks(link.children, rewriteUrl, hiddenSlugs) : undefined }
+        })
 }
 
 /** Rewrite `url` fields in footer column links. */
@@ -61,12 +70,23 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
     const slugCanonical = buildSlugCanonicalMap(pages as unknown as { id: string | number; slug?: string | null; isHomepage?: boolean | null }[])
     const rewriteUrl = (url: string | undefined) => rewriteLiveUrl(url, slugCanonical)
 
+    // SiteLayoutShell is live-mode only — filter hidden/deleted pages for non-owners
+    const hiddenSlugs = new Set<string>()
+    if (!isOwner) {
+        for (const p of pages) {
+            if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '')) {
+                const raw = (p.slug ?? '').trim()
+                hiddenSlugs.add(!raw || raw === '/' ? '/' : (raw.startsWith('/') ? raw : `/${raw}`))
+            }
+        }
+    }
+
     // Rewrite URLs in nav + footer blocks
     const rawHeader = site.headerBlock as Record<string, unknown> | null | undefined
     const rawFooter = site.footerBlock as Record<string, unknown> | null | undefined
 
     const headerBlock: Record<string, unknown> | null = rawHeader
-        ? { ...rawHeader, links: rewriteNavLinks(rawHeader.links, rewriteUrl), ctaButton: rawHeader.ctaButton ? { ...(rawHeader.ctaButton as object), url: rewriteUrl((rawHeader.ctaButton as { url?: string }).url) } : rawHeader.ctaButton }
+        ? { ...rawHeader, links: rewriteNavLinks(rawHeader.links, rewriteUrl, hiddenSlugs), ctaButton: rawHeader.ctaButton ? { ...(rawHeader.ctaButton as object), url: rewriteUrl((rawHeader.ctaButton as { url?: string }).url) } : rawHeader.ctaButton }
         : null
 
     const footerBlock: Record<string, unknown> | null = rawFooter

@@ -2849,8 +2849,11 @@
       "slugConflict": "Slug halaman sudah wujud dalam laman ini",
       "noPagesFound": "Tiada halaman dijumpai",
       "noPagesSuggestion": "Cipta halaman pertama anda untuk bermula.",
-      "tooltipLive": "Halaman ini telah diterbitkan dan laman web anda aktif — ia dapat dilihat oleh pengunjung.",
-      "tooltipDraft": "Halaman ini tidak akan muncul di laman web anda. Sama ada halaman ini masih dalam draf atau laman web anda belum diterbitkan."
+      "tooltipLive": "Diterbitkan & Kelihatan: Sesiapa boleh melihat halaman ini melalui menu atau pautan terus.",
+      "tooltipLiveHidden": "Diterbitkan & Tersembunyi: Halaman ini disembunyikan daripada menu dan akses terus disekat (404).",
+      "tooltipLiveNoLink": "Diterbitkan & Tidak Dipautkan: Halaman ini aktif tetapi tidak ada dalam menu. Boleh diakses melalui URL terus sahaja.",
+      "tooltipDraft": "Draf: Halaman ini belum diterbitkan. Terbitkan untuk menjadikannya aktif.",
+      "tooltipDraftSite": "Laman Web Belum Diterbitkan: Laman web anda sedang di luar talian. Tiada halaman yang dapat dilihat oleh pengunjung."
     },
     "navigationValidation": {
       "labelRequired": "Label pautan diperlukan",
