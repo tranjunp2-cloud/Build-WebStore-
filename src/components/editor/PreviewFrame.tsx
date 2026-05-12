@@ -44,6 +44,10 @@ interface PreviewFrameProps {
     onInlineEditSave?: () => Promise<boolean | void>
     /** Called after mount with an imperative handle; called with null on unmount. */
     onHandleReady?: (handle: PreviewFrameHandle | null) => void
+    /** Called when a footer field is edited inline in the preview — dedicated footer channel. */
+    onFooterUpdate?: (changes: Record<string, unknown>) => void
+    /** Called when footer inline edit session ends (blur/Enter/Escape) — flush debounce + save once. */
+    onFooterEditStop?: () => void
 }
 
 type HoverRect = {
@@ -230,6 +234,8 @@ function PreviewFrameInner({
     disableDragDrop = false,
     onInlineEditSave,
     onHandleReady,
+    onFooterUpdate,
+    onFooterEditStop,
 }: PreviewFrameProps) {
     const { t } = useI18n()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
@@ -239,6 +245,10 @@ function PreviewFrameInner({
     useEffect(() => { blocksRef.current = blocks }, [blocks])
     const onInlineEditSaveRef = useRef(onInlineEditSave)
     useEffect(() => { onInlineEditSaveRef.current = onInlineEditSave }, [onInlineEditSave])
+    const onFooterUpdateRef = useRef(onFooterUpdate)
+    useEffect(() => { onFooterUpdateRef.current = onFooterUpdate }, [onFooterUpdate])
+    const onFooterEditStopRef = useRef(onFooterEditStop)
+    useEffect(() => { onFooterEditStopRef.current = onFooterEditStop }, [onFooterEditStop])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
     const [selectedGlobalBlockLayout, setSelectedGlobalBlockLayout] = useState<BlockLayoutRect | null>(null)
@@ -669,6 +679,14 @@ function PreviewFrameInner({
                 if (ALLOWED_TOAST_VARIANTS.has(variant as 'success' | 'error' | 'info')) {
                     toast[variant as 'success' | 'error' | 'info'](message)
                 }
+            } else if (e.data?.type === 'FOOTER_FIELD_EDIT_START') {
+                // no-op — could scroll sidebar to footer section in a future iteration
+            } else if (e.data?.type === 'FOOTER_FIELD_EDITED') {
+                const { fieldName, newValue } = e.data as { fieldName: string; newValue: string }
+                onFooterUpdateRef.current?.({ [fieldName]: newValue })
+            } else if (e.data?.type === 'FOOTER_FIELD_EDIT_STOP') {
+                // Cancel pending debounce timer, then fire exactly one save
+                onFooterEditStopRef.current?.()
             }
         }
         window.addEventListener('message', handleMessage)

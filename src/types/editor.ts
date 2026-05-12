@@ -16,7 +16,7 @@ export type AIAction = {
 }
 
 export type CtaButton = { label?: string; url?: string; style?: 'primary' | 'secondary' | 'outline' | 'ghost' }
-export type NavLink = { label?: string; url?: string }
+export type NavLink = { label?: string; url?: string; style?: 'internal' | 'external' }
 export type FeatureItem = { title?: string; description?: string; icon?: string }
 export type TestimonialItem = { name?: string; title?: string; quote?: string; rating?: number }
 export type FooterColumn = { title?: string; links?: NavLink[] }

@@ -333,6 +333,8 @@ function SettingsPanelInner({
 
     const breadcrumbSectionRef = React.useRef<HTMLDivElement>(null)
     const breadcrumbScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const footerSectionRef = React.useRef<HTMLDivElement>(null)
+    const footerScrollTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const [phoneTouchedSet, setPhoneTouchedSet] = useState<Set<string>>(new Set())
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
@@ -345,8 +347,15 @@ function SettingsPanelInner({
                     breadcrumbSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                 }, 80)
             }
+            if (requestedTab.section === 'footer') {
+                if (footerScrollTimerRef.current) clearTimeout(footerScrollTimerRef.current)
+                footerScrollTimerRef.current = setTimeout(() => {
+                    footerSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }, 80)
+            }
             return () => {
                 if (breadcrumbScrollTimerRef.current) clearTimeout(breadcrumbScrollTimerRef.current)
+                if (footerScrollTimerRef.current) clearTimeout(footerScrollTimerRef.current)
             }
         }
         if (block) {
@@ -949,7 +958,7 @@ function SettingsPanelInner({
 
                 {/* ─── Footer Settings ─────────────────────────────────────── */}
                 {footerBlock && (
-                    <div className={sectionCls}>
+                    <div ref={footerSectionRef} className={sectionCls}>
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-base leading-none">🎨</span>
                             <span className="text-[13px] font-semibold uppercase tracking-wide text-[#2dd4bf]">{s.footerSettings}</span>
