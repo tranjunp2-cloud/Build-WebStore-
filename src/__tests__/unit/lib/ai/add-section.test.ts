@@ -116,18 +116,16 @@ describe('inferAddSectionType [TC-F05.13]', () => {
         expect(inferAddSectionType('show instagram link')).toBe('socialWidget')
     })
 
-    // GH-960: cartWidget re-enabled — cart keywords now resolve to 'cartWidget'
-    it('returns "cartWidget" for "cart" keyword [TC-F05.27]', () => {
-        expect(inferAddSectionType('add a cart widget')).toBe('cartWidget')
-    })
-
-    it('returns "cartWidget" for "shopping cart" keyword', () => {
-        expect(inferAddSectionType('add shopping cart')).toBe('cartWidget')
-    })
-
-    it('returns "cartWidget" for "checkout" keyword', () => {
-        expect(inferAddSectionType('show checkout button')).toBe('cartWidget')
-    })
+    // GH-960: cartWidget re-hidden — re-enable tests when #961 (cart/checkout) ships
+    // it('returns "cartWidget" for "cart" keyword [TC-F05.27]', () => {
+    //     expect(inferAddSectionType('add a cart widget')).toBe('cartWidget')
+    // })
+    // it('returns "cartWidget" for "shopping cart" keyword', () => {
+    //     expect(inferAddSectionType('add shopping cart')).toBe('cartWidget')
+    // })
+    // it('returns "cartWidget" for "checkout" keyword', () => {
+    //     expect(inferAddSectionType('show checkout button')).toBe('cartWidget')
+    // })
 
     // requestedType is prepended to haystack — whichever SECTION_TYPE_MATCHERS entry
     // appears first in the array wins when both match. 'testimonials' comes before 'faq'
@@ -208,9 +206,10 @@ describe('getAddSectionLabel [TC-F05.13]', () => {
         expect(getAddSectionLabel('socialWidget')).toBe('social media')
     })
 
-    it('returns "cart" for cartWidget type', () => {
-        expect(getAddSectionLabel('cartWidget')).toBe('cart')
-    })
+    // GH-960: cartWidget re-hidden — re-enable when #961 ships
+    // it('returns "cart" for cartWidget type', () => {
+    //     expect(getAddSectionLabel('cartWidget')).toBe('cart')
+    // })
 })
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -440,18 +439,17 @@ describe('createAddSectionBlock — socialWidget [TC-F05.26]', () => {
     })
 })
 
-// GH-960: cartWidget re-enabled — createAddSectionBlock returns block for cart instructions
-describe('createAddSectionBlock — cartWidget [TC-F05.27]', () => {
-    it('returns cartWidget block for "add cart widget" instruction', () => {
-        const block = createAddSectionBlock({ instruction: 'add cart widget' })
-        expect(block).toMatchObject({ blockType: 'cartWidget', variant: 'floating' })
-    })
-
-    it('returns cartWidget block for "add cart" instruction', () => {
-        const block = createAddSectionBlock({ instruction: 'add cart' })
-        expect(block).toMatchObject({ blockType: 'cartWidget', variant: 'floating' })
-    })
-})
+// GH-960: cartWidget re-hidden — re-enable describe block when #961 (cart/checkout) ships
+// describe('createAddSectionBlock — cartWidget [TC-F05.27]', () => {
+//     it('returns cartWidget block for "add cart widget" instruction', () => {
+//         const block = createAddSectionBlock({ instruction: 'add cart widget' })
+//         expect(block).toMatchObject({ blockType: 'cartWidget', variant: 'floating' })
+//     })
+//     it('returns cartWidget block for "add cart" instruction', () => {
+//         const block = createAddSectionBlock({ instruction: 'add cart' })
+//         expect(block).toMatchObject({ blockType: 'cartWidget', variant: 'floating' })
+//     })
+// })
 
 describe('createAddSectionBlock — unknown / null cases [TC-F05.13]', () => {
     it('returns null when section type cannot be inferred', () => {

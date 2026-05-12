@@ -60,8 +60,9 @@ export function buildSystemPrompt(
   // the editor library UI for manual user drag-drop, just hidden from AI.
   //
   // Plan 260415 F01-gen-audit — also drop blocks on the unsupported list.
-  // (Plan 260422-1900: booking-widget, before-after re-enabled; now only
-  // menu-display and review-cards remain on unsupported list.)
+  // (Plan 260422-1900: booking-widget, before-after re-enabled.)
+  // (GH-935: menu-display re-hidden. Current BLOCKS_TEMP_HIDDEN: step-process, booking-widget,
+  //  doctor-profile, gallery-masonry, before-after, menu-display. review-cards in MEDIA_PIPELINE.)
   // Filter at prompt-build time so GPT never sees unsupported blocks.
   const blockMetas = blockRegistry
     .getAllMeta()
@@ -99,6 +100,7 @@ Spacing: "${preset.spacingPreset}" — apply this consistently across ALL pages.
     : ''
 
   // NOTE: 'video-showcase' removed from VARIETY RULES #6 — temporarily hidden (aiVisible: false, archived). Re-add when block is production-ready.
+  // GH-960: VARIETY RULES 8-10 (menu-display, pricing-table, product-quick-view) removed — re-add when #961 (cart/checkout) ships.
   return `You are an expert website designer AI. Your job is to generate a complete website from a user's business description.${themeSection}
 
 ## OUTPUT FORMAT
@@ -241,9 +243,6 @@ ORDERING RULES:
 5. Footer has 4 variants — vary between simple, minimal, centered-stack, dark-gradient.
 6. Include at least ONE uncommon block on homepage: before-after, countdown-timer, or social-proof.
 7. Block ORDER must vary — do NOT always put features directly after hero.
-8. Restaurant industry: use menu-food OR menu-display for the menu section — NOT both. Do NOT use generic "features" as a menu stand-in.
-9. SaaS/tech industry: prefer pricing-table over pricing when plan comparison + billing toggle is needed.
-10. Ecommerce industry: include product-quick-view for browsing-heavy catalog sites alongside products-grid.
 
 ## IMPORTANT
 - Respond ONLY with the JSON object, no markdown, no explanation
