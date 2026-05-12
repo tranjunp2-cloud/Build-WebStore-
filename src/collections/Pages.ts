@@ -1562,7 +1562,8 @@ export const Pages: CollectionConfig = {
                 FooterBlock,
                 StatsBlock,
                 PricingBlock,
-                PricingTableBlock,
+                // GH-960: re-register when #961 (cart/checkout) ships
+                // PricingTableBlock,
                 FAQBlock,
                 TeamBlock,
                 SocialWidgetBlock,
@@ -1589,7 +1590,8 @@ export const Pages: CollectionConfig = {
                 BreadcrumbBlock,
                 ClientLogosBlock,
                 MenuFoodBlock,
-                MenuDisplayBlock,
+                // GH-960: re-register when #961 (cart/checkout) ships
+                // MenuDisplayBlock,
                 PortfolioGridBlock,
                 // Industry-specific (composer-driven)
                 DoctorProfileBlock,

@@ -68,8 +68,9 @@ export const menuDisplayMeta = {
     defaultVariant: 'tabs',
     editableFields: ['headline', 'subheadline', 'categories', 'currency', 'showDietaryIcons'],
     quickActions: ['Add category', 'Add item', 'Toggle dietary icons'],
-    aiVisible: true,
-    category: 'store' as const,
+    // GH-960: re-enable when #961 (cart/checkout) ships
+    aiVisible: false,
+    category: 'archive' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

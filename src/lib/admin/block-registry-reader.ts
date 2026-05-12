@@ -90,6 +90,12 @@ const EDITOR_HIDDEN_BLOCKS = new Set([
     // feat/fix-broken-block-variants: temporarily hidden — re-enable by removing from this set
     'step-process',
     'booking-widget',
+    // GH-960: re-enable when #961 (cart/checkout) ships
+    'cartWidget',
+    'menu-display',
+    'pricing-table',
+    'product-quick-view',
+    'property-card',
 ])
 
 // ── Module-level cache (process lifetime) ────────────────────────────────────
