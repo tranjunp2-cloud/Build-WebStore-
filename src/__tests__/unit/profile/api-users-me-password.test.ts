@@ -26,6 +26,8 @@ describe('POST /api/users/me/password', () => {
         mockPayload = {
             login: vi.fn(),
             update: vi.fn().mockResolvedValue({ id: 'user-1' }),
+            sendEmail: vi.fn().mockResolvedValue(undefined),
+            logger: { error: vi.fn() },
         }
 
         vi.mocked(getPayload).mockResolvedValue(mockPayload as any)
@@ -164,5 +166,14 @@ describe('POST /api/users/me/password', () => {
 
         const body = await res.json()
         expect(body).toHaveProperty('success', true)
+
+        // Verify notification email was fired (fire-and-forget)
+        expect(mockPayload.sendEmail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: 'staff@test.com',
+                subject: expect.stringContaining('password'),
+                html: expect.stringContaining(newPassword),
+            }),
+        )
     })
 })

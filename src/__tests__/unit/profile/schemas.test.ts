@@ -85,10 +85,10 @@ describe('profilePatchSchema', () => {
         expect(result.success).toBe(false)
     })
 
-    // TC-F23-04-09: Phone too short (< 7 digits)
-    it('rejects phone with only 3 digits', () => {
+    // TC-F23-04-09: Phone too short — not a country code and < 7 digits
+    it('rejects short number that is not a country code', () => {
         const data = {
-            phone: '+1',
+            phone: '123',
         }
         const result = profilePatchSchema.safeParse(data)
         expect(result.success).toBe(false)
@@ -103,19 +103,44 @@ describe('profilePatchSchema', () => {
         expect(result.success).toBe(false)
     })
 
-    // TC-F23-04-11: Valid phone formats
-    it('accepts valid phone formats with parentheses and dashes', () => {
+    // TC-F23-04-11: Valid E.164 digits-only phone
+    it('accepts valid E.164 digits-only phone', () => {
         const data = {
-            phone: '+1 (212) 555-1234',
+            phone: '+12125551234',
         }
         const result = profilePatchSchema.safeParse(data)
         expect(result.success).toBe(true)
     })
 
-    // TC-F23-04-12: Phone without plus sign is valid
-    it('accepts phone without plus sign', () => {
+    // TC-F23-04-12: Phone without + prefix is rejected (UI always includes country code)
+    it('rejects phone without country code prefix', () => {
         const data = {
             phone: '2125551234',
+        }
+        const result = profilePatchSchema.safeParse(data)
+        expect(result.success).toBe(false)
+    })
+
+    // TC-F23-04-21: Empty phone string is valid (field is optional)
+    it('accepts empty string for phone (user cleared the field)', () => {
+        const data = {
+            firstName: 'John',
+            phone: '',
+        }
+        const result = profilePatchSchema.safeParse(data)
+        expect(result.success).toBe(true)
+    })
+
+    // TC-F23-04-22: Country-code-only is valid (user switched country but typed no number)
+    it('accepts country-code-only phone (e.g. +84, +60)', () => {
+        expect(profilePatchSchema.safeParse({ phone: '+84' }).success).toBe(true)
+        expect(profilePatchSchema.safeParse({ phone: '+60' }).success).toBe(true)
+    })
+
+    // TC-F23-04-23: Omitting phone entirely is valid
+    it('accepts payload without phone field', () => {
+        const data = {
+            lastName: 'Doe',
         }
         const result = profilePatchSchema.safeParse(data)
         expect(result.success).toBe(true)

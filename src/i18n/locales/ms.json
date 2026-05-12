@@ -329,6 +329,16 @@
       "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
       "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
     },
+    "passwordChanged": {
+      "subject": "Kata laluan PrimeWeb anda telah ditukar 🔐",
+      "heading": "Kata Laluan Ditukar",
+      "subheading": "Kata laluan akaun anda telah dikemas kini",
+      "greeting": "Hai",
+      "body": "Kata laluan akaun PrimeWeb anda telah berjaya ditukar. Kata laluan baharu anda ditunjukkan di bawah sebagai rujukan.",
+      "newPasswordLabel": "Kata Laluan Baharu",
+      "warning": "Jika anda tidak membuat perubahan ini, hubungi pentadbir ruang kerja anda dengan segera dan tetapkan semula kata laluan anda.",
+      "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
+    },
     "order": {
       "subject": "Pesanan Disahkan",
       "heading": "Pesanan Disahkan ✓",
