@@ -1,10 +1,12 @@
 'use client'
 
-import { createContext, useContext } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 
 const HiddenSlugsContext = createContext<Set<string>>(new Set())
 
-export const HiddenSlugsProvider = HiddenSlugsContext.Provider
+export function HiddenSlugsProvider({ value, children }: { value: Set<string>; children: ReactNode }) {
+    return <HiddenSlugsContext.Provider value={value}>{children}</HiddenSlugsContext.Provider>
+}
 
 /** Returns true when the given URL points to a hidden/deleted page (editor mode only). */
 export function useIsHiddenLink(url: string | undefined): boolean {
