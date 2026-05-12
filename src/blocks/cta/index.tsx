@@ -96,7 +96,7 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
 
     if (shouldReduce) {
         return (
-            <BrokenLinkWarning url={url}>
+            <BrokenLinkWarning url={url} rounded="rounded-md">
                 <a href={url} {...linkAttrs} onClick={handleClick} className={`${btnCls} hover:opacity-90`} style={buttonStyle}>
                     {labelNode}
                 </a>
@@ -105,7 +105,7 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
     }
 
     return (
-        <BrokenLinkWarning url={url}>
+        <BrokenLinkWarning url={url} rounded="rounded-md">
             <motion.a href={url} {...linkAttrs} onClick={handleClick} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className={btnCls} style={buttonStyle}>
                 {labelNode}
             </motion.a>
@@ -132,7 +132,7 @@ function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string
 
     if (shouldReduce) {
         return (
-            <BrokenLinkWarning url={url}>
+            <BrokenLinkWarning url={url} rounded="rounded-md">
                 <a href={url} {...linkAttrs} onClick={handleClick} className={cls} style={style}>
                     <RichText text={label} as="span" />
                 </a>
@@ -140,7 +140,7 @@ function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string
         )
     }
     return (
-        <BrokenLinkWarning url={url}>
+        <BrokenLinkWarning url={url} rounded="rounded-md">
             <motion.a href={url} {...linkAttrs} onClick={handleClick} whileHover={{ x: 3 }} className={cls} style={style}>
                 <RichText text={label} as="span" />
             </motion.a>

@@ -42,7 +42,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
     return (
         <div className="flex flex-wrap gap-4">
             {buttons.map((btn, i) => (
-                <BrokenLinkWarning key={i} url={btn?.url}>
+                <BrokenLinkWarning key={i} url={btn?.url} rounded="rounded-xl">
                 <motion.a
                     href={btn?.url}
                     onClick={() => {

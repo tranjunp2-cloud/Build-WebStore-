@@ -4,21 +4,26 @@ import { AlertTriangle } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useIsHiddenLink } from '@/components/site-renderer/HiddenSlugsContext'
 
-type Props = { url?: string; children: ReactNode }
+type Props = {
+    url?: string
+    children: ReactNode
+    /** Border-radius class to match the wrapped button shape. Defaults to rounded-lg. */
+    rounded?: string
+}
 
 /**
  * Editor-only: wraps any CTA/button and shows a red outline + warning badge
  * when the URL points to a hidden or deleted page.
  * On live site the context is empty → renders children transparently.
  */
-export function BrokenLinkWarning({ url, children }: Props) {
+export function BrokenLinkWarning({ url, children, rounded = 'rounded-lg' }: Props) {
     const isHidden = useIsHiddenLink(url)
     if (!isHidden) return <>{children}</>
 
     return (
         <span className="relative inline-flex">
             <span
-                className="pointer-events-none absolute inset-0 rounded-xl ring-2 ring-red-500"
+                className={`pointer-events-none absolute inset-0 ${rounded} ring-2 ring-red-500`}
                 aria-hidden="true"
             />
             <span
