@@ -234,17 +234,18 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             }
         })
     }
-    // Slugs (normalized to /slug) of pages hidden from visitor nav (isVisible=false or soft-deleted).
-    // Owners and editor preview always see the full menu.
-    const hiddenSlugs = new Set<string>()
-    if (!isEditor && !isOwner) {
-        for (const p of pages) {
-            if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '')) {
-                const raw = (p.slug ?? '').trim()
-                hiddenSlugs.add(!raw || raw === '/' ? '/' : (raw.startsWith('/') ? raw : `/${raw}`))
-            }
+    // All slugs of hidden/deleted pages (normalized to /slug).
+    const warnSlugs = new Set<string>()
+    for (const p of pages) {
+        if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '')) {
+            const raw = (p.slug ?? '').trim()
+            warnSlugs.add(!raw || raw === '/' ? '/' : (raw.startsWith('/') ? raw : `/${raw}`))
         }
     }
+    // For visitors: filter hidden/deleted slugs out of nav. Owners/editors see all links.
+    const hiddenSlugs = (!isEditor && !isOwner) ? warnSlugs : new Set<string>()
+    // In editor/preview: mark hidden links so NavigationBlock can render a warning indicator.
+    const markHiddenLinks = isEditor && warnSlugs.size > 0
 
     const rewriteNavLinks = (links: unknown): unknown => {
         if (!Array.isArray(links)) return links
@@ -260,10 +261,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             .map((l) => {
                 if (!l || typeof l !== 'object') return l
                 const link = l as { url?: string; children?: unknown; [k: string]: unknown }
+                const url = (link.url ?? '').trim()
+                const normalized = url.startsWith('/') ? url : `/${url}`
+                const isHiddenFromVisitor = markHiddenLinks && !!url && url !== '#' && warnSlugs.has(normalized)
                 return {
                     ...link,
                     url: rewriteUrl(link.url),
                     children: link.children ? rewriteNavLinks(link.children) : undefined,
+                    ...(isHiddenFromVisitor ? { _hiddenFromVisitor: true } : {}),
                 }
             })
     }

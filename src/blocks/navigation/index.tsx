@@ -5,7 +5,7 @@ import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, EyeOff } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
@@ -79,9 +79,10 @@ function DropdownLink({ link, i }: { link: NavLink; i: number }) {
                 key={i}
                 href={link?.url}
                 whileHover={{ y: -1 }}
-                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
+                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] inline-flex items-center gap-1"
             >
                 {link.label}
+                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
             </motion.a>
         )
     }
@@ -148,10 +149,11 @@ function MobileNavItem({
         <div>
             <a
                 href={link?.url}
-                className={`block rounded-lg px-4 ${depth === 0 ? `py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] ${TOUCH_TARGET.min} flex items-center` : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04]'} transition-all duration-200`}
+                className={`rounded-lg px-4 ${depth === 0 ? `py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] ${TOUCH_TARGET.min} flex items-center gap-1` : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
             >
                 {link.label}
+                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
             </a>
             {hasChildren && (
                 <div className="ml-4 flex flex-col gap-0.5">
@@ -184,10 +186,11 @@ function SidebarNavItem({
         <div>
             <a
                 href={link?.url}
-                className={`block rounded-lg px-4 ${depth === 0 ? 'py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06]' : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04]'} transition-all duration-200`}
+                className={`rounded-lg px-4 ${depth === 0 ? 'py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] flex items-center gap-1' : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
             >
                 {link.label}
+                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
             </a>
             {hasChildren && (
                 <div className="ml-4 border-l border-white/10 pl-2">
