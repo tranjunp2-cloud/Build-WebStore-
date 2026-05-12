@@ -479,14 +479,16 @@ export function PreviewScripts() {
                 const stopFooterFieldEdit = (silent?: boolean) => {
                     if (!isEditingFooterField) return
                     if (ffInputTimer) { clearTimeout(ffInputTimer); ffInputTimer = null }
+                    // Guard must be cleared BEFORE contentEditable='false' — setting it fires blur
+                    // synchronously, which would re-enter this function and send a duplicate STOP message
+                    isEditingFooterField = false
+                    footerFieldEl = null
+                    footerFieldStopFn = null
                     ffEl.contentEditable = 'false'
                     ffEl.removeEventListener('input', onFFInput)
                     ffEl.removeEventListener('keydown', onFFKeyDown)
                     ffEl.removeEventListener('paste', onFFPaste)
                     ffEl.removeEventListener('blur', onFFBlur)
-                    isEditingFooterField = false
-                    footerFieldEl = null
-                    footerFieldStopFn = null
                     if (!silent) {
                         window.parent.postMessage({ type: 'FOOTER_FIELD_EDIT_STOP', fieldName }, parentOrigin)
                     }
