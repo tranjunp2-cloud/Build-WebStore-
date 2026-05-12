@@ -59,6 +59,7 @@ type CTAButtonProps = {
 function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: CTAButtonProps) {
     const shouldReduce = useReducedMotion()
     const isOwner = useIsOwner()
+    if (!url) return null
     const isPrimary = style === 'primary'
     const linkAttrs = getLinkAttrs(url)
 

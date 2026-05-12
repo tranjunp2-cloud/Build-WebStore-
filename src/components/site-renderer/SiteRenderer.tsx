@@ -25,7 +25,7 @@ import { FloatingContainerProvider } from './FloatingContainerContext'
 // socialWidget/cartWidget are camelCase (BLOCK_TYPES registry); whatsapp-button/announcement-bar are kebab.
 const FLOATING_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget', 'announcement-bar'])
 
-export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
+export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null; status?: string }
 
 export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null; children?: NavLinkItem[] };
 type PreviewBlock = {
@@ -241,7 +241,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     const warnSlugs = new Set<string>()
     const warnPageIds = new Set<string>()
     for (const p of pages) {
-        if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '')) {
+        if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '') || p.status === 'draft') {
             const raw = (p.slug ?? '').trim()
             warnSlugs.add(!raw || raw === '/' ? '/' : (raw.startsWith('/') ? raw : `/${raw}`))
             warnPageIds.add(String(p.id))
@@ -251,6 +251,15 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     const hiddenSlugs = (!isEditor && !isOwner) ? warnSlugs : new Set<string>()
     // In editor/preview: mark hidden links so NavigationBlock can render a warning indicator.
     const markHiddenLinks = isEditor && warnSlugs.size > 0
+
+    // Returns true when a URL points to a page that should be hidden from visitors.
+    const isHiddenSlug = (url: string | undefined): boolean => {
+        if (!hiddenSlugs.size || !url) return false
+        const trimmed = url.trim()
+        if (!trimmed || trimmed === '#' || trimmed.startsWith('http')) return false
+        const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+        return hiddenSlugs.has(normalized)
+    }
 
     const rewriteNavLinks = (links: unknown): unknown => {
         if (!Array.isArray(links)) return links
@@ -280,21 +289,32 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
     const blocks = rawBlocks.map((b) => {
         if (b.blockType === 'navigation') {
+            const rawCta = b.ctaButton as { show?: boolean; url?: string; [k: string]: unknown } | null | undefined
             return {
                 ...b,
                 links: rewriteNavLinks(b.links) as typeof b.links,
-                ctaButton: b.ctaButton
-                    ? { ...b.ctaButton, url: rewriteUrl(b.ctaButton.url) }
+                ctaButton: rawCta
+                    ? isHiddenSlug(rawCta.url)
+                        ? { ...rawCta, show: false }
+                        : { ...rawCta, url: rewriteUrl(rawCta.url) }
                     : b.ctaButton,
             }
         }
         if (b.blockType === 'hero' && Array.isArray(b.ctaButtons)) {
             return {
                 ...b,
-                ctaButtons: b.ctaButtons.map((btn) => ({
-                    ...btn,
-                    url: rewriteUrl(btn?.url),
-                })),
+                ctaButtons: b.ctaButtons
+                    .filter((btn) => !isHiddenSlug(btn?.url))
+                    .map((btn) => ({ ...btn, url: rewriteUrl(btn?.url) })),
+            }
+        }
+        if (b.blockType === 'cta') {
+            const ctaUrl = b.ctaUrl as string | undefined
+            const secUrl = b.secondaryCtaUrl as string | undefined
+            return {
+                ...b,
+                ctaUrl: isHiddenSlug(ctaUrl) ? '' : rewriteUrl(ctaUrl),
+                secondaryCtaUrl: isHiddenSlug(secUrl) ? '' : rewriteUrl(secUrl),
             }
         }
         if (b.blockType === 'breadcrumb') {
