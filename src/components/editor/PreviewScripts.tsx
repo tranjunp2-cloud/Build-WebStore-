@@ -448,10 +448,16 @@ export function PreviewScripts() {
                 ffSel?.removeAllRanges()
                 ffSel?.addRange(ffRange)
 
-                window.parent.postMessage({ type: 'FOOTER_FIELD_EDIT_START', fieldName, value: ffEl.textContent, rect: ffEl.getBoundingClientRect() }, parentOrigin)
+                const ffRect = ffEl.getBoundingClientRect()
+                window.parent.postMessage({ type: 'FOOTER_FIELD_EDIT_START', fieldName, value: ffEl.textContent, rect: { top: ffRect.top, left: ffRect.left, width: ffRect.width, height: ffRect.height } }, parentOrigin)
 
+                let ffInputTimer: ReturnType<typeof setTimeout> | null = null
                 const onFFInput = () => {
-                    window.parent.postMessage({ type: 'FOOTER_FIELD_EDITED', fieldName, newValue: ffEl.textContent ?? '' }, parentOrigin)
+                    if (ffInputTimer) clearTimeout(ffInputTimer)
+                    ffInputTimer = setTimeout(() => {
+                        ffInputTimer = null
+                        window.parent.postMessage({ type: 'FOOTER_FIELD_EDITED', fieldName, newValue: ffEl.textContent ?? '' }, parentOrigin)
+                    }, 300)
                 }
                 const onFFKeyDown = (ev: KeyboardEvent) => {
                     if (ev.key === 'Enter' || ev.key === 'Escape') { ev.preventDefault(); ffEl.blur() }
@@ -459,10 +465,20 @@ export function PreviewScripts() {
                 const onFFPaste = (ev: ClipboardEvent) => {
                     ev.preventDefault()
                     const text = ev.clipboardData?.getData('text/plain') ?? ''
-                    document.execCommand('insertText', false, text)
+                    const sel = window.getSelection()
+                    if (sel && sel.rangeCount > 0) {
+                        const range = sel.getRangeAt(0)
+                        range.deleteContents()
+                        range.insertNode(document.createTextNode(text))
+                        range.collapse(false)
+                        sel.removeAllRanges()
+                        sel.addRange(range)
+                        onFFInput()
+                    }
                 }
                 const stopFooterFieldEdit = (silent?: boolean) => {
                     if (!isEditingFooterField) return
+                    if (ffInputTimer) { clearTimeout(ffInputTimer); ffInputTimer = null }
                     ffEl.contentEditable = 'false'
                     ffEl.removeEventListener('input', onFFInput)
                     ffEl.removeEventListener('keydown', onFFKeyDown)

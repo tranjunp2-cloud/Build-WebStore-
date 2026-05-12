@@ -429,11 +429,14 @@ export default function EditorPage() {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
     }, [hasUnsavedChanges])
 
-    // Clear pending reorder-save timer on unmount
+    // Clear pending save timers on unmount
     useEffect(() => {
         return () => {
             if (reorderSaveTimerRef.current !== null) {
                 window.clearTimeout(reorderSaveTimerRef.current)
+            }
+            if (footerUpdateSaveTimerRef.current !== null) {
+                clearTimeout(footerUpdateSaveTimerRef.current)
             }
         }
     }, [])

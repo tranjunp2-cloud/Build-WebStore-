@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { FooterConfigSchema, footerMeta } from '@/blocks/footer/config'
 
 // Note: rendering tests (T4, T5, T6) disabled due to Footer component complexity.
