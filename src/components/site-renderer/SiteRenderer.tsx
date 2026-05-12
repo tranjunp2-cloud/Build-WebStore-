@@ -15,6 +15,7 @@ import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
 import { OwnerProvider } from './OwnerContext'
+import { HiddenSlugsProvider } from './HiddenSlugsContext'
 import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 import { FloatingContainerProvider } from './FloatingContainerContext'
 
@@ -422,6 +423,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     })
 
     return (
+        <HiddenSlugsProvider value={isEditor ? warnSlugs : new Set()}>
         <OwnerProvider value={!!isOwner}>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`
@@ -607,5 +609,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 </div>
             ))}
         </OwnerProvider>
+        </HiddenSlugsProvider>
     )
 }
