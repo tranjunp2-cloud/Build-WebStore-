@@ -11,6 +11,7 @@ import {
     verifyProjectDomain,
     getProjectDomain,
     removeProjectDomain,
+    isMockMode,
 } from '@/lib/vercel/domains';
 import {
     VercelDomainsError,
@@ -319,16 +320,30 @@ export async function verifyCustomDomain(rawDomain: string): Promise<DomainActio
 
     // Hard DNS pre-flight — domain must be pointing to Vercel before marking active.
     // Skipped in local dev mock mode (no VERCEL_TOKEN) so UI can be tested without real DNS.
-    const isMockMode = !process.env.VERCEL_TOKEN && process.env.NODE_ENV === 'development';
-    if (!isMockMode) {
+    if (!isMockMode()) {
+        const DNS_TIMEOUT_MS = 5000;
+        const withDnsTimeout = <T>(p: Promise<T>): Promise<T> =>
+            Promise.race([
+                p,
+                new Promise<T>((_, reject) =>
+                    setTimeout(() => reject(Object.assign(new Error('DNS_TIMEOUT'), { code: 'DNS_TIMEOUT' })), DNS_TIMEOUT_MS),
+                ),
+            ]);
+
+        const DNS_PROPAGATION_NOTE = 'DNS changes can take up to 24 hours to propagate.';
+
         if (isApexDomain(domain)) {
             let addresses: string[] = [];
             try {
-                addresses = await dns.resolve4(domain);
-            } catch {
+                addresses = await withDnsTimeout(dns.resolve4(domain));
+            } catch (err: unknown) {
+                const code = (err as NodeJS.ErrnoException).code;
+                if (code === 'DNS_TIMEOUT') {
+                    return { success: false, error: 'DNS lookup timed out. Please try again.' };
+                }
                 return {
                     success: false,
-                    error: 'DNS records not detected yet. Please add the A record above and try again. DNS changes can take a few minutes to propagate.',
+                    error: `DNS records not detected yet. Please add the A record above and try again. ${DNS_PROPAGATION_NOTE}`,
                 };
             }
             if (!addresses.includes(VERCEL_APEX_IP)) {
@@ -340,18 +355,22 @@ export async function verifyCustomDomain(rawDomain: string): Promise<DomainActio
         } else {
             let cnames: string[] = [];
             try {
-                cnames = await dns.resolveCname(domain);
-            } catch {
+                cnames = await withDnsTimeout(dns.resolveCname(domain));
+            } catch (err: unknown) {
+                const code = (err as NodeJS.ErrnoException).code;
+                if (code === 'DNS_TIMEOUT') {
+                    return { success: false, error: 'DNS lookup timed out. Please try again.' };
+                }
                 return {
                     success: false,
-                    error: 'DNS records not detected yet. Please add the CNAME record above and try again. DNS changes can take a few minutes to propagate.',
+                    error: `DNS records not detected yet. Please add the CNAME record above and try again. ${DNS_PROPAGATION_NOTE}`,
                 };
             }
             const normalized = cnames.map((c) => c.replace(/\.$/, '').toLowerCase());
             if (!normalized.includes(VERCEL_CNAME.toLowerCase())) {
                 return {
                     success: false,
-                    error: `Your domain is not yet pointing to our servers. Expected CNAME: ${VERCEL_CNAME} — currently resolves to: ${cnames.join(', ')}. Please update your DNS and try again.`,
+                    error: `Your domain is not yet pointing to our servers. Expected CNAME: ${VERCEL_CNAME} — currently resolves to: ${normalized.join(', ')}. Please update your DNS and try again.`,
                 };
             }
         }

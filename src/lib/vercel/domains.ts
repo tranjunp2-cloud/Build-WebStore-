@@ -32,7 +32,7 @@ const VERCEL_API_BASE = 'https://api.vercel.com'
 //
 // VERCEL_MOCK_MODE=pending  → domain added as pending (TXT challenge shown)
 // VERCEL_MOCK_MODE=active   → domain added as immediately active (default)
-function isMockMode(): boolean {
+export function isMockMode(): boolean {
     return !process.env.VERCEL_TOKEN && process.env.NODE_ENV === 'development'
 }
 

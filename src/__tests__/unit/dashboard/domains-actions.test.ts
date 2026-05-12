@@ -32,6 +32,7 @@ vi.mock('@/lib/vercel/domains', () => ({
     verifyProjectDomain: vi.fn(),
     getProjectDomain: vi.fn(),
     removeProjectDomain: vi.fn(),
+    isMockMode: vi.fn().mockReturnValue(false),
 }));
 
 // Stub dns.promises — the action uses resolve4 / resolveCname for a soft
@@ -477,6 +478,22 @@ describe('Domains Server Actions (Vercel-backed)', () => {
             expect(res.error).toMatch(/not yet pointing/i);
             expect(res.error).toContain('cname.vercel-dns.com');
             expect(res.error).toContain('some-other-host.com');
+            expect(vi.mocked(verifyProjectDomain)).not.toHaveBeenCalled();
+        });
+
+        // TC-F19.17 — DNS timeout: resolve4 hangs beyond 5s threshold.
+        it('TC-F19.17: DNS timeout returns specific timeout error without calling Vercel', async () => {
+            mockFindByID.mockResolvedValueOnce({
+                id: 'tenant-123',
+                customDomains: [{ domain: 'example.com', status: 'pending' }],
+            });
+            vi.mocked(dns.promises.resolve4).mockRejectedValueOnce(
+                Object.assign(new Error('DNS_TIMEOUT'), { code: 'DNS_TIMEOUT' }),
+            );
+
+            const res = await verifyCustomDomain('example.com');
+            expect(res.success).toBe(false);
+            expect(res.error).toMatch(/timed out/i);
             expect(vi.mocked(verifyProjectDomain)).not.toHaveBeenCalled();
         });
     });

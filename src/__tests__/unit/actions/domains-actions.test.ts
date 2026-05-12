@@ -26,6 +26,7 @@ vi.mock('@/lib/vercel/domains', () => ({
     verifyProjectDomain: vi.fn(),
     getProjectDomain: vi.fn(),
     removeProjectDomain: vi.fn(),
+    isMockMode: vi.fn().mockReturnValue(false),
 }))
 
 // Action's soft DNS pre-flight — must never hard-fail tests.
