@@ -406,6 +406,36 @@ describe('Domains Server Actions (Vercel-backed)', () => {
             });
         });
 
+        // TC-A-08b — verifyProjectDomain resolves 200 with verified=false (not thrown).
+        // Distinct from TC-A-08 (400 thrown). This path: Vercel says "not verified yet"
+        // with a fresh TXT challenge in the body — action persists and surfaces it.
+        it('TC-A-08b: verifyProjectDomain 200 verified=false persists fresh verification and returns error', async () => {
+            const freshVerification = [
+                { type: 'TXT' as const, domain: '_vercel.pending.com', value: 'vc-fresh-token', reason: 'pending_domain_verification' },
+            ];
+            mockFindByID.mockResolvedValueOnce({
+                id: 'tenant-123',
+                customDomains: [{ domain: 'pending.com', status: 'pending' }],
+            });
+            vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
+                makeVercelDomain({ name: 'pending.com', apexName: 'pending.com', verified: false, verification: freshVerification }),
+            );
+
+            const res = await verifyCustomDomain('pending.com');
+            expect(res.success).toBe(false);
+            expect(res.error).toMatch(/verification failed/i);
+            expect((res as { verification: unknown }).verification).toEqual(freshVerification);
+
+            // Payload row updated with fresh verification challenges.
+            const finalUpdate = mockUpdate.mock.calls.at(-1)?.[0];
+            expect(finalUpdate.data.customDomains[0]).toMatchObject({
+                domain: 'pending.com',
+                vercelVerification: freshVerification,
+            });
+            // getProjectDomain should NOT be called — no 400 error thrown.
+            expect(vi.mocked(getProjectDomain)).not.toHaveBeenCalled();
+        });
+
         // TC-A-09 — Idempotent: already-active domain short-circuits.
         it('TC-A-09: idempotent short-circuit when already active', async () => {
             mockFindByID.mockResolvedValueOnce({

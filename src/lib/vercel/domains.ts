@@ -30,8 +30,8 @@ const VERCEL_API_BASE = 'https://api.vercel.com'
 // Activates automatically when VERCEL_TOKEN is absent in development so the
 // full domain UI flow can be exercised without a real Vercel project.
 //
-// VERCEL_MOCK_MODE=pending  → domain added as pending (TXT challenge shown)
-// VERCEL_MOCK_MODE=active   → domain added as immediately active (default)
+// VERCEL_MOCK_MODE=pending  → domain added as pending (TXT challenge shown) — default
+// VERCEL_MOCK_MODE=active   → domain added as immediately active
 export function isMockMode(): boolean {
     return !process.env.VERCEL_TOKEN && process.env.NODE_ENV === 'development'
 }
@@ -209,7 +209,7 @@ async function vercelFetch<T>(
  */
 export async function addProjectDomain(name: string): Promise<VercelDomain> {
     if (isMockMode()) {
-        console.warn(`[vercel-domains] MOCK: addProjectDomain("${name}") mode=${process.env.VERCEL_MOCK_MODE ?? 'active'}`)
+        console.warn(`[vercel-domains] MOCK: addProjectDomain("${name}") mode=${process.env.VERCEL_MOCK_MODE ?? 'pending'}`)
         return mockDomain(name)
     }
     const { projectId } = assertVercelEnv()

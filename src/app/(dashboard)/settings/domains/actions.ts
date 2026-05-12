@@ -323,12 +323,16 @@ export async function verifyCustomDomain(rawDomain: string): Promise<DomainActio
     if (!isMockMode()) {
         const DNS_TIMEOUT_MS = 5000;
         const withDnsTimeout = <T>(p: Promise<T>): Promise<T> =>
-            Promise.race([
-                p,
-                new Promise<T>((_, reject) =>
-                    setTimeout(() => reject(Object.assign(new Error('DNS_TIMEOUT'), { code: 'DNS_TIMEOUT' })), DNS_TIMEOUT_MS),
-                ),
-            ]);
+            new Promise<T>((resolve, reject) => {
+                const timer = setTimeout(
+                    () => reject(Object.assign(new Error('DNS_TIMEOUT'), { code: 'DNS_TIMEOUT' })),
+                    DNS_TIMEOUT_MS,
+                );
+                p.then(
+                    (v) => { clearTimeout(timer); resolve(v); },
+                    (e) => { clearTimeout(timer); reject(e); },
+                );
+            });
 
         const DNS_PROPAGATION_NOTE = 'DNS changes can take up to 24 hours to propagate.';
 
