@@ -97,4 +97,73 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
 
         expect(body.data.total).toBe(116) // 100 subtotal + 10 shipping + 6 SST
     })
+
+    it('[TC-F09.NEW-1] COD checkout → paymentStatus: unpaid', async () => {
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ id: 'prod-1', name: 'Product', price: 50, stock: 10 })
+            .mockResolvedValueOnce({ id: 'prod-1', stock: 10 })
+        mockCreate.mockResolvedValue({ id: 'order-1', paymentStatus: 'unpaid' })
+        mockUpdate.mockResolvedValue({})
+
+        const res = await POST(mockReq({ ...validBody, paymentMethod: 'cod' }))
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        // Verify create was called with paymentStatus: unpaid
+        expect(mockCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    paymentStatus: 'unpaid',
+                })
+            })
+        )
+    })
+
+    it('[TC-F09.NEW-2] QR Banking checkout with proof image → paymentStatus: paid', async () => {
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ id: 'prod-1', name: 'Product', price: 75, stock: 5 })
+            .mockResolvedValueOnce({ id: 'prod-1', stock: 5 })
+        mockCreate.mockResolvedValue({ id: 'order-2', paymentStatus: 'paid' })
+        mockUpdate.mockResolvedValue({})
+
+        const qrPayload = {
+            ...validBody,
+            paymentMethod: 'qr_banking',
+            paymentProofImage: 'data:image/png;base64,iVBORw0KGgo...'
+        }
+
+        const res = await POST(mockReq(qrPayload))
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        // Verify create was called with paymentStatus: paid
+        expect(mockCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    paymentStatus: 'paid',
+                    paymentProofImage: 'data:image/png;base64,iVBORw0KGgo...'
+                })
+            })
+        )
+    })
+
+    it('[TC-F09.NEW-3] Out of stock → 422, cart not cleared', async () => {
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ id: 'prod-1', name: 'Limited Product', price: 100, stock: 1 }) // only 1 left
+
+        // Requesting 3 items, but only 1 available
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 3 }] }))
+        const body = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(body.error.code).toBe('OUT_OF_STOCK')
+        // Verify cart clearing was NOT attempted (create should not be called)
+        expect(mockCreate).not.toHaveBeenCalled()
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
 })

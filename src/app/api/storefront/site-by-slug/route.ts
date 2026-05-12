@@ -37,8 +37,8 @@ export async function GET(req: Request) {
             collection: 'sites',
             where: { tenant: { equals: tenant.id } },
             limit: 1,
-            depth: 0,
-            select: { id: true },
+            depth: 1,
+            select: { id: true, paymentConfig: true },
             overrideAccess: true,
         })
 
@@ -47,7 +47,19 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
-        return NextResponse.json({ siteId: site.id, tenantId: tenant.id })
+        const paymentConfig = (site as any).paymentConfig
+        const merchantQrCode = paymentConfig?.merchantQrCode
+        const merchantQrCodeUrl = merchantQrCode && typeof merchantQrCode === 'object'
+            ? (merchantQrCode.url ?? null)
+            : null
+
+        return NextResponse.json({
+            siteId: site.id,
+            tenantId: tenant.id,
+            merchantQrCodeUrl,
+            enableCod: paymentConfig?.enableCod ?? true,
+            enableQrBanking: paymentConfig?.enableQrBanking ?? true,
+        })
     } catch (error) {
         console.error('[Storefront site-by-slug]', error)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

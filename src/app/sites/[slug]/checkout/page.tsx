@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
-import { ArrowLeft, CheckCircle, Loader2, ShoppingBag, Upload, X, CreditCard, Banknote, QrCode, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Loader2, ShoppingBag, Upload, X, Banknote, QrCode, AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
 function formatPrice(price: number, currency: string) {
@@ -46,6 +47,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [isOwner, setIsOwner] = useState(false)
     const { items, subtotal, clearCart } = useCartStore()
 
+    const [merchantQrUrl, setMerchantQrUrl] = useState<string | null>(null)
+    const [enableCod, setEnableCod] = useState(true)
+    const [enableQrBanking, setEnableQrBanking] = useState(true)
+
     const [form, setForm] = useState<CheckoutForm>(initialForm)
     const [paymentMethod, setPaymentMethod] = useState<'cod' | 'qr_banking'>('cod')
     const [proofFile, setProofFile] = useState<File | null>(null)
@@ -53,8 +58,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [proofError, setProofError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    const router = useRouter()
+
     const [isPlacing, setIsPlacing] = useState(false)
-    const [orderResult, setOrderResult] = useState<any>(null)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -73,6 +79,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 }
                 const data = await res.json()
                 if (data.siteId) setSiteId(String(data.siteId))
+                if (data.merchantQrCodeUrl) setMerchantQrUrl(data.merchantQrCodeUrl)
+                if (data.enableCod === false) {
+                    setEnableCod(false)
+                    setPaymentMethod('qr_banking')
+                }
+                if (data.enableQrBanking === false) setEnableQrBanking(false)
 
                 // Check if current user is tenant member (skip tracking for owners) — best-effort
                 try {
@@ -199,7 +211,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             const data = await res.json()
 
             if (res.ok && data.success) {
-                setOrderResult(data.data)
                 clearCart()
                 if (siteId) {
                     trackEvent({
@@ -214,6 +225,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                         },
                     })
                 }
+                router.push(`/sites/${slug}/order/${data.data.orderId}/confirm`)
             } else {
                 // AC-2: Cart preserved on error
                 setError(data.error?.message || 'Failed to place order')
@@ -224,59 +236,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         } finally {
             setIsPlacing(false)
         }
-    }
-
-    // ─── Order Success ─────────────────────────────────────────
-    if (orderResult) {
-        return (
-            <div style={{
-                fontFamily: 'Inter, sans-serif', minHeight: '100vh',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: '#fafafa', padding: '24px',
-            }}>
-                <div style={{
-                    textAlign: 'center', maxWidth: '480px', width: '100%', padding: '48px 32px',
-                    background: 'white', borderRadius: '24px', boxShadow: '0 4px 24px rgba(0,0,0,0.05)',
-                }}>
-                    <div style={{
-                        width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
-                    }}>
-                        <CheckCircle size={32} color="#22c55e" />
-                    </div>
-                    <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px' }}>{ck.orderConfirmed}</h1>
-                    <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>
-                        {ck.thankYou}
-                    </p>
-                    <div style={{
-                        background: '#f8fafc', borderRadius: '12px', padding: '20px', marginBottom: '24px',
-                    }}>
-                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>{ck.orderNumber}</p>
-                        <p style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 12px', letterSpacing: '1px' }}>
-                            {orderResult.orderNumber}
-                        </p>
-                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>{ck.total}</p>
-                        <p style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
-                            {formatPrice(orderResult.total, orderResult.currency)}
-                        </p>
-                        <p style={{ fontSize: '13px', color: '#999', margin: '12px 0 0' }}>
-                            Payment: {orderResult.paymentMethod === 'cod' ? ck.cod : ck.qrBanking}
-                        </p>
-                    </div>
-                    <p style={{ fontSize: '13px', color: '#999' }}>
-                        {ck.confirmationEmail}
-                    </p>
-                    <Link href={`/sites/${slug}/products`}
-                        style={{
-                            display: 'inline-block', marginTop: '24px', padding: '12px 32px',
-                            background: '#111', color: 'white', borderRadius: '12px',
-                            textDecoration: 'none', fontSize: '14px', fontWeight: 600,
-                        }}>
-                        {ck.continueShopping}
-                    </Link>
-                </div>
-            </div>
-        )
     }
 
     // ─── Empty Cart ────────────────────────────────────────────
@@ -380,52 +339,56 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                         <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>{ck.paymentMethod}</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {/* COD Option */}
-                            <label
-                                onClick={() => setPaymentMethod('cod')}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '14px',
-                                    padding: '16px 20px', borderRadius: '12px', cursor: 'pointer',
-                                    border: `2px solid ${paymentMethod === 'cod' ? '#111' : '#e5e7eb'}`,
-                                    background: paymentMethod === 'cod' ? '#f8fafc' : 'white',
-                                    transition: 'all 0.15s',
-                                }}>
-                                <div style={{
-                                    width: '20px', height: '20px', borderRadius: '50%',
-                                    border: `2px solid ${paymentMethod === 'cod' ? '#111' : '#ccc'}`,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                                }}>
-                                    {paymentMethod === 'cod' && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#111' }} />}
-                                </div>
-                                <Banknote size={20} color="#666" />
-                                <div>
-                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{ck.cod}</p>
-                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>{ck.codDesc}</p>
-                                </div>
-                            </label>
+                            {enableCod && (
+                                <label
+                                    onClick={() => setPaymentMethod('cod')}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '14px',
+                                        padding: '16px 20px', borderRadius: '12px', cursor: 'pointer',
+                                        border: `2px solid ${paymentMethod === 'cod' ? '#111' : '#e5e7eb'}`,
+                                        background: paymentMethod === 'cod' ? '#f8fafc' : 'white',
+                                        transition: 'all 0.15s',
+                                    }}>
+                                    <div style={{
+                                        width: '20px', height: '20px', borderRadius: '50%',
+                                        border: `2px solid ${paymentMethod === 'cod' ? '#111' : '#ccc'}`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                    }}>
+                                        {paymentMethod === 'cod' && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#111' }} />}
+                                    </div>
+                                    <Banknote size={20} color="#666" />
+                                    <div>
+                                        <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{ck.cod}</p>
+                                        <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>{ck.codDesc}</p>
+                                    </div>
+                                </label>
+                            )}
 
                             {/* QR Banking Option */}
-                            <label
-                                onClick={() => setPaymentMethod('qr_banking')}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '14px',
-                                    padding: '16px 20px', borderRadius: '12px', cursor: 'pointer',
-                                    border: `2px solid ${paymentMethod === 'qr_banking' ? '#111' : '#e5e7eb'}`,
-                                    background: paymentMethod === 'qr_banking' ? '#f8fafc' : 'white',
-                                    transition: 'all 0.15s',
-                                }}>
-                                <div style={{
-                                    width: '20px', height: '20px', borderRadius: '50%',
-                                    border: `2px solid ${paymentMethod === 'qr_banking' ? '#111' : '#ccc'}`,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                                }}>
-                                    {paymentMethod === 'qr_banking' && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#111' }} />}
-                                </div>
-                                <QrCode size={20} color="#666" />
-                                <div>
-                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{ck.qrBanking}</p>
-                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>{ck.qrBankingDesc}</p>
-                                </div>
-                            </label>
+                            {enableQrBanking && (
+                                <label
+                                    onClick={() => setPaymentMethod('qr_banking')}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '14px',
+                                        padding: '16px 20px', borderRadius: '12px', cursor: 'pointer',
+                                        border: `2px solid ${paymentMethod === 'qr_banking' ? '#111' : '#e5e7eb'}`,
+                                        background: paymentMethod === 'qr_banking' ? '#f8fafc' : 'white',
+                                        transition: 'all 0.15s',
+                                    }}>
+                                    <div style={{
+                                        width: '20px', height: '20px', borderRadius: '50%',
+                                        border: `2px solid ${paymentMethod === 'qr_banking' ? '#111' : '#ccc'}`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                    }}>
+                                        {paymentMethod === 'qr_banking' && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#111' }} />}
+                                    </div>
+                                    <QrCode size={20} color="#666" />
+                                    <div>
+                                        <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>{ck.qrBanking}</p>
+                                        <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>{ck.qrBankingDesc}</p>
+                                    </div>
+                                </label>
+                            )}
                         </div>
 
                         {/* QR Banking Details */}
@@ -439,16 +402,22 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                     <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 16px' }}>
                                         {ck.scanToPay}
                                     </p>
-                                    <div style={{
-                                        width: '200px', height: '200px', margin: '0 auto',
-                                        borderRadius: '16px', background: '#f8fafc',
-                                        border: '2px dashed #d1d5db',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        flexDirection: 'column', gap: '8px',
-                                    }}>
-                                        <QrCode size={48} color="#9ca3af" />
-                                        <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{ck.merchantQr}</p>
-                                    </div>
+                                    {merchantQrUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={merchantQrUrl} alt="Merchant QR Code"
+                                            style={{ width: '200px', height: '200px', objectFit: 'contain', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'block', margin: '0 auto' }} />
+                                    ) : (
+                                        <div style={{
+                                            width: '200px', height: '200px', margin: '0 auto',
+                                            borderRadius: '16px', background: '#f8fafc',
+                                            border: '2px dashed #d1d5db',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            flexDirection: 'column', gap: '8px',
+                                        }}>
+                                            <QrCode size={48} color="#9ca3af" />
+                                            <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>{ck.merchantQr}</p>
+                                        </div>
+                                    )}
                                     <p style={{ fontSize: '12px', color: '#999', margin: '12px 0 0' }}>
                                         {ck.amount} <strong>{formatPrice(total, currency)}</strong>
                                     </p>

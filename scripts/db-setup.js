@@ -3802,6 +3802,13 @@ const MIGRATIONS = [
   // Remove 'tenant-owner' from users_roles for users who have tenant memberships but are not an owner
   // in any of them. Owners (users_tenants.role = 'owner') are unaffected.
   { name: 'users_roles.strip_tenant_owner_from_non_owners', sql: `DELETE FROM users_roles WHERE value = 'tenant-owner' AND parent_id IN (SELECT DISTINCT u.id FROM users u WHERE EXISTS (SELECT 1 FROM users_tenants ut WHERE ut._parent_id = u.id) AND NOT EXISTS (SELECT 1 FROM users_tenants ut WHERE ut._parent_id = u.id AND ut.role = 'owner'));` },
+  // GH-961: paymentStatus — separate payment tracking field for COD/QR Banking orders
+  { name: 'orders.payment_status', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status varchar DEFAULT 'unpaid';` },
+  { name: 'orders.payment_status_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_status_idx ON orders (payment_status);` },
+  // GH-961: Sites paymentConfig group — merchant QR code + payment method toggles per site
+  { name: 'sites.payment_config_merchant_qr_code_id', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_merchant_qr_code_id integer;` },
+  { name: 'sites.payment_config_enable_cod', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_enable_cod boolean DEFAULT true;` },
+  { name: 'sites.payment_config_enable_qr_banking', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_enable_qr_banking boolean DEFAULT true;` },
 ];
 
 async function runMigrations(pool) {

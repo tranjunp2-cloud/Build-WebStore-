@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { ORDER_STATUS_TRANSITIONS, Orders } from '@/collections/Orders'
 
 // ─── TC-F10.09: Order status transitions ─────────────────────────────
 // ─── TC-F10.32: Bypass state machine validation ──────────────────────
@@ -108,5 +108,111 @@ describe('ORDER_STATUS_TRANSITIONS — helper validation', () => {
 
     it('returns false for unknown status', () => {
         expect(isValidTransition('nonexistent', 'confirmed')).toBe(false)
+    })
+})
+
+// ─── TC-F10.01: COD Auto-pay Hook ──────────────────────────────────────
+describe('Orders collection — beforeChange hook', () => {
+    // Extract the beforeChange hook from Orders collection config
+    const beforeChangeHook = Orders.hooks?.beforeChange?.[0]
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('[TC-F10.01-1] status=completed + paymentMethod=cod → paymentStatus=paid', async () => {
+        // Arrange
+        const data = {
+            status: 'completed',
+            paymentMethod: 'cod',
+            paymentStatus: 'unpaid' // Before the hook runs
+        }
+        const originalDoc = {
+            status: 'pending',
+            paymentMethod: 'cod',
+            paymentStatus: 'unpaid'
+        }
+
+        // Act
+        const result = await beforeChangeHook({ data, originalDoc })
+
+        // Assert
+        expect(result.paymentStatus).toBe('paid')
+    })
+
+    it('[TC-F10.01-2] status=completed + paymentMethod=qr_banking → paymentStatus unchanged', async () => {
+        // Arrange
+        const data = {
+            status: 'completed',
+            paymentMethod: 'qr_banking',
+            paymentStatus: 'paid' // Already paid, should stay paid
+        }
+        const originalDoc = {
+            status: 'pending',
+            paymentMethod: 'qr_banking',
+            paymentStatus: 'paid'
+        }
+
+        // Act
+        const result = await beforeChangeHook({ data, originalDoc })
+
+        // Assert
+        expect(result.paymentStatus).toBe('paid') // No change
+    })
+
+    it('[TC-F10.01-3] status=cancelled + paymentStatus=unpaid → paymentStatus=cancelled', async () => {
+        // Arrange
+        const data = {
+            status: 'cancelled',
+            paymentStatus: 'unpaid'
+        }
+        const originalDoc = {
+            status: 'pending',
+            paymentStatus: 'unpaid'
+        }
+
+        // Act
+        const result = await beforeChangeHook({ data, originalDoc })
+
+        // Assert
+        expect(result.paymentStatus).toBe('cancelled')
+    })
+
+    it('[TC-F10.01-4] status=cancelled + paymentStatus=paid → paymentStatus unchanged (already paid)', async () => {
+        // Arrange
+        const data = {
+            status: 'cancelled',
+            paymentStatus: 'paid' // Already paid, should stay as is
+        }
+        const originalDoc = {
+            status: 'pending',
+            paymentStatus: 'paid'
+        }
+
+        // Act
+        const result = await beforeChangeHook({ data, originalDoc })
+
+        // Assert
+        expect(result.paymentStatus).toBe('paid') // No change when already paid
+    })
+
+    it('[TC-F10.01-5] status no change → no hook modification', async () => {
+        // Arrange
+        const data = {
+            status: 'pending',
+            paymentMethod: 'cod',
+            paymentStatus: 'unpaid'
+        }
+        const originalDoc = {
+            status: 'pending',
+            paymentMethod: 'cod',
+            paymentStatus: 'unpaid'
+        }
+
+        // Act
+        const result = await beforeChangeHook({ data, originalDoc })
+
+        // Assert
+        expect(result.paymentStatus).toBe('unpaid') // No change
     })
 })

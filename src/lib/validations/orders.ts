@@ -22,8 +22,11 @@ export const orderCreateSchema = z.object({
         }).optional(),
     }),
     paymentMethod: z.enum(['cod', 'qr_banking']),
-    paymentProofImage: z.string().optional(), // Media ID from upload
-})
+    paymentProofImage: z.string().optional(),
+}).refine(
+    data => data.paymentMethod !== 'qr_banking' || !!data.paymentProofImage,
+    { message: 'Payment proof image is required for QR Banking', path: ['paymentProofImage'] }
+)
 
 // --- Update Order Status ---
 export const orderStatusUpdateSchema = z.object({
