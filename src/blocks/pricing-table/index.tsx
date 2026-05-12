@@ -66,6 +66,10 @@ function PlanCTA({ href, label, highlighted = false, fullWidth = false, extraCla
     )
 }
 
+// Payload stores features as textarea (comma or newline-separated); AI path provides string[]. Normalize both.
+const toStringArray = (v: unknown): string[] =>
+    Array.isArray(v) ? (v as string[]) : typeof v === 'string' && v ? v.split(/[,\n]/).map(s => s.trim()).filter(Boolean) : []
+
 export function PricingTableBlock({ block }: BlockProps<PricingTableConfig>) {
     const { variant = 'columns', headline, subheadline, billingToggle = 'monthly', plans = [] } = block
     const [billing, setBilling] = useState<'monthly' | 'yearly'>(billingToggle)
@@ -103,7 +107,7 @@ export function PricingTableBlock({ block }: BlockProps<PricingTableConfig>) {
                                     </div>
                                     {plan.description && <Body size="small" className="opacity-60 mb-3">{plan.description}</Body>}
                                     <div className="flex flex-wrap gap-3">
-                                        {plan.features.map((f, j) => (
+                                        {toStringArray(plan.features).map((f, j) => (
                                             <Caption key={j} className="px-3 py-1 rounded-full" style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'var(--brand-primary)' }}>{f}</Caption>
                                         ))}
                                     </div>
@@ -113,7 +117,7 @@ export function PricingTableBlock({ block }: BlockProps<PricingTableConfig>) {
                                         <span className="text-3xl font-bold">{currency}{displayPrice}</span>
                                         <span className="text-sm opacity-60">/{billing === 'yearly' ? 'yr' : 'mo'}</span>
                                     </div>
-                                    <PlanCTA href={plan.cta?.url ?? '#'} label={plan.cta.label} highlighted={plan.popular} />
+                                    <PlanCTA href={plan.cta?.url ?? '#'} label={plan.cta?.label ?? 'Get Started'} highlighted={plan.popular} />
                                 </div>
                             </div>
                         )
@@ -137,14 +141,14 @@ export function PricingTableBlock({ block }: BlockProps<PricingTableConfig>) {
                                 <span className="text-sm opacity-60">/{billing === 'yearly' ? 'yr' : 'mo'}</span>
                             </div>
                             <ul className="space-y-3 mb-8">
-                                {plan.features.map((f, j) => (
+                                {toStringArray(plan.features).map((f, j) => (
                                     <li key={j} className="flex items-center gap-2 text-sm">
                                         <span style={{ color: 'var(--brand-primary)' }}>✓</span>
                                         <RichText text={f} as="span" />
                                     </li>
                                 ))}
                             </ul>
-                            <PlanCTA href={plan.cta?.url ?? '#'} label={plan.cta.label} highlighted={plan.popular} fullWidth />
+                            <PlanCTA href={plan.cta?.url ?? '#'} label={plan.cta?.label ?? 'Get Started'} highlighted={plan.popular} fullWidth />
                         </div>
                     )
                 })}

@@ -51,7 +51,7 @@ describe('filterUnsupportedBlocks', () => {
     it('drops unsupported + keeps supported in order', () => {
         const input = [
             { blockType: 'hero' },
-            { blockType: 'menu-display' },
+            { blockType: 'google-maps' },
             { blockType: 'features' },
             { blockType: 'review-cards' },
             { blockType: 'footer' },
@@ -66,7 +66,7 @@ describe('filterUnsupportedBlocks', () => {
     })
 
     it('logs fallback prefix when context="fallback"', () => {
-        filterUnsupportedBlocks([{ blockType: 'menu-display' }], 'fallback')
+        filterUnsupportedBlocks([{ blockType: 'google-maps' }], 'fallback')
         expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[Fallback]'))
     })
 

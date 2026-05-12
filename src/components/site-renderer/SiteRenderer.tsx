@@ -508,8 +508,8 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     : null
 
                 const blockContent = (
-                    <BlockEditCallbackProvider value={callbackValue}>
-                        <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
+                    <BlockEditCallbackProvider key={`${block.blockType}-${index}`} value={callbackValue}>
+                        <BlockErrorBoundary blockType={block.blockType}>
                             <HeadingProvider level={headingLevel}>
                                 <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
                             </HeadingProvider>

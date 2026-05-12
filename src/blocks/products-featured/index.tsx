@@ -12,10 +12,11 @@ import { Heading, Body, Caption } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
+import { handleCartClick } from '@/lib/storefront/editor-intercept'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
-// gh-839: Hide Add to Cart until checkout is implemented. Flip to true to re-enable.
-const CART_ENABLED = false
+// GH-960: Cart enabled for editor preview. Real checkout logic ships in #961.
+const CART_ENABLED = true
 
 interface FeaturedProduct {
     id: string
@@ -234,6 +235,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                             type="button"
                             className={`px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 ${TOUCH_TARGET.min}`}
                             style={{ backgroundColor: 'var(--brand-primary)', color: theme.colorMode === 'dark' ? '#000' : '#fff' }}
+                            onClick={handleCartClick}
                         >
                             Add to Cart
                         </button>

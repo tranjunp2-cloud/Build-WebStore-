@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-05-07
+last_updated: 2026-05-12
 ---
 
 # Project Changelog
@@ -32,6 +32,26 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 **Security:** HTML-escaped `message`/`linkText` in preview renderer; `rel="noopener noreferrer"` on external CTA links
 
 **Tests:** 16 unit TCs (all pass) in `src/__tests__/unit/blocks/announcement-bar.test.tsx` covering gradient/solid/minimal variants, CTA rendering, padding, and dismissible toggle.
+
+---
+
+### GH-960 — Enable Product Blocks in Editor (F05-08)
+
+**Features:**
+- 9 product/commerce blocks now enabled for drag-drop and AI generation in F05 editor: `products-grid`, `products-featured`, `cart-widget`, `menu-food`, `product-quick-view`, `pricing-table`, `menu-display`, `pricing`, `property-card`
+- `cart-widget` re-enabled (was hidden since GH-839, checkout ships in v1.1) with "Add to Cart" preview toast in editor
+- `menu-display` and `pricing-table` blocks registered in Payload Pages collection (previously absent → silently dropped on save)
+- Product blocks marked `aiVisible: true` and re-categorized from archive → commerce/store, enabling AI gen for industry-appropriate industries
+- AI system prompt updated with VARIETY RULES 8–10 for industry-specific block recommendations
+- Restaurant/food blocks (`menu-food`, `menu-display`) now appear in category recipes for hospitality industry
+
+**Related changes:**
+- Migrations: new DB fields for `menu-display` + `pricing-table` block configurations
+- Payload schema: registered 2 new blocks in `src/collections/Pages.ts`
+- AI pipeline: removed blocks from `unsupported-blocks.ts` (menu-display, property-card) and `template-composer.ts` (property-card)
+- Editor registry: removed cartWidget from `EDITOR_HIDDEN_BLOCKS`
+
+**Tests:** 5+ unit TCs covering block visibility, AI generation, and toast behavior. All CI tests pass (lint, type-check).
 
 ---
 
