@@ -259,3 +259,242 @@ Bộ test case vét cạn 100% Acceptance Criteria của F19, bao gồm: Quản 
 
 ---
 **PHÊ DUYỆT BỞI:** .................................... **NGÀY:** ..../..../2026
+
+---
+
+## 7. Addendum — F19 Vercel Migration: Add Domain Flow (Cập nhật 2026-05-11)
+
+> **Áp dụng cho branch:** `investigate/F19-domain-ui-flow`
+> **Thay đổi lớn:** (1) Always-pending policy — domain không tự active khi add. (2) Hard DNS preflight trước verify. (3) TxtChallengeCard cho ownership challenge. (4) Cloudflare proxy hint.
+> **Môi trường:** Local (mock mode) cho Phase 1–3. Staging (Vercel thật + DNS thật) cho Phase 4–6.
+
+---
+
+### Phase 1 — Client Validation (Local ✅)
+
+Vào **Settings → Domains → "Add Custom Domain"** → modal mở.
+
+| TC | Input | Bước | Kết quả mong đợi | Env |
+|----|-------|------|-----------------|-----|
+| **TC-D01** | `https://shop.mystore.com` | Gõ → click Add | Inline error đỏ: *"Do not include http/https, enter the domain name only"* — modal vẫn mở | Local |
+| **TC-D02** | *(để trống)* | Click Add | Inline error đỏ: *"Please enter a domain name"* | Local |
+| **TC-D03** | `shop my store.com` | Gõ → click Add | Inline error đỏ: *"Domain name cannot contain spaces"* | Local |
+| **TC-D04** | Chuỗi 254 ký tự | Paste → click Add | Inline error đỏ: *"Domain name must not exceed 253 characters"* | Local |
+| **TC-D05** | `nodothere` | Gõ → click Add | Inline error đỏ: *"Domain must include an extension (e.g., .com, .my)"* | Local |
+| **TC-D06** | `shop!@#$.com` | Gõ → click Add | Inline error đỏ: *"Domain contains invalid characters"* | Local |
+| **TC-D07** | `-.com` hoặc `-start.com` | Gõ → click Add | Inline error đỏ: *"Invalid domain format"* | Local |
+
+**Pass criteria:** Modal không đóng, không call server, error hiện đúng dưới input.
+
+---
+
+### Phase 2 — Server Errors khi Add (Staging ⚠️)
+
+| TC | Tình huống | Cách reproduce | Kết quả mong đợi |
+|----|-----------|---------------|-----------------|
+| **TC-D08** | Domain đã có ở tenant khác | Lấy domain đang active ở store khác → add vào store này | `toast.error("Domain already registered by another store.")` |
+| **TC-D09** | Domain đã có ở chính tenant này | Add domain đã thấy trong danh sách | `toast.error("Domain already added to your store.")` |
+| **TC-D10** | Vercel 409 — domain trong Vercel project khác | Domain đang gắn project Vercel khác cùng team | `toast.error("Domain already registered by another store.")` |
+
+---
+
+### Phase 3 — Add thành công → Pending UI
+
+#### TC-D11: Domain hoàn toàn mới, chưa trỏ CNAME (Local ✅)
+
+**Bước:**
+1. Add `shop.newdomain.com` (domain chưa từng dùng)
+2. Quan sát UI
+
+**Kết quả mong đợi:**
+- [ ] Modal đóng ngay
+- [ ] Toast xanh: *"Domain added. Point your DNS records below, then click Verify."*
+- [ ] Badge cam **"Pending Verification"** xuất hiện
+- [ ] A Record: `76.76.21.21` + copy button → click copy → toast *"Copied IP 1!"*
+- [ ] CNAME: `cname.vercel-dns.com` + copy button → click copy → toast *"Copied!"*
+- [ ] Text nhỏ: *"Using Cloudflare? Disable the proxy (orange cloud → grey cloud) before verifying."*
+- [ ] Nút **"Verify Connection"** (gradient xanh) hiện
+- [ ] Nút **"Remove"** (đỏ) hiện
+- [ ] **Không có** TxtChallengeCard
+
+#### TC-D12: Domain đã trỏ CNAME đúng sẵn (Staging ⚠️)
+
+**Bước:**
+1. Đảm bảo `shop.mystore.com` đã có CNAME → `cname.vercel-dns.com` tại registrar
+2. Add domain này vào hệ thống
+
+**Kết quả mong đợi:**
+- [ ] Giống TC-D11 hoàn toàn — vẫn badge cam, vẫn pending (không tự active)
+- [ ] Click **"Verify Connection"** ngay → ~3–5s → card chuyển xanh **"Connected & Secured"**
+
+#### TC-D13: Domain mới + Vercel yêu cầu TXT (Staging ⚠️)
+
+*Xảy ra khi domain đang dùng bởi project Vercel khác trong cùng team.*
+
+**Kết quả mong đợi:**
+- [ ] Pending card hiện như TC-D11
+- [ ] **TxtChallengeCard** hiện thêm bên dưới:
+  - Hostname: `_vercel.shop.mystore.com`
+  - Value: `vc-domain-verify-xxxxx` + copy button
+  - Text: *"Last checked: just now"*
+  - Nút **"Verify Now"**
+
+---
+
+### Phase 4 — Click "Verify Connection"
+
+#### TC-D14: Loading state (Local ✅)
+
+**Bước:** Click **"Verify Connection"**
+
+**Kết quả mong đợi:**
+- [ ] Nút đổi thành **"Verifying..."** + spinner ngay lập tức
+- [ ] Nút bị disable trong lúc chờ (không click thêm được)
+
+#### TC-D15: Double-click debounce (Local ✅)
+
+**Bước:** Click **"Verify Connection"** 2 lần thật nhanh (< 1 giây)
+
+**Kết quả mong đợi:**
+- [ ] Chỉ 1 request gửi lên server — không double submit
+
+#### TC-D16: DNS chưa trỏ — Apex domain (Staging ⚠️)
+
+*Apex = `mystore.com` không có subdomain prefix*
+
+**Bước:**
+1. Add `mystore.com` (chưa set A record)
+2. Click Verify ngay
+
+**Kết quả mong đợi:**
+- [ ] Error banner đỏ: *"DNS records not detected yet. Please add the A record above and try again..."*
+- [ ] `toast.error(...)` cùng nội dung
+- [ ] Nút về lại "Verify Connection" — không bị kẹt
+
+#### TC-D17: A record trỏ sai IP — Apex domain (Staging ⚠️)
+
+**Bước:**
+1. Set A record `mystore.com` → IP sai (vd: `1.2.3.4`)
+2. Click Verify
+
+**Kết quả mong đợi:**
+- [ ] Error banner đỏ: *"Expected A record: 76.76.21.21 — currently resolves to: 1.2.3.4. Please update your DNS..."*
+
+#### TC-D18: CNAME chưa trỏ — Subdomain (Staging ⚠️)
+
+**Bước:**
+1. Add `shop.mystore.com` (chưa set CNAME)
+2. Click Verify ngay
+
+**Kết quả mong đợi:**
+- [ ] Error banner đỏ: *"DNS records not detected yet. Please add the CNAME record above and try again..."*
+
+#### TC-D19: CNAME trỏ sai — Subdomain (Staging ⚠️)
+
+**Bước:**
+1. Set CNAME `shop.mystore.com` → `some-other-host.com`
+2. Click Verify
+
+**Kết quả mong đợi:**
+- [ ] Error banner đỏ: *"Expected CNAME: cname.vercel-dns.com — currently resolves to: some-other-host.com..."*
+
+#### TC-D20: Cloudflare proxy ON (Staging ⚠️ — cần Cloudflare account)
+
+**Bước:**
+1. Domain dùng Cloudflare, proxy 🟠 ON
+2. CNAME đã set đúng nhưng proxy che
+3. Click Verify
+
+**Kết quả mong đợi:**
+- [ ] Verify fail vì DNS không thấy CNAME thật
+- [ ] User thấy hint: *"Using Cloudflare? Disable the proxy..."* ở DNS card
+
+**Fix:** Tắt proxy 🔘 OFF → click Verify lại → pass
+
+#### TC-D21: DNS đúng → Verify thành công (Staging ⚠️)
+
+**Bước:**
+1. Set CNAME/A record đúng → chờ propagate
+2. Verify bằng `dig CNAME shop.mystore.com +short` → thấy `cname.vercel-dns.com.`
+3. Click **"Verify Connection"**
+
+**Kết quả mong đợi:**
+- [ ] Card chuyển **xanh lá "Connected & Secured"** ✓
+- [ ] `toast.success("Domain active. SSL provisioning may take 1-2 minutes.")`
+- [ ] **SSL Banner** xuất hiện bên dưới card (~60s rồi tự ẩn)
+- [ ] TxtChallengeCard biến mất (nếu có trước đó)
+- [ ] Nút **"Remove Domain"** hiện, click được
+
+#### TC-D22: Reload sau verify — vẫn active (Local ✅ / Staging ⚠️)
+
+**Bước:** Sau TC-D21 → F5 reload trang
+
+**Kết quả mong đợi:**
+- [ ] Domain vẫn **"Connected & Secured"** — không reset về pending
+
+---
+
+### Phase 5 — TxtChallengeCard flow (Staging ⚠️)
+
+| TC | Bước | Kết quả mong đợi |
+|----|------|-----------------|
+| **TC-D23** | Click "Verify Now" trên TxtChallengeCard khi TXT chưa add | Error: *"Verification failed. Please add the TXT record below."* — card cập nhật token mới |
+| **TC-D24** | Add TXT record đúng tại registrar → click "Verify Now" | Domain flip active — giống TC-D21 |
+| **TC-D25** | Reload trang khi đang có TxtChallengeCard | TxtChallengeCard vẫn hiện (persist từ DB) |
+
+---
+
+### Phase 6 — Remove Domain (Local ✅ / Staging ⚠️)
+
+| TC | Bước | Kết quả mong đợi |
+|----|------|-----------------|
+| **TC-D26** | Click "Remove" trên domain pending | Confirm modal xuất hiện: *"Are you sure you want to remove..."* |
+| **TC-D27** | Confirm modal → click "Remove Domain" | Domain biến khỏi danh sách + `toast.success("Custom domain removed.")` |
+| **TC-D28** | Add lại domain vừa remove | Thành công — không bị báo duplicate |
+| **TC-D29** | Click "Remove" trên primary domain | Nút bị disable — không click được |
+
+---
+
+### Phase 7 — Primary Domain (Local ✅)
+
+| TC | Bước | Kết quả mong đợi |
+|----|------|-----------------|
+| **TC-D30** | Click "Select primary domain" | Panel slide-in từ phải |
+| **TC-D31** | Panel hiện — domain pending | Domain pending **không xuất hiện** trong danh sách chọn |
+| **TC-D32** | Chọn active domain → Save | `toast.success('"xxx.com" is now your Primary Domain.')` |
+| **TC-D33** | Reload | Domain đó vẫn là primary |
+
+---
+
+### Checklist nhanh cho tester
+
+```
+LOCAL (không cần net/staging):
+[ ] TC-D01  https:// prefix → error đỏ
+[ ] TC-D02  Empty → error đỏ
+[ ] TC-D03  Space → error đỏ
+[ ] TC-D04  >253 chars → error đỏ
+[ ] TC-D05  No TLD → error đỏ
+[ ] TC-D06  Ký tự đặc biệt → error đỏ
+[ ] TC-D07  Format sai → error đỏ
+[ ] TC-D11  Add mới → pending card + badge cam + A/CNAME card
+[ ] TC-D14  Click verify → "Verifying..." spinner
+[ ] TC-D15  Double-click → chỉ 1 request
+[ ] TC-D22  Reload → vẫn active
+[ ] TC-D30  Primary panel → pending không xuất hiện
+
+STAGING (cần Vercel API + DNS thật):
+[ ] TC-D08  Domain tenant khác → error
+[ ] TC-D09  Domain trùng tenant → error
+[ ] TC-D12  Add domain đã trỏ CNAME → verify ngay → active
+[ ] TC-D16  DNS chưa trỏ apex → "DNS records not detected yet"
+[ ] TC-D17  A record sai → expected vs actual
+[ ] TC-D18  CNAME chưa trỏ subdomain → error
+[ ] TC-D19  CNAME sai → expected vs actual
+[ ] TC-D21  DNS đúng → verify → Connected + SSL banner
+[ ] TC-D26  Remove → confirm → biến mất
+[ ] TC-D29  Remove primary → disabled
+
+STAGING + CLOUDFLARE:
+[ ] TC-D20  Proxy ON → verify fail + thấy hint
+```

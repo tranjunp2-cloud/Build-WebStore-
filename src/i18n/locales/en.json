@@ -2062,6 +2062,7 @@
     "aRecord": "A Record (Static IPs)",
     "pointToIps": "Point your domain to any of these IPs.",
     "cnameRecord": "CNAME Record",
+    "cloudflareTip": "Using Cloudflare? Disable the proxy (orange cloud → grey cloud) before verifying.",
     "copiedIp": "Copied IP {n}!",
     "copied": "Copied!",
     "verifyConnection": "Verify Connection",

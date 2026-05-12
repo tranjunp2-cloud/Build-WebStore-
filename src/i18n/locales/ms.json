@@ -2062,6 +2062,7 @@
     "aRecord": "Rekod A (IP Statik)",
     "pointToIps": "Halakan domain anda ke mana-mana IP ini.",
     "cnameRecord": "Rekod CNAME",
+    "cloudflareTip": "Guna Cloudflare? Nyahaktifkan proksi (awan oren → awan kelabu) sebelum mengesahkan.",
     "copiedIp": "IP {n} disalin!",
     "copied": "Disalin!",
     "verifyConnection": "Sahkan Sambungan",

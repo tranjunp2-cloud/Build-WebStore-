@@ -26,6 +26,7 @@ vi.mock('@/lib/vercel/domains', () => ({
     verifyProjectDomain: vi.fn(),
     getProjectDomain: vi.fn(),
     removeProjectDomain: vi.fn(),
+    isMockMode: vi.fn().mockReturnValue(false),
 }))
 
 // Action's soft DNS pre-flight — must never hard-fail tests.
@@ -130,7 +131,7 @@ describe('addCustomDomain [TC-F19.02, TC-F19.03]', () => {
         }
     })
 
-    it('adds valid new domain and persists Vercel result', async () => {
+    it('adds valid new domain and always saves as pending [TC-F19.02]', async () => {
         vi.mocked(addProjectDomain).mockResolvedValueOnce(
             makeVercelDomain({
                 name: 'store.example.com',
@@ -141,11 +142,12 @@ describe('addCustomDomain [TC-F19.02, TC-F19.03]', () => {
 
         const result = await addCustomDomain('store.example.com')
         expect(result.success).toBe(true)
-        // Last update is the final write with vercelDomainId + status='active'.
+        // BUG-F19 fix: always pending even when Vercel returns verified=true.
+        // DNS routing is not confirmed at add time — Verify button must be clicked.
         const finalUpdate = mockUpdate.mock.calls.at(-1)?.[0]
         expect(finalUpdate.data.customDomains[0]).toMatchObject({
             domain: 'store.example.com',
-            status: 'active',
+            status: 'pending',
             vercelDomainId: 'store.example.com',
         })
     })
