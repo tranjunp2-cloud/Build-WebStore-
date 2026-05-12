@@ -15,4 +15,5 @@ export type PlatformUser = {
     createdAt: string
     updatedAt: string
     has_seen_ai_wizard?: boolean
+    prefer_lang?: 'en' | 'ms'
 }

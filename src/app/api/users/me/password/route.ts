@@ -59,12 +59,11 @@ export async function POST(req: NextRequest) {
             overrideAccess: true,
         })
 
-        const userName = [
-            (user as Record<string, unknown>).firstName,
-            (user as Record<string, unknown>).lastName,
-        ].filter(Boolean).join(' ') || user.email
+        const u = user as unknown as import('@/types/user').PlatformUser
+        const userName = [u.firstName, u.lastName].filter(Boolean).join(' ') || user.email
+        const locale = u.prefer_lang ?? 'en'
 
-        const { subject, html } = passwordChangedEmail({ userName, newPassword })
+        const { subject, html } = passwordChangedEmail({ userName, newPassword, locale })
         payload.sendEmail({ to: user.email, subject, html })
             .catch((err: unknown) => payload.logger.error({ err }, '[users/me/password] notify email failed'))
 
