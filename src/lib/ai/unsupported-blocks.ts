@@ -23,13 +23,12 @@
  *    - gallery, portfolio-grid → now filled by media-pipeline.ts (Unsplash)
  *  Re-enabled via plan 260422-1900-block-aivisible-audit-fix:
  *    - before-after, booking-widget → added to Payload Pages.ts + pages-schema.ts
- *  Still dropped (separate followup):
- *    - menu-display, review-cards (not in Payload schema, not image-related)
+ *  Re-enabled via GH-960:
+ *    - menu-display → registered in Payload Pages.ts (imageUrl is plain string, no upload pipeline needed)
  *  GH-820: google-maps temporarily disabled — embedUrl cannot be auto-generated
  *  GH-820: class-schedule not production-ready — also hidden from editor UI
  */
 export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
-    'menu-display',
     'review-cards',
     'google-maps',
     'class-schedule',
@@ -37,7 +36,6 @@ export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
 
 /** Blocks missing from Payload Pages.ts layout.blocks — silently dropped on save. */
 export const BLOCKS_NOT_IN_PAYLOAD: ReadonlySet<string> = new Set([
-    'menu-display',
     'review-cards',
 ])
 
@@ -50,7 +48,6 @@ export const BLOCKS_TEMP_HIDDEN: ReadonlySet<string> = new Set([
     'doctor-profile',
     'gallery-masonry',
     'before-after',
-    'property-card',
 ])
 
 /**

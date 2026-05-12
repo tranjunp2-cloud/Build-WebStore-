@@ -562,6 +562,48 @@ const PricingBlock = {
     ],
 }
 
+const PricingTableBlock = {
+    slug: 'pricing-table',
+    labels: { singular: 'Pricing Table', plural: 'Pricing Tables' },
+    fields: [
+        {
+            name: 'variant', type: 'select' as const, defaultValue: 'columns',
+            options: [
+                { label: 'Columns', value: 'columns' },
+                { label: 'Horizontal', value: 'horizontal' },
+            ],
+        },
+        { name: 'headline', type: 'text' as const },
+        { name: 'subheadline', type: 'textarea' as const },
+        {
+            name: 'billingToggle', type: 'select' as const, defaultValue: 'monthly',
+            options: [
+                { label: 'Monthly', value: 'monthly' },
+                { label: 'Yearly', value: 'yearly' },
+            ],
+        },
+        {
+            name: 'plans', type: 'array' as const,
+            fields: [
+                { name: 'name', type: 'text' as const, required: true },
+                { name: 'price', type: 'text' as const, required: true },
+                { name: 'yearlyPrice', type: 'text' as const },
+                { name: 'currency', type: 'text' as const, defaultValue: '$' },
+                { name: 'description', type: 'textarea' as const },
+                { name: 'features', type: 'textarea' as const }, // comma-separated strings
+                {
+                    name: 'cta', type: 'group' as const,
+                    fields: [
+                        { name: 'label', type: 'text' as const },
+                        { name: 'url', type: 'text' as const },
+                    ],
+                },
+                { name: 'popular', type: 'checkbox' as const, defaultValue: false },
+            ],
+        },
+    ],
+}
+
 const FAQBlock = {
     slug: 'faq',
     labels: { singular: 'FAQ Section', plural: 'FAQ Sections' },
@@ -1096,6 +1138,46 @@ const MenuFoodBlock = {
     ],
 }
 
+const MenuDisplayBlock = {
+    slug: 'menu-display',
+    labels: { singular: 'Menu Display', plural: 'Menu Displays' },
+    fields: [
+        {
+            name: 'variant', type: 'select' as const, defaultValue: 'tabs',
+            options: [
+                { label: 'Tabs', value: 'tabs' },
+                { label: 'Photo Grid', value: 'photo-grid' },
+                { label: 'Accordion', value: 'accordion' },
+            ],
+        },
+        { name: 'headline', type: 'text' as const, required: true },
+        { name: 'subheadline', type: 'textarea' as const },
+        { name: 'currency', type: 'text' as const, defaultValue: 'RM' },
+        { name: 'showDietaryIcons', type: 'checkbox' as const, defaultValue: true },
+        {
+            name: 'categories', type: 'array' as const,
+            fields: [
+                { name: 'name', type: 'text' as const, required: true },
+                { name: 'description', type: 'textarea' as const },
+                { name: 'icon', type: 'text' as const },
+                {
+                    name: 'items', type: 'array' as const,
+                    fields: [
+                        { name: 'name', type: 'text' as const, required: true },
+                        { name: 'description', type: 'textarea' as const },
+                        { name: 'price', type: 'number' as const, required: true },
+                        { name: 'originalPrice', type: 'number' as const },
+                        { name: 'imageUrl', type: 'text' as const },
+                        { name: 'dietaryTags', type: 'text' as const }, // comma-separated DietaryTag values
+                        { name: 'isPopular', type: 'checkbox' as const, defaultValue: false },
+                        { name: 'isNew', type: 'checkbox' as const, defaultValue: false },
+                    ],
+                },
+            ],
+        },
+    ],
+}
+
 const PortfolioGridBlock = {
     slug: 'portfolio-grid',
     labels: { singular: 'Portfolio Grid', plural: 'Portfolio Grids' },
@@ -1480,6 +1562,7 @@ export const Pages: CollectionConfig = {
                 FooterBlock,
                 StatsBlock,
                 PricingBlock,
+                PricingTableBlock,
                 FAQBlock,
                 TeamBlock,
                 SocialWidgetBlock,
@@ -1506,6 +1589,7 @@ export const Pages: CollectionConfig = {
                 BreadcrumbBlock,
                 ClientLogosBlock,
                 MenuFoodBlock,
+                MenuDisplayBlock,
                 PortfolioGridBlock,
                 // Industry-specific (composer-driven)
                 DoctorProfileBlock,

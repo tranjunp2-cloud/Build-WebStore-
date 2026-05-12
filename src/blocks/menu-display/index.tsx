@@ -20,6 +20,14 @@ const DIETARY_ICONS: Record<DietaryTag, { label: string; icon: string }> = {
     'gluten-free': { label: 'Gluten Free', icon: '\uD83C\uDF3E' },
 }
 
+// Payload stores dietaryTags as comma-separated text; AI path provides DietaryTag[]. Normalize both.
+// Filter to known keys so unknown tags don't crash DIETARY_ICONS[tag].label lookup.
+const VALID_DIETARY_TAGS = new Set(Object.keys(DIETARY_ICONS) as DietaryTag[])
+const normDietaryTags = (v: unknown): DietaryTag[] => {
+    const raw = Array.isArray(v) ? (v as unknown[]) : typeof v === 'string' && v ? v.split(',').map(s => s.trim()).filter(Boolean) : []
+    return raw.filter((t): t is DietaryTag => VALID_DIETARY_TAGS.has(t as DietaryTag))
+}
+
 export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
     const {
         headline,
@@ -132,7 +140,7 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                                             {item.isNew && <NewBadge />}
                                         </div>
                                         {item.description && <RichText text={item.description} as="p" className="text-sm opacity-50 mb-2" />}
-                                        <DietaryBadges tags={item.dietaryTags} />
+                                        <DietaryBadges tags={normDietaryTags(item.dietaryTags)} />
                                     </div>
                                     <PriceDisplay item={item} />
                                 </div>
@@ -182,7 +190,7 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                                         <PriceDisplay item={item} />
                                     </div>
                                     {item.description && <RichText text={item.description} as="p" className="text-sm opacity-50 mb-3" />}
-                                    <DietaryBadges tags={item.dietaryTags} />
+                                    <DietaryBadges tags={normDietaryTags(item.dietaryTags)} />
                                 </div>
                             </motion.div>
                         ))}
@@ -245,7 +253,7 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                                                         {item.isNew && <NewBadge />}
                                                     </div>
                                                     {item.description && <RichText text={item.description} as="p" className="text-sm opacity-50 mb-2" />}
-                                                    <DietaryBadges tags={item.dietaryTags} />
+                                                    <DietaryBadges tags={normDietaryTags(item.dietaryTags)} />
                                                 </div>
                                                 <PriceDisplay item={item} />
                                             </div>

@@ -29,6 +29,14 @@ export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: Add
 
     const handleClick = () => {
         if (isOutOfStock) return
+        // GH-960: In editor iframe show preview toast; real cart logic ships in #961.
+        if (typeof window !== 'undefined' && window.parent !== window) {
+            window.parent.postMessage(
+                { type: 'SHOW_TOAST', variant: 'info', message: 'Navigation is disabled inside the Editor.' },
+                window.location.origin,
+            )
+            return
+        }
         setSiteSlug(siteSlug)
         addItem({
             productId: product.id,

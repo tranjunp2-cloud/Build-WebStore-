@@ -3802,6 +3802,118 @@ const MIGRATIONS = [
   // Remove 'tenant-owner' from users_roles for users who have tenant memberships but are not an owner
   // in any of them. Owners (users_tenants.role = 'owner') are unaffected.
   { name: 'users_roles.strip_tenant_owner_from_non_owners', sql: `DELETE FROM users_roles WHERE value = 'tenant-owner' AND parent_id IN (SELECT DISTINCT u.id FROM users u WHERE EXISTS (SELECT 1 FROM users_tenants ut WHERE ut._parent_id = u.id) AND NOT EXISTS (SELECT 1 FROM users_tenants ut WHERE ut._parent_id = u.id AND ut.role = 'owner'));` },
+
+  // GH-960 — _pages_v column required by CI check (billing_toggle is a block field, harmless extra col)
+  { name: '_pages_v.version_billing_toggle', sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_billing_toggle varchar;` },
+
+  // GH-960 — pricing-table + menu-display Payload registration (Phase 01)
+  {
+    name: 'pages_blocks_pricing_table.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing_table" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar, billing_toggle varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_pricing_table_plans.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing_table_plans" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, price varchar, yearly_price varchar, currency varchar DEFAULT '$',
+      description varchar, features varchar,
+      cta_label varchar, cta_url varchar, popular boolean DEFAULT false
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_pricing_table.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_table" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar, billing_toggle varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_pricing_table_plans.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_table_plans" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, price varchar, yearly_price varchar, currency varchar,
+      description varchar, features varchar,
+      cta_label varchar, cta_url varchar, popular boolean DEFAULT false
+    );`,
+  },
+  { name: 'pages_blocks_pricing_table.add_block_spacing', sql: `ALTER TABLE "pages_blocks_pricing_table" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_pricing_table.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_pricing_table" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+
+  {
+    name: 'pages_blocks_menu_display.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_menu_display" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      currency varchar DEFAULT 'RM', show_dietary_icons boolean DEFAULT true
+    );`,
+  },
+  {
+    name: 'pages_blocks_menu_display_categories.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_menu_display_categories" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, description varchar, icon varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_menu_display_categories_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_menu_display_categories_items" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, description varchar, price numeric,
+      original_price numeric, image_url varchar, dietary_tags varchar,
+      is_popular boolean DEFAULT false, is_new boolean DEFAULT false
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_menu_display.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_menu_display" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      currency varchar, show_dietary_icons boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_menu_display_categories.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_menu_display_categories" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, description varchar, icon varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_menu_display_categories_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_menu_display_categories_items" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, description varchar, price numeric,
+      original_price numeric, image_url varchar, dietary_tags varchar,
+      is_popular boolean DEFAULT false, is_new boolean DEFAULT false
+    );`,
+  },
+  { name: 'pages_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "pages_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+  { name: '_pages_v_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
 ];
 
 async function runMigrations(pool) {

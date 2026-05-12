@@ -44,6 +44,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [slug, setSlug] = useState('')
     const [siteId, setSiteId] = useState('')
     const [isOwner, setIsOwner] = useState(false)
+    const [mounted, setMounted] = useState(false)
     const { items, subtotal, clearCart } = useCartStore()
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
@@ -57,6 +58,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [orderResult, setOrderResult] = useState<any>(null)
     const [error, setError] = useState<string | null>(null)
 
+    useEffect(() => setMounted(true), [])
     useEffect(() => {
         params.then(p => setSlug(p.slug))
     }, [params])
@@ -280,7 +282,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     }
 
     // ─── Empty Cart ────────────────────────────────────────────
-    if (items.length === 0 && !isPlacing) {
+    // Guard with `mounted` to prevent hydration mismatch: server always has empty
+    // cart (no localStorage), client may have items → different render tree.
+    if (mounted && items.length === 0 && !isPlacing) {
         return (
             <div style={{
                 fontFamily: 'Inter, sans-serif', minHeight: '100vh',

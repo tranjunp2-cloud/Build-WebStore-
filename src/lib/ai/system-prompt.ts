@@ -241,6 +241,9 @@ ORDERING RULES:
 5. Footer has 4 variants — vary between simple, minimal, centered-stack, dark-gradient.
 6. Include at least ONE uncommon block on homepage: before-after, countdown-timer, or social-proof.
 7. Block ORDER must vary — do NOT always put features directly after hero.
+8. Restaurant industry: use menu-food OR menu-display for the menu section — NOT both. Do NOT use generic "features" as a menu stand-in.
+9. SaaS/tech industry: prefer pricing-table over pricing when plan comparison + billing toggle is needed.
+10. Ecommerce industry: include product-quick-view for browsing-heavy catalog sites alongside products-grid.
 
 ## IMPORTANT
 - Respond ONLY with the JSON object, no markdown, no explanation

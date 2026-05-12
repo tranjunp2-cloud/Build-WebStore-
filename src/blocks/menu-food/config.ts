@@ -48,7 +48,7 @@ export const menuFoodMeta = {
     defaultVariant: 'classic',
     editableFields: ['headline', 'categories'],
     quickActions: ['Add category', 'Add item', 'Change prices'],
-    aiVisible: false,
+    aiVisible: true,
     category: 'store' as const,
 }
 

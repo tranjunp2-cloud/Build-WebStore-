@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-04-19
+last_updated: 2026-05-12
 ---
 
 # Codebase Summary
@@ -27,6 +27,7 @@ src/
 │   ├── payment/      Payment integration (F13 — Phase 2)
 │   ├── images/       Image processing + S3 upload (via Payload cloud-storage + AWS SDK)
 │   ├── cache/        Caching utilities
+│   ├── storefront/   Storefront utilities (cart, editor intercepts)
 │   └── otp/, analytics/, notifications/, fonts/  Feature-specific utilities
 ├── providers/        React context providers (theme, query client, auth)
 ├── scripts/          CLI tools scoped to src/ (admin, migration helpers)

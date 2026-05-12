@@ -56,7 +56,7 @@ export const propertyCardMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'properties', 'showMap', 'currency'],
     quickActions: ['Add property', 'Filter by type', 'Update prices'],
-    aiVisible: false, // hidden: re-hidden 260508 — PR #836 accidentally re-enabled
+    aiVisible: true,
     category: 'commerce' as const,
 }
 
