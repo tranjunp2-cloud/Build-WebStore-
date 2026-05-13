@@ -3,7 +3,6 @@
 import { getPayloadHMR } from '@payloadcms/next/utilities';
 import configPromise from '@payload-config';
 import { revalidatePath } from 'next/cache';
-import { promises as dns } from 'dns';
 import psl from 'psl';
 import { getCurrentTenantId } from '@/lib/auth';
 import {
@@ -13,15 +12,12 @@ import {
     removeProjectDomain,
     isMockMode,
 } from '@/lib/vercel/domains';
+import { checkDnsRouting, checkHttpsConnectivity } from '@/lib/vercel/dns-check';
 import {
     VercelDomainsError,
     type VercelDomainVerification,
 } from '@/lib/vercel/domains.types';
 
-// Env-driven DNS expectations — default to Vercel's public values.
-// Override via VERCEL_APEX_A_RECORD / VERCEL_CNAME_TARGET if Vercel rotates them.
-const VERCEL_APEX_IP = process.env.VERCEL_APEX_A_RECORD ?? '76.76.21.21';
-const VERCEL_CNAME = process.env.VERCEL_CNAME_TARGET ?? 'cname.vercel-dns.com';
 
 type DomainEntry = {
     domain: string;
@@ -35,7 +31,7 @@ type DomainEntry = {
 
 export type DomainActionResult =
     | { success: true; verification?: VercelDomainVerification[]; warning?: string }
-    | { success: false; error: string; verification?: VercelDomainVerification[] };
+    | { success: false; error: string; verification?: VercelDomainVerification[]; ownershipConfirmed?: boolean };
 
 // Helper to get current domains array from tenant
 async function getTenantDomains(
@@ -318,68 +314,71 @@ export async function verifyCustomDomain(rawDomain: string): Promise<DomainActio
         return { success: true };
     }
 
-    // Soft DNS pre-flight — log mismatches but never hard-fail here.
-    // Vercel's /verify endpoint checks DNS from global distributed infra and is
-    // the authoritative source of truth. A Node.js lookup from a single serverless
-    // region can fail even when the domain is already propagated to the user's ISP,
-    // causing a false-negative that blocks verification (issue #975).
-    if (!isMockMode()) {
-        const DNS_TIMEOUT_MS = 5000;
-        const withDnsTimeout = <T>(p: Promise<T>): Promise<T> =>
-            new Promise<T>((resolve, reject) => {
-                const timer = setTimeout(
-                    () => reject(Object.assign(new Error('DNS_TIMEOUT'), { code: 'DNS_TIMEOUT' })),
-                    DNS_TIMEOUT_MS,
-                );
-                p.then(
-                    (v) => { clearTimeout(timer); resolve(v); },
-                    (e) => { clearTimeout(timer); reject(e); },
-                );
-            });
-
-        if (isApexDomain(domain)) {
-            try {
-                const addresses = await withDnsTimeout(dns.resolve4(domain));
-                if (!addresses.includes(VERCEL_APEX_IP)) {
-                    console.warn(`[verifyCustomDomain] DNS pre-flight: ${domain} A record resolves to [${addresses.join(', ')}], expected ${VERCEL_APEX_IP}. Letting Vercel API decide.`);
-                }
-            } catch (err: unknown) {
-                console.warn(`[verifyCustomDomain] DNS pre-flight: A record lookup failed for ${domain} (${(err as NodeJS.ErrnoException).code}). Letting Vercel API decide.`);
-            }
-        } else {
-            try {
-                const cnames = await withDnsTimeout(dns.resolveCname(domain));
-                const normalized = cnames.map((c) => c.replace(/\.$/, '').toLowerCase());
-                if (!normalized.includes(VERCEL_CNAME.toLowerCase())) {
-                    console.warn(`[verifyCustomDomain] DNS pre-flight: ${domain} CNAME resolves to [${normalized.join(', ')}], expected ${VERCEL_CNAME}. Letting Vercel API decide.`);
-                }
-            } catch (err: unknown) {
-                console.warn(`[verifyCustomDomain] DNS pre-flight: CNAME lookup failed for ${domain} (${(err as NodeJS.ErrnoException).code}). Letting Vercel API decide.`);
-            }
-        }
-    }
-
     // Call Vercel verify.
     try {
         const result = await verifyProjectDomain(domain);
 
         if (result.verified === true && !result.verification?.length) {
-            // Success — persist active status and clear any stale verification challenges.
-            const updated = current.map((d) =>
+            // Vercel confirmed ownership — clear TXT challenge immediately so user doesn't see
+            // a stale "add TXT record" card even if DNS/HTTPS check still fails below.
+            const ownershipCleared = current.map((d) =>
+                d.domain === domain ? { ...d, vercelVerification: null } : d,
+            );
+            try {
+                await payload.update({
+                    collection: 'tenants',
+                    id: tenantId,
+                    data: { customDomains: ownershipCleared } as unknown as Record<string, unknown>,
+                });
+            } catch (err) {
+                console.error('[verifyCustomDomain] Failed to clear TXT after ownership confirm:', err);
+                // Don't continue silently — stuck state if Write-1 fails and Write-2 later succeeds
+                // (domain would be active in DB but vercelVerification still set from old state).
+                return {
+                    success: false,
+                    error: 'Verification confirmed but status update failed. Please try again.',
+                    ownershipConfirmed: true,
+                };
+            }
+
+            // Now verify DNS routing and HTTPS connectivity before marking active.
+            if (!isMockMode()) {
+                const dnsCheck = await checkDnsRouting(domain, isApexDomain(domain));
+                if (!dnsCheck.ok) {
+                    revalidatePath('/settings/domains');
+                    return {
+                        success: false,
+                        error: dnsCheck.message ?? 'DNS not yet routing through Vercel. Please check your A/CNAME records.',
+                        ownershipConfirmed: true,
+                    };
+                }
+                const httpsCheck = await checkHttpsConnectivity(domain);
+                if (!httpsCheck.ok) {
+                    revalidatePath('/settings/domains');
+                    return {
+                        success: false,
+                        error: httpsCheck.message ?? 'Domain is not yet accessible.',
+                        ownershipConfirmed: true,
+                    };
+                }
+            }
+
+            // All checks passed — re-fetch before Write-2 to guard against concurrent removes
+            // (a removeCustomDomain between Write-1 and Write-2 would otherwise restore the domain).
+            const freshList = await getTenantDomains(payload, tenantId);
+            if (!freshList.find((d) => d.domain === domain)) {
+                return { success: false, error: 'Domain was removed during verification. Please add it again.' };
+            }
+            const activated = freshList.map((d) =>
                 d.domain === domain
-                    ? {
-                          ...d,
-                          status: 'active' as const,
-                          vercelDomainId: result.name,
-                          vercelVerification: null,
-                      }
+                    ? { ...d, status: 'active' as const, vercelDomainId: result.name }
                     : d,
             );
             try {
                 await payload.update({
                     collection: 'tenants',
                     id: tenantId,
-                    data: { customDomains: updated } as unknown as Record<string, unknown>,
+                    data: { customDomains: activated } as unknown as Record<string, unknown>,
                 });
             } catch (err) {
                 console.error('[verifyCustomDomain] Payload update after success failed:', err);
