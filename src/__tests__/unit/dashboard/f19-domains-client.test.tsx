@@ -203,7 +203,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
         await waitFor(() => {
             expect(actions.verifyCustomDomain).toHaveBeenCalledWith('store.custom.com');
             expect(toast.success).toHaveBeenCalledWith(
-                expect.stringContaining('Domain active. SSL provisioning'),
+                expect.stringContaining('Domain connected!'),
             );
         });
     });
@@ -346,7 +346,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
 
         await waitFor(() => {
             expect(toast.success).toHaveBeenCalledWith(
-                expect.stringContaining('SSL provisioning may take 1-2 minutes'),
+                expect.stringContaining('Domain connected!'),
             );
         });
     });

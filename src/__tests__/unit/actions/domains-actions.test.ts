@@ -19,8 +19,6 @@ vi.mock('@payloadcms/next/utilities', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
-// Post-DO migration: mock the Vercel domains client. We keep the real
-// VercelDomainsError class (imported below) so `instanceof` checks work.
 vi.mock('@/lib/vercel/domains', () => ({
     addProjectDomain: vi.fn(),
     verifyProjectDomain: vi.fn(),
@@ -29,27 +27,31 @@ vi.mock('@/lib/vercel/domains', () => ({
     isMockMode: vi.fn().mockReturnValue(false),
 }))
 
-// Action's soft DNS pre-flight — must never hard-fail tests.
-vi.mock('dns', () => {
-    const promises = {
-        resolve4: vi.fn().mockResolvedValue(['76.76.21.21']),
-        resolveCname: vi.fn().mockResolvedValue(['cname.vercel-dns.com']),
-    }
-    return { default: { promises }, promises }
-})
+vi.mock('@/lib/vercel/dns-check', () => ({
+    checkDnsRouting: vi.fn().mockResolvedValue({ ok: true }),
+    checkHttpsConnectivity: vi.fn().mockResolvedValue({ ok: true }),
+}))
 
 import { getCurrentTenantId } from '@/lib/auth'
 import {
     addCustomDomain,
     removeCustomDomain,
+    verifyCustomDomain,
     setPrimaryDomain,
     clearPrimaryDomain,
 } from '@/app/(dashboard)/settings/domains/actions'
 import {
     addProjectDomain,
+    verifyProjectDomain,
+    getProjectDomain,
     removeProjectDomain,
+    isMockMode,
 } from '@/lib/vercel/domains'
+import { checkDnsRouting, checkHttpsConnectivity } from '@/lib/vercel/dns-check'
+import { VercelDomainsError } from '@/lib/vercel/domains.types'
 import type { VercelDomain } from '@/lib/vercel/domains.types'
+
+// ─── Fixtures ─────────────────────────────────────────────────────────
 
 function makeVercelDomain(overrides: Partial<VercelDomain> = {}): VercelDomain {
     return {
@@ -63,110 +65,420 @@ function makeVercelDomain(overrides: Partial<VercelDomain> = {}): VercelDomain {
     }
 }
 
-describe('addCustomDomain [TC-F19.02, TC-F19.03]', () => {
+const TXT_CHALLENGE = [{ type: 'TXT', domain: '_vercel.example.com', value: 'vc-abc123' }]
+
+// ─── addCustomDomain ──────────────────────────────────────────────────
+
+describe('addCustomDomain — validation [TC-F19.02, TC-F19.03]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.stubEnv('VERCEL_TOKEN', 'test-token')
-        vi.stubEnv('VERCEL_TEAM_ID', 'team_test')
-        vi.stubEnv('VERCEL_PROJECT_ID', 'prj_test')
         vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
         mockFindByID.mockResolvedValue({ id: 'tenant-1', customDomains: [] })
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
     })
 
-    afterEach(() => {
-        vi.unstubAllEnvs()
-    })
+    afterEach(() => vi.unstubAllEnvs())
 
-    it('returns error when not authenticated', async () => {
+    it('returns Unauthorized when not authenticated', async () => {
         vi.mocked(getCurrentTenantId).mockResolvedValue(null)
-        const result = await addCustomDomain('test.com')
-        expect(result.success).toBe(false)
-        if (result.success === false) {
-            expect(result.error).toBe('Unauthorized')
-        }
+        const res = await addCustomDomain('test.com')
+        expect(res).toMatchObject({ success: false, error: 'Unauthorized' })
     })
 
-    it('rejects invalid domain format [TC-F19.02]', async () => {
-        const result = await addCustomDomain('not a domain!!!')
-        expect(result.success).toBe(false)
-        if (result.success === false) {
-            expect(result.error).toContain('Invalid domain')
-        }
-        expect(vi.mocked(addProjectDomain)).not.toHaveBeenCalled()
+    it('rejects invalid domain format (spaces) [TC-F19.02]', async () => {
+        const res = await addCustomDomain('my store.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('Invalid domain')
+        expect(addProjectDomain).not.toHaveBeenCalled()
     })
 
-    it('accepts https:// prefix after sanitization', async () => {
+    it('rejects invalid domain format (special chars) [TC-F19.02]', async () => {
+        const res = await addCustomDomain('not a domain!!!')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('Invalid domain')
+    })
+
+    it('strips https:// prefix before validation [TC-F19.02]', async () => {
         vi.mocked(addProjectDomain).mockResolvedValueOnce(
-            makeVercelDomain({ name: 'valid.com', apexName: 'valid.com', verified: true }),
+            makeVercelDomain({ name: 'valid.com', apexName: 'valid.com' }),
         )
-
-        const result = await addCustomDomain('https://valid.com')
-        expect(result.success).toBe(true)
-        expect(vi.mocked(addProjectDomain)).toHaveBeenCalledWith('valid.com')
+        const res = await addCustomDomain('https://valid.com')
+        expect(res.success).toBe(true)
+        expect(addProjectDomain).toHaveBeenCalledWith('valid.com')
     })
 
-    it('rejects duplicate domain across tenants [TC-F19.03]', async () => {
+    it('rejects domain already registered by another tenant [TC-F19.03]', async () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: 'other-tenant' }] })
-
-        const result = await addCustomDomain('taken.com')
-        expect(result.success).toBe(false)
-        if (result.success === false) {
-            expect(result.error).toContain('already registered')
-        }
-        expect(vi.mocked(addProjectDomain)).not.toHaveBeenCalled()
+        const res = await addCustomDomain('taken.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('another store')
+        expect(addProjectDomain).not.toHaveBeenCalled()
     })
 
-    it('rejects duplicate domain within same tenant', async () => {
+    it('rejects domain already added to same tenant', async () => {
         mockFindByID.mockResolvedValue({
             id: 'tenant-1',
             customDomains: [{ domain: 'existing.com', status: 'active' }],
         })
-
-        const result = await addCustomDomain('existing.com')
-        expect(result.success).toBe(false)
-        if (result.success === false) {
-            expect(result.error).toContain('already added')
-        }
-    })
-
-    it('adds valid new domain and always saves as pending [TC-F19.02]', async () => {
-        vi.mocked(addProjectDomain).mockResolvedValueOnce(
-            makeVercelDomain({
-                name: 'store.example.com',
-                apexName: 'example.com',
-                verified: true,
-            }),
-        )
-
-        const result = await addCustomDomain('store.example.com')
-        expect(result.success).toBe(true)
-        // BUG-F19 fix: always pending even when Vercel returns verified=true.
-        // DNS routing is not confirmed at add time — Verify button must be clicked.
-        const finalUpdate = mockUpdate.mock.calls.at(-1)?.[0]
-        expect(finalUpdate.data.customDomains[0]).toMatchObject({
-            domain: 'store.example.com',
-            status: 'pending',
-            vercelDomainId: 'store.example.com',
-        })
+        const res = await addCustomDomain('existing.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('already added')
     })
 })
 
-describe('removeCustomDomain [TC-F19.62]', () => {
+describe('addCustomDomain — success path [TC-F19.02]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.stubEnv('VERCEL_TOKEN', 'test-token')
-        vi.stubEnv('VERCEL_TEAM_ID', 'team_test')
-        vi.stubEnv('VERCEL_PROJECT_ID', 'prj_test')
         vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        mockFindByID.mockResolvedValue({ id: 'tenant-1', customDomains: [] })
+        mockFind.mockResolvedValue({ docs: [] })
+        mockUpdate.mockResolvedValue({})
     })
 
-    afterEach(() => {
-        vi.unstubAllEnvs()
+    afterEach(() => vi.unstubAllEnvs())
+
+    it('saves domain as pending even when Vercel returns verified=true', async () => {
+        vi.mocked(addProjectDomain).mockResolvedValueOnce(
+            makeVercelDomain({ name: 'shop.example.com', verified: true }),
+        )
+        const res = await addCustomDomain('shop.example.com')
+        expect(res.success).toBe(true)
+        const finalCall = mockUpdate.mock.calls.at(-1)?.[0]
+        expect(finalCall.data.customDomains[0]).toMatchObject({
+            domain: 'shop.example.com',
+            status: 'pending',
+        })
     })
 
-    it('removes domain from tenant and calls Vercel', async () => {
+    it('returns verification[] when Vercel requires TXT challenge', async () => {
+        vi.mocked(addProjectDomain).mockResolvedValueOnce(
+            makeVercelDomain({ verified: false, verification: TXT_CHALLENGE }),
+        )
+        const res = await addCustomDomain('newdomain.com')
+        expect(res.success).toBe(true)
+        if (res.success) expect(res.verification).toEqual(TXT_CHALLENGE)
+    })
+
+    it('saves vercelVerification when TXT challenge returned', async () => {
+        vi.mocked(addProjectDomain).mockResolvedValueOnce(
+            makeVercelDomain({ verified: false, verification: TXT_CHALLENGE }),
+        )
+        await addCustomDomain('newdomain.com')
+        const finalCall = mockUpdate.mock.calls.at(-1)?.[0]
+        expect(finalCall.data.customDomains[0].vercelVerification).toEqual(TXT_CHALLENGE)
+    })
+})
+
+describe('addCustomDomain — error handling & rollback', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.stubEnv('VERCEL_TOKEN', 'test-token')
+        vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        mockFindByID.mockResolvedValue({ id: 'tenant-1', customDomains: [] })
+        mockFind.mockResolvedValue({ docs: [] })
+        mockUpdate.mockResolvedValue({})
+    })
+
+    afterEach(() => vi.unstubAllEnvs())
+
+    it('rolls back Payload when Vercel fails after optimistic write', async () => {
+        vi.mocked(addProjectDomain).mockRejectedValueOnce(new Error('network'))
+        const res = await addCustomDomain('domain.com')
+        expect(res.success).toBe(false)
+        // optimistic write + rollback = 2 calls
+        expect(mockUpdate).toHaveBeenCalledTimes(2)
+        const rollbackCall = mockUpdate.mock.calls.at(-1)?.[0]
+        expect(rollbackCall.data.customDomains).toEqual([])
+    })
+
+    it('maps Vercel 409 domain_already_in_use to user-safe message', async () => {
+        const err = new VercelDomainsError({ code: 'domain_already_in_use', status: 409, message: 'taken' })
+        vi.mocked(addProjectDomain).mockRejectedValueOnce(err)
+        const res = await addCustomDomain('taken.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('another store')
+    })
+
+    it('maps Vercel 429 rate limit to user-safe message', async () => {
+        const err = new VercelDomainsError({ code: 'rate_limited', status: 429, message: 'slow down', retryAfter: 30 })
+        vi.mocked(addProjectDomain).mockRejectedValueOnce(err)
+        const res = await addCustomDomain('slow.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('Too many requests')
+    })
+
+    it('maps Vercel 5xx to generic message', async () => {
+        const err = new VercelDomainsError({ code: 'server_error', status: 503, message: 'unavailable' })
+        vi.mocked(addProjectDomain).mockRejectedValueOnce(err)
+        const res = await addCustomDomain('fail.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('temporarily unavailable')
+    })
+
+    it('removes from Vercel when Payload final write fails', async () => {
+        vi.mocked(addProjectDomain).mockResolvedValueOnce(makeVercelDomain())
+        // optimistic write ok, final write fails
+        mockUpdate
+            .mockResolvedValueOnce({})
+            .mockRejectedValueOnce(new Error('db fail'))
+        vi.mocked(removeProjectDomain).mockResolvedValueOnce(undefined)
+
+        const res = await addCustomDomain('domain.com')
+        expect(res.success).toBe(false)
+        expect(removeProjectDomain).toHaveBeenCalledWith('domain.com')
+    })
+})
+
+// ─── verifyCustomDomain ───────────────────────────────────────────────
+
+describe('verifyCustomDomain — guard checks', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(isMockMode).mockReturnValue(false)
+        vi.mocked(checkDnsRouting).mockResolvedValue({ ok: true })
+        vi.mocked(checkHttpsConnectivity).mockResolvedValue({ ok: true })
+    })
+
+    it('returns Unauthorized when not authenticated', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue(null)
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false, error: 'Unauthorized' })
+    })
+
+    it('returns error when domain not in tenant [TC-F19.11]', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        mockFindByID.mockResolvedValue({ id: 'tenant-1', customDomains: [] })
+        const res = await verifyCustomDomain('notmine.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('not found')
+    })
+
+    it('returns success immediately when domain already active (idempotent)', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            customDomains: [{ domain: 'already.com', status: 'active' }],
+        })
+        const res = await verifyCustomDomain('already.com')
+        expect(res.success).toBe(true)
+        expect(verifyProjectDomain).not.toHaveBeenCalled()
+    })
+})
+
+describe('verifyCustomDomain — Vercel ownership check fails', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        vi.mocked(isMockMode).mockReturnValue(false)
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            customDomains: [{ domain: 'example.com', status: 'pending', vercelVerification: TXT_CHALLENGE }],
+        })
+        mockUpdate.mockResolvedValue({})
+    })
+
+    it('returns TXT challenges when verified=false [TC-F19.11]', async () => {
+        vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
+            makeVercelDomain({ verified: false, verification: TXT_CHALLENGE }),
+        )
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) {
+            expect(res.verification).toEqual(TXT_CHALLENGE)
+            expect(res.error).toContain('TXT record')
+        }
+    })
+
+    it('fetches fresh challenges on Vercel 400 [TC-F19.11]', async () => {
+        vi.mocked(verifyProjectDomain).mockRejectedValueOnce(
+            new VercelDomainsError({ code: 'invalid_domain', status: 400, message: 'bad request' }),
+        )
+        vi.mocked(getProjectDomain).mockResolvedValueOnce(
+            makeVercelDomain({ verified: false, verification: TXT_CHALLENGE }),
+        )
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false })
+        expect(getProjectDomain).toHaveBeenCalledWith('example.com')
+        if (!res.success) expect(res.verification).toEqual(TXT_CHALLENGE)
+    })
+})
+
+describe('verifyCustomDomain — ownership OK, DNS/HTTPS gates [TC-F19.12, TC-F19.16]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        vi.mocked(isMockMode).mockReturnValue(false)
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            customDomains: [{ domain: 'example.com', status: 'pending' }],
+        })
+        mockUpdate.mockResolvedValue({})
+        vi.mocked(verifyProjectDomain).mockResolvedValue(
+            makeVercelDomain({ verified: true, verification: [] }),
+        )
+    })
+
+    it('clears TXT card immediately when Vercel confirms ownership', async () => {
+        vi.mocked(checkDnsRouting).mockResolvedValueOnce({ ok: false, message: 'DNS not set' })
+        await verifyCustomDomain('example.com')
+        const firstWrite = mockUpdate.mock.calls[0]?.[0]
+        expect(firstWrite.data.customDomains[0].vercelVerification).toBeNull()
+    })
+
+    it('returns error with ownershipConfirmed when DNS not routing [TC-F19.16]', async () => {
+        vi.mocked(checkDnsRouting).mockResolvedValueOnce({
+            ok: false,
+            message: 'A record not pointing to Vercel. Expected: 76.76.21.21 — currently: 1.2.3.4',
+        })
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false, ownershipConfirmed: true })
+        if (!res.success) expect(res.error).toContain('76.76.21.21')
+    })
+
+    it('returns error with ownershipConfirmed when DNS not set [TC-F19.11]', async () => {
+        vi.mocked(checkDnsRouting).mockResolvedValueOnce({
+            ok: false,
+            message: 'A record not pointing to Vercel. Expected: 76.76.21.21 — currently: none',
+        })
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false, ownershipConfirmed: true })
+        if (!res.success) expect(res.error).toContain('none')
+    })
+
+    it('returns SSL error with ownershipConfirmed when HTTPS probe fails [TC-F19.13]', async () => {
+        vi.mocked(checkDnsRouting).mockResolvedValueOnce({ ok: true })
+        vi.mocked(checkHttpsConnectivity).mockResolvedValueOnce({
+            ok: false,
+            message: 'SSL certificate is being provisioned. Please try again in 1–2 minutes.',
+        })
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false, ownershipConfirmed: true })
+        if (!res.success) expect(res.error).toContain('SSL')
+    })
+
+    it('returns not-accessible error when domain unreachable [TC-F19.12]', async () => {
+        vi.mocked(checkDnsRouting).mockResolvedValueOnce({ ok: true })
+        vi.mocked(checkHttpsConnectivity).mockResolvedValueOnce({
+            ok: false,
+            message: 'Domain is not yet accessible. Please try again in a few minutes.',
+        })
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false, ownershipConfirmed: true })
+        if (!res.success) expect(res.error).toContain('accessible')
+    })
+
+    it('marks domain active when all 3 gates pass [TC-F19.12]', async () => {
+        vi.mocked(checkDnsRouting).mockResolvedValueOnce({ ok: true })
+        vi.mocked(checkHttpsConnectivity).mockResolvedValueOnce({ ok: true })
+        const res = await verifyCustomDomain('example.com')
+        expect(res.success).toBe(true)
+        // second write = mark active
+        const activeWrite = mockUpdate.mock.calls.at(-1)?.[0]
+        expect(activeWrite.data.customDomains[0]).toMatchObject({
+            domain: 'example.com',
+            status: 'active',
+        })
+    })
+
+    it('skips DNS and HTTPS checks in mock mode [TC-F19.17]', async () => {
+        vi.mocked(isMockMode).mockReturnValue(true)
+        const res = await verifyCustomDomain('example.com')
+        expect(res.success).toBe(true)
+        expect(checkDnsRouting).not.toHaveBeenCalled()
+        expect(checkHttpsConnectivity).not.toHaveBeenCalled()
+    })
+
+    it('returns error with ownershipConfirmed when Write-1 (clear TXT) fails', async () => {
+        // Write-1 fails — must not continue silently to DNS/HTTPS checks
+        mockUpdate.mockRejectedValueOnce(new Error('db timeout'))
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false, ownershipConfirmed: true })
+        if (!res.success) expect(res.error).toContain('Please try again')
+        // DNS and HTTPS should NOT have been called
+        expect(checkDnsRouting).not.toHaveBeenCalled()
+        expect(checkHttpsConnectivity).not.toHaveBeenCalled()
+    })
+
+    it('returns error when domain removed concurrently between Write-1 and Write-2 (zombie guard)', async () => {
+        vi.mocked(checkDnsRouting).mockResolvedValueOnce({ ok: true })
+        vi.mocked(checkHttpsConnectivity).mockResolvedValueOnce({ ok: true })
+        // Write-1 succeeds; then fresh re-fetch returns empty list (domain was removed)
+        mockUpdate.mockResolvedValueOnce({})
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'tenant-1', customDomains: [{ domain: 'example.com', status: 'pending' }] })
+            .mockResolvedValueOnce({ id: 'tenant-1', customDomains: [] }) // concurrent remove
+        const res = await verifyCustomDomain('example.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('removed')
+        // Write-2 must NOT have been called (domain gone)
+        expect(mockUpdate).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe('verifyCustomDomain — retry after DNS fix [TC-F19.17]', () => {
+    it('first verify fails (DNS wrong), second verify succeeds after fix', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        vi.mocked(isMockMode).mockReturnValue(false)
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            customDomains: [{ domain: 'example.com', status: 'pending' }],
+        })
+        mockUpdate.mockResolvedValue({})
+        vi.mocked(verifyProjectDomain).mockResolvedValue(
+            makeVercelDomain({ verified: true, verification: [] }),
+        )
+
+        vi.mocked(checkDnsRouting)
+            .mockResolvedValueOnce({ ok: false, message: 'A record wrong' })
+            .mockResolvedValueOnce({ ok: true })
+        vi.mocked(checkHttpsConnectivity).mockResolvedValue({ ok: true })
+
+        const first = await verifyCustomDomain('example.com')
+        expect(first.success).toBe(false)
+
+        // simulate user fixed DNS — findByID still returns pending
+        const second = await verifyCustomDomain('example.com')
+        expect(second.success).toBe(true)
+    })
+})
+
+// ─── removeCustomDomain ───────────────────────────────────────────────
+
+describe('removeCustomDomain [TC-F19.14, TC-F19.62]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        mockUpdate.mockResolvedValue({})
+    })
+
+    it('returns Unauthorized when not authenticated', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue(null)
+        const res = await removeCustomDomain('test.com')
+        expect(res).toMatchObject({ success: false, error: 'Unauthorized' })
+    })
+
+    it('returns error when domain not found in tenant', async () => {
+        mockFindByID.mockResolvedValue({ id: 'tenant-1', customDomains: [] })
+        const res = await removeCustomDomain('notmine.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('not found')
+    })
+
+    it('blocks removal of primary domain [TC-F19.14]', async () => {
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            customDomains: [{ domain: 'primary.com', status: 'active', isPrimary: true }],
+        })
+        const res = await removeCustomDomain('primary.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('primary')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('removes domain from Payload and calls Vercel cleanup [TC-F19.62]', async () => {
         mockFindByID.mockResolvedValue({
             id: 'tenant-1',
             customDomains: [
@@ -174,46 +486,53 @@ describe('removeCustomDomain [TC-F19.62]', () => {
                 { domain: 'remove.com', status: 'active' },
             ],
         })
-        mockUpdate.mockResolvedValue({})
         vi.mocked(removeProjectDomain).mockResolvedValueOnce(undefined)
 
-        const result = await removeCustomDomain('remove.com')
-        expect(result.success).toBe(true)
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    customDomains: [{ domain: 'keep.com', status: 'active' }],
-                }),
-            }),
-        )
-        expect(vi.mocked(removeProjectDomain)).toHaveBeenCalledWith('remove.com')
+        const res = await removeCustomDomain('remove.com')
+        expect(res.success).toBe(true)
+        const updatedList = mockUpdate.mock.calls[0]?.[0].data.customDomains
+        expect(updatedList).toEqual([{ domain: 'keep.com', status: 'active' }])
+        expect(removeProjectDomain).toHaveBeenCalledWith('remove.com')
     })
 
-    it('returns error when not authenticated', async () => {
-        vi.mocked(getCurrentTenantId).mockResolvedValue(null)
-        const result = await removeCustomDomain('test.com')
-        expect(result.success).toBe(false)
+    it('succeeds even when Vercel returns 404 (idempotent)', async () => {
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            customDomains: [{ domain: 'gone.com', status: 'active' }],
+        })
+        vi.mocked(removeProjectDomain).mockRejectedValueOnce(
+            new VercelDomainsError({ code: 'not_found', status: 404, message: 'not found' }),
+        )
+        const res = await removeCustomDomain('gone.com')
+        expect(res.success).toBe(true)
+    })
+
+    it('succeeds even when Vercel returns 5xx (Payload already cleared)', async () => {
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            customDomains: [{ domain: 'flaky.com', status: 'active' }],
+        })
+        vi.mocked(removeProjectDomain).mockRejectedValueOnce(
+            new VercelDomainsError({ code: 'server_error', status: 503, message: 'unavailable' }),
+        )
+        const res = await removeCustomDomain('flaky.com')
+        expect(res.success).toBe(true)
     })
 })
+
+// ─── setPrimaryDomain ─────────────────────────────────────────────────
 
 describe('setPrimaryDomain [TC-F19.58]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        mockUpdate.mockResolvedValue({})
     })
 
-    it('sets active domain as primary', async () => {
-        mockFindByID.mockResolvedValue({
-            id: 'tenant-1',
-            customDomains: [
-                { domain: 'a.com', status: 'active', isPrimary: true },
-                { domain: 'b.com', status: 'active', isPrimary: false },
-            ],
-        })
-        mockUpdate.mockResolvedValue({})
-
-        const result = await setPrimaryDomain('b.com')
-        expect(result.success).toBe(true)
+    it('returns Unauthorized when not authenticated', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue(null)
+        const res = await setPrimaryDomain('a.com')
+        expect(res).toMatchObject({ success: false, error: 'Unauthorized' })
     })
 
     it('rejects setting pending domain as primary', async () => {
@@ -221,38 +540,61 @@ describe('setPrimaryDomain [TC-F19.58]', () => {
             id: 'tenant-1',
             customDomains: [{ domain: 'pending.com', status: 'pending' }],
         })
+        const res = await setPrimaryDomain('pending.com')
+        expect(res).toMatchObject({ success: false })
+        if (!res.success) expect(res.error).toContain('verified')
+    })
 
-        const result = await setPrimaryDomain('pending.com')
-        expect(result.success).toBe(false)
-        if (result.success === false) {
-            expect(result.error).toContain('verified')
-        }
+    it('rejects domain not found', async () => {
+        mockFindByID.mockResolvedValue({ id: 'tenant-1', customDomains: [] })
+        const res = await setPrimaryDomain('notfound.com')
+        expect(res).toMatchObject({ success: false })
+    })
+
+    it('sets active domain as primary, clears others', async () => {
+        mockFindByID.mockResolvedValue({
+            id: 'tenant-1',
+            customDomains: [
+                { domain: 'a.com', status: 'active', isPrimary: true },
+                { domain: 'b.com', status: 'active', isPrimary: false },
+            ],
+        })
+        const res = await setPrimaryDomain('b.com')
+        expect(res.success).toBe(true)
+        const updated = mockUpdate.mock.calls[0]?.[0].data.customDomains
+        expect(updated).toEqual([
+            { domain: 'a.com', status: 'active', isPrimary: false },
+            { domain: 'b.com', status: 'active', isPrimary: true },
+        ])
     })
 })
+
+// ─── clearPrimaryDomain ───────────────────────────────────────────────
 
 describe('clearPrimaryDomain', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        mockUpdate.mockResolvedValue({})
     })
 
-    it('clears isPrimary on all domains', async () => {
+    it('returns Unauthorized when not authenticated', async () => {
+        vi.mocked(getCurrentTenantId).mockResolvedValue(null)
+        const res = await clearPrimaryDomain()
+        expect(res).toMatchObject({ success: false, error: 'Unauthorized' })
+    })
+
+    it('clears isPrimary on all domains → platform subdomain becomes default', async () => {
         mockFindByID.mockResolvedValue({
             id: 'tenant-1',
             customDomains: [
                 { domain: 'a.com', status: 'active', isPrimary: true },
+                { domain: 'b.com', status: 'active', isPrimary: false },
             ],
         })
-        mockUpdate.mockResolvedValue({})
-
-        const result = await clearPrimaryDomain()
-        expect(result.success).toBe(true)
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    customDomains: [{ domain: 'a.com', status: 'active', isPrimary: false }],
-                }),
-            }),
-        )
+        const res = await clearPrimaryDomain()
+        expect(res.success).toBe(true)
+        const updated = mockUpdate.mock.calls[0]?.[0].data.customDomains
+        expect(updated.every((d: { isPrimary: boolean }) => d.isPrimary === false)).toBe(true)
     })
 })

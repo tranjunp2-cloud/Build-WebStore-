@@ -35,20 +35,10 @@ vi.mock('@/lib/vercel/domains', () => ({
     isMockMode: vi.fn().mockReturnValue(false),
 }));
 
-// Stub dns.promises — the action uses resolve4 / resolveCname for a soft
-// pre-flight check that should never hard-fail tests.
-vi.mock('dns', () => {
-    const promises = {
-        resolve4: vi.fn().mockResolvedValue(['76.76.21.21']),
-        resolveCname: vi.fn().mockResolvedValue(['cname.vercel-dns.com']),
-    };
-    return {
-        default: { promises },
-        promises,
-    };
-});
-
-import dns from 'dns';
+vi.mock('@/lib/vercel/dns-check', () => ({
+    checkDnsRouting: vi.fn().mockResolvedValue({ ok: true }),
+    checkHttpsConnectivity: vi.fn().mockResolvedValue({ ok: true }),
+}));
 
 import {
     addCustomDomain,
@@ -342,12 +332,18 @@ describe('Domains Server Actions (Vercel-backed)', () => {
 
     // ── verifyCustomDomain ──────────────────────────────────────────────────
     describe('verifyCustomDomain', () => {
-        // TC-A-07 — Happy: verified=true → status flipped to active.
+        // TC-A-07 — Happy: verified=true → DNS + HTTPS pass → status flipped to active.
         it('TC-A-07: happy path flips tenant row to status=active', async () => {
-            mockFindByID.mockResolvedValueOnce({
-                id: 'tenant-123',
-                customDomains: [{ domain: 'check-me.com', status: 'pending' }],
-            });
+            // Initial read + re-fetch (zombie guard before Write-2)
+            mockFindByID
+                .mockResolvedValueOnce({
+                    id: 'tenant-123',
+                    customDomains: [{ domain: 'check-me.com', status: 'pending' }],
+                })
+                .mockResolvedValueOnce({
+                    id: 'tenant-123',
+                    customDomains: [{ domain: 'check-me.com', status: 'pending' }],
+                });
             vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
                 makeVercelDomain({ name: 'check-me.com', apexName: 'check-me.com', verified: true }),
             );
@@ -462,74 +458,6 @@ describe('Domains Server Actions (Vercel-backed)', () => {
             expect(vi.mocked(verifyProjectDomain)).not.toHaveBeenCalled();
         });
 
-        // TC-F19.11 — Soft DNS pre-flight: apex A record mismatch is logged but Vercel API
-        // is still called. Vercel's global infra is the source of truth (issue #975 fix).
-        it('TC-F19.11: soft DNS pre-flight warns on apex A record mismatch but still calls Vercel', async () => {
-            mockFindByID.mockResolvedValueOnce({
-                id: 'tenant-123',
-                customDomains: [{ domain: 'example.com', status: 'pending' }],
-            });
-            vi.mocked(dns.promises.resolve4).mockResolvedValueOnce(['1.2.3.4'] as any);
-            vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
-                makeVercelDomain({ name: 'example.com', apexName: 'example.com', verified: true }),
-            );
-
-            const res = await verifyCustomDomain('example.com');
-            expect(res.success).toBe(true);
-            expect(vi.mocked(verifyProjectDomain)).toHaveBeenCalledWith('example.com');
-        });
-
-        // TC-F19.16 — Soft DNS pre-flight: ENOTFOUND is logged but Vercel API is still called.
-        it('TC-F19.16: soft DNS pre-flight warns on apex ENOTFOUND but still calls Vercel', async () => {
-            mockFindByID.mockResolvedValueOnce({
-                id: 'tenant-123',
-                customDomains: [{ domain: 'example.com', status: 'pending' }],
-            });
-            vi.mocked(dns.promises.resolve4).mockRejectedValueOnce(
-                Object.assign(new Error('queryA ENOTFOUND example.com'), { code: 'ENOTFOUND' }),
-            );
-            vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
-                makeVercelDomain({ name: 'example.com', apexName: 'example.com', verified: true }),
-            );
-
-            const res = await verifyCustomDomain('example.com');
-            expect(res.success).toBe(true);
-            expect(vi.mocked(verifyProjectDomain)).toHaveBeenCalledWith('example.com');
-        });
-
-        // TC-F19.16b — Soft DNS pre-flight: CNAME mismatch is logged but Vercel API is still called.
-        it('TC-F19.16b: soft DNS pre-flight warns on subdomain CNAME mismatch but still calls Vercel', async () => {
-            mockFindByID.mockResolvedValueOnce({
-                id: 'tenant-123',
-                customDomains: [{ domain: 'shop.example.com', status: 'pending' }],
-            });
-            vi.mocked(dns.promises.resolveCname).mockResolvedValueOnce(['some-other-host.com'] as any);
-            vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
-                makeVercelDomain({ name: 'shop.example.com', apexName: 'example.com', verified: true }),
-            );
-
-            const res = await verifyCustomDomain('shop.example.com');
-            expect(res.success).toBe(true);
-            expect(vi.mocked(verifyProjectDomain)).toHaveBeenCalledWith('shop.example.com');
-        });
-
-        // TC-F19.17 — Soft DNS pre-flight: timeout is logged but Vercel API is still called.
-        it('TC-F19.17: DNS timeout logs warning but still calls Vercel API', async () => {
-            mockFindByID.mockResolvedValueOnce({
-                id: 'tenant-123',
-                customDomains: [{ domain: 'example.com', status: 'pending' }],
-            });
-            vi.mocked(dns.promises.resolve4).mockRejectedValueOnce(
-                Object.assign(new Error('DNS_TIMEOUT'), { code: 'DNS_TIMEOUT' }),
-            );
-            vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
-                makeVercelDomain({ name: 'example.com', apexName: 'example.com', verified: true }),
-            );
-
-            const res = await verifyCustomDomain('example.com');
-            expect(res.success).toBe(true);
-            expect(vi.mocked(verifyProjectDomain)).toHaveBeenCalledWith('example.com');
-        });
     });
 
     // ── setPrimaryDomain (unchanged — platform-agnostic) ────────────────────
