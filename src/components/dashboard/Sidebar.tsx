@@ -84,7 +84,7 @@ const NAV_ITEMS: NavItemConfig[] = [
         href: '/customers',
     },
     {
-        label: { en: 'Store Config', ms: 'Konfigurasi Stor' },
+        label: { en: 'Settings', ms: 'Tetapan' },
         icon: Settings,
         href: '/settings',
         children: [
