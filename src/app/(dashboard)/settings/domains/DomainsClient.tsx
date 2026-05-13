@@ -418,9 +418,15 @@ export function DomainsClient({
                     // Ownership confirmed by Vercel — TXT no longer needed, clear the card.
                     setVerifications(prev => { const next = { ...prev }; delete next[domain]; return next; });
                 }
-                const friendly = res.error || 'Verification failed. Please check your DNS records.';
-                setVerifyErrors(prev => ({ ...prev, [domain]: friendly }));
-                toast.error(`Verification failed: ${friendly}`);
+                if (res.ownershipConfirmed) {
+                    const msg = 'DNS records are still propagating. This usually takes 5–30 minutes after you save them. Try again shortly.';
+                    setVerifyErrors(prev => ({ ...prev, [domain]: msg }));
+                    toast.warning(msg);
+                } else {
+                    const friendly = res.error || 'Verification failed. Please check your DNS records.';
+                    setVerifyErrors(prev => ({ ...prev, [domain]: friendly }));
+                    toast.error(`Verification failed: ${friendly}`);
+                }
             }
         });
     };
