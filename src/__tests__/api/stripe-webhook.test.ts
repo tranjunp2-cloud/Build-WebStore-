@@ -132,7 +132,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(res.status).toBe(200) // Still 200 to prevent Stripe retries
     })
 
-    it('skips already processed orders (idempotency)', async () => {
+    it('[TC-F13.14] skips already processed orders (idempotency)', async () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
@@ -144,5 +144,128 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(res.status).toBe(200)
         // update should NOT be called for already-processed order
         expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    // ─── TC-F13.11: FPX payment method mapping ───────────────────────
+    it('[TC-F13.11] maps FPX payment_method_types to paymentMethod=fpx in order', async () => {
+        // Arrange
+        mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
+        mockNormalize.mockReturnValue({
+            type: 'payment_success',
+            data: {
+                id: 'sess_fpx_123',
+                client_reference_id: 'order-fpx',
+                payment_method_types: ['fpx'],
+                payment_intent: 'pi_fpx_456',
+            },
+        })
+        mockFind.mockResolvedValue({ docs: [] }) // Not already processed
+        mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValue({
+            id: 'order-fpx',
+            items: [],
+            customerEmail: 'buyer@test.com',
+            orderNumber: 'ORD-FPX-001',
+            tenant: 'tenant-1',
+        })
+
+        // Act
+        const res = await POST(createRequest('{}', 'sig_valid'))
+
+        // Assert
+        expect(res.status).toBe(200)
+        // First update call should set paymentMethod to 'fpx'
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collection: 'orders',
+                id: 'order-fpx',
+                data: expect.objectContaining({
+                    paymentMethod: 'fpx',
+                    status: 'paid',
+                }),
+            }),
+        )
+    })
+
+    // ─── TC-F13.11b: Card payment method mapping ────────────────────
+    it('[TC-F13.11b] maps card payment_method_types to paymentMethod=card in order', async () => {
+        // Arrange
+        mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
+        mockNormalize.mockReturnValue({
+            type: 'payment_success',
+            data: {
+                id: 'sess_card_123',
+                client_reference_id: 'order-card',
+                payment_method_types: ['card'],
+                payment_intent: 'pi_card_456',
+            },
+        })
+        mockFind.mockResolvedValue({ docs: [] })
+        mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValue({
+            id: 'order-card',
+            items: [],
+            customerEmail: 'buyer@test.com',
+            orderNumber: 'ORD-CARD-001',
+            tenant: 'tenant-1',
+        })
+
+        // Act
+        const res = await POST(createRequest('{}', 'sig_valid'))
+
+        // Assert
+        expect(res.status).toBe(200)
+        // Update should set paymentMethod to 'card'
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collection: 'orders',
+                id: 'order-card',
+                data: expect.objectContaining({
+                    paymentMethod: 'card',
+                    status: 'paid',
+                }),
+            }),
+        )
+    })
+
+    // ─── TC-F13.11: stripeChargeId extraction from payment_intent ─────
+    it('[TC-F13.11] extracts stripeChargeId from expanded payment_intent.latest_charge', async () => {
+        // Arrange
+        mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
+        mockNormalize.mockReturnValue({
+            type: 'payment_success',
+            data: {
+                id: 'sess_charge_123',
+                client_reference_id: 'order-charge',
+                payment_method_types: ['fpx'],
+                payment_intent: {
+                    id: 'pi_with_charge',
+                    latest_charge: 'ch_test_charge_abc123',
+                },
+            },
+        })
+        mockFind.mockResolvedValue({ docs: [] })
+        mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValue({
+            id: 'order-charge',
+            items: [],
+            customerEmail: 'buyer@test.com',
+            orderNumber: 'ORD-CHARGE-001',
+            tenant: 'tenant-1',
+        })
+
+        // Act
+        const res = await POST(createRequest('{}', 'sig_valid'))
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    stripeChargeId: 'ch_test_charge_abc123',
+                    stripePaymentIntentId: 'pi_with_charge',
+                }),
+            }),
+        )
     })
 })

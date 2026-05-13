@@ -3936,6 +3936,12 @@ const MIGRATIONS = [
   },
   { name: 'pages_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "pages_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+
+  // ── F13: FPX + Card payment via Stripe Checkout Session (issue #963) ──
+  { name: 'orders.stripe_charge_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_charge_id varchar;` },
+  { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
+  { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },
+  { name: 'sites.payment_config_fpx_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_fpx_enabled boolean DEFAULT true;` },
 ];
 
 async function runMigrations(pool) {

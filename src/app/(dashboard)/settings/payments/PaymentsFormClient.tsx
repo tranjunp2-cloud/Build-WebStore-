@@ -5,7 +5,7 @@ import NextImage from 'next/image';
 import { CreditCard, Banknote, Upload, UploadCloud, X, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, type PaymentUpdates } from './actions';
+import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, updateSitePaymentConfig, type PaymentUpdates } from './actions';
 import { useI18n } from '@/i18n';
 
 type Media = {
@@ -48,9 +48,19 @@ function isLocalOrBlob(urlStr: string | null): boolean {
     }
 }
 
-export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined }) {
+export function PaymentsFormClient({
+    tenantId,
+    initialCardEnabled = true,
+    initialFpxEnabled = true,
+}: {
+    tenantId: string | undefined
+    initialCardEnabled?: boolean
+    initialFpxEnabled?: boolean
+}) {
     const [paymentCod, setPaymentCod] = useState(false);
     const [paymentQr, setPaymentQr] = useState(false);
+    const [cardEnabled, setCardEnabled] = useState(initialCardEnabled);
+    const [fpxEnabled, setFpxEnabled] = useState(initialFpxEnabled);
     const [qrWidgetExpanded, setQrWidgetExpanded] = useState(false);
     const [qrImageId, setQrImageId] = useState<string | number | null>(null);
     const [qrPreviewUrl, setQrPreviewUrl] = useState<string | null>(null);
@@ -58,7 +68,6 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
 
-    const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,6 +121,30 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
             const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
             toast.error(errorMessage);
             return false;
+        }
+    };
+
+    const handleToggleCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const checked = e.target.checked;
+        setCardEnabled(checked);
+        const res = await updateSitePaymentConfig({ cardEnabled: checked });
+        if (res.success) {
+            toast.success(pt.successSave);
+        } else {
+            setCardEnabled(!checked);
+            toast.error(pt.failSaveSettings);
+        }
+    };
+
+    const handleToggleFpx = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const checked = e.target.checked;
+        setFpxEnabled(checked);
+        const res = await updateSitePaymentConfig({ fpxEnabled: checked });
+        if (res.success) {
+            toast.success(pt.successSave);
+        } else {
+            setFpxEnabled(!checked);
+            toast.error(pt.failSaveSettings);
         }
     };
 
@@ -223,36 +256,6 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
         }
     };
 
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!tenantId) return;
-
-        setIsSaving(true);
-        try {
-            const res = await fetch(`/api/tenants/${tenantId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    payments: {
-                        payment_cod: paymentCod,
-                        payment_qr: paymentQr,
-                        qr_image: qrImageId,
-                    }
-                }),
-                credentials: 'include',
-            });
-
-            if (!res.ok) throw new Error("Failed to save settings");
-            toast.success(pt.successSave);
-        } catch (error) {
-            console.error(error);
-            toast.error(pt.failSaveSettings);
-        } finally {
-            setIsSaving(false);
-        }
-    };
 
     if (isLoading) {
         return <div className="p-8 text-white">{pt.loading}</div>;
@@ -271,34 +274,89 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                 </div>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-[16px]">
+            <form className="space-y-[16px]">
 
-                {/* Stripe / Card Section */}
-                <div className="flex flex-col p-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 transition-colors gap-[16px]">
+                {/* Card (Stripe) Section */}
+                <div className={cn(
+                    "flex flex-col p-[25px] rounded-[16px] transition-all duration-300 gap-[16px]",
+                    cardEnabled ? "border-blue-500/30 bg-[#1E293B]/60 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "border-white/[0.08] bg-[#1E293B]/60"
+                )}>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="flex h-[50px] w-[50px] items-center justify-center rounded-[16px] bg-white/5 border border-white/[0.08] shrink-0">
-                                <CreditCard className="h-6 w-6 text-slate-200" />
+                            <div className={cn(
+                                "flex h-[50px] w-[50px] items-center justify-center rounded-[16px] border shrink-0 transition-colors duration-300",
+                                cardEnabled ? "bg-blue-500/10 border-blue-500/20" : "bg-white/5 border-white/[0.08]"
+                            )}>
+                                <CreditCard className={cn("h-6 w-6 transition-colors duration-300", cardEnabled ? "text-blue-500" : "text-slate-200")} />
                             </div>
                             <div>
                                 <h3 className="text-[18px] font-semibold text-slate-50">{pt.gatewayTitle}</h3>
                                 <p className="mt-1 text-[14px] text-slate-50/60 max-w-[320px]">{pt.gatewaySubtitle}</p>
                             </div>
                         </div>
-                        {/* Mock Stripe Toggle */}
                         <div className="mt-4 sm:mt-0">
-                            <label className="relative inline-flex cursor-not-allowed items-center text-slate-50">
-                                <div className="h-[32px] w-[56px] rounded-full bg-[#1E293B] border border-white/[0.12] relative">
-                                    <div className="absolute left-[4px] top-[3px] h-[24px] w-[24px] rounded-full bg-slate-400/50 transition-all shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]"></div>
-                                </div>
+                            <label className="relative inline-flex cursor-pointer items-center text-slate-50">
+                                <input type="checkbox" className="peer sr-only" checked={cardEnabled} onChange={handleToggleCard} />
+                                <div className={cn(
+                                    "h-[32px] w-[56px] rounded-full border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/50 after:absolute after:left-[4px] after:top-[3px] after:h-[24px] after:w-[24px] after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-[24px] after:shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]",
+                                    cardEnabled ? "bg-gradient-to-r from-blue-500 to-teal-400 border-transparent shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-[#1E293B] border-white/[0.12]"
+                                )}></div>
                             </label>
                         </div>
                     </div>
-                    {/* Status Pill matching Text alignment */}
                     <div>
-                        <div className="flex w-[79px] h-[34px] items-center justify-center rounded-[12px] border border-white/[0.05] bg-[#0B1120]/50">
-                            <span className="text-[14px] font-medium leading-none text-slate-50/50">{pt.inactive}</span>
+                        {cardEnabled ? (
+                            <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
+                                <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
+                                <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">{pt.active}</span>
+                            </div>
+                        ) : (
+                            <div className="flex w-[79px] h-[34px] items-center justify-center rounded-[12px] border border-white/[0.05] bg-[#0B1120]/50">
+                                <span className="text-[14px] font-medium leading-none text-slate-50/50">{pt.inactive}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* FPX (Online Banking) Section */}
+                <div className={cn(
+                    "flex flex-col p-[25px] rounded-[16px] transition-all duration-300 gap-[16px]",
+                    fpxEnabled ? "border-blue-500/30 bg-[#1E293B]/60 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "border-white/[0.08] bg-[#1E293B]/60"
+                )}>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={cn(
+                                "flex h-[50px] w-[50px] items-center justify-center rounded-[16px] border shrink-0 transition-colors duration-300",
+                                fpxEnabled ? "bg-blue-500/10 border-blue-500/20" : "bg-white/5 border-white/[0.08]"
+                            )}>
+                                <Banknote className={cn("h-6 w-6 transition-colors duration-300", fpxEnabled ? "text-blue-500" : "text-slate-200")} />
+                            </div>
+                            <div>
+                                <h3 className="text-[18px] font-semibold text-slate-50">FPX (Online Banking)</h3>
+                                <p className="mt-1 text-[14px] text-slate-50/60 max-w-[320px]">{pt.bankTransferSubtitle}</p>
+                            </div>
                         </div>
+                        <div className="mt-4 sm:mt-0">
+                            <label className="relative inline-flex cursor-pointer items-center text-slate-50">
+                                <input type="checkbox" className="peer sr-only" checked={fpxEnabled} onChange={handleToggleFpx} />
+                                <div className={cn(
+                                    "h-[32px] w-[56px] rounded-full border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/50 after:absolute after:left-[4px] after:top-[3px] after:h-[24px] after:w-[24px] after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-[24px] after:shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]",
+                                    fpxEnabled ? "bg-gradient-to-r from-blue-500 to-teal-400 border-transparent shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-[#1E293B] border-white/[0.12]"
+                                )}></div>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        {fpxEnabled ? (
+                            <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
+                                <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
+                                <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">{pt.active}</span>
+                            </div>
+                        ) : (
+                            <div className="flex w-[79px] h-[34px] items-center justify-center rounded-[12px] border border-white/[0.05] bg-[#0B1120]/50">
+                                <span className="text-[14px] font-medium leading-none text-slate-50/50">{pt.inactive}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 

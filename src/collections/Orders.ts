@@ -222,6 +222,7 @@ export const Orders: CollectionConfig = {
                 { label: 'Cash on Delivery', value: 'cod' },
                 { label: 'QR Banking', value: 'qr_banking' },
                 { label: 'Credit Card', value: 'card' },
+                { label: 'FPX (Online Banking)', value: 'fpx' },
                 { label: 'Bank Transfer', value: 'bank' },
                 { label: 'e-Wallet', value: 'ewallet' },
             ],
@@ -249,6 +250,12 @@ export const Orders: CollectionConfig = {
             type: 'text',
             index: true,
             admin: { readOnly: true, description: 'Stripe PaymentIntent ID' },
+        },
+        {
+            name: 'stripeChargeId',
+            type: 'text',
+            index: true,
+            admin: { readOnly: true, description: 'Stripe Charge ID (from payment_intent.latest_charge)' },
         },
         // --- Customer ---
         {

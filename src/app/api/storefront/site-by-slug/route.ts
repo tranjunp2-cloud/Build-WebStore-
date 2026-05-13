@@ -33,6 +33,14 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
+        const tenantFull = await payload.findByID({
+            collection: 'tenants',
+            id: tenant.id,
+            depth: 0,
+            select: { id: true, stripeOnboardingComplete: true } as any,
+            overrideAccess: true,
+        })
+
         const siteResult = await payload.find({
             collection: 'sites',
             where: { tenant: { equals: tenant.id } },
@@ -47,7 +55,7 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
-        const paymentConfig = (site as any).paymentConfig
+        const paymentConfig = (site as any).paymentConfig ?? {}
         const merchantQrCode = paymentConfig?.merchantQrCode
         const merchantQrCodeUrl = merchantQrCode && typeof merchantQrCode === 'object'
             ? (merchantQrCode.url ?? null)
@@ -64,6 +72,9 @@ export async function GET(req: Request) {
             bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
             shippingConfig: (site as any).shippingConfig ?? null,
             theme: (site as any).theme ?? null,
+            cardEnabled: paymentConfig.cardEnabled !== false,
+            fpxEnabled: paymentConfig.fpxEnabled !== false,
+            stripeEnabled: Boolean((tenantFull as any)?.stripeOnboardingComplete),
         })
     } catch (error) {
         console.error('[Storefront site-by-slug]', error)

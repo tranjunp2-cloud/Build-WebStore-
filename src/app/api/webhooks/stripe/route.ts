@@ -133,14 +133,28 @@ async function handleCheckoutCompleted(
 
     // Find the pending order by ID and update it
     try {
+        // Map Stripe payment method to our enum value (fpx → 'fpx', anything else → 'card')
+        const rawMethod = session.payment_method_types?.[0]
+        const paymentMethod = rawMethod === 'fpx' ? 'fpx' : 'card'
+
+        // stripeChargeId is available when payment_intent is expanded as an object
+        const stripeChargeId: string | undefined =
+            typeof session.payment_intent === 'object' && session.payment_intent !== null
+                ? (session.payment_intent as any).latest_charge ?? undefined
+                : undefined
+
         await payload.update({
             collection: 'orders',
             id: orderId,
             data: {
                 status: 'paid',
                 stripeSessionId,
-                stripePaymentIntentId: session.payment_intent ?? undefined,
-                paymentMethod: session.payment_method_types?.[0] === 'fpx' ? 'bank' : 'card',
+                stripePaymentIntentId:
+                    typeof session.payment_intent === 'string'
+                        ? session.payment_intent
+                        : (session.payment_intent as any)?.id ?? undefined,
+                stripeChargeId,
+                paymentMethod,
             },
         })
 

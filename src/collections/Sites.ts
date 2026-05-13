@@ -397,6 +397,18 @@ export const Sites: CollectionConfig = {
                     type: 'text',
                     label: 'Account Holder Name',
                 },
+                {
+                    name: 'cardEnabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Allow Credit/Debit Card via Stripe (layer-2 guard)' },
+                },
+                {
+                    name: 'fpxEnabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Allow FPX (Online Banking) via Stripe — Malaysia only (layer-2 guard)' },
+                },
             ],
         },
         {

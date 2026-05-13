@@ -23,6 +23,9 @@ type InitialSiteData = {
     bankAccountNo: string | null
     bankAccountHolder: string | null
     shippingConfig: ShippingConfig | null
+    cardEnabled: boolean
+    fpxEnabled: boolean
+    stripeEnabled: boolean
 }
 
 export default async function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -59,6 +62,14 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
         }
 
         if (tenant) {
+            const tenantFull = await payload.findByID({
+                collection: 'tenants',
+                id: tenant.id,
+                depth: 0,
+                select: { id: true, stripeOnboardingComplete: true } as any,
+                overrideAccess: true,
+            })
+
             const siteResult = await payload.find({
                 collection: 'sites',
                 where: { tenant: { equals: tenant.id } },
@@ -101,6 +112,9 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                     bankAccountNo: paymentConfig?.bankAccountNo ?? null,
                     bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
                     shippingConfig: (site as any).shippingConfig ?? null,
+                    cardEnabled: paymentConfig?.cardEnabled !== false,
+                    fpxEnabled: paymentConfig?.fpxEnabled !== false,
+                    stripeEnabled: Boolean((tenantFull as any)?.stripeOnboardingComplete),
                 }
             }
         }
