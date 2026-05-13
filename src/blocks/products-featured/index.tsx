@@ -15,8 +15,8 @@ import { getGalleryImages } from '@/lib/images/industry-images'
 import { handleCartClick } from '@/lib/storefront/editor-intercept'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
-// GH-960: Cart enabled for editor preview. Real checkout logic ships in #961.
-const CART_ENABLED = true
+// GH-960: re-enable (set true) when #961 (cart/checkout) ships
+const CART_ENABLED = false
 
 interface FeaturedProduct {
     id: string

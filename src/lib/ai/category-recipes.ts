@@ -104,9 +104,10 @@ export const SUPPORTED_BLOCK_IDS = new Set([
   // 'video-showcase', // temporarily hidden from AI generation (aiVisible: false, archived)
   'doctor-profile',
   'property-card',
-  'menu-display',
-  'pricing-table',
-  'product-quick-view',
+  // GH-960: re-add when #961 (cart/checkout) ships
+  // 'menu-display',
+  // 'pricing-table',
+  // 'product-quick-view',
   'products-grid',
   'products-featured',
   'portfolio-grid',
@@ -133,8 +134,9 @@ const RESTAURANT_RECIPES: CategoryRecipe[] = [
     id: 'rest-story',
     label: 'Story-first',
     rhythm: 'story-first',
-    blocks: ['hero', 'about', 'menu-display', 'gallery', 'testimonials', 'faq', 'cta', 'contact', 'footer'],
-    required: ['hero', 'about', 'menu-display', 'contact'],
+    // GH-960: menu-display removed — restore when #961 ships
+    blocks: ['hero', 'about', 'features', 'gallery', 'testimonials', 'faq', 'cta', 'contact', 'footer'],
+    required: ['hero', 'about', 'features', 'contact'],
     middleShuffleRange: [3, 5],
     description: 'Lead with the founder story — about → menu → gallery. Best for heritage brands.',
   },
@@ -142,19 +144,21 @@ const RESTAURANT_RECIPES: CategoryRecipe[] = [
     id: 'rest-menu',
     label: 'Menu-first',
     rhythm: 'menu-first',
-    blocks: ['hero', 'menu-display', 'features', 'testimonials', 'gallery', 'cta', 'contact', 'footer'],
-    required: ['hero', 'menu-display', 'cta', 'contact'],
+    // GH-960: menu-display removed — restore when #961 ships
+    blocks: ['hero', 'features', 'features', 'testimonials', 'gallery', 'cta', 'cta', 'contact', 'footer'],
+    required: ['hero', 'features', 'cta', 'contact'],
     middleShuffleRange: [2, 5],
-    description: 'Show the menu first — menu-display → features → social proof. Best for casual dining + QSR.',
+    description: 'Show the menu first — menu → features → social proof. Best for casual dining + QSR.',
   },
   {
     id: 'rest-gallery',
     label: 'Gallery-first',
     rhythm: 'gallery-first',
-    blocks: ['hero', 'gallery', 'menu-display', 'about', 'testimonials', 'cta', 'contact', 'footer'],
-    required: ['hero', 'gallery', 'menu-display', 'contact'],
+    // GH-960: menu-display removed — restore when #961 ships
+    blocks: ['hero', 'gallery', 'features', 'about', 'testimonials', 'cta', 'contact', 'footer'],
+    required: ['hero', 'gallery', 'features', 'contact'],
     middleShuffleRange: [2, 4],
-    description: 'Visual-led — gallery first to show the food, menu-display for the menu section. Best for fine dining + plated presentations.',
+    description: 'Visual-led — gallery first to show the food. Best for fine dining + plated presentations.',
   },
 ]
 

@@ -56,8 +56,9 @@ export const propertyCardMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'properties', 'showMap', 'currency'],
     quickActions: ['Add property', 'Filter by type', 'Update prices'],
-    aiVisible: true,
-    category: 'commerce' as const,
+    // GH-960: re-enable when #961 (cart/checkout) ships
+    aiVisible: false,
+    category: 'archive' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

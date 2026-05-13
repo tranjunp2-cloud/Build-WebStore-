@@ -12,13 +12,15 @@ import { ResetAccountCard } from '@/app/(dashboard)/dashboard/settings/ResetAcco
 
 type Props = {
     initialUser: PlatformUser
-    ssoUrl: string
 }
 
-export function AccountSettingsClient({ initialUser, ssoUrl }: Props) {
+export function AccountSettingsClient({ initialUser }: Props) {
     const { t } = useI18n()
     const [user, setUser] = useState<PlatformUser>(initialUser)
     const [activeTab, setActiveTab] = useState('general')
+
+    const ssoBase = (process.env.NEXT_PUBLIC_SSO_BASE_URL ?? '').replace(/\/$/, '')
+    const ssoUrl = ssoBase ? `${ssoBase}/setting` : ''
 
     const role = isOwner(user) ? 'owner' : 'staff'
 

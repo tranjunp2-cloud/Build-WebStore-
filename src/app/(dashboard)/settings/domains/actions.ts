@@ -318,8 +318,11 @@ export async function verifyCustomDomain(rawDomain: string): Promise<DomainActio
         return { success: true };
     }
 
-    // Hard DNS pre-flight — domain must be pointing to Vercel before marking active.
-    // Skipped in local dev mock mode (no VERCEL_TOKEN) so UI can be tested without real DNS.
+    // Soft DNS pre-flight — log mismatches but never hard-fail here.
+    // Vercel's /verify endpoint checks DNS from global distributed infra and is
+    // the authoritative source of truth. A Node.js lookup from a single serverless
+    // region can fail even when the domain is already propagated to the user's ISP,
+    // causing a false-negative that blocks verification (issue #975).
     if (!isMockMode()) {
         const DNS_TIMEOUT_MS = 5000;
         const withDnsTimeout = <T>(p: Promise<T>): Promise<T> =>
@@ -334,48 +337,24 @@ export async function verifyCustomDomain(rawDomain: string): Promise<DomainActio
                 );
             });
 
-        const DNS_PROPAGATION_NOTE = 'DNS changes can take up to 24 hours to propagate.';
-
         if (isApexDomain(domain)) {
-            let addresses: string[] = [];
             try {
-                addresses = await withDnsTimeout(dns.resolve4(domain));
-            } catch (err: unknown) {
-                const code = (err as NodeJS.ErrnoException).code;
-                if (code === 'DNS_TIMEOUT') {
-                    return { success: false, error: 'DNS lookup timed out. Please try again.' };
+                const addresses = await withDnsTimeout(dns.resolve4(domain));
+                if (!addresses.includes(VERCEL_APEX_IP)) {
+                    console.warn(`[verifyCustomDomain] DNS pre-flight: ${domain} A record resolves to [${addresses.join(', ')}], expected ${VERCEL_APEX_IP}. Letting Vercel API decide.`);
                 }
-                return {
-                    success: false,
-                    error: `DNS records not detected yet. Please add the A record above and try again. ${DNS_PROPAGATION_NOTE}`,
-                };
-            }
-            if (!addresses.includes(VERCEL_APEX_IP)) {
-                return {
-                    success: false,
-                    error: `Your domain is not yet pointing to our servers. Expected A record: ${VERCEL_APEX_IP} — currently resolves to: ${addresses.join(', ')}. Please update your DNS and try again.`,
-                };
+            } catch (err: unknown) {
+                console.warn(`[verifyCustomDomain] DNS pre-flight: A record lookup failed for ${domain} (${(err as NodeJS.ErrnoException).code}). Letting Vercel API decide.`);
             }
         } else {
-            let cnames: string[] = [];
             try {
-                cnames = await withDnsTimeout(dns.resolveCname(domain));
-            } catch (err: unknown) {
-                const code = (err as NodeJS.ErrnoException).code;
-                if (code === 'DNS_TIMEOUT') {
-                    return { success: false, error: 'DNS lookup timed out. Please try again.' };
+                const cnames = await withDnsTimeout(dns.resolveCname(domain));
+                const normalized = cnames.map((c) => c.replace(/\.$/, '').toLowerCase());
+                if (!normalized.includes(VERCEL_CNAME.toLowerCase())) {
+                    console.warn(`[verifyCustomDomain] DNS pre-flight: ${domain} CNAME resolves to [${normalized.join(', ')}], expected ${VERCEL_CNAME}. Letting Vercel API decide.`);
                 }
-                return {
-                    success: false,
-                    error: `DNS records not detected yet. Please add the CNAME record above and try again. ${DNS_PROPAGATION_NOTE}`,
-                };
-            }
-            const normalized = cnames.map((c) => c.replace(/\.$/, '').toLowerCase());
-            if (!normalized.includes(VERCEL_CNAME.toLowerCase())) {
-                return {
-                    success: false,
-                    error: `Your domain is not yet pointing to our servers. Expected CNAME: ${VERCEL_CNAME} — currently resolves to: ${normalized.join(', ')}. Please update your DNS and try again.`,
-                };
+            } catch (err: unknown) {
+                console.warn(`[verifyCustomDomain] DNS pre-flight: CNAME lookup failed for ${domain} (${(err as NodeJS.ErrnoException).code}). Letting Vercel API decide.`);
             }
         }
     }

@@ -48,6 +48,8 @@ export const BLOCKS_TEMP_HIDDEN: ReadonlySet<string> = new Set([
     'doctor-profile',
     'gallery-masonry',
     'before-after',
+    // GH-960: re-enable when #961 (cart/checkout) ships
+    'menu-display',
 ])
 
 /**

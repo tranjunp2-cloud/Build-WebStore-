@@ -8,6 +8,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import {
     BLOCKS_REQUIRE_MEDIA_PIPELINE,
     BLOCKS_NOT_IN_PAYLOAD,
+    BLOCKS_TEMP_HIDDEN,
     isUnsupportedBlock,
     filterUnsupportedBlocks,
 } from '@/lib/ai/unsupported-blocks'
@@ -23,6 +24,15 @@ describe('isUnsupportedBlock', () => {
         for (const t of BLOCKS_NOT_IN_PAYLOAD) {
             expect(isUnsupportedBlock(t)).toBe(true)
         }
+    })
+
+    // GH-960: menu-display re-hidden until #961 (cart/checkout) ships
+    it('menu-display is in BLOCKS_TEMP_HIDDEN [TC-F01-UB-01]', () => {
+        expect(BLOCKS_TEMP_HIDDEN.has('menu-display')).toBe(true)
+    })
+
+    it('isUnsupportedBlock returns true for menu-display', () => {
+        expect(isUnsupportedBlock('menu-display')).toBe(true)
     })
 
     it('returns false for supported blocks', () => {
