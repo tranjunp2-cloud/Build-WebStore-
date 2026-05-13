@@ -76,9 +76,9 @@ describe('F18 CMS Core Layout', () => {
         it('[TC-F18.01] Renders Desktop sidebar and links correctly', () => {
             render(<DashboardSidebar {...defaultProps} />)
             expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0)
-            // v1.0: Products/Orders removed — verify "My Website" and "Store Config" present
+            // v1.0: Products/Orders removed — verify "My Website" and Settings group present
             expect(screen.getAllByText('My Website').length).toBeGreaterThan(0)
-            expect(screen.getAllByText('Store Config').length).toBeGreaterThan(0)
+            expect(screen.getAllByRole('button', { name: /Settings/i }).length).toBeGreaterThan(0)
 
             // Check hrefs
             const dashboardLinks = screen.getAllByRole('link', { name: /Dashboard/i })
