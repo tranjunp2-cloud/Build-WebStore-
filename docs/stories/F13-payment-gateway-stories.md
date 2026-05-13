@@ -97,10 +97,22 @@ THEN  Card + FPX toggles render disabled + lock icon overlay
   AND CTA button "Connect Stripe →" visible
 ```
 
+#### AC-3: Backend Defense-in-depth Validation (FR-15)
+```gherkin
+GIVEN tenant.payment_card = false AND tenant.payment_fpx = false
+  AND client somehow bypass UI hide rule (FR-13)
+WHEN  POST /api/orders/create với buyer chọn Stripe
+THEN  backend buildPaymentMethodTypes(tenant) returns []
+  AND API reject với HTTP 422
+  AND error response { code: 'NO_PAYMENT_METHODS', message: 'Seller has not enabled Card or FPX' }
+  AND KHÔNG gọi Stripe API (zero waste)
+```
+
 ### Definition of Done
 - [ ] UI Settings cập nhật real-time phía cổng thanh toán (Checkout).
 - [ ] Dynamic `payment_method_types` verified qua Stripe sandbox.
 - [ ] Disabled+Lock+Tooltip UX verified screen-reader compatible.
+- [ ] Backend 422 `NO_PAYMENT_METHODS` test cover both-OFF edge case (FR-15).
 
 ---
 

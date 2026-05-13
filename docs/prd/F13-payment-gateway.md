@@ -107,6 +107,7 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 | FR-12 | Return handler `?stripe=refresh` → toast warning + retry CTA | US-F13-04 | P0 | |
 | FR-13 | Stripe row label dynamic theo settings (Card·FPX / Card / FPX); hidden khi cả 2 OFF | US-F13-02 | P0 | Design §8.7 |
 | FR-14 | Toggles Card+FPX Disabled+Lock+Tooltip khi `stripeOnboardingComplete = false` | US-F13-02 | P0 | Design §8.5 / D-03 |
+| FR-15 | Backend `/api/orders/create` reject 422 `NO_PAYMENT_METHODS` nếu cả Card+FPX OFF | US-F13-02 | P0 | Defense-in-depth (UI ẩn row khi both-OFF, nhưng backend vẫn validate) |
 
 ---
 
