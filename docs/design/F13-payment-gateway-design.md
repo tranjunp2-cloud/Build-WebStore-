@@ -6,10 +6,13 @@
 > - PRD: [`docs/prd/F13-payment-gateway.md`](../prd/F13-payment-gateway.md)
 > - Stories: [`docs/stories/F13-payment-gateway-stories.md`](../stories/F13-payment-gateway-stories.md) — US-F13-01 (FPX), US-F13-02 (Seller Settings), US-F13-03 (Mobile UX)
 > - Architecture: [`docs/architecture/F13-payment-gateway.md`](../architecture/F13-payment-gateway.md) *(TBD — chưa tồn tại)*
-> - **🎨 Figma Design (hi-fi reference):** https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30877-2233
->   - **Dev action:** Mở Figma node → Inspect spacing/typography/color → implement Figma làm UI source-of-truth
+> - **🎨 Claude Design (hi-fi reference — PRIMARY):**
+>   - [Payment Settings.html](https://claude.ai/design/p/019dd7e0-9ebb-7240-9a01-c5a1a8aa733b?file=Payment%20Settings.html&present=1) — Screen A main spec
+>   - [Payment Settings - Comparison.html](https://claude.ai/design/p/019dd7e0-9ebb-7240-9a01-c5a1a8aa733b?file=Payment%20Settings.html&present=1&file=Payment%20Settings%20-%20Comparison.html&present=1) — variant comparison (onboarded vs not-onboarded vs both-OFF)
+> - **🎨 Figma Design (hi-fi reference — secondary):** https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30877-2233
+>   - **Dev action:** Implement theo Claude Design HTML (primary source-of-truth). Figma làm cross-reference cho designer intent
 >   - Wireframe ASCII bên dưới chỉ là sketch low-fi
->   - Nếu Figma conflict §8 decisions → ưu tiên §8 (đã chốt với PM)
+>   - Nếu Claude Design / Figma conflict §8 decisions → ưu tiên §8 (đã chốt với PM)
 > - Related: F09 Storefront Commerce (Checkout host), F14 Shipping (sibling settings card), F18 CMS Global Layout, F19 Store Configuration (extends `Settings > Payments`)
 > - Code reference: [`src/lib/payment/stripe.ts`](../../src/lib/payment/stripe.ts), [`src/app/api/orders/create/route.ts`](../../src/app/api/orders/create/route.ts), [`src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx`](../../src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx)
 
@@ -45,14 +48,17 @@ Wave 6 Payment bao gồm 3 surface chính:
 
 ### 2.1. Screen A — Seller Payment Settings <a id="screen-a-seller-settings"></a>
 
-> **🎨 Hi-fi reference:** [Figma — TM_Prime-Web-V2.0 / Node 30877-2233](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30877-2233)
+> **🎨 Hi-fi references:**
+> - **PRIMARY (Claude Design):** [Payment Settings.html](https://claude.ai/design/p/019dd7e0-9ebb-7240-9a01-c5a1a8aa733b?file=Payment%20Settings.html&present=1)
+> - **Variant comparison:** [Payment Settings - Comparison.html](https://claude.ai/design/p/019dd7e0-9ebb-7240-9a01-c5a1a8aa733b?file=Payment%20Settings.html&present=1&file=Payment%20Settings%20-%20Comparison.html&present=1) — onboarded / not-onboarded / both-OFF states side-by-side
+> - **SECONDARY (Figma):** [TM_Prime-Web-V2.0 / Node 30877-2233](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30877-2233)
 >
 > **Dev implementation steps:**
-> 1. Mở Figma link → navigate đến node `30877-2233`
-> 2. Inspect spacing, color tokens, typography, component states
-> 3. Implement theo Figma làm UI source-of-truth
+> 1. Mở Claude Design `Payment Settings.html` → đây là UI source-of-truth
+> 2. Reference `Payment Settings - Comparison.html` cho variants (Disabled+Lock+Tooltip D-03, both-OFF warning §8.1)
+> 3. Cross-check với Figma node `30877-2233` cho designer intent (color, typography fine-tuning)
 > 4. Wireframe ASCII bên dưới chỉ là low-fi sketch
-> 5. Nếu Figma conflict §8 decisions → ưu tiên §8
+> 5. Nếu Claude Design / Figma conflict §8 decisions → ưu tiên §8 (đã chốt với PM)
 
 **Path:** `Dashboard > Settings > Payments` (`/dashboard/settings/payments`)
 **Trạng thái:** Seller đã đăng nhập, Stripe Connect onboarded (`chargesEnabled = true`), Card ON, FPX OFF.
@@ -555,7 +561,7 @@ Reference: [`docs/design/decorative-vocabulary.md`](./decorative-vocabulary.md),
 1. **PRD §0 outdated:** PRD vẫn note "F13 chưa có Story file riêng" — stories file đã tồn tại (3 stories). BA cần update PRD §0.
 2. **PRD §13 code sample misleading:** PRD viết Payment Element pattern, code dùng Checkout Session. BA/PM cần update PRD §13 + §17 9-Point Done Checklist (bỏ "Card Element validation", thay bằng "Stripe redirect happy path").
 3. **Architecture file:** `docs/architecture/F13-payment-gateway.md` chưa tồn tại. Dev cần draft: Direct Charges flow, application_fee_amount calc, webhook signature verify, idempotency (orderId làm `client_reference_id`), connected account state machine.
-4. **Figma scope:** Node `30877-2233` cover screens nào? Cần Design team confirm Figma đã align với hướng A (Checkout Session) chứ không phải Payment Element inline.
+4. ~~**Figma scope:**~~ → **RESOLVED 2026-05-13:** Claude Design đã gen 2 file hi-fi cho Screen A (Payment Settings.html + Comparison.html) làm primary source-of-truth. Figma node `30877-2233` giữ làm secondary reference. Screens B (Checkout) + C (Mobile) vẫn cần hi-fi — track separately.
 5. **Card toggle wiring:** `PaymentsFormClient.tsx` line 288-296 hiện đang mock toggle. F13 cần ticket: wire `handleToggleStripe` + persist `tenant.paymentMethods.card` + add FPX toggle (currently missing).
 6. **Dynamic `payment_method_types`:** Hiện code hardcode `['card', 'fpx']` ở `stripe.ts:123`. F13 cần refactor: pass dynamic array từ `orders/create` route based on tenant settings.
 7. **MYR-only enforcement:** BR-01 yêu cầu MYR. UI có cần warning nếu seller dùng non-MYR không, hay assume MYR-by-default cho MY stores?
