@@ -419,9 +419,7 @@ export function DomainsClient({
                     setVerifications(prev => { const next = { ...prev }; delete next[domain]; return next; });
                 }
                 if (res.ownershipConfirmed) {
-                    const msg = 'DNS records are still propagating. This usually takes 5–30 minutes after you save them. Try again shortly.';
-                    setVerifyErrors(prev => ({ ...prev, [domain]: msg }));
-                    toast.warning(msg);
+                    toast.warning('DNS records are still propagating. This usually takes 5–30 minutes after you save them. Try again shortly.');
                 } else {
                     const friendly = res.error || 'Verification failed. Please check your DNS records.';
                     setVerifyErrors(prev => ({ ...prev, [domain]: friendly }));
