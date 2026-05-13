@@ -25,7 +25,7 @@ Wire Stripe Card + FPX vào Settings + Checkout, dùng **Stripe Checkout Session
 
 **Reason for split:** COD/QR đang active edit `checkout/page.tsx`. Phase A touch files COD/QR không touch → 0 conflict. Phase B touch shared file → conflict risk cao, HOLD.
 
-**Timeline (semi-flexible):** Target Phase A complete trong **tuần này** (~8-10h) để giải phóng nguồn lực sang Phase 04 / F15 / F21 / F22.
+**Timeline (semi-flexible):** Target Phase A complete trong **tuần này** (~10-13h, tăng từ 8-10h sau khi cover 2 gap: Connect Stripe flow + return query handler) để giải phóng nguồn lực sang Phase 04 / F15 / F21 / F22.
 
 ---
 
@@ -34,8 +34,9 @@ Wire Stripe Card + FPX vào Settings + Checkout, dùng **Stripe Checkout Session
 | # | File | Scope | Est | Parallel |
 |---|------|-------|-----|----------|
 | 01 | [`phase-01-schema-settings-backend.md`](./phase-01-schema-settings-backend.md) | Tenants.ts schema fields, actions.ts, DB migration | S | — (blocks 02, 03) |
-| 02 | [`phase-02-settings-ui-wiring.md`](./phase-02-settings-ui-wiring.md) | Extract `<StripePaymentToggles />` wrapper + wire toggles + add FPX | S | ✅ với 03 |
-| 02b | (sub-task của 02) | Verify `/dashboard/settings/payments/connect` route hoặc fallback API onboard | XS (1-2h) | (sequential trong Phase 02) |
+| 02 | [`phase-02-settings-ui-wiring.md`](./phase-02-settings-ui-wiring.md) | Extract `<StripePaymentToggles />` wrapper + wire toggles + FPX + **Connect Stripe flow + return query handler** | S+ (4-6h) | ✅ với 03 |
+| 02b | (sub-task của 02) | Wire `handleConnectStripe` POST `/api/stripe/connect/onboard` + full sandbox cycle test | XS (1-2h) | (sequential trong Phase 02) |
+| 02c | (sub-task của 02) | **Update backend return URLs** `/settings` → `/dashboard/settings/payments` + return query handler `?stripe=complete/refresh` | XS (1h) | (sequential trong Phase 02) |
 | 03 | [`phase-03-checkout-api-dynamic-methods.md`](./phase-03-checkout-api-dynamic-methods.md) | Stripe lib accept dynamic `payment_method_types`, orders/create pass tenant settings, backfill migration | S | ✅ với 02 |
 | 04 | [`phase-04-storefront-integration-hold.md`](./phase-04-storefront-integration-hold.md) | **HOLD** — Storefront checkout add Stripe radio + redirect | M | — (after COD/QR merge) |
 
@@ -65,6 +66,8 @@ Phase 01 (schema)
 | `scripts/db-setup.js` | 01 | None — append MIGRATIONS entry |
 | `src/app/(dashboard)/settings/payments/actions.ts` | 01 | None — extend functions |
 | `src/app/(dashboard)/settings/payments/PaymentsFormClient.tsx` | 02 | **Low** — additive; COD/QR section untouched |
+| `src/app/(dashboard)/settings/payments/stripe-payment-toggles.tsx` | 02 | **NEW file** — 0 conflict |
+| `src/app/api/stripe/connect/onboard/route.ts` | 02c | **Low** — 2 dòng return URL update; backend không có nhánh khác đang sửa |
 | `src/lib/payment/stripe.ts` | 03 | None — COD/QR doesn't use |
 | `src/app/api/orders/create/route.ts` | 03 | None — COD/QR uses `/checkout` |
 | `src/app/sites/[slug]/checkout/page.tsx` | 04 (HOLD) | **HIGH** — COD/QR actively edits |

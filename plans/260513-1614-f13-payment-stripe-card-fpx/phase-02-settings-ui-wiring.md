@@ -176,30 +176,100 @@ Use shadcn `Tooltip` + add `Lock` icon overlay khi `showLock={true}` (visual cue
 
 ### 4b. Connect Stripe button — Phase 02b verification (D-04)
 
-`handleConnectStripe` function — verify route tồn tại trước khi commit:
+`handleConnectStripe` function — call existing onboard endpoint:
 
 ```typescript
 const handleConnectStripe = async () => {
-  // Option A: Có UI page tại /dashboard/settings/payments/connect → push route
-  // Option B: Fallback — call API onboard endpoint trực tiếp
+  setConnecting(true)
   try {
-    const res = await fetch('/api/stripe/connect/onboard', { method: 'POST' })
-    const { url } = await res.json()
-    if (url) {
-      window.location.href = url  // Stripe-hosted onboarding
+    const res = await fetch('/api/stripe/connect/onboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId }),
+    })
+    const data = await res.json()
+    if (data.success && data.data?.onboardingUrl) {
+      window.location.href = data.data.onboardingUrl  // Stripe-hosted KYC
     } else {
       toast.error(pt.connectFailed)
+      setConnecting(false)
     }
   } catch (err) {
     toast.error(pt.connectFailed)
+    setConnecting(false)
   }
 }
 ```
 
 **Verify trước commit Phase 02:**
-- Test route `/dashboard/settings/payments/connect` — tồn tại UI page chưa? → push route
-- Nếu không tồn tại → fallback POST `/api/stripe/connect/onboard` (đã có ở `src/app/api/stripe/connect/onboard/route.ts`)
-- Estimate: 1-2h verify + adjust (Phase 02b sub-task)
+- Endpoint `POST /api/stripe/connect/onboard` đã có sẵn (`src/app/api/stripe/connect/onboard/route.ts` — 110 lines, withAuth + tenant ownership check)
+- Backend response shape: `{ success: true, data: { accountId, onboardingUrl } }` — confirm shape khi wire UI
+- Return URLs Backend hardcode: `${baseUrl}/settings?stripe=refresh` và `${baseUrl}/settings?stripe=complete` (line 60-61, 92-93 onboard route) — **NOT** `/dashboard/settings/payments` → cần handler ở `/settings` page hoặc đổi return URL ở backend (xem §4c)
+- Approach: Dùng client-side `fetch()` (đã spec ở trên) — KHÔNG cần server action `connectStripe` riêng (KISS — endpoint đã withAuth)
+- Estimate: 1-2h verify + test full Stripe sandbox onboard cycle (Phase 02b sub-task)
+
+### 4c. Return-from-Stripe redirect handler (NEW gap)
+
+**Backend `/api/stripe/connect/onboard` set return URLs:**
+- `success_url`: `/settings?stripe=complete` (KYC done)
+- `refresh_url`: `/settings?stripe=refresh` (KYC interrupted, need retry)
+
+**Hiện trạng:** Frontend chưa parse 2 query params → tenant onboard xong land back nhưng không thấy feedback.
+
+**Action:** Add useEffect ở `PaymentsFormClient.tsx` (hoặc parent page server-side):
+
+```typescript
+import { useSearchParams, useRouter } from 'next/navigation'
+
+const searchParams = useSearchParams()
+const router = useRouter()
+
+useEffect(() => {
+  const stripe = searchParams.get('stripe')
+  if (stripe === 'complete') {
+    toast.success(pt.stripeConnectSuccess)
+    // Refetch tenant status để verify chargesEnabled
+    fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.data?.onboardingComplete) {
+          setStripeReady(true)
+          // Optionally auto-enable Card on first successful onboard (per D-02 backfill spirit)
+        } else {
+          toast.warning(pt.stripeKycPending)
+        }
+      })
+    // Strip query param
+    router.replace('/dashboard/settings/payments')
+  } else if (stripe === 'refresh') {
+    toast.warning(pt.stripeOnboardingIncomplete)
+    router.replace('/dashboard/settings/payments')
+  }
+}, [searchParams])
+```
+
+**Backend return URL coordination:** Hiện return URLs trỏ về `/settings` (root settings page). Phase 02 cần quyết định:
+- Option A: Update backend `onboard/route.ts:60-61, 92-93` để return URL về `/dashboard/settings/payments` (chuyển scope đúng) — recommended
+- Option B: Add handler ở `/settings` page router parent → redirect → tới `/dashboard/settings/payments` với query params preserved
+
+**Đề xuất Option A** — KISS, scope đúng, không cần router middleware. Update 2 dòng ở `onboard/route.ts`:
+
+```diff
+- `${baseUrl}/settings?stripe=refresh`,
+- `${baseUrl}/settings?stripe=complete`,
++ `${baseUrl}/dashboard/settings/payments?stripe=refresh`,
++ `${baseUrl}/dashboard/settings/payments?stripe=complete`,
+```
+
+**i18n strings thêm:**
+```json
+{
+  "stripeConnectSuccess": "Stripe connected successfully! You can now enable Card and FPX payments.",
+  "stripeKycPending": "Stripe account created but KYC verification is pending. Try refreshing in a few minutes.",
+  "stripeOnboardingIncomplete": "Stripe onboarding incomplete. Click Connect again to continue.",
+  "connecting": "Connecting to Stripe..."
+}
+```
 
 ### 5. Both-OFF warning
 
@@ -250,10 +320,14 @@ BM (`ms.json`) cần dịch.
 - [ ] Implement Card + FPX Switch + handler trong wrapper
 - [ ] Implement Disabled+Lock+Tooltip state khi not onboarded (D-03)
 - [ ] Add both-OFF warning Alert (chỉ render khi onboarded)
-- [ ] **Phase 02b:** Verify Connect Stripe route — push `/dashboard/settings/payments/connect` HOẶC fallback POST `/api/stripe/connect/onboard` (D-04)
-- [ ] Update i18n `en.json` + `ms.json` (11 new strings)
-- [ ] Create `stripe-payment-toggles.test.tsx` — 5 test cases (onboarded toggle, not-onboarded disabled, tooltip render, connect CTA, both-OFF warning)
+- [ ] **Phase 02b:** Wire `handleConnectStripe` → POST `/api/stripe/connect/onboard` + redirect (D-04)
+- [ ] **NEW gap:** Update backend `onboard/route.ts:60-61, 92-93` — return URLs trỏ về `/dashboard/settings/payments` thay vì `/settings`
+- [ ] **NEW gap:** Add return handler — parse `?stripe=complete` / `?stripe=refresh` → toast + refetch status + strip query
+- [ ] Update i18n `en.json` + `ms.json` (15 new strings)
+- [ ] Create `stripe-payment-toggles.test.tsx` — 7 test cases (onboarded toggle, not-onboarded disabled, tooltip render, connect CTA, both-OFF warning, return-complete handler, return-refresh handler)
 - [ ] Manual QA: toggle Card on/off, FPX on/off, not-onboarded state, warning Alert
+- [ ] Manual QA: full sandbox cycle — Connect → Stripe KYC → return `?stripe=complete` → toast + auto-enable visibility
+- [ ] Manual QA: Stripe KYC abandoned → return `?stripe=refresh` → toast warning
 - [ ] Verify `tabIndex` order accessible (keyboard nav) + tooltip screen-reader
 - [ ] Verify mobile 54px hitbox preserved (test 375px viewport)
 
@@ -261,11 +335,13 @@ BM (`ms.json`) cần dịch.
 
 - Toggle Card → persists `payment_card = true` trong DB
 - Toggle FPX → persists `payment_fpx = true`
-- `stripeOnboardingComplete = false` → toggles disabled + Connect CTA visible
+- `stripeOnboardingComplete = false` → toggles disabled + Connect CTA visible + tooltip "Connect Stripe to enable"
+- Click Connect Stripe → redirect ra Stripe-hosted KYC → return `/dashboard/settings/payments?stripe=complete` → toast success + auto-show enabled toggles
+- Stripe KYC abandoned → return `/dashboard/settings/payments?stripe=refresh` → toast warning + Connect CTA still visible
 - Both OFF → warning Alert visible (không block Save)
 - Mobile 375px: toggle hit area ≥ 54×54px
 - 0 regression trên COD/QR toggles (existing tests pass)
-- All new i18n strings localized (en + ms)
+- All new i18n strings localized (en + ms — 15 strings)
 
 ## Risk
 
