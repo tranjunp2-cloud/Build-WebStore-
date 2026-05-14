@@ -38,7 +38,7 @@ export async function GET(req: Request) {
             where: { tenant: { equals: tenant.id } },
             limit: 1,
             depth: 1,
-            select: { id: true, paymentConfig: true },
+            select: { id: true, paymentConfig: true, theme: true },
             overrideAccess: true,
         })
 
@@ -59,6 +59,7 @@ export async function GET(req: Request) {
             merchantQrCodeUrl,
             enableCod: paymentConfig?.enableCod ?? true,
             enableQrBanking: paymentConfig?.enableQrBanking ?? true,
+            theme: (site as any).theme ?? null,
         })
     } catch (error) {
         console.error('[Storefront site-by-slug]', error)

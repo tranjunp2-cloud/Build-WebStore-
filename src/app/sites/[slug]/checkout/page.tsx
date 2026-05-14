@@ -11,6 +11,7 @@ import {
     QrCode, UploadCloud, FileImage,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -58,6 +59,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const router = useRouter()
     const [isPlacing, setIsPlacing] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [themeCSS, setThemeCSS] = useState('')
 
     useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
 
@@ -72,6 +74,22 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 if (data.merchantQrCodeUrl) setMerchantQrUrl(data.merchantQrCodeUrl)
                 if (data.enableCod === false) { setEnableCod(false); setPaymentMethod('qr_banking') }
                 if (data.enableQrBanking === false) setEnableQrBanking(false)
+                if (data.theme) {
+                    const resolved = resolveTheme({
+                        primaryColor: data.theme.primaryColor,
+                        secondaryColor: data.theme.secondaryColor,
+                        accentColor: data.theme.accentColor,
+                        surfaceColor: data.theme.surfaceColor,
+                        textColor: data.theme.textColor,
+                        mutedColor: data.theme.mutedColor,
+                        fontPairingId: data.theme.fontPairingId,
+                        fontHeading: data.theme.fontHeading,
+                        fontBody: data.theme.fontBody,
+                        colorMode: data.theme.colorMode,
+                        backgroundColor: data.theme.backgroundColor,
+                    })
+                    setThemeCSS(generateThemeCSS(resolved))
+                }
                 try {
                     const meRes = await fetch('/api/users/me')
                     if (meRes.ok) {
@@ -183,7 +201,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                   .ck-empty{font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
                   .ck-empty svg{opacity:.2;}
                   .ck-empty h2{font-size:20px;font-weight:600;margin:0;color:#0c1014;}
-                  .ck-empty a{color:#0e7556;font-size:14px;text-decoration:none;}
+                  .ck-empty a{color:var(--accent,#0e7556);font-size:14px;text-decoration:none;}
                 `}</style>
             </div>
         )
@@ -205,6 +223,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         <>
             {/* eslint-disable-next-line @next/next/no-page-custom-font */}
             <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" />
+            {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
             <div className="ck-page">
 
                 {/* ── Header ───────────────────────────────── */}
@@ -438,7 +457,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 const CK_CSS = `
 *{box-sizing:border-box;}
 .ck-page{
-  --tl:#0e7556;--tl7:#095e44;--tl2:#c2e6d5;--tl5:#ecf6f0;--tlt:rgba(14,117,86,.06);--tlb:rgba(14,117,86,.30);
+  --tl:var(--accent,#0e7556);--tl7:var(--accent-hover,#095e44);--tl2:rgba(var(--accent-rgb,14,117,86),.22);--tl5:rgba(var(--accent-rgb,14,117,86),.07);--tlt:rgba(var(--accent-rgb,14,117,86),.06);--tlb:rgba(var(--accent-rgb,14,117,86),.30);
   --f1:#0c1014;--f2:#2a3138;--f3:#7b8390;--f4:#a8b0b9;
   --bd:#e6e9ed;--bd2:#eef0f2;--card:#fff;--inp:#eff1f3;
   --sh:0 1px 2px rgba(15,23,42,.04),0 4px 14px -8px rgba(15,23,42,.10);
@@ -471,23 +490,25 @@ const CK_CSS = `
 .ck-iw{background:var(--inp);border-radius:8px;border:1.5px solid transparent;transition:background .15s,border-color .15s,box-shadow .15s;}
 .ck-iw input,.ck-iw select{display:block;width:100%;height:44px;background:transparent;border:none;outline:none;padding:0 14px;font-size:14px;color:var(--f1);font-weight:500;letter-spacing:-.005em;font-family:inherit;box-sizing:border-box;}
 .ck-iw input::placeholder{color:var(--f4);font-weight:400;}
-.ck-iw:focus-within{background:#fff;border-color:var(--tlb);box-shadow:0 0 0 3px rgba(14,117,86,.10);}
+.ck-iw:focus-within{background:#fff;border-color:var(--tlb);box-shadow:0 0 0 3px rgba(var(--accent-rgb,14,117,86),.10);}
 .ck-sel{position:relative;}
 .ck-sel select{appearance:none;padding-right:36px;cursor:pointer;}
 .ck-sel::after{content:"";position:absolute;right:14px;top:50%;width:8px;height:8px;border-right:1.5px solid var(--f3);border-bottom:1.5px solid var(--f3);transform:translateY(-70%) rotate(45deg);pointer-events:none;}
 .ck-row{display:grid;gap:14px;margin-top:14px;}
 .ck-row.c2{grid-template-columns:1fr 1fr;}
 .ck-row.c3{grid-template-columns:1fr 1fr 1fr;}
+.ck-row.c2>*,.ck-row.c3>*{display:flex;flex-direction:column;}
+.ck-row.c2>* .ck-iw,.ck-row.c3>* .ck-iw{margin-top:auto;}
 /* Error */
 .ck-err{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;font-size:13px;color:#dc2626;display:flex;align-items:center;gap:10px;}
 /* Payment methods */
 .pm-list{display:flex;flex-direction:column;gap:12px;}
 .pm{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:16px 18px;cursor:pointer;transition:all .18s cubic-bezier(.22,1,.36,1);}
 .pm:hover:not(.active){border-color:#d8dde2;background:#fafbfc;}
-.pm.active{border:1.5px solid var(--tl);background:var(--tl5);padding:15.5px 17.5px;box-shadow:0 0 0 4px rgba(14,117,86,.06);}
+.pm.active{border:1.5px solid var(--tl);background:var(--tl5);padding:15.5px 17.5px;box-shadow:0 0 0 4px var(--tlt);}
 .pm-row{display:flex;align-items:flex-start;gap:16px;}
 .pm-rad{width:20px;height:20px;border-radius:999px;border:1.5px solid #c5cbd2;background:#fff;display:grid;place-items:center;transition:all .15s;flex-shrink:0;margin-top:1px;}
-.pm-rad.on{border-color:var(--tl);background:var(--tl);box-shadow:0 0 0 4px rgba(14,117,86,.12);}
+.pm-rad.on{border-color:var(--tl);background:var(--tl);box-shadow:0 0 0 4px rgba(var(--accent-rgb,14,117,86),.12);}
 .pm-rad.on::after{content:"";width:7px;height:7px;border-radius:999px;background:#fff;}
 .pm-body{flex:1;min-width:0;}
 .pm-title{font-size:14.5px;font-weight:700;color:var(--f1);margin:0;letter-spacing:-.005em;}
@@ -528,7 +549,7 @@ const CK_CSS = `
 .sum-hd{font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);margin:0 0 14px;}
 .sum-items{list-style:none;margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid var(--bd);display:flex;flex-direction:column;gap:10px;}
 .sum-item{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;}
-.s-th{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,#ecf6f0,#d9efe5);border:1px solid var(--bd);display:grid;place-items:center;color:var(--tl);overflow:hidden;flex-shrink:0;}
+.s-th{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--tl5),var(--tl2));border:1px solid var(--bd);display:grid;place-items:center;color:var(--tl);overflow:hidden;flex-shrink:0;}
 .s-th img{width:100%;height:100%;object-fit:cover;}
 .s-nm{font-size:13px;font-weight:600;color:var(--f1);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .s-mt{font-size:11px;color:var(--f3);margin:2px 0 0;}
@@ -543,7 +564,7 @@ const CK_CSS = `
 .st-v{font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;letter-spacing:-.01em;color:var(--tl);white-space:nowrap;flex-shrink:0;}
 .st-ccy{font-size:13px;font-family:monospace;font-weight:500;color:var(--tl);margin-right:4px;}
 /* Place Order button */
-.po-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:54px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--tl);color:#fff;box-shadow:0 6px 16px -6px rgba(14,117,86,.55);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;padding:0 14px;}
+.po-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:54px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--tl);color:#fff;box-shadow:0 6px 16px -6px rgba(var(--accent-rgb,14,117,86),.55);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;padding:0 14px;}
 .po-btn:hover:not(.dis){background:var(--tl7);transform:translateY(-1px);}
 .po-btn.dis{background:#d9dde2;color:#8a929b;box-shadow:none;cursor:not-allowed;}
 .sum-trust{margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
