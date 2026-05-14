@@ -64,9 +64,9 @@ export const saveSiteSchema = z.object({
         ogImage: z.union([z.string(), z.number()]).nullable().optional(),
     }).optional(),
     shippingConfig: z.object({
-        westRate: z.number().optional(),
-        eastRate: z.number().optional(),
-        freeAbove: z.number().nullable().optional(),
+        westRate: z.number().min(0).max(100_000).optional(),
+        eastRate: z.number().min(0).max(100_000).optional(),
+        freeAbove: z.number().min(1).max(10_000_000).nullable().optional(),
     }).optional(),
     isDraft: z.boolean().optional(),
 }).refine(data => data.blocks !== undefined

@@ -1285,6 +1285,8 @@
         "infoDesc": "Pelanggan hanya akan melihat kaedah pembayaran yang diaktifkan semasa pembayaran. Untuk integrasi Stripe, anda perlu menyambungkan akaun anda dalam tetapan lanjutan."
       },
       "shipping": {
+        "pageTitle": "Penghantaran",
+        "pageSubtitle": "Konfigurasikan penghantaran kadar rata untuk pembeli Malaysia. Penghantaran percuma aktif apabila jumlah kecil pembeli mencapai had anda.",
         "title": "Kadar Penghantaran mengikut Wilayah",
         "subtitle": "Tetapkan bayaran rata untuk setiap wilayah Malaysia. Digunakan semasa pembayaran berdasarkan negeri pembeli.",
         "westMalaysia": "Malaysia Barat",
@@ -1308,7 +1310,8 @@
         "saveChanges": "Simpan Perubahan",
         "savedSuccess": "Tetapan penghantaran disimpan",
         "saveError": "Gagal menyimpan tetapan",
-        "rateError": "Kadar mestilah 0 – RM 1,000"
+        "rateError": "Kadar mestilah 0 – RM 1,000",
+        "freeError": "Had mestilah RM 0.01 – RM 100,000"
       }
     },
     "blog": {

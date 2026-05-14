@@ -130,6 +130,62 @@ describe('saveSiteSchema', () => {
         expect(result.success).toBe(true)
     })
 
+    // TC-F14.18: rate=0 is valid (free shipping for that zone)
+    it('TC-F14.18 — accepts westRate=0 and eastRate=0 (free zone)', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: { westRate: 0, eastRate: 0 },
+        })
+        expect(result.success).toBe(true)
+    })
+
+    // TC-F14.20: rate=100_000 sen (RM 1,000) is the inclusive upper boundary
+    it('TC-F14.20 — accepts westRate=100_000 sen (RM 1,000 boundary, inclusive)', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: { westRate: 100_000, eastRate: 100_000 },
+        })
+        expect(result.success).toBe(true)
+    })
+
+    // TC-F14.17: negative rate must be rejected
+    it('TC-F14.17 — rejects negative westRate', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: { westRate: -1, eastRate: 15 },
+        })
+        expect(result.success).toBe(false)
+    })
+
+    // TC-F14.19: rate above 100_000 sen (RM 1,000) must be rejected
+    it('TC-F14.19 — rejects westRate above 100_000 sen (RM 1,000.01)', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: { westRate: 100_001, eastRate: 15 },
+        })
+        expect(result.success).toBe(false)
+    })
+
+    // TC-F14.57: freeAbove=1 sen (RM 0.01) is the minimum valid threshold
+    it('TC-F14.57 — accepts freeAbove=1 sen (RM 0.01 minimum boundary)', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: { westRate: 800, eastRate: 1500, freeAbove: 1 },
+        })
+        expect(result.success).toBe(true)
+    })
+
+    // TC-F14.58: negative freeAbove must be rejected (prevents all-orders-ship-free exploit)
+    it('TC-F14.58 — rejects negative freeAbove', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: { westRate: 800, eastRate: 1500, freeAbove: -1 },
+        })
+        expect(result.success).toBe(false)
+    })
+
+    // TC-F14.59: freeAbove above 10_000_000 sen (RM 100,000) must be rejected
+    it('TC-F14.59 — rejects freeAbove above 10_000_000 sen (RM 100,000.01)', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: { westRate: 800, eastRate: 1500, freeAbove: 10_000_001 },
+        })
+        expect(result.success).toBe(false)
+    })
+
     it('rejects empty object (refine: at least one field required)', () => {
         const result = saveSiteSchema.safeParse({})
         expect(result.success).toBe(false)

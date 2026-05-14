@@ -18,10 +18,12 @@ function hasSiteAccess(user: any, site: any): boolean {
 }
 
 // Distinguishes "missing/empty" (→ use default) from "invalid/negative" (→ reject).
-function parseOptionalSen(rm: unknown): { value: number | null; invalid: boolean } {
+function parseOptionalSen(rm: unknown, max = RATE_MAX): { value: number | null; invalid: boolean } {
     if (rm === null || rm === undefined || rm === '') return { value: null, invalid: false }
     const n = Number(rm)
-    if (!Number.isFinite(n) || n < 0) return { value: null, invalid: true }
+    if (!Number.isFinite(n) || n < 0 || Math.round(n * 100) > max) {
+        return { value: null, invalid: true }
+    }
     return { value: Math.round(n * 100), invalid: false }
 }
 
@@ -80,7 +82,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
 
         const w = parseOptionalSen(westRateRm)
         const e = parseOptionalSen(eastRateRm)
-        const f = parseOptionalSen(freeAboveRm)
+        const f = parseOptionalSen(freeAboveRm, 10_000_000)
 
         if (w.invalid || e.invalid) {
             return NextResponse.json(
@@ -90,7 +92,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         }
         if (f.invalid) {
             return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Free threshold must be ≥ RM 0.01' } },
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Free threshold must be between RM 0.01 and RM 100,000' } },
                 { status: 422 }
             )
         }
@@ -99,14 +101,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const eastRate = e.value ?? SHIPPING_DEFAULTS.eastRate
         const freeAbove = f.value
 
-        if (westRate > RATE_MAX || eastRate > RATE_MAX) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Rate exceeds RM 1000' } },
-                { status: 422 }
-            )
-        }
-
-        if (freeAbove !== null && (freeAbove <= 0 || freeAbove > 10_000_000)) {
+        if (freeAbove !== null && freeAbove <= 0) {
             return NextResponse.json(
                 { success: false, error: { code: 'VALIDATION_ERROR', message: 'Free threshold must be between RM 0.01 and RM 100,000' } },
                 { status: 422 }

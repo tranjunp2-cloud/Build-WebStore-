@@ -1285,6 +1285,8 @@
         "infoDesc": "Customers will only see enabled payment methods during checkout. For Stripe integration, you'll need to connect your account in the advanced settings."
       },
       "shipping": {
+        "pageTitle": "Shipping",
+        "pageSubtitle": "Configure flat-rate shipping for Malaysian buyers. Free shipping kicks in when buyer subtotal hits your threshold.",
         "title": "Shipping Rates by Region",
         "subtitle": "Set a flat fee for each Malaysian region. Applied at checkout based on the buyer's selected state.",
         "westMalaysia": "West Malaysia",
@@ -1308,7 +1310,8 @@
         "saveChanges": "Save Changes",
         "savedSuccess": "Shipping settings saved",
         "saveError": "Failed to save settings",
-        "rateError": "Rate must be 0 – RM 1,000"
+        "rateError": "Rate must be 0 – RM 1,000",
+        "freeError": "Threshold must be RM 0.01 – RM 100,000"
       }
     },
     "blog": {

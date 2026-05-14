@@ -15,4 +15,5 @@ export const SHIPPING_DEFAULTS = {
 } as const
 
 export const RATE_MAX = 100_000
+export const FREE_ABOVE_MAX = 10_000_000
 export const HINT_HIGHLIGHT_THRESHOLD = 5_000
