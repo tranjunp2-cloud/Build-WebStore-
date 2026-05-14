@@ -88,10 +88,9 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     // BUG-F05-01: explicitly fetch published versions for live site.
     // Editor saves with draft:true; publish route promotes to published.
     // Owner previewing unpublished site sees drafts; visitors see published.
-    // BUG-F05-08: hide pages with isVisible=false from everyone on live site.
-    // BUG-F05-11: exclude soft-deleted pages (deletedAt set) from live site.
-    // Owner accesses hidden pages via editor preview, not via live site URL.
-    const visibilityFilter = [{ isVisible: { not_equals: false } }]
+    // BUG-F05-08: hide pages with isVisible=false from visitors (owner can still access per spec)
+    // BUG-F05-11: exclude soft-deleted pages (deletedAt set) from live site
+    const visibilityFilter = !isOwner ? [{ isVisible: { not_equals: false } }] : []
     const deletedFilter = [{ deletedAt: { exists: false } }]
     const pagesResult = await payload.find({
         collection: 'pages',
