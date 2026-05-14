@@ -9,9 +9,10 @@ interface Props {
     page: SiteRendererProps['page']
     pages: NavPage[]
     isBuilderPreview?: boolean
+    isEditorIframe?: boolean
 }
 
-export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPages, isBuilderPreview }: Props) {
+export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPages, isBuilderPreview, isEditorIframe }: Props) {
     const [page, setPage] = useState(initialPage)
     const [siteState, setSiteState] = useState(site)
     const [pages, setPages] = useState(initialPages)
@@ -102,6 +103,7 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
             pages={pages}
             isEditor={true}
             isBuilderPreview={isBuilderPreview}
+            isEditorIframe={isEditorIframe}
             isOwner={true}
             onBlockFieldChange={handleBlockFieldChange}
         />

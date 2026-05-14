@@ -18,7 +18,7 @@ type PreviewLayoutBlock = Record<string, unknown> & {
 
 interface PreviewPageProps {
     params: Promise<{ siteId: string }>
-    searchParams: Promise<{ pageId?: string; v?: string; builder?: string }>
+    searchParams: Promise<{ pageId?: string; v?: string; builder?: string; editor?: string }>
 }
 
 export const dynamic = 'force-dynamic'
@@ -37,7 +37,8 @@ export const viewport: Viewport = {
 
 export default async function PreviewPage({ params, searchParams }: PreviewPageProps) {
     const { siteId } = await params
-    const { pageId, builder } = await searchParams
+    const { pageId, builder, editor } = await searchParams
+    const isEditorIframe = !!editor || !!builder
 
     // 1. Auth Check (P0 Security Rule - Auth Redirect)
     const user = await getCurrentUser() as PlatformUser | null
@@ -93,7 +94,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             page.isVisible === false ||
             (page.deletedAt != null && page.deletedAt !== '') ||
             page.status === 'draft'
-        if (isHiddenPage && !builder) {
+        if (isHiddenPage && !isEditorIframe) {
             const notFoundResult = await payload.find({
                 collection: 'pages',
                 where: {
@@ -245,6 +246,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
                         isBuilderPreview={!!builder}
+                        isEditorIframe={isEditorIframe}
                     />
 
                     {/* Editor listeners (full) or builder-preview link handler (lightweight) */}

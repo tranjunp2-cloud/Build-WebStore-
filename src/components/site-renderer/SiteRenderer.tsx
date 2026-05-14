@@ -69,6 +69,8 @@ export type SiteRendererProps = {
     pages?: NavPage[]
     isEditor?: boolean
     isBuilderPreview?: boolean
+    /** True when loaded inside the standard page editor iframe (PreviewFrame). */
+    isEditorIframe?: boolean
     siteId?: string
     isOwner?: boolean
     onBlockFieldChange?: (blockIndex: number, field: string, value: unknown) => void
@@ -129,7 +131,7 @@ function applyGlobalSystemBlocks(
     return nextBlocks
 }
 
-export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuilderPreview = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuilderPreview = false, isEditorIframe = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -249,9 +251,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             warnPageIds.add(String(p.id))
         }
     }
-    // Indicators (EyeOff, BrokenLinkWarning) only active inside the page editor (builder=1).
-    // Page Preview and live site both render clean — no editor indicators.
-    const showIndicators = isEditor && isBuilderPreview
+    // Indicators (EyeOff, BrokenLinkWarning) only active inside the page editor iframe
+    // or AI Builder. Page Preview and live site both render clean — no editor indicators.
+    const showIndicators = isEditor && (isEditorIframe || isBuilderPreview)
     // Filter hidden pages from nav/CTA links:
     //   - Builder mode (showIndicators): keep all, indicators handle the warning
     //   - Page Preview (isEditor, no builder): filter like a visitor

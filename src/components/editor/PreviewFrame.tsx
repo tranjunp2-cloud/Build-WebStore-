@@ -1198,6 +1198,7 @@ function PreviewFrameInner({
         if (pageId) {
             url.searchParams.set('pageId', pageId)
         }
+        url.searchParams.set('editor', '1')
 
         // Add scroll parameters to avoid relying on native iframe onLoad which can be flaky.
         // NOTE: This runs only when iframeKey/pageId changes (when we INTEND to reload).
