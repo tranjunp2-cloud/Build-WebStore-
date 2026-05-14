@@ -176,6 +176,35 @@ describe('[TC-S2-014] Footer Block Variants', () => {
         })
     })
 
+    // TC-F05-967-D2: Footer config supports tagline (Company Description) inline edit field
+    describe('[TC-F05-967-D2] Footer config — tagline field', () => {
+        it('accepts tagline field', () => {
+            const result = FooterConfigSchema.safeParse(minimalFooterConfig({
+                tagline: 'Building the future, one site at a time.',
+            }))
+            expect(result.success).toBe(true)
+            if (result.success) {
+                expect(result.data.tagline).toBe('Building the future, one site at a time.')
+            }
+        })
+
+        it('tagline is optional', () => {
+            const result = FooterConfigSchema.safeParse(minimalFooterConfig())
+            expect(result.success).toBe(true)
+            if (result.success) {
+                expect(result.data.tagline).toBeUndefined()
+            }
+        })
+
+        it('footerMeta.editableFields includes tagline', () => {
+            expect(footerMeta.editableFields).toContain('tagline')
+        })
+
+        it('footerMeta.editableFields includes copyrightText', () => {
+            expect(footerMeta.editableFields).toContain('copyrightText')
+        })
+    })
+
     // TC-F05-967-D: Footer config supports editable field (copyrightText)
     describe('[TC-F05-967-D] Footer config supports copyrightText', () => {
         it('accepts copyrightText field', () => {

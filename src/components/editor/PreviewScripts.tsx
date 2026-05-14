@@ -478,6 +478,9 @@ export function PreviewScripts() {
                 }
                 const stopFooterFieldEdit = (silent?: boolean) => {
                     if (!isEditingFooterField) return
+                    // Capture latest content BEFORE clearing debounce timer — guarantees parent
+                    // receives the value even on fast blur/Enter before the 300ms fires
+                    const pendingValue = ffEl.textContent ?? ''
                     if (ffInputTimer) { clearTimeout(ffInputTimer); ffInputTimer = null }
                     // Guard must be cleared BEFORE contentEditable='false' — setting it fires blur
                     // synchronously, which would re-enter this function and send a duplicate STOP message
@@ -490,7 +493,7 @@ export function PreviewScripts() {
                     ffEl.removeEventListener('paste', onFFPaste)
                     ffEl.removeEventListener('blur', onFFBlur)
                     if (!silent) {
-                        window.parent.postMessage({ type: 'FOOTER_FIELD_EDIT_STOP', fieldName }, parentOrigin)
+                        window.parent.postMessage({ type: 'FOOTER_FIELD_EDIT_STOP', fieldName, newValue: pendingValue }, parentOrigin)
                     }
                 }
                 const onFFBlur = () => stopFooterFieldEdit()

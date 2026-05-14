@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { useI18n } from '@/i18n'
 
-const ALLOWED_FOOTER_FIELDS = new Set(['copyrightText'])
+const ALLOWED_FOOTER_FIELDS = new Set(['copyrightText', 'tagline'])
 
 export interface PreviewFrameHandle {
     /** Send a postMessage to the preview iframe without triggering a full reload. */
@@ -688,7 +688,11 @@ function PreviewFrameInner({
                 if (!ALLOWED_FOOTER_FIELDS.has(fieldName)) return
                 onFooterUpdateRef.current?.({ [fieldName]: newValue })
             } else if (e.data?.type === 'FOOTER_FIELD_EDIT_STOP') {
-                // Cancel pending debounce timer, then fire exactly one save
+                const { fieldName: stopField, newValue: stopValue } = e.data as { fieldName?: string; newValue?: string }
+                // Flush any in-flight content that the 300ms debounce hadn't fired yet (fast blur/Enter scenario)
+                if (stopField && stopValue !== undefined && ALLOWED_FOOTER_FIELDS.has(stopField)) {
+                    onFooterUpdateRef.current?.({ [stopField]: stopValue })
+                }
                 onFooterEditStopRef.current?.()
             }
         }
