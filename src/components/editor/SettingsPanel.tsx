@@ -31,6 +31,7 @@ import { useI18n } from '@/i18n'
 import { useEditorStore } from '@/store/editorStore'
 import { toast } from 'sonner'
 import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
+import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
@@ -46,24 +47,6 @@ function sanitizeInput(value: string): string {
 /** Check if input contains HTML/script injection */
 function containsHtml(value: string): boolean {
     return /<[^>]*>/i.test(value)
-}
-
-/** Returns the warning state for a URL pointing to a hidden, draft, deleted, or non-existent page. */
-function checkHiddenPageUrl(url: string | undefined, pages?: PageData[]): 'hidden' | 'draft' | 'deleted' | 'not-found' | false {
-    if (!url || !pages?.length) return false
-    const slugCanonical = buildSlugCanonicalMap(pages)
-    const resolvedPath = resolveInternalUrlPath(url, slugCanonical)
-    if (!resolvedPath) return false
-    const match = pages.find(p => {
-        const s = (p.slug ?? '').trim()
-        const pagePath = ((p as { isHomepage?: boolean }).isHomepage || !s || s === '/' || s === 'home') ? '/' : (s.startsWith('/') ? s : `/${s}`)
-        return pagePath === resolvedPath
-    })
-    if (!match) return 'not-found'
-    if (match.deletedAt != null && match.deletedAt !== '') return 'deleted'
-    if (match.isVisible === false) return 'hidden'
-    if (match.status === 'draft') return 'draft'
-    return false
 }
 
 /** Validate URL format — allow http/https and relative paths (/ or #), reject protocol-relative (//host) */
@@ -1113,6 +1096,7 @@ function SettingsPanelInner({
                             <FooterLinkEditor
                                 columns={(footerBlock?.columns as FooterColumn[]) || []}
                                 onUpdate={(cols) => onFooterUpdate?.({ columns: cols })}
+                                pages={pages}
                             />
                         )}
 

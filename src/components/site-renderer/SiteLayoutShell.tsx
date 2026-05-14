@@ -40,13 +40,29 @@ function rewriteNavLinks(
         })
 }
 
-/** Rewrite `url` fields in footer column links. */
-function rewriteFooterColumns(columns: unknown, rewriteUrl: (u: string | undefined) => string): unknown {
+/** Rewrite `url` fields in footer column links; filter links pointing to hidden/deleted/draft pages. */
+function rewriteFooterColumns(
+    columns: unknown,
+    rewriteUrl: (u: string | undefined) => string,
+    hiddenSlugs: Set<string>,
+    slugCanonical: Map<string, string>,
+): unknown {
     if (!Array.isArray(columns)) return columns
     return columns.map((col) => {
         if (!col || typeof col !== 'object') return col
         const c = col as { links?: Array<{ url?: string; [k: string]: unknown }>; [k: string]: unknown }
-        return { ...c, links: Array.isArray(c.links) ? c.links.map((l) => ({ ...l, url: rewriteUrl(l?.url) })) : c.links }
+        return {
+            ...c,
+            links: Array.isArray(c.links)
+                ? c.links
+                    .filter((l) => {
+                        if (!hiddenSlugs.size || !l?.url) return true
+                        const resolvedPath = resolveInternalUrlPath(l.url, slugCanonical)
+                        return !resolvedPath || !hiddenSlugs.has(resolvedPath)
+                    })
+                    .map((l) => ({ ...l, url: rewriteUrl(l?.url) }))
+                : c.links,
+        }
     })
 }
 
@@ -108,7 +124,7 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
         : null
 
     const footerBlock: Record<string, unknown> | null = rawFooter
-        ? { ...rawFooter, columns: rewriteFooterColumns(rawFooter.columns, rewriteUrl) }
+        ? { ...rawFooter, columns: rewriteFooterColumns(rawFooter.columns, rewriteUrl, hiddenSlugs, slugCanonical) }
         : null
 
     const renderBlock = (block: Record<string, unknown>, blockType: string) => {

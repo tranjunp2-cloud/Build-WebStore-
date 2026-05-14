@@ -13,10 +13,12 @@ import {
     verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, ChevronRight, ExternalLink, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, GripVertical, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import type { FooterColumn, NavLink } from '@/types/editor'
+import type { PageData } from '@/store/editorStore'
+import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
 
 const labelCls = 'text-[12px] font-medium leading-4 text-slate-400'
 
@@ -31,14 +33,16 @@ interface SortableLinkProps {
     link: NavLink
     ci: number
     li: number
+    pages?: PageData[]
     onUpdate: (field: 'label' | 'url' | 'style', val: string) => void
     onRemove: () => void
 }
 
-function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProps) {
+function SortableLink({ id, link, ci, li, pages, onUpdate, onRemove }: SortableLinkProps) {
     const { t } = useI18n()
     const s = t.editor.settings
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+    const hiddenStatus = checkHiddenPageUrl(link.url, pages)
 
     const currentStyle: 'internal' | 'external' =
         link.style ?? (isExternal(link.url ?? '') ? 'external' : 'internal')
@@ -103,12 +107,22 @@ function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProp
                             placeholder={currentStyle === 'external' ? 'https://example.com' : '/about'}
                             onBlur={(e) => onUpdate('url', e.target.value.toLowerCase())}
                             variant="editor"
-                            className={cn('h-8 text-[14px] text-[#94a3b8] w-full lowercase', currentStyle === 'external' && 'pr-8')}
+                            className={cn(
+                                'h-8 text-[14px] text-[#94a3b8] w-full lowercase',
+                                currentStyle === 'external' && 'pr-8',
+                                hiddenStatus && 'ring-2 ring-red-500/70',
+                            )}
                         />
                         {currentStyle === 'external' && (
                             <ExternalLink className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500" />
                         )}
                     </div>
+                    {hiddenStatus && (
+                        <p className="flex items-center gap-1 text-[11px] text-red-400">
+                            <AlertTriangle size={11} className="shrink-0" />
+                            {hiddenStatus === 'deleted' ? s.linkPageDeleted : hiddenStatus === 'draft' ? s.linkPageDraft : hiddenStatus === 'not-found' ? s.linkPageNotFound : s.linkPageHidden}
+                        </p>
+                    )}
                 </div>
             </div>
         </div>
@@ -120,9 +134,10 @@ function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProp
 interface FooterLinkEditorProps {
     columns: FooterColumn[]
     onUpdate: (cols: FooterColumn[]) => void
+    pages?: PageData[]
 }
 
-export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
+export function FooterLinkEditor({ columns, onUpdate, pages }: FooterLinkEditorProps) {
     const { t, ti } = useI18n()
     const s = t.editor.settings
     const [openCols, setOpenCols] = useState<Set<number>>(new Set())
@@ -252,6 +267,7 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
                                                             link={link}
                                                             ci={ci}
                                                             li={li}
+                                                            pages={pages}
                                                             onUpdate={(field, val) => updateLink(ci, li, field, val)}
                                                             onRemove={() => removeLink(ci, li)}
                                                         />

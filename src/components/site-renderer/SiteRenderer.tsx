@@ -226,19 +226,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         ? rewritePreviewUrl
         : (url: string | undefined) => rewriteLiveUrl(url, slugCanonical)
 
-    const rewriteFooterColumns = (columns: unknown): unknown => {
-        if (!Array.isArray(columns)) return columns
-        return columns.map((col) => {
-            if (!col || typeof col !== 'object') return col
-            const c = col as { links?: Array<{ url?: string; [k: string]: unknown }>; [k: string]: unknown }
-            return {
-                ...c,
-                links: Array.isArray(c.links)
-                    ? c.links.map((l) => ({ ...l, url: rewriteUrl(l?.url) }))
-                    : c.links,
-            }
-        })
-    }
     // All slugs + IDs of hidden/deleted pages.
     // warnSlugs: normalized /slug — used for live-site URL matching.
     // warnPageIds: page IDs — used for editor preview URLs (/preview/...?pageId=xxx).
@@ -254,7 +241,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     // Indicators (EyeOff, BrokenLinkWarning) only active inside the page editor iframe
     // or AI Builder. Page Preview and live site both render clean — no editor indicators.
     const showIndicators = isEditor && (isEditorIframe || isBuilderPreview)
-    // Filter hidden pages from nav/CTA links:
+    // Filter hidden pages from nav/CTA/footer links:
     //   - Builder/editor mode (showIndicators): keep all, indicators handle the warning
     //   - Page Preview, live site visitor: filter hidden pages
     //   - Live site owner: keep all (owner can access hidden pages per spec)
@@ -267,6 +254,31 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         if (!hiddenSlugs.size) return false
         const resolvedPath = resolveInternalUrlPath(url, slugCanonical)
         return !!resolvedPath && hiddenSlugs.has(resolvedPath)
+    }
+
+    const rewriteFooterColumns = (columns: unknown): unknown => {
+        if (!Array.isArray(columns)) return columns
+        return columns.map((col) => {
+            if (!col || typeof col !== 'object') return col
+            const c = col as { links?: Array<{ url?: string; [k: string]: unknown }>; [k: string]: unknown }
+            return {
+                ...c,
+                links: Array.isArray(c.links)
+                    ? c.links
+                        .filter((l) => !isHiddenSlug(l?.url))
+                        .map((l) => {
+                            const resolvedPath = resolveInternalUrlPath(l?.url, slugCanonical)
+                            const isHiddenFromVisitor = markHiddenLinks && !!resolvedPath && warnSlugs.has(resolvedPath)
+                            const rewritten = rewriteUrl(l?.url)
+                            return {
+                                ...l,
+                                url: markBrokenUrl(l?.url, rewritten),
+                                ...(isHiddenFromVisitor ? { _hiddenFromVisitor: true } : {}),
+                            }
+                        })
+                    : c.links,
+            }
+        })
     }
 
     const rewriteNavLinks = (links: unknown): unknown => {
