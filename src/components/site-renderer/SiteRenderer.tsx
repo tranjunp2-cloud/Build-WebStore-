@@ -249,10 +249,17 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             warnPageIds.add(String(p.id))
         }
     }
-    // For visitors: filter hidden/deleted slugs out of nav. Owners/editors see all links.
-    const hiddenSlugs = (!isEditor && !isOwner) ? warnSlugs : new Set<string>()
-    // In editor/preview: mark hidden links so NavigationBlock can render a warning indicator.
-    const markHiddenLinks = isEditor && warnSlugs.size > 0
+    // Indicators (EyeOff, BrokenLinkWarning) only active inside the page editor (builder=1).
+    // Page Preview and live site both render clean — no editor indicators.
+    const showIndicators = isEditor && isBuilderPreview
+    // Filter hidden pages from nav/CTA links:
+    //   - Builder mode (showIndicators): keep all, indicators handle the warning
+    //   - Page Preview (isEditor, no builder): filter like a visitor
+    //   - Live site visitor (!isOwner): filter
+    //   - Live site owner: keep all (owner can access hidden pages)
+    const hiddenSlugs = showIndicators ? new Set<string>() : (isEditor || !isOwner) ? warnSlugs : new Set<string>()
+    // Mark hidden nav links with _hiddenFromVisitor flag (EyeOff indicator) — builder mode only.
+    const markHiddenLinks = showIndicators && warnSlugs.size > 0
 
     // Returns true when a URL points to a page that should be hidden from visitors.
     const isHiddenSlug = (url: string | undefined): boolean => {
@@ -288,7 +295,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     // prefix with '_broken_url_:' so BrokenLinkWarning can detect the broken link.
     // On live site or for external/anchor URLs this is a no-op.
     const markBrokenUrl = (original: string | undefined, rewritten: string): string => {
-        if (!isEditor || rewritten !== '#') return rewritten
+        if (!showIndicators || rewritten !== '#') return rewritten
         const trimmed = (original ?? '').trim()
         if (!trimmed || trimmed === '#' || trimmed.startsWith('#')) return rewritten
         if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('//')) return rewritten
@@ -456,7 +463,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     })
 
     return (
-        <HiddenSlugsProvider value={isEditor ? { slugs: warnSlugs, pageIds: warnPageIds } : { slugs: new Set(), pageIds: new Set() }}>
+        <HiddenSlugsProvider value={showIndicators ? { slugs: warnSlugs, pageIds: warnPageIds } : { slugs: new Set(), pageIds: new Set() }}>
         <OwnerProvider value={!!isOwner}>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`
