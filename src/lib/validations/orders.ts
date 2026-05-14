@@ -4,6 +4,8 @@ import { MY_STATES } from '@/lib/shipping'
 export const MAX_CHECKOUT_ITEMS = 50
 
 // --- Create Order via Stripe Checkout (FPX / Card) ---
+// paymentMethod intentionally omitted — backend builds payment_method_types from tenant flags.
+// Legacy clients that still send paymentMethod will have it logged and ignored.
 export const stripeCheckoutSchema = z.object({
     siteId: z.union([z.string(), z.number()]),
     items: z.array(z.object({
@@ -24,7 +26,6 @@ export const stripeCheckoutSchema = z.object({
             country: z.string().optional(),
         }).optional(),
     }),
-    paymentMethod: z.enum(['fpx', 'card']),
 })
 
 // --- Create Order (manual: COD/QR Banking) ---

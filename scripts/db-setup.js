@@ -3942,6 +3942,16 @@ const MIGRATIONS = [
   { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
   { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },
   { name: 'sites.payment_config_fpx_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_fpx_enabled boolean DEFAULT true;` },
+  // ── F13: Tenant-level Card/FPX master toggles (docs/architecture/F13-payment-gateway.md §4) ──
+  // Layer-1 of 2-layer config: tenant.payments_payment_card/fpx = master; sites.payment_config_* = per-site guard.
+  { name: 'tenants.payments_payment_card', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_payment_card boolean DEFAULT false;` },
+  { name: 'tenants.payments_payment_fpx', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_payment_fpx boolean DEFAULT false;` },
+  // Backfill: onboarded tenants get payment_card=true to preserve existing hardcoded ['card','fpx'] behavior (D-02).
+  // FPX stays false — requires explicit seller opt-in. Idempotent re-runs are safe.
+  { name: 'tenants.payments_payment_card.backfill_onboarded', sql: `UPDATE tenants SET payments_payment_card = true WHERE stripe_onboarding_complete = true AND payments_payment_card = false;` },
+  // ── F13: Bank Transfer bank_name + account_number for DuitNow QR section ──
+  { name: 'tenants.payments_bank_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_bank_name varchar;` },
+  { name: 'tenants.payments_account_number', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_number varchar;` },
 ];
 
 async function runMigrations(pool) {

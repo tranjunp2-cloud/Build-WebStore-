@@ -4,31 +4,65 @@ import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { stripeCheckoutSchema } from '@/lib/validations/orders'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
+import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
 
 /**
  * POST /api/orders/stripe-checkout
  *
- * Public endpoint (guest checkout). Creates a pending order and a Stripe
- * Checkout Session for FPX or Card payment (Direct Charges model).
- * Stock is only decremented after payment confirmation via webhook.
+ * 6-step validation chain (locked F13 decision):
+ *   1. Resolve site by siteId
+ *   2. Resolve tenant from site.tenant
+ *   3. Validate tenant.stripeAccountId + stripeOnboardingComplete → 422 STRIPE_NOT_READY
+ *   4. types = buildPaymentMethodTypes(tenant)
+ *      → if [] → 422 NO_PAYMENT_METHODS (tenant has Card+FPX both OFF) — TC-F13.37
+ *   5. Site-level guard (layer 2):
+ *      - site.paymentConfig.cardEnabled === false → drop 'card' from types
+ *      - site.paymentConfig.fpxEnabled  === false → drop 'fpx'  from types
+ *      → if [] after guard → 422 METHOD_DISABLED — TC-F13.38, TC-F13.39
+ *   6. createStripeCheckoutSession({ paymentMethodTypes: types, ... })
  *
- * Body: { siteId, items, customer, paymentMethod: 'fpx' | 'card' }
- * Returns: { success, data: { orderId, orderNumber, sessionUrl } }
+ * Request body does NOT include paymentMethod — backend builds the full enabled array.
+ * If legacy clients still send paymentMethod, it is logged as warning and ignored.
+ *
+ * Pending order created with status='pending'; webhook transitions to 'new' on success.
  */
 export async function POST(request: NextRequest) {
-    try {
-        const { data, errorResponse } = await parseRequest(request, stripeCheckoutSchema)
-        if (errorResponse) return errorResponse
+    const rawBody = await request.json().catch(() => null)
+    if (!rawBody) {
+        return NextResponse.json(
+            { success: false, error: { code: 'INVALID_BODY', message: 'Request body is required' } },
+            { status: 400 },
+        )
+    }
 
-        const { siteId, items, customer, paymentMethod } = data!
+    const parse = stripeCheckoutSchema.safeParse(rawBody)
+    if (!parse.success) {
+        return NextResponse.json(
+            { success: false, error: { code: 'INVALID_BODY', message: parse.error.message } },
+            { status: 400 },
+        )
+    }
+
+    const { siteId, items, customer } = parse.data
+
+    if ((rawBody as any).paymentMethod) {
+        console.warn('[stripe-checkout] legacy paymentMethod field received and ignored', { siteId })
+    }
+
+    try {
         const payload = await getPayload({ config })
 
         const siteIdNum =
             typeof siteId === 'string' && !isNaN(Number(siteId)) ? Number(siteId) : siteId
 
-        // 1. Resolve site
-        const site = await payload.findByID({ collection: 'sites', id: siteIdNum })
+        // Step 1: Resolve site
+        const site = await payload.findByID({
+            collection: 'sites',
+            id: siteIdNum,
+            depth: 0,
+            overrideAccess: true,
+        })
         if (!site) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
@@ -36,19 +70,17 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // 2. Check payment method enabled in site config (default: enabled)
-        const paymentConfig = (site as any).paymentConfig ?? {}
-        const methodKey = paymentMethod === 'fpx' ? 'fpxEnabled' : 'cardEnabled'
-        if (paymentConfig[methodKey] === false) {
-            return NextResponse.json(
-                { success: false, error: { code: 'METHOD_DISABLED', message: `${paymentMethod.toUpperCase()} is not enabled for this store` } },
-                { status: 422 },
-            )
-        }
-
-        // 3. Resolve tenant → verify Stripe onboarding complete
-        const tenantId = typeof site.tenant === 'object' ? (site.tenant as any).id : site.tenant
-        const tenant = await payload.findByID({ collection: 'tenants', id: tenantId })
+        // Step 2: Resolve tenant
+        const tenantId =
+            typeof (site as any).tenant === 'object'
+                ? (site as any).tenant?.id
+                : (site as any).tenant
+        const tenant = await payload.findByID({
+            collection: 'tenants',
+            id: tenantId,
+            depth: 0,
+            overrideAccess: true,
+        })
         if (!tenant) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Store not found' } },
@@ -56,18 +88,54 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const stripeAccountId = (tenant as any).stripeAccountId
-        const stripeOnboardingComplete = (tenant as any).stripeOnboardingComplete
-        if (!stripeAccountId || !stripeOnboardingComplete) {
+        // TC-F13.88: suspended or banned tenant cannot accept payments
+        if ((tenant as any).status === 'suspended' || (tenant as any).bannedAt) {
             return NextResponse.json(
-                { success: false, error: { code: 'PAYMENT_NOT_CONFIGURED', message: 'Store payment not configured' } },
-                { status: 400 },
+                { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
+                { status: 403 },
             )
         }
 
-        // 4. Validate products, check stock, build line items
+        // Step 3: Stripe-ready check
+        const stripeAccountId = (tenant as any).stripeAccountId
+        const onboardingComplete = (tenant as any).stripeOnboardingComplete === true
+        if (!stripeAccountId) {
+            return NextResponse.json(
+                { success: false, error: { code: 'STRIPE_NOT_CONNECTED', message: 'Seller has not connected Stripe yet' } },
+                { status: 422 },
+            )
+        }
+        if (!onboardingComplete) {
+            return NextResponse.json(
+                { success: false, error: { code: 'STRIPE_NOT_READY', message: 'Payment temporarily unavailable' } },
+                { status: 422 },
+            )
+        }
+
+        // Step 4: Tenant master gate — build enabled methods from tenant flags
+        let types = buildPaymentMethodTypes(tenant as any)
+        if (types.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'NO_PAYMENT_METHODS', message: 'Seller has not enabled Card or FPX' } },
+                { status: 422 },
+            )
+        }
+
+        // Step 5: Site-level layer-2 guard
+        const paymentConfig = (site as any).paymentConfig ?? {}
+        if (paymentConfig.cardEnabled === false) types = types.filter(t => t !== 'card')
+        if (paymentConfig.fpxEnabled === false) types = types.filter(t => t !== 'fpx')
+        if (types.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'METHOD_DISABLED', message: 'No payment method is enabled for this site' } },
+                { status: 422 },
+            )
+        }
+
+        // Step 6: Validate products, check stock, build line items
         const built = await buildOrderItems(payload, items)
         if (built.errorResponse) return built.errorResponse
+
         const { orderItems, checkoutItems, subtotal, currency } = built
 
         if (orderItems.length === 0) {
@@ -77,13 +145,44 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // 5. Calculate totals (SST 6% + flat shipping — #962 will replace shipping calc)
+        // Calculate totals (SST 6% + flat shipping — #962 will replace shipping calc)
         const shippingFee = 10
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + shippingFee + tax
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
 
-        // 6. Create order in pending status (webhook updates to 'paid' on success)
+        // TC-F13.103: free order (coupon 100% off or zero-priced) — skip Stripe
+        if (total <= 0) {
+            const freeOrder = await payload.create({
+                collection: 'orders',
+                data: {
+                    tenant: tenantId,
+                    site: siteIdNum,
+                    orderNumber,
+                    items: orderItems,
+                    subtotal,
+                    tax,
+                    shippingFee,
+                    total: 0,
+                    currency,
+                    status: 'paid',
+                    paymentMethod: 'free',
+                    customerEmail: customer.email,
+                    customerName: customer.name,
+                    customerPhone: customer.phone || '',
+                } as any,
+            })
+            return NextResponse.json({
+                success: true,
+                data: { orderId: freeOrder.id, orderNumber, total: 0, currency, status: 'paid', sessionUrl: null },
+            })
+        }
+
+        // paymentMethod on order: single-method tenant gets that method; multi-method defaults 'card'
+        // Webhook will update to actual method used when checkout.session.completed fires.
+        const orderPaymentMethod = types.length === 1 ? types[0] : 'card'
+
+        // Create order in pending status
         const order = await payload.create({
             collection: 'orders',
             data: {
@@ -97,7 +196,7 @@ export async function POST(request: NextRequest) {
                 total,
                 currency,
                 status: 'pending',
-                paymentMethod,
+                paymentMethod: orderPaymentMethod,
                 customerEmail: customer.email,
                 customerName: customer.name,
                 customerPhone: customer.phone || '',
@@ -114,22 +213,34 @@ export async function POST(request: NextRequest) {
             } as any,
         })
 
-        // 7. Create Stripe Checkout Session on merchant's connected account
+        // Create Stripe Checkout Session on merchant's connected account (Direct Charges)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = (tenant as any).slug || tenantId
 
-        const checkout = await createStripeCheckoutSession({
-            orderId: order.id as string,
-            items: checkoutItems,
-            currency: currency as 'MYR' | 'USD' | 'SGD',
-            customerEmail: customer.email,
-            successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
-            cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout`,
-            stripeAccountId,
-            metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber, paymentMethod },
-        })
+        let checkout
+        try {
+            checkout = await createStripeCheckoutSession({
+                orderId: order.id as string,
+                items: checkoutItems,
+                currency: currency as 'MYR' | 'USD' | 'SGD',
+                customerEmail: customer.email,
+                successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
+                cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout?stripe_cancelled=1`,
+                stripeAccountId,
+                paymentMethodTypes: types,
+                metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },
+            })
+        } catch (stripeErr: any) {
+            console.error('[stripe-checkout] Stripe API error:', stripeErr.message)
+            // Clean up pending order so it doesn't litter the DB
+            await payload.delete({ collection: 'orders', id: order.id }).catch(() => null)
+            return NextResponse.json(
+                { success: false, error: { code: 'STRIPE_API_ERROR', message: 'Payment service is busy. Please try again.' } },
+                { status: 502 },
+            )
+        }
 
-        // 8. Persist session ID for idempotent webhook processing
+        // Persist session ID for idempotent webhook processing
         await payload.update({
             collection: 'orders',
             id: order.id,

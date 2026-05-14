@@ -109,6 +109,10 @@ export async function createStripeCheckoutSession(
 ): Promise<CheckoutResult> {
     const stripe = getStripeClient()
 
+    if (!params.paymentMethodTypes || params.paymentMethodTypes.length === 0) {
+        throw new Error('paymentMethodTypes must contain at least one method')
+    }
+
     const feePercent = params.applicationFeePercent ?? 3
     const totalAmount = params.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -120,7 +124,7 @@ export async function createStripeCheckoutSession(
         {
             mode: 'payment',
             currency: params.currency.toLowerCase(),
-            payment_method_types: ['card', 'fpx'],
+            payment_method_types: params.paymentMethodTypes,
             line_items: params.items.map((item) => ({
                 price_data: {
                     currency: params.currency.toLowerCase(),
@@ -198,6 +202,7 @@ export function normalizeStripeEvent(
         'payment_intent.payment_failed': 'payment_failed',
         'customer.subscription.updated': 'subscription_updated',
         'account.updated': 'account_updated',
+        'account.application.deauthorized': 'account_deauthorized',
     }
 
     const normalizedType = typeMap[event.type]

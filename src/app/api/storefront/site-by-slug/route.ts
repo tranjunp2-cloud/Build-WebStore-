@@ -4,9 +4,8 @@ import config from '@payload-config'
 
 /**
  * GET /api/storefront/site-by-slug?slug=xxx
- * Public endpoint — resolves tenant slug to siteId + tenantId.
- * Uses local Payload API (overrideAccess) to bypass restricted read access on Tenants collection.
- * Returns only the minimum fields needed; never exposes billing, subdomain, or other tenant data.
+ * Public endpoint — resolves tenant slug to siteId + tenantId + payment config.
+ * Returns both layers of payment config so the storefront can render the correct UI.
  */
 export async function GET(req: Request) {
     try {
@@ -37,7 +36,6 @@ export async function GET(req: Request) {
             collection: 'tenants',
             id: tenant.id,
             depth: 0,
-            select: { id: true, stripeOnboardingComplete: true } as any,
             overrideAccess: true,
         })
 
@@ -46,7 +44,7 @@ export async function GET(req: Request) {
             where: { tenant: { equals: tenant.id } },
             limit: 1,
             depth: 1,
-            select: { id: true, paymentConfig: true, theme: true },
+            select: { id: true, paymentConfig: true, shippingConfig: true, theme: true },
             overrideAccess: true,
         })
 
@@ -55,11 +53,21 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
-        const paymentConfig = (site as any).paymentConfig ?? {}
+        const paymentConfig = (site as any)?.paymentConfig ?? {}
+        const tenantPayments = (tenantFull as any)?.payments ?? {}
+
         const merchantQrCode = paymentConfig?.merchantQrCode
         const merchantQrCodeUrl = merchantQrCode && typeof merchantQrCode === 'object'
             ? (merchantQrCode.url ?? null)
             : null
+
+        // Layer 1 — tenant master flags (default false: must be explicitly enabled)
+        const tenantCardEnabled = tenantPayments.payment_card === true
+        const tenantFpxEnabled = tenantPayments.payment_fpx === true
+
+        // Layer 2 — site-level guard (default true: permissive opt-out)
+        const siteCardEnabled = paymentConfig.cardEnabled !== false
+        const siteFpxEnabled = paymentConfig.fpxEnabled !== false
 
         return NextResponse.json({
             siteId: site.id,
@@ -72,9 +80,20 @@ export async function GET(req: Request) {
             bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
             shippingConfig: (site as any).shippingConfig ?? null,
             theme: (site as any).theme ?? null,
-            cardEnabled: paymentConfig.cardEnabled !== false,
-            fpxEnabled: paymentConfig.fpxEnabled !== false,
-            stripeEnabled: Boolean((tenantFull as any)?.stripeOnboardingComplete),
+
+            // Layer 1 — tenant master flags
+            tenant_payment_card: tenantCardEnabled,
+            tenant_payment_fpx: tenantFpxEnabled,
+
+            // Layer 2 — site-level guard
+            site_card_enabled: siteCardEnabled,
+            site_fpx_enabled: siteFpxEnabled,
+
+            // Derived — what the storefront should render
+            cardEnabled: tenantCardEnabled && siteCardEnabled,
+            fpxEnabled: tenantFpxEnabled && siteFpxEnabled,
+
+            stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true,
         })
     } catch (error) {
         console.error('[Storefront site-by-slug]', error)

@@ -8,6 +8,10 @@ export type PaymentUpdates = {
     payment_cod?: boolean;
     payment_qr?: boolean;
     qr_image?: string | number | null;
+    payment_card?: boolean;
+    payment_fpx?: boolean;
+    bank_name?: string | null;
+    account_number?: string | null;
 };
 
 export async function getPaymentSettings() {
@@ -61,6 +65,38 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
         if (updates.qr_image !== undefined) {
             cleanUpdates.qr_image = updates.qr_image;
+        }
+
+        if (updates.payment_card !== undefined) {
+            if (typeof updates.payment_card === 'boolean') {
+                cleanUpdates.payment_card = updates.payment_card;
+            } else {
+                return { success: false, error: 'Invalid type for payment_card. Expected boolean.' };
+            }
+        }
+
+        if (updates.payment_fpx !== undefined) {
+            if (typeof updates.payment_fpx === 'boolean') {
+                cleanUpdates.payment_fpx = updates.payment_fpx;
+            } else {
+                return { success: false, error: 'Invalid type for payment_fpx. Expected boolean.' };
+            }
+        }
+
+        if (updates.bank_name !== undefined) {
+            if (updates.bank_name === null || typeof updates.bank_name === 'string') {
+                cleanUpdates.bank_name = updates.bank_name;
+            } else {
+                return { success: false, error: 'Invalid type for bank_name. Expected string.' };
+            }
+        }
+
+        if (updates.account_number !== undefined) {
+            if (updates.account_number === null || typeof updates.account_number === 'string') {
+                cleanUpdates.account_number = updates.account_number;
+            } else {
+                return { success: false, error: 'Invalid type for account_number. Expected string.' };
+            }
         }
 
         if (Object.keys(cleanUpdates).length === 0) {

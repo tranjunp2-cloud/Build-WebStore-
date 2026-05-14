@@ -5,6 +5,7 @@ import { orderCreateSchema } from '@/lib/validations/orders'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
+import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 
 /**
  * POST /api/orders/create
@@ -41,6 +42,14 @@ export const POST = withAuth(async (_user, request) => {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Tenant not found' } },
                 { status: 404 }
+            )
+        }
+
+        // TC-F13.88: suspended or banned tenant cannot accept payments
+        if ((tenant as any).status === 'suspended' || (tenant as any).bannedAt) {
+            return NextResponse.json(
+                { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
+                { status: 403 },
             )
         }
 
@@ -103,6 +112,32 @@ export const POST = withAuth(async (_user, request) => {
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + tax
 
+        // TC-F13.103: free order (coupon 100% off) — skip Stripe, mark paid immediately
+        if (total <= 0) {
+            const freeOrder = await payload.create({
+                collection: 'orders',
+                data: {
+                    tenant: tenantId,
+                    site: siteId,
+                    orderNumber,
+                    items: orderItems,
+                    subtotal,
+                    tax,
+                    total: 0,
+                    currency,
+                    status: 'paid',
+                    paymentMethod: 'free',
+                    customerEmail: customer.email,
+                    customerName: customer.name,
+                    customerPhone: customer.phone || '',
+                } as any,
+            })
+            return NextResponse.json({
+                success: true,
+                data: { orderId: freeOrder.id, orderNumber, total: 0, currency, status: 'paid', checkoutUrl: null },
+            })
+        }
+
         // Create order in PENDING status (will be updated to 'paid' by webhook)
         const order = await payload.create({
             collection: 'orders',
@@ -134,6 +169,8 @@ export const POST = withAuth(async (_user, request) => {
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = (tenant as any).slug || tenantId
 
+        const paymentMethodTypes = buildPaymentMethodTypes(tenant as any)
+
         const checkout = await createStripeCheckoutSession({
             orderId: order.id as string,
             items: checkoutItems,
@@ -142,6 +179,7 @@ export const POST = withAuth(async (_user, request) => {
             successUrl: `${baseUrl}/sites/${siteSlug}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
             cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout/cancel`,
             stripeAccountId,
+            paymentMethodTypes: paymentMethodTypes.length > 0 ? paymentMethodTypes : ['card'],
             metadata: {
                 siteId: String(siteId),
                 tenantId: String(tenantId),

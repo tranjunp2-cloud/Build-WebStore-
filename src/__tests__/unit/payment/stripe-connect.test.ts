@@ -265,6 +265,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
             successUrl: 'https://example.com/success',
             cancelUrl: 'https://example.com/cancel',
             stripeAccountId: 'acct_merchant_1',
+            paymentMethodTypes: ['card', 'fpx'],
         })
 
         expect(result.sessionId).toBe('cs_test_1')
@@ -295,6 +296,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
             successUrl: 'https://example.com/success',
             cancelUrl: 'https://example.com/cancel',
             stripeAccountId: 'acct_merchant_2',
+            paymentMethodTypes: ['card', 'fpx'],
         })
 
         expect(mockCheckoutSessionCreate).toHaveBeenCalledWith(
@@ -323,6 +325,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
             cancelUrl: 'https://example.com/cancel',
             stripeAccountId: 'acct_merchant_3',
             applicationFeePercent: 5,
+            paymentMethodTypes: ['card', 'fpx'],
         })
 
         expect(mockCheckoutSessionCreate).toHaveBeenCalledWith(
@@ -350,6 +353,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
             successUrl: 'https://example.com/success',
             cancelUrl: 'https://example.com/cancel',
             stripeAccountId: 'acct_merchant_4',
+            paymentMethodTypes: ['card', 'fpx'],
         })
 
         expect(mockCheckoutSessionCreate).toHaveBeenCalledWith(
@@ -374,6 +378,7 @@ describe('createStripeCheckoutSession (Connect)', () => {
             successUrl: 'https://example.com/success',
             cancelUrl: 'https://example.com/cancel',
             stripeAccountId: 'acct_merchant_5',
+            paymentMethodTypes: ['card'],
         })).rejects.toThrow('Stripe did not return a checkout session URL')
     })
 })

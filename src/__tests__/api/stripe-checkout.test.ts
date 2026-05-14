@@ -33,7 +33,11 @@ vi.mock('@/lib/validations/helpers', () => ({
         }
     }),
 }))
-vi.mock('@/lib/validations/orders', () => ({ stripeCheckoutSchema: {} }))
+vi.mock('@/lib/validations/orders', () => ({
+    stripeCheckoutSchema: {
+        safeParse: (data: any) => ({ success: true, data }),
+    },
+}))
 
 import { POST } from '@/app/api/orders/stripe-checkout/route'
 import { buildOrderItems } from '@/app/api/orders/stripe-checkout/build-order-items'
@@ -61,6 +65,8 @@ const VALID_TENANT = {
     stripeAccountId: 'acct_test_123',
     stripeOnboardingComplete: true,
     slug: 'test-store',
+    payment_card: true,
+    payment_fpx: true,
 }
 
 const VALID_PRODUCT = {
@@ -139,7 +145,7 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
             expect.objectContaining({
                 currency: 'MYR',
                 stripeAccountId: 'acct_test_123',
-                metadata: expect.objectContaining({ paymentMethod: 'fpx' }),
+                metadata: expect.objectContaining({ siteId: '1', tenantId: 'tenant-1' }),
             }),
         )
     })
@@ -174,15 +180,18 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
 
     // ─── TC-F13.26: FPX disabled ────────────────────────────────────
     it('[TC-F13.26] returns 422 METHOD_DISABLED when FPX is disabled', async () => {
-        // Arrange
+        // Arrange — tenant has ONLY fpx; site disables fpx → no method left → METHOD_DISABLED
         const siteWithFpxDisabled = {
             ...VALID_SITE,
             paymentConfig: { fpxEnabled: false, cardEnabled: true },
         }
-        mockFindByID.mockResolvedValueOnce(siteWithFpxDisabled)
+        const tenantFpxOnly = { ...VALID_TENANT, payment_card: false, payment_fpx: true }
+        mockFindByID
+            .mockResolvedValueOnce(siteWithFpxDisabled)
+            .mockResolvedValueOnce(tenantFpxOnly)
 
         // Act
-        const req = mockRequest({ ...VALID_REQUEST_BODY, paymentMethod: 'fpx' })
+        const req = mockRequest(VALID_REQUEST_BODY)
         const res = await POST(req)
         const body = await res.json()
 
@@ -194,15 +203,18 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
 
     // ─── TC-F13.27: Card disabled ───────────────────────────────────
     it('[TC-F13.27] returns 422 METHOD_DISABLED when card is disabled', async () => {
-        // Arrange
+        // Arrange — tenant has ONLY card; site disables card → no method left → METHOD_DISABLED
         const siteWithCardDisabled = {
             ...VALID_SITE,
             paymentConfig: { fpxEnabled: true, cardEnabled: false },
         }
-        mockFindByID.mockResolvedValueOnce(siteWithCardDisabled)
+        const tenantCardOnly = { ...VALID_TENANT, payment_card: true, payment_fpx: false }
+        mockFindByID
+            .mockResolvedValueOnce(siteWithCardDisabled)
+            .mockResolvedValueOnce(tenantCardOnly)
 
         // Act
-        const req = mockRequest({ ...VALID_REQUEST_BODY, paymentMethod: 'card' })
+        const req = mockRequest(VALID_REQUEST_BODY)
         const res = await POST(req)
         const body = await res.json()
 
@@ -212,8 +224,46 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
+    // ─── TC-F13.37: Both tenant flags off → NO_PAYMENT_METHODS ─────
+    it('[TC-F13.37] returns 422 NO_PAYMENT_METHODS when both tenant payment flags are off', async () => {
+        // Arrange — tenant explicitly disables both card and fpx
+        const tenantBothOff = { ...VALID_TENANT, payment_card: false, payment_fpx: false }
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(tenantBothOff)
+
+        // Act
+        const req = mockRequest(VALID_REQUEST_BODY)
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(422)
+        expect(body.error.code).toBe('NO_PAYMENT_METHODS')
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+    })
+
+    // ─── TC-F13.88: Suspended tenant cannot accept payments ─────────
+    it('[TC-F13.88] returns 403 STORE_UNAVAILABLE for suspended tenant', async () => {
+        // Arrange
+        const suspendedTenant = { ...VALID_TENANT, status: 'suspended' }
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(suspendedTenant)
+
+        // Act
+        const req = mockRequest(VALID_REQUEST_BODY)
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(403)
+        expect(body.error.code).toBe('STORE_UNAVAILABLE')
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+    })
+
     // ─── TC-F13.18: Stripe onboarding incomplete ────────────────────
-    it('[TC-F13.18] returns 400 PAYMENT_NOT_CONFIGURED when stripeOnboardingComplete=false', async () => {
+    it('[TC-F13.18] returns 422 STRIPE_NOT_READY when stripeOnboardingComplete=false', async () => {
         // Arrange
         const tenantIncomplete = {
             ...VALID_TENANT,
@@ -229,8 +279,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         const body = await res.json()
 
         // Assert
-        expect(res.status).toBe(400)
-        expect(body.error.code).toBe('PAYMENT_NOT_CONFIGURED')
+        expect(res.status).toBe(422)
+        expect(body.error.code).toBe('STRIPE_NOT_READY')
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
@@ -267,7 +317,7 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
     })
 
     // ─── Edge: No stripeAccountId ────────────────────────────────────
-    it('returns 400 PAYMENT_NOT_CONFIGURED when stripeAccountId is missing', async () => {
+    it('returns 422 STRIPE_NOT_CONNECTED when stripeAccountId is missing', async () => {
         // Arrange
         const tenantNoAccount = {
             ...VALID_TENANT,
@@ -283,8 +333,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         const body = await res.json()
 
         // Assert
-        expect(res.status).toBe(400)
-        expect(body.error.code).toBe('PAYMENT_NOT_CONFIGURED')
+        expect(res.status).toBe(422)
+        expect(body.error.code).toBe('STRIPE_NOT_CONNECTED')
     })
 
     // ─── Edge: buildOrderItems returns error ──────────────────────────
@@ -340,7 +390,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(body.success).toBe(true)
         expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
             expect.objectContaining({
-                metadata: expect.objectContaining({ paymentMethod: 'card' }),
+                stripeAccountId: 'acct_test_123',
+                metadata: expect.objectContaining({ siteId: '1', tenantId: 'tenant-1' }),
             }),
         )
     })

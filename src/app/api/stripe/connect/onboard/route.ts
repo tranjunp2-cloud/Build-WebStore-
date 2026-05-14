@@ -57,8 +57,8 @@ export const POST = withAuth(async (user, request) => {
             // Already has account — just create a new onboarding link (for retry/refresh)
             const accountLinkUrl = await createAccountLink(
                 (tenant as any).stripeAccountId,
-                `${baseUrl}/settings?stripe=refresh`,
-                `${baseUrl}/settings?stripe=complete`,
+                `${baseUrl}/dashboard/settings/payments?stripe=refresh`,
+                `${baseUrl}/dashboard/settings/payments?stripe=complete`,
             )
 
             return NextResponse.json({
@@ -89,8 +89,8 @@ export const POST = withAuth(async (user, request) => {
         // Create onboarding link
         const accountLinkUrl = await createAccountLink(
             accountId,
-            `${baseUrl}/settings?stripe=refresh`,
-            `${baseUrl}/settings?stripe=complete`,
+            `${baseUrl}/dashboard/settings/payments?stripe=refresh`,
+            `${baseUrl}/dashboard/settings/payments?stripe=complete`,
         )
 
         return NextResponse.json({

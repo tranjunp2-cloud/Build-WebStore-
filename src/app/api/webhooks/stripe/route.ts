@@ -89,6 +89,10 @@ export async function POST(request: NextRequest) {
                 await handleAccountUpdated(payload, event)
                 break
 
+            case 'account_deauthorized':
+                await handleAccountDeauthorized(payload, event)
+                break
+
             default:
                 console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`)
         }
@@ -116,12 +120,12 @@ async function handleCheckoutCompleted(
         return
     }
 
-    // Idempotency: check if order already processed (status already 'paid')
+    // Idempotency: check if order already processed (status already 'new')
     const existing = await payload.find({
         collection: 'orders',
         where: {
             stripeSessionId: { equals: stripeSessionId },
-            status: { equals: 'paid' },
+            status: { equals: 'new' },
         },
         limit: 1,
     })
@@ -147,7 +151,7 @@ async function handleCheckoutCompleted(
             collection: 'orders',
             id: orderId,
             data: {
-                status: 'paid',
+                status: 'new',
                 stripeSessionId,
                 stripePaymentIntentId:
                     typeof session.payment_intent === 'string'
@@ -158,7 +162,7 @@ async function handleCheckoutCompleted(
             },
         })
 
-        console.log(`[Stripe Webhook] Order ${orderId} marked as paid`)
+        console.log(`[Stripe Webhook] Order ${orderId} marked as new`)
 
         // Reduce stock with optimistic locking (prevents race condition)
         const order = await payload.findByID({
@@ -313,6 +317,38 @@ async function handleSubscriptionUpdated(
     })
 
     console.log(`[Stripe Webhook] Subscription ${stripeSubId} updated to ${subscription.status}`)
+}
+
+// TC-F13.87: lock seller's Card/FPX when Stripe revokes the Connect application
+async function handleAccountDeauthorized(
+    payload: any,
+    event: PaymentWebhookEvent,
+) {
+    // Stripe sends the accountId in the top-level 'account' field for Connect events
+    const accountId = event.connectedAccountId ?? (event.data as any).id
+    if (!accountId) {
+        console.warn('[Stripe Webhook] account.application.deauthorized missing accountId')
+        return
+    }
+
+    const tenants = await payload.find({
+        collection: 'tenants',
+        where: { stripeAccountId: { equals: accountId } },
+        limit: 1,
+    })
+
+    if (tenants.docs.length === 0) {
+        console.warn(`[Stripe Webhook] No tenant found for deauthorized account ${accountId}`)
+        return
+    }
+
+    await payload.update({
+        collection: 'tenants',
+        id: tenants.docs[0].id,
+        data: { stripeOnboardingComplete: false },
+    })
+
+    console.log(`[Stripe Webhook] Tenant ${tenants.docs[0].id} deauthorized — toggles locked`)
 }
 
 async function handleAccountUpdated(

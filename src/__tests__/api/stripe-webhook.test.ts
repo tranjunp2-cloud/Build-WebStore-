@@ -132,13 +132,14 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(res.status).toBe(200) // Still 200 to prevent Stripe retries
     })
 
-    it('[TC-F13.14] skips already processed orders (idempotency)', async () => {
+    it('[TC-F13.34] skips already processed orders (idempotency) — status=new guard', async () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
             data: { id: 'sess_dup', client_reference_id: 'order-dup' },
         })
-        mockFind.mockResolvedValue({ docs: [{ id: 'order-dup', status: 'paid' }] })
+        // Webhook queries WHERE stripeSessionId=X AND status='new' — returns doc means already processed
+        mockFind.mockResolvedValue({ docs: [{ id: 'order-dup', status: 'new' }] })
 
         const res = await POST(createRequest('{}', 'sig_valid'))
         expect(res.status).toBe(200)
@@ -181,7 +182,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
                 id: 'order-fpx',
                 data: expect.objectContaining({
                     paymentMethod: 'fpx',
-                    status: 'paid',
+                    status: 'new',
                 }),
             }),
         )
@@ -222,7 +223,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
                 id: 'order-card',
                 data: expect.objectContaining({
                     paymentMethod: 'card',
-                    status: 'paid',
+                    status: 'new',
                 }),
             }),
         )
@@ -265,6 +266,64 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
                     stripeChargeId: 'ch_test_charge_abc123',
                     stripePaymentIntentId: 'pi_with_charge',
                 }),
+            }),
+        )
+    })
+
+    // ─── TC-F13.87: account.application.deauthorized locks seller toggles ──
+    it('[TC-F13.87] account.application.deauthorized locks stripeOnboardingComplete=false', async () => {
+        // Arrange
+        mockVerify.mockReturnValue({ type: 'account.application.deauthorized' })
+        mockNormalize.mockReturnValue({
+            type: 'account_deauthorized',
+            data: { id: 'acct_revoked' },
+            connectedAccountId: 'acct_revoked',
+        })
+        mockFind.mockResolvedValue({ docs: [{ id: 'tenant-revoked' }] })
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const res = await POST(createRequest('{"account":"acct_revoked"}', 'sig_valid'))
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collection: 'tenants',
+                id: 'tenant-revoked',
+                data: expect.objectContaining({ stripeOnboardingComplete: false }),
+            }),
+        )
+    })
+
+    // ─── TC-F13.33: webhook sets order status to 'new' (architecture contract) ─
+    it('[TC-F13.33] checkout.session.completed sets order status to new', async () => {
+        // Arrange
+        mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
+        mockNormalize.mockReturnValue({
+            type: 'payment_success',
+            data: { id: 'sess_success', client_reference_id: 'order-success', payment_intent: 'pi_success' },
+        })
+        mockFind.mockResolvedValue({ docs: [] }) // Not already processed
+        mockUpdate.mockResolvedValue({})
+        mockFindByID.mockResolvedValue({
+            id: 'order-success',
+            items: [],
+            customerEmail: 'buyer@test.com',
+            orderNumber: 'ORD-SUCCESS-001',
+            tenant: 'tenant-1',
+        })
+
+        // Act
+        const res = await POST(createRequest('{}', 'sig_valid'))
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collection: 'orders',
+                id: 'order-success',
+                data: expect.objectContaining({ status: 'new' }),
             }),
         )
     })
