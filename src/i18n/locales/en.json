@@ -1282,6 +1282,32 @@
         "failClearQR": "Failed to clear QR image setting.",
         "infoTitle": "Payment Method Setup",
         "infoDesc": "Customers will only see enabled payment methods during checkout. For Stripe integration, you'll need to connect your account in the advanced settings."
+      },
+      "shipping": {
+        "title": "Shipping Rates by Region",
+        "subtitle": "Set a flat fee for each Malaysian region. Applied at checkout based on the buyer's selected state.",
+        "westMalaysia": "West Malaysia",
+        "westBadge": "SEMENANJUNG",
+        "eastMalaysia": "East Malaysia",
+        "eastBadge": "SABAH / SARAWAK",
+        "moreStates": "+{count} more",
+        "freeTitle": "Free Shipping Threshold",
+        "freeSubtitle": "Offer free shipping when subtotal reaches a minimum value. Powerful upsell trigger.",
+        "freeMinLabel": "Minimum subtotal for free shipping",
+        "freeHelper": "Buyers spending RM {amount} + ship free to either region.",
+        "livePreview": "Live Preview",
+        "liveSubtotal": "Subtotal",
+        "liveShipping": "Shipping (West Malaysia)",
+        "liveAddMore": "Add {amount} more for FREE shipping",
+        "liveSst": "SST (6%)",
+        "liveBuyerPays": "Buyer pays",
+        "allSaved": "All changes saved",
+        "resetToDefaults": "Reset to Defaults",
+        "saving": "Saving…",
+        "saveChanges": "Save Changes",
+        "savedSuccess": "Shipping settings saved",
+        "saveError": "Failed to save settings",
+        "rateError": "Rate must be 0 – RM 1,000"
       }
     },
     "blog": {
@@ -2967,7 +2993,11 @@
       "invalidImage": "Only JPG / PNG images are accepted",
       "fileTooLarge": "File size must be under 2MB",
       "uploadFailed": "Failed to upload payment proof",
-      "networkError": "Network error. Please try again."
+      "networkError": "Network error. Please try again.",
+      "calculatingShipping": "Calculating…",
+      "retryShipping": "Retry",
+      "estimatedDeliveryEast": "Estimated delivery: 5–7 business days",
+      "freeShippingHint": "Add RM {amount} more for FREE shipping"
     },
     "notFound": {
       "code": "404",

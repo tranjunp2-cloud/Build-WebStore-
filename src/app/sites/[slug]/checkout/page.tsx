@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
+import { MY_STATES } from '@/lib/shipping'
 import { ArrowLeft, CheckCircle, Loader2, ShoppingBag, Upload, X, CreditCard, Banknote, QrCode, AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { useDebounce } from '@/hooks/useDebounce'
+
+type ShippingHint = { tier: 'highlight' | 'neutral'; gap: number }
+type ShippingCalc = { fee: number; isFree: boolean; region: 'west' | 'east'; hint?: ShippingHint }
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -29,12 +34,6 @@ const initialForm: CheckoutForm = {
     line1: '', line2: '', city: '', state: '', postcode: '',
 }
 
-const MY_STATES = [
-    'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka',
-    'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis',
-    'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu',
-]
-
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
 const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
 
@@ -53,6 +52,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [proofPreview, setProofPreview] = useState<string | null>(null)
     const [proofError, setProofError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const [shippingCalc, setShippingCalc] = useState<ShippingCalc | null>(null)
+    const [isCalculatingShipping, setIsCalculatingShipping] = useState(false)
+    const [shippingError, setShippingError] = useState<string | null>(null)
+    const [retryTick, setRetryTick] = useState(0)
+    const requestIdRef = useRef(0)
+    const debouncedState = useDebounce(form.state, 300)
 
     const [isPlacing, setIsPlacing] = useState(false)
     const [orderResult, setOrderResult] = useState<any>(null)
@@ -93,8 +99,53 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     }, [slug])
 
     const currency = items[0]?.currency || 'MYR'
-    const sub = subtotal()
-    const shippingFee = sub > 0 ? 10 : 0 // Flat RM10 shipping
+    const sub = useMemo(() => subtotal(), [items])
+
+    // Debounced shipping calc — latest-request-wins via requestIdRef
+    useEffect(() => {
+        if (!siteId || !debouncedState) {
+            setShippingCalc(null)
+            setShippingError(null)
+            return
+        }
+        const reqId = ++requestIdRef.current
+        let cancelled = false
+        setIsCalculatingShipping(true)
+        setShippingError(null)
+
+        const attempt = async (isRetry: boolean): Promise<void> => {
+            try {
+                const res = await fetch('/api/orders/calculate-shipping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ siteId, state: debouncedState, subtotalSen: Math.round(sub * 100) }),
+                })
+                const json = await res.json()
+                if (cancelled || reqId !== requestIdRef.current) return
+                if (!res.ok || !json.success) throw new Error(json?.error?.message ?? 'Calc failed')
+                setShippingCalc(json.data as ShippingCalc)
+                setIsCalculatingShipping(false)
+            } catch (err) {
+                if (cancelled || reqId !== requestIdRef.current) return
+                if (!isRetry) {
+                    setTimeout(() => { if (!cancelled) void attempt(true) }, 1000)
+                    return
+                }
+                setShippingError((err as Error).message || 'Failed to calculate shipping')
+                setIsCalculatingShipping(false)
+            }
+        }
+        void attempt(false)
+        return () => { cancelled = true }
+    }, [debouncedState, siteId, sub, retryTick])
+
+    const retryShipping = () => {
+        setShippingError(null)
+        setIsCalculatingShipping(true)
+        setRetryTick(t => t + 1)
+    }
+
+    const shippingFee = shippingCalc?.fee != null ? shippingCalc.fee / 100 : 0
     const tax = Math.round(sub * 0.06 * 100) / 100
     const total = sub + shippingFee + tax
 
@@ -141,6 +192,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         siteId !== '' &&
         form.name.trim() && form.email.trim() &&
         items.length > 0 &&
+        !!form.state &&
+        shippingCalc !== null &&
+        !isCalculatingShipping &&
+        !shippingError &&
         (paymentMethod === 'cod' || (paymentMethod === 'qr_banking' && proofFile))
 
     const handlePlaceOrder = async () => {
@@ -370,11 +425,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                     onChange={e => updateField('state', e.target.value)}
                                     style={{ ...inputStyle, color: form.state ? '#111' : '#9ca3af' }}>
                                     <option value="">{ck.state}</option>
-                                    {MY_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    {[...MY_STATES].sort().map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
                             </div>
                             <input placeholder={ck.postcode} value={form.postcode}
                                 onChange={e => updateField('postcode', e.target.value)}
+                                inputMode="numeric" pattern="\d{5}"
                                 style={{ ...inputStyle, maxWidth: '200px' }} />
                         </div>
                     </section>
@@ -589,9 +645,40 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             <span style={{ color: '#666' }}>{ck.subtotal}</span>
                             <span>{formatPrice(sub, currency)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
-                            <span style={{ color: '#666' }}>{ck.shipping}</span>
-                            <span>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
+                        <div style={{ marginBottom: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                                <span style={{ color: '#666' }}>{ck.shipping}</span>
+                                <span>
+                                    {isCalculatingShipping ? (
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#9ca3af' }}>
+                                            <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> {ck.calculatingShipping}
+                                        </span>
+                                    ) : shippingError ? (
+                                        <button type="button" onClick={retryShipping}
+                                            style={{ color: '#dc2626', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}>
+                                            {ck.retryShipping}
+                                        </button>
+                                    ) : shippingCalc?.isFree ? (
+                                        <span style={{ color: '#16a34a', fontWeight: 600 }}>🎉 FREE</span>
+                                    ) : (
+                                        <span>{formatPrice(shippingFee, currency)}</span>
+                                    )}
+                                </span>
+                            </div>
+                            {shippingCalc?.hint && (
+                                <p style={{
+                                    margin: '4px 0 0', fontSize: '12px',
+                                    color: shippingCalc.hint.tier === 'highlight' ? '#d97706' : '#9ca3af',
+                                    fontWeight: shippingCalc.hint.tier === 'highlight' ? 500 : 400,
+                                }}>
+                                    💡 {ck.freeShippingHint.replace('{amount}', (shippingCalc.hint.gap / 100).toFixed(2))}
+                                </p>
+                            )}
+                            {shippingCalc?.region === 'east' && (
+                                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#9ca3af' }}>
+                                    {ck.estimatedDeliveryEast}
+                                </p>
+                            )}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
                             <span style={{ color: '#666' }}>{ck.sst}</span>

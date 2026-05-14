@@ -71,11 +71,13 @@ Adding a new collection requires: Payload config + migration in `scripts/db-setu
 - **Builder store** (`src/store/builderStore.ts`) — Zustand store for in-memory page tree. Gold-standard test: `src/__tests__/unit/builder/builder-store.test.ts`.
 - **Stores** (`src/store/`) — `builderStore`, `cartStore`, `editorStore`, `notificationStore` (Zustand).
 - **Auth** (`src/app/api/auth/`, `src/lib/auth.ts`) — JWT + Payload session, OTP via AWS SES. SSO provisioning at `src/app/api/v1/sso/`.
+- **Shipping** (`src/lib/shipping/`) — F14 flat-rate Malaysia shipping. Modules: `constants.ts` (region defs, defaults, MY_STATES enum), `classify-region.ts` (state→region via isEastState), `calculate-fee.ts` (config + state + subtotal → fee + hint), `types.ts` (ShippingConfig/ShippingHint). APIs: `GET /api/sites/:siteId/shipping-config` (public read), `PATCH /api/sites/:siteId/shipping-config` (authed write), `POST /api/orders/calculate-shipping` (public calc with integer guard). Dashboard settings page at `src/app/(dashboard)/settings/shipping/`. See `docs/architecture/F14-shipping.md`.
 - **Images / S3** (`src/lib/images/`, Payload plugin-cloud-storage) — upload via AWS SDK v3 to DO Spaces-compatible S3.
 - **Email** (`src/lib/email/send.ts`) — Custom utility over `payload.sendEmail()`. See `.claude/rules/email-smtp.md`.
 - **Test harness** (`scripts/test-harness/`) — E2E page-gen regression harness with Playwright visual diff.
 - **Template drift validator** (`src/lib/ai/template-drift-validator.ts`) — scans TS presets + DB templates against live block registry; CI gate + post-deploy preflight. Paired with `block-schema-version.ts` hash stamped on seed.
 - **Templates health dashboard** (`src/app/(dashboard)/templates-health/`) — super-admin page surfacing per-template drift badges + re-seed/re-harness buttons.
+- **E2E shipping tests** (`e2e/f14-shipping.spec.ts`) — F14 API route reachability + auth validation (RF-03).
 
 ## Notable patterns
 

@@ -1282,6 +1282,32 @@
         "failClearQR": "Gagal memadam tetapan imej QR.",
         "infoTitle": "Tetapan Kaedah Pembayaran",
         "infoDesc": "Pelanggan hanya akan melihat kaedah pembayaran yang diaktifkan semasa pembayaran. Untuk integrasi Stripe, anda perlu menyambungkan akaun anda dalam tetapan lanjutan."
+      },
+      "shipping": {
+        "title": "Kadar Penghantaran mengikut Wilayah",
+        "subtitle": "Tetapkan bayaran rata untuk setiap wilayah Malaysia. Digunakan semasa pembayaran berdasarkan negeri pembeli.",
+        "westMalaysia": "Malaysia Barat",
+        "westBadge": "SEMENANJUNG",
+        "eastMalaysia": "Malaysia Timur",
+        "eastBadge": "SABAH / SARAWAK",
+        "moreStates": "+{count} lagi",
+        "freeTitle": "Had Penghantaran Percuma",
+        "freeSubtitle": "Tawarkan penghantaran percuma apabila jumlah kecil mencapai nilai minimum. Pencetus upsell yang berkesan.",
+        "freeMinLabel": "Jumlah kecil minimum untuk penghantaran percuma",
+        "freeHelper": "Pembeli yang berbelanja RM {amount} + penghantaran percuma ke mana-mana wilayah.",
+        "livePreview": "Pratonton Langsung",
+        "liveSubtotal": "Jumlah Kecil",
+        "liveShipping": "Penghantaran (Malaysia Barat)",
+        "liveAddMore": "Tambah {amount} lagi untuk penghantaran PERCUMA",
+        "liveSst": "SST (6%)",
+        "liveBuyerPays": "Pembeli bayar",
+        "allSaved": "Semua perubahan disimpan",
+        "resetToDefaults": "Set Semula ke Lalai",
+        "saving": "Menyimpan…",
+        "saveChanges": "Simpan Perubahan",
+        "savedSuccess": "Tetapan penghantaran disimpan",
+        "saveError": "Gagal menyimpan tetapan",
+        "rateError": "Kadar mestilah 0 – RM 1,000"
       }
     },
     "blog": {
@@ -2967,7 +2993,11 @@
       "invalidImage": "Hanya imej JPG / PNG diterima",
       "fileTooLarge": "Saiz fail mestilah kurang daripada 2MB",
       "uploadFailed": "Gagal memuat naik bukti pembayaran",
-      "networkError": "Ralat rangkaian. Sila cuba lagi."
+      "networkError": "Ralat rangkaian. Sila cuba lagi.",
+      "calculatingShipping": "Mengira…",
+      "retryShipping": "Cuba semula",
+      "estimatedDeliveryEast": "Anggaran penghantaran: 5–7 hari bekerja",
+      "freeShippingHint": "Tambah RM {amount} lagi untuk penghantaran PERCUMA"
     },
     "notFound": {
       "code": "404",

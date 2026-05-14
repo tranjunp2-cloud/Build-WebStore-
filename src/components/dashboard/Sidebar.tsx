@@ -90,6 +90,7 @@ const NAV_ITEMS: NavItemConfig[] = [
         children: [
             { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
             { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff' },
+            { label: { en: 'Shipping', ms: 'Penghantaran' }, href: '/settings/shipping' },
             { label: { en: 'Account profile', ms: 'Profil Akaun' }, href: '/settings/profile' },
         ],
     },

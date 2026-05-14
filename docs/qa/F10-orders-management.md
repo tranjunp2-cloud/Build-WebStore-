@@ -166,6 +166,14 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10-05-05** | `[UI State]` | Loading skeleton tren Mobile | 1. Lam cham mang, mo Orders tren Mobile. | - Skeleton Card hien thi thay vi trang trang. | Medium | [ ] |
 | **TC-F10-05-06** | `[Mobile]` | Stats Bar responsive tren Mobile | 1. Xem trang Orders tren man 375px. | - Stats Bar cac the (Pending, Confirmed...) co gian hoac xep thanh 2 hang, khong tran ngang. | Medium | [ ] |
 
+#### Nhom 6 — Checkout API Security (F14 Bug Fixes)
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-06-01** | `[Security]` | Chan cross-tenant product trong checkout | 1. Goi `POST /api/orders/checkout` voi productId thuoc site khac. | - Tra ve **HTTP 404 PRODUCT_NOT_FOUND**.<br>- Khong lo thong tin product ton tai o tenant khac. | Blocker | [x] |
+| **TC-F10-06-02** | `[Security]` | Dedup items — ngan vuot stock qua split quantity | 1. Goi checkout voi 2 dong cung productId, moi dong qty=2, stock=3.<br>2. Tong qty=4 > stock=3. | - Tra ve **HTTP 422 OUT_OF_STOCK**.<br>- Khong cho dat hang voi tong so luong vuot stock. | Blocker | [x] |
+| **TC-F10-06-03** | `[Func]` | Dedup items — gop thanh 1 dong trong order | 1. Goi checkout voi 2 dong cung productId qty=2 va qty=3, stock=10. | - Don tao ra chi co **1 dong** cho product do voi quantity=5.<br>- Tong tien tinh dung. | High | [x] |
+
 ---
 
 ## 4. Bien Ban Kiem Dinh — 10-Point Checklist (Sign-Off)
