@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, EyeOff } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
+import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
@@ -233,15 +234,17 @@ type NavCTAButtonProps = {
 
 /** Desktop CTA button — gradient bg + min-h 44px (WCAG 2.5.5). */
 function NavCTAButton({
-    href = '#',
+    href: rawHref = '#',
     label,
     className = 'hidden sm:inline-flex px-5 py-2.5',
     onClick,
 }: NavCTAButtonProps) {
     const cls = `${className} rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
+    const isBroken = rawHref.startsWith(BROKEN_URL_PREFIX)
+    const href = isBroken ? '#' : rawHref
     const isExternal = href.startsWith('http://') || href.startsWith('https://')
     return (
-        <BrokenLinkWarning url={href}>
+        <BrokenLinkWarning url={rawHref}>
             <motion.a
                 href={href}
                 {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
@@ -258,7 +261,8 @@ function NavCTAButton({
 }
 
 /** Mobile drawer CTA — full-width, centered, min-h 44px. */
-function NavMobileCTAButton({ href = '#', label, onClick }: { href?: string; label: string; onClick?: () => void }) {
+function NavMobileCTAButton({ href: rawHref = '#', label, onClick }: { href?: string; label: string; onClick?: () => void }) {
+    const href = rawHref.startsWith(BROKEN_URL_PREFIX) ? '#' : rawHref
     return (
         <a
             href={href}

@@ -3,6 +3,7 @@ import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import {
+    BROKEN_URL_PREFIX,
     HOMEPAGE_ALIASES,
     buildSlugCanonicalMap,
     resolveInternalUrlPath,
@@ -283,6 +284,18 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             })
     }
 
+    // In editor mode: when rewriteUrl cannot resolve an internal path (returns '#'),
+    // prefix with '_broken_url_:' so BrokenLinkWarning can detect the broken link.
+    // On live site or for external/anchor URLs this is a no-op.
+    const markBrokenUrl = (original: string | undefined, rewritten: string): string => {
+        if (!isEditor || rewritten !== '#') return rewritten
+        const trimmed = (original ?? '').trim()
+        if (!trimmed || trimmed === '#' || trimmed.startsWith('#')) return rewritten
+        if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('//')) return rewritten
+        if (!trimmed.startsWith('/')) return rewritten
+        return `${BROKEN_URL_PREFIX}${trimmed}`
+    }
+
     const blocks = rawBlocks.map((b) => {
         if (b.blockType === 'navigation') {
             const rawCta = b.ctaButton as { show?: boolean; url?: string; [k: string]: unknown } | null | undefined
@@ -292,7 +305,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 ctaButton: rawCta
                     ? isHiddenSlug(rawCta.url)
                         ? { ...rawCta, show: false }
-                        : { ...rawCta, url: rewriteUrl(rawCta.url) }
+                        : { ...rawCta, url: markBrokenUrl(rawCta.url, rewriteUrl(rawCta.url)) }
                     : b.ctaButton,
             }
         }
@@ -301,7 +314,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 ...b,
                 ctaButtons: b.ctaButtons
                     .filter((btn) => !isHiddenSlug(btn?.url))
-                    .map((btn) => ({ ...btn, url: rewriteUrl(btn?.url) })),
+                    .map((btn) => ({ ...btn, url: markBrokenUrl(btn?.url, rewriteUrl(btn?.url)) })),
             }
         }
         if (b.blockType === 'cta') {
@@ -309,8 +322,8 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             const secUrl = b.secondaryCtaUrl as string | undefined
             return {
                 ...b,
-                ctaUrl: isHiddenSlug(ctaUrl) ? '' : rewriteUrl(ctaUrl),
-                secondaryCtaUrl: isHiddenSlug(secUrl) ? '' : rewriteUrl(secUrl),
+                ctaUrl: isHiddenSlug(ctaUrl) ? '' : markBrokenUrl(ctaUrl, rewriteUrl(ctaUrl)),
+                secondaryCtaUrl: isHiddenSlug(secUrl) ? '' : markBrokenUrl(secUrl, rewriteUrl(secUrl)),
             }
         }
         if (b.blockType === 'breadcrumb') {
