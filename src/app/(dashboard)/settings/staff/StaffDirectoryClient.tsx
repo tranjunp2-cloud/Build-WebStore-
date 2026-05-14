@@ -140,7 +140,7 @@ export function StaffDirectoryClient({
                 <div className="overflow-x-auto mt-[24px]">
                     <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
-                                <tr>
+                            <tr>
                                 <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.nameEmail || 'NAME / EMAIL'}</th>
                                 <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.role || 'ROLE'}</th>
                                 <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.status || 'STATUS'}</th>

@@ -38,11 +38,10 @@ test.describe('Settings', () => {
         await page.waitForLoadState('networkidle')
 
         const headerCells = page.locator('table thead th')
-        const count = await headerCells.count()
-        if (count > 0) {
-            // Verify border-bottom inline style applied to th (not relying on Tailwind divide utility)
-            await expect(headerCells.first()).toHaveCSS('border-bottom-style', 'solid')
-        }
+        // Table must be present — fail fast if staff table didn't render
+        await expect(headerCells).not.toHaveCount(0)
+        // Verify border-bottom inline style applied to th (not relying on Tailwind divide utility)
+        await expect(headerCells.first()).toHaveCSS('border-bottom-style', 'solid')
     })
 
     test('[TC-F13.03] payment settings page loads', async ({ page }) => {
