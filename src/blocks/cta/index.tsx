@@ -60,8 +60,10 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
     const shouldReduce = useReducedMotion()
     const isOwner = useIsOwner()
     if (!url) return null
+    const isBrokenUrl = url.startsWith('_broken_url_:')
+    const href = isBrokenUrl ? '#' : url
     const isPrimary = style === 'primary'
-    const linkAttrs = getLinkAttrs(url)
+    const linkAttrs = getLinkAttrs(href)
 
     const buttonStyle: React.CSSProperties = isPrimary
         ? onInverseBg
@@ -98,7 +100,7 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
     if (shouldReduce) {
         return (
             <BrokenLinkWarning url={url} rounded="rounded-md">
-                <a href={url} {...linkAttrs} onClick={handleClick} className={`${btnCls} hover:opacity-90`} style={buttonStyle}>
+                <a href={href} {...linkAttrs} onClick={handleClick} className={`${btnCls} hover:opacity-90`} style={buttonStyle}>
                     {labelNode}
                 </a>
             </BrokenLinkWarning>
@@ -107,7 +109,7 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
 
     return (
         <BrokenLinkWarning url={url} rounded="rounded-md">
-            <motion.a href={url} {...linkAttrs} onClick={handleClick} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className={btnCls} style={buttonStyle}>
+            <motion.a href={href} {...linkAttrs} onClick={handleClick} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }} className={btnCls} style={buttonStyle}>
                 {labelNode}
             </motion.a>
         </BrokenLinkWarning>
@@ -120,7 +122,9 @@ function CTAButton({ label, url, style, variant, siteId, onInverseBg = false }: 
 function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string; url: string; siteId?: string; onInverseBg?: boolean }) {
     const shouldReduce = useReducedMotion()
     const isOwner = useIsOwner()
-    const linkAttrs = getLinkAttrs(url)
+    const isBrokenUrl = url.startsWith('_broken_url_:')
+    const href = isBrokenUrl ? '#' : url
+    const linkAttrs = getLinkAttrs(href)
 
     const handleClick = () => {
         if (siteId) trackEvent({ siteId, event: 'click', metadata: { label, url, role: 'secondary' }, isOwner })
@@ -134,7 +138,7 @@ function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string
     if (shouldReduce) {
         return (
             <BrokenLinkWarning url={url} rounded="rounded-md">
-                <a href={url} {...linkAttrs} onClick={handleClick} className={cls} style={style}>
+                <a href={href} {...linkAttrs} onClick={handleClick} className={cls} style={style}>
                     <RichText text={label} as="span" />
                 </a>
             </BrokenLinkWarning>
@@ -142,7 +146,7 @@ function SecondaryCTAButton({ label, url, siteId, onInverseBg }: { label: string
     }
     return (
         <BrokenLinkWarning url={url} rounded="rounded-md">
-            <motion.a href={url} {...linkAttrs} onClick={handleClick} whileHover={{ x: 3 }} className={cls} style={style}>
+            <motion.a href={href} {...linkAttrs} onClick={handleClick} whileHover={{ x: 3 }} className={cls} style={style}>
                 <RichText text={label} as="span" />
             </motion.a>
         </BrokenLinkWarning>

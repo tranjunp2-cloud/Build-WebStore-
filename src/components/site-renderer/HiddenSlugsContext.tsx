@@ -23,6 +23,10 @@ export function useIsHiddenLink(url: string | undefined): boolean {
     const trimmed = url.trim()
     if (!trimmed || trimmed === '#') return false
 
+    // Non-existent internal URL — marked by SiteRenderer when rewritePreviewUrl
+    // cannot resolve a path to any known page (falls back to '#' instead).
+    if (trimmed.startsWith('_broken_url_:')) return true
+
     // Editor preview URLs: /preview/{siteId}?pageId={id}
     if (pageIds.size && trimmed.includes('pageId=')) {
         try {

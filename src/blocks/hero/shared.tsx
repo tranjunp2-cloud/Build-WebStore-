@@ -42,11 +42,14 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
     return (
         <div className="flex flex-wrap gap-4">
             {buttons.map((btn, i) => {
-                const isExternal = !!btn?.url && (btn.url.startsWith('http://') || btn.url.startsWith('https://'))
+                const rawUrl = btn?.url
+                const isBroken = rawUrl?.startsWith('_broken_url_:')
+                const href = isBroken ? '#' : (rawUrl || '#')
+                const isExternal = !isBroken && !!rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))
                 return (
-                <BrokenLinkWarning key={i} url={btn?.url} rounded="rounded-xl">
+                <BrokenLinkWarning key={i} url={rawUrl} rounded="rounded-xl">
                 <motion.a
-                    href={btn?.url}
+                    href={href}
                     {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     onClick={() => {
                         if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' }, isOwner })
