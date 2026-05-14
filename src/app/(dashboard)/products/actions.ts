@@ -88,7 +88,9 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
     }
 }
 
-export async function updateProductFieldAction(id: string | number, data: unknown) {
+export async function updateProductFieldAction(id: string | number, data: unknown, opts?: { overrideAccess?: boolean }) {
+    if (!id && id !== 0) throw new Error('Invalid product ID')
+
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
@@ -98,6 +100,7 @@ export async function updateProductFieldAction(id: string | number, data: unknow
         id,
         data: data as Record<string, unknown>,
         user,
+        overrideAccess: opts?.overrideAccess ?? false,
     })
     return JSON.parse(JSON.stringify(res))
 }

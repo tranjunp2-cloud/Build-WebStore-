@@ -940,6 +940,7 @@
           "priceMax": "Price is too large",
           "stockMin": "Stock must be 0 or greater",
           "stockMax": "Stock is too large",
+          "urlSlugRequired": "URL Slug is required",
           "urlSlugMin": "URL Slug is too short",
           "urlSlugMax": "URL Slug is too long",
           "urlSlugInvalid": "Slug must be lowercase alphanumeric with hyphens",
