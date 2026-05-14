@@ -11,7 +11,7 @@ export function checkHiddenPageUrl(url: string | undefined, pages?: PageData[]):
     if (!resolvedPath) return false
     const match = pages.find(p => {
         const s = (p.slug ?? '').trim()
-        const pagePath = ((p as { isHomepage?: boolean }).isHomepage || !s || s === '/' || s === 'home') ? '/' : (s.startsWith('/') ? s : `/${s}`)
+        const pagePath = ((p as { isHomepage?: boolean }).isHomepage || !s || s === '/') ? '/' : (s.startsWith('/') ? s : `/${s}`)
         return pagePath === resolvedPath
     })
     if (!match) return 'not-found'

@@ -243,8 +243,12 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     const showIndicators = isEditor && (isEditorIframe || isBuilderPreview)
     // Filter hidden pages from nav/CTA/footer links:
     //   - Builder/editor mode (showIndicators): keep all, indicators handle the warning
-    //   - Page Preview, live site visitor: filter hidden pages
-    //   - Live site owner: keep all (owner can access hidden pages per spec)
+    //   - Page Preview (isEditor=true, no iframe): isEditor short-circuits → warnSlugs (filters)
+    //   - Live site visitor (!isOwner): !isOwner → warnSlugs (filters)
+    //   - Live site owner (isOwner=true): both conditions false → empty (owner sees all)
+    // IMPORTANT: isOwner must always originate from server-side auth. SiteRenderer has no
+    // internal enforcement — any caller that passes isOwner=true without auth check would
+    // silently expose hidden link slugs in rendered HTML.
     const hiddenSlugs = showIndicators ? new Set<string>() : (isEditor || !isOwner) ? warnSlugs : new Set<string>()
     // Mark hidden nav links with _hiddenFromVisitor flag (EyeOff indicator) — builder mode only.
     const markHiddenLinks = showIndicators && warnSlugs.size > 0

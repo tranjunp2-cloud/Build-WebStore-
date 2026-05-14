@@ -744,6 +744,80 @@ describe('[TC-F05-959-04] SiteRenderer footer hidden-page link filtering', () =>
         const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
         expect(cols[0].links.map(l => l.label)).toEqual(['Home'])
     })
+
+    it('TC-F05-959-04d: footer links to draft pages are filtered for visitors', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Draft Page', url: '/draft' },
+                { label: 'About', url: '/about' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/draft', isVisible: true, status: 'draft' },
+            { id: '3', slug: '/about', isVisible: true, status: 'published' },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home', 'About'])
+    })
+
+    it('TC-F05-959-04e: footer links in editor iframe are not filtered but stamped _hiddenFromVisitor', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Hidden Page', url: '/hidden' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/hidden', isVisible: false },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isEditor={true}
+                isEditorIframe={true}
+                isOwner={true}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string; _hiddenFromVisitor?: boolean }> }>
+        // Both links present (not filtered)
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home', 'Hidden Page'])
+        // Hidden page link gets the indicator flag
+        expect(cols[0].links[1]._hiddenFromVisitor).toBe(true)
+        expect(cols[0].links[0]._hiddenFromVisitor).toBeFalsy()
+    })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
