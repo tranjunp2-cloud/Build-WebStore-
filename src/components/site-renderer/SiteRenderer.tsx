@@ -254,12 +254,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     // Indicators (EyeOff, BrokenLinkWarning) only active inside the page editor iframe
     // or AI Builder. Page Preview and live site both render clean — no editor indicators.
     const showIndicators = isEditor && (isEditorIframe || isBuilderPreview)
-    // Filter hidden pages from nav/CTA links:
-    //   - Builder mode (showIndicators): keep all, indicators handle the warning
-    //   - Page Preview (isEditor, no builder): filter like a visitor
-    //   - Live site visitor (!isOwner): filter
-    //   - Live site owner: keep all (owner can access hidden pages)
-    const hiddenSlugs = showIndicators ? new Set<string>() : (isEditor || !isOwner) ? warnSlugs : new Set<string>()
+    // Filter hidden pages from nav/CTA links for everyone except editor indicator mode.
+    // Owner accesses hidden pages via editor preview, not via live site.
+    const hiddenSlugs = showIndicators ? new Set<string>() : warnSlugs
     // Mark hidden nav links with _hiddenFromVisitor flag (EyeOff indicator) — builder mode only.
     const markHiddenLinks = showIndicators && warnSlugs.size > 0
 
