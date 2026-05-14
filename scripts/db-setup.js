@@ -175,6 +175,10 @@ const MIGRATIONS = [
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS locale varchar DEFAULT 'ms';`,
   },
   {
+    name: 'sites.shipping_config_enabled',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_enabled boolean DEFAULT true;`,
+  },
+  {
     name: 'sites.shipping_config_west_rate',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_west_rate numeric DEFAULT 800;`,
   },

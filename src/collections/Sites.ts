@@ -333,6 +333,12 @@ export const Sites: CollectionConfig = {
             admin: { description: 'Shipping rates for Malaysia regions' },
             fields: [
                 {
+                    name: 'enabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Enable shipping calculation. If off, shipping fee = 0' },
+                },
+                {
                     name: 'westRate',
                     type: 'number',
                     defaultValue: 800,

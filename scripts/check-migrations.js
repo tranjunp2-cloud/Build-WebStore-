@@ -131,7 +131,7 @@ function getNewFieldsFromDiff() {
 }
 
 // Known Payload group field prefixes — only strip these when matching migrations
-const KNOWN_GROUP_PREFIXES = ['theme', 'seo', 'payments', 'badge', 'ai_generation_metadata']
+const KNOWN_GROUP_PREFIXES = ['theme', 'seo', 'payments', 'badge', 'ai_generation_metadata', 'shipping_config']
 
 function getMigrationColumns() {
   const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')

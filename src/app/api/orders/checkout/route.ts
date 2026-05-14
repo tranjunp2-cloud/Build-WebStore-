@@ -3,6 +3,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
+import { getShippingRate } from '@/lib/shipping'
+
+export const maxDuration = 60
 
 /**
  * POST /api/orders/checkout
@@ -17,6 +20,18 @@ export async function POST(request: Request) {
         if (errorResponse) return errorResponse
 
         const { siteId, items, customer, paymentMethod, paymentProofImage } = data!
+
+        // Aggregate duplicate (productId, variant) pairs before validation (prevents stock bypass via split quantities)
+        const itemMap: Record<string, { productId: string | number; quantity: number; variant?: string }> = {}
+        for (const item of items) {
+            const key = `${String(item.productId)}:${item.variant ?? ''}`
+            if (itemMap[key]) {
+                itemMap[key].quantity += item.quantity
+            } else {
+                itemMap[key] = { ...item }
+            }
+        }
+        const aggregatedItems = Object.values(itemMap)
 
         const payload = await getPayload({ config })
 
@@ -37,14 +52,25 @@ export async function POST(request: Request) {
         let subtotal = 0
         let currency = 'MYR'
 
-        for (const item of items) {
+        for (const item of aggregatedItems) {
             const productLookupId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
-            const product = await payload.findByID({
+            // RF-01: filter by site, active status, and non-deleted — overrideAccess so the explicit where clause is the sole gate
+            const productResult = await payload.find({
                 collection: 'products',
-                id: productLookupId,
+                where: {
+                    and: [
+                        { id: { equals: productLookupId } },
+                        { site: { equals: siteLookupId } },
+                        { status: { equals: 'active' } },
+                        { deletedAt: { exists: false } },
+                    ],
+                },
+                limit: 1,
                 depth: 0,
+                overrideAccess: true,
             })
 
+            const product = productResult.docs[0]
             if (!product) {
                 return NextResponse.json(
                     { success: false, error: { code: 'PRODUCT_NOT_FOUND', message: `Product ${item.productId} not found` } },
@@ -54,16 +80,16 @@ export async function POST(request: Request) {
 
             const p = product as any
 
-            // Check stock
-            if (p.stock !== undefined && p.stock !== null && p.stock < item.quantity) {
+            // Check stock — top-level field in Products collection is `inventory` (variants have per-variant `stock`)
+            if (p.inventory !== undefined && p.inventory !== null && p.inventory < item.quantity) {
                 return NextResponse.json(
                     {
                         success: false,
                         error: {
                             code: 'OUT_OF_STOCK',
-                            message: `"${p.name}" has only ${p.stock} left in stock`,
+                            message: `"${p.name}" has only ${p.inventory} left in stock`,
                             product: p.name,
-                            available: p.stock,
+                            available: p.inventory,
                             requested: item.quantity,
                         },
                     },
@@ -91,11 +117,24 @@ export async function POST(request: Request) {
             )
         }
 
+        // State is required for shipping calculation — Zod enum already blocks invalid/empty values, this guards undefined
+        if (!customer.address?.state) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Please select a valid state' } },
+                { status: 422 }
+            )
+        }
+
         // Generate order number
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
 
-        // Tax (SST 6% for Malaysia)
-        const shippingFee = 10 // Flat RM10 shipping
+        // Shipping: rates stored in sen, subtotal is RM-float → convert for calc, result back to RM
+        // PR note: subtotal is RM-float (p.price * qty); shippingConfig rates are in sen (800 = RM 8)
+        const subtotalSen = Math.round(subtotal * 100)
+        const shippingFeeSen = getShippingRate(customer.address.state, (site as any).shippingConfig, subtotalSen)
+        const shippingFee = shippingFeeSen / 100
+
+        // Tax (SST 6% on subtotal only — BR-05)
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + shippingFee + tax
 
@@ -110,7 +149,7 @@ export async function POST(request: Request) {
                 subtotal,
                 shippingFee,
                 tax,
-                total: subtotal + shippingFee + tax,
+                total,
                 currency,
                 status: 'pending',
                 paymentMethod,
@@ -129,20 +168,21 @@ export async function POST(request: Request) {
             } as any,
         })
 
-        // Decrement stock for COD orders (immediate commitment)
-        for (const item of items) {
+        // Decrement inventory immediately for all manual payment methods
+        for (const item of aggregatedItems) {
             try {
                 const product = await payload.findByID({
                     collection: 'products',
                     id: item.productId,
                     depth: 0,
+                    overrideAccess: true,
                 })
                 const p = product as any
-                if (p.stock !== undefined && p.stock !== null) {
+                if (p.inventory !== undefined && p.inventory !== null) {
                     await payload.update({
                         collection: 'products',
                         id: item.productId,
-                        data: { stock: Math.max(0, p.stock - item.quantity) } as any,
+                        data: { inventory: Math.max(0, p.inventory - item.quantity) } as any,
                     })
                 }
             } catch (err) {
