@@ -323,7 +323,10 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // Mirror nav header links so minimal footer stays in sync with navigation.
     // Falls back to columns[0] if no header links configured.
     if (variant === 'minimal') {
-        const navHeaderLinks = ((site?.headerBlock as Record<string, unknown> | undefined)?.links as { label?: string; url?: string }[] | undefined)?.filter(l => l?.url)
+        // Prefer _filteredNavLinks (injected by SiteRenderer/SiteLayoutShell with hidden pages filtered/marked)
+        // over raw site.headerBlock.links to prevent hidden-page links leaking to visitors.
+        const filteredNavLinks = (block as Record<string, unknown>)._filteredNavLinks as { label?: string; url?: string; _hiddenFromVisitor?: boolean }[] | undefined
+        const navHeaderLinks = (filteredNavLinks ?? (site?.headerBlock as Record<string, unknown> | undefined)?.links as { label?: string; url?: string }[] | undefined)?.filter(l => l?.url)
         const firstColLinks = (navHeaderLinks?.length ? navHeaderLinks : columns[0]?.links) || []
 
         return (
@@ -346,9 +349,10 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                         href={link?.url}
                                         target={ext ? '_blank' : undefined}
                                         rel={ext ? 'noopener noreferrer' : undefined}
-                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                                     >
                                         <Body size="small" as="span">{link.label}</Body>
+                                        {(link as { _hiddenFromVisitor?: boolean })._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
                                     </a>
                                     )
                                 })}

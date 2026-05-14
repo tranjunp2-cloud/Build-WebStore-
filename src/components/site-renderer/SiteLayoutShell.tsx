@@ -124,7 +124,11 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
         : null
 
     const footerBlock: Record<string, unknown> | null = rawFooter
-        ? { ...rawFooter, columns: rewriteFooterColumns(rawFooter.columns, rewriteUrl, hiddenSlugs, slugCanonical) }
+        ? {
+            ...rawFooter,
+            columns: rewriteFooterColumns(rawFooter.columns, rewriteUrl, hiddenSlugs, slugCanonical),
+            _filteredNavLinks: rewriteNavLinks(rawHeader?.links, rewriteUrl, hiddenSlugs, slugCanonical),
+        }
         : null
 
     const renderBlock = (block: Record<string, unknown>, blockType: string) => {

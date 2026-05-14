@@ -407,9 +407,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             }
         }
         if (b.blockType === 'footer') {
+            const rawSiteHeaderLinks = (site?.headerBlock as Record<string, unknown> | undefined)?.links
             return {
                 ...b,
                 columns: rewriteFooterColumns(b.columns),
+                _filteredNavLinks: rewriteNavLinks(rawSiteHeaderLinks),
             }
         }
         if (b.blockType === 'cta' && b.ctaButton && typeof b.ctaButton === 'object') {

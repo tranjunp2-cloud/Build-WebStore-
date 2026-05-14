@@ -239,7 +239,7 @@ function NavCTAButton({
     className = 'hidden sm:inline-flex px-5 py-2.5',
     onClick,
 }: NavCTAButtonProps) {
-    const cls = `${className} rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
+    const cls = `${className} rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
     const isBroken = rawHref.startsWith(BROKEN_URL_PREFIX)
     const href = isBroken ? '#' : rawHref
     const isExternal = href.startsWith('http://') || href.startsWith('https://')
@@ -266,7 +266,7 @@ function NavMobileCTAButton({ href: rawHref = '#', label, onClick }: { href?: st
     return (
         <a
             href={href}
-            className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
+            className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
             style={{ background: CTA_GRADIENT_BACKGROUND }}
             onClick={onClick}
         >
@@ -619,7 +619,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                 <div className="p-6">
                                     <a
                                         href={ctaButton.url || '#'}
-                                        className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
+                                        className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
                                         style={CTA_GRADIENT_STYLE}
                                         onClick={() => setIsOpen(false)}
                                     >
@@ -925,7 +925,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                     {ctaButton?.show && (
                         <a
                             href={ctaButton.url || '#'}
-                            className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
+                            className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
                             style={{ background: CTA_GRADIENT_BACKGROUND }}
                         >
                             {ctaButton.label}
@@ -969,7 +969,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                             {ctaButton?.show && (
                                 <a
                                     href={ctaButton.url || '#'}
-                                    className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
+                                    className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white no-underline text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
                                     style={{ background: CTA_GRADIENT_BACKGROUND }}
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
