@@ -36,7 +36,7 @@ test.describe('F05 page visibility sync', () => {
         if (deletedNavLink) await expect(deletedNavLink).toHaveCount(0)
     })
 
-    test('[TC-F05-02-12] visitor direct URL for hidden page returns HTTP 404', async ({ request }) => {
+    test('[TC-F05-02-13] visitor direct URL for hidden page returns HTTP 404', async ({ request }) => {
         test.skip(!siteSlug || !hiddenPath, 'Set E2E_F05_SITE_SLUG and E2E_F05_HIDDEN_PATH to run this regression')
 
         // Arrange
