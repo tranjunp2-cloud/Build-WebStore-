@@ -54,9 +54,8 @@ export const productQuickViewMeta = {
     defaultVariant: 'grid',
     editableFields: ['headline', 'subheadline', 'products', 'columns', 'showQuickView', 'currency'],
     quickActions: ['Add product', 'Change columns', 'Update prices'],
-    // GH-960: re-enable when #961 (cart/checkout) ships
-    aiVisible: false,
-    category: 'archive' as const,
+    aiVisible: true,
+    category: 'commerce' as const,
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

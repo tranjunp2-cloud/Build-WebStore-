@@ -311,8 +311,7 @@ export default async function ProductDetailPage({ params }: Props) {
                         </>
                     )}
 
-                    {/* GH-960: Add to Cart hidden — re-enable when #961 (cart/checkout) ships */}
-                    {false && <AddToCartButton
+                    <AddToCartButton
                         product={{
                             id: String(p.id),
                             slug: p.slug,
@@ -326,7 +325,7 @@ export default async function ProductDetailPage({ params }: Props) {
                         primaryColor={primaryColor}
                         siteSlug={slug}
                         siteId={String(site.id)}
-                    />}
+                    />
 
                     {/* Specifications */}
                     {attributes.length > 0 && (

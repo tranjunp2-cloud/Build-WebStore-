@@ -26,13 +26,12 @@ describe('isUnsupportedBlock', () => {
         }
     })
 
-    // GH-960: menu-display re-hidden until #961 (cart/checkout) ships
-    it('menu-display is in BLOCKS_TEMP_HIDDEN [TC-F01-UB-01]', () => {
-        expect(BLOCKS_TEMP_HIDDEN.has('menu-display')).toBe(true)
+    it('menu-display is NOT in BLOCKS_TEMP_HIDDEN [TC-F01-UB-01]', () => {
+        expect(BLOCKS_TEMP_HIDDEN.has('menu-display')).toBe(false)
     })
 
-    it('isUnsupportedBlock returns true for menu-display', () => {
-        expect(isUnsupportedBlock('menu-display')).toBe(true)
+    it('isUnsupportedBlock returns false for menu-display', () => {
+        expect(isUnsupportedBlock('menu-display')).toBe(false)
     })
 
     it('returns false for supported blocks', () => {
