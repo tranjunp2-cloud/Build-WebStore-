@@ -1220,7 +1220,7 @@ export function PreviewScripts() {
                   text-decoration-color: currentColor !important;
                   text-underline-offset: 2px;
                 }
-                .blw a[href] {
+                .blw a[href], nav a[href] {
                   text-decoration: none !important;
                 }
                 [contenteditable="true"] a {
