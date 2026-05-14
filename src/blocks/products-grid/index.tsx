@@ -14,8 +14,7 @@ import { handleCartClick } from '@/lib/storefront/editor-intercept'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
-// GH-960: re-enable (set true) when #961 (cart/checkout) ships
-const CART_ENABLED = false
+const CART_ENABLED = true
 
 interface ProductItem {
     id: string

@@ -14,8 +14,7 @@ export const PricingTableConfigSchema = BaseBlockSchema.extend({
     })).default([]),
 })
 export const pricingTableMeta = { type: 'pricing-table' as const, name: 'Pricing Table', description: 'Pricing plans with monthly/yearly toggle and feature comparison', icon: '💲', variants: ['columns', 'horizontal'], defaultVariant: 'columns', editableFields: ['headline', 'subheadline', 'billingToggle', 'plans'], quickActions: ['Add plan', 'Toggle billing', 'Mark popular'],
-    // GH-960: re-enable when #961 (cart/checkout) ships
-    aiVisible: false, category: 'archive' as const }
+    aiVisible: true, category: 'commerce' as const }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
 export const configSchema = PricingTableConfigSchema

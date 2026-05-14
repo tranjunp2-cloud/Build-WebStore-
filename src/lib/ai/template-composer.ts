@@ -71,8 +71,6 @@ export const TEMP_HIDDEN_BLOCK_TYPES = new Set([
   'doctor-profile',   // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
   'gallery-masonry',  // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
   'before-after',     // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
-  // GH-960: re-enable when #961 (cart/checkout) ships
-  'property-card',    // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
 ])
 
 function simpleHash(str: string): number {

@@ -13,8 +13,7 @@ export type SupportedAddSectionType =
     | 'banner'
     | 'cta'
     | 'socialWidget'
-    // GH-960: cartWidget re-hidden — re-enable when #961 (cart/checkout) ships
-    // | 'cartWidget'
+    | 'cartWidget'
     // v1.1 new blocks
     | 'pricing-table'
     | 'gallery-masonry'
@@ -76,11 +75,9 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['banner', [/\bbanner\b/i, /\bpromo\b/i, /\bpromotion\b/i]],
     ['cta', [/\bcta\b/i, /\bcall to action\b/i]],
     ['socialWidget', [/\bsocial\s*widget\b/i, /\bsocial\s*media\b/i, /\bsocial\s*links?\b/i, /\bfacebook\b/i, /\binstagram\b/i, /\blinkedin\b/i, /\byoutube\b/i]],
-    // GH-960: cartWidget re-hidden — re-enable when #961 ships
-    // ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]],
+    ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]],
     // v1.1 new blocks
-    // GH-960: pricing-table hidden — re-enable when #961 (cart/checkout) ships
-    // ['pricing-table', [/\bpricing\s*table\b/i, /\bprice\s*comparison\b/i, /\bplan\s*comparison\b/i]],
+    ['pricing-table', [/\bpricing\s*table\b/i, /\bprice\s*comparison\b/i, /\bplan\s*comparison\b/i]],
     ['gallery-masonry', [/\bmasonry\b/i, /\bmosaic\b/i]],
     ['whatsapp-button', [/\bwhatsapp\b/i, /\bwa\s*button\b/i]],
     ['google-maps', [/\bgoogle\s*maps?\b/i, /\bmap\b/i, /\blocation\b/i, /\baddress\b/i]],
@@ -97,8 +94,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['accordion', [/\baccordion\b/i, /\bcollapsible\b/i, /\bexpandable\b/i]],
     // ['step-process', [/\bstep\b/i, /\bprocess\b/i, /\bhow\s*it\s*works\b/i, /\btimeline\b/i]], // feat/fix-broken-block-variants: temporarily hidden
     ['portfolio-grid', [/\bportfolio\b/i, /\bproject\b/i, /\bshowcase\b/i, /\bwork\b/i]],
-    // GH-960: menu-display hidden — re-enable when #961 (cart/checkout) ships
-    // ['menu-display', [/\bmenu-display\b/i, /\bmenu\s+display\b/i]],
+    ['menu-display', [/\bmenu-display\b/i, /\bmenu\s+display\b/i]],
     ['menu-food', [/\bmenu\b/i, /\bfood\b/i, /\brestaurant\b/i, /\bdish\b/i]],
     ['service-cards', [/\bservice\b/i, /\boffering\b/i]],
     ['carousel', [/\bcarousel\b/i, /\bslider\b/i, /\bslideshow\b/i]],
@@ -110,8 +106,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     // ['video-showcase', [/\bvideo-showcase\b/i, /\bvideo\s+showcase\b/i]], // temporarily hidden (aiVisible: false, archived)
     ['video', [/\bvideo\b/i, /\byoutube\b/i, /\bembed\b/i]],
     ['blog-list', [/\bblog\b/i, /\barticle(s)?\b/i, /\bpost(s)?\b/i]],
-    // GH-960: product-quick-view hidden — re-enable when #961 (cart/checkout) ships
-    // ['product-quick-view', [/\bproduct-quick-view\b/i, /\bquick[-\s]view\b/i]],
+    ['product-quick-view', [/\bproduct-quick-view\b/i, /\bquick[-\s]view\b/i]],
     // ['booking-widget', [/\bbooking(-widget)?\b/i, /\bbook\s+appointment\b/i, /\bappointment\b/i]], // feat/fix-broken-block-variants: temporarily hidden
     ['class-schedule', [/\bclass(-schedule)?\b/i, /\bclass\s+schedule\b/i, /\bschedule\b/i, /\btimetable\b/i]],
     ['doctor-profile', [/\bdoctor(-profile)?\b/i, /\bphysician\b/i, /\bdentist\b/i]],
@@ -133,8 +128,7 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     banner: 'banner',
     cta: 'CTA',
     socialWidget: 'social media',
-    // GH-960: cartWidget re-hidden — re-enable when #961 ships
-    // cartWidget: 'cart',
+    cartWidget: 'cart',
     'pricing-table': 'pricing table',
     'gallery-masonry': 'masonry gallery',
     'whatsapp-button': 'WhatsApp button',
@@ -344,9 +338,8 @@ export function createAddSectionBlock({
                 links: getDefaultSocialWidgetLinks(),
             })
 
-        // GH-960: cartWidget re-hidden — re-enable when #961 ships
-        // case 'cartWidget':
-        //     return { blockType: 'cartWidget', variant: 'floating', label: 'Cart', showLabel: false }
+        case 'cartWidget':
+            return { blockType: 'cartWidget', variant: 'floating', label: 'Cart', showLabel: false }
 
         // ── v1.1 New Blocks ─────────────────────────────────────────
 

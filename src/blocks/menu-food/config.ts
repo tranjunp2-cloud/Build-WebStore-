@@ -48,9 +48,7 @@ export const menuFoodMeta = {
     defaultVariant: 'classic',
     editableFields: ['headline', 'categories'],
     quickActions: ['Add category', 'Add item', 'Change prices'],
-    // GH-960: re-enable when #961 (cart/checkout) ships
-    aiVisible: false,
-    // intentionally 'store' not 'archive' — menu-food renders in editor without cart; only hidden from AI generation
+    aiVisible: true,
     category: 'store' as const,
 }
 
