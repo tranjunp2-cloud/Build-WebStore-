@@ -8,6 +8,7 @@ import { navigateTo } from './helpers/navigation'
  * TC-F03.01: Dashboard greeting + content
  * TC-F03.02: Site cards / empty state
  * TC-F03.03: Dashboard tab navigation
+ * TC-F18.30: Sidebar label renamed from "Store Config" to "Settings" (BUG-985)
  */
 
 test.describe('Dashboard', () => {
@@ -66,6 +67,15 @@ test.describe('Dashboard', () => {
             await page.waitForLoadState('networkidle')
             await expectNoServerError(page)
         }
+    })
+
+    test('[TC-F18.30] sidebar shows "Settings" label — not "Store Config" (regression BUG-985)', async ({ page }) => {
+        await expectPageLoaded(page)
+
+        // "Store Config" must be gone
+        await expect(page.locator('text=Store Config')).toHaveCount(0)
+        // "Settings" nav button must be present in sidebar
+        await expect(page.getByRole('button', { name: /^Settings$/i }).first()).toBeVisible()
     })
 
     test('sidebar navigation links work', async ({ page }) => {

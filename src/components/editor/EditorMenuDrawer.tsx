@@ -87,7 +87,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
             { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
             { label: { en: 'Customers', ms: 'Pelanggan' }, href: '/customers', icon: Users },
             {
-                label: { en: 'Site Settings', ms: 'Tetapan Laman' },
+                label: { en: 'Settings', ms: 'Tetapan' },
                 href: '/settings',
                 icon: Settings,
                 children: [
