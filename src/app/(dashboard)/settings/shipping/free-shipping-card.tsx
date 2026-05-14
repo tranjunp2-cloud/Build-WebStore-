@@ -7,11 +7,12 @@ import { cn } from '@/lib/utils'
 type Props = {
     freeEnabled: boolean
     freeAboveRm: string
+    freeAboveError?: string
     onToggle: (v: boolean) => void
     onAmountChange: (v: string) => void
 }
 
-export function FreeShippingCard({ freeEnabled, freeAboveRm, onToggle, onAmountChange }: Props) {
+export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onToggle, onAmountChange }: Props) {
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping
     const parsedAmount = parseFloat(freeAboveRm)
@@ -64,13 +65,21 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, onToggle, onAmountC
                         max="100000"
                         inputMode="decimal"
                         disabled={!freeEnabled}
-                        className="min-h-[44px] w-full rounded-[10px] border border-white/[0.12] bg-[#0B1120]/50 pl-10 pr-3 text-[15px] text-slate-50 placeholder:text-slate-50/30 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30 disabled:cursor-not-allowed"
+                        className={cn(
+                            "min-h-[44px] w-full rounded-[10px] border bg-[#0B1120]/50 pl-10 pr-3 text-[15px] text-slate-50 placeholder:text-slate-50/30 focus:outline-none focus:ring-1 disabled:cursor-not-allowed",
+                            freeAboveError
+                                ? "border-destructive focus:border-destructive focus:ring-destructive/30"
+                                : "border-white/[0.12] focus:border-cyan-500/50 focus:ring-cyan-500/30"
+                        )}
                         placeholder="100.00"
                         value={freeAboveRm}
                         onChange={e => onAmountChange(e.target.value)}
                     />
                 </div>
-                {showHelper && (
+                {freeAboveError && (
+                    <p className="mt-1 text-xs text-destructive">{freeAboveError}</p>
+                )}
+                {showHelper && !freeAboveError && (
                     <p className="flex items-center gap-1.5 text-[13px] text-slate-400">
                         <Info className="h-3.5 w-3.5 shrink-0 text-slate-500" />
                         {s.freeHelper.replace('{amount}', parsedAmount.toFixed(2))}

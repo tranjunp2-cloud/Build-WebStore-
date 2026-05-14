@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import type { ShippingConfig } from '@/lib/shipping'
-import { SHIPPING_DEFAULTS, RATE_MAX } from '@/lib/shipping'
+import { SHIPPING_DEFAULTS, RATE_MAX, FREE_ABOVE_MAX } from '@/lib/shipping'
 import { ShippingRatesCard } from './shipping-rates-card'
 import { FreeShippingCard } from './free-shipping-card'
 import { SettingsFooter } from './settings-footer'
@@ -45,6 +45,7 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
     )
     const [westRateError, setWestRateError] = useState('')
     const [eastRateError, setEastRateError] = useState('')
+    const [freeAboveError, setFreeAboveError] = useState('')
     const [isSaving, setIsSaving] = useState(false)
     const [lastSaveSucceeded, setLastSaveSucceeded] = useState(false)
 
@@ -64,6 +65,9 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
         setEastRateRm(DEFAULTS.eastRm)
         setFreeAboveRm(DEFAULTS.freeAboveRm)
         setFreeEnabled(DEFAULTS.freeEnabled)
+        setWestRateError('')
+        setEastRateError('')
+        setFreeAboveError('')
     }
 
     const handleSave = async () => {
@@ -73,7 +77,13 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
         const eErr = !isNaN(e) && (e < 0 || Math.round(e * 100) > RATE_MAX) ? s.rateError : ''
         setWestRateError(wErr)
         setEastRateError(eErr)
-        if (wErr || eErr) return
+        let fErr = ''
+        if (freeEnabled && freeAboveRm !== '') {
+            const f = parseFloat(freeAboveRm)
+            if (isNaN(f) || f <= 0 || Math.round(f * 100) > FREE_ABOVE_MAX) fErr = s.freeError
+        }
+        setFreeAboveError(fErr)
+        if (wErr || eErr || fErr) return
 
         // RF-05: preserve existing enabled state — saving rate settings must not silently re-enable disabled shipping
         const shippingEnabled = initial?.enabled !== false
@@ -86,8 +96,8 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
                 credentials: 'include',
                 body: JSON.stringify({
                     enabled: shippingEnabled,
-                    westRateRm: westRateRm || null,
-                    eastRateRm: eastRateRm || null,
+                    westRateRm: westRateRm !== '' ? westRateRm : null,
+                    eastRateRm: eastRateRm !== '' ? eastRateRm : null,
                     freeAboveRm: freeEnabled ? (freeAboveRm || null) : null,
                 }),
             })
@@ -105,6 +115,10 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
 
     return (
         <div className="w-full pb-4">
+            <div className="mb-6">
+                <h1 className="text-[32px] font-black text-[#e1e2eb] tracking-[-0.9px] leading-10">{s.pageTitle}</h1>
+                <p className="mt-2 text-[14px] text-slate-400">{s.pageSubtitle}</p>
+            </div>
             <div className="space-y-5">
                 <ShippingRatesCard
                     westRateRm={westRateRm}
@@ -119,8 +133,9 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
                 <FreeShippingCard
                     freeEnabled={freeEnabled}
                     freeAboveRm={freeAboveRm}
+                    freeAboveError={freeAboveError}
                     onToggle={setFreeEnabled}
-                    onAmountChange={setFreeAboveRm}
+                    onAmountChange={v => { setFreeAboveRm(v); setFreeAboveError('') }}
                 />
             </div>
 

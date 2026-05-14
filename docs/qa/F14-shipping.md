@@ -185,6 +185,9 @@ Legend: **Type** = `Func` (functional) / `UI` / `Sec` (security/validation) / `E
 | **TC-F14.54** | Func | High | Migration backfill freeAbove=10000 cho sites cũ | 1. Site existing có `freeAbove=null`. 2. Run `scripts/db-setup.js` migration. | Site row update: `freeAbove=10000` (BR-07 default). Sites đã có giá trị custom KHÔNG bị overwrite. | Arch §10, BR-07 |
 | **TC-F14.55** | Edge | Medium | Default values seed match SHIPPING_DEFAULTS constant | New site tạo lần đầu. Check DB `sites.shippingConfig`. | `westRate=800, eastRate=1500, freeAbove=10000`. Khớp `SHIPPING_DEFAULTS` trong `lib/shipping/constants.ts`. | Arch §7, BR-07 |
 | **TC-F14.56** | Edge | Medium | Order DB lưu shippingFee = giá trị từ calc | Place order với state Sabah, subtotal 5000 sen. | DB row `orders.shippingFee = 1500`, NOT hardcoded 10 hay 1000. | FR-02, FR-09 |
+| **TC-F14.57** | Unit | High | saveSiteSchema chấp nhận freeAbove=1 sen (minimum) | `saveSiteSchema.safeParse({ shippingConfig: { freeAbove: 1 } })` | `success=true`. RM 0.01 là giá trị hợp lệ thấp nhất. | FR-04, BR-06 |
+| **TC-F14.58** | Unit | Critical | saveSiteSchema từ chối freeAbove âm | `saveSiteSchema.safeParse({ shippingConfig: { freeAbove: -1 } })` | `success=false`. Ngăn exploit free-shipping-for-all qua save endpoint. | FR-04, BR-06 |
+| **TC-F14.59** | Unit | High | saveSiteSchema từ chối freeAbove > 10_000_000 sen | `saveSiteSchema.safeParse({ shippingConfig: { freeAbove: 10_000_001 } })` | `success=false`. Consistent với giới hạn RM 100,000 ở route shipping-config. | FR-04, BR-06 |
 
 ---
 
