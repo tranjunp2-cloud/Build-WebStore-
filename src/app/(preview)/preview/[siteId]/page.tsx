@@ -87,9 +87,13 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         if (String(pageSiteId) !== String(siteId)) {
             return notFound()
         }
-        // Issue 862: hidden pages (isVisible=false) render the site's 404 page in preview.
-        // Builder mode is exempt so the owner can still edit/view the hidden page in the editor.
-        if (page.isVisible === false && !builder) {
+        // Page Preview (no builder=1) behaves like live site: hidden/deleted/draft pages → 404.
+        // Builder mode is exempt so the owner can still view and edit these pages in the editor.
+        const isHiddenPage =
+            page.isVisible === false ||
+            (page.deletedAt != null && page.deletedAt !== '') ||
+            page.status === 'draft'
+        if (isHiddenPage && !builder) {
             const notFoundResult = await payload.find({
                 collection: 'pages',
                 where: {
@@ -110,7 +114,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     blockType: 'hero',
                     variant: 'centered',
                     headline: '404',
-                    subheadline: 'This page is hidden and not visible to visitors.',
+                    subheadline: 'This page is not visible to visitors.',
                 }],
             }
         }
