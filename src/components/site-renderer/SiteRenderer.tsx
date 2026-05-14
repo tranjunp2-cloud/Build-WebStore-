@@ -3,6 +3,7 @@ import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import {
+    BROKEN_URL_PREFIX,
     HOMEPAGE_ALIASES,
     buildSlugCanonicalMap,
     resolveInternalUrlPath,
@@ -292,7 +293,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         if (!trimmed || trimmed === '#' || trimmed.startsWith('#')) return rewritten
         if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('//')) return rewritten
         if (!trimmed.startsWith('/')) return rewritten
-        return `_broken_url_:${trimmed}`
+        return `${BROKEN_URL_PREFIX}${trimmed}`
     }
 
     const blocks = rawBlocks.map((b) => {

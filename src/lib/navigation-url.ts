@@ -71,6 +71,10 @@ export type NavPageLike = {
  */
 export const HOMEPAGE_ALIASES = ['/home', 'home', '/index', 'index'] as const
 
+/** Runtime-only prefix marking an internal URL that could not be resolved to any known page.
+ *  Never persisted to the database. Detected by useIsHiddenLink / BrokenLinkWarning in editor mode. */
+export const BROKEN_URL_PREFIX = '_broken_url_:'
+
 /**
  * Build a `{ anyFormOfSlug → canonical /slug }` map from the pages list.
  * Three forms are indexed per page so the rewriter tolerates casing +

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import type { HeroConfig } from './config'
 import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
@@ -43,7 +44,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
         <div className="flex flex-wrap gap-4">
             {buttons.map((btn, i) => {
                 const rawUrl = btn?.url
-                const isBroken = rawUrl?.startsWith('_broken_url_:')
+                const isBroken = rawUrl?.startsWith(BROKEN_URL_PREFIX)
                 const href = isBroken ? '#' : (rawUrl || '#')
                 const isExternal = !isBroken && !!rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))
                 return (

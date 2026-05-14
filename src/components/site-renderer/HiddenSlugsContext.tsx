@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, type ReactNode } from 'react'
+import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 
 type HiddenContext = {
     /** Normalized /slugs of hidden/deleted pages — used for live-site and nav link URLs. */
@@ -25,7 +26,7 @@ export function useIsHiddenLink(url: string | undefined): boolean {
 
     // Non-existent internal URL — marked by SiteRenderer when rewritePreviewUrl
     // cannot resolve a path to any known page (falls back to '#' instead).
-    if (trimmed.startsWith('_broken_url_:')) return true
+    if (trimmed.startsWith(BROKEN_URL_PREFIX)) return true
 
     // Editor preview URLs: /preview/{siteId}?pageId={id}
     if (pageIds.size && trimmed.includes('pageId=')) {
