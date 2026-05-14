@@ -69,6 +69,8 @@ export type SiteRendererProps = {
     pages?: NavPage[]
     isEditor?: boolean
     isBuilderPreview?: boolean
+    /** True when loaded inside the standard page editor iframe (PreviewFrame). */
+    isEditorIframe?: boolean
     siteId?: string
     isOwner?: boolean
     onBlockFieldChange?: (blockIndex: number, field: string, value: unknown) => void
@@ -129,7 +131,7 @@ function applyGlobalSystemBlocks(
     return nextBlocks
 }
 
-export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuilderPreview = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuilderPreview = false, isEditorIframe = false, siteId, isOwner, onBlockFieldChange }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -224,19 +226,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         ? rewritePreviewUrl
         : (url: string | undefined) => rewriteLiveUrl(url, slugCanonical)
 
-    const rewriteFooterColumns = (columns: unknown): unknown => {
-        if (!Array.isArray(columns)) return columns
-        return columns.map((col) => {
-            if (!col || typeof col !== 'object') return col
-            const c = col as { links?: Array<{ url?: string; [k: string]: unknown }>; [k: string]: unknown }
-            return {
-                ...c,
-                links: Array.isArray(c.links)
-                    ? c.links.map((l) => ({ ...l, url: rewriteUrl(l?.url) }))
-                    : c.links,
-            }
-        })
-    }
     // All slugs + IDs of hidden/deleted pages.
     // warnSlugs: normalized /slug — used for live-site URL matching.
     // warnPageIds: page IDs — used for editor preview URLs (/preview/...?pageId=xxx).
@@ -249,16 +238,47 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             warnPageIds.add(String(p.id))
         }
     }
-    // For visitors: filter hidden/deleted slugs out of nav. Owners/editors see all links.
-    const hiddenSlugs = (!isEditor && !isOwner) ? warnSlugs : new Set<string>()
-    // In editor/preview: mark hidden links so NavigationBlock can render a warning indicator.
-    const markHiddenLinks = isEditor && warnSlugs.size > 0
+    // Indicators (EyeOff, BrokenLinkWarning) only active inside the page editor iframe
+    // or AI Builder. Page Preview and live site both render clean — no editor indicators.
+    const showIndicators = isEditor && (isEditorIframe || isBuilderPreview)
+    // Filter hidden pages from nav/CTA/footer links:
+    //   - Builder/editor mode (showIndicators): keep all, indicators handle the warning
+    //   - Page Preview, live site visitor: filter hidden pages
+    //   - Live site owner: keep all (owner can access hidden pages per spec)
+    const hiddenSlugs = showIndicators ? new Set<string>() : (isEditor || !isOwner) ? warnSlugs : new Set<string>()
+    // Mark hidden nav links with _hiddenFromVisitor flag (EyeOff indicator) — builder mode only.
+    const markHiddenLinks = showIndicators && warnSlugs.size > 0
 
     // Returns true when a URL points to a page that should be hidden from visitors.
     const isHiddenSlug = (url: string | undefined): boolean => {
         if (!hiddenSlugs.size) return false
         const resolvedPath = resolveInternalUrlPath(url, slugCanonical)
         return !!resolvedPath && hiddenSlugs.has(resolvedPath)
+    }
+
+    const rewriteFooterColumns = (columns: unknown): unknown => {
+        if (!Array.isArray(columns)) return columns
+        return columns.map((col) => {
+            if (!col || typeof col !== 'object') return col
+            const c = col as { links?: Array<{ url?: string; [k: string]: unknown }>; [k: string]: unknown }
+            return {
+                ...c,
+                links: Array.isArray(c.links)
+                    ? c.links
+                        .filter((l) => !isHiddenSlug(l?.url))
+                        .map((l) => {
+                            const resolvedPath = resolveInternalUrlPath(l?.url, slugCanonical)
+                            const isHiddenFromVisitor = markHiddenLinks && !!resolvedPath && warnSlugs.has(resolvedPath)
+                            const rewritten = rewriteUrl(l?.url)
+                            return {
+                                ...l,
+                                url: markBrokenUrl(l?.url, rewritten),
+                                ...(isHiddenFromVisitor ? { _hiddenFromVisitor: true } : {}),
+                            }
+                        })
+                    : c.links,
+            }
+        })
     }
 
     const rewriteNavLinks = (links: unknown): unknown => {
@@ -288,7 +308,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     // prefix with '_broken_url_:' so BrokenLinkWarning can detect the broken link.
     // On live site or for external/anchor URLs this is a no-op.
     const markBrokenUrl = (original: string | undefined, rewritten: string): string => {
-        if (!isEditor || rewritten !== '#') return rewritten
+        if (!showIndicators || rewritten !== '#') return rewritten
         const trimmed = (original ?? '').trim()
         if (!trimmed || trimmed === '#' || trimmed.startsWith('#')) return rewritten
         if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('//')) return rewritten
@@ -456,7 +476,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     })
 
     return (
-        <HiddenSlugsProvider value={isEditor ? { slugs: warnSlugs, pageIds: warnPageIds } : { slugs: new Set(), pageIds: new Set() }}>
+        <HiddenSlugsProvider value={showIndicators ? { slugs: warnSlugs, pageIds: warnPageIds } : { slugs: new Set(), pageIds: new Set() }}>
         <OwnerProvider value={!!isOwner}>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`

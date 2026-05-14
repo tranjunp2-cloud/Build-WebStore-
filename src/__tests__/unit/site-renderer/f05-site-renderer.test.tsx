@@ -637,6 +637,116 @@ describe('[TC-F04-SR-06] SiteRenderer nav link visibility filtering', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
+// TC-F05-959-04 — footer column links to hidden pages are filtered for visitors
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F05-959-04] SiteRenderer footer hidden-page link filtering', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F05-959-04a: footer links to hidden pages are filtered for visitors', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Services', url: '/services' },   // isVisible=false
+                { label: 'About', url: '/about' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+            { id: '3', slug: '/about', isVisible: true },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home', 'About'])
+    })
+
+    it('TC-F05-959-04b: footer links to hidden pages are preserved for owners', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Services', url: '/services' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isOwner={true}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home', 'Services'])
+    })
+
+    it('TC-F05-959-04c: footer links to soft-deleted pages are filtered for visitors', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Old Page', url: '/old' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true, deletedAt: null },
+            { id: '2', slug: '/old', isVisible: true, deletedAt: '2026-05-01T00:00:00Z' },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home'])
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TC-F04-SR-07 — GoogleFontsLoader receives correct fonts from theme
 // ═══════════════════════════════════════════════════════════════════════════
 describe('[TC-F04-SR-07] SiteRenderer renders GoogleFontsLoader with correct fonts from theme', () => {

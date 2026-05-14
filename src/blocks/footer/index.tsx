@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { EyeOff } from 'lucide-react'
 
 import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
@@ -155,7 +156,7 @@ function FooterSectionTitle({ children, className = '' }: { children: ReactNode;
 
 type LinkColumnProps = {
     title: string
-    links: { label?: string; url?: string; style?: 'internal' | 'external' }[]
+    links: { label?: string; url?: string; style?: 'internal' | 'external'; _hiddenFromVisitor?: boolean }[]
     spacing?: 'tight' | 'default'
 }
 
@@ -177,9 +178,10 @@ function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
                                 href={link?.url}
                                 target={ext ? '_blank' : undefined}
                                 rel={ext ? 'noopener noreferrer' : undefined}
-                                className="opacity-70 hover:opacity-100 transition-all duration-200 hover:translate-x-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                className="opacity-70 hover:opacity-100 transition-all duration-200 hover:translate-x-1 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                             >
                                 <Body size="small" as="span">{link.label}</Body>
+                                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
                             </a>
                         </li>
                     )
@@ -242,9 +244,10 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                                         href={link?.url}
                                                         target={ext ? '_blank' : undefined}
                                                         rel={ext ? 'noopener noreferrer' : undefined}
-                                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                                                     >
                                                         <Body size="small" as="span">{link.label}</Body>
+                                                        {(link as { _hiddenFromVisitor?: boolean })._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
                                                     </a>
                                                 )
                                             })}

@@ -18,7 +18,7 @@ type PreviewLayoutBlock = Record<string, unknown> & {
 
 interface PreviewPageProps {
     params: Promise<{ siteId: string }>
-    searchParams: Promise<{ pageId?: string; v?: string; builder?: string }>
+    searchParams: Promise<{ pageId?: string; v?: string; builder?: string; editor?: string }>
 }
 
 export const dynamic = 'force-dynamic'
@@ -37,7 +37,8 @@ export const viewport: Viewport = {
 
 export default async function PreviewPage({ params, searchParams }: PreviewPageProps) {
     const { siteId } = await params
-    const { pageId, builder } = await searchParams
+    const { pageId, builder, editor } = await searchParams
+    const isEditorIframe = !!editor || !!builder
 
     // 1. Auth Check (P0 Security Rule - Auth Redirect)
     const user = await getCurrentUser() as PlatformUser | null
@@ -87,9 +88,13 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         if (String(pageSiteId) !== String(siteId)) {
             return notFound()
         }
-        // Issue 862: hidden pages (isVisible=false) render the site's 404 page in preview.
-        // Builder mode is exempt so the owner can still edit/view the hidden page in the editor.
-        if (page.isVisible === false && !builder) {
+        // Page Preview (no builder=1) behaves like live site: hidden/deleted/draft pages → 404.
+        // Builder mode is exempt so the owner can still view and edit these pages in the editor.
+        const isHiddenPage =
+            page.isVisible === false ||
+            (page.deletedAt != null && page.deletedAt !== '') ||
+            page.status === 'draft'
+        if (isHiddenPage && !isEditorIframe) {
             const notFoundResult = await payload.find({
                 collection: 'pages',
                 where: {
@@ -110,7 +115,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                     blockType: 'hero',
                     variant: 'centered',
                     headline: '404',
-                    subheadline: 'This page is hidden and not visible to visitors.',
+                    subheadline: 'This page is not visible to visitors.',
                 }],
             }
         }
@@ -241,6 +246,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                         page={page}
                         pages={navPagesResult.docs as unknown as NavPage[]}
                         isBuilderPreview={!!builder}
+                        isEditorIframe={isEditorIframe}
                     />
 
                     {/* Editor listeners (full) or builder-preview link handler (lightweight) */}
