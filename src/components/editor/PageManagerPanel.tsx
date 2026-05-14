@@ -10,6 +10,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 import type { PageData } from '@/store/editorStore'
+import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
 
 interface PageManagerPanelProps {
     siteId: string
@@ -38,22 +39,23 @@ function getPagePath(page: PageData) {
 }
 
 /** Collect slugs (normalized to /slug) from a nav links tree (recursive). */
-function collectNavSlugs(links: unknown): Set<string> {
+function collectNavSlugs(links: unknown, slugCanonical: Map<string, string>): Set<string> {
     const slugs = new Set<string>()
     if (!Array.isArray(links)) return slugs
     for (const link of links) {
         if (!link || typeof link !== 'object') continue
         const l = link as { url?: string; children?: unknown }
-        const url = (l.url ?? '').trim()
-        if (url && url !== '#') slugs.add(url.startsWith('/') ? url : `/${url}`)
-        if (l.children) for (const s of collectNavSlugs(l.children)) slugs.add(s)
+        const resolvedPath = resolveInternalUrlPath(l.url, slugCanonical)
+        if (resolvedPath) slugs.add(resolvedPath)
+        if (l.children) for (const s of collectNavSlugs(l.children, slugCanonical)) slugs.add(s)
     }
     return slugs
 }
 
 /** Return IDs of pages whose slug appears in the nav links tree. */
 function collectMenuPageIds(links: unknown, pages: PageData[]): Set<string> {
-    const navSlugs = collectNavSlugs(links)
+    const slugCanonical = buildSlugCanonicalMap(pages)
+    const navSlugs = collectNavSlugs(links, slugCanonical)
     const ids = new Set<string>()
     for (const page of pages) {
         const pagePath =

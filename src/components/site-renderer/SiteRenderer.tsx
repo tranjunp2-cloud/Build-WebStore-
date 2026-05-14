@@ -5,6 +5,7 @@ import type { ThemeConfig } from '@/blocks/types'
 import {
     HOMEPAGE_ALIASES,
     buildSlugCanonicalMap,
+    resolveInternalUrlPath,
     rewriteLiveUrl,
     splitPathAndTail,
 } from '@/lib/navigation-url'
@@ -254,11 +255,9 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
 
     // Returns true when a URL points to a page that should be hidden from visitors.
     const isHiddenSlug = (url: string | undefined): boolean => {
-        if (!hiddenSlugs.size || !url) return false
-        const trimmed = url.trim()
-        if (!trimmed || trimmed === '#' || trimmed.startsWith('http')) return false
-        const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
-        return hiddenSlugs.has(normalized)
+        if (!hiddenSlugs.size) return false
+        const resolvedPath = resolveInternalUrlPath(url, slugCanonical)
+        return !!resolvedPath && hiddenSlugs.has(resolvedPath)
     }
 
     const rewriteNavLinks = (links: unknown): unknown => {
@@ -267,17 +266,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             .filter((l) => {
                 if (!hiddenSlugs.size || !l || typeof l !== 'object') return true
                 const link = l as { url?: string }
-                const url = (link.url ?? '').trim()
-                if (!url || url === '#') return true
-                const normalized = url.startsWith('/') ? url : `/${url}`
-                return !hiddenSlugs.has(normalized)
+                const resolvedPath = resolveInternalUrlPath(link.url, slugCanonical)
+                return !resolvedPath || !hiddenSlugs.has(resolvedPath)
             })
             .map((l) => {
                 if (!l || typeof l !== 'object') return l
                 const link = l as { url?: string; children?: unknown; [k: string]: unknown }
-                const url = (link.url ?? '').trim()
-                const normalized = url.startsWith('/') ? url : `/${url}`
-                const isHiddenFromVisitor = markHiddenLinks && !!url && url !== '#' && warnSlugs.has(normalized)
+                const resolvedPath = resolveInternalUrlPath(link.url, slugCanonical)
+                const isHiddenFromVisitor = markHiddenLinks && !!resolvedPath && warnSlugs.has(resolvedPath)
                 return {
                     ...link,
                     url: rewriteUrl(link.url),

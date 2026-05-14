@@ -126,6 +126,37 @@ export function splitPathAndTail(url: string): [string, string] {
 }
 
 /**
+ * Resolve an internal URL to the canonical page path used for comparisons.
+ * Unlike rewriteLiveUrl(), this accepts bare internal slugs too because editor
+ * data may contain `services` while render data typically contains `/services`.
+ */
+export function resolveInternalUrlPath(
+    url: string | undefined | null,
+    slugCanonical: Map<string, string>,
+): string | null {
+    if (!url) return null
+    const trimmed = url.trim()
+    if (!trimmed || trimmed === '#' || trimmed.startsWith('#')) return null
+    if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('//')) return null
+    if (trimmed.includes(':') && !trimmed.startsWith('/')) return null
+
+    const [rawPath] = splitPathAndTail(trimmed)
+    if (!rawPath || rawPath === '#') return null
+
+    const path = rawPath.startsWith('/') ? rawPath : `/${rawPath}`
+    const withoutTrailingSlash = path.length > 1 ? path.replace(/\/+$/, '') : path
+    const bare = withoutTrailingSlash.replace(/^\//, '')
+    const hit =
+        slugCanonical.get(path) ??
+        slugCanonical.get(path.toLowerCase()) ??
+        slugCanonical.get(withoutTrailingSlash) ??
+        slugCanonical.get(withoutTrailingSlash.toLowerCase()) ??
+        slugCanonical.get(bare)
+
+    return hit ?? withoutTrailingSlash.toLowerCase()
+}
+
+/**
  * Resolve a URL against the canonical slug map. Returns canonical `/slug`
  * (with query+hash reattached) when the path resolves to a known page.
  * Otherwise returns `path.toLowerCase()` + tail — unmatched internal paths

@@ -537,6 +537,41 @@ describe('[TC-F04-SR-06] SiteRenderer nav link visibility filtering', () => {
         expect(renderedLinks.map(l => l.label)).toEqual(['Home', 'About'])
     })
 
+    it('TC-F05-959-01b: hidden-page filtering handles case drift, query/hash, and trailing slash', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'nav-block' })
+        }
+        mockGetComponent.mockReturnValue(NavBlock)
+
+        const links = [
+            { label: 'Home', url: '/' },
+            { label: 'Services Case', url: '/Services' },
+            { label: 'Services Query', url: '/services?utm=nav' },
+            { label: 'Services Hash', url: '/services#pricing' },
+            { label: 'Services Slash', url: '/services/' },
+            { label: 'About', url: '/about' },
+        ]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+            { id: '3', slug: '/about', isVisible: true },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'navigation', links }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        const renderedLinks = capturedBlocks[0].links as Array<{ label: string }>
+        expect(renderedLinks.map(l => l.label)).toEqual(['Home', 'About'])
+    })
+
     it('TC-F05-959-02: links to hidden pages are preserved for owners', () => {
         // Owners always see all links (edit context)
         const capturedBlocks: Record<string, unknown>[] = []

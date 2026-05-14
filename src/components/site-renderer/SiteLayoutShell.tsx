@@ -1,7 +1,7 @@
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
-import { buildSlugCanonicalMap, rewriteLiveUrl } from '@/lib/navigation-url'
+import { buildSlugCanonicalMap, resolveInternalUrlPath, rewriteLiveUrl } from '@/lib/navigation-url'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { OwnerProvider } from './OwnerContext'
@@ -15,21 +15,28 @@ type SiteLayoutShellProps = {
 }
 
 /** Rewrite all `url` fields in nav links array recursively; filter hidden/deleted page slugs for visitors. */
-function rewriteNavLinks(links: unknown, rewriteUrl: (u: string | undefined) => string, hiddenSlugs: Set<string>): unknown {
+function rewriteNavLinks(
+    links: unknown,
+    rewriteUrl: (u: string | undefined) => string,
+    hiddenSlugs: Set<string>,
+    slugCanonical: Map<string, string>,
+): unknown {
     if (!Array.isArray(links)) return links
     return links
         .filter((l) => {
             if (!hiddenSlugs.size || !l || typeof l !== 'object') return true
             const link = l as { url?: string }
-            const url = (link.url ?? '').trim()
-            if (!url || url === '#') return true
-            const normalized = url.startsWith('/') ? url : `/${url}`
-            return !hiddenSlugs.has(normalized)
+            const resolvedPath = resolveInternalUrlPath(link.url, slugCanonical)
+            return !resolvedPath || !hiddenSlugs.has(resolvedPath)
         })
         .map((l) => {
             if (!l || typeof l !== 'object') return l
             const link = l as { url?: string; children?: unknown; [k: string]: unknown }
-            return { ...link, url: rewriteUrl(link.url), children: link.children ? rewriteNavLinks(link.children, rewriteUrl, hiddenSlugs) : undefined }
+            return {
+                ...link,
+                url: rewriteUrl(link.url),
+                children: link.children ? rewriteNavLinks(link.children, rewriteUrl, hiddenSlugs, slugCanonical) : undefined,
+            }
         })
 }
 
@@ -86,12 +93,12 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
     const rawFooter = site.footerBlock as Record<string, unknown> | null | undefined
 
     const rawHeaderCta = rawHeader?.ctaButton as { show?: boolean; url?: string; [k: string]: unknown } | null | undefined
-    const headerCtaUrl = rawHeaderCta?.url ?? ''
-    const headerCtaHidden = hiddenSlugs.size > 0 && !!headerCtaUrl && !headerCtaUrl.startsWith('http') && hiddenSlugs.has(headerCtaUrl.startsWith('/') ? headerCtaUrl : `/${headerCtaUrl}`)
+    const headerCtaPath = resolveInternalUrlPath(rawHeaderCta?.url, slugCanonical)
+    const headerCtaHidden = hiddenSlugs.size > 0 && !!headerCtaPath && hiddenSlugs.has(headerCtaPath)
     const headerBlock: Record<string, unknown> | null = rawHeader
         ? {
             ...rawHeader,
-            links: rewriteNavLinks(rawHeader.links, rewriteUrl, hiddenSlugs),
+            links: rewriteNavLinks(rawHeader.links, rewriteUrl, hiddenSlugs, slugCanonical),
             ctaButton: rawHeaderCta
                 ? headerCtaHidden
                     ? { ...rawHeaderCta, show: false }
