@@ -7,6 +7,7 @@ import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 
 // Token shortcut: hero containers consume CONTAINER.default + INNER_PADDING.
 export const HERO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -40,10 +41,13 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
 
     return (
         <div className="flex flex-wrap gap-4">
-            {buttons.map((btn, i) => (
+            {buttons.map((btn, i) => {
+                const isExternal = !!btn?.url && (btn.url.startsWith('http://') || btn.url.startsWith('https://'))
+                return (
+                <BrokenLinkWarning key={i} url={btn?.url} rounded="rounded-xl">
                 <motion.a
-                    key={i}
                     href={btn?.url}
+                    {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     onClick={() => {
                         if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' }, isOwner })
                     }}
@@ -79,7 +83,9 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
                 >
                     <RichText text={btn.label} as="span" />
                 </motion.a>
-            ))}
+                </BrokenLinkWarning>
+                )
+            })}
         </div>
     )
 }

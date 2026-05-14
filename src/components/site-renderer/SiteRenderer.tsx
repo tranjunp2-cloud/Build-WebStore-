@@ -5,6 +5,7 @@ import type { ThemeConfig } from '@/blocks/types'
 import {
     HOMEPAGE_ALIASES,
     buildSlugCanonicalMap,
+    resolveInternalUrlPath,
     rewriteLiveUrl,
     splitPathAndTail,
 } from '@/lib/navigation-url'
@@ -15,6 +16,7 @@ import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 import { TrackingManager } from './TrackingManager'
 import { OwnerProvider } from './OwnerContext'
+import { HiddenSlugsProvider } from './HiddenSlugsContext'
 import { BlockEditCallbackProvider } from './BlockEditCallbackContext'
 import { FloatingContainerProvider } from './FloatingContainerContext'
 
@@ -24,7 +26,7 @@ import { FloatingContainerProvider } from './FloatingContainerContext'
 // socialWidget/cartWidget are camelCase (BLOCK_TYPES registry); whatsapp-button/announcement-bar are kebab.
 const FLOATING_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget', 'announcement-bar'])
 
-export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
+export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null; status?: string }
 
 export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null; children?: NavLinkItem[] };
 type PreviewBlock = {
@@ -234,36 +236,81 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             }
         })
     }
+    // All slugs + IDs of hidden/deleted pages.
+    // warnSlugs: normalized /slug — used for live-site URL matching.
+    // warnPageIds: page IDs — used for editor preview URLs (/preview/...?pageId=xxx).
+    const warnSlugs = new Set<string>()
+    const warnPageIds = new Set<string>()
+    for (const p of pages) {
+        if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '') || p.status === 'draft') {
+            const raw = (p.slug ?? '').trim()
+            warnSlugs.add(!raw || raw === '/' ? '/' : (raw.startsWith('/') ? raw : `/${raw}`))
+            warnPageIds.add(String(p.id))
+        }
+    }
+    // For visitors: filter hidden/deleted slugs out of nav. Owners/editors see all links.
+    const hiddenSlugs = (!isEditor && !isOwner) ? warnSlugs : new Set<string>()
+    // In editor/preview: mark hidden links so NavigationBlock can render a warning indicator.
+    const markHiddenLinks = isEditor && warnSlugs.size > 0
+
+    // Returns true when a URL points to a page that should be hidden from visitors.
+    const isHiddenSlug = (url: string | undefined): boolean => {
+        if (!hiddenSlugs.size) return false
+        const resolvedPath = resolveInternalUrlPath(url, slugCanonical)
+        return !!resolvedPath && hiddenSlugs.has(resolvedPath)
+    }
+
     const rewriteNavLinks = (links: unknown): unknown => {
         if (!Array.isArray(links)) return links
-        return links.map((l) => {
-            if (!l || typeof l !== 'object') return l
-            const link = l as { url?: string; children?: unknown; [k: string]: unknown }
-            return {
-                ...link,
-                url: rewriteUrl(link.url),
-                children: link.children ? rewriteNavLinks(link.children) : undefined,
-            }
-        })
+        return links
+            .filter((l) => {
+                if (!hiddenSlugs.size || !l || typeof l !== 'object') return true
+                const link = l as { url?: string }
+                const resolvedPath = resolveInternalUrlPath(link.url, slugCanonical)
+                return !resolvedPath || !hiddenSlugs.has(resolvedPath)
+            })
+            .map((l) => {
+                if (!l || typeof l !== 'object') return l
+                const link = l as { url?: string; children?: unknown; [k: string]: unknown }
+                const resolvedPath = resolveInternalUrlPath(link.url, slugCanonical)
+                const isHiddenFromVisitor = markHiddenLinks && !!resolvedPath && warnSlugs.has(resolvedPath)
+                return {
+                    ...link,
+                    url: rewriteUrl(link.url),
+                    children: link.children ? rewriteNavLinks(link.children) : undefined,
+                    ...(isHiddenFromVisitor ? { _hiddenFromVisitor: true } : {}),
+                }
+            })
     }
 
     const blocks = rawBlocks.map((b) => {
         if (b.blockType === 'navigation') {
+            const rawCta = b.ctaButton as { show?: boolean; url?: string; [k: string]: unknown } | null | undefined
             return {
                 ...b,
                 links: rewriteNavLinks(b.links) as typeof b.links,
-                ctaButton: b.ctaButton
-                    ? { ...b.ctaButton, url: rewriteUrl(b.ctaButton.url) }
+                ctaButton: rawCta
+                    ? isHiddenSlug(rawCta.url)
+                        ? { ...rawCta, show: false }
+                        : { ...rawCta, url: rewriteUrl(rawCta.url) }
                     : b.ctaButton,
             }
         }
         if (b.blockType === 'hero' && Array.isArray(b.ctaButtons)) {
             return {
                 ...b,
-                ctaButtons: b.ctaButtons.map((btn) => ({
-                    ...btn,
-                    url: rewriteUrl(btn?.url),
-                })),
+                ctaButtons: b.ctaButtons
+                    .filter((btn) => !isHiddenSlug(btn?.url))
+                    .map((btn) => ({ ...btn, url: rewriteUrl(btn?.url) })),
+            }
+        }
+        if (b.blockType === 'cta') {
+            const ctaUrl = b.ctaUrl as string | undefined
+            const secUrl = b.secondaryCtaUrl as string | undefined
+            return {
+                ...b,
+                ctaUrl: isHiddenSlug(ctaUrl) ? '' : rewriteUrl(ctaUrl),
+                secondaryCtaUrl: isHiddenSlug(secUrl) ? '' : rewriteUrl(secUrl),
             }
         }
         if (b.blockType === 'breadcrumb') {
@@ -396,6 +443,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
     })
 
     return (
+        <HiddenSlugsProvider value={isEditor ? { slugs: warnSlugs, pageIds: warnPageIds } : { slugs: new Set(), pageIds: new Set() }}>
         <OwnerProvider value={!!isOwner}>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`
@@ -463,12 +511,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                     return null
                 }
 
-                // Nav always renders every link the user authored, even when
-                // a target page is `isVisible=false`. Hiding only affects
-                // direct routing (public route query already returns 404 for
-                // hidden pages); the nav menu itself stays stable so users
-                // never see menu items disappear mid-session as they click
-                // around.
                 const normalizedBlock = block
 
                 const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
@@ -587,5 +629,6 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                 </div>
             ))}
         </OwnerProvider>
+        </HiddenSlugsProvider>
     )
 }

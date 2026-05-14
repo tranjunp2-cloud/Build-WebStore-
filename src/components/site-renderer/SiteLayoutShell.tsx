@@ -1,7 +1,7 @@
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
-import { buildSlugCanonicalMap, rewriteLiveUrl } from '@/lib/navigation-url'
+import { buildSlugCanonicalMap, resolveInternalUrlPath, rewriteLiveUrl } from '@/lib/navigation-url'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { OwnerProvider } from './OwnerContext'
@@ -14,14 +14,30 @@ type SiteLayoutShellProps = {
     children: React.ReactNode
 }
 
-/** Rewrite all `url` fields in nav links array recursively. */
-function rewriteNavLinks(links: unknown, rewriteUrl: (u: string | undefined) => string): unknown {
+/** Rewrite all `url` fields in nav links array recursively; filter hidden/deleted page slugs for visitors. */
+function rewriteNavLinks(
+    links: unknown,
+    rewriteUrl: (u: string | undefined) => string,
+    hiddenSlugs: Set<string>,
+    slugCanonical: Map<string, string>,
+): unknown {
     if (!Array.isArray(links)) return links
-    return links.map((l) => {
-        if (!l || typeof l !== 'object') return l
-        const link = l as { url?: string; children?: unknown; [k: string]: unknown }
-        return { ...link, url: rewriteUrl(link.url), children: link.children ? rewriteNavLinks(link.children, rewriteUrl) : undefined }
-    })
+    return links
+        .filter((l) => {
+            if (!hiddenSlugs.size || !l || typeof l !== 'object') return true
+            const link = l as { url?: string }
+            const resolvedPath = resolveInternalUrlPath(link.url, slugCanonical)
+            return !resolvedPath || !hiddenSlugs.has(resolvedPath)
+        })
+        .map((l) => {
+            if (!l || typeof l !== 'object') return l
+            const link = l as { url?: string; children?: unknown; [k: string]: unknown }
+            return {
+                ...link,
+                url: rewriteUrl(link.url),
+                children: link.children ? rewriteNavLinks(link.children, rewriteUrl, hiddenSlugs, slugCanonical) : undefined,
+            }
+        })
 }
 
 /** Rewrite `url` fields in footer column links. */
@@ -61,12 +77,34 @@ export function SiteLayoutShell({ site, pages = [], isOwner, children }: SiteLay
     const slugCanonical = buildSlugCanonicalMap(pages as unknown as { id: string | number; slug?: string | null; isHomepage?: boolean | null }[])
     const rewriteUrl = (url: string | undefined) => rewriteLiveUrl(url, slugCanonical)
 
+    // SiteLayoutShell is live-mode only — filter hidden/deleted/draft pages for non-owners
+    const hiddenSlugs = new Set<string>()
+    if (!isOwner) {
+        for (const p of pages) {
+            if (p.isVisible === false || (p.deletedAt != null && p.deletedAt !== '') || p.status === 'draft') {
+                const raw = (p.slug ?? '').trim()
+                hiddenSlugs.add(!raw || raw === '/' ? '/' : (raw.startsWith('/') ? raw : `/${raw}`))
+            }
+        }
+    }
+
     // Rewrite URLs in nav + footer blocks
     const rawHeader = site.headerBlock as Record<string, unknown> | null | undefined
     const rawFooter = site.footerBlock as Record<string, unknown> | null | undefined
 
+    const rawHeaderCta = rawHeader?.ctaButton as { show?: boolean; url?: string; [k: string]: unknown } | null | undefined
+    const headerCtaPath = resolveInternalUrlPath(rawHeaderCta?.url, slugCanonical)
+    const headerCtaHidden = hiddenSlugs.size > 0 && !!headerCtaPath && hiddenSlugs.has(headerCtaPath)
     const headerBlock: Record<string, unknown> | null = rawHeader
-        ? { ...rawHeader, links: rewriteNavLinks(rawHeader.links, rewriteUrl), ctaButton: rawHeader.ctaButton ? { ...(rawHeader.ctaButton as object), url: rewriteUrl((rawHeader.ctaButton as { url?: string }).url) } : rawHeader.ctaButton }
+        ? {
+            ...rawHeader,
+            links: rewriteNavLinks(rawHeader.links, rewriteUrl, hiddenSlugs, slugCanonical),
+            ctaButton: rawHeaderCta
+                ? headerCtaHidden
+                    ? { ...rawHeaderCta, show: false }
+                    : { ...rawHeaderCta, url: rewriteUrl(rawHeaderCta.url) }
+                : rawHeader.ctaButton,
+        }
         : null
 
     const footerBlock: Record<string, unknown> | null = rawFooter

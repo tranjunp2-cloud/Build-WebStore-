@@ -2703,6 +2703,10 @@
       "breadcrumbShowOnAllPagesDesc": "Display breadcrumb on every page",
       "breadcrumbPreview": "Preview",
       "noButtons": "No buttons yet",
+      "linkPageHidden": "This page is set to Hidden — not visible to visitors",
+      "linkPageDraft": "This page is in Draft — not visible to visitors",
+      "linkPageDeleted": "This page has been deleted — link will not work",
+      "linkPageNotFound": "No page found with this URL — link may not work",
       "secondaryButton": "Secondary Button",
       "removeButton": "Remove",
       "faqConfiguration": "FAQ Configuration",
@@ -2859,8 +2863,11 @@
       "slugConflict": "Page slug already exists in this site",
       "noPagesFound": "No pages found",
       "noPagesSuggestion": "Create your first page to get started.",
-      "tooltipLive": "This page is published and your site is live — it's visible to visitors.",
-      "tooltipDraft": "This page won't appear on your website. Either the page is still a draft or your site hasn't been published yet."
+      "tooltipLive": "Published & Visible: Anyone can see this page through the menu or direct link.",
+      "tooltipLiveHidden": "Published & Hidden: This page is hidden from the menu and direct access is blocked (404).",
+      "tooltipLiveNoLink": "Published & Unlinked: Page is live but not in the menu. Accessible only via direct URL.",
+      "tooltipDraft": "Draft: This page is not yet public. Publish it to make it live.",
+      "tooltipDraftSite": "Site Unpublished: Your site is currently offline. No pages are visible to visitors."
     },
     "navigationValidation": {
       "labelRequired": "Link label is required",

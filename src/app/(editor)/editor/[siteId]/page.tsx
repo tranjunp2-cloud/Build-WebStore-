@@ -437,6 +437,12 @@ export default function EditorPage() {
         }
     }, [])
 
+    // Sync pages visibility/deleted state to preview iframe so BrokenLinkWarning indicators update live.
+    useEffect(() => {
+        if (!pages.length) return
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_PAGES', pages })
+    }, [pages])
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement

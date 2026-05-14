@@ -2,7 +2,7 @@
 
 import React, { memo, useEffect, useMemo, useState } from 'react'
 import * as Tooltip from '@radix-ui/react-tooltip'
-import { ChevronDown, Globe2, Loader2, UploadCloud } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Globe2, Loader2, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
@@ -30,6 +30,7 @@ import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
 import { useEditorStore } from '@/store/editorStore'
 import { toast } from 'sonner'
+import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
@@ -45,6 +46,24 @@ function sanitizeInput(value: string): string {
 /** Check if input contains HTML/script injection */
 function containsHtml(value: string): boolean {
     return /<[^>]*>/i.test(value)
+}
+
+/** Returns the warning state for a URL pointing to a hidden, draft, deleted, or non-existent page. */
+function checkHiddenPageUrl(url: string | undefined, pages?: PageData[]): 'hidden' | 'draft' | 'deleted' | 'not-found' | false {
+    if (!url || !pages?.length) return false
+    const slugCanonical = buildSlugCanonicalMap(pages)
+    const resolvedPath = resolveInternalUrlPath(url, slugCanonical)
+    if (!resolvedPath) return false
+    const match = pages.find(p => {
+        const s = (p.slug ?? '').trim()
+        const pagePath = ((p as { isHomepage?: boolean }).isHomepage || !s || s === '/' || s === 'home') ? '/' : (s.startsWith('/') ? s : `/${s}`)
+        return pagePath === resolvedPath
+    })
+    if (!match) return 'not-found'
+    if (match.deletedAt != null && match.deletedAt !== '') return 'deleted'
+    if (match.isVisible === false) return 'hidden'
+    if (match.status === 'draft') return 'draft'
+    return false
 }
 
 /** Validate URL format — allow http/https and relative paths (/ or #), reject protocol-relative (//host) */
@@ -910,23 +929,37 @@ function SettingsPanelInner({
                                 onHeaderUpdate?.({ ctaButton: { ...current, label: e.target.value } })
                             }}
                         />
-                        <Input
-                            key={`nav-cta-url-${((headerBlock?.ctaButton as Record<string, unknown>)?.url as string) || ''}`}
-                            defaultValue={((headerBlock?.ctaButton as Record<string, unknown>)?.url as string) || ''}
-                            placeholder={s.navCtaUrl}
-                            variant="editor"
-                            onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
-                                const raw = e.target.value.trim()
-                                const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: true, label: '', url: '' }
-                                // Block javascript:/data:/vbscript: URIs — relative paths (/contact, #section) are allowed.
-                                if (raw && /^(javascript|data|vbscript):/i.test(raw)) {
-                                    toast.error(s.invalidSocialUrl)
-                                    e.target.value = (current.url as string) || ''
-                                    return
-                                }
-                                onHeaderUpdate?.({ ctaButton: { ...current, url: raw } })
-                            }}
-                        />
+                        {(() => {
+                            const ctaUrl = (headerBlock?.ctaButton as Record<string, unknown>)?.url as string | undefined
+                            const hiddenCta = checkHiddenPageUrl(ctaUrl, pages)
+                            return (
+                                <>
+                                    <Input
+                                        key={`nav-cta-url-${ctaUrl || ''}`}
+                                        defaultValue={ctaUrl || ''}
+                                        placeholder={s.navCtaUrl}
+                                        variant="editor"
+                                        className={hiddenCta ? 'mt-1.5 ring-2 ring-red-500/70' : undefined}
+                                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                                            const raw = e.target.value.trim()
+                                            const current = (headerBlock?.ctaButton as Record<string, unknown>) || { show: true, label: '', url: '' }
+                                            if (raw && /^(javascript|data|vbscript):/i.test(raw)) {
+                                                toast.error(s.invalidSocialUrl)
+                                                e.target.value = (current.url as string) || ''
+                                                return
+                                            }
+                                            onHeaderUpdate?.({ ctaButton: { ...current, url: raw } })
+                                        }}
+                                    />
+                                    {hiddenCta && (
+                                        <p className="mt-1 flex items-center gap-1 text-[11px] text-red-400">
+                                            <AlertTriangle size={11} className="shrink-0" />
+                                            {hiddenCta === 'deleted' ? s.linkPageDeleted : hiddenCta === 'draft' ? s.linkPageDraft : hiddenCta === 'not-found' ? s.linkPageNotFound : s.linkPageHidden}
+                                        </p>
+                                    )}
+                                </>
+                            )
+                        })()}
                     </div>
                 </div>
 
@@ -1470,10 +1503,25 @@ function SettingsPanelInner({
                                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaLabel', e.target.value)}
                                             variant="editor"
                                             className={editorInputClassName} placeholder={s.buttonText} />
-                                        <Input defaultValue={(block.ctaUrl as string) || ''} key={`ctaurl-${bk}`}
-                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaUrl', e.target.value)}
-                                            variant="editor"
-                                            className={editorInputClassName} placeholder={s.buttonUrl} />
+                                        {(() => {
+                                            const ctaUrlVal = block.ctaUrl as string | undefined
+                                            const hiddenCtaUrl = checkHiddenPageUrl(ctaUrlVal, pages)
+                                            return (
+                                                <>
+                                                    <Input defaultValue={ctaUrlVal || ''} key={`ctaurl-${bk}`}
+                                                        onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaUrl', e.target.value)}
+                                                        variant="editor"
+                                                        className={hiddenCtaUrl ? `${editorInputClassName} ring-2 ring-red-500/70` : editorInputClassName}
+                                                        placeholder={s.buttonUrl} />
+                                                    {hiddenCtaUrl && (
+                                                        <p className="flex items-center gap-1 text-[11px] text-red-400">
+                                                            <AlertTriangle size={11} className="shrink-0" />
+                                                            {hiddenCtaUrl === 'deleted' ? s.linkPageDeleted : hiddenCtaUrl === 'draft' ? s.linkPageDraft : hiddenCtaUrl === 'not-found' ? s.linkPageNotFound : s.linkPageHidden}
+                                                        </p>
+                                                    )}
+                                                </>
+                                            )
+                                        })()}
                                     </div>
                                 </div>
                             )}
@@ -1744,10 +1792,23 @@ function SettingsPanelInner({
                                                 onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
                                                 variant="editor"
                                                 className={editorInputClassName} />
-                                            <Input defaultValue={btn.url || ''} placeholder={s.url}
-                                                onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'url', e.target.value)}
-                                                variant="editor"
-                                                className={editorInputClassName} />
+                                            {(() => {
+                                                const hiddenBtn = checkHiddenPageUrl(btn.url, pages)
+                                                return (
+                                                    <>
+                                                        <Input defaultValue={btn.url || ''} placeholder={s.url}
+                                                            onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'url', e.target.value)}
+                                                            variant="editor"
+                                                            className={hiddenBtn ? `${editorInputClassName} ring-2 ring-red-500/70` : editorInputClassName} />
+                                                        {hiddenBtn && (
+                                                            <p className="flex items-center gap-1 text-[11px] text-red-400">
+                                                                <AlertTriangle size={11} className="shrink-0" />
+                                                                {hiddenBtn === 'deleted' ? s.linkPageDeleted : hiddenBtn === 'draft' ? s.linkPageDraft : hiddenBtn === 'not-found' ? s.linkPageNotFound : s.linkPageHidden}
+                                                            </p>
+                                                        )}
+                                                    </>
+                                                )
+                                            })()}
                                         </div>
                                     ))}
                                     <button
@@ -1775,10 +1836,24 @@ function SettingsPanelInner({
                                                 onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), label: e.target.value } })}
                                                 variant="editor"
                                                 className={editorInputClassName} />
-                                            <Input defaultValue={(block.ctaButton as CtaButton)?.url || ''} placeholder={s.buttonUrl}
-                                                onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), url: e.target.value } })}
-                                                variant="editor"
-                                                className={editorInputClassName} />
+                                            {(() => {
+                                                const navBtnUrl = (block.ctaButton as CtaButton)?.url
+                                                const hiddenNavBtn = checkHiddenPageUrl(navBtnUrl, pages)
+                                                return (
+                                                    <>
+                                                        <Input defaultValue={navBtnUrl || ''} placeholder={s.buttonUrl}
+                                                            onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), url: e.target.value } })}
+                                                            variant="editor"
+                                                            className={hiddenNavBtn ? `${editorInputClassName} ring-2 ring-red-500/70` : editorInputClassName} />
+                                                        {hiddenNavBtn && (
+                                                            <p className="mt-1 flex items-center gap-1 text-[11px] text-red-400">
+                                                                <AlertTriangle size={11} className="shrink-0" />
+                                                                {hiddenNavBtn === 'deleted' ? s.linkPageDeleted : hiddenNavBtn === 'draft' ? s.linkPageDraft : hiddenNavBtn === 'not-found' ? s.linkPageNotFound : s.linkPageHidden}
+                                                            </p>
+                                                        )}
+                                                    </>
+                                                )
+                                            })()}
                                         </div>
                                     )}
                                 </div>

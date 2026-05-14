@@ -128,13 +128,14 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         page = homepageFallback.docs[0]
     }
 
+    // Fetch ALL pages (including hidden/deleted) so SiteRenderer can build hiddenSlugs
+    // and filter nav links client-side. Visibility/404 enforcement is handled above
+    // on the current-page lookup; passing partial data here would break the filter.
     const navigationPages = await payload.find({
         collection: 'pages',
         where: {
             and: [
                 { site: { equals: site.id } },
-                ...visibilityFilter,
-                ...deletedFilter,
             ],
         },
         limit: 100,

@@ -7,6 +7,8 @@ export type NavLink = {
     label: string
     url: string
     children?: NavLink[]
+    /** Runtime-only: injected by SiteRenderer in editor/preview to flag links hidden from visitors */
+    _hiddenFromVisitor?: boolean
 }
 
 export type NavigationConfig = {
