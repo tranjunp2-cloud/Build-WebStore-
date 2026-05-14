@@ -16,6 +16,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { useI18n } from '@/i18n'
 
+const ALLOWED_FOOTER_FIELDS = new Set(['copyrightText', 'tagline'])
+
 export interface PreviewFrameHandle {
     /** Send a postMessage to the preview iframe without triggering a full reload. */
     sendToIframe: (message: object) => void
@@ -44,6 +46,10 @@ interface PreviewFrameProps {
     onInlineEditSave?: () => Promise<boolean | void>
     /** Called after mount with an imperative handle; called with null on unmount. */
     onHandleReady?: (handle: PreviewFrameHandle | null) => void
+    /** Called when a footer field is edited inline in the preview — dedicated footer channel. */
+    onFooterUpdate?: (changes: Record<string, unknown>) => void
+    /** Called when footer inline edit session ends (blur/Enter/Escape) — flush debounce + save once. */
+    onFooterEditStop?: () => void
 }
 
 type HoverRect = {
@@ -230,6 +236,8 @@ function PreviewFrameInner({
     disableDragDrop = false,
     onInlineEditSave,
     onHandleReady,
+    onFooterUpdate,
+    onFooterEditStop,
 }: PreviewFrameProps) {
     const { t } = useI18n()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
@@ -239,6 +247,10 @@ function PreviewFrameInner({
     useEffect(() => { blocksRef.current = blocks }, [blocks])
     const onInlineEditSaveRef = useRef(onInlineEditSave)
     useEffect(() => { onInlineEditSaveRef.current = onInlineEditSave }, [onInlineEditSave])
+    const onFooterUpdateRef = useRef(onFooterUpdate)
+    useEffect(() => { onFooterUpdateRef.current = onFooterUpdate }, [onFooterUpdate])
+    const onFooterEditStopRef = useRef(onFooterEditStop)
+    useEffect(() => { onFooterEditStopRef.current = onFooterEditStop }, [onFooterEditStop])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
     const [selectedGlobalBlockLayout, setSelectedGlobalBlockLayout] = useState<BlockLayoutRect | null>(null)
@@ -669,6 +681,19 @@ function PreviewFrameInner({
                 if (ALLOWED_TOAST_VARIANTS.has(variant as 'success' | 'error' | 'info')) {
                     toast[variant as 'success' | 'error' | 'info'](message)
                 }
+            } else if (e.data?.type === 'FOOTER_FIELD_EDIT_START') {
+                // no-op — could scroll sidebar to footer section in a future iteration
+            } else if (e.data?.type === 'FOOTER_FIELD_EDITED') {
+                const { fieldName, newValue } = e.data as { fieldName: string; newValue: string }
+                if (!ALLOWED_FOOTER_FIELDS.has(fieldName)) return
+                onFooterUpdateRef.current?.({ [fieldName]: newValue })
+            } else if (e.data?.type === 'FOOTER_FIELD_EDIT_STOP') {
+                const { fieldName: stopField, newValue: stopValue } = e.data as { fieldName?: string; newValue?: string }
+                // Flush any in-flight content that the 300ms debounce hadn't fired yet (fast blur/Enter scenario)
+                if (stopField && stopValue !== undefined && ALLOWED_FOOTER_FIELDS.has(stopField)) {
+                    onFooterUpdateRef.current?.({ [stopField]: stopValue })
+                }
+                onFooterEditStopRef.current?.()
             }
         }
         window.addEventListener('message', handleMessage)

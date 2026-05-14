@@ -128,6 +128,7 @@ export default function EditorPage() {
     const [templateApplied, setTemplateApplied] = useState(false)
     const [showSaveGuard, setShowSaveGuard] = useState(false)
     const reorderSaveTimerRef = useRef<number | null>(null)
+    const footerUpdateSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     // Imperative handle to send postMessages to iframe without full reload (Gap B)
     const previewFrameSendRef = useRef<PreviewFrameHandle | null>(null)
     const isSavingRef = useRef(false)
@@ -428,11 +429,14 @@ export default function EditorPage() {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload)
     }, [hasUnsavedChanges])
 
-    // Clear pending reorder-save timer on unmount
+    // Clear pending save timers on unmount
     useEffect(() => {
         return () => {
             if (reorderSaveTimerRef.current !== null) {
                 window.clearTimeout(reorderSaveTimerRef.current)
+            }
+            if (footerUpdateSaveTimerRef.current !== null) {
+                clearTimeout(footerUpdateSaveTimerRef.current)
             }
         }
     }, [])
@@ -1153,7 +1157,8 @@ export default function EditorPage() {
         if (blockType === 'navigation' || blockType === 'footer' || blockType === 'breadcrumb') {
             setSelectedBlock(null)
             // Use unique key to force re-trigger even on repeated clicks
-            setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: blockType === 'breadcrumb' ? 'breadcrumb' : undefined })
+            const sectionMap: Record<string, string> = { breadcrumb: 'breadcrumb', footer: 'footer' }
+            setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: blockType ? sectionMap[blockType] : undefined })
         } else {
             setSelectedBlock(blockIndex)
             setSettingsRequestedTab(null)
@@ -1343,7 +1348,11 @@ export default function EditorPage() {
                                         updateFooterBlock(changes)
                                         const updatedFooter = useEditorStore.getState().footerBlock
                                         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
-                                        void saveWithRetry({ showToast: false, refreshPreview: false })
+                                        if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
+                                        footerUpdateSaveTimerRef.current = setTimeout(() => {
+                                            footerUpdateSaveTimerRef.current = null
+                                            void saveWithRetry({ showToast: false, refreshPreview: false })
+                                        }, 600)
                                     }}
                                     onSiteSettingsChange={handleSiteSettingsChange}
                                     onPageUpdate={handlePageUpdate}
@@ -1426,6 +1435,25 @@ export default function EditorPage() {
                                 // Reloading here causes visible jank while user is still editing.
                                 await handleSave({ showToast: false, refreshPreview: false })
                             }}
+                            onFooterUpdate={(changes) => {
+                                updateFooterBlock(changes)
+                                const updatedFooter = useEditorStore.getState().footerBlock
+                                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
+                                if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
+                                footerUpdateSaveTimerRef.current = setTimeout(() => {
+                                    footerUpdateSaveTimerRef.current = null
+                                    void saveWithRetry({ showToast: false, refreshPreview: false })
+                                }, 600)
+                            }}
+                            onFooterEditStop={() => {
+                                // Only save if a debounce is pending — if it already fired, the save is done
+                                const hadPending = !!footerUpdateSaveTimerRef.current
+                                if (footerUpdateSaveTimerRef.current) {
+                                    clearTimeout(footerUpdateSaveTimerRef.current)
+                                    footerUpdateSaveTimerRef.current = null
+                                }
+                                if (hadPending) void saveWithRetry({ showToast: false, refreshPreview: false })
+                            }}
                             onHandleReady={(handle) => { previewFrameSendRef.current = handle }}
                         />
                     </div>
@@ -1461,7 +1489,11 @@ export default function EditorPage() {
                                 updateFooterBlock(changes)
                                 const updatedFooter = useEditorStore.getState().footerBlock
                                 previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: updatedFooter })
-                                void saveWithRetry({ showToast: false, refreshPreview: false })
+                                if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
+                                footerUpdateSaveTimerRef.current = setTimeout(() => {
+                                    footerUpdateSaveTimerRef.current = null
+                                    void saveWithRetry({ showToast: false, refreshPreview: false })
+                                }, 600)
                             }}
                             onSiteSettingsChange={handleSiteSettingsChange}
                             onPageUpdate={handlePageUpdate}

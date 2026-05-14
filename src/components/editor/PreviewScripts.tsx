@@ -186,6 +186,11 @@ export function PreviewScripts() {
         let originalHtml = ''
         let originalTag = ''
 
+        // Footer field inline edit state — dedicated channel separate from generic TEXT_EDITING
+        let isEditingFooterField = false
+        let footerFieldEl: HTMLElement | null = null
+        let footerFieldStopFn: ((silent?: boolean) => void) | null = null
+
         const HEADING_TAGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6']
         const LIST_TAGS = ['UL', 'OL']
 
@@ -424,6 +429,82 @@ export function PreviewScripts() {
 
         const onClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement
+
+            // Footer field inline edit (dedicated channel — separate from generic TEXT_EDITING_STARTED)
+            const ffEl = (target as HTMLElement).closest('[data-footer-field]') as HTMLElement | null
+            if (ffEl && !isEditingFooterField) {
+                e.stopPropagation()
+                const fieldName = ffEl.dataset.footerField as string
+                isEditingFooterField = true
+                footerFieldEl = ffEl
+
+                ffEl.contentEditable = 'true'
+                ffEl.focus()
+                // Place caret at end
+                const ffRange = document.createRange()
+                ffRange.selectNodeContents(ffEl)
+                ffRange.collapse(false)
+                const ffSel = window.getSelection()
+                ffSel?.removeAllRanges()
+                ffSel?.addRange(ffRange)
+
+                const ffRect = ffEl.getBoundingClientRect()
+                window.parent.postMessage({ type: 'FOOTER_FIELD_EDIT_START', fieldName, value: ffEl.textContent, rect: { top: ffRect.top, left: ffRect.left, width: ffRect.width, height: ffRect.height } }, parentOrigin)
+
+                let ffInputTimer: ReturnType<typeof setTimeout> | null = null
+                const onFFInput = () => {
+                    if (ffInputTimer) clearTimeout(ffInputTimer)
+                    ffInputTimer = setTimeout(() => {
+                        ffInputTimer = null
+                        window.parent.postMessage({ type: 'FOOTER_FIELD_EDITED', fieldName, newValue: ffEl.textContent ?? '' }, parentOrigin)
+                    }, 300)
+                }
+                const onFFKeyDown = (ev: KeyboardEvent) => {
+                    if (ev.key === 'Enter' || ev.key === 'Escape') { ev.preventDefault(); ffEl.blur() }
+                }
+                const onFFPaste = (ev: ClipboardEvent) => {
+                    ev.preventDefault()
+                    const text = ev.clipboardData?.getData('text/plain') ?? ''
+                    const sel = window.getSelection()
+                    if (sel && sel.rangeCount > 0) {
+                        const range = sel.getRangeAt(0)
+                        range.deleteContents()
+                        range.insertNode(document.createTextNode(text))
+                        range.collapse(false)
+                        sel.removeAllRanges()
+                        sel.addRange(range)
+                        onFFInput()
+                    }
+                }
+                const stopFooterFieldEdit = (silent?: boolean) => {
+                    if (!isEditingFooterField) return
+                    // Capture latest content BEFORE clearing debounce timer — guarantees parent
+                    // receives the value even on fast blur/Enter before the 300ms fires
+                    const pendingValue = ffEl.textContent ?? ''
+                    if (ffInputTimer) { clearTimeout(ffInputTimer); ffInputTimer = null }
+                    // Guard must be cleared BEFORE contentEditable='false' — setting it fires blur
+                    // synchronously, which would re-enter this function and send a duplicate STOP message
+                    isEditingFooterField = false
+                    footerFieldEl = null
+                    footerFieldStopFn = null
+                    ffEl.contentEditable = 'false'
+                    ffEl.removeEventListener('input', onFFInput)
+                    ffEl.removeEventListener('keydown', onFFKeyDown)
+                    ffEl.removeEventListener('paste', onFFPaste)
+                    ffEl.removeEventListener('blur', onFFBlur)
+                    if (!silent) {
+                        window.parent.postMessage({ type: 'FOOTER_FIELD_EDIT_STOP', fieldName, newValue: pendingValue }, parentOrigin)
+                    }
+                }
+                const onFFBlur = () => stopFooterFieldEdit()
+                footerFieldStopFn = stopFooterFieldEdit as (silent?: boolean) => void
+
+                ffEl.addEventListener('input', onFFInput)
+                ffEl.addEventListener('keydown', onFFKeyDown)
+                ffEl.addEventListener('paste', onFFPaste)
+                ffEl.addEventListener('blur', onFFBlur)
+                return
+            }
 
             // Notify parent which block was clicked → opens block settings tab
             const clickedBlock = target.closest('[data-block-index]')
@@ -952,6 +1033,12 @@ export function PreviewScripts() {
                 toolbarActive = false
                 cleanUpEditing()
             }
+            if (e.data?.type === 'STOP_FOOTER_FIELD_EDIT') {
+                if (isEditingFooterField && footerFieldEl) {
+                    // Call stop with silent=true to avoid re-posting FOOTER_FIELD_EDIT_STOP to parent
+                    footerFieldStopFn?.(true)
+                }
+            }
             if (e.data?.type === 'DRAG_BLOCK_START') {
                 const el = document.querySelector(`[data-block-index="${e.data.blockIndex}"]`) as HTMLElement
                 if (el) el.style.opacity = '0.3'
@@ -1139,6 +1226,9 @@ export function PreviewScripts() {
                 [contenteditable="true"] a {
                   cursor: text;
                 }
+                [data-footer-field]{cursor:text;}
+                [data-footer-field]:hover{outline:2px dashed rgba(59,130,246,0.4);outline-offset:2px;}
+                [data-footer-field][contenteditable="true"]{outline:2px solid rgba(59,130,246,0.85);outline-offset:2px;}
         `
 
         // Cleanup
