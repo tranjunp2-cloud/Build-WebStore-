@@ -28,6 +28,10 @@ export async function POST(request: Request) {
             return badRequest('VALIDATION_ERROR', 'Invalid JSON body')
         }
 
+        if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+            return badRequest('VALIDATION_ERROR', 'Request body must be a JSON object')
+        }
+
         const { siteId, state, subtotalSen } = body
 
         if (typeof siteId !== 'string' || siteId.length === 0 || siteId.length > 100) {

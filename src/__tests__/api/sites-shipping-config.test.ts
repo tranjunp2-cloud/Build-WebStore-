@@ -155,6 +155,15 @@ describe('PATCH /api/sites/[siteId]/shipping-config [TC-F14]', () => {
         expect(body.error.code).toBe('VALIDATION_ERROR')
     })
 
+    it('[TC-F14.95] null JSON body returns 400 VALIDATION_ERROR (not 500)', async () => {
+        const res = await PATCH(mockReq(null), mockCtx())
+        const body = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(body.error.code).toBe('VALIDATION_ERROR')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
     it('returns 404 when site not found', async () => {
         mockFindByID.mockResolvedValueOnce(null)
 
