@@ -9,6 +9,7 @@ import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
     ShieldCheck, ChevronRight, Rocket, MapPin, Truck,
     QrCode, UploadCloud, FileImage, Tag, Info, Lock, AlertTriangle,
+    Landmark, Copy, CheckCheck,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
@@ -24,6 +25,9 @@ type InitialSiteData = {
     merchantQrCodeUrl: string | null
     enableCod: boolean
     enableQrBanking: boolean
+    bankName: string | null
+    bankAccountNo: string | null
+    bankAccountHolder: string | null
 }
 
 type CheckoutClientProps = {
@@ -60,6 +64,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [merchantQrUrl, setMerchantQrUrl] = useState<string | null>(initialSiteData?.merchantQrCodeUrl ?? null)
     const [enableCod, setEnableCod] = useState(initialSiteData?.enableCod ?? true)
     const [enableQrBanking, setEnableQrBanking] = useState(initialSiteData?.enableQrBanking ?? true)
+    const [bankName, setBankName] = useState(initialSiteData?.bankName ?? '')
+    const [bankAccountNo, setBankAccountNo] = useState(initialSiteData?.bankAccountNo ?? '')
+    const [bankAccountHolder, setBankAccountHolder] = useState(initialSiteData?.bankAccountHolder ?? '')
+    const [copiedField, setCopiedField] = useState<string | null>(null)
     const [showStripe, setShowStripe] = useState(false)
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
@@ -126,6 +134,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 if (data.merchantQrCodeUrl) setMerchantQrUrl(data.merchantQrCodeUrl)
                 if (data.enableCod === false) { setEnableCod(false); setPaymentMethod('qr_banking') }
                 if (data.enableQrBanking === false) setEnableQrBanking(false)
+                if (data.bankName) setBankName(data.bankName)
+                if (data.bankAccountNo) setBankAccountNo(data.bankAccountNo)
+                if (data.bankAccountHolder) setBankAccountHolder(data.bankAccountHolder)
                 if (data.enableStripe === true) setShowStripe(true)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
@@ -173,6 +184,14 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const handlePhoneBlur = () => {
         const err = validatePhone(form.phone)
         if (err) setFieldErrors(prev => ({ ...prev, phone: err }))
+    }
+
+    const copyToClipboard = async (text: string, field: string) => {
+        try {
+            await navigator.clipboard.writeText(text)
+            setCopiedField(field)
+            setTimeout(() => setCopiedField(null), 2000)
+        } catch { /* clipboard API may be blocked in some browsers */ }
     }
 
     const handleStateChange = (stateId: string) => {
@@ -475,6 +494,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                             <div className="pm-body">
                                                 <h3 className="pm-title">Bank Transfer / DuitNow QR</h3>
                                                 <p className="pm-desc">Scan DuitNow QR or transfer to seller's bank. Upload receipt to confirm.</p>
+                                                <div className="pm-mini-marks">
+                                                    <span className="pm-mini-mark mark-qr"><QrCode size={12} /></span>
+                                                    <span className="pm-mini-mark mark-bnk"><Landmark size={12} /></span>
+                                                </div>
                                                 <div className="pm-pills">
                                                     <span className="pm-pill teal"><ShieldCheck size={11} /> Seller-verified</span>
                                                     <span className="pm-pill">No extra fee</span>
@@ -500,6 +523,43 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                                         <p>Open any MY banking or e-wallet app and confirm <strong>{formatPrice(total, currency)}</strong>.</p>
                                                         <span className="qr-apps">Maybank2u · TNG · Boost · GrabPay</span>
                                                     </div>
+                                                </div>
+
+                                                {/* Bank account details */}
+                                                {(bankName || bankAccountNo || bankAccountHolder) && (
+                                                    <ul className="bk-rows">
+                                                        {bankName && (
+                                                            <li className="bk-row">
+                                                                <span className="bk-lbl">Bank</span>
+                                                                <span className="bk-val">{bankName}</span>
+                                                                <button className="bk-copy" onClick={() => copyToClipboard(bankName, 'bank')}>
+                                                                    {copiedField === 'bank' ? <><CheckCheck size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
+                                                                </button>
+                                                            </li>
+                                                        )}
+                                                        {bankAccountNo && (
+                                                            <li className="bk-row">
+                                                                <span className="bk-lbl">Account No</span>
+                                                                <span className="bk-val mono">{bankAccountNo}</span>
+                                                                <button className="bk-copy" onClick={() => copyToClipboard(bankAccountNo, 'acct')}>
+                                                                    {copiedField === 'acct' ? <><CheckCheck size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
+                                                                </button>
+                                                            </li>
+                                                        )}
+                                                        {bankAccountHolder && (
+                                                            <li className="bk-row">
+                                                                <span className="bk-lbl">Holder</span>
+                                                                <span className="bk-val">{bankAccountHolder}</span>
+                                                                <button className="bk-copy" onClick={() => copyToClipboard(bankAccountHolder, 'holder')}>
+                                                                    {copiedField === 'holder' ? <><CheckCheck size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
+                                                                </button>
+                                                            </li>
+                                                        )}
+                                                    </ul>
+                                                )}
+                                                <div className="bk-note">
+                                                    <Info size={12} style={{ flexShrink: 0 }} />
+                                                    Transfer the exact amount then upload your receipt below to confirm payment.
                                                 </div>
 
                                                 {/* Upload */}
@@ -573,7 +633,12 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             {sub > 0 && sub < FREE_SHIPPING_THRESHOLD && (
                                 <div className="sum-nudge">
                                     <Truck size={12} />
-                                    <span>Add <strong>{formatPrice(FREE_SHIPPING_THRESHOLD - sub, currency)}</strong> more for <strong>FREE shipping</strong></span>
+                                    <div className="sn-body">
+                                        <span>Add <strong>{formatPrice(FREE_SHIPPING_THRESHOLD - sub, currency)}</strong> more for <strong>FREE shipping</strong></span>
+                                        <div className="sn-bar">
+                                            <div className="sn-fill" style={{ width: `${Math.min((sub / FREE_SHIPPING_THRESHOLD) * 100, 100)}%` }} />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -718,7 +783,8 @@ const CK_CSS = `
 .sum-promo input{flex:1;border:none;background:transparent;outline:none;font-size:13px;color:var(--f1);font-family:inherit;min-width:0;}
 .sum-promo input::placeholder{color:var(--f4);}
 .sp-ap{flex-shrink:0;font-size:12px;font-weight:700;color:var(--tl);background:transparent;border:none;padding:0;opacity:.4;cursor:not-allowed;}
-.sum-nudge{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--tl5);border:1px solid var(--tl2);border-radius:8px;font-size:12px;color:var(--f3);margin:6px 0;}
+.sum-nudge{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;background:var(--tl5);border:1px solid var(--tl2);border-radius:8px;font-size:12px;color:var(--f3);margin:6px 0;}
+.sum-nudge svg{margin-top:2px;}
 .sum-nudge svg{color:var(--tl);flex-shrink:0;}
 .sum-nudge strong{color:var(--tl7);}
 .sum-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;}
@@ -760,8 +826,8 @@ const CK_CSS = `
 .pm-brand.mc .mc-c span:last-child{background:#f79e1b;margin-left:-6px;mix-blend-mode:multiply;}
 .pm-brand.fpx{background:linear-gradient(135deg,#0a8a3f,#0c6e34);color:#fff;border-color:rgba(0,0,0,.06);}
 /* Locked / maintenance state */
-.pm.locked{opacity:.7;cursor:default;}
-.pm-rad.locked-rad{background:var(--inp);border-color:var(--bd);}
+.pm.locked{border-style:dashed;background:color-mix(in srgb,var(--card) 92%,var(--f1) 8%);opacity:1;cursor:default;}
+.pm-rad.locked-rad{border-style:dashed;background:transparent;}
 .pm-lock-glyph{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#92400e;background:#fff4dc;border:1px solid #f1d693;padding:2px 8px;border-radius:999px;opacity:1!important;filter:none!important;}
 .pm-tooltip{position:absolute;z-index:10;width:268px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;box-shadow:0 8px 30px rgba(15,23,42,.15);font-size:12px;line-height:1.5;color:var(--f2);opacity:0;pointer-events:none;transition:opacity .15s;}
 .pm.locked:hover .pm-tooltip{opacity:1;}
@@ -771,4 +837,23 @@ const CK_CSS = `
 .pt-head{display:flex;align-items:center;gap:6px;font-weight:700;font-size:12.5px;margin-bottom:4px;color:var(--f1);}
 .pt-cta{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:11.5px;font-weight:600;color:var(--tl);}
 .pm-pill.amber{background:#fff4dc;border-color:#f1d693;color:#92400e;}
+/* QR / Bank mini marks (#4) */
+.pm-mini-marks{display:flex;align-items:center;gap:6px;margin-top:8px;}
+.pm-mini-mark{width:26px;height:26px;border-radius:7px;border:1px solid;display:grid;place-items:center;}
+.mark-qr{background:var(--tl5);border-color:var(--tl2);color:var(--tl);}
+.mark-bnk{background:#f3eafd;border-color:#e1ccf7;color:#6b3dbf;}
+/* Free shipping progress bar (#3) */
+.sn-body{flex:1;display:flex;flex-direction:column;gap:5px;}
+.sn-bar{height:4px;border-radius:999px;background:rgba(var(--accent-rgb,14,117,86),.15);position:relative;overflow:hidden;}
+.sn-fill{position:absolute;inset:0;width:0;background:var(--tl);border-radius:999px;transition:width .4s ease;}
+/* Bank detail rows (#2) */
+.bk-rows{list-style:none;margin:0;padding:0;background:var(--inp);border:1px solid var(--bd);border-radius:12px;overflow:hidden;}
+.bk-row{display:grid;grid-template-columns:88px 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--bd);}
+.bk-row:last-child{border-bottom:none;}
+.bk-lbl{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
+.bk-val{font-size:13px;font-weight:600;color:var(--f1);}
+.bk-val.mono{font-family:monospace;letter-spacing:.02em;}
+.bk-copy{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--tl7);background:var(--tl5);border:1px solid var(--tl2);border-radius:7px;cursor:pointer;transition:all .12s;white-space:nowrap;}
+.bk-copy:hover{background:var(--tl2);}
+.bk-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:#fff4dc;border:1px solid #f1d693;border-radius:10px;color:#8a5c0a;font-size:12px;line-height:1.5;}
 `

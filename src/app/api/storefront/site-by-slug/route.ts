@@ -59,6 +59,9 @@ export async function GET(req: Request) {
             merchantQrCodeUrl,
             enableCod: paymentConfig?.enableCod ?? true,
             enableQrBanking: paymentConfig?.enableQrBanking ?? true,
+            bankName: paymentConfig?.bankName ?? null,
+            bankAccountNo: paymentConfig?.bankAccountNo ?? null,
+            bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
             theme: (site as any).theme ?? null,
         })
     } catch (error) {

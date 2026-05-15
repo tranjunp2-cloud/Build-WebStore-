@@ -3810,6 +3810,9 @@ const MIGRATIONS = [
   { name: 'sites.payment_config_merchant_qr_code_id', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_merchant_qr_code_id integer;` },
   { name: 'sites.payment_config_enable_cod', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_enable_cod boolean DEFAULT true;` },
   { name: 'sites.payment_config_enable_qr_banking', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_enable_qr_banking boolean DEFAULT true;` },
+  { name: 'sites.payment_config_bank_name', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_bank_name varchar;` },
+  { name: 'sites.payment_config_bank_account_no', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_bank_account_no varchar;` },
+  { name: 'sites.payment_config_bank_account_holder', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_bank_account_holder varchar;` },
   // GH-961: Malaysia geo reference tables for checkout cascade dropdowns (state → district → postcode)
   { name: 'malaysia_states.create_table', sql: `CREATE TABLE IF NOT EXISTS malaysia_states (id serial PRIMARY KEY, name varchar(60) NOT NULL UNIQUE, state_code varchar(5) NOT NULL UNIQUE, zone varchar(5) NOT NULL DEFAULT 'west');` },
   { name: 'malaysia_states.create_idx', sql: `CREATE INDEX IF NOT EXISTS idx_malaysia_states_code ON malaysia_states(state_code);` },

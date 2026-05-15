@@ -375,6 +375,22 @@ export const Sites: CollectionConfig = {
                     label: 'Enable QR Banking',
                     defaultValue: true,
                 },
+                {
+                    name: 'bankName',
+                    type: 'text',
+                    label: 'Bank Name',
+                    admin: { description: 'e.g. Maybank, CIMB, Public Bank' },
+                },
+                {
+                    name: 'bankAccountNo',
+                    type: 'text',
+                    label: 'Account Number',
+                },
+                {
+                    name: 'bankAccountHolder',
+                    type: 'text',
+                    label: 'Account Holder Name',
+                },
             ],
         },
         {
