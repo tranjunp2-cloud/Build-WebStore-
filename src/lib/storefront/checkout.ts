@@ -38,11 +38,3 @@ export function calculateOrderTotals(items: Array<{ price: number; quantity: num
 export function generateOrderNumber(): string {
     return `ORD-${Date.now().toString(36).toUpperCase()}`
 }
-
-export const MY_STATES = [
-    'Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang',
-    'Perak', 'Perlis', 'Pulau Pinang', 'Sabah', 'Sarawak', 'Selangor',
-    'Terengganu', 'W.P. Kuala Lumpur', 'W.P. Labuan', 'W.P. Putrajaya',
-] as const
-
-export const EAST_MY_STATES: readonly string[] = ['Sabah', 'Sarawak']

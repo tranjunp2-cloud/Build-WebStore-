@@ -13,7 +13,10 @@ import {
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
-import { MY_STATES, EAST_MY_STATES, type CheckoutForm } from '@/lib/storefront'
+import { type CheckoutForm } from '@/lib/storefront'
+
+type GeoState = { id: number; name: string; state_code: string; zone: string }
+type GeoDistrict = { id: number; name: string }
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -45,7 +48,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [showStripe, setShowStripe] = useState(false)
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
-    const [postcodeBlurred, setPostcodeBlurred] = useState(false)
+    const [states, setStates] = useState<GeoState[]>([])
+    const [statesLoading, setStatesLoading] = useState(true)
+    const [selectedStateId, setSelectedStateId] = useState('')
+    const [districts, setDistricts] = useState<GeoDistrict[]>([])
+    const [districtsLoading, setDistrictsLoading] = useState(false)
+    const [selectedDistrictId, setSelectedDistrictId] = useState('')
+    const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
+    const [postcodesLoading, setPostcodesLoading] = useState(false)
     const [paymentMethod, setPaymentMethod] = useState<'cod' | 'qr_banking'>('cod')
     const [proofFile, setProofFile] = useState<File | null>(null)
     const [proofPreview, setProofPreview] = useState<string | null>(null)
@@ -60,6 +70,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [fontBody, setFontBody] = useState('Inter')
 
     useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
+
+    useEffect(() => {
+        fetch('/api/geo/states')
+            .then(r => r.json())
+            .then(data => setStates(Array.isArray(data) ? data : []))
+            .catch(() => {})
+            .finally(() => setStatesLoading(false))
+    }, [])
 
     useEffect(() => {
         if (!slug) return
@@ -109,12 +127,46 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
     const currency = items[0]?.currency || 'MYR'
     const sub = subtotal()
-    const shippingFee = sub > 0 ? (EAST_MY_STATES.includes(form.state) ? SHIPPING_EAST : SHIPPING_WEST) : 0
+    const selectedState = states.find(s => s.id === Number(selectedStateId))
+    const shippingFee = sub > 0 ? (selectedState?.zone === 'east' ? SHIPPING_EAST : SHIPPING_WEST) : 0
     const tax = Math.round(sub * 0.06 * 100) / 100
     const total = sub + shippingFee + tax
 
     const updateField = (field: keyof CheckoutForm, value: string) =>
         setForm(prev => ({ ...prev, [field]: value }))
+
+    const handleStateChange = (stateId: string) => {
+        setSelectedStateId(stateId)
+        const st = states.find(s => s.id === Number(stateId))
+        updateField('state', st?.name || '')
+        updateField('city', '')
+        updateField('postcode', '')
+        setSelectedDistrictId('')
+        setDistricts([])
+        setPostcodeOpts([])
+        if (!stateId) return
+        setDistrictsLoading(true)
+        fetch(`/api/geo/districts?stateId=${stateId}`)
+            .then(r => r.json())
+            .then(data => setDistricts(Array.isArray(data) ? data : []))
+            .catch(() => {})
+            .finally(() => setDistrictsLoading(false))
+    }
+
+    const handleDistrictChange = (districtId: string) => {
+        setSelectedDistrictId(districtId)
+        const d = districts.find(dist => dist.id === Number(districtId))
+        updateField('city', d?.name || '')
+        updateField('postcode', '')
+        setPostcodeOpts([])
+        if (!districtId) return
+        setPostcodesLoading(true)
+        fetch(`/api/geo/postcodes?districtId=${districtId}`)
+            .then(r => r.json())
+            .then(data => setPostcodeOpts(Array.isArray(data) ? data : []))
+            .catch(() => {})
+            .finally(() => setPostcodesLoading(false))
+    }
 
     const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -137,10 +189,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
-    const postcodeValid = form.postcode.length === 5
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
-        postcodeValid && items.length > 0 &&
+        form.city && form.postcode && items.length > 0 &&
         (paymentMethod === 'cod' || (paymentMethod === 'qr_banking' && proofFile))
     )
 
@@ -278,7 +329,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             <div className="ck-ch">
                                 <span className="ck-num">02</span>
                                 <h2 className="ck-ct">{ck.shippingAddress}</h2>
-                                <span className="ck-aux"><Truck size={12} /> {EAST_MY_STATES.includes(form.state) ? 'East Malaysia' : 'West Malaysia'}</span>
+                                <span className="ck-aux"><Truck size={12} /> {selectedState?.zone === 'east' ? 'East Malaysia' : 'West Malaysia'}</span>
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine1}</label>
@@ -290,27 +341,29 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             </div>
                             <div className="ck-row c3">
                                 <div className="ck-f">
+                                    <label className="ck-lb">{ck.state}</label>
+                                    <div className="ck-iw ck-sel">
+                                        <select value={selectedStateId} onChange={e => handleStateChange(e.target.value)} disabled={statesLoading}>
+                                            <option value="">{statesLoading ? 'Loading…' : '— Select State —'}</option>
+                                            {states.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="ck-f">
                                     <label className="ck-lb">{ck.city}</label>
-                                    <div className="ck-iw"><input value={form.city} onChange={e => updateField('city', e.target.value)} /></div>
+                                    <div className="ck-iw ck-sel">
+                                        <select value={selectedDistrictId} onChange={e => handleDistrictChange(e.target.value)} disabled={!selectedStateId || districtsLoading}>
+                                            <option value="">{districtsLoading ? 'Loading…' : '— Select City —'}</option>
+                                            {districts.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.postcode}</label>
-                                    <div className={`ck-iw${postcodeBlurred && !postcodeValid ? ' err' : ''}`}><input
-                                        value={form.postcode}
-                                        onChange={e => updateField('postcode', e.target.value.replace(/\D/g, '').slice(0, 5))}
-                                        onBlur={() => setPostcodeBlurred(true)}
-                                        inputMode="numeric"
-                                        pattern="[0-9]{5}"
-                                        maxLength={5}
-                                        placeholder="40000"
-                                    /></div>
-                                </div>
-                                <div className="ck-f">
-                                    <label className="ck-lb">{ck.state}</label>
                                     <div className="ck-iw ck-sel">
-                                        <select value={form.state} onChange={e => updateField('state', e.target.value)}>
-                                            <option value="">— Select —</option>
-                                            {MY_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        <select value={form.postcode} onChange={e => updateField('postcode', e.target.value)} disabled={!selectedDistrictId || postcodesLoading}>
+                                            <option value="">{postcodesLoading ? 'Loading…' : '— Select —'}</option>
+                                            {postcodeOpts.map(p => <option key={p} value={p}>{p}</option>)}
                                         </select>
                                     </div>
                                 </div>
@@ -468,7 +521,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             <div className="sum-row"><span className="sr-l">{ck.subtotal} ({items.length})</span><span className="sr-v">{formatPrice(sub, currency)}</span></div>
                             <div className="sum-row"><span className="sr-l">{ck.sst}</span><span className="sr-v">{formatPrice(tax, currency)}</span></div>
                             <div className="sum-row">
-                                <span className="sr-l">{ck.shipping} ({EAST_MY_STATES.includes(form.state) ? 'East MY' : 'West MY'})</span>
+                                <span className="sr-l">{ck.shipping} ({selectedState?.zone === 'east' ? 'East MY' : 'West MY'})</span>
                                 <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
                             </div>
                             {sub > 0 && sub < FREE_SHIPPING_THRESHOLD && (

@@ -4,7 +4,6 @@ import {
     validateCheckoutForm,
     calculateOrderTotals,
     generateOrderNumber,
-    MY_STATES,
 } from '@/lib/storefront'
 
 // ─── TC-F09.23, TC-F09.24: Checkout Form Validation ────────────────────────
@@ -272,33 +271,4 @@ describe('[TC-F09.11] Price Formatting — Malaysia RM (formatPrice)', () => {
     })
 })
 
-// ─── TC-F09.26: Malaysian States Dropdown ───────────────────────────────────
-describe('[TC-F09.26] Malaysian States List (MY_STATES)', () => {
-    it('TC-F09.26: contains exactly 16 states and territories', () => {
-        // Assert — Malaysia has 13 states + 3 federal territories
-        expect(MY_STATES).toHaveLength(16)
-    })
-
-    it('TC-F09.26: includes all major states required for Malaysia market', () => {
-        // Assert — TC-F09.26: official names per AC-3 (F14-shipping)
-        expect(MY_STATES).toContain('W.P. Kuala Lumpur')
-        expect(MY_STATES).toContain('Selangor')
-        expect(MY_STATES).toContain('Johor')
-        expect(MY_STATES).toContain('Sabah')
-        expect(MY_STATES).toContain('Sarawak')
-        expect(MY_STATES).toContain('Pulau Pinang')
-    })
-
-    it('TC-F09.26: includes East Malaysia states (Sabah + Sarawak for shipping zone)', () => {
-        // Assert — TC-F09.34 references East MY for different shipping rate (RM 15.00)
-        expect(MY_STATES).toContain('Sabah')
-        expect(MY_STATES).toContain('Sarawak')
-    })
-
-    it('TC-F09.26: includes federal territories (W.P. prefix per official naming)', () => {
-        // Assert — AC-3 (F14): official W.P. prefix for federal territories
-        expect(MY_STATES).toContain('W.P. Kuala Lumpur')
-        expect(MY_STATES).toContain('W.P. Labuan')
-        expect(MY_STATES).toContain('W.P. Putrajaya')
-    })
-})
+// TC-F09.26: MY_STATES static list removed — states now served from DB via GET /api/geo/states
