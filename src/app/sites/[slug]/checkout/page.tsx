@@ -561,10 +561,10 @@ const CK_CSS = `
 .ck-page{
   --tl:var(--accent,#0e7556);--tl7:var(--accent-hover,#095e44);--tl2:rgba(var(--accent-rgb,14,117,86),.22);--tl5:rgba(var(--accent-rgb,14,117,86),.07);--tlt:rgba(var(--accent-rgb,14,117,86),.06);--tlb:rgba(var(--accent-rgb,14,117,86),.30);
   --f1:var(--text-primary,#0c1014);--f2:var(--text-secondary,#2a3138);--f3:var(--text-muted,#7b8390);--f4:var(--muted,#a8b0b9);
-  --bd:color-mix(in srgb,var(--background,#eff1f3) 78%,var(--text-primary,#0c1014) 22%);
-  --bd2:color-mix(in srgb,var(--background,#eff1f3) 88%,var(--text-primary,#0c1014) 12%);
   --card:var(--surface-card,var(--surface,#fff));
-  --inp:var(--surface-secondary,var(--surface,#eff1f3));
+  --inp:color-mix(in srgb,var(--card) 91%,var(--f1) 9%);
+  --bd:color-mix(in srgb,var(--card) 80%,var(--f1) 20%);
+  --bd2:color-mix(in srgb,var(--card) 90%,var(--f1) 10%);
   --sh:0 1px 2px rgba(15,23,42,.04),0 4px 14px -8px rgba(15,23,42,.10);
   --hf:var(--font-heading,'Outfit',sans-serif);--bf:var(--font-body,'Inter',system-ui,sans-serif);
   font-family:var(--bf);color:var(--f1);background:var(--background,#eff1f3);min-height:100vh;display:flex;flex-direction:column;
