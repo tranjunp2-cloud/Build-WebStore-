@@ -280,13 +280,13 @@ describe('[TC-F09.26] Malaysian States List (MY_STATES)', () => {
     })
 
     it('TC-F09.26: includes all major states required for Malaysia market', () => {
-        // Assert — TC-F09.26 specifically requires: Selangor, Johor, Penang, Sabah, Sarawak
-        expect(MY_STATES).toContain('Kuala Lumpur')
+        // Assert — TC-F09.26: official names per AC-3 (F14-shipping)
+        expect(MY_STATES).toContain('W.P. Kuala Lumpur')
         expect(MY_STATES).toContain('Selangor')
         expect(MY_STATES).toContain('Johor')
         expect(MY_STATES).toContain('Sabah')
         expect(MY_STATES).toContain('Sarawak')
-        expect(MY_STATES).toContain('Penang')
+        expect(MY_STATES).toContain('Pulau Pinang')
     })
 
     it('TC-F09.26: includes East Malaysia states (Sabah + Sarawak for shipping zone)', () => {
@@ -295,10 +295,10 @@ describe('[TC-F09.26] Malaysian States List (MY_STATES)', () => {
         expect(MY_STATES).toContain('Sarawak')
     })
 
-    it('TC-F09.26: includes federal territories (KL, Labuan, Putrajaya)', () => {
-        // Assert
-        expect(MY_STATES).toContain('Kuala Lumpur')
-        expect(MY_STATES).toContain('Labuan')
-        expect(MY_STATES).toContain('Putrajaya')
+    it('TC-F09.26: includes federal territories (W.P. prefix per official naming)', () => {
+        // Assert — AC-3 (F14): official W.P. prefix for federal territories
+        expect(MY_STATES).toContain('W.P. Kuala Lumpur')
+        expect(MY_STATES).toContain('W.P. Labuan')
+        expect(MY_STATES).toContain('W.P. Putrajaya')
     })
 })

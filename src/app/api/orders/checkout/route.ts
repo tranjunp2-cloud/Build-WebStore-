@@ -110,7 +110,8 @@ export async function POST(request: Request) {
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
 
         // Tax (SST 6% for Malaysia)
-        const shippingFee = 10 // Flat RM10 shipping
+        const EAST_MY = ['Sabah', 'Sarawak']
+        const shippingFee = EAST_MY.includes(customer.address?.state || '') ? 15 : 8
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + shippingFee + tax
 

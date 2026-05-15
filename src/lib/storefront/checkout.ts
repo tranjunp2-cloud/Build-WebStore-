@@ -40,7 +40,9 @@ export function generateOrderNumber(): string {
 }
 
 export const MY_STATES = [
-    'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka',
-    'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis',
-    'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu',
+    'Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang',
+    'Perak', 'Perlis', 'Pulau Pinang', 'Sabah', 'Sarawak', 'Selangor',
+    'Terengganu', 'W.P. Kuala Lumpur', 'W.P. Labuan', 'W.P. Putrajaya',
 ] as const
+
+export const EAST_MY_STATES: readonly string[] = ['Sabah', 'Sarawak']

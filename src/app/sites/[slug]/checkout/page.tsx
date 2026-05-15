@@ -8,11 +8,12 @@ import { trackEvent } from '@/lib/analytics/track-event'
 import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
     ShieldCheck, ChevronRight, Rocket, MapPin, Truck,
-    QrCode, UploadCloud, FileImage,
+    QrCode, UploadCloud, FileImage, Tag, Info, Lock, AlertTriangle,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
+import { MY_STATES, EAST_MY_STATES, type CheckoutForm } from '@/lib/storefront'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -20,20 +21,12 @@ function formatPrice(price: number, currency: string) {
     return `$${price.toFixed(2)}`
 }
 
-type CheckoutForm = {
-    name: string; email: string; phone: string
-    line1: string; line2: string; city: string; state: string; postcode: string
-}
-
 const initialForm: CheckoutForm = {
     name: '', email: '', phone: '', line1: '', line2: '', city: '', state: '', postcode: '',
 }
-
-const MY_STATES = [
-    'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka',
-    'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis',
-    'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu',
-]
+const SHIPPING_EAST = 15
+const SHIPPING_WEST = 8
+const FREE_SHIPPING_THRESHOLD = 150
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
 const MAX_FILE_SIZE = 2 * 1024 * 1024
@@ -49,8 +42,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [merchantQrUrl, setMerchantQrUrl] = useState<string | null>(null)
     const [enableCod, setEnableCod] = useState(true)
     const [enableQrBanking, setEnableQrBanking] = useState(true)
+    const [showStripe, setShowStripe] = useState(false)
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
+    const [postcodeBlurred, setPostcodeBlurred] = useState(false)
     const [paymentMethod, setPaymentMethod] = useState<'cod' | 'qr_banking'>('cod')
     const [proofFile, setProofFile] = useState<File | null>(null)
     const [proofPreview, setProofPreview] = useState<string | null>(null)
@@ -77,6 +72,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 if (data.merchantQrCodeUrl) setMerchantQrUrl(data.merchantQrCodeUrl)
                 if (data.enableCod === false) { setEnableCod(false); setPaymentMethod('qr_banking') }
                 if (data.enableQrBanking === false) setEnableQrBanking(false)
+                if (data.enableStripe === true) setShowStripe(true)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
                     if (data.theme.fontBody) setFontBody(data.theme.fontBody)
@@ -113,7 +109,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
     const currency = items[0]?.currency || 'MYR'
     const sub = subtotal()
-    const shippingFee = sub > 0 ? 10 : 0
+    const shippingFee = sub > 0 ? (EAST_MY_STATES.includes(form.state) ? SHIPPING_EAST : SHIPPING_WEST) : 0
     const tax = Math.round(sub * 0.06 * 100) / 100
     const total = sub + shippingFee + tax
 
@@ -141,9 +137,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
+    const postcodeValid = form.postcode.length === 5
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
-        items.length > 0 &&
+        postcodeValid && items.length > 0 &&
         (paymentMethod === 'cod' || (paymentMethod === 'qr_banking' && proofFile))
     )
 
@@ -220,7 +217,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         >
             {isPlacing
                 ? <><Loader2 size={16} className="spin" /> {ck.placingOrder}</>
-                : <><Rocket size={16} /> {ck.placeOrder} — {formatPrice(total, currency)}</>}
+                : <><Rocket size={16} /> {ck.placeOrder}</>}
         </button>
     )
 
@@ -281,7 +278,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             <div className="ck-ch">
                                 <span className="ck-num">02</span>
                                 <h2 className="ck-ct">{ck.shippingAddress}</h2>
-                                <span className="ck-aux"><Truck size={12} /> West Malaysia</span>
+                                <span className="ck-aux"><Truck size={12} /> {EAST_MY_STATES.includes(form.state) ? 'East Malaysia' : 'West Malaysia'}</span>
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine1}</label>
@@ -298,7 +295,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.postcode}</label>
-                                    <div className="ck-iw"><input value={form.postcode} onChange={e => updateField('postcode', e.target.value)} maxLength={5} /></div>
+                                    <div className={`ck-iw${postcodeBlurred && !postcodeValid ? ' err' : ''}`}><input
+                                        value={form.postcode}
+                                        onChange={e => updateField('postcode', e.target.value.replace(/\D/g, '').slice(0, 5))}
+                                        onBlur={() => setPostcodeBlurred(true)}
+                                        inputMode="numeric"
+                                        pattern="[0-9]{5}"
+                                        maxLength={5}
+                                        placeholder="40000"
+                                    /></div>
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.state}</label>
@@ -320,6 +325,34 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                 <span className="ck-aux"><ShieldCheck size={12} /> Encrypted</span>
                             </div>
                             <div className="pm-list">
+                                {showStripe && (
+                                    <div className="pm pm-stripe locked">
+                                        <div className="pm-row">
+                                            <div className="pm-rad locked-rad" />
+                                            <div className="pm-body">
+                                                <h3 className="pm-title">
+                                                    Pay with Stripe
+                                                    <span className="pm-lock-glyph"><Lock size={10} /> Under maintenance</span>
+                                                </h3>
+                                                <p className="pm-desc">Card · FPX Online Banking · Secure hosted checkout</p>
+                                                <div className="pm-brands">
+                                                    <span className="pm-brand visa">VISA</span>
+                                                    <span className="pm-brand mc"><span className="mc-c"><span /><span /></span></span>
+                                                    <span className="pm-brand amex">AMEX</span>
+                                                    <span className="pm-brand fpx">FPX</span>
+                                                </div>
+                                                <div className="pm-pills">
+                                                    <span className="pm-pill amber"><AlertTriangle size={11} /> Temporarily unavailable</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="pm-tooltip tip-right">
+                                            <div className="pt-head"><AlertTriangle size={12} /><span>Payment method unavailable</span></div>
+                                            <p>Phương thức này chưa sẵn sàng. Vui lòng chọn phương thức khác.</p>
+                                            <span className="pt-cta">Choose another method <ChevronRight size={11} /></span>
+                                        </div>
+                                    </div>
+                                )}
                                 {enableCod && (
                                     <div className={`pm${paymentMethod === 'cod' ? ' active' : ''}`} onClick={() => setPaymentMethod('cod')}>
                                         <div className="pm-row">
@@ -417,23 +450,33 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                                 ? <img src={item.imageUrl} alt={item.name} />
                                                 : <ShoppingBag size={18} />}
                                         </div>
-                                        <div className="s-info">
-                                            <div className="s-top" data-tooltip={item.name}>
-                                                <p className="s-nm">{item.name}</p>
-                                                <span className="s-pr">{formatPrice(item.price * item.quantity, item.currency)}</span>
-                                            </div>
+                                        <div className="s-info" data-tooltip={item.name}>
+                                            <p className="s-nm">{item.name}</p>
                                             <p className="s-mt"><span className="s-qty">×{item.quantity}</span> {formatPrice(item.price, item.currency)}</p>
                                         </div>
+                                        <span className="s-pr">{formatPrice(item.price * item.quantity, item.currency)}</span>
                                     </li>
                                 ))}
                             </ul>
 
+                            <div className="sum-promo">
+                                <Tag size={13} />
+                                <input placeholder="Promo or gift card code" />
+                                <button className="sp-ap" disabled>Apply</button>
+                            </div>
+
                             <div className="sum-row"><span className="sr-l">{ck.subtotal} ({items.length})</span><span className="sr-v">{formatPrice(sub, currency)}</span></div>
-                            <div className="sum-row"><span className="sr-l">{ck.sst} (6%)</span><span className="sr-v">{formatPrice(tax, currency)}</span></div>
+                            <div className="sum-row"><span className="sr-l">{ck.sst}</span><span className="sr-v">{formatPrice(tax, currency)}</span></div>
                             <div className="sum-row">
-                                <span className="sr-l">{ck.shipping}</span>
+                                <span className="sr-l">{ck.shipping} ({EAST_MY_STATES.includes(form.state) ? 'East MY' : 'West MY'})</span>
                                 <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
                             </div>
+                            {sub > 0 && sub < FREE_SHIPPING_THRESHOLD && (
+                                <div className="sum-nudge">
+                                    <Truck size={12} />
+                                    <span>Add <strong>{formatPrice(FREE_SHIPPING_THRESHOLD - sub, currency)}</strong> more for <strong>FREE shipping</strong></span>
+                                </div>
+                            )}
 
                             <div className="sum-total">
                                 <span className="st-l">{ck.total}</span>
@@ -444,7 +487,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
                             <div className={`sum-trust${paymentMethod === 'qr_banking' ? ' note' : ''}`}>
                                 {paymentMethod === 'qr_banking'
-                                    ? 'Upload your payment receipt in the section above before placing your order.'
+                                    ? <><Info size={11} style={{ flexShrink: 0 }} /> {"You'll upload your payment proof in the next step after your order is confirmed."}</>
                                     : <><ShieldCheck size={11} /> Encrypted Checkout</>}
                             </div>
                         </div>
@@ -498,6 +541,8 @@ const CK_CSS = `
 .ck-iw input,.ck-iw select{display:block;width:100%;height:44px;background:transparent;border:none;outline:none;padding:0 14px;font-size:14px;color:var(--f1);font-weight:500;letter-spacing:-.005em;font-family:inherit;box-sizing:border-box;}
 .ck-iw input::placeholder{color:var(--f4);font-weight:400;}
 .ck-iw:focus-within{background:#fff;border-color:var(--tlb);box-shadow:0 0 0 3px rgba(var(--accent-rgb,14,117,86),.10);}
+.ck-iw.err{border-color:#fca5a5;background:#fff;}
+.ck-iw.err:focus-within{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.12);}
 .ck-sel{position:relative;}
 .ck-sel select{appearance:none;padding-right:36px;cursor:pointer;}
 .ck-sel::after{content:"";position:absolute;right:14px;top:50%;width:8px;height:8px;border-right:1.5px solid var(--f3);border-bottom:1.5px solid var(--f3);transform:translateY(-70%) rotate(45deg);pointer-events:none;}
@@ -510,7 +555,7 @@ const CK_CSS = `
 .ck-err{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;font-size:13px;color:#dc2626;display:flex;align-items:center;gap:10px;}
 /* Payment methods */
 .pm-list{display:flex;flex-direction:column;gap:12px;}
-.pm{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:16px 18px;cursor:pointer;transition:all .18s cubic-bezier(.22,1,.36,1);}
+.pm{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:16px 18px;cursor:pointer;transition:all .18s cubic-bezier(.22,1,.36,1);position:relative;}
 .pm:hover:not(.active){border-color:#d8dde2;background:#fafbfc;}
 .pm.active{border:1.5px solid var(--tl);background:var(--tl5);padding:15.5px 17.5px;box-shadow:0 0 0 4px var(--tlt);}
 .pm-row{display:flex;align-items:flex-start;gap:16px;}
@@ -555,17 +600,24 @@ const CK_CSS = `
 .sum-card{background:#fff;border-radius:16px;box-shadow:var(--sh);padding:22px;display:flex;flex-direction:column;}
 .sum-hd{font-family:var(--hf);font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);margin:0 0 14px;}
 .sum-items{list-style:none;margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid var(--bd);display:flex;flex-direction:column;gap:10px;}
-.sum-item{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start;}
+.sum-item{display:grid;grid-template-columns:44px 1fr auto;gap:6px 12px;align-items:start;}
 .s-th{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--tl5),var(--tl2));border:1px solid var(--bd);display:grid;place-items:center;color:var(--tl);overflow:hidden;flex-shrink:0;}
 .s-th img{width:100%;height:100%;object-fit:cover;}
-.s-info{min-width:0;}
-.s-top{display:flex;align-items:baseline;gap:8px;min-width:0;position:relative;}
-.s-top[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 7px);left:0;background:#1e293b;color:#f1f5f9;font-size:12px;font-weight:500;letter-spacing:0;padding:6px 10px;border-radius:7px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;z-index:20;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.22);animation:tipIn .15s ease;}
+.s-info{min-width:0;position:relative;}
+.s-info[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 7px);left:0;background:#1e293b;color:#f1f5f9;font-size:12px;font-weight:500;letter-spacing:0;padding:6px 10px;border-radius:7px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;z-index:20;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.22);animation:tipIn .15s ease;}
 @keyframes tipIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
-.s-nm{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--f1);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.s-nm{min-width:0;font-size:13px;font-weight:600;color:var(--f1);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .s-mt{font-size:11px;color:var(--f3);margin:3px 0 0;}
 .s-qty{display:inline-block;padding:1px 6px;background:var(--inp);border-radius:999px;font-size:10px;color:var(--f2);margin-right:4px;font-family:monospace;}
-.s-pr{font-size:12.5px;font-weight:600;color:var(--f2);white-space:nowrap;font-family:monospace;flex-shrink:0;}
+.s-pr{font-size:13px;font-weight:700;color:var(--f2);white-space:nowrap;font-family:monospace;padding-top:1px;}
+.sum-promo{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--inp);border:1.5px dashed var(--bd);border-radius:10px;margin-bottom:10px;}
+.sum-promo svg{color:var(--f4);flex-shrink:0;}
+.sum-promo input{flex:1;border:none;background:transparent;outline:none;font-size:13px;color:var(--f1);font-family:inherit;min-width:0;}
+.sum-promo input::placeholder{color:var(--f4);}
+.sp-ap{flex-shrink:0;font-size:12px;font-weight:700;color:var(--tl);background:transparent;border:none;padding:0;opacity:.4;cursor:not-allowed;}
+.sum-nudge{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--tl5);border:1px solid var(--tl2);border-radius:8px;font-size:12px;color:var(--f3);margin:6px 0;}
+.sum-nudge svg{color:var(--tl);flex-shrink:0;}
+.sum-nudge strong{color:var(--tl7);}
 .sum-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;}
 .sr-l{color:var(--f3);}
 .sr-v{font-family:monospace;font-weight:500;color:var(--f2);white-space:nowrap;flex-shrink:0;}
@@ -580,11 +632,46 @@ const CK_CSS = `
 .po-btn.dis{background:#d9dde2;color:#8a929b;box-shadow:none;cursor:not-allowed;}
 .sum-trust{margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
 .sum-trust.note{font-size:11.5px;font-weight:500;letter-spacing:0;text-transform:none;text-align:left;align-items:flex-start;line-height:1.5;}
+/* Stripe locked */
+.pm.locked{cursor:not-allowed;background:#f5f6f8;border-style:dashed;}
+.pm.locked .pm-body,.pm.locked .pm-brands{opacity:.55;filter:grayscale(.4);}
+.pm.locked .pm-pill{opacity:.55;filter:grayscale(.4);}
+.pm-lock-glyph{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#92400e;background:#fff4dc;border:1px solid #f1d693;padding:2px 8px;border-radius:999px;opacity:1!important;filter:none!important;}
+.pm-lock-glyph svg{width:10px;height:10px;}
+.locked-rad{border-style:dashed!important;background:transparent!important;opacity:.6;}
+.pm-pill.amber{background:#fff4dc;border-color:#f1d693;color:#92400e;}
+/* Brand icon strip */
+.pm-brands{display:inline-flex;align-items:center;gap:5px;margin:8px 0 0;}
+.pm-brand{height:22px;min-width:34px;padding:0 6px;border-radius:5px;display:inline-grid;place-items:center;font-family:var(--hf);font-size:9.5px;font-weight:800;letter-spacing:.06em;background:#fff;color:#0b1120;border:1px solid #d8dde2;box-shadow:0 1px 2px rgba(15,23,42,.08);}
+.pm-brand.visa{color:#1a1f71;}
+.pm-brand.amex{background:#1d4cba;color:#fff;border-color:rgba(0,0,0,.06);}
+.pm-brand.mc{padding:0 7px;}
+.mc-c{display:inline-flex;}
+.mc-c span{width:11px;height:11px;border-radius:999px;display:inline-block;}
+.mc-c span:first-child{background:#eb001b;margin-right:-4px;}
+.mc-c span:last-child{background:#f79e1b;mix-blend-mode:multiply;}
+.pm-brand.fpx{background:linear-gradient(135deg,#0a8a3f,#0c6e34);color:#fff;border-color:rgba(0,0,0,.06);}
+/* Lock tooltip */
+.pm-tooltip{position:absolute;z-index:10;width:268px;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:12px 14px;box-shadow:0 8px 30px rgba(15,23,42,.15);font-size:12px;line-height:1.5;color:var(--f2);opacity:0;pointer-events:none;transition:opacity .15s;}
+.pm.locked:hover .pm-tooltip{opacity:1;pointer-events:auto;}
+.pm-tooltip::before{content:"";position:absolute;width:12px;height:12px;background:#fff;border-top:1px solid var(--bd);border-left:1px solid var(--bd);transform:rotate(45deg);}
+.pm-tooltip.tip-right{top:14px;left:calc(100% + 12px);}
+.pm-tooltip.tip-right::before{left:-7px;top:18px;transform:rotate(-45deg);}
+.pm-tooltip.tip-bottom{top:calc(100% + 12px);left:50%;transform:translateX(-50%);}
+.pm-tooltip.tip-bottom::before{top:-7px;left:50%;margin-left:-6px;transform:rotate(45deg);}
+.pt-head{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-weight:700;font-size:11.5px;letter-spacing:.02em;color:#92400e;}
+.pt-head svg{width:12px;height:12px;}
+.pm-tooltip p{margin:0;color:var(--f2);}
+.pt-cta{margin-top:8px;display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:var(--tl);cursor:pointer;}
+.pt-cta:hover{color:var(--tl7);}
 /* Spinner */
 .spin{animation:spin 1s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 /* Mobile */
 @media(max-width:768px){
+  .pm-tooltip.tip-right{left:0;top:calc(100% + 12px);transform:none;}
+  .pm-tooltip.tip-right::before{left:20px;top:-7px;transform:rotate(45deg);}
+  .pm-tooltip{width:calc(100vw - 72px);}
   .ck-hd{padding:14px 16px;}
   .ck-crumbs{display:none;}
   .ck-shell{grid-template-columns:1fr;padding:16px;gap:16px;}
