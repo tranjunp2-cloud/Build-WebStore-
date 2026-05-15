@@ -48,6 +48,8 @@ interface PreviewFrameProps {
     onHandleReady?: (handle: PreviewFrameHandle | null) => void
     /** Called when a footer field is edited inline in the preview — dedicated footer channel. */
     onFooterUpdate?: (changes: Record<string, unknown>) => void
+    /** Called during live typing in a footer field (no iframe re-send — cursor-safe). */
+    onFooterInlineEdit?: (changes: Record<string, unknown>) => void
     /** Called when footer inline edit session ends (blur/Enter/Escape) — flush debounce + save once. */
     onFooterEditStop?: () => void
 }
@@ -237,6 +239,7 @@ function PreviewFrameInner({
     onInlineEditSave,
     onHandleReady,
     onFooterUpdate,
+    onFooterInlineEdit,
     onFooterEditStop,
 }: PreviewFrameProps) {
     const { t } = useI18n()
@@ -249,6 +252,8 @@ function PreviewFrameInner({
     useEffect(() => { onInlineEditSaveRef.current = onInlineEditSave }, [onInlineEditSave])
     const onFooterUpdateRef = useRef(onFooterUpdate)
     useEffect(() => { onFooterUpdateRef.current = onFooterUpdate }, [onFooterUpdate])
+    const onFooterInlineEditRef = useRef(onFooterInlineEdit)
+    useEffect(() => { onFooterInlineEditRef.current = onFooterInlineEdit }, [onFooterInlineEdit])
     const onFooterEditStopRef = useRef(onFooterEditStop)
     useEffect(() => { onFooterEditStopRef.current = onFooterEditStop }, [onFooterEditStop])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
@@ -686,7 +691,8 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'FOOTER_FIELD_EDITED') {
                 const { fieldName, newValue } = e.data as { fieldName: string; newValue: string }
                 if (!ALLOWED_FOOTER_FIELDS.has(fieldName)) return
-                onFooterUpdateRef.current?.({ [fieldName]: newValue })
+                // Use inline-edit path (no iframe re-send) to avoid overwriting contentEditable cursor
+                ;(onFooterInlineEditRef.current ?? onFooterUpdateRef.current)?.({ [fieldName]: newValue })
             } else if (e.data?.type === 'FOOTER_FIELD_EDIT_STOP') {
                 const { fieldName: stopField, newValue: stopValue } = e.data as { fieldName?: string; newValue?: string }
                 // Flush any in-flight content that the 300ms debounce hadn't fired yet (fast blur/Enter scenario)

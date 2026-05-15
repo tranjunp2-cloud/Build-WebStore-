@@ -1152,7 +1152,7 @@ function SettingsPanelInner({
                         <div className="mb-4">
                             <label className={labelCls}>{s.copyrightText}</label>
                             <Input
-                                key={`footer-copyright-${fbk}`}
+                                key={`footer-copyright-${fbk}-${(footerBlock?.copyrightText as string) || ''}`}
                                 defaultValue={(footerBlock?.copyrightText as string) || ''}
                                 placeholder="© 2026 Your Company. All rights reserved."
                                 onBlur={(e: FieldBlurEvent) => onFooterUpdate?.({ copyrightText: sanitizeInput(e.target.value) })}
