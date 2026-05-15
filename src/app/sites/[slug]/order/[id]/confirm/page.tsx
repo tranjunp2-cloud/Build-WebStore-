@@ -70,6 +70,12 @@ export default async function OrderConfirmPage({
         }))
         : ''
 
+    const thFontHeading = siteTheme?.fontHeading || 'Outfit'
+    const thFontBody = siteTheme?.fontBody || 'Inter'
+    const sanitizeFont = (f: string) => f.replace(/[^a-zA-Z0-9 -]/g, '')
+    const fonts = [thFontHeading, thFontBody].filter((v, i, a) => a.indexOf(v) === i).map(sanitizeFont)
+    const googleFontsHref = `https://fonts.googleapis.com/css2?${fonts.map(f => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@300;400;500;600;700;800;900`).join('&')}&subset=latin,vietnamese&display=swap`
+
     let order: Order | null = null
     try {
         const result = await payload.find({
@@ -119,8 +125,10 @@ export default async function OrderConfirmPage({
 
     return (
         <>
+            <link rel="preconnect" href="https://fonts.googleapis.com" />
+            <link crossOrigin="anonymous" href="https://fonts.gstatic.com" rel="preconnect" />
             {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" />
+            <link rel="stylesheet" href={googleFontsHref} />
             {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
             <div className="ty-page">
 
@@ -244,11 +252,13 @@ export default async function OrderConfirmPage({
                                     <li key={idx} className="ty-item">
                                         <div className="ty-item-th"><ShoppingBag size={18} /></div>
                                         <div className="ty-item-info">
-                                            <p className="ty-item-nm">{item.productName}</p>
+                                            <div className="ty-item-top" data-tooltip={item.productName}>
+                                                <p className="ty-item-nm">{item.productName}</p>
+                                                <span className="ty-item-pr">{formatPrice(item.unitPrice * item.quantity, currency)}</span>
+                                            </div>
                                             {item.variant && <p className="ty-item-var">{item.variant}</p>}
                                             <p className="ty-item-qty">Qty: {item.quantity} × {formatPrice(item.unitPrice, currency)}</p>
                                         </div>
-                                        <span className="ty-item-pr">{formatPrice(item.unitPrice * item.quantity, currency)}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -266,10 +276,12 @@ export default async function OrderConfirmPage({
                                     <li key={idx} className="sum-item">
                                         <div className="s-th"><ShoppingBag size={18} /></div>
                                         <div className="s-info">
-                                            <p className="s-nm">{item.productName}</p>
-                                            <p className="s-mt"><span className="s-qty">×{item.quantity}</span></p>
+                                            <div className="s-top" data-tooltip={item.productName}>
+                                                <p className="s-nm">{item.productName}</p>
+                                                <span className="s-pr">{formatPrice(item.unitPrice * item.quantity, currency)}</span>
+                                            </div>
+                                            <p className="s-mt"><span className="s-qty">×{item.quantity}</span> {formatPrice(item.unitPrice, currency)}</p>
                                         </div>
-                                        <span className="s-pr">{formatPrice(item.unitPrice * item.quantity, currency)}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -327,13 +339,14 @@ const TY_CSS = `
   --f1:#0c1014;--f2:#2a3138;--f3:#7b8390;--f4:#a8b0b9;
   --bd:#e6e9ed;--bd2:#eef0f2;--card:#fff;--inp:#eff1f3;
   --sh:0 1px 2px rgba(15,23,42,.04),0 4px 14px -8px rgba(15,23,42,.10);
-  font-family:'Inter',system-ui,sans-serif;color:var(--f1);background:#eff1f3;min-height:100vh;display:flex;flex-direction:column;
+  --hf:var(--font-heading,'Outfit',sans-serif);--bf:var(--font-body,'Inter',system-ui,sans-serif);
+  font-family:var(--bf);color:var(--f1);background:#eff1f3;min-height:100vh;display:flex;flex-direction:column;
 }
 /* Header */
 .ty-hd{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--bd);padding:18px 28px;display:flex;align-items:center;gap:14px;}
 .ty-back{width:36px;height:36px;border-radius:10px;background:var(--inp);border:1px solid var(--bd);display:grid;place-items:center;color:var(--f2);text-decoration:none;flex-shrink:0;transition:background .15s;}
 .ty-back:hover{background:#e3e7ec;}
-.ty-h1{font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;letter-spacing:-.005em;margin:0;color:var(--f1);}
+.ty-h1{font-family:var(--hf);font-size:18px;font-weight:800;letter-spacing:-.005em;margin:0;color:var(--f1);}
 .ty-crumbs{font-size:12px;color:var(--f3);margin-left:auto;display:flex;align-items:center;gap:8px;}
 .ty-crumbs strong{color:var(--tl);font-weight:700;}
 .ty-ssl{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tl);background:var(--tl5);border:1px solid var(--tl2);border-radius:999px;margin-left:8px;}
@@ -350,7 +363,7 @@ const TY_CSS = `
 .ty-ring{position:absolute;inset:0;border-radius:999px;border:2px solid rgba(var(--accent-rgb,14,117,86),.55);opacity:0;pointer-events:none;animation:ring 2.4s ease-out infinite;}
 .ty-ring.r2{animation-delay:1.2s;}
 @keyframes ring{0%{transform:scale(.95);opacity:.55;}100%{transform:scale(1.7);opacity:0;}}
-.ty-hero-title{font-family:'Outfit',sans-serif;font-size:26px;font-weight:800;letter-spacing:-.01em;color:var(--f1);margin:0 0 12px;position:relative;}
+.ty-hero-title{font-family:var(--hf);font-size:26px;font-weight:800;letter-spacing:-.01em;color:var(--f1);margin:0 0 12px;position:relative;}
 .ty-order-row{display:inline-flex;align-items:center;gap:8px;padding:7px 10px 7px 14px;background:var(--inp);border:1px solid var(--bd);border-radius:999px;font-size:12px;font-weight:600;color:var(--f3);margin:0 0 14px;position:relative;letter-spacing:.02em;}
 .ty-order-label{white-space:nowrap;}
 .ty-order-id{font-family:monospace;color:var(--f1);font-weight:700;font-size:13px;letter-spacing:0;}
@@ -363,7 +376,7 @@ const TY_CSS = `
 .ty-block{background:#fff;border-radius:16px;box-shadow:var(--sh);padding:24px 26px;}
 .ty-block-hd{display:flex;align-items:flex-start;gap:16px;margin-bottom:18px;}
 .ty-block-titles{flex:1;min-width:0;}
-.ty-block-titles h3{font-family:'Outfit',sans-serif;font-size:17px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--f1);margin:0 0 4px;}
+.ty-block-titles h3{font-family:var(--hf);font-size:17px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--f1);margin:0 0 4px;}
 .ty-block-titles p{font-size:12.5px;color:var(--f3);margin:0;line-height:1.5;}
 .ty-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;flex-shrink:0;}
 .ty-pill.pending{background:#fff4dc;border:1px solid #f1d693;color:#8a5c0a;}
@@ -390,29 +403,36 @@ const TY_CSS = `
 .ty-email-note strong{color:var(--f2);font-weight:700;}
 /* Items list */
 .ty-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;}
-.ty-item{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;}
+.ty-item{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start;}
 .ty-item-th{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--tl5),var(--tl2));border:1px solid var(--bd);display:grid;place-items:center;color:var(--tl);}
-.ty-item-nm{font-size:13px;font-weight:600;color:var(--f1);margin:0 0 2px;}
+.ty-item-info{min-width:0;}
+.ty-item-top{display:flex;align-items:baseline;gap:8px;min-width:0;position:relative;}
+.ty-item-top[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 7px);left:0;background:#1e293b;color:#f1f5f9;font-size:12px;font-weight:500;letter-spacing:0;padding:6px 10px;border-radius:7px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;z-index:20;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.22);animation:tipIn .15s ease;}
+.ty-item-nm{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--f1);margin:0 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ty-item-var{font-size:11px;color:var(--f4);margin:0 0 2px;}
 .ty-item-qty{font-size:11px;color:var(--f3);margin:0;}
-.ty-item-pr{font-size:13px;font-weight:600;color:var(--f2);white-space:nowrap;font-family:monospace;}
+.ty-item-pr{font-size:13px;font-weight:600;color:var(--f2);white-space:nowrap;font-family:monospace;flex-shrink:0;}
 /* Summary card (shared with checkout) */
 .sum-card{background:#fff;border-radius:16px;box-shadow:var(--sh);padding:22px;display:flex;flex-direction:column;}
-.sum-hd{font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);margin:0 0 14px;}
+.sum-hd{font-family:var(--hf);font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);margin:0 0 14px;}
 .sum-items{list-style:none;margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid var(--bd);display:flex;flex-direction:column;gap:10px;}
-.sum-item{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;}
+.sum-item{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start;}
 .s-th{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--tl5),var(--tl2));border:1px solid var(--bd);display:grid;place-items:center;color:var(--tl);overflow:hidden;flex-shrink:0;}
 .s-th img{width:100%;height:100%;object-fit:cover;}
-.s-nm{font-size:13px;font-weight:600;color:var(--f1);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.s-mt{font-size:11px;color:var(--f3);margin:2px 0 0;}
+.s-info{min-width:0;}
+.s-top{display:flex;align-items:baseline;gap:8px;min-width:0;position:relative;}
+.s-top[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 7px);left:0;background:#1e293b;color:#f1f5f9;font-size:12px;font-weight:500;letter-spacing:0;padding:6px 10px;border-radius:7px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;z-index:20;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.22);animation:tipIn .15s ease;}
+@keyframes tipIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+.s-nm{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--f1);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.s-mt{font-size:11px;color:var(--f3);margin:3px 0 0;}
 .s-qty{display:inline-block;padding:1px 6px;background:var(--inp);border-radius:999px;font-size:10px;color:var(--f2);margin-right:4px;font-family:monospace;}
-.s-pr{font-size:12.5px;font-weight:500;color:var(--f2);white-space:nowrap;font-family:monospace;}
+.s-pr{font-size:12.5px;font-weight:600;color:var(--f2);white-space:nowrap;font-family:monospace;flex-shrink:0;}
 .sum-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;}
 .sr-l{color:var(--f3);}
 .sr-v{font-family:monospace;font-weight:500;color:var(--f2);white-space:nowrap;flex-shrink:0;}
 .sum-total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:14px 0 0;padding-top:16px;border-top:1px solid var(--bd);}
-.st-l{font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);}
-.st-v{font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;letter-spacing:-.01em;color:var(--tl);white-space:nowrap;flex-shrink:0;}
+.st-l{font-family:var(--hf);font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);}
+.st-v{font-family:var(--hf);font-size:28px;font-weight:800;letter-spacing:-.01em;color:var(--tl);white-space:nowrap;flex-shrink:0;}
 .st-ccy{font-size:13px;font-family:monospace;font-weight:500;color:var(--tl);margin-right:4px;}
 /* Status banner */
 .ty-status{display:flex;align-items:center;gap:10px;margin-top:14px;padding:12px 14px;border-radius:10px;}

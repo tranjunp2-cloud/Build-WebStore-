@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
+import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -60,6 +61,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
     const [isPlacing, setIsPlacing] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [themeCSS, setThemeCSS] = useState('')
+    const [fontHeading, setFontHeading] = useState('Outfit')
+    const [fontBody, setFontBody] = useState('Inter')
 
     useEffect(() => { params.then(p => setSlug(p.slug)) }, [params])
 
@@ -75,6 +78,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 if (data.enableCod === false) { setEnableCod(false); setPaymentMethod('qr_banking') }
                 if (data.enableQrBanking === false) setEnableQrBanking(false)
                 if (data.theme) {
+                    if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
+                    if (data.theme.fontBody) setFontBody(data.theme.fontBody)
                     const resolved = resolveTheme({
                         primaryColor: data.theme.primaryColor,
                         secondaryColor: data.theme.secondaryColor,
@@ -198,7 +203,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 <h2>{ck.cartEmpty}</h2>
                 <Link href={`/sites/${slug}/products`}>{ck.browseProducts}</Link>
                 <style>{`
-                  .ck-empty{font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
+                  .ck-empty{font-family:var(--bf);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
                   .ck-empty svg{opacity:.2;}
                   .ck-empty h2{font-size:20px;font-weight:600;margin:0;color:#0c1014;}
                   .ck-empty a{color:var(--accent,#0e7556);font-size:14px;text-decoration:none;}
@@ -221,8 +226,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
     return (
         <>
-            {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" />
+            <GoogleFontsLoader fontHeading={fontHeading} fontBody={fontBody} />
             {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
             <div className="ck-page">
 
@@ -414,10 +418,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                                 : <ShoppingBag size={18} />}
                                         </div>
                                         <div className="s-info">
-                                            <p className="s-nm">{item.name}</p>
+                                            <div className="s-top" data-tooltip={item.name}>
+                                                <p className="s-nm">{item.name}</p>
+                                                <span className="s-pr">{formatPrice(item.price * item.quantity, item.currency)}</span>
+                                            </div>
                                             <p className="s-mt"><span className="s-qty">×{item.quantity}</span> {formatPrice(item.price, item.currency)}</p>
                                         </div>
-                                        <span className="s-pr">{formatPrice(item.price * item.quantity, item.currency)}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -461,13 +467,14 @@ const CK_CSS = `
   --f1:#0c1014;--f2:#2a3138;--f3:#7b8390;--f4:#a8b0b9;
   --bd:#e6e9ed;--bd2:#eef0f2;--card:#fff;--inp:#eff1f3;
   --sh:0 1px 2px rgba(15,23,42,.04),0 4px 14px -8px rgba(15,23,42,.10);
-  font-family:'Inter',system-ui,sans-serif;color:var(--f1);background:#eff1f3;min-height:100vh;display:flex;flex-direction:column;
+  --hf:var(--font-heading,'Outfit',sans-serif);--bf:var(--font-body,'Inter',system-ui,sans-serif);
+  font-family:var(--bf);color:var(--f1);background:#eff1f3;min-height:100vh;display:flex;flex-direction:column;
 }
 /* Header */
 .ck-hd{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--bd);padding:18px 28px;display:flex;align-items:center;gap:14px;}
 .ck-back{width:36px;height:36px;border-radius:10px;background:var(--inp);border:1px solid var(--bd);display:grid;place-items:center;color:var(--f2);text-decoration:none;flex-shrink:0;transition:background .15s;}
 .ck-back:hover{background:#e3e7ec;}
-.ck-h1{font-family:'Outfit',sans-serif;font-size:18px;font-weight:800;letter-spacing:-.005em;margin:0;color:var(--f1);}
+.ck-h1{font-family:var(--hf);font-size:18px;font-weight:800;letter-spacing:-.005em;margin:0;color:var(--f1);}
 .ck-crumbs{font-size:12px;color:var(--f3);margin-left:auto;display:flex;align-items:center;gap:8px;}
 .ck-crumbs strong{color:var(--tl);font-weight:700;}
 .ck-ssl{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tl);background:var(--tl5);border:1px solid var(--tl2);border-radius:999px;margin-left:8px;}
@@ -478,8 +485,8 @@ const CK_CSS = `
 /* Section card */
 .ck-card{background:#fff;border-radius:16px;box-shadow:var(--sh);padding:28px;}
 .ck-ch{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;}
-.ck-num{font-family:'Outfit',sans-serif;font-weight:800;font-size:22px;letter-spacing:-.01em;color:var(--tl);flex-shrink:0;width:28px;}
-.ck-ct{font-family:'Outfit',sans-serif;font-weight:800;font-size:17px;letter-spacing:.04em;text-transform:uppercase;color:var(--f1);margin:0;flex:1;}
+.ck-num{font-family:var(--hf);font-weight:800;font-size:22px;letter-spacing:-.01em;color:var(--tl);flex-shrink:0;width:28px;}
+.ck-ct{font-family:var(--hf);font-weight:800;font-size:17px;letter-spacing:.04em;text-transform:uppercase;color:var(--f1);margin:0;flex:1;}
 .ck-aux{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;}
 /* Fields */
 .ck-f{display:flex;flex-direction:column;gap:6px;min-width:0;}
@@ -523,7 +530,7 @@ const CK_CSS = `
 .qr-ph{width:120px;height:120px;flex-shrink:0;border:2px dashed var(--tlb);border-radius:8px;background:var(--tlt);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--tl);}
 .qr-ph span{font-size:11px;font-weight:600;}
 .qr-meta{flex:1;min-width:0;}
-.qr-meta h4{font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;margin:0 0 4px;color:var(--f1);}
+.qr-meta h4{font-family:var(--hf);font-size:14px;font-weight:700;margin:0 0 4px;color:var(--f1);}
 .qr-meta p{font-size:12.5px;color:var(--f3);margin:0;line-height:1.5;}
 .qr-meta strong{color:var(--tl7);font-weight:800;}
 .qr-apps{display:block;font-size:11px;color:var(--tl);font-weight:600;margin-top:6px;}
@@ -546,25 +553,29 @@ const CK_CSS = `
 .ru-err{display:flex;align-items:center;gap:6px;font-size:12px;color:#dc2626;margin:2px 0 0;}
 /* Summary card */
 .sum-card{background:#fff;border-radius:16px;box-shadow:var(--sh);padding:22px;display:flex;flex-direction:column;}
-.sum-hd{font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);margin:0 0 14px;}
+.sum-hd{font-family:var(--hf);font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);margin:0 0 14px;}
 .sum-items{list-style:none;margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid var(--bd);display:flex;flex-direction:column;gap:10px;}
-.sum-item{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;}
+.sum-item{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start;}
 .s-th{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--tl5),var(--tl2));border:1px solid var(--bd);display:grid;place-items:center;color:var(--tl);overflow:hidden;flex-shrink:0;}
 .s-th img{width:100%;height:100%;object-fit:cover;}
-.s-nm{font-size:13px;font-weight:600;color:var(--f1);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.s-mt{font-size:11px;color:var(--f3);margin:2px 0 0;}
+.s-info{min-width:0;}
+.s-top{display:flex;align-items:baseline;gap:8px;min-width:0;position:relative;}
+.s-top[data-tooltip]:hover::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 7px);left:0;background:#1e293b;color:#f1f5f9;font-size:12px;font-weight:500;letter-spacing:0;padding:6px 10px;border-radius:7px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;z-index:20;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.22);animation:tipIn .15s ease;}
+@keyframes tipIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+.s-nm{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--f1);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.s-mt{font-size:11px;color:var(--f3);margin:3px 0 0;}
 .s-qty{display:inline-block;padding:1px 6px;background:var(--inp);border-radius:999px;font-size:10px;color:var(--f2);margin-right:4px;font-family:monospace;}
-.s-pr{font-size:12.5px;font-weight:500;color:var(--f2);white-space:nowrap;font-family:monospace;}
+.s-pr{font-size:12.5px;font-weight:600;color:var(--f2);white-space:nowrap;font-family:monospace;flex-shrink:0;}
 .sum-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;}
 .sr-l{color:var(--f3);}
 .sr-v{font-family:monospace;font-weight:500;color:var(--f2);white-space:nowrap;flex-shrink:0;}
 .sr-v.free{color:var(--tl);font-weight:700;font-family:inherit;}
 .sum-total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:14px 0;padding-top:16px;border-top:1px solid var(--bd);}
-.st-l{font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);}
-.st-v{font-family:'Outfit',sans-serif;font-size:28px;font-weight:800;letter-spacing:-.01em;color:var(--tl);white-space:nowrap;flex-shrink:0;}
+.st-l{font-family:var(--hf);font-size:14px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--f1);}
+.st-v{font-family:var(--hf);font-size:28px;font-weight:800;letter-spacing:-.01em;color:var(--tl);white-space:nowrap;flex-shrink:0;}
 .st-ccy{font-size:13px;font-family:monospace;font-weight:500;color:var(--tl);margin-right:4px;}
 /* Place Order button */
-.po-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:54px;border-radius:10px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--tl);color:#fff;box-shadow:0 6px 16px -6px rgba(var(--accent-rgb,14,117,86),.55);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;padding:0 14px;}
+.po-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:54px;border-radius:10px;font-family:var(--hf);font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:var(--tl);color:#fff;box-shadow:0 6px 16px -6px rgba(var(--accent-rgb,14,117,86),.55);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;padding:0 14px;}
 .po-btn:hover:not(.dis){background:var(--tl7);transform:translateY(-1px);}
 .po-btn.dis{background:#d9dde2;color:#8a929b;box-shadow:none;cursor:not-allowed;}
 .sum-trust{margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
