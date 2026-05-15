@@ -8,7 +8,7 @@ import { trackEvent } from '@/lib/analytics/track-event'
 import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
     ShieldCheck, ChevronRight, Rocket, MapPin, Truck,
-    QrCode, UploadCloud, FileImage, Info, Lock, AlertTriangle,
+    QrCode, UploadCloud, FileImage, /* Tag, */ Info, Lock, AlertTriangle,
     Landmark, Copy, CheckCheck, Check,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
@@ -643,6 +643,13 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 ))}
                             </ul>
 
+                            {/* TODO: Promo/gift card — re-enable when promotion system is defined
+                            <div className="sum-promo">
+                                <Tag size={13} />
+                                <input placeholder="Promo or gift card code" />
+                                <button className="sp-ap" disabled>Apply</button>
+                            </div>
+                            */}
                             <div className="sum-row"><span className="sr-l">{ck.subtotal} ({items.length})</span><span className="sr-v">{formatPrice(sub, currency)}</span></div>
                             <div className="sum-row"><span className="sr-l">{ck.sst}</span><span className="sr-v">{formatPrice(tax, currency)}</span></div>
                             <div className="sum-row">
@@ -806,6 +813,13 @@ const CK_CSS = `
 .sum-nudge strong{color:var(--tl7);}
 .sum-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;}
 .sr-l{color:var(--f3);}
+/* TODO: Promo input CSS — re-enable with .sum-promo JSX above
+.sum-promo{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--inp);border:1.5px dashed var(--bd);border-radius:10px;margin-bottom:10px;}
+.sum-promo svg{color:var(--f4);flex-shrink:0;}
+.sum-promo input{flex:1;border:none;background:transparent;outline:none;font-size:13px;color:var(--f1);font-family:inherit;min-width:0;}
+.sum-promo input::placeholder{color:var(--f4);}
+.sp-ap{flex-shrink:0;font-size:12px;font-weight:700;color:var(--tl);background:transparent;border:none;padding:0;opacity:.4;cursor:not-allowed;}
+*/
 .sr-v{font-family:monospace;font-weight:500;color:var(--f2);white-space:nowrap;flex-shrink:0;}
 .sr-v.free{color:var(--tl);font-weight:700;font-family:inherit;}
 .sum-total{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:14px 0;padding-top:16px;border-top:1px solid var(--bd);}
