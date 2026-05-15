@@ -46,6 +46,7 @@ export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: Add
             compareAtPrice: product.compareAtPrice,
             currency: product.currency || 'MYR',
             imageUrl: product.imageUrl,
+            inventory: product.inventory,
         })
         if (siteId) {
             trackEvent({

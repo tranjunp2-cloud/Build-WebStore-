@@ -9,6 +9,7 @@ export type CartItem = {
     currency: string
     imageUrl?: string
     quantity: number
+    inventory?: number // undefined = unlimited
 }
 
 type CartStore = {

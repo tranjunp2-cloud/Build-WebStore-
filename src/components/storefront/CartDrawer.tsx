@@ -104,14 +104,25 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                             <span style={{ fontSize: '14px', fontWeight: 600, minWidth: '20px', textAlign: 'center' }}>
                                                 {item.quantity}
                                             </span>
-                                            <button onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                                                style={{
-                                                    width: '28px', height: '28px', borderRadius: '6px',
-                                                    border: '1px solid #eee', background: 'white',
-                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                }}>
-                                                <Plus size={12} />
-                                            </button>
+                                            {(() => {
+                                                const atMax = item.inventory != null && item.quantity >= item.inventory
+                                                return atMax ? (
+                                                    <span style={{
+                                                        fontSize: '10px', fontWeight: 700, color: '#f59e0b',
+                                                        background: '#fef3c7', borderRadius: '4px',
+                                                        padding: '2px 5px', whiteSpace: 'nowrap',
+                                                    }}>MAX</span>
+                                                ) : (
+                                                    <button onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                                                        style={{
+                                                            width: '28px', height: '28px', borderRadius: '6px',
+                                                            border: '1px solid #eee', background: 'white',
+                                                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        }}>
+                                                        <Plus size={12} />
+                                                    </button>
+                                                )
+                                            })()}
                                             <button onClick={() => removeItem(item.productId)}
                                                 style={{
                                                     marginLeft: 'auto', background: 'none', border: 'none',
