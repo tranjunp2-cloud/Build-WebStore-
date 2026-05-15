@@ -1,5 +1,9 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F08 - Products CRUD
-> **Phiên bản:** 9.0 | **Cập nhật:** 2026-04-06 | **Thực hiện:** QA Team
+> **Phiên bản:** 9.1 | **Cập nhật:** 2026-05-15 (thêm TC-F08.141..177 — schema 100% PRD §7.5 coverage + BR/FR contracts) | **Thực hiện:** QA Team
+
+### Changelog
+- **v9.1 (2026-05-15)** — Thêm TC-F08.141..177 (37 TCs) phủ 37 gaps từ ck:scenario audit: (A) BR/FR contracts — BR-04 price=0, BR-06 stock=0, FR-07 required fields, FR-13 attributes max 20; (B) Data Validation Rules §7.5 boundary — name 120/121, compareAtPrice ==/>, SKU 50/51, weight 0/0.01/1001, dimensions 0/-1/10001, SEO title 70/71, SEO desc 160/161, URL slug regex + trim; (C) Variants + Attributes — max 2 tiers, 30 options, 900 variants, case-insensitive duplicates, attribute key 100; (D) Design/i18n — empty images placeholder, max 5 images, Bahasa Melayu unicode. **37/37 PASS**.
+- **v9.0 (2026-04-06)** — Initial 140 TCs across 8 groups (US-01..07 + US-831 storefront API + Global Dev-Killer + Blog Auto-Seed + GH-909 Regression).
 > **Nguồn Tham chiếu:** PRD (`F08-products-crud.md`), User Stories (7 US chính + Global AC)
 > **Kỹ năng ứng dụng (.agent):** BDD (Gherkin Expectations), Security Contexting, Boundary UI/UX Check, CCT/Navigation Flow, Edge Categories.
 
@@ -277,4 +281,69 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-REG.02** | `afterChangeHook` — `doc.site` is scalar string | `findByID` called with string id (behavior unchanged) | `notification-triggers.test.ts` |
 | **TC-F08-REG.03** | `afterChangeHook` — `doc.site` is populated object | `findByID` called with `site.id` (behavior unchanged) | `notification-triggers.test.ts` |
 | **TC-F08-REG.04** | `lowStockHook` — `doc.tenant` is null | Hook returns doc without throwing; notification called with null tenantId | `notification-triggers.test.ts` |
+
+---
+
+## 7. Schema 100% PRD Coverage (thêm v9.1 — 2026-05-15)
+
+> **File test nguồn:** `src/__tests__/unit/dashboard/products-schema-coverage.test.ts` (NEW, 37 tests, **37/37 PASS**)
+> **Source spec:** `docs/prd/F08-products-crud.md` §7.5 Data Validation Rules + 17 FRs + 6 BRs
+> **Implementation:** `src/components/dashboard/product-form/schema.ts` (Zod)
+
+### A) BR/FR contracts [TC-F08.141..147]
+
+| TC-ID | Scenario | Expected | Refs |
+|---|---|---|---|
+| **TC-F08.141** | BR-04: price=0 accepted (free product) | `safeParse({basePrice:0})` success=true | BR-04 |
+| **TC-F08.142** | BR-06: stock=0 accepted by schema (status preservation at API layer) | success=true | BR-06 |
+| **TC-F08.143** | FR-07: missing basePrice rejected even if other fields valid | success=false, error path basePrice | FR-07 |
+| **TC-F08.144** | FR-07: missing/whitespace baseSku rejected | success=false | FR-07 |
+| **TC-F08.145** | FR-07: missing baseInventory rejected | success=false | FR-07 |
+| **TC-F08.146** | FR-13 attributes: duplicate keys schema-permissive (UI dedup) — documents contract | success=true | FR-13, TC-F08-06-03 |
+| **TC-F08.147** | FR-13: 21 attributes rejected (max 20) | success=false | FR-13, TC-F08-06-02 |
+
+### B) Data Validation Rules §7.5 boundary [TC-F08.148..167]
+
+| TC-ID | Field | Boundary case | Refs |
+|---|---|---|---|
+| **TC-F08.148** | Name | 120 chars exact max → accepted | §7.5 |
+| **TC-F08.149** | Name | 121 chars → rejected | §7.5, TC-F08-01-04 |
+| **TC-F08.150** | compareAtPrice | == basePrice → rejected (strict >) | §7.5, TC-F08-01-17 |
+| **TC-F08.151** | compareAtPrice | > basePrice → accepted | §7.5 |
+| **TC-F08.152** | SKU | 50 chars exact max → accepted | §7.5 |
+| **TC-F08.153** | SKU | 51 chars → rejected | §7.5 |
+| **TC-F08.154** | Weight | 0 → rejected (must > 0) | §7.5, FR-07 |
+| **TC-F08.155** | Weight | 0.01 exact min → accepted | §7.5 |
+| **TC-F08.156** | Weight | 1001 → rejected (max 1000) | §7.5 |
+| **TC-F08.157** | Length | 0 → accepted (≥0) | §7.5 |
+| **TC-F08.158** | Length | -1 → rejected | §7.5 |
+| **TC-F08.159** | Length | 10001 → rejected (max 10000) | §7.5 |
+| **TC-F08.160** | SEO Title | 70 chars exact → accepted | §7.5, TC-F08-03-03 |
+| **TC-F08.161** | SEO Title | 71 chars → rejected | §7.5 |
+| **TC-F08.162** | SEO Description | 160 chars exact → accepted | §7.5 |
+| **TC-F08.163** | SEO Description | 161 chars → rejected | §7.5 |
+| **TC-F08.164** | URL Slug | `valid-slug-123` → accepted (lowercase+hyphen+digit) | §7.5, TC-F08-01-31 |
+| **TC-F08.165** | URL Slug | `Invalid-Slug!` → rejected (uppercase + special) | §7.5 |
+| **TC-F08.166** | URL Slug | empty → rejected (required) | §7.5, TC-F08-01-30 |
+| **TC-F08.167** | URL Slug | leading/trailing whitespace trimmed before regex | §7.5 |
+
+### C) Variants + Attributes [TC-F08.168..174]
+
+| TC-ID | Scenario | Expected | Refs |
+|---|---|---|---|
+| **TC-F08.168** | Variants 3rd tier → rejected | success=false (max 2) | FR-04, TC-F08-02-04 |
+| **TC-F08.169** | Tier với 31 options → rejected (max 30) | success=false | FR-04, TC-F08-02-08 |
+| **TC-F08.170** | Variants duplicate option case-insensitive `Red`/`red` rejected | success=false | TC-F08-02-07 |
+| **TC-F08.171** | Variants duplicate tier names `Color`/`COLOR` rejected | success=false | TC-F08-02-09 |
+| **TC-F08.172** | 901 SKU variants → rejected (max 900) | success=false | FR-05 |
+| **TC-F08.173** | Duplicate SKU codes across variants → detected | success=false, error /unique/ | FR-05 |
+| **TC-F08.174** | Attribute key 100 chars exact max → accepted | success=true | FR-13 |
+
+### D) Design states + i18n + Compliance [TC-F08.175..177]
+
+| TC-ID | Scenario | Expected | Refs |
+|---|---|---|---|
+| **TC-F08.175** | Empty images array accepted (placeholder fallback FR-11) | success=true (UI renders crate-carton) | FR-11, TC-F08-04-04 |
+| **TC-F08.176** | 6 images → rejected (max 5 per FR-09) | success=false | FR-09, TC-F08-01-14 |
+| **TC-F08.177** | i18n: BM product name `Baju Kurung Tradisional Melayu` Unicode preserved | success=true, name intact | TC-F08-01-21, TC-F08-G-02 |
 
