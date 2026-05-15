@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { FooterLinkEditor } from '@/components/editor/footer-link-editor'
 import { I18nProvider } from '@/i18n'
-import React from 'react'
+import React, { useState } from 'react'
+import type { FooterColumn } from '@/types/editor'
 
 // Mock i18n dependencies
 vi.mock('@/i18n', async () => {
@@ -21,6 +22,13 @@ vi.mock('@/i18n', async () => {
                         addColumn: 'Add Column',
                         columnN: 'Column {{n}}',
                         removeColumn: 'Remove Column',
+                        linkPageDeleted: 'Page deleted',
+                        linkPageDraft: 'Page is draft',
+                        linkPageNotFound: 'Page not found',
+                        linkPageHidden: 'Page is hidden',
+                    },
+                    navigation: {
+                        selectPage: 'Select page',
                     },
                 },
             },
@@ -152,5 +160,80 @@ describe('[TC-F05-967-B] FooterLinkEditor — single-expand accordion', () => {
         expect(screen.queryByDisplayValue('Link 1A')).not.toBeInTheDocument()
         expect(screen.queryByDisplayValue('Link 2A')).not.toBeInTheDocument()
         expect(screen.queryByDisplayValue('Link 3A')).not.toBeInTheDocument()
+    })
+})
+
+// Stateful wrapper so onUpdate propagates back into the component (simulates real parent)
+function StatefulFooterLinkEditor({ initialColumns }: { initialColumns: FooterColumn[] }) {
+    const [columns, setColumns] = useState<FooterColumn[]>(initialColumns)
+    return <FooterLinkEditor columns={columns} onUpdate={setColumns} />
+}
+
+// TC-F05-967-C: Add 2 links to a column — both must appear
+describe('[TC-F05-967-C] FooterLinkEditor — add 2 links both render', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('adds 2 links sequentially — both link rows visible in open column', async () => {
+        const initialColumns: FooterColumn[] = [{ title: 'Products', links: [] }]
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <StatefulFooterLinkEditor initialColumns={initialColumns} />
+            </I18nProvider>,
+        )
+
+        // Open the column
+        const colHeader = screen.getByText('Products')
+        fireEvent.click(colHeader)
+
+        await waitFor(() => {
+            expect(screen.getByText('Add Link')).toBeInTheDocument()
+        })
+
+        // Add first link
+        await act(async () => { fireEvent.click(screen.getByText('Add Link')) })
+
+        // Add second link
+        await act(async () => { fireEvent.click(screen.getByText('Add Link')) })
+
+        // Both SortableLink rows must render (each has a label input and a remove button)
+        const removeButtons = screen.getAllByLabelText('Remove link')
+        expect(removeButtons).toHaveLength(2)
+    })
+
+    it('removes correct link when 2 links exist', async () => {
+        const initialColumns: FooterColumn[] = [{
+            title: 'Company',
+            links: [
+                { label: 'About', url: '/about' },
+                { label: 'Contact', url: '/contact' },
+            ],
+        }]
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <StatefulFooterLinkEditor initialColumns={initialColumns} />
+            </I18nProvider>,
+        )
+
+        // Open the column
+        fireEvent.click(screen.getByText('Company'))
+
+        await waitFor(() => {
+            expect(screen.getByDisplayValue('About')).toBeInTheDocument()
+            expect(screen.getByDisplayValue('Contact')).toBeInTheDocument()
+        })
+
+        // Remove first link
+        const removeButtons = screen.getAllByLabelText('Remove link')
+        await act(async () => { fireEvent.click(removeButtons[0]!) })
+
+        // Only "Contact" remains
+        await waitFor(() => {
+            expect(screen.queryByDisplayValue('About')).not.toBeInTheDocument()
+            expect(screen.getByDisplayValue('Contact')).toBeInTheDocument()
+        })
     })
 })
