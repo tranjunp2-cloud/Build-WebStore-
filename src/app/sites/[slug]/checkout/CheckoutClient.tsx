@@ -358,14 +358,14 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                     <div className={`ck-iw${fieldErrors.email ? ' err' : ''}`}>
                                         <input type="email" value={form.email} onChange={e => updateField('email', e.target.value)} onBlur={handleEmailBlur} placeholder="ahmad@email.com" />
                                     </div>
-                                    {fieldErrors.email && <p className="ck-ferr">{fieldErrors.email}</p>}
+                                    <p className="ck-ferr">{fieldErrors.email ?? ''}</p>
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.phone} (+60)</label>
                                     <div className={`ck-iw${fieldErrors.phone ? ' err' : ''}`}>
                                         <input type="tel" value={form.phone} onChange={e => updateField('phone', e.target.value)} onBlur={handlePhoneBlur} placeholder="+60 12 345 6789" />
                                     </div>
-                                    {fieldErrors.phone && <p className="ck-ferr">{fieldErrors.phone}</p>}
+                                    <p className="ck-ferr">{fieldErrors.phone ?? ''}</p>
                                 </div>
                             </div>
                         </div>
@@ -655,7 +655,7 @@ const CK_CSS = `
 .ck-row.c2>* .ck-iw,.ck-row.c3>* .ck-iw{margin-top:auto;}
 /* Error */
 .ck-err{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;font-size:13px;color:#dc2626;display:flex;align-items:center;gap:10px;}
-.ck-ferr{font-size:11.5px;color:#dc2626;margin:3px 0 0;display:flex;align-items:center;gap:4px;font-weight:500;}
+.ck-ferr{font-size:11.5px;color:#dc2626;margin:3px 0 0;display:flex;align-items:center;gap:4px;font-weight:500;min-height:16px;}
 /* Payment methods */
 .pm-list{display:flex;flex-direction:column;gap:12px;}
 .pm{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px 18px;cursor:pointer;transition:all .18s cubic-bezier(.22,1,.36,1);position:relative;}
