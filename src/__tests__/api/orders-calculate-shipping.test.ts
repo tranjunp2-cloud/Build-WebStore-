@@ -7,6 +7,7 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 
 import { POST } from '@/app/api/orders/calculate-shipping/route'
+import { getPayload } from 'payload'
 
 // ─── POST /api/orders/calculate-shipping [TC-F14] ──────────────────────────
 
@@ -157,5 +158,63 @@ describe('POST /api/orders/calculate-shipping — validation [TC-F14]', () => {
 
         expect(res.status).toBe(400)
         expect(body.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('[TC-F14.85] null JSON body returns 400 VALIDATION_ERROR (not 500)', async () => {
+        const res = await POST(new Request('http://localhost/api/orders/calculate-shipping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: 'null',
+        }))
+        expect(res.status).toBe(400)
+        const body = await res.json()
+        expect(body.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('[TC-F14.85b] array JSON body returns 400 VALIDATION_ERROR', async () => {
+        const res = await POST(new Request('http://localhost/api/orders/calculate-shipping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify([{ siteId: 'x' }]),
+        }))
+        expect(res.status).toBe(400)
+        const body = await res.json()
+        expect(body.error.code).toBe('VALIDATION_ERROR')
+    })
+})
+
+// TC-F14.23 — Live recalc: same endpoint with different states returns state-specific fees (no bleed-through)
+describe('POST /api/orders/calculate-shipping — live recalc [TC-F14.23]', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('[TC-F14.23] West→East recalc: sequential state changes return correct fees without bleed-through', async () => {
+        // Arrange: persistent mock covers both calls
+        mockSite(null)
+
+        // West call
+        const resWest = await callPost({ ...validBase, state: 'Selangor' })
+        const west = await resWest.json()
+        expect(west.data.fee).toBe(800)
+        expect(west.data.region).toBe('west')
+
+        // East call — different state, verifies no fee bleed-through from prior call
+        const resEast = await callPost({ ...validBase, state: 'Sabah' })
+        const east = await resEast.json()
+        expect(east.data.fee).toBe(1500)
+        expect(east.data.region).toBe('east')
+    })
+})
+
+// TC-F14.50 — Network error: getPayload failure returns 500 (outer try/catch, not thrown to caller)
+describe('POST /api/orders/calculate-shipping — error handling [TC-F14.50]', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('[TC-F14.50] getPayload failure → 500 with INTERNAL_ERROR response (not thrown)', async () => {
+        vi.mocked(getPayload).mockRejectedValueOnce(new Error('DB timeout'))
+        const res = await callPost(validBase)
+        expect(res.status).toBe(500)
+        const body = await res.json()
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('INTERNAL_ERROR')
     })
 })

@@ -237,6 +237,7 @@ sequenceDiagram
 **Auth:** Public (checkout guest)
 **Idempotent:** Yes (pure calc).
 **Rate limit:** 60 req/min per IP (sane default; checkout debounce 300ms makes this generous).
+**Body validation:** Handler guards against null or array body → returns 400.
 
 ```typescript
 // Request body
@@ -261,7 +262,7 @@ sequenceDiagram
   }
 }
 
-// Response 400 — invalid state
+// Response 400 — validation error (invalid state, null/array body)
 { success: false, error: { code: 'INVALID_STATE', message: 'Unknown Malaysian state' } }
 
 // Response 404 — site not found
