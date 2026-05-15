@@ -62,6 +62,7 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08-01-29b** | `US-01/Sec` | `Unit` | updateProductFieldAction — product không tồn tại hoặc không có quyền truy cập → throws trước update | Unit test: findByID trả về null (product bị xoá, hoặc tenant khác). | - Throws Error "Product not found or access denied".<br>- payload.update không được gọi. | Blocker | [x] |
 | **TC-F08-01-30** | `US-01/Val` | `Unit` | urlSlug rỗng sau trim → Zod báo lỗi "URL Slug is required" | Unit test: `productFormSchema.safeParse({ ...validData, urlSlug: '' })`. | - `result.success` = false.<br>- `fieldErrors.urlSlug[0]` khớp /URL Slug is required/. | Blocker | [x] |
 | **TC-F08-01-31** | `US-01/Val` | `Unit` | urlSlug có ký tự không hợp lệ → Zod báo lỗi "lowercase alphanumeric" | Unit test: `productFormSchema.safeParse({ ...validData, urlSlug: 'Invalid Slug!' })`. | - `result.success` = false.<br>- `fieldErrors.urlSlug[0]` khớp /lowercase alphanumeric/. | Blocker | [x] |
+| **TC-F08-01-32** | `US-01/Bug` | `Unit` | updateProductFieldAction — sản phẩm có variants → id tự quản lý bị strip trước khi gọi payload.update | Unit test: findByID trả về product với variants/variantConfigs có `id` trên mỗi phần tử. Gọi action với `{ status: 'active' }`. | - `payload.update` được gọi với variants/variantConfigs không chứa `id` trên bất kỳ phần tử nào.<br>- Cả options lồng trong variantConfigs cũng không chứa `id`. | Blocker | [x] |
 
 ---
 
