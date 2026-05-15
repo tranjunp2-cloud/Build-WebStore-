@@ -106,7 +106,7 @@ function SortableLink({ id, link, ci, li, pages, onUpdate, onRemove }: SortableL
                             <select
                                 key={`link-url-${ci}-${li}-internal`}
                                 value={link.url || '#'}
-                                onChange={(e) => onUpdate('url', e.target.value)}
+                                onChange={(e) => onUpdate('url', e.target.value === '#' ? '' : e.target.value)}
                                 className={cn(
                                     'h-8 w-full appearance-none rounded-md border border-white/[0.08] bg-[rgba(15,23,42,0.7)] pl-7 pr-8 text-[13px] text-[#94a3b8] cursor-pointer focus:outline-none focus:border-blue-500/40',
                                     hiddenStatus && 'ring-2 ring-red-500/70',
