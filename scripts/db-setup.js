@@ -18,6 +18,7 @@
  */
 const { spawn } = require('child_process');
 const { bootstrapSeed } = require('./bootstrap-seed');
+const { seedMalaysiaGeo } = require('./seed-malaysia-geo-boot');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -3915,6 +3916,18 @@ async function runBootstrapSeed(pool) {
     } else {
       console.warn(`[db-setup]   ⚠️  ${r.label}: error during bootstrap`);
     }
+  }
+
+  console.log('[db-setup] Bootstrap: seeding Malaysia geo data...');
+  try {
+    const geo = await seedMalaysiaGeo(pool);
+    if (geo.action === 'exists') {
+      console.log(`[db-setup]   ✅ Malaysia geo: EXISTS (${geo.count} states) — skipped`);
+    } else {
+      console.log(`[db-setup]   ✅ Malaysia geo: SEEDED — ${geo.states} states, ${geo.districts} districts, ${geo.postcodes} postcodes`);
+    }
+  } catch (e) {
+    console.warn('[db-setup]   ⚠️  Malaysia geo seed failed (non-blocking):', e.message);
   }
 }
 
