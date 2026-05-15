@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { toast, Toaster } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCartStore } from '@/store/cartStore'
@@ -276,7 +277,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const handlePlaceOrder = async () => {
         if (!canPlaceOrder) return
-        setIsPlacing(true); setError(null)
+        setIsPlacing(true)
         try {
             let paymentProofImageId: string | undefined
             if (paymentMethod === 'qr_banking' && proofFile) {
@@ -314,10 +315,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 }
                 router.push(`/sites/${slug}/order/${data.data.orderId}/confirm`)
             } else {
-                setError(data.error?.message || 'Failed to place order')
+                toast.error(data.error?.message || 'Failed to place order')
             }
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : ck.networkError)
+            toast.error(err instanceof Error ? err.message : ck.networkError)
         } finally {
             setIsPlacing(false)
         }
@@ -353,6 +354,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     return (
         <>
+            <Toaster position="bottom-center" richColors />
             <GoogleFontsLoader fontHeading={fontHeading} fontBody={fontBody} />
             {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
             <div className="ck-page">
