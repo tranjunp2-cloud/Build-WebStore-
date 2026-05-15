@@ -462,12 +462,13 @@ describe('[TC-F04-SR-05] SiteRenderer renders empty content when layout is empty
 // returns 404); the menu itself stays stable so users never see items
 // disappear mid-session.
 // ═══════════════════════════════════════════════════════════════════════════
-describe('[TC-F04-SR-06] SiteRenderer preserves all nav links regardless of page visibility', () => {
+describe('[TC-F04-SR-06] SiteRenderer nav link visibility filtering', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('passes nav links through unchanged even when a target page has isVisible=false', () => {
+    it('TC-F04-SR-06a: visible pages keep their nav links; hidden page link is filtered for visitors', () => {
+        // Slug-based matching: /services page is hidden → its nav link must be removed
         const capturedBlocks: Record<string, unknown>[] = []
         const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
             capturedBlocks.push(block)
@@ -477,7 +478,7 @@ describe('[TC-F04-SR-06] SiteRenderer preserves all nav links regardless of page
 
         const links = [
             { label: 'Home', url: '/' },
-            { label: 'Services', url: '/services' }, // target page hidden
+            { label: 'Services', url: '/services' }, // isVisible=false below
             { label: 'About', url: '/about' },
         ]
         const pages = [
@@ -491,10 +492,331 @@ describe('[TC-F04-SR-06] SiteRenderer preserves all nav links regardless of page
                 site={defaultSite}
                 page={{ layout: [{ blockType: 'navigation', links }] }}
                 pages={pages}
+                isOwner={false}
             />
         )
 
-        expect(capturedBlocks[0].links).toEqual(links)
+        // Services link filtered — only Home + About remain
+        const renderedLinks = capturedBlocks[0].links as Array<{ label: string }>
+        expect(renderedLinks.length).toBe(2)
+        expect(renderedLinks.map((l: { label: string }) => l.label)).toEqual(['Home', 'About'])
+    })
+
+    it('TC-F05-959-01: URL-based links to hidden pages are filtered for visitors (non-owner, non-editor)', () => {
+        // Arrange — links use URL/slug (actual data format, no reference.value)
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'nav-block' })
+        }
+        mockGetComponent.mockReturnValue(NavBlock)
+
+        const links = [
+            { label: 'Home', url: '/' },
+            { label: 'Services', url: '/services' }, // isVisible=false page
+            { label: 'About', url: '/about' },
+        ]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+            { id: '3', slug: '/about', isVisible: true },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'navigation', links }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        // /services filtered out — only Home + About remain
+        const renderedLinks = capturedBlocks[0].links as Array<{ label: string }>
+        expect(renderedLinks.length).toBe(2)
+        expect(renderedLinks.map(l => l.label)).toEqual(['Home', 'About'])
+    })
+
+    it('TC-F05-959-01b: hidden-page filtering handles case drift, query/hash, and trailing slash', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'nav-block' })
+        }
+        mockGetComponent.mockReturnValue(NavBlock)
+
+        const links = [
+            { label: 'Home', url: '/' },
+            { label: 'Services Case', url: '/Services' },
+            { label: 'Services Query', url: '/services?utm=nav' },
+            { label: 'Services Hash', url: '/services#pricing' },
+            { label: 'Services Slash', url: '/services/' },
+            { label: 'About', url: '/about' },
+        ]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+            { id: '3', slug: '/about', isVisible: true },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'navigation', links }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        const renderedLinks = capturedBlocks[0].links as Array<{ label: string }>
+        expect(renderedLinks.map(l => l.label)).toEqual(['Home', 'About'])
+    })
+
+    it('TC-F05-959-02: links to hidden pages are preserved for owners', () => {
+        // Owners always see all links (edit context)
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'nav-block' })
+        }
+        mockGetComponent.mockReturnValue(NavBlock)
+
+        const links = [
+            { label: 'Home', url: '/' },
+            { label: 'Services', url: '/services' },
+        ]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'navigation', links }] }}
+                pages={pages}
+                isOwner={true}
+            />
+        )
+
+        // All links kept for owner
+        expect((capturedBlocks[0].links as unknown[]).length).toBe(2)
+    })
+
+    it('TC-F05-959-03: links to soft-deleted pages are filtered for visitors', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'nav-block' })
+        }
+        mockGetComponent.mockReturnValue(NavBlock)
+
+        const links = [
+            { label: 'Home', url: '/' },
+            { label: 'Old Page', url: '/old' },
+        ]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true, deletedAt: null },
+            { id: '2', slug: '/old', isVisible: true, deletedAt: '2026-05-01T00:00:00Z' },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'navigation', links }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        // Soft-deleted /old link filtered out
+        const renderedLinks = capturedBlocks[0].links as Array<{ label: string }>
+        expect(renderedLinks.length).toBe(1)
+        expect(renderedLinks[0].label).toBe('Home')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F05-959-04 — footer column links to hidden pages are filtered for visitors
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-F05-959-04] SiteRenderer footer hidden-page link filtering', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('TC-F05-959-04a: footer links to hidden pages are filtered for visitors', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Services', url: '/services' },   // isVisible=false
+                { label: 'About', url: '/about' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+            { id: '3', slug: '/about', isVisible: true },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home', 'About'])
+    })
+
+    it('TC-F05-959-04b: footer links to hidden pages are preserved for owners', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Services', url: '/services' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/services', isVisible: false },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isOwner={true}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home', 'Services'])
+    })
+
+    it('TC-F05-959-04c: footer links to soft-deleted pages are filtered for visitors', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Old Page', url: '/old' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true, deletedAt: null },
+            { id: '2', slug: '/old', isVisible: true, deletedAt: '2026-05-01T00:00:00Z' },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home'])
+    })
+
+    it('TC-F05-959-04d: footer links to draft pages are filtered for visitors', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Draft Page', url: '/draft' },
+                { label: 'About', url: '/about' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/draft', isVisible: true, status: 'draft' },
+            { id: '3', slug: '/about', isVisible: true, status: 'published' },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isOwner={false}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string }> }>
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home', 'About'])
+    })
+
+    it('TC-F05-959-04e: footer links in editor iframe are not filtered but stamped _hiddenFromVisitor', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const FooterBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'footer-block' })
+        }
+        mockGetComponent.mockImplementation((type) => type === 'footer' ? FooterBlock : null)
+
+        const columns = [{
+            heading: 'Links',
+            links: [
+                { label: 'Home', url: '/' },
+                { label: 'Hidden Page', url: '/hidden' },
+            ],
+        }]
+        const pages = [
+            { id: '1', slug: '/', isHomepage: true, isVisible: true },
+            { id: '2', slug: '/hidden', isVisible: false },
+        ]
+
+        render(
+            <SiteRenderer
+                site={defaultSite}
+                page={{ layout: [{ blockType: 'footer', columns }] }}
+                pages={pages}
+                isEditor={true}
+                isEditorIframe={true}
+                isOwner={true}
+            />
+        )
+
+        const cols = capturedBlocks[0].columns as Array<{ links: Array<{ label: string; _hiddenFromVisitor?: boolean }> }>
+        // Both links present (not filtered)
+        expect(cols[0].links.map(l => l.label)).toEqual(['Home', 'Hidden Page'])
+        // Hidden page link gets the indicator flag
+        expect(cols[0].links[1]._hiddenFromVisitor).toBe(true)
+        expect(cols[0].links[0]._hiddenFromVisitor).toBeFalsy()
     })
 })
 

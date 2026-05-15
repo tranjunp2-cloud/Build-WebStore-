@@ -71,6 +71,10 @@ export type NavPageLike = {
  */
 export const HOMEPAGE_ALIASES = ['/home', 'home', '/index', 'index'] as const
 
+/** Runtime-only prefix marking an internal URL that could not be resolved to any known page.
+ *  Never persisted to the database. Detected by useIsHiddenLink / BrokenLinkWarning in editor mode. */
+export const BROKEN_URL_PREFIX = '_broken_url_:'
+
 /**
  * Build a `{ anyFormOfSlug → canonical /slug }` map from the pages list.
  * Three forms are indexed per page so the rewriter tolerates casing +
@@ -123,6 +127,37 @@ export function splitPathAndTail(url: string): [string, string] {
                 : hIdx >= 0 ? hIdx
                     : url.length
     return [url.slice(0, tailIdx), url.slice(tailIdx)]
+}
+
+/**
+ * Resolve an internal URL to the canonical page path used for comparisons.
+ * Unlike rewriteLiveUrl(), this accepts bare internal slugs too because editor
+ * data may contain `services` while render data typically contains `/services`.
+ */
+export function resolveInternalUrlPath(
+    url: string | undefined | null,
+    slugCanonical: Map<string, string>,
+): string | null {
+    if (!url) return null
+    const trimmed = url.trim()
+    if (!trimmed || trimmed === '#' || trimmed.startsWith('#')) return null
+    if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('//')) return null
+    if (trimmed.includes(':') && !trimmed.startsWith('/')) return null
+
+    const [rawPath] = splitPathAndTail(trimmed)
+    if (!rawPath || rawPath === '#') return null
+
+    const path = rawPath.startsWith('/') ? rawPath : `/${rawPath}`
+    const withoutTrailingSlash = path.length > 1 ? path.replace(/\/+$/, '') : path
+    const bare = withoutTrailingSlash.replace(/^\//, '')
+    const hit =
+        slugCanonical.get(path) ??
+        slugCanonical.get(path.toLowerCase()) ??
+        slugCanonical.get(withoutTrailingSlash) ??
+        slugCanonical.get(withoutTrailingSlash.toLowerCase()) ??
+        slugCanonical.get(bare)
+
+    return hit ?? withoutTrailingSlash.toLowerCase()
 }
 
 /**

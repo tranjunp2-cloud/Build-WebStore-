@@ -26,6 +26,32 @@ import {
 
 const VERCEL_API_BASE = 'https://api.vercel.com'
 
+// ── Local dev mock ──────────────────────────────────────────────────────────
+// Activates automatically when VERCEL_TOKEN is absent in development so the
+// full domain UI flow can be exercised without a real Vercel project.
+//
+// VERCEL_MOCK_MODE=pending  → domain added as pending (TXT challenge shown) — default
+// VERCEL_MOCK_MODE=active   → domain added as immediately active
+export function isMockMode(): boolean {
+    return !process.env.VERCEL_TOKEN && process.env.NODE_ENV === 'development'
+}
+
+function mockDomain(name: string, forceVerified?: boolean): VercelDomain {
+    const mockMode = process.env.VERCEL_MOCK_MODE ?? 'pending'
+    const pending = forceVerified !== true && mockMode !== 'active'
+    return {
+        name,
+        apexName: name.split('.').slice(-2).join('.'),
+        projectId: 'mock-project-id',
+        verified: !pending,
+        verification: pending
+            ? [{ type: 'TXT', domain: `_vercel.${name}`, value: 'mock_token_abc123', reason: 'pending_domain_verification' }]
+            : undefined,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+    }
+}
+
 interface VercelEnv {
     token: string
     teamId: string
@@ -182,6 +208,10 @@ async function vercelFetch<T>(
  * - `400 invalid_domain` — malformed input (should be caught before by input regex).
  */
 export async function addProjectDomain(name: string): Promise<VercelDomain> {
+    if (isMockMode()) {
+        console.warn(`[vercel-domains] MOCK: addProjectDomain("${name}") mode=${process.env.VERCEL_MOCK_MODE ?? 'pending'}`)
+        return mockDomain(name)
+    }
     const { projectId } = assertVercelEnv()
     // gitBranch routes the domain to the correct environment's latest deployment.
     // VERCEL_GIT_COMMIT_REF is injected by Vercel at build time ('staging', 'main', etc.).
@@ -211,6 +241,7 @@ export async function addProjectDomain(name: string): Promise<VercelDomain> {
  *   or set a stale value. Surface `message` to the user.
  */
 export async function verifyProjectDomain(domain: string): Promise<VercelDomain> {
+    if (isMockMode()) return mockDomain(domain, true)
     const { projectId } = assertVercelEnv()
     return vercelFetch<VercelDomain>(
         `/v9/projects/${encodeURIComponent(projectId)}/domains/${encodeURIComponent(domain)}/verify`,
@@ -228,6 +259,7 @@ export async function verifyProjectDomain(domain: string): Promise<VercelDomain>
  * `verified === true && (verification ?? []).length === 0` as "ready".
  */
 export async function getProjectDomain(domain: string): Promise<VercelDomain> {
+    if (isMockMode()) return mockDomain(domain)
     const { projectId } = assertVercelEnv()
     return vercelFetch<VercelDomain>(
         `/v9/projects/${encodeURIComponent(projectId)}/domains/${encodeURIComponent(domain)}`,
@@ -249,6 +281,7 @@ export async function removeProjectDomain(
     domain: string,
     opts: { removeRedirects?: boolean } = {},
 ): Promise<void> {
+    if (isMockMode()) return
     const { projectId } = assertVercelEnv()
     const body =
         opts.removeRedirects !== undefined

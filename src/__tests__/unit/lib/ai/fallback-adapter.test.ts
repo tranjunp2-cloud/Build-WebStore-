@@ -83,9 +83,7 @@ describe('composeFallbackResult — behaviors', () => {
     })
 
     it('restaurant fallback emits at least one restaurant-appropriate block', () => {
-        // menu-display, booking-widget, gallery dropped by unsupported-blocks filter
-        // (fc0020d regression fix). Test now checks for any survivable restaurant block.
-        const ACCEPTABLE = new Set(['hero', 'features', 'testimonials', 'faq', 'cta', 'stats', 'team', 'pricing'])
+        const ACCEPTABLE = new Set(['hero', 'features', 'testimonials', 'faq', 'cta', 'stats', 'team', 'pricing', 'menu-display'])
         const blockTypes = new Set<string>()
         for (let seed = 0; seed < 4; seed++) {
             const result = composeFallbackResult('restaurant', seed, 'en')
@@ -105,11 +103,11 @@ describe('composeFallbackResult — behaviors', () => {
 
     it('drops unsupported blocks from fallback output (fc0020d regression fix)', () => {
         // Health seed 7 previously emitted booking-widget; must not leak through.
-        // Restaurant may emit menu-display; review-cards drops on all gen paths.
+        // review-cards drops on all gen paths (media pipeline required).
         // Note: before-after, booking-widget re-enabled via plan 260422-1900-block-aivisible-audit-fix.
         // Note: gallery + portfolio-grid re-enabled via plan 260414-1400 Unsplash pipeline.
+        // Note: menu-display re-enabled via GH-960 (#961 cart/checkout shipped).
         const UNSUPPORTED = new Set([
-            'menu-display',
             'review-cards',
         ])
 

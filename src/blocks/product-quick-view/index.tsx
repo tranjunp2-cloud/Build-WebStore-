@@ -15,10 +15,10 @@ import {
     CARD_PADDING,
     TOUCH_TARGET,
 } from '@/lib/design-tokens'
+import { handleCartClick } from '@/lib/storefront/editor-intercept'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
-// gh-839: Hide CTA/Add to Cart until checkout is implemented. Flip to true to re-enable.
-const CART_ENABLED = false
+const CART_ENABLED = true
 type QuickViewProductWithCurrency = QuickViewProduct & { _currency?: string }
 
 const PRODUCT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -190,6 +190,7 @@ function QuickViewModal({
                                 href={product.ctaUrl}
                                 className={`block w-full py-3 rounded-xl font-semibold text-center text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                                 style={{ background: 'var(--brand-primary)' }}
+                                onClick={handleCartClick}
                             >
                                 {product.ctaLabel || 'Add to Cart'}
                             </a>
@@ -198,6 +199,7 @@ function QuickViewModal({
                                 type="button"
                                 className={`w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                                 style={{ background: 'var(--brand-primary)' }}
+                                onClick={handleCartClick}
                             >
                                 {product.ctaLabel || 'Add to Cart'}
                             </button>

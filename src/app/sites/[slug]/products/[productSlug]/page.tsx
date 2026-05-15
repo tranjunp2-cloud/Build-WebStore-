@@ -311,8 +311,7 @@ export default async function ProductDetailPage({ params }: Props) {
                         </>
                     )}
 
-                    {/* Add to Cart — hidden until checkout is implemented (gh-839) */}
-                    {false && <AddToCartButton
+                    <AddToCartButton
                         product={{
                             id: String(p.id),
                             slug: p.slug,
@@ -326,7 +325,7 @@ export default async function ProductDetailPage({ params }: Props) {
                         primaryColor={primaryColor}
                         siteSlug={slug}
                         siteId={String(site.id)}
-                    />}
+                    />
 
                     {/* Specifications */}
                     {attributes.length > 0 && (

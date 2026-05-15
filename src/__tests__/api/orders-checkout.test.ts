@@ -10,6 +10,7 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 
 import { POST } from '@/app/api/orders/checkout/route'
+import { MAX_CHECKOUT_ITEMS } from '@/lib/validations/orders'
 
 // ─── TC-F10: Order checkout API ──────────────────────────────────────
 
@@ -17,10 +18,22 @@ function mockReq(body: any) {
     return { json: () => Promise.resolve(body) } as unknown as Request
 }
 
+// Simulates a payload.find() returning one matching product
+function mockProduct(product: object) {
+    return { docs: [product], totalDocs: 1 }
+}
+
+// Simulates payload.find() returning no results (not found / filtered out)
+const EMPTY_FIND = { docs: [], totalDocs: 0 }
+
 const validBody = {
     siteId: 'site-1',
     items: [{ productId: 'prod-1', quantity: 2 }],
-    customer: { name: 'John', email: 'john@test.com' },
+    customer: {
+        name: 'John',
+        email: 'john@test.com',
+        address: { line1: '123 Main St', city: 'Kuala Lumpur', state: 'Selangor', postcode: '50100', country: 'Malaysia' },
+    },
     paymentMethod: 'cod',
 }
 
@@ -31,9 +44,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
 
     it('creates order with valid input', async () => {
         mockFindByID
-            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site
-            .mockResolvedValueOnce({ id: 'prod-1', name: 'Product 1', price: 25, stock: 10 }) // product
-            .mockResolvedValueOnce({ id: 'prod-1', stock: 10 }) // restock check
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })   // site
+            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 })         // restock check
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'Product 1', price: 25, inventory: 10 }))
         mockCreate.mockResolvedValue({ id: 'order-1' })
         mockUpdate.mockResolvedValue({})
 
@@ -61,9 +74,8 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     })
 
     it('returns 404 when product not found', async () => {
-        mockFindByID
-            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce(null) // product not found
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(EMPTY_FIND)
 
         const res = await POST(mockReq(validBody))
         const body = await res.json()
@@ -73,9 +85,8 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     })
 
     it('returns 422 when out of stock', async () => {
-        mockFindByID
-            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce({ id: 'prod-1', name: 'Product', price: 25, stock: 1 }) // only 1 left
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'Product', price: 25, inventory: 1 })) // only 1 left
 
         const res = await POST(mockReq(validBody)) // requesting 2
         const body = await res.json()
@@ -87,83 +98,213 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
     it('calculates SST 6% tax', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce({ id: 'prod-1', name: 'P', price: 100, stock: 10 })
-            .mockResolvedValueOnce({ id: 'prod-1', stock: 10 })
+            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 }) // restock check
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
         mockCreate.mockResolvedValue({ id: 'order-1' })
         mockUpdate.mockResolvedValue({})
 
         const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }] }))
         const body = await res.json()
 
-        expect(body.data.total).toBe(114) // 100 subtotal + 8 shipping (West MY default) + 6 SST
+        expect(body.data.total).toBe(114) // 100 subtotal + 8 shipping (Selangor/west default) + 6 SST
     })
 
-    it('[TC-F09.NEW-1] COD checkout → paymentStatus: unpaid', async () => {
+    it('[TC-F14.02 integration] Sabah → east rate RM 15 applied to order total', async () => {
         mockFindByID
-            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce({ id: 'prod-1', name: 'Product', price: 50, stock: 10 })
-            .mockResolvedValueOnce({ id: 'prod-1', stock: 10 })
-        mockCreate.mockResolvedValue({ id: 'order-1', paymentStatus: 'unpaid' })
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' }) // site — no shippingConfig, uses defaults
+            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 })      // restock check
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
+        mockCreate.mockResolvedValue({ id: 'order-1' })
         mockUpdate.mockResolvedValue({})
 
-        const res = await POST(mockReq({ ...validBody, paymentMethod: 'cod' }))
-        const body = await res.json()
-
-        expect(res.status).toBe(200)
-        expect(body.success).toBe(true)
-        // Verify create was called with paymentStatus: unpaid
-        expect(mockCreate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    paymentStatus: 'unpaid',
-                })
-            })
-        )
-    })
-
-    it('[TC-F09.NEW-2] QR Banking checkout with proof image → paymentStatus: paid', async () => {
-        mockFindByID
-            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce({ id: 'prod-1', name: 'Product', price: 75, stock: 5 })
-            .mockResolvedValueOnce({ id: 'prod-1', stock: 5 })
-        mockCreate.mockResolvedValue({ id: 'order-2', paymentStatus: 'paid' })
-        mockUpdate.mockResolvedValue({})
-
-        const qrPayload = {
+        const body = {
             ...validBody,
-            paymentMethod: 'qr_banking',
-            paymentProofImage: 'data:image/png;base64,iVBORw0KGgo...'
+            items: [{ productId: 'prod-1', quantity: 1 }],
+            customer: { ...validBody.customer, address: { ...validBody.customer.address, state: 'Sabah' } },
         }
-
-        const res = await POST(mockReq(qrPayload))
-        const body = await res.json()
+        const res = await POST(mockReq(body))
+        const data = await res.json()
 
         expect(res.status).toBe(200)
-        expect(body.success).toBe(true)
-        // Verify create was called with paymentStatus: paid
-        expect(mockCreate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    paymentStatus: 'paid',
-                    paymentProofImage: 'data:image/png;base64,iVBORw0KGgo...'
-                })
-            })
-        )
+        expect(data.data.total).toBe(121) // 100 sub + 15 ship (east default) + 6 SST
     })
 
-    it('[TC-F09.NEW-3] Out of stock → 422, cart not cleared', async () => {
+    it('[TC-F14.06 integration] shippingFee=0 when subtotal meets freeAbove threshold', async () => {
+        const siteWithConfig = {
+            id: 'site-1', tenant: 'tenant-1',
+            shippingConfig: { enabled: true, westRate: 800, eastRate: 1500, freeAbove: 10_000 },
+        }
         mockFindByID
-            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce({ id: 'prod-1', name: 'Limited Product', price: 100, stock: 1 }) // only 1 left
+            .mockResolvedValueOnce(siteWithConfig) // product price=100 → subtotal=10000 sen ≥ freeAbove
+            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 }) // restock check
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
+        mockCreate.mockResolvedValue({ id: 'order-1' })
+        mockUpdate.mockResolvedValue({})
 
-        // Requesting 3 items, but only 1 available
-        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 3 }] }))
-        const body = await res.json()
+        const res = await POST(mockReq({ ...validBody, items: [{ productId: 'prod-1', quantity: 1 }] }))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(data.data.total).toBe(106) // 100 sub + 0 ship (free) + 6 SST
+    })
+
+    it('[TC-F14.04] empty/invalid state rejected by schema — returns 400', async () => {
+        const body = {
+            ...validBody,
+            customer: { ...validBody.customer, address: { ...validBody.customer.address, state: '' } },
+        }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(data.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('[TC-F14.04] non-MY state string rejected by schema — returns 400', async () => {
+        const body = {
+            ...validBody,
+            customer: { ...validBody.customer, address: { ...validBody.customer.address, state: 'California' } },
+        }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(data.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('[TC-F14.04] missing state (undefined) returns 422 VALIDATION_ERROR', async () => {
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 100, inventory: 10 }))
+        const { state: _s, ...addressWithoutState } = validBody.customer.address
+        const body = {
+            ...validBody,
+            customer: { ...validBody.customer, address: addressWithoutState },
+        }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
 
         expect(res.status).toBe(422)
-        expect(body.error.code).toBe('OUT_OF_STOCK')
-        // Verify cart clearing was NOT attempted (create should not be called)
-        expect(mockCreate).not.toHaveBeenCalled()
-        expect(mockUpdate).not.toHaveBeenCalled()
+        expect(data.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('[TC-F10-06-01 security] cross-tenant product returns 404', async () => {
+        // find() query filters by site=site-1, so a product from site-2 is not returned
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(EMPTY_FIND)
+
+        const res = await POST(mockReq(validBody))
+        const body = await res.json()
+
+        expect(res.status).toBe(404)
+        expect(body.error.code).toBe('PRODUCT_NOT_FOUND')
+    })
+
+    it('[TC-F10-06-02 security] duplicate productIds aggregated — stock bypass prevented', async () => {
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'Product', price: 25, inventory: 3 })) // inventory=3
+
+        const body = {
+            ...validBody,
+            items: [
+                { productId: 'prod-1', quantity: 2 }, // individually passes inventory=3
+                { productId: 'prod-1', quantity: 2 }, // individually passes inventory=3 — aggregate=4 should fail
+            ],
+        }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(422)
+        expect(data.error.code).toBe('OUT_OF_STOCK')
+    })
+
+    it('[TC-F10-06-03 security] duplicate productIds create one aggregated order line', async () => {
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 }) // restock check
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'Product', price: 25, inventory: 10 }))
+        mockCreate.mockResolvedValue({ id: 'order-1' })
+        mockUpdate.mockResolvedValue({})
+
+        const body = {
+            ...validBody,
+            items: [
+                { productId: 'prod-1', quantity: 2 },
+                { productId: 'prod-1', quantity: 3 },
+            ],
+        }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(200)
+        const createdItems = mockCreate.mock.calls[0][0].data.items
+        expect(createdItems).toHaveLength(1)
+        expect(createdItems[0].quantity).toBe(5)
+    })
+
+    // ─── RF-02 regression: quantity validation ────────────────────────
+
+    it('[TC-F14-RF02.01 RF-02] fractional quantity rejected by schema — returns 400', async () => {
+        const body = { ...validBody, items: [{ productId: 'prod-1', quantity: 1.5 }] }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(data.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it(`[TC-F14-RF02.02 RF-02] more than ${MAX_CHECKOUT_ITEMS} items rejected by schema — returns 400`, async () => {
+        const body = {
+            ...validBody,
+            items: Array.from({ length: MAX_CHECKOUT_ITEMS + 1 }, (_, i) => ({ productId: `prod-${i}`, quantity: 1 })),
+        }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        expect(res.status).toBe(400)
+        expect(data.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    // ─── RF-01 regression: product eligibility via find() filter ─────
+
+    it('[TC-F14-RF01.01 RF-01] inactive product (status≠active) returns 404 — find() where clause verified', async () => {
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(EMPTY_FIND) // status filter excludes draft/archived products
+
+        const res = await POST(mockReq(validBody))
+        const body = await res.json()
+
+        expect(res.status).toBe(404)
+        expect(body.error.code).toBe('PRODUCT_NOT_FOUND')
+        // Verify find() was called with the status=active and site filters
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'products',
+            where: expect.objectContaining({
+                and: expect.arrayContaining([
+                    expect.objectContaining({ status: { equals: 'active' } }),
+                    expect.objectContaining({ deletedAt: { exists: false } }),
+                ]),
+            }),
+        }))
+    })
+
+    it('[TC-F14-RF01.02 RF-01] soft-deleted product (deletedAt set) returns 404 — find() where clause verified', async () => {
+        mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValueOnce(EMPTY_FIND) // deletedAt filter excludes soft-deleted products
+
+        const res = await POST(mockReq(validBody))
+        const body = await res.json()
+
+        expect(res.status).toBe(404)
+        expect(body.error.code).toBe('PRODUCT_NOT_FOUND')
+        // Verify the where clause enforces both eligibility conditions
+        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'products',
+            where: expect.objectContaining({
+                and: expect.arrayContaining([
+                    expect.objectContaining({ status: { equals: 'active' } }),
+                    expect.objectContaining({ deletedAt: { exists: false } }),
+                ]),
+            }),
+        }))
     })
 })

@@ -1,9 +1,11 @@
 # PRD — F19: Store Configuration & Staff Management
 
-> **Document Status:** Draft
+> **Document Status:** Draft (v1.1 — Bank Transfer settings expanded per PD-018)
 > **Feature Code:** F19
-> **Target Release:** TBD
+> **Target Release:** Wave 6 (v1.1) · TBD (base v1.0)
 > **Epic:** Store Setup & Configuration
+> **Updated:** 2026-05-15
+> **Decisions Log:** [PD-018](../decisions/decisions-log.md#pd-018--manual-payment-bank-transfer-verification-flow) · Issue [#1004](https://github.com/primeproduction/ech-prime-web-v2/issues/1004)
 
 ## 1. Context & Problem Statement
 Merchants creating their stores on PrimeWeb need to establish their own brand identity and manage their internal team. The platform provides a default subdomain (e.g., `store-name.echprime.com`), but professional merchants require the ability to connect custom domains. Furthermore, Owners (Sellers) need a secure way to invite their staff to help manage the store without sharing their own credentials, requiring granular Role-Based Access Control (RBAC) trực tiếp cấu hình ở Store Settings.
@@ -19,7 +21,8 @@ Merchants creating their stores on PrimeWeb need to establish their own brand id
 **In Scope:**
 - Adding custom domain names and SSL verification.
 - Setting a Primary Domain among verified domains to auto-redirect.
-- Cấu hình phương thức thanh toán (Payment Settings): Tùy chọn bật/tắt COD và QR Banking.
+- Cấu hình phương thức thanh toán (Payment Settings): Tùy chọn bật/tắt COD và **Bank Transfer** (rename khỏi "QR Banking" — v1.1 per PD-018).
+- **[v1.1]** Bank Transfer config block: Upload QR/STK image + bank account details (tên ngân hàng, STK, tên TK) + auto-generate `paymentReferencePrefix` per tenant (default `BT`).
 - Chức năng Staff Management: Phân quyền dành cho Seller/Owner để quản lý hệ thống.
 - Cấu trúc 2 Roles chính:
   1. **Full Quyền (Full Access):** Quyền tương đương Admin có thể thao tác mọi tính năng.
@@ -45,8 +48,11 @@ Merchants creating their stores on PrimeWeb need to establish their own brand id
 | REQ-F19-04 | **SSL Provisioning:** Once "Connected", the system must automatically provision and manage an SSL certificate for the domain. | US-F19-01 |
 | REQ-F19-05 | **Primary Domain Selection:** The system must allow the user to designate one "Connected" domain (custom or default) as the Primary Domain. | US-F19-02 |
 | REQ-F19-06 | **Traffic Redirection:** All traffic coming to non-primary domains attached to the store must 301 redirect to the primary domain. | US-F19-02 |
-| REQ-F19-07 | **Payment Configuration:** The system must allow the user to enable/disable payment options such as COD and QR Banking. Multiple options can be active simultaneously. | US-F19-03 |
-| REQ-F19-08 | **QR Banking Upload Rules:** The system MUST strictly enforce the upload of a valid QR image (size < 2MB, JPG/PNG format) before allowing QR Banking to be enabled. | US-F19-03 |
+| REQ-F19-07 | **Payment Configuration:** The system must allow the user to enable/disable payment options such as COD and Bank Transfer. Multiple options can be active simultaneously. | US-F19-03 |
+| REQ-F19-08 | **Bank Transfer Upload Rules:** The system MUST strictly enforce the upload of a valid QR image (size < 2MB, JPG/PNG format) before allowing Bank Transfer to be enabled. | US-F19-03 |
+| **REQ-F19-08.1** | **[v1.1] Bank Transfer Details Fields:** Khi bật Bank Transfer, seller bắt buộc nhập: `bankName` (text), `bankAccountNumber` (text — validate alphanumeric), `bankAccountHolderName` (text). Optional `paymentReferencePrefix` (default `BT`, 2-4 chars uppercase). | US-F19-03 |
+| **REQ-F19-08.2** | **[v1.1] Storefront Bank Transfer Visibility:** Nếu `payment_bank_transfer = false` (toggle OFF), storefront checkout KHÔNG hiển thị Bank Transfer option. Tenant settings là single source of truth (fix gap audit G-01). | US-F19-03 |
+| **REQ-F19-08.3** | **[v1.1] Post-Order Upload Page Inheritance:** Buyer-facing Post-Order Upload page (F10 FR-16) read tenant Bank Transfer config (QR image, bank details, reference prefix) để render. | US-F19-03 |
 | REQ-F19-09 | **Invite Staff:** Hệ thống cho phép Chủ cửa hàng (Seller/Owner) nhập Email để gửi lời mời tham gia quản lý Workspace. | US-F19-05 |
 | REQ-F19-10 | **Role Assignment:** Khi mời Staff, Seller bắt buộc chọn 1 trong 2 loại quyền: `Full Access` hoặc `Custom Features` (cho phép tick chọn từng nhóm tính năng cụ thể). | US-F19-05 |
 | REQ-F19-11 | **Staff Directory:** Liệt kê danh sách Staff hiện tại kèm Trạng thái (Pending / Active) và Phân quyền đang có. | US-F19-06 |
@@ -83,10 +89,16 @@ Merchants creating their stores on PrimeWeb need to establish their own brand id
   - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 9.2. Màn hình Tab Payment Configuration
-- **Mô tả:** Nơi bật tắt các kênh thanh toán Manual (COD, QR).
+- **Mô tả:** Nơi bật tắt các kênh thanh toán Manual (COD, Bank Transfer). Stripe Card/FPX configured qua F13 (Stripe Connect onboarding).
 - **Components chính:**
-  - Khối Toggle Bật/Tắt COD. 
-  - Khối Toggle Bật/Tắt Bank Transfer / QR. Kèm nút Upload Ảnh QR.
+  - Khối Toggle Bật/Tắt **COD**.
+  - **[v1.1]** Khối Toggle Bật/Tắt **Bank Transfer** (rename khỏi "Bank Transfer / QR"). Khi expanded:
+    - Upload QR image (max 2MB, JPG/PNG) với preview
+    - Input `bankName` (e.g., "Maybank")
+    - Input `bankAccountNumber` (e.g., "1234567890")
+    - Input `bankAccountHolderName` (e.g., "Cty TNHH ABC")
+    - Optional input `paymentReferencePrefix` (default `BT`, 2-4 chars uppercase) — preview: "Reference Code sẽ có dạng `BT-XXXXXX`"
+  - Toggle Bank Transfer chỉ có thể bật ON khi tất cả 4 fields trên hợp lệ (QR + 3 bank details bắt buộc).
 - **Design / Wireframe:**
   - [Link tới file wireframe/design trong thư mục docs/design/...]
 

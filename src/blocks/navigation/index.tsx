@@ -5,8 +5,10 @@ import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, EyeOff } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
+import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
+import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
@@ -79,9 +81,10 @@ function DropdownLink({ link, i }: { link: NavLink; i: number }) {
                 key={i}
                 href={link?.url}
                 whileHover={{ y: -1 }}
-                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
+                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] inline-flex items-center gap-1"
             >
                 {link.label}
+                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
             </motion.a>
         )
     }
@@ -148,10 +151,11 @@ function MobileNavItem({
         <div>
             <a
                 href={link?.url}
-                className={`block rounded-lg px-4 ${depth === 0 ? `py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] ${TOUCH_TARGET.min} flex items-center` : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04]'} transition-all duration-200`}
+                className={`rounded-lg px-4 ${depth === 0 ? `py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] ${TOUCH_TARGET.min} flex items-center gap-1` : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
             >
                 {link.label}
+                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
             </a>
             {hasChildren && (
                 <div className="ml-4 flex flex-col gap-0.5">
@@ -184,10 +188,11 @@ function SidebarNavItem({
         <div>
             <a
                 href={link?.url}
-                className={`block rounded-lg px-4 ${depth === 0 ? 'py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06]' : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04]'} transition-all duration-200`}
+                className={`rounded-lg px-4 ${depth === 0 ? 'py-3 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] flex items-center gap-1' : 'py-2 text-sm opacity-50 hover:opacity-90 hover:bg-white/[0.04] flex items-center gap-1'} transition-all duration-200`}
                 onClick={onNavigate}
             >
                 {link.label}
+                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
             </a>
             {hasChildren && (
                 <div className="ml-4 border-l border-white/10 pl-2">
@@ -229,32 +234,39 @@ type NavCTAButtonProps = {
 
 /** Desktop CTA button — gradient bg + min-h 44px (WCAG 2.5.5). */
 function NavCTAButton({
-    href = '#',
+    href: rawHref = '#',
     label,
     className = 'hidden sm:inline-flex px-5 py-2.5',
     onClick,
 }: NavCTAButtonProps) {
-    const cls = `${className} rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
+    const cls = `${className} rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
+    const isBroken = rawHref.startsWith(BROKEN_URL_PREFIX)
+    const href = isBroken ? '#' : rawHref
+    const isExternal = href.startsWith('http://') || href.startsWith('https://')
     return (
-        <motion.a
-            href={href}
-            whileHover={{ scale: 1.04, y: -1 }}
-            whileTap={{ scale: 0.97 }}
-            className={cls}
-            style={CTA_GRADIENT_STYLE}
-            onClick={onClick}
-        >
-            {label}
-        </motion.a>
+        <BrokenLinkWarning url={rawHref}>
+            <motion.a
+                href={href}
+                {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                whileHover={{ scale: 1.04, y: -1 }}
+                whileTap={{ scale: 0.97 }}
+                className={cls}
+                style={CTA_GRADIENT_STYLE}
+                onClick={onClick}
+            >
+                {label}
+            </motion.a>
+        </BrokenLinkWarning>
     )
 }
 
 /** Mobile drawer CTA — full-width, centered, min-h 44px. */
-function NavMobileCTAButton({ href = '#', label, onClick }: { href?: string; label: string; onClick?: () => void }) {
+function NavMobileCTAButton({ href: rawHref = '#', label, onClick }: { href?: string; label: string; onClick?: () => void }) {
+    const href = rawHref.startsWith(BROKEN_URL_PREFIX) ? '#' : rawHref
     return (
         <a
             href={href}
-            className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
+            className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
             style={{ background: CTA_GRADIENT_BACKGROUND }}
             onClick={onClick}
         >
@@ -607,7 +619,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                 <div className="p-6">
                                     <a
                                         href={ctaButton.url || '#'}
-                                        className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
+                                        className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
                                         style={CTA_GRADIENT_STYLE}
                                         onClick={() => setIsOpen(false)}
                                     >
@@ -680,11 +692,13 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                             <DropdownLink key={i} link={link} i={i} />
                         ))}
                         {ctaButton?.show && (
-                            <NavCTAButton
-                                href={ctaButton.url || '#'}
-                                label={ctaButton.label}
-                                className="ml-2 inline-flex px-5 py-2.5"
-                            />
+                            <span className="ml-2">
+                                <NavCTAButton
+                                    href={ctaButton.url || '#'}
+                                    label={ctaButton.label}
+                                    className="inline-flex px-5 py-2.5"
+                                />
+                            </span>
                         )}
                     </div>
                 </div>
@@ -911,7 +925,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                     {ctaButton?.show && (
                         <a
                             href={ctaButton.url || '#'}
-                            className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
+                            className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
                             style={{ background: CTA_GRADIENT_BACKGROUND }}
                         >
                             {ctaButton.label}
@@ -955,7 +969,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                             {ctaButton?.show && (
                                 <a
                                     href={ctaButton.url || '#'}
-                                    className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
+                                    className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white no-underline text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
                                     style={{ background: CTA_GRADIENT_BACKGROUND }}
                                     onClick={() => setMobileMenuOpen(false)}
                                 >

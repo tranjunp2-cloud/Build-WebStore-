@@ -90,7 +90,6 @@ const EDITOR_HIDDEN_BLOCKS = new Set([
     // feat/fix-broken-block-variants: temporarily hidden — re-enable by removing from this set
     'step-process',
     'booking-widget',
-    'cartWidget',
 ])
 
 // ── Module-level cache (process lifetime) ────────────────────────────────────

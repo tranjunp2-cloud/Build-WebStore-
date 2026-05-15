@@ -87,12 +87,13 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
             { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
             { label: { en: 'Customers', ms: 'Pelanggan' }, href: '/customers', icon: Users },
             {
-                label: { en: 'Site Settings', ms: 'Tetapan Laman' },
+                label: { en: 'Settings', ms: 'Tetapan' },
                 href: '/settings',
                 icon: Settings,
                 children: [
                     { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
                     { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff', roleFilter: (role) => role === 'owner' },
+                    { label: { en: 'Shipping', ms: 'Penghantaran' }, href: '/settings/shipping' },
                     { label: { en: 'Account Profile', ms: 'Profil Akaun' }, href: '/settings/profile' },
                 ],
             },

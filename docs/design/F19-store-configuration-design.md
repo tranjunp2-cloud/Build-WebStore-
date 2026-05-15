@@ -107,15 +107,27 @@ Các wireframe dưới đây được thiết kế sát nhất với thực tế
 │              │ │      Allow manual cash collection.   │ │
 │              │ └──────────────────────────────────────┘ │
 │              │ ┌──────────────────────────────────────┐ │
-│              │ │ [OFF] Bank Transfer / DuitNow QR     │ │
+│              │ │ [OFF] Bank Transfer                  │ │ ◄── renamed v1.1
 │              │ │                                      │ │
-│              │ │ Error: Upload a QR Code first!       │ │ ◄── Toggles OFF if no QR
+│              │ │ Error: Complete details below first! │ │ ◄── Toggles OFF if missing
 │              │ │                                      │ │
-│              │ │ Upload QR Code:                      │ │
+│              │ │ Upload DuitNow QR Code:              │ │
 │              │ │ ┌──────────────────────────────────┐ │ │
 │              │ │ │  [📤 Upload QR Image (JPG/PNG)]  │ │ │
 │              │ │ │  Max size: 2MB                   │ │ │
 │              │ │ └──────────────────────────────────┘ │ │
+│              │ │                                      │ │
+│              │ │ [v1.1] Bank Details (all required):  │ │
+│              │ │  Bank Name:    [_______________]     │ │
+│              │ │  Account No:   [_______________]     │ │
+│              │ │  Account Name: [_______________]     │ │
+│              │ │                                      │ │
+│              │ │ Reference Prefix (optional, 2-4 char)│ │
+│              │ │  [BT___]  Preview: BT-A3K9P2         │ │
+│              │ │                                      │ │
+│              │ │ Toggle ON only when:                 │ │
+│              │ │  ✓ QR uploaded  ✓ Bank Name          │ │
+│              │ │  ✓ Account No   ✓ Account Name       │ │
 │              │ └──────────────────────────────────────┘ │
 └──────────────┴──────────────────────────────────────────┘
 ```

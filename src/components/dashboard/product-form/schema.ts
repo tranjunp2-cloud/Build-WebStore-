@@ -5,15 +5,6 @@ type ProductFormI18n = { dashboard?: { products?: { form?: { errors?: Record<str
 export const getProductFormSchema = (t: ProductFormI18n) => {
     const errorT = t?.dashboard?.products?.form?.errors || {};
 
-    const optionTierSchema = z.object({
-        id: z.string(),
-        name: z.string().trim().min(1, errorT.tierNameRequired || 'Tier name is required').max(50, errorT.tierNameLong || 'Tier name is too long'),
-        options: z.array(z.string().trim().min(1, errorT.optionEmpty || 'Option cannot be empty').max(50, errorT.optionLong || 'Option is too long'))
-            .min(1, errorT.optionMin || 'At least one option is required')
-            .max(30, errorT.optionMax || 'Maximum 30 options per tier')
-            .refine((opts) => new Set(opts.map(o => o.toLowerCase())).size === opts.length, errorT.uniqueOptions || 'Options must be unique (no duplicates)'),
-    });
-
     const skuVariantSchema = z.object({
         id: z.string(),
         variantName: z.string(),
@@ -45,7 +36,44 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
         baseSku: z.string().trim().max(50, errorT.skuLong || 'SKU must not exceed 50 characters').optional(),
         
         // Variant mode
-        tiers: z.array(optionTierSchema).max(2, errorT.maxTiers || 'Maximum 2 tiers allowed').optional(),
+        tiers: z.array(z.object({
+            id: z.string(),
+            name: z.string().trim().max(50, errorT.tierNameLong || 'Option name is too long'),
+            options: z.array(z.string().trim().max(50, errorT.optionLong || 'Option is too long'))
+                .max(30, errorT.optionMax || 'Maximum 30 options per tier'),
+        }))
+        .max(2, errorT.maxTiers || 'Maximum 2 tiers allowed')
+        .superRefine((tiers, ctx) => {
+            tiers.forEach((tier, i) => {
+                const isEmpty = !tier.name?.trim() && (tier.options || []).every(o => !o?.trim());
+                if (isEmpty) return;
+
+                if (!tier.name?.trim()) {
+                    ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.tierNameRequired || 'Option name is required', path: [i, 'name'] });
+                }
+
+                const validOpts = (tier.options || []).filter(o => o?.trim());
+                if (validOpts.length === 0) {
+                    ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.optionMin || 'At least one option is required', path: [i, 'options'] });
+                } else {
+                    (tier.options || []).forEach((opt, oIdx) => {
+                        if (!opt?.trim()) {
+                            ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.optionEmpty || 'Option cannot be empty', path: [i, 'options', oIdx] });
+                        }
+                    });
+                }
+
+                if (new Set(validOpts.map(o => o.toLowerCase())).size !== validOpts.length) {
+                    ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.uniqueOptions || 'Options must be unique (no duplicates)', path: [i, 'options'] });
+                }
+            });
+
+            const nonEmptyNames = tiers.filter(t => t.name?.trim()).map(t => t.name.trim().toLowerCase());
+            if (new Set(nonEmptyNames).size !== nonEmptyNames.length) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.uniqueTiers || 'Option names must be unique', path: [] });
+            }
+        })
+        .optional(),
         variants: z.array(skuVariantSchema)
             .max(900, errorT.maxVariants || 'Too many variants')
             .superRefine((variants, ctx) => {
@@ -80,7 +108,7 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
         autoGenerateSeo: z.boolean().default(false),
         metaTitle: z.string().max(70, errorT.seoTitleMax || 'SEO Title should not exceed 70 characters').optional(),
         metaDescription: z.string().max(160, errorT.seoDescMax || 'SEO description should not exceed 160 characters').optional(),
-        urlSlug: z.string().trim().regex(/^[a-z0-9-]+$/, errorT.urlSlugInvalid || 'Slug must be lowercase alphanumeric with hyphens').optional(),
+        urlSlug: z.string().trim().min(1, errorT.urlSlugRequired || 'URL Slug is required').regex(/^[a-z0-9-]+$/, errorT.urlSlugInvalid || 'Slug must be lowercase alphanumeric with hyphens'),
 
         // Attributes (key/value pairs, max 20)
         attributes: z.array(z.object({
@@ -113,16 +141,6 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
              }
         }
 
-        if (data.hasVariants && data.tiers) {
-            const tierNames = data.tiers.map(t => t.name.trim().toLowerCase()).filter(Boolean);
-            if (new Set(tierNames).size !== tierNames.length) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: errorT.uniqueTiers || 'Tier names must be unique (cannot have duplicate labels)',
-                    path: ['tiers']
-                });
-            }
-        }
     });
 };
 

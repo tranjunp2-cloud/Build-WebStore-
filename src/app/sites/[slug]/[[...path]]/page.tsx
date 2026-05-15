@@ -88,7 +88,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     // BUG-F05-01: explicitly fetch published versions for live site.
     // Editor saves with draft:true; publish route promotes to published.
     // Owner previewing unpublished site sees drafts; visitors see published.
-    // BUG-F05-08: hide pages with isVisible=false from visitors (owner can still preview)
+    // BUG-F05-08: hide pages with isVisible=false from visitors (owner can still access per spec)
     // BUG-F05-11: exclude soft-deleted pages (deletedAt set) from live site
     const visibilityFilter = !isOwner ? [{ isVisible: { not_equals: false } }] : []
     const deletedFilter = [{ deletedAt: { exists: false } }]
@@ -128,13 +128,14 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         page = homepageFallback.docs[0]
     }
 
+    // Fetch ALL pages (including hidden/deleted) so SiteRenderer can build hiddenSlugs
+    // and filter nav links client-side. Visibility/404 enforcement is handled above
+    // on the current-page lookup; passing partial data here would break the filter.
     const navigationPages = await payload.find({
         collection: 'pages',
         where: {
             and: [
                 { site: { equals: site.id } },
-                ...visibilityFilter,
-                ...deletedFilter,
             ],
         },
         limit: 100,

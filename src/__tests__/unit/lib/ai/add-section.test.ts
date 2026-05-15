@@ -116,17 +116,14 @@ describe('inferAddSectionType [TC-F05.13]', () => {
         expect(inferAddSectionType('show instagram link')).toBe('socialWidget')
     })
 
-    // gh-839: cartWidget matcher disabled until checkout ships — these must return null
-    it('returns null for "cart" keyword [TC-F05.27]', () => {
-        expect(inferAddSectionType('add a cart widget')).toBeNull()
+    it('returns "cartWidget" for "cart" keyword [TC-F05.27]', () => {
+        expect(inferAddSectionType('add a cart widget')).toBe('cartWidget')
     })
-
-    it('returns null for "shopping cart" keyword', () => {
-        expect(inferAddSectionType('add shopping cart')).toBeNull()
+    it('returns "cartWidget" for "shopping cart" keyword', () => {
+        expect(inferAddSectionType('add shopping cart')).toBe('cartWidget')
     })
-
-    it('returns null for "checkout" keyword', () => {
-        expect(inferAddSectionType('show checkout button')).toBeNull()
+    it('returns "cartWidget" for "checkout" keyword', () => {
+        expect(inferAddSectionType('show checkout button')).toBe('cartWidget')
     })
 
     // requestedType is prepended to haystack — whichever SECTION_TYPE_MATCHERS entry
@@ -440,16 +437,14 @@ describe('createAddSectionBlock — socialWidget [TC-F05.26]', () => {
     })
 })
 
-// gh-839: cartWidget disabled — createAddSectionBlock returns null for cart instructions
 describe('createAddSectionBlock — cartWidget [TC-F05.27]', () => {
-    it('returns null for cart widget instruction (gh-839: hidden until checkout ships)', () => {
+    it('returns cartWidget block for "add cart widget" instruction', () => {
         const block = createAddSectionBlock({ instruction: 'add cart widget' })
-        expect(block).toBeNull()
+        expect(block).toMatchObject({ blockType: 'cartWidget', variant: 'floating' })
     })
-
-    it('returns null for "add cart" instruction', () => {
+    it('returns cartWidget block for "add cart" instruction', () => {
         const block = createAddSectionBlock({ instruction: 'add cart' })
-        expect(block).toBeNull()
+        expect(block).toMatchObject({ blockType: 'cartWidget', variant: 'floating' })
     })
 })
 

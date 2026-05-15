@@ -32,20 +32,13 @@ vi.mock('@/lib/vercel/domains', () => ({
     verifyProjectDomain: vi.fn(),
     getProjectDomain: vi.fn(),
     removeProjectDomain: vi.fn(),
+    isMockMode: vi.fn().mockReturnValue(false),
 }));
 
-// Stub dns.promises — the action uses resolve4 / resolveCname for a soft
-// pre-flight check that should never hard-fail tests.
-vi.mock('dns', () => {
-    const promises = {
-        resolve4: vi.fn().mockResolvedValue(['76.76.21.21']),
-        resolveCname: vi.fn().mockResolvedValue(['cname.vercel-dns.com']),
-    };
-    return {
-        default: { promises },
-        promises,
-    };
-});
+vi.mock('@/lib/vercel/dns-check', () => ({
+    checkDnsRouting: vi.fn().mockResolvedValue({ ok: true }),
+    checkHttpsConnectivity: vi.fn().mockResolvedValue({ ok: true }),
+}));
 
 import {
     addCustomDomain,
@@ -153,8 +146,9 @@ describe('Domains Server Actions (Vercel-backed)', () => {
             expect(vi.mocked(addProjectDomain)).not.toHaveBeenCalled();
         });
 
-        // TC-A-02 — Happy path: verified=true → active immediately.
-        it('TC-A-02: happy path persists status=active + vercelDomainId', async () => {
+        // TC-A-02 — Happy path: even when Vercel returns verified=true, domain is always saved as pending.
+        // BUG-F19 fix: DNS routing not confirmed at add time — Verify button must be clicked.
+        it('TC-A-02: happy path always persists status=pending even when verified=true', async () => {
             vi.mocked(addProjectDomain).mockResolvedValueOnce(
                 makeVercelDomain({ name: 'new-store.com', apexName: 'new-store.com', verified: true }),
             );
@@ -163,12 +157,12 @@ describe('Domains Server Actions (Vercel-backed)', () => {
             expect(res.success).toBe(true);
             expect(vi.mocked(addProjectDomain)).toHaveBeenCalledWith('new-store.com');
 
-            // Final Payload update should contain status='active' + vercelDomainId.
+            // Always pending — vercelDomainId still saved for future verify calls.
             const finalUpdate = mockUpdate.mock.calls.at(-1)?.[0];
             expect(finalUpdate.data.customDomains).toEqual([
                 expect.objectContaining({
                     domain: 'new-store.com',
-                    status: 'active',
+                    status: 'pending',
                     vercelDomainId: 'new-store.com',
                 }),
             ]);
@@ -202,6 +196,32 @@ describe('Domains Server Actions (Vercel-backed)', () => {
                 domain: 'new-store.com',
                 status: 'pending',
                 vercelVerification: verification,
+            });
+        });
+
+        // TC-A-03b — verified=false, verification=[] (no TXT needed — DNS-only pending).
+        // Vercel registers the domain but DNS hasn't propagated yet; no ownership
+        // TXT is required. UI should show only A/CNAME card, no TxtChallengeCard.
+        it('TC-A-03b: verified=false with empty verification[] saved as pending without TXT challenge', async () => {
+            vi.mocked(addProjectDomain).mockResolvedValueOnce(
+                makeVercelDomain({
+                    name: 'shop.mystore.com',
+                    apexName: 'mystore.com',
+                    verified: false,
+                    verification: [],
+                }),
+            );
+
+            const res = await addCustomDomain('shop.mystore.com');
+            expect(res.success).toBe(true);
+            // No verification hints returned — UI must NOT show TxtChallengeCard.
+            expect(res.verification).toBeUndefined();
+
+            const finalUpdate = mockUpdate.mock.calls.at(-1)?.[0];
+            expect(finalUpdate.data.customDomains[0]).toMatchObject({
+                domain: 'shop.mystore.com',
+                status: 'pending',
+                vercelVerification: null,
             });
         });
 
@@ -312,12 +332,18 @@ describe('Domains Server Actions (Vercel-backed)', () => {
 
     // ── verifyCustomDomain ──────────────────────────────────────────────────
     describe('verifyCustomDomain', () => {
-        // TC-A-07 — Happy: verified=true → status flipped to active.
+        // TC-A-07 — Happy: verified=true → DNS + HTTPS pass → status flipped to active.
         it('TC-A-07: happy path flips tenant row to status=active', async () => {
-            mockFindByID.mockResolvedValueOnce({
-                id: 'tenant-123',
-                customDomains: [{ domain: 'check-me.com', status: 'pending' }],
-            });
+            // Initial read + re-fetch (zombie guard before Write-2)
+            mockFindByID
+                .mockResolvedValueOnce({
+                    id: 'tenant-123',
+                    customDomains: [{ domain: 'check-me.com', status: 'pending' }],
+                })
+                .mockResolvedValueOnce({
+                    id: 'tenant-123',
+                    customDomains: [{ domain: 'check-me.com', status: 'pending' }],
+                });
             vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
                 makeVercelDomain({ name: 'check-me.com', apexName: 'check-me.com', verified: true }),
             );
@@ -376,6 +402,36 @@ describe('Domains Server Actions (Vercel-backed)', () => {
             });
         });
 
+        // TC-A-08b — verifyProjectDomain resolves 200 with verified=false (not thrown).
+        // Distinct from TC-A-08 (400 thrown). This path: Vercel says "not verified yet"
+        // with a fresh TXT challenge in the body — action persists and surfaces it.
+        it('TC-A-08b: verifyProjectDomain 200 verified=false persists fresh verification and returns error', async () => {
+            const freshVerification = [
+                { type: 'TXT' as const, domain: '_vercel.pending.com', value: 'vc-fresh-token', reason: 'pending_domain_verification' },
+            ];
+            mockFindByID.mockResolvedValueOnce({
+                id: 'tenant-123',
+                customDomains: [{ domain: 'pending.com', status: 'pending' }],
+            });
+            vi.mocked(verifyProjectDomain).mockResolvedValueOnce(
+                makeVercelDomain({ name: 'pending.com', apexName: 'pending.com', verified: false, verification: freshVerification }),
+            );
+
+            const res = await verifyCustomDomain('pending.com');
+            expect(res.success).toBe(false);
+            expect(res.error).toMatch(/verification failed/i);
+            expect((res as { verification: unknown }).verification).toEqual(freshVerification);
+
+            // Payload row updated with fresh verification challenges.
+            const finalUpdate = mockUpdate.mock.calls.at(-1)?.[0];
+            expect(finalUpdate.data.customDomains[0]).toMatchObject({
+                domain: 'pending.com',
+                vercelVerification: freshVerification,
+            });
+            // getProjectDomain should NOT be called — no 400 error thrown.
+            expect(vi.mocked(getProjectDomain)).not.toHaveBeenCalled();
+        });
+
         // TC-A-09 — Idempotent: already-active domain short-circuits.
         it('TC-A-09: idempotent short-circuit when already active', async () => {
             mockFindByID.mockResolvedValueOnce({
@@ -401,6 +457,7 @@ describe('Domains Server Actions (Vercel-backed)', () => {
             expect(res.error).toMatch(/not found in your store/i);
             expect(vi.mocked(verifyProjectDomain)).not.toHaveBeenCalled();
         });
+
     });
 
     // ── setPrimaryDomain (unchanged — platform-agnostic) ────────────────────

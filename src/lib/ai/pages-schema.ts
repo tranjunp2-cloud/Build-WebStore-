@@ -30,6 +30,7 @@ export const PAGES_BLOCK_WHITELIST: ReadonlySet<string> = new Set([
     'video-showcase', 'product-quick-view', 'feature-comparison',
     // Industry blocks enabled for AI gen (Plan 260422-1900-block-aivisible-audit-fix)
     'before-after', 'booking-widget', 'gallery-masonry',
+    'menu-display', 'pricing-table',
 ])
 
 /**
@@ -73,6 +74,8 @@ export const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fal
     'before-after': { field: 'variant', values: ['slider', 'side-by-side'], fallback: 'slider' },
     'booking-widget': { field: 'variant', values: ['inline', 'sidebar', 'modal-trigger'], fallback: 'inline' },
     'gallery-masonry': { field: 'variant', values: ['masonry', 'grid-3', 'grid-4'], fallback: 'masonry' },
+    'menu-display': { field: 'variant', values: ['tabs', 'photo-grid', 'accordion'], fallback: 'tabs' },
+    'pricing-table': { field: 'variant', values: ['columns', 'horizontal'], fallback: 'columns' },
 }
 
 /** Map blueprint variant names → Pages.ts valid values. */
@@ -148,6 +151,8 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     'before-after': ['variant', 'headline', 'beforeImage', 'afterImage'],
     'booking-widget': ['variant', 'headline', 'subheadline', 'services', 'availableDays', 'timeSlotInterval', 'startTime', 'endTime', 'bookingUrl', 'showPrice'],
     'gallery-masonry': ['variant', 'headline', 'images'],
+    'menu-display': ['variant', 'headline', 'subheadline', 'categories', 'currency', 'showDietaryIcons'],
+    'pricing-table': ['variant', 'headline', 'subheadline', 'billingToggle', 'plans'],
 }
 
 const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])

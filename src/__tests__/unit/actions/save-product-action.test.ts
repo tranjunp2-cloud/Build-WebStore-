@@ -1,10 +1,11 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockFind, mockCreate, mockUpdate, mockGetOrCreateCrateCartonId } = vi.hoisted(() => ({
+const { mockFind, mockCreate, mockUpdate, mockFindByID, mockGetOrCreateCrateCartonId } = vi.hoisted(() => ({
     mockFind: vi.fn(),
     mockCreate: vi.fn(),
     mockUpdate: vi.fn(),
+    mockFindByID: vi.fn(),
     mockGetOrCreateCrateCartonId: vi.fn(),
 }))
 
@@ -13,6 +14,7 @@ vi.mock('payload', () => ({
         find: mockFind,
         create: mockCreate,
         update: mockUpdate,
+        findByID: mockFindByID,
     }),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -25,7 +27,7 @@ vi.mock('@/app/(dashboard)/actions/media', () => ({
     uploadMediaAction: vi.fn(),
 }))
 
-import { saveProductAction } from '@/app/(dashboard)/products/actions'
+import { saveProductAction, updateProductFieldAction } from '@/app/(dashboard)/products/actions'
 import { getCurrentUser } from '@/lib/auth'
 
 const VALID_PRODUCT = { name: 'Test Product', price: 100 }
@@ -160,5 +162,122 @@ describe('saveProductAction', () => {
             id: 42,
         }))
         expect(mockCreate).not.toHaveBeenCalled()
+    })
+})
+
+describe('updateProductFieldAction', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(getCurrentUser).mockResolvedValue({ id: 'u1', email: 'test@example.com' } as never)
+        mockUpdate.mockResolvedValue({ id: 42, status: 'active' })
+        mockFindByID.mockResolvedValue({ id: 42, name: 'Test Product', tenant: 68 })
+    })
+
+    // ── ID Guard ──────────────────────────────────────────────────────────────
+
+    it('[TC-F08-01-27] null id → throws Invalid product ID', async () => {
+        await expect(updateProductFieldAction(null as never, { status: 'active' })).rejects.toThrow('Invalid product ID')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-01-27] undefined id → throws Invalid product ID', async () => {
+        await expect(updateProductFieldAction(undefined as never, { status: 'active' })).rejects.toThrow('Invalid product ID')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-01-27] empty string id → throws Invalid product ID', async () => {
+        await expect(updateProductFieldAction('', { status: 'active' })).rejects.toThrow('Invalid product ID')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-01-27] id=0 → guard allows through (valid DB id)', async () => {
+        await updateProductFieldAction(0, { status: 'active' })
+        expect(mockUpdate).toHaveBeenCalledOnce()
+    })
+
+    // ── Auth ──────────────────────────────────────────────────────────────────
+
+    it('[TC-F08-01-29] unauthenticated → throws Unauthorized before findByID or update', async () => {
+        vi.mocked(getCurrentUser).mockResolvedValue(null)
+        await expect(updateProductFieldAction(42, { status: 'active' })).rejects.toThrow('Unauthorized')
+        expect(mockFindByID).not.toHaveBeenCalled()
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    // ── Field allowlist ───────────────────────────────────────────────────────
+
+    it('[TC-F08-01-28] disallowed field → throws ZodError before payload.update', async () => {
+        await expect(updateProductFieldAction(42, { tenant: 99 })).rejects.toThrow()
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F08-01-28] valid field (deletedAt) → findByID access-gate then update with overrideAccess', async () => {
+        // Arrange — findByID confirms product exists and user has access (default beforeEach mock)
+
+        // Act
+        await updateProductFieldAction(42, { deletedAt: null })
+
+        // Assert — access gate via findByID (with user context)
+        expect(mockFindByID).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'products',
+            id: 42,
+            user: expect.objectContaining({ id: 'u1' }),
+        }))
+        // Assert — update uses overrideAccess:true to bypass Payload/Neon WHERE bug for variant docs
+        // data also contains variants/variantConfigs (stripped of auto-managed 'id')
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'products',
+            id: 42,
+            data: expect.objectContaining({ deletedAt: null }),
+            overrideAccess: true,
+        }))
+    })
+
+    it('[TC-F08-01-29b] product not found / no access → throws before update', async () => {
+        // Arrange — findByID returns null (product not found or tenant mismatch)
+        mockFindByID.mockResolvedValue(null)
+
+        // Act & Assert
+        await expect(updateProductFieldAction(42, { status: 'active' })).rejects.toThrow('Product not found or access denied')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    // ── Payload 3.79 variant id-strip ─────────────────────────────────────────
+
+    it('[TC-F08-01-32] product with variants → auto-managed id stripped from variants/variantConfigs before update', async () => {
+        // Arrange — product with variants that have Payload's auto-managed UUID 'id' on each row
+        mockFindByID.mockResolvedValue({
+            id: 42,
+            name: 'Test Product',
+            tenant: 68,
+            variants: [
+                { id: 'uuid-v1', name: 'Red/S', sku: 'P-R-S', price: 10, stock: 5 },
+                { id: 'uuid-v2', name: 'Blue/M', sku: 'P-B-M', price: 10, stock: 3 },
+            ],
+            variantConfigs: [
+                {
+                    id: 'uuid-vc1',
+                    name: 'Color',
+                    options: [
+                        { id: 'uuid-o1', value: 'Red' },
+                        { id: 'uuid-o2', value: 'Blue' },
+                    ],
+                },
+            ],
+        })
+
+        // Act
+        await updateProductFieldAction(42, { status: 'active' })
+
+        // Assert — auto-managed 'id' must not reach payload.update (Payload 3.79 traverseFields bug)
+        const call = mockUpdate.mock.calls[0][0]
+        expect(call.data.variants[0]).not.toHaveProperty('id')
+        expect(call.data.variants[1]).not.toHaveProperty('id')
+        expect(call.data.variantConfigs[0]).not.toHaveProperty('id')
+        expect(call.data.variantConfigs[0].options[0]).not.toHaveProperty('id')
+        expect(call.data.variantConfigs[0].options[1]).not.toHaveProperty('id')
+        // Non-id fields must be preserved
+        expect(call.data.variants[0]).toMatchObject({ name: 'Red/S', sku: 'P-R-S', price: 10, stock: 5 })
+        expect(call.data.variantConfigs[0]).toMatchObject({ name: 'Color' })
     })
 })

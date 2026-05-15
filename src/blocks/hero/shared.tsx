@@ -5,8 +5,10 @@ import { motion } from 'framer-motion'
 import type { HeroConfig } from './config'
 import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 
 // Token shortcut: hero containers consume CONTAINER.default + INNER_PADDING.
 export const HERO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -40,10 +42,16 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
 
     return (
         <div className="flex flex-wrap gap-4">
-            {buttons.map((btn, i) => (
+            {buttons.map((btn, i) => {
+                const rawUrl = btn?.url
+                const isBroken = rawUrl?.startsWith(BROKEN_URL_PREFIX)
+                const href = isBroken ? '#' : (rawUrl || '#')
+                const isExternal = !isBroken && !!rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'))
+                return (
+                <BrokenLinkWarning key={i} url={rawUrl} rounded="rounded-xl">
                 <motion.a
-                    key={i}
-                    href={btn?.url}
+                    href={href}
+                    {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     onClick={() => {
                         if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' }, isOwner })
                     }}
@@ -79,7 +87,9 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
                 >
                     <RichText text={btn.label} as="span" />
                 </motion.a>
-            ))}
+                </BrokenLinkWarning>
+                )
+            })}
         </div>
     )
 }

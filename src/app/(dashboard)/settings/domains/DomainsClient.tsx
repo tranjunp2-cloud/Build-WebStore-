@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition, useCallback, useRef, useEffect } from 'react';
-import { Globe, Plus, AlertCircle, AlertTriangle, Info, X, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
+import { Globe, Plus, AlertCircle, AlertTriangle, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useI18n } from '@/i18n';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
@@ -248,44 +248,6 @@ function TxtChallengeCard({
     );
 }
 
-// ── SSL Provisioning Banner ─────────────────────────────────────────────────
-function SslProvisioningBanner({
-    domain,
-    shownAt,
-    onDismiss,
-}: {
-    domain: string;
-    shownAt: number;
-    onDismiss: () => void;
-}) {
-    useEffect(() => {
-        const timeout = setTimeout(onDismiss, 60000); // auto-dismiss after 60s
-        return () => clearTimeout(timeout);
-    }, [onDismiss, shownAt]);
-
-    return (
-        <div
-            role="status"
-            aria-live="polite"
-            className="mt-3 flex items-start gap-3 p-3 rounded-[10px] bg-[rgba(0,211,212,0.06)] border border-[#00D3D4]/20"
-        >
-            <Info className="h-4 w-4 text-[#00D3D4] shrink-0 mt-0.5" aria-hidden="true" />
-            <p className="flex-1 text-[13px] text-[#F8FAFC] font-['Inter']">
-                SSL certificate is being provisioned. May take 1-2 minutes.
-                Try <code className="text-[#00D3D4]">https://{domain}</code> after a moment.
-            </p>
-            <button
-                type="button"
-                onClick={onDismiss}
-                aria-label="Dismiss SSL provisioning notice"
-                className="shrink-0 h-6 w-6 flex items-center justify-center rounded text-[rgba(248,250,252,0.4)] hover:text-[#F8FAFC] transition-colors"
-            >
-                <X className="h-4 w-4" />
-            </button>
-        </div>
-    );
-}
-
 // ── Main DomainsClient ───────────────────────────────────────────────────────
 export function DomainsClient({
     tenantId,
@@ -313,8 +275,6 @@ export function DomainsClient({
         )
     );
     const [lastCheckedAt, setLastCheckedAt] = useState<Record<string, number>>({});
-    const [sslProvisioningDomains, setSslProvisioningDomains] = useState<Record<string, number>>({});
-    const [dnsSetupDomains, setDnsSetupDomains] = useState<Set<string>>(new Set());
     const lastVerifyClickRef = useRef<Record<string, number>>({});
     const [domainError, setDomainError] = useState('');
 
@@ -417,19 +377,12 @@ export function DomainsClient({
             if (res.success) {
                 setIsAddModalOpen(false);
                 setNewDomainInput('');
-                const hasVerification = !!(res.verification && res.verification.length > 0);
-                setDomains(prev => [
-                    ...prev,
-                    { domain: domainValue, status: hasVerification ? 'pending' : 'active' },
-                ]);
-                if (hasVerification) {
+                // Always pending — Verify button must be clicked after pointing DNS.
+                setDomains(prev => [...prev, { domain: domainValue, status: 'pending' }]);
+                if (res.verification && res.verification.length > 0) {
                     setVerifications(prev => ({ ...prev, [domainValue]: res.verification! }));
-                    toast.success('Add the TXT record below, then click Verify.');
-                } else {
-                    setSslProvisioningDomains(prev => ({ ...prev, [domainValue]: Date.now() }));
-                    setDnsSetupDomains(prev => new Set(prev).add(domainValue));
-                    toast.success('Domain connected! Configure DNS records below to point your domain to this store.');
                 }
+                toast.success('Domain added. Point your DNS records below, then click Verify.');
                 if (res.warning) {
                     toast.warning(res.warning);
                 }
@@ -456,15 +409,22 @@ export function DomainsClient({
             if (res.success) {
                 setDomains(prev => prev.map(d => d.domain === domain ? { ...d, status: 'active' } : d));
                 setVerifications(prev => { const next = { ...prev }; delete next[domain]; return next; });
-                setSslProvisioningDomains(prev => ({ ...prev, [domain]: Date.now() }));
-                toast.success('Domain active. SSL provisioning may take 1-2 minutes.');
+                toast.success(`Domain connected! https://${domain} is now live.`);
             } else {
                 if (res.verification && res.verification.length > 0) {
+                    // Vercel returned new TXT challenges — update card.
                     setVerifications(prev => ({ ...prev, [domain]: res.verification! }));
+                } else if (res.ownershipConfirmed) {
+                    // Ownership confirmed by Vercel — TXT no longer needed, clear the card.
+                    setVerifications(prev => { const next = { ...prev }; delete next[domain]; return next; });
                 }
-                const friendly = res.error || 'Verification failed. Please check your DNS records.';
-                setVerifyErrors(prev => ({ ...prev, [domain]: friendly }));
-                toast.error(`Verification failed: ${friendly}`);
+                if (res.ownershipConfirmed) {
+                    toast.warning('DNS records are still propagating. This usually takes 5–30 minutes after you save them. Try again shortly.');
+                } else {
+                    const friendly = res.error || 'Verification failed. Please check your DNS records.';
+                    setVerifyErrors(prev => ({ ...prev, [domain]: friendly }));
+                    toast.error(`Verification failed: ${friendly}`);
+                }
             }
         });
     };
@@ -478,7 +438,6 @@ export function DomainsClient({
             if (res.success) {
                 setDomains(prev => prev.filter(d => d.domain !== domain));
                 setVerifications(prev => { const next = { ...prev }; delete next[domain]; return next; });
-                setSslProvisioningDomains(prev => { const next = { ...prev }; delete next[domain]; return next; });
                 setLastCheckedAt(prev => { const next = { ...prev }; delete next[domain]; return next; });
                 if (res.warning) {
                     toast.warning(res.warning);
@@ -729,6 +688,9 @@ export function DomainsClient({
                                             </div>
                                         </div>
                                     </div>
+                                    <p className="text-[12px] text-[rgba(248,250,252,0.4)]">
+                                        {t?.Domains?.cloudflareTip || 'Using Cloudflare? Disable the proxy (orange cloud → grey cloud) before verifying.'}
+                                    </p>
                                 </div>
 
                                 {/* Error banner */}
@@ -809,70 +771,6 @@ export function DomainsClient({
                                     </button>
                                 </div>
                                 </div>
-                                {/* DNS setup — shown when domain went active without TXT challenge */}
-                                {dnsSetupDomains.has(domain) && (
-                                    <div className="flex flex-col p-[16px] rounded-[16px] border border-blue-500/20 bg-blue-500/[0.04] gap-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="text-[14px] font-semibold text-[#F8FAFC] font-['Inter']">Configure DNS records</p>
-                                                <p className="text-[13px] text-[rgba(248,250,252,0.6)] font-['Inter'] mt-1">
-                                                    {t?.Domains?.configureDns || 'Configure these DNS records at your domain registrar:'}
-                                                </p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setDnsSetupDomains(prev => { const next = new Set(prev); next.delete(domain); return next; })}
-                                                className="shrink-0 h-7 w-7 flex items-center justify-center rounded text-[rgba(248,250,252,0.4)] hover:text-[#F8FAFC] transition-colors"
-                                                aria-label="Dismiss"
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                        <div className="flex flex-col gap-4">
-                                            <div className="flex flex-col gap-1.5">
-                                                <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">{t?.Domains?.aRecord || 'A Record (Apex / root domain)'}</span>
-                                                <div className="flex flex-col gap-2">
-                                                    {DNS_A_RECORD.split(',').map((ip, idx) => (
-                                                        <div key={idx} className="flex items-center gap-2">
-                                                            <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
-                                                                <span className="text-[14px] text-[#F8FAFC] font-mono">{ip.trim()}</span>
-                                                            </div>
-                                                            <button type="button" onClick={() => { navigator.clipboard.writeText(ip.trim()); toast.success((t?.Domains?.copiedIp || 'Copied IP {n}!').replace('{n}', String(idx + 1))); }} className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0">
-                                                                <Copy className="h-5 w-5" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col gap-1.5">
-                                                <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">{t?.Domains?.cnameRecord || 'CNAME Record (subdomain, e.g. www)'}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
-                                                        <span className="text-[14px] text-[#F8FAFC] font-mono">{DNS_CNAME}</span>
-                                                    </div>
-                                                    <button type="button" onClick={() => { navigator.clipboard.writeText(DNS_CNAME); toast.success(t?.Domains?.copied || 'Copied!'); }} className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0">
-                                                        <Copy className="h-5 w-5" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <p className="text-[12px] text-[rgba(248,250,252,0.4)] font-['Inter']">
-                                            Using Cloudflare? Disable proxy (gray cloud) or set SSL mode to &quot;Full&quot;.
-                                        </p>
-                                    </div>
-                                )}
-                                {/* SSL Provisioning banner — render only when recently flipped active */}
-                                {sslProvisioningDomains[domain] && (
-                                    <SslProvisioningBanner
-                                        domain={domain}
-                                        shownAt={sslProvisioningDomains[domain]}
-                                        onDismiss={() => setSslProvisioningDomains(prev => {
-                                            const next = { ...prev };
-                                            delete next[domain];
-                                            return next;
-                                        })}
-                                    />
-                                )}
                             </div>
                         );
                     }

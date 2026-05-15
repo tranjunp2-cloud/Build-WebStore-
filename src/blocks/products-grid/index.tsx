@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { BlockProps } from '../types'
 import type { ProductsGridConfig } from './config'
@@ -10,11 +10,11 @@ import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+import { handleCartClick } from '@/lib/storefront/editor-intercept'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
-// gh-839: Hide Add to Cart until checkout is implemented. Flip to true to re-enable.
-const CART_ENABLED = false
+const CART_ENABLED = true
 
 interface ProductItem {
     id: string
@@ -182,6 +182,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                                             e.currentTarget.style.color = CSS_VARS.primary
                                         }
                                     }}
+                                    onClick={handleCartClick}
                                 >
                                     Add to Cart
                                 </button>

@@ -8,6 +8,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import {
     BLOCKS_REQUIRE_MEDIA_PIPELINE,
     BLOCKS_NOT_IN_PAYLOAD,
+    BLOCKS_TEMP_HIDDEN,
     isUnsupportedBlock,
     filterUnsupportedBlocks,
 } from '@/lib/ai/unsupported-blocks'
@@ -23,6 +24,14 @@ describe('isUnsupportedBlock', () => {
         for (const t of BLOCKS_NOT_IN_PAYLOAD) {
             expect(isUnsupportedBlock(t)).toBe(true)
         }
+    })
+
+    it('menu-display is NOT in BLOCKS_TEMP_HIDDEN [TC-F01-UB-01]', () => {
+        expect(BLOCKS_TEMP_HIDDEN.has('menu-display')).toBe(false)
+    })
+
+    it('isUnsupportedBlock returns false for menu-display', () => {
+        expect(isUnsupportedBlock('menu-display')).toBe(false)
     })
 
     it('returns false for supported blocks', () => {
@@ -51,7 +60,7 @@ describe('filterUnsupportedBlocks', () => {
     it('drops unsupported + keeps supported in order', () => {
         const input = [
             { blockType: 'hero' },
-            { blockType: 'menu-display' },
+            { blockType: 'google-maps' },
             { blockType: 'features' },
             { blockType: 'review-cards' },
             { blockType: 'footer' },
@@ -66,7 +75,7 @@ describe('filterUnsupportedBlocks', () => {
     })
 
     it('logs fallback prefix when context="fallback"', () => {
-        filterUnsupportedBlocks([{ blockType: 'menu-display' }], 'fallback')
+        filterUnsupportedBlocks([{ blockType: 'google-maps' }], 'fallback')
         expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[Fallback]'))
     })
 

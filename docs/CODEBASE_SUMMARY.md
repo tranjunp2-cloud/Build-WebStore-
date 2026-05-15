@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-04-19
+last_updated: 2026-05-12
 ---
 
 # Codebase Summary
@@ -27,6 +27,7 @@ src/
 │   ├── payment/      Payment integration (F13 — Phase 2)
 │   ├── images/       Image processing + S3 upload (via Payload cloud-storage + AWS SDK)
 │   ├── cache/        Caching utilities
+│   ├── storefront/   Storefront utilities (cart, editor intercepts)
 │   └── otp/, analytics/, notifications/, fonts/  Feature-specific utilities
 ├── providers/        React context providers (theme, query client, auth)
 ├── scripts/          CLI tools scoped to src/ (admin, migration helpers)
@@ -70,6 +71,7 @@ Adding a new collection requires: Payload config + migration in `scripts/db-setu
 - **Builder store** (`src/store/builderStore.ts`) — Zustand store for in-memory page tree. Gold-standard test: `src/__tests__/unit/builder/builder-store.test.ts`.
 - **Stores** (`src/store/`) — `builderStore`, `cartStore`, `editorStore`, `notificationStore` (Zustand).
 - **Auth** (`src/app/api/auth/`, `src/lib/auth.ts`) — JWT + Payload session, OTP via AWS SES. SSO provisioning at `src/app/api/v1/sso/`.
+- **Shipping** (`src/lib/shipping/`) — F14 flat-rate Malaysia shipping. Modules: `constants.ts` (region defs, defaults, MY_STATES enum), `classify-region.ts` (state→region via isEastState), `calculate-fee.ts` (config + state + subtotal → fee + hint), `types.ts` (ShippingConfig/ShippingHint). APIs: `GET /api/sites/:siteId/shipping-config` (public read), `PATCH /api/sites/:siteId/shipping-config` (authed write), `POST /api/orders/calculate-shipping` (public calc with null/array body guard). Dashboard settings page at `src/app/(dashboard)/settings/shipping/`. Unit tests: `src/__tests__/api/orders-calculate-shipping.test.ts` (17 tests), `src/__tests__/unit/hooks/use-debounce.test.ts` (3 tests for checkout debounce). E2E: `e2e/f14-shipping.spec.ts` (US-F14-05 suite). See `docs/architecture/F14-shipping.md`.
 - **Images / S3** (`src/lib/images/`, Payload plugin-cloud-storage) — upload via AWS SDK v3 to DO Spaces-compatible S3.
 - **Email** (`src/lib/email/send.ts`) — Custom utility over `payload.sendEmail()`. See `.claude/rules/email-smtp.md`.
 - **Test harness** (`scripts/test-harness/`) — E2E page-gen regression harness with Playwright visual diff.

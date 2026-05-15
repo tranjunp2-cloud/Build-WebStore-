@@ -32,6 +32,12 @@ export interface CategoryRule {
     ctaIsMandatory: boolean
 }
 
+// GH-960: restaurant/fnb reference menu-display; ecommerce references product-quick-view + pricing-table;
+// tech references pricing-table; realestate references property-card — all hidden until #961 ships.
+// Structure-enforcer and template-composer guard these at runtime via isUnsupportedBlock / TEMP_HIDDEN_BLOCK_TYPES.
+// On re-enable, restore: block configs (aiVisible, category), EDITOR_HIDDEN_BLOCKS, BLOCKS_TEMP_HIDDEN,
+// TEMP_HIDDEN_BLOCK_TYPES, SECTION_TYPE_MATCHERS, Pages.ts layout.blocks, PAGES_BLOCK_WHITELIST/SCHEMA/FIELDS,
+// SUPPORTED_BLOCK_IDS, category-recipes, system-prompt VARIETY RULES 8-10.
 export const TEMPLATE_RULES: Readonly<Record<string, CategoryRule>> = {
     restaurant: {
         minBlocks: 11,

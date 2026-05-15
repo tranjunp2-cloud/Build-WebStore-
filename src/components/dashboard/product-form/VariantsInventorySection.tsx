@@ -1,22 +1,25 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { useFormContext, useFieldArray } from 'react-hook-form'
+import type { FieldError } from 'react-hook-form'
 import { ProductFormValues } from './schema'
-import { Plus, X, Wand2, Trash2 } from 'lucide-react'
+import { Plus, Wand2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
 import { useI18n } from '@/i18n'
 import { SkuMatrixMobile } from './SkuMatrixMobile'
+import { computeDuplicateIndicesForOptions, isNonEmptyTier } from './variant-utils'
 
 export function VariantsInventorySection() {
     const { register, watch, setValue, getValues, control, formState, trigger } = useFormContext<ProductFormValues>()
     const { t } = useI18n()
-    
+    const [isGenerating, setIsGenerating] = useState(false)
+
     const hasVariants = watch('hasVariants')
     const errors = formState.errors
     
     // Tiers setup
-    const { fields: tiers, append: appendTier, remove: removeTier, update: updateTier } = useFieldArray({
+    const { fields: tiers, append: appendTier, update: updateTier } = useFieldArray({
         control,
         name: 'tiers'
     })
@@ -27,8 +30,6 @@ export function VariantsInventorySection() {
         name: 'variants'
     })
 
-    const [newOptionInputs, setNewOptionInputs] = useState<Record<number, string>>({})
-
     const watchedTiers = watch('tiers') || []
 
     const isAllTiersEmpty = watchedTiers.every(
@@ -37,76 +38,91 @@ export function VariantsInventorySection() {
 
     const duplicateOptionIndices: Record<number, Set<number>> = {}
     watchedTiers.forEach((tier, tIdx) => {
-        const seen = new Map<string, number>()
-        const dups = new Set<number>()
-        ;(tier.options || []).forEach((opt, oIdx) => {
-            const norm = (opt || '').trim().toLowerCase()
-            if (!norm) return
-            if (seen.has(norm)) dups.add(oIdx)
-            else seen.set(norm, oIdx)
-        })
+        const dups = computeDuplicateIndicesForOptions(tier.options || [])
         if (dups.size) duplicateOptionIndices[tIdx] = dups
     })
 
     const hasDuplicates = Object.keys(duplicateOptionIndices).length > 0
 
-    const isGenerateDisabled = watchedTiers.length === 0 || hasDuplicates || watchedTiers.some(
+    const activeTiers = watchedTiers.filter(isNonEmptyTier)
+    const activeTierNames = activeTiers.map(t => t.name.trim().toLowerCase()).filter(Boolean)
+    const hasDuplicateTierNames = new Set(activeTierNames).size !== activeTierNames.length
+
+    // Clear stale variants whenever a tier becomes empty (active tier count drops)
+    const prevActiveTierCountRef = useRef<number | null>(null)
+    useEffect(() => {
+        const current = activeTiers.length
+        const prev = prevActiveTierCountRef.current
+        if (prev !== null && prev > current && (getValues('variants') || []).length > 0) {
+            replaceVariants([])
+        }
+        prevActiveTierCountRef.current = current
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTiers.length])
+
+    const isGenerateDisabled = activeTiers.length === 0 || hasDuplicates || hasDuplicateTierNames || activeTiers.some(
         t => !t.name?.trim() || (t.options || []).filter(o => o?.trim()).length === 0
     )
 
     const generateSkuTable = async () => {
-        // Evaluate master fields validation before generating matrix
-        const isValid = await trigger(['basePrice', 'compareAtPrice', 'baseSku', 'baseInventory']);
-        if (!isValid) return;
+        if (isGenerating) return
+        setIsGenerating(true)
+        try {
+            // Evaluate master fields validation before generating matrix
+            const isValid = await trigger(['basePrice', 'compareAtPrice', 'baseSku', 'baseInventory']);
+            if (!isValid) return;
 
-        // Cartesian Product to generate variants Matrix
-        const liveTiers = getValues('tiers') || []
-        if (!liveTiers || liveTiers.length === 0) return
+            // Cartesian Product to generate variants Matrix
+            const liveTiers = getValues('tiers') || []
+            if (!liveTiers || liveTiers.length === 0) return;
 
-        const validTiers = liveTiers
-            .map(t => ({ ...t, options: t.options.filter(o => o.trim() !== '') }))
-            .filter(t => t.options.length > 0)
+            const validTiers = liveTiers
+                .map(t => ({ ...t, options: t.options.filter(o => o.trim() !== '') }))
+                .filter(t => t.options.length > 0)
 
-        if (validTiers.length === 0) return
+            if (validTiers.length === 0) return;
 
-        let combinations: string[][] = [[]];
+            let combinations: string[][] = [[]];
 
-        for (const tier of validTiers) {
-            const newCombinations: string[][] = []
-            for (const combo of combinations) {
-                for (const option of tier.options) {
-                    newCombinations.push([...combo, option])
+            for (const tier of validTiers) {
+                const newCombinations: string[][] = []
+                for (const combo of combinations) {
+                    for (const option of tier.options) {
+                        newCombinations.push([...combo, option])
+                    }
                 }
+                combinations = newCombinations
             }
-            combinations = newCombinations
-        }
 
-        const basePrice = getValues('basePrice') || 0;
-        const compareAtPrice = getValues('compareAtPrice') || 0;
-        const baseInventory = getValues('baseInventory') || 0;
-        const baseSku = getValues('baseSku') || 'SKU';
+            const basePrice = getValues('basePrice') || 0;
+            const compareAtPrice = getValues('compareAtPrice') || 0;
+            const baseInventory = getValues('baseInventory') || 0;
+            const baseSku = getValues('baseSku') || 'SKU';
 
-        const newVariants = combinations.map((combo) => {
-            const variantName = combo.join(' - ')
-            
-            // Preserve existing data for UX robustness (using live form values, not stale fields)
             const currentVariants = getValues('variants') || []
-            const existing = currentVariants.find(v => v.variantName === variantName)
-            if (existing) return existing
+            const newVariants = combinations.map((combo) => {
+                const variantName = combo.join(' - ')
 
-            const suffix = combo.map(c => c.substring(0,2).toUpperCase()).join('-')
-            const skuCode = `${baseSku}-${suffix}`
-            return {
-                id: crypto.randomUUID(),
-                variantName,
-                skuCode,
-                price: basePrice,
-                stock: baseInventory,
-                compareAtPrice: compareAtPrice,
-            }
-        })
+                // Preserve existing data for UX robustness (using live form values, not stale fields)
+                const existing = currentVariants.find(v => v.variantName === variantName)
+                if (existing) return existing
 
-        replaceVariants(newVariants)
+                const suffix = combo.map(c => c.substring(0,3).toUpperCase()).join('-')
+                const skuCode = `${baseSku}-${suffix}`
+                return {
+                    id: crypto.randomUUID(),
+                    variantName,
+                    skuCode,
+                    price: basePrice,
+                    stock: baseInventory,
+                    compareAtPrice: compareAtPrice,
+                }
+            })
+
+            replaceVariants(newVariants)
+        } finally {
+            setIsGenerating(false)
+        }
     }
 
     return (
@@ -128,10 +144,7 @@ export function VariantsInventorySection() {
                             const newVal = !hasVariants
                             setValue('hasVariants', newVal, { shouldDirty: true })
                             if (newVal && tiers.length === 0) {
-                                appendTier([
-                                    { id: crypto.randomUUID(), name: '', options: [] },
-                                    { id: crypto.randomUUID(), name: '', options: [] }
-                                ])
+                                appendTier({ id: crypto.randomUUID(), name: '', options: [] })
                             }
                         }}
                         className={cn(
@@ -240,6 +253,11 @@ export function VariantsInventorySection() {
                                                 ? (t.dashboard.products.form.sections?.color || 'Color')
                                                 : (t.dashboard.products.form.sections?.size || 'Size'))
                                             || `Option ${index + 1} (Example: ${index === 0 ? 'Color' : 'Size'})`}
+                                        {index > 0 && (
+                                            <span className="text-[12px] font-normal text-[#F8FAFC]/40 ml-1">
+                                                ({t.dashboard.products.form.sections?.optionalLabel || 'Optional'})
+                                            </span>
+                                        )}
                                     </label>
 
                                     {/* Card */}
@@ -247,25 +265,34 @@ export function VariantsInventorySection() {
                                         {/* Option name sub-label + input */}
                                         <div className="flex flex-col gap-2 w-full">
                                             <span className="text-[14px] font-medium text-[#F8FAFC] m-0">
-                                                {t.dashboard.products.form.sections?.optionNameLabel || 'Option name:'}
+                                                {t.dashboard.products.form.sections?.optionNameLabel || 'Option name'}
+                                                {index === 0 && <span className="text-[#F8FAFC] ml-0.5">*</span>}
                                             </span>
                                             <input
                                                 {...register(`tiers.${index}.name`)}
                                                 placeholder={index === 0 ? (t.dashboard.products.form.sections?.tierPlaceholderColor || 'e.g. Color') : (t.dashboard.products.form.sections?.tierPlaceholderSize || 'e.g. Size')}
                                                 className={cn(
-                                                    'w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 outline-none focus:ring-1 focus:ring-white transition-colors',
-                                                    errors.tiers?.[index]?.name ? 'border-red-500 focus:border-red-500' : 'border-white/[0.08] focus:border-white'
+                                                    'w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 outline-none focus:ring-1 transition-colors',
+                                                    (errors.tiers?.[index]?.name || hasDuplicateTierNames)
+                                                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                                                        : 'border-white/[0.08] focus:border-white focus:ring-white'
                                                 )}
                                             />
                                             {errors.tiers?.[index]?.name && (
                                                 <span className="text-[12px] text-red-500">{errors.tiers[index]?.name?.message}</span>
+                                            )}
+                                            {!errors.tiers?.[index]?.name && hasDuplicateTierNames && (
+                                                <span className="text-[12px] text-red-500">
+                                                    {t.dashboard.products.form.errors?.uniqueTiers || 'Option names must be unique'}
+                                                </span>
                                             )}
                                         </div>
 
                                         {/* Values sub-label + inputs */}
                                         <div className="flex flex-col gap-2">
                                             <span className="text-[14px] font-medium text-[#F8FAFC] m-0">
-                                                {t.dashboard.products.form.sections?.valuesLabel || 'Values:'}
+                                                {t.dashboard.products.form.sections?.valuesLabel || 'Values'}
+                                                {index === 0 && <span className="text-[#F8FAFC] ml-0.5">*</span>}
                                             </span>
                                             <div className="flex flex-col gap-3">
                                                 {tier.options.map((opt, oIdx) => {
@@ -279,8 +306,8 @@ export function VariantsInventorySection() {
                                                                     {...register(`tiers.${index}.options.${oIdx}` as const)}
                                                                     placeholder={index === 0 ? (t.dashboard.products.form.sections?.optionPlaceholderRed || 'e.g. Red') : (t.dashboard.products.form.sections?.optionPlaceholderSmall || 'e.g. Small')}
                                                                     className={cn(
-                                                                        'flex-1 rounded-xl border bg-[#0B1120] px-4 py-[10px] text-[14px] text-[#F8FAFC] outline-none focus:ring-1 focus:ring-white transition-colors',
-                                                                        showRed ? 'border-red-500 focus:border-red-500' : 'border-white/[0.08] focus:border-white'
+                                                                        'flex-1 rounded-xl border bg-[#0B1120] px-4 py-[10px] text-[14px] text-[#F8FAFC] outline-none focus:ring-1 transition-colors',
+                                                                        showRed ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-white/[0.08] focus:border-white focus:ring-white'
                                                                     )}
                                                                 />
                                                                 <button
@@ -310,6 +337,13 @@ export function VariantsInventorySection() {
                                                     )
                                                 })}
 
+                                                {/* Array-root error (e.g. "at least one option required") */}
+                                                {(errors.tiers?.[index]?.options as FieldError | undefined)?.message && (
+                                                    <span className="text-[12px] text-red-500">
+                                                        {(errors.tiers![index]!.options as FieldError).message}
+                                                    </span>
+                                                )}
+
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -336,7 +370,7 @@ export function VariantsInventorySection() {
                                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-transparent py-3 text-[14px] font-medium text-[#F8FAFC]/60 hover:bg-white/5 transition-colors"
                             >
                                 <Plus className="h-4 w-4" />
-                                {t.dashboard.products.form.sections?.addTier || 'Add Option / Tier'}
+                                {t.dashboard.products.form.sections?.addTier || 'Add Option'}
                             </button>
                         )}
 
@@ -345,10 +379,10 @@ export function VariantsInventorySection() {
                                 <button
                                     type="button"
                                     onClick={generateSkuTable}
-                                    disabled={isGenerateDisabled}
+                                    disabled={isGenerateDisabled || isGenerating}
                                     className={cn(
                                         'flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-[14px] font-medium transition-colors',
-                                        isGenerateDisabled
+                                        isGenerateDisabled || isGenerating
                                             ? 'border-white/[0.08] bg-white/[0.04] text-[#F8FAFC]/40 cursor-not-allowed'
                                             : 'border-blue-500/20 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20'
                                     )}

@@ -9,11 +9,13 @@ interface Props {
     page: SiteRendererProps['page']
     pages: NavPage[]
     isBuilderPreview?: boolean
+    isEditorIframe?: boolean
 }
 
-export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderPreview }: Props) {
+export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPages, isBuilderPreview, isEditorIframe }: Props) {
     const [page, setPage] = useState(initialPage)
     const [siteState, setSiteState] = useState(site)
+    const [pages, setPages] = useState(initialPages)
 
     const handleBlockFieldChange = useCallback((blockIndex: number, field: string, value: unknown) => {
         window.parent?.postMessage(
@@ -85,6 +87,9 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
                 const { imageLibraryS3 } = e.data
                 if (typeof imageLibraryS3 !== 'object' || imageLibraryS3 === null) return
                 setSiteState(prev => ({ ...prev, imageLibraryS3: imageLibraryS3 as Record<string, string> }))
+            } else if (e.data?.type === 'UPDATE_PAGES') {
+                const { pages: updatedPages } = e.data
+                if (Array.isArray(updatedPages)) setPages(updatedPages as NavPage[])
             }
         }
         window.addEventListener('message', onMessage)
@@ -98,6 +103,7 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages, isBuilderP
             pages={pages}
             isEditor={true}
             isBuilderPreview={isBuilderPreview}
+            isEditorIframe={isEditorIframe}
             isOwner={true}
             onBlockFieldChange={handleBlockFieldChange}
         />

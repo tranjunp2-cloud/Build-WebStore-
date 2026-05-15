@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ProductFormValues, getProductFormSchema } from './schema'
+import { isNonEmptyTier } from './variant-utils'
 import Link from 'next/link'
 import { ChevronLeft, Save, Trash2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,7 +38,18 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 : values;
             return zodResolver(schema)(payload, context, options);
         },
-        defaultValues: initialData || {
+        defaultValues: initialData ? {
+            ...initialData,
+            // Derive slug from product name for existing products that predate the required-slug constraint
+            urlSlug: initialData.urlSlug ||
+                (initialData.name ?? '')
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                    .slice(0, 60),
+        } : {
             name: '',
             categoryIds: [],
             images: [],
@@ -93,9 +105,14 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
 
     const onSubmit = async (data: ProductFormValues) => {
         setIsSaving(true)
+        // Strip fully-empty optional tiers before sending to API
+        const payload = {
+            ...data,
+            tiers: (data.tiers || []).filter(isNonEmptyTier),
+        }
         try {
             if (onSubmitForm) {
-                await onSubmitForm(data);
+                await onSubmitForm(payload);
             } else {
                 console.log('Form data:', data)
                 toast.success(t.dashboard.products.form.draftSaved)
@@ -135,7 +152,8 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     tiers: t.dashboard.products.form.fields.tiers || 'Variant Options',
                     basePrice: t.dashboard.products.form.fields.basePrice || 'Price',
                     baseSku: t.dashboard.products.form.fields.baseSku || 'SKU Code',
-                    baseInventory: t.dashboard.products.form.fields.baseInventory || 'Inventory'
+                    baseInventory: t.dashboard.products.form.fields.baseInventory || 'Inventory',
+                    urlSlug: t.dashboard.products.form.sections?.urlSlug || 'URL Slug',
                 }
                 return map[key] || key
             })

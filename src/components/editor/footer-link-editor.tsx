@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useI18n } from '@/i18n'
 import {
     DndContext, closestCenter,
@@ -13,10 +13,12 @@ import {
     verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, ChevronRight, ExternalLink, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronRight, ExternalLink, FileText, GripVertical, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import type { FooterColumn, NavLink } from '@/types/editor'
+import type { PageData } from '@/store/editorStore'
+import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
 
 const labelCls = 'text-[12px] font-medium leading-4 text-slate-400'
 
@@ -31,14 +33,20 @@ interface SortableLinkProps {
     link: NavLink
     ci: number
     li: number
-    onUpdate: (field: 'label' | 'url', val: string) => void
+    pages?: PageData[]
+    onUpdate: (field: 'label' | 'url' | 'style', val: string) => void
     onRemove: () => void
 }
 
-function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProps) {
+function SortableLink({ id, link, ci, li, pages, onUpdate, onRemove }: SortableLinkProps) {
     const { t } = useI18n()
     const s = t.editor.settings
+    const nav = t.editor.navigation
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+    const hiddenStatus = checkHiddenPageUrl(link.url, pages)
+
+    const currentStyle: 'internal' | 'external' =
+        link.style ?? (isExternal(link.url ?? '') ? 'external' : 'internal')
 
     return (
         <div
@@ -59,37 +67,87 @@ function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProp
                 </button>
 
                 <div className="flex-1 space-y-2 pb-3">
-                    <Input
-                        key={`link-label-${ci}-${li}-${link.label}`}
-                        defaultValue={link.label}
-                        placeholder="About Us"
-                        onBlur={(e) => onUpdate('label', e.target.value)}
-                        variant="editor"
-                        className="h-8 text-[14px] text-[#94a3b8]"
-                    />
-                    <div className="relative">
+                    {/* Label + delete */}
+                    <div className="flex items-center gap-1">
                         <Input
-                            key={`link-url-${ci}-${li}-${link.url}`}
-                            defaultValue={link.url}
-                            placeholder="/about"
-                            onBlur={(e) => onUpdate('url', e.target.value.toLowerCase())}
+                            key={`link-label-${ci}-${li}-${link.label}`}
+                            defaultValue={link.label}
+                            placeholder="About Us"
+                            onBlur={(e) => onUpdate('label', e.target.value)}
                             variant="editor"
-                            className={cn('h-8 text-[14px] text-[#94a3b8] w-full lowercase', isExternal(link.url || '') && 'pr-8')}
+                            className="h-8 flex-1 text-[14px] text-[#94a3b8]"
                         />
-                        {isExternal(link.url || '') && (
-                            <ExternalLink className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500" />
-                        )}
+                        <button
+                            type="button"
+                            onClick={onRemove}
+                            aria-label={s.removeLink}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-red-400"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
                     </div>
-                </div>
 
-                <button
-                    type="button"
-                    onClick={onRemove}
-                    aria-label={s.removeLink}
-                    className="flex h-7 w-7 shrink-0 items-start justify-center pt-[6px] text-slate-400 transition-colors hover:text-red-400"
-                >
-                    <Trash2 className="h-4 w-4" />
-                </button>
+                    {/* Style dropdown */}
+                    <div className="relative">
+                        <select
+                            value={currentStyle}
+                            onChange={(e) => onUpdate('style', e.target.value)}
+                            className="h-8 w-full appearance-none rounded-md border border-white/[0.08] bg-[rgba(15,23,42,0.7)] px-3 pr-8 text-[13px] text-[#94a3b8] cursor-pointer focus:outline-none focus:border-blue-500/40"
+                        >
+                            <option value="internal">Style: Internal</option>
+                            <option value="external">Style: External</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                    </div>
+
+                    {/* URL — page selector for internal, text input for external */}
+                    {currentStyle === 'internal' && pages && pages.length > 0 ? (
+                        <div className="relative">
+                            <select
+                                key={`link-url-${ci}-${li}-internal`}
+                                value={link.url || '#'}
+                                onChange={(e) => onUpdate('url', e.target.value === '#' ? '' : e.target.value)}
+                                className={cn(
+                                    'h-8 w-full appearance-none rounded-md border border-white/[0.08] bg-[rgba(15,23,42,0.7)] pl-7 pr-8 text-[13px] text-[#94a3b8] cursor-pointer focus:outline-none focus:border-blue-500/40',
+                                    hiddenStatus && 'ring-2 ring-red-500/70',
+                                )}
+                            >
+                                <option value="#">{nav.selectPage}</option>
+                                {pages.filter(p => p.slug !== '404' && p.slug !== '/404').map(p => (
+                                    <option key={p.id} value={p.slug.startsWith('/') ? p.slug : `/${p.slug}`}>
+                                        {p.title}
+                                    </option>
+                                ))}
+                            </select>
+                            <FileText className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500" />
+                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
+                        </div>
+                    ) : (
+                        <div className="relative">
+                            <Input
+                                key={`link-url-${ci}-${li}-${link.url}`}
+                                defaultValue={link.url}
+                                placeholder={currentStyle === 'external' ? 'https://example.com' : '/page-slug'}
+                                onBlur={(e) => onUpdate('url', e.target.value)}
+                                variant="editor"
+                                className={cn(
+                                    'h-8 text-[14px] text-[#94a3b8] w-full',
+                                    currentStyle === 'external' && 'pr-8',
+                                    hiddenStatus && 'ring-2 ring-red-500/70',
+                                )}
+                            />
+                            {currentStyle === 'external' && (
+                                <ExternalLink className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500" />
+                            )}
+                        </div>
+                    )}
+                    {hiddenStatus && (
+                        <p className="flex items-center gap-1 text-[11px] text-red-400">
+                            <AlertTriangle size={11} className="shrink-0" />
+                            {hiddenStatus === 'deleted' ? s.linkPageDeleted : hiddenStatus === 'draft' ? s.linkPageDraft : hiddenStatus === 'not-found' ? s.linkPageNotFound : s.linkPageHidden}
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     )
@@ -100,12 +158,22 @@ function SortableLink({ id, link, ci, li, onUpdate, onRemove }: SortableLinkProp
 interface FooterLinkEditorProps {
     columns: FooterColumn[]
     onUpdate: (cols: FooterColumn[]) => void
+    pages?: PageData[]
 }
 
-export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
+export function FooterLinkEditor({ columns, onUpdate, pages }: FooterLinkEditorProps) {
     const { t, ti } = useI18n()
     const s = t.editor.settings
     const [openCols, setOpenCols] = useState<Set<number>>(new Set())
+    const linkListRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+    // Reset open state when a column is deleted (stale index would re-open wrong column on delete)
+    const prevColCountRef = useRef(columns.length)
+    useEffect(() => {
+        if (columns.length < prevColCountRef.current) {
+            setOpenCols(new Set())
+        }
+        prevColCountRef.current = columns.length
+    }, [columns.length])
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -114,16 +182,12 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
     )
 
     const toggleCol = (i: number) =>
-        setOpenCols(prev => {
-            const next = new Set(prev)
-            next.has(i) ? next.delete(i) : next.add(i)
-            return next
-        })
+        setOpenCols(prev => (prev.has(i) ? new Set<number>() : new Set<number>([i])))
 
     const updateColTitle = (ci: number, title: string) =>
         onUpdate(columns.map((c, i) => i !== ci ? c : { ...c, title }))
 
-    const updateLink = (ci: number, li: number, field: 'label' | 'url', val: string) =>
+    const updateLink = (ci: number, li: number, field: 'label' | 'url' | 'style', val: string) =>
         onUpdate(columns.map((c, i) =>
             i !== ci ? c : { ...c, links: (c.links || []).map((l, j) => j !== li ? l : { ...l, [field]: val }) }
         ))
@@ -138,6 +202,13 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
         onUpdate(columns.map((c, i) =>
             i !== ci ? c : { ...c, links: [...(c.links || []), { label: '', url: '' }] }
         ))
+        // Scroll to bottom of link list after DOM updates so the new row is visible
+        requestAnimationFrame(() => {
+            const el = linkListRefs.current.get(ci)
+            if (el && typeof el.scrollIntoView === 'function') {
+                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            }
+        })
     }
 
     const removeCol = (ci: number) => {
@@ -209,7 +280,13 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
                                 </div>
 
                                 {links.length > 0 && (
-                                    <div className="space-y-1.5">
+                                    <div
+                                        className="space-y-1.5"
+                                        ref={(el) => {
+                                            if (el) linkListRefs.current.set(ci, el)
+                                            else linkListRefs.current.delete(ci)
+                                        }}
+                                    >
                                         <label className={labelCls}>{s.links}</label>
                                         <DndContext
                                             sensors={sensors}
@@ -228,6 +305,7 @@ export function FooterLinkEditor({ columns, onUpdate }: FooterLinkEditorProps) {
                                                             link={link}
                                                             ci={ci}
                                                             li={li}
+                                                            pages={pages}
                                                             onUpdate={(field, val) => updateLink(ci, li, field, val)}
                                                             onRemove={() => removeLink(ci, li)}
                                                         />

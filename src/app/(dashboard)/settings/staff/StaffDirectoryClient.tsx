@@ -140,14 +140,14 @@ export function StaffDirectoryClient({
                 <div className="overflow-x-auto mt-[24px]">
                     <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
-                            <tr className="border-b border-white/[0.08]">
-                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.nameEmail || 'NAME / EMAIL'}</th>
-                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.role || 'ROLE'}</th>
-                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.status || 'STATUS'}</th>
-                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.actions || 'ACTIONS'}</th>
+                            <tr>
+                                <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.nameEmail || 'NAME / EMAIL'}</th>
+                                <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.role || 'ROLE'}</th>
+                                <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.status || 'STATUS'}</th>
+                                <th style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.actions || 'ACTIONS'}</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/[0.08]">
+                        <tbody>
                             {currentStaffPage.map((user) => {
                                 const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
                                     user.email.split('@')[0];
@@ -162,9 +162,9 @@ export function StaffDirectoryClient({
                                 const canDelete = !isSelf && amIOwner;
 
                                 return (
-                                    <tr key={user.id} className="h-[73px] border-b border-white/[0.05] hover:bg-white/[0.02] transition-colors group">
+                                    <tr key={user.id} className="h-[73px] hover:bg-white/[0.02] transition-colors group">
                                         {/* NAME / EMAIL */}
-                                        <td className="px-[24px] whitespace-nowrap">
+                                        <td style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} className="px-[24px] whitespace-nowrap">
                                             <div className="flex items-center gap-[12px]">
                                                 {user.avatar ? (
                                                     <img src={user.avatar} alt={displayName} className="h-[40px] w-[40px] rounded-full object-cover" />
@@ -184,7 +184,7 @@ export function StaffDirectoryClient({
                                         </td>
 
                                         {/* ROLE */}
-                                        <td className="px-[24px] whitespace-nowrap">
+                                        <td style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} className="px-[24px] whitespace-nowrap">
                                             {isOwner ? (
                                                 <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)]">
                                                     <span className="text-[12px] font-semibold text-[#3B82F6] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.owner || 'Owner'}</span>
@@ -201,7 +201,7 @@ export function StaffDirectoryClient({
                                         </td>
 
                                         {/* STATUS */}
-                                        <td className="px-[24px] whitespace-nowrap">
+                                        <td style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} className="px-[24px] whitespace-nowrap">
                                             {user.status === 'active' ? (
                                                 <div className="flex items-center gap-[8px]">
                                                     <div className="w-[8px] h-[8px] rounded-full bg-[#00C950]"></div>
@@ -221,7 +221,7 @@ export function StaffDirectoryClient({
                                         </td>
 
                                         {/* ACTIONS */}
-                                        <td className="px-[24px] whitespace-nowrap relative">
+                                        <td style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }} className="px-[24px] whitespace-nowrap relative">
                                             {(!canEdit && !canDelete) ? (
                                                 <span className="text-[14px] font-normal text-[rgba(248,250,252,0.4)] leading-[1.428em] font-['Inter']">—</span>
                                             ) : (

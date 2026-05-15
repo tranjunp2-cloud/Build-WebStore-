@@ -119,6 +119,22 @@ const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operati
     return data
 }
 
+// Extract tenant IDs from user session. Numeric strings (e.g. "1") are coerced to numbers
+// so that Neon PostgreSQL strict mode can match them against integer FK columns.
+// Non-numeric strings are kept as-is for compatibility.
+function getTenantIds(user: unknown): (string | number)[] {
+    const tenants = (user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> }).tenants
+    return (tenants?.map((t) => {
+        const raw = typeof t.tenant === 'object' && t.tenant !== null ? t.tenant.id : t.tenant
+        if (typeof raw === 'number' && !Number.isNaN(raw)) return raw
+        if (typeof raw === 'string' && raw.trim() !== '') {
+            const num = Number(raw)
+            return Number.isNaN(num) ? raw : num
+        }
+        return null
+    }).filter((id): id is string | number => id !== null)) ?? []
+}
+
 export const Products: CollectionConfig = {
     slug: 'products',
     hooks: {
@@ -141,27 +157,21 @@ export const Products: CollectionConfig = {
             }
             // Authenticated: tenant-scoped read (dashboard)
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
-            ) ?? []
+            const tenantIds = getTenantIds(req.user)
             if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         update: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
-            ) ?? []
+            const tenantIds = getTenantIds(req.user)
             if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         delete: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
-                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
-            ) ?? []
+            const tenantIds = getTenantIds(req.user)
             if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },

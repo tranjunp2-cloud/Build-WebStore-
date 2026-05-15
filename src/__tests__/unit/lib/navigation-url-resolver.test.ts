@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
     buildSlugCanonicalMap,
+    resolveInternalUrlPath,
     rewriteLiveUrl,
     splitPathAndTail,
 } from '@/lib/navigation-url'
@@ -176,5 +177,29 @@ describe('[TC-F05-nav-resolver] rewriteLiveUrl', () => {
         expect(rewriteLiveUrl('/Services', emptyMap)).toBe('/services')
         expect(rewriteLiveUrl('/', emptyMap)).toBe('/')
         expect(rewriteLiveUrl('https://Google.com', emptyMap)).toBe('https://Google.com')
+    })
+})
+
+describe('[TC-F05-nav-resolver] resolveInternalUrlPath', () => {
+    const map = buildSlugCanonicalMap(samplePages)
+
+    it('TC-F05-nav-resolver-18: canonicalizes internal URLs for hidden-page comparisons', () => {
+        expect(resolveInternalUrlPath('/Services', map)).toBe('/services')
+        expect(resolveInternalUrlPath('/Services?utm=x', map)).toBe('/services')
+        expect(resolveInternalUrlPath('/Services#pricing', map)).toBe('/services')
+        expect(resolveInternalUrlPath('/Services/?utm=x#top', map)).toBe('/services')
+        expect(resolveInternalUrlPath('services', map)).toBe('/services')
+    })
+
+    it('TC-F05-nav-resolver-19: preserves homepage aliases and ignores non-internal URLs', () => {
+        expect(resolveInternalUrlPath('/Home', map)).toBe('/')
+        expect(resolveInternalUrlPath('/Index#top', map)).toBe('/')
+        expect(resolveInternalUrlPath('https://example.com/services', map)).toBeNull()
+        expect(resolveInternalUrlPath('mailto:hello@example.com', map)).toBeNull()
+        expect(resolveInternalUrlPath('#pricing', map)).toBeNull()
+    })
+
+    it('TC-F05-nav-resolver-20: unmatched internal URLs still return normalized paths for not-found warnings', () => {
+        expect(resolveInternalUrlPath('/Missing-Page?x=1', map)).toBe('/missing-page')
     })
 })

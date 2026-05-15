@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-05-07
+last_updated: 2026-05-12
 ---
 
 # Project Changelog
@@ -14,6 +14,57 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### GH-962 — Shipping Flat-Rate Configuration (F14)
+
+**Features:**
+- Flat-rate shipping by Malaysian region (West/East): sellers configure rates in new dashboard settings page, buyers see dynamic fees at checkout
+- Three public API endpoints: `GET /api/sites/:siteId/shipping-config` (fetch seller config), `PATCH /api/sites/:siteId/shipping-config` (update rates), `POST /api/orders/calculate-shipping` (compute fee + hints)
+- Free shipping threshold: sellers set amount above which shipping cost becomes zero (e.g., ≥ RM 100); checkout displays hint "Add RM X more for FREE shipping" when gap ≤ RM 50
+- Dashboard settings card: form inputs for West Malaysia rate (default RM 8), East Malaysia rate (default RM 15), free shipping threshold toggle + input
+- Live checkout calculation: state selection triggers debounced shipping fee recalc; updates order summary and total dynamically
+- Supports 16 Malaysian states + Labuan (East region boundary test TC-F14.03)
+
+**Code changes:**
+- New library: `src/lib/shipping/` — `classify-region.ts` (pure state→region fn), `calculate-fee.ts` (pure fee logic), `constants.ts` (region definitions, defaults, rates), `index.ts` (exports)
+- New API routes: `src/app/api/orders/calculate-shipping/route.ts` (public POST), `src/app/api/sites/[siteId]/shipping-config/route.ts` (public GET + authed PATCH with tenant member verification)
+- New dashboard page: `src/app/(dashboard)/settings/shipping/` with `ShippingSettingsCard` form component
+- Checkout integration: `src/app/sites/[slug]/checkout/page.tsx` — fetch config on mount, debounce state changes, display shipping fee + hint
+- Unit tests: `src/__tests__/unit/lib/shipping/calculate-fee.test.ts` (region classification, free threshold boundary, hint logic), `src/__tests__/api/orders-calculate-shipping.test.ts` (API validation, auth, edge cases)
+
+**Security fixes:**
+- `src/lib/validations/orders.ts`: state field now validates against `MY_STATES` enum — blocks invalid state codes from being used to compute incorrect shipping rates
+- `src/app/api/orders/checkout/route.ts`: added cross-tenant product guard (404 for products from other sites), variant-aware item deduplication before stock check
+
+**Bug fixes:**
+- TC-F14.13: PATCH `/api/sites/[siteId]/shipping-config` now properly validates: negative rates rejected, null freeAbove interpreted as disabled (not invalid), boundary conditions ≤RATE_MAX enforced
+- `src/app/api/orders/calculate-shipping/route.ts`: added null/array body guard returning 400 instead of 500 (fixes TC-F14.85, TC-F14.95)
+- Public response filtering: `GET /api/storefront/site-by-slug` no longer leaks `shippingConfig` object (moved to authed shipping-config endpoint)
+- `src/app/api/orders/calculate-shipping/route.ts`: integer guard for subtotalSen, removed pre-formatted hint message (now client-side), removed dead code
+- `src/lib/shipping/classify-region.ts`: delegates to `isEastState()` helper — DRY refactor
+- `src/app/(dashboard)/settings/shipping/settings-footer.tsx`: fixed left offset 292→260px
+- `src/app/(dashboard)/settings/shipping/shipping-rates-card.tsx`: derived `WEST_STATES_HIDDEN` from `WEST_MY_STATES.length`
+- `src/app/sites/[slug]/checkout/page.tsx`: imports MY_STATES from lib, i18n string updates, ShippingHint type updated, useMemo for subtotal calculation
+
+**Improvements:**
+- Removed unused `RATE_MIN` constant from `src/lib/shipping/constants.ts`
+- New i18n keys in `src/i18n/locales/en.json` + `ms.json`: `storefront.checkout.calculatingShipping`, `retryShipping`, `estimatedDeliveryEast`, `freeShippingHint`
+
+**Non-breaking:**
+- Existing `Sites.shippingConfig` schema retained; backfill migration sets `freeAbove = 10000` (RM 100) for null values in `scripts/db-setup.js`
+- Wave 6 scope: merchant self-delivery only (no carrier API calls). Tracking number manual entry deferred to Wave 7.
+
+**Tests:** 20 TC-IDs (TC-F14.01–20) covering calculation logic, region classification, free shipping thresholds, settings CRUD, validation, mobile responsive, state change recalc. All CI tests pass. Unit tests: `src/__tests__/api/orders-calculate-shipping.test.ts` (17 tests: TC-F14.23, TC-F14.50, TC-F14.85, TC-F14.95 + edge cases), `src/__tests__/unit/hooks/use-debounce.test.ts` (3 tests for 300ms debounce behavior). E2E: `e2e/f14-shipping.spec.ts` with US-F14-05 describe block (TC-PW-F14.05 state change recalc, TC-PW-F14.06 debounce batching, TC-PW-F14.09 error→retry UI, guarded by `E2E_CHECKOUT_URL` env var).
+
+**Review fixes (GH-962 follow-up):**
+- Validation: `src/lib/validations/orders.ts` — integer quantity validation, 50-item cap
+- Checkout API: `src/app/api/orders/checkout/route.ts` — product eligibility via tenant/status/deletedAt filters, fixed `p.stock` → `p.inventory` field name bug, `maxDuration = 60`
+- Calculate-shipping API: `src/app/api/orders/calculate-shipping/route.ts` — `maxDuration = 60`, siteId length bound
+- Shipping-config API: `src/app/api/sites/[siteId]/shipping-config/route.ts` — `maxDuration = 60`
+- Dashboard: `src/app/(dashboard)/settings/shipping/shipping-settings-client.tsx` — preserve `enabled` state on save
+- E2E tests: new `e2e/f14-shipping.spec.ts` covering API reachability and auth (RF-03)
+
+---
 
 ### GH-899 — Announcement Bar: CTA Link Integration & Content Configuration
 
@@ -35,6 +86,26 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ---
 
+### GH-960 — Enable Product Blocks in Editor (F05-08)
+
+**Features:**
+- 9 product/commerce blocks now enabled for drag-drop and AI generation in F05 editor: `products-grid`, `products-featured`, `cart-widget`, `menu-food`, `product-quick-view`, `pricing-table`, `menu-display`, `pricing`, `property-card`
+- `cart-widget` re-enabled (was hidden since GH-839, checkout ships in v1.1) with "Add to Cart" preview toast in editor
+- `menu-display` and `pricing-table` blocks registered in Payload Pages collection (previously absent → silently dropped on save)
+- Product blocks marked `aiVisible: true` and re-categorized from archive → commerce/store, enabling AI gen for industry-appropriate industries
+- AI system prompt updated with VARIETY RULES 8–10 for industry-specific block recommendations
+- Restaurant/food blocks (`menu-food`, `menu-display`) now appear in category recipes for hospitality industry
+
+**Related changes:**
+- Migrations: new DB fields for `menu-display` + `pricing-table` block configurations
+- Payload schema: registered 2 new blocks in `src/collections/Pages.ts`
+- AI pipeline: removed blocks from `unsupported-blocks.ts` (menu-display, property-card) and `template-composer.ts` (property-card)
+- Editor registry: removed cartWidget from `EDITOR_HIDDEN_BLOCKS`
+
+**Tests:** 5+ unit TCs covering block visibility, AI generation, and toast behavior. All CI tests pass (lint, type-check).
+
+---
+
 ### Added
 - **GH-871 Blog Auto-seed on Website Generation (F08)** — when user generates a website, 3 published blog posts are now auto-seeded per tenant using hand-curated seed data. Prevents blog-list block from appearing empty. Ships `src/lib/ai/seed-blog-posts.ts` with `seedBlogPosts()` and `wrapExcerptInLexical()` helpers, integrated into generate-site pipeline. Non-fatal operation; skips if tenant already has posts. Unit tests: `src/__tests__/unit/lib/ai/seed-blog-posts.test.ts` (5 tests, TC-F08-BS.01–05, all pass). Slug collision avoided via tenantId prefix.
 - **GH-871+ Blog Seed Thumbnails (F08)** — auto-seeded blog posts now include distinct thumbnail images using 2-tier strategy: Tier A searches Unsplash by blog category; Tier C falls back to gallery pool if search returns no results. Non-fatal per-post; posts created without thumbnail if fetch fails. Extracted shared `src/lib/ai/upload-media.ts::uploadImageUrl()` helper for reuse across product and blog seed flows (DRY refactor). Extended tests: `src/__tests__/unit/lib/ai/seed-blog-posts.test.ts` (9 tests, TC-F08-BS.01–09, all pass).
@@ -43,6 +114,7 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 - **F30 Hero Media Overlay (GH-12)** — inline hover overlay for hero blocks enabling live image/video swap without leaving the site renderer. Ships `src/lib/media/compress-image.ts` (canvas-based client compression: 1920px, 2MB cap, WebP 0.85), `src/components/site-renderer/BlockEditCallbackContext.tsx` (React context wiring `blockIndex` + `onFieldChange`), and `src/blocks/hero/hero-media-overlay.tsx` ("Change Image" + optional "Change Video" buttons, file-type validation, upload via `uploadMediaAction`, `VideoInputPopover` for URL entry, `positionClass` prop for background-image variants). Wired into 6 hero variants: split, magazine, cards-overlay, slideshow, video, split-video. QA doc `docs/qa/F30-hero-media-overlay.md` (10 TC-IDs); unit tests `src/__tests__/unit/blocks/hero-media-overlay.test.tsx` (9 tests, all pass). Branch: `fix/F05-12-image-upload-ai-gen`.
 
 ### Fix
+- **GH-935 Variant Form Clarity & Validation** — redesigned product variant tier input UX with improved labeling ("Option N (Example: ...)" replaces ambiguous "Tier N"), inline validation (required indicators, duplicate-value detection per-tier), and corrected button labels ("Generate variants" vs "Create SKU Table", "Add values" vs "Add option"). Generate button now gated when any tier lacks a name or has no values or contains duplicates, preventing malformed variant matrices. i18n updates to `en.json` and `ms.json`. Changes: `src/components/dashboard/product-form/VariantsInventorySection.tsx`, `src/components/dashboard/product-form/schema.ts`.
 - **GH-103 Attributes Dashboard UI (F08-06)** — added "Thông tin Mở rộng (Attributes)" section to product create/edit form with dynamic key/value rows (max 20, `useFieldArray`), inline validation, dark theme support, and correct load/save mapping to Payload `attributes` array. Server-side constraints: `key: maxLength 100`, `value: maxLength 500`. i18n support added (`en.json`, `ms.json`). Component: `src/components/product-form/attributes-section.tsx`.
 - **GH-737**: Heading and body font selections now apply correctly in storefront preview — `fontNameToCSSVar` reordered to put literal font name first (resolves AppShell scope limitation); added missing `body` key to Tailwind `fontFamily` config so `font-body` utility generates a CSS rule
 - **GH-12 Hero Block PRD Gap Fixes** — resolved 11 compliance gaps in `src/blocks/hero/`: fixed gradient PRM duplicate div bug (C1), added prefers-reduced-motion to split-video (C2), wired overlayOpacity in cards-overlay (C3), added split-right column reversal (I1), removed dead `height`/`overlay` config fields (I2, I3), added Framer Motion scroll parallax to magazine image (I4), optimized slideshow to render current+next only (I5), fixed minimal CTA to use RichText (I6), suppressed video autoplay on mobile (I7), replaced fullscreen py-32 with HERO_MIN_HEIGHT constant (I8)

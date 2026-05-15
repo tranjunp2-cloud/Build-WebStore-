@@ -33,8 +33,5 @@ export default async function AccountSettingsPage() {
         updatedAt: String(u.updatedAt ?? ''),
     }
 
-    const ssoBase = (process.env.NEXT_PUBLIC_SSO_BASE_URL ?? '').replace(/\/$/, '')
-    const ssoUrl = ssoBase ? `${ssoBase}/setting` : ''
-
-    return <AccountSettingsClient initialUser={initialUser} ssoUrl={ssoUrl} />
+    return <AccountSettingsClient initialUser={initialUser} />
 }

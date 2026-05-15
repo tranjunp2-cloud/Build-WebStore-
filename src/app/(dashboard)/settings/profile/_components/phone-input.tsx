@@ -10,13 +10,12 @@ const COUNTRY_CODES: CountryCode[] = [
 ]
 
 function parsePhone(value: string): { code: string; rest: string } {
-    const match = value.match(/^(\+\d{1,3})(.*)$/)
-    if (match) {
-        const found = COUNTRY_CODES.find(c => c.code === match[1])
-        if (found) return { code: found.code, rest: match[2] }
+    for (const c of COUNTRY_CODES) {
+        if (value.startsWith(c.code)) {
+            return { code: c.code, rest: value.slice(c.code.length).replace(/\D/g, '') }
+        }
     }
-    // Strip any leading + when falling back — prevents double-prefix on country code change
-    return { code: '+60', rest: value.replace(/^\+\d{1,3}/, '') }
+    return { code: '+60', rest: value.replace(/\D/g, '') }
 }
 
 type Props = {
@@ -34,7 +33,9 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
     }
 
     function handleRestChange(e: React.ChangeEvent<HTMLInputElement>) {
-        onChange(`${code}${e.target.value}`)
+        const rest = e.target.value.replace(/\D/g, '')
+        // Keep country code when user clears the number — schema allows code-only
+        onChange(rest ? `${code}${rest}` : code)
     }
 
     const inputBase = 'bg-[#0b1120] border border-[rgba(255,255,255,0.1)] rounded-[8px] h-[48px] text-[14px] text-white outline-none focus:border-blue-500/50 transition-colors shadow-[0px_1px_1px_rgba(0,0,0,0.1)]'
@@ -63,6 +64,7 @@ export function PhoneInput({ value, onChange, disabled }: Props) {
             {/* Phone number input */}
             <input
                 type="tel"
+                inputMode="numeric"
                 value={rest}
                 onChange={handleRestChange}
                 disabled={disabled}

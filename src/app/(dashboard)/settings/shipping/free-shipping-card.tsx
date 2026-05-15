@@ -1,0 +1,91 @@
+"use client"
+
+import { Gift, Info } from 'lucide-react'
+import { useI18n } from '@/i18n'
+import { cn } from '@/lib/utils'
+
+type Props = {
+    freeEnabled: boolean
+    freeAboveRm: string
+    freeAboveError?: string
+    onToggle: (v: boolean) => void
+    onAmountChange: (v: string) => void
+}
+
+export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onToggle, onAmountChange }: Props) {
+    const { t } = useI18n()
+    const s = t.dashboard.settings.shipping
+    const parsedAmount = parseFloat(freeAboveRm)
+    const showHelper = freeEnabled && freeAboveRm !== '' && !isNaN(parsedAmount)
+
+    return (
+        <div className="flex flex-col rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 overflow-hidden">
+            {/* Card header: icon + title + subtitle + toggle — separated by border-b */}
+            <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-white/[0.08]">
+                <div className="flex items-start gap-4">
+                    <div className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] bg-amber-500/10 border border-amber-500/20 shrink-0">
+                        <Gift className="h-5 w-5 text-amber-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-[18px] font-semibold text-slate-50">{s.freeTitle}</h3>
+                        <p className="mt-1 text-[13px] text-slate-50/50">{s.freeSubtitle}</p>
+                    </div>
+                </div>
+                {/* Cyan toggle */}
+                <label className="relative inline-flex cursor-pointer items-center shrink-0 mt-1">
+                    <input
+                        type="checkbox"
+                        className="peer sr-only"
+                        checked={freeEnabled}
+                        onChange={e => onToggle(e.target.checked)}
+                    />
+                    <div className={cn(
+                        "h-[28px] w-[50px] rounded-full border transition-all",
+                        "after:absolute after:left-[3px] after:top-[3px] after:h-[22px] after:w-[22px] after:rounded-full after:bg-white after:transition-all after:content-['']",
+                        "peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-cyan-500/50",
+                        "peer-checked:after:translate-x-[22px] after:shadow-sm",
+                        freeEnabled
+                            ? "bg-gradient-to-r from-cyan-500 to-teal-400 border-transparent shadow-[0_0_10px_rgba(6,182,212,0.35)]"
+                            : "bg-[#0B1120] border-white/[0.12]"
+                    )} />
+                </label>
+            </div>
+
+            {/* Input section */}
+            <div className={cn("flex flex-col gap-2 px-6 py-5 transition-opacity", !freeEnabled && "opacity-40")}>
+                <label className="text-[14px] font-semibold text-slate-200">{s.freeMinLabel}</label>
+                <div className="relative w-full">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400 select-none pointer-events-none">
+                        RM
+                    </span>
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        max="100000"
+                        inputMode="decimal"
+                        disabled={!freeEnabled}
+                        className={cn(
+                            "min-h-[44px] w-full rounded-[10px] border bg-[#0B1120]/50 pl-10 pr-3 text-[15px] text-slate-50 placeholder:text-slate-50/30 focus:outline-none focus:ring-1 disabled:cursor-not-allowed",
+                            freeAboveError
+                                ? "border-destructive focus:border-destructive focus:ring-destructive/30"
+                                : "border-white/[0.12] focus:border-cyan-500/50 focus:ring-cyan-500/30"
+                        )}
+                        placeholder="100.00"
+                        value={freeAboveRm}
+                        onChange={e => onAmountChange(e.target.value)}
+                    />
+                </div>
+                {freeAboveError && (
+                    <p className="mt-1 text-xs text-destructive">{freeAboveError}</p>
+                )}
+                {showHelper && !freeAboveError && (
+                    <p className="flex items-center gap-1.5 text-[13px] text-slate-400">
+                        <Info className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                        {s.freeHelper.replace('{amount}', parsedAmount.toFixed(2))}
+                    </p>
+                )}
+            </div>
+        </div>
+    )
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { EyeOff } from 'lucide-react'
 
 import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
@@ -14,6 +15,14 @@ import {
     CONTAINER,
     INNER_PADDING,
 } from '@/lib/design-tokens'
+
+// ── Link style helpers ────────────────────────────────────────────────────────
+function isExternal(url: string): boolean {
+    return url.startsWith('http://') || url.startsWith('https://')
+}
+
+const resolveStyle = (link: { style?: 'internal' | 'external'; url?: string }): 'internal' | 'external' =>
+    link.style ?? (isExternal(link.url ?? '') ? 'external' : 'internal')
 
 /**
  * Plan 260415 Lỗi B + 7F — SocialIcon giờ dùng shared SOCIAL_ICONS map
@@ -147,7 +156,7 @@ function FooterSectionTitle({ children, className = '' }: { children: ReactNode;
 
 type LinkColumnProps = {
     title: string
-    links: { label?: string; url?: string }[]
+    links: { label?: string; url?: string; style?: 'internal' | 'external'; _hiddenFromVisitor?: boolean }[]
     spacing?: 'tight' | 'default'
 }
 
@@ -161,16 +170,22 @@ function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
         <div>
             <FooterSectionTitle>{title}</FooterSectionTitle>
             <ul className={ulSpacing}>
-                {(links || []).map((link, j) => (
-                    <li key={`${link?.label || 'link'}-${j}`}>
-                        <a
-                            href={link?.url}
-                            className="opacity-70 hover:opacity-100 transition-all duration-200 hover:translate-x-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
-                        >
-                            <Body size="small" as="span">{link.label}</Body>
-                        </a>
-                    </li>
-                ))}
+                {(links || []).map((link, j) => {
+                    const ext = resolveStyle(link) === 'external'
+                    return (
+                        <li key={`${link?.label || 'link'}-${j}`}>
+                            <a
+                                href={link?.url}
+                                target={ext ? '_blank' : undefined}
+                                rel={ext ? 'noopener noreferrer' : undefined}
+                                className="opacity-70 hover:opacity-100 transition-all duration-200 hover:translate-x-1 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                            >
+                                <Body size="small" as="span">{link.label}</Body>
+                                {link._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
+                            </a>
+                        </li>
+                    )
+                })}
             </ul>
         </div>
     )
@@ -206,7 +221,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                     <div className="text-center">
                         <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4 flex justify-center" />
                         {tagline && (
-                            <Body size="small" className="opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
+                            <Body size="small" data-footer-field="tagline" className="opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
                         )}
 
                         {/* Link columns as horizontal lists */}
@@ -221,15 +236,21 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                                             {col.title}
                                         </Heading>
                                         <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
-                                            {(col.links || []).map((link, j) => (
-                                                <a
-                                                    key={`${link?.label || 'link'}-${j}`}
-                                                    href={link?.url}
-                                                    className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
-                                                >
-                                                    <Body size="small" as="span">{link.label}</Body>
-                                                </a>
-                                            ))}
+                                            {(col.links || []).map((link, j) => {
+                                                const ext = resolveStyle(link) === 'external'
+                                                return (
+                                                    <a
+                                                        key={`${link?.label || 'link'}-${j}`}
+                                                        href={link?.url}
+                                                        target={ext ? '_blank' : undefined}
+                                                        rel={ext ? 'noopener noreferrer' : undefined}
+                                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                                    >
+                                                        <Body size="small" as="span">{link.label}</Body>
+                                                        {(link as { _hiddenFromVisitor?: boolean })._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
+                                                    </a>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 ))}
@@ -238,7 +259,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
 
                         <SocialIconList socials={socialsArr} className="justify-center mb-8" />
 
-                        <Caption className="opacity-60">{copyrightLine}</Caption>
+                        <Caption data-footer-field="copyrightText" className="opacity-60">{copyrightLine}</Caption>
                     </div>
                 </div>
             </footer>
@@ -269,7 +290,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         <div className="lg:max-w-xs">
                             <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-3" />
                             {tagline && (
-                                <Body size="small" className="opacity-40 leading-relaxed">{tagline}</Body>
+                                <Body size="small" data-footer-field="tagline" className="opacity-40 leading-relaxed">{tagline}</Body>
                             )}
                         </div>
 
@@ -288,7 +309,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
 
                     {/* Copyright */}
                     <div className="mt-10 pt-6 text-center" style={FOOTER_DIVIDER_STYLE}>
-                        <Caption className="opacity-30">{copyrightLine}</Caption>
+                        <Caption data-footer-field="copyrightText" className="opacity-30">{copyrightLine}</Caption>
                     </div>
                 </div>
             </footer>
@@ -302,7 +323,10 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     // Mirror nav header links so minimal footer stays in sync with navigation.
     // Falls back to columns[0] if no header links configured.
     if (variant === 'minimal') {
-        const navHeaderLinks = ((site?.headerBlock as Record<string, unknown> | undefined)?.links as { label?: string; url?: string }[] | undefined)?.filter(l => l?.url)
+        // Prefer _filteredNavLinks (injected by SiteRenderer/SiteLayoutShell with hidden pages filtered/marked)
+        // over raw site.headerBlock.links to prevent hidden-page links leaking to visitors.
+        const filteredNavLinks = (block as Record<string, unknown>)._filteredNavLinks as { label?: string; url?: string; _hiddenFromVisitor?: boolean }[] | undefined
+        const navHeaderLinks = (filteredNavLinks ?? (site?.headerBlock as Record<string, unknown> | undefined)?.links as { label?: string; url?: string }[] | undefined)?.filter(l => l?.url)
         const firstColLinks = (navHeaderLinks?.length ? navHeaderLinks : columns[0]?.links) || []
 
         return (
@@ -317,20 +341,26 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         {/* First-column links — center */}
                         {firstColLinks.length > 0 && (
                             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
-                                {firstColLinks.slice(0, 6).map((link, i) => (
+                                {firstColLinks.slice(0, 6).map((link, i) => {
+                                    const ext = resolveStyle(link) === 'external'
+                                    return (
                                     <a
                                         key={`${link?.label || 'link'}-${i}`}
                                         href={link?.url}
-                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                        target={ext ? '_blank' : undefined}
+                                        rel={ext ? 'noopener noreferrer' : undefined}
+                                        className="opacity-70 hover:opacity-100 transition-opacity duration-200 inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                                     >
                                         <Body size="small" as="span">{link.label}</Body>
+                                        {(link as { _hiddenFromVisitor?: boolean })._hiddenFromVisitor && <EyeOff size={11} className="text-amber-400 shrink-0" aria-label="Hidden from visitors" />}
                                     </a>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
 
                         {/* Copyright — right */}
-                        <Caption className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
+                        <Caption data-footer-field="copyrightText" className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
                     </div>
                 </div>
             </footer>
@@ -348,7 +378,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                     {socialsArr.length > 0 && (
                         <SocialIconList socials={socialsArr} iconSize="sm" />
                     )}
-                    <Caption className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
+                    <Caption data-footer-field="copyrightText" className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
                 </div>
             </div>
         </footer>
