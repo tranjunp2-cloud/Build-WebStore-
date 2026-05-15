@@ -109,9 +109,17 @@ export async function POST(request: Request) {
         // Generate order number
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
 
-        // Tax (SST 6% for Malaysia)
+        // Shipping fee from merchant's shippingConfig (rates stored in sen, convert to RM)
+        const sc = (site as any).shippingConfig
+        const westRateRM = (sc?.westRate ?? 800) / 100
+        const eastRateRM = (sc?.eastRate ?? 1500) / 100
+        const freeAboveRM = sc?.freeAbove != null ? sc.freeAbove / 100 : null
         const EAST_MY = ['Sabah', 'Sarawak']
-        const shippingFee = EAST_MY.includes(customer.address?.state || '') ? 15 : 8
+        const isEast = EAST_MY.includes(customer.address?.state || '')
+        const baseShipping = isEast ? eastRateRM : westRateRM
+        const shippingFee = freeAboveRM !== null && subtotal >= freeAboveRM ? 0 : baseShipping
+
+        // Tax (SST 6% for Malaysia)
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + shippingFee + tax
 

@@ -62,6 +62,7 @@ export async function GET(req: Request) {
             bankName: paymentConfig?.bankName ?? null,
             bankAccountNo: paymentConfig?.bankAccountNo ?? null,
             bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
+            shippingConfig: (site as any).shippingConfig ?? null,
             theme: (site as any).theme ?? null,
         })
     } catch (error) {

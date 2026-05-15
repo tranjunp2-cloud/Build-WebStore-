@@ -9,7 +9,7 @@ import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
     ShieldCheck, ChevronRight, Rocket, MapPin, Truck,
     QrCode, UploadCloud, FileImage, Tag, Info, Lock, AlertTriangle,
-    Landmark, Copy, CheckCheck,
+    Landmark, Copy, CheckCheck, Check,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
@@ -18,6 +18,12 @@ import { type CheckoutForm, validateEmail, validatePhone } from '@/lib/storefron
 
 type GeoState = { id: number; name: string; state_code: string; zone: string }
 type GeoDistrict = { id: number; name: string }
+
+type ShippingConfig = {
+    westRate: number | null
+    eastRate: number | null
+    freeAbove: number | null
+}
 
 type InitialSiteData = {
     siteId: string
@@ -28,6 +34,7 @@ type InitialSiteData = {
     bankName: string | null
     bankAccountNo: string | null
     bankAccountHolder: string | null
+    shippingConfig: ShippingConfig | null
 }
 
 type CheckoutClientProps = {
@@ -47,9 +54,6 @@ function formatPrice(price: number, currency: string) {
 const initialForm: CheckoutForm = {
     name: '', email: '', phone: '', line1: '', line2: '', city: '', state: '', postcode: '',
 }
-const SHIPPING_EAST = 15
-const SHIPPING_WEST = 8
-const FREE_SHIPPING_THRESHOLD = 150
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
 const MAX_FILE_SIZE = 2 * 1024 * 1024
@@ -68,6 +72,13 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [bankAccountNo, setBankAccountNo] = useState(initialSiteData?.bankAccountNo ?? '')
     const [bankAccountHolder, setBankAccountHolder] = useState(initialSiteData?.bankAccountHolder ?? '')
     const [copiedField, setCopiedField] = useState<string | null>(null)
+    // Shipping rates in RM (shippingConfig stores sen; divide by 100)
+    const sc = initialSiteData?.shippingConfig
+    const [shippingWestRM, setShippingWestRM] = useState((sc?.westRate ?? 800) / 100)
+    const [shippingEastRM, setShippingEastRM] = useState((sc?.eastRate ?? 1500) / 100)
+    const [freeAboveRM, setFreeAboveRM] = useState<number | null>(
+        sc?.freeAbove != null ? sc.freeAbove / 100 : null
+    )
     const [showStripe, setShowStripe] = useState(false)
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
@@ -137,6 +148,12 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 if (data.bankName) setBankName(data.bankName)
                 if (data.bankAccountNo) setBankAccountNo(data.bankAccountNo)
                 if (data.bankAccountHolder) setBankAccountHolder(data.bankAccountHolder)
+                if (data.shippingConfig) {
+                    const s = data.shippingConfig
+                    if (s.westRate != null) setShippingWestRM(s.westRate / 100)
+                    if (s.eastRate != null) setShippingEastRM(s.eastRate / 100)
+                    setFreeAboveRM(s.freeAbove != null ? s.freeAbove / 100 : null)
+                }
                 if (data.enableStripe === true) setShowStripe(true)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
@@ -165,7 +182,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const currency = items[0]?.currency || 'MYR'
     const sub = subtotal()
     const selectedState = states.find(s => s.id === Number(selectedStateId))
-    const shippingFee = sub > 0 ? (selectedState?.zone === 'east' ? SHIPPING_EAST : SHIPPING_WEST) : 0
+    const baseShipping = sub > 0 ? (selectedState?.zone === 'east' ? shippingEastRM : shippingWestRM) : 0
+    const shippingFee = freeAboveRM !== null && sub >= freeAboveRM ? 0 : baseShipping
     const tax = Math.round(sub * 0.06 * 100) / 100
     const total = sub + shippingFee + tax
 
@@ -247,6 +265,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         setProofFile(null); setProofPreview(null); setProofError(null)
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
+
+    const contactVerified = form.name.trim().length > 0 && form.email.trim().length > 0 && !fieldErrors.email && !fieldErrors.phone
 
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
@@ -366,6 +386,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className="ck-ch">
                                 <span className="ck-num">01</span>
                                 <h2 className="ck-ct">{ck.contactInfo}</h2>
+                                {contactVerified && <span className="ck-aux ck-verified"><Check size={11} /> Verified</span>}
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.fullName}</label>
@@ -394,7 +415,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className="ck-ch">
                                 <span className="ck-num">02</span>
                                 <h2 className="ck-ct">{ck.shippingAddress}</h2>
-                                <span className="ck-aux"><Truck size={12} /> {selectedState?.zone === 'east' ? 'East Malaysia' : 'West Malaysia'}</span>
+                                <span className="ck-aux">
+                                    <Truck size={12} />
+                                    {selectedState?.zone === 'east' ? 'East Malaysia' : 'West Malaysia'}
+                                    {' · '}{shippingFee === 0 ? 'Free' : formatPrice(shippingFee, currency)}
+                                </span>
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine1}</label>
@@ -440,7 +465,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className="ck-ch">
                                 <span className="ck-num">03</span>
                                 <h2 className="ck-ct">{ck.paymentMethod}</h2>
-                                <span className="ck-aux"><ShieldCheck size={12} /> Encrypted</span>
+                                <span className="ck-aux"><Lock size={12} /> Encrypted</span>
                             </div>
                             <div className="pm-list">
                                 {showStripe && (
@@ -630,16 +655,18 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 <span className="sr-l">{ck.shipping} ({selectedState?.zone === 'east' ? 'East MY' : 'West MY'})</span>
                                 <span className={`sr-v${shippingFee === 0 ? ' free' : ''}`}>{shippingFee > 0 ? formatPrice(shippingFee, currency) : ck.free}</span>
                             </div>
-                            {sub > 0 && sub < FREE_SHIPPING_THRESHOLD && (
-                                <div className="sum-nudge">
-                                    <Truck size={12} />
-                                    <div className="sn-body">
-                                        <span>Add <strong>{formatPrice(FREE_SHIPPING_THRESHOLD - sub, currency)}</strong> more for <strong>FREE shipping</strong></span>
-                                        <div className="sn-bar">
-                                            <div className="sn-fill" style={{ width: `${Math.min((sub / FREE_SHIPPING_THRESHOLD) * 100, 100)}%` }} />
-                                        </div>
+                            {sub > 0 && freeAboveRM !== null && (
+                                <>
+                                    <div className="sum-nudge">
+                                        <Truck size={12} />
+                                        {sub < freeAboveRM
+                                            ? <span>Add <strong>{formatPrice(freeAboveRM - sub, currency)}</strong> more for <strong>FREE shipping</strong></span>
+                                            : <span><strong>FREE shipping</strong> unlocked!</span>}
                                     </div>
-                                </div>
+                                    <div className="sn-bar">
+                                        <div className="sn-fill" style={{ width: `${Math.min((sub / freeAboveRM) * 100, 100)}%` }} />
+                                    </div>
+                                </>
                             )}
 
                             <div className="sum-total">
@@ -698,6 +725,7 @@ const CK_CSS = `
 .ck-num{font-family:var(--hf);font-weight:800;font-size:22px;letter-spacing:-.01em;color:var(--tl);flex-shrink:0;width:28px;}
 .ck-ct{font-family:var(--hf);font-weight:800;font-size:17px;letter-spacing:.04em;text-transform:uppercase;color:var(--f1);margin:0;flex:1;}
 .ck-aux{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;}
+.ck-verified{color:var(--tl);}
 /* Fields */
 .ck-f{display:flex;flex-direction:column;gap:6px;min-width:0;}
 .ck-f+.ck-f{margin-top:14px;}
@@ -730,7 +758,7 @@ const CK_CSS = `
 .pm-rad{width:20px;height:20px;border-radius:999px;border:1.5px solid var(--bd);background:var(--inp);display:grid;place-items:center;transition:all .15s;flex-shrink:0;margin-top:1px;}
 .pm-rad.on{border-color:var(--tl);background:var(--tl);box-shadow:0 0 0 4px rgba(var(--accent-rgb,14,117,86),.12);}
 .pm-rad.on::after{content:"";width:7px;height:7px;border-radius:999px;background:#fff;}
-.pm-body{flex:1;min-width:0;}
+.pm-body{flex:1;min-width:0;position:relative;}
 .pm-title{font-size:14.5px;font-weight:700;color:var(--f1);margin:0;letter-spacing:-.005em;}
 .pm-desc{font-size:12.5px;color:var(--f3);margin:2px 0 0;line-height:1.5;}
 .pm-pills{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
@@ -838,14 +866,18 @@ const CK_CSS = `
 .pt-cta{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:11.5px;font-weight:600;color:var(--tl);}
 .pm-pill.amber{background:#fff4dc;border-color:#f1d693;color:#92400e;}
 /* QR / Bank mini marks (#4) */
-.pm-mini-marks{display:flex;align-items:center;gap:6px;margin-top:8px;}
-.pm-mini-mark{width:26px;height:26px;border-radius:7px;border:1px solid;display:grid;place-items:center;}
+.pm{container-type:inline-size;}
+.pm-mini-marks{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;margin-top:8px;}
+.pm-mini-mark{height:22px;min-width:26px;padding:0 6px;border-radius:5px;border:1px solid;display:inline-grid;place-items:center;overflow:hidden;}
 .mark-qr{background:var(--tl5);border-color:var(--tl2);color:var(--tl);}
 .mark-bnk{background:#f3eafd;border-color:#e1ccf7;color:#6b3dbf;}
+@container(min-width:460px){
+  .pm .pm-body{position:relative;padding-right:90px;}
+  .pm .pm-mini-marks{position:absolute;top:0;right:0;margin-top:0;}
+}
 /* Free shipping progress bar (#3) */
-.sn-body{flex:1;display:flex;flex-direction:column;gap:5px;}
-.sn-bar{height:4px;border-radius:999px;background:rgba(var(--accent-rgb,14,117,86),.15);position:relative;overflow:hidden;}
-.sn-fill{position:absolute;inset:0;width:0;background:var(--tl);border-radius:999px;transition:width .4s ease;}
+.sn-bar{height:4px;border-radius:999px;background:rgba(var(--accent-rgb,14,117,86),.15);overflow:hidden;display:block;margin:2px 0 6px;}
+.sn-fill{display:block;height:4px;background:var(--tl);border-radius:999px;transition:width .4s ease;}
 /* Bank detail rows (#2) */
 .bk-rows{list-style:none;margin:0;padding:0;background:var(--inp);border:1px solid var(--bd);border-radius:12px;overflow:hidden;}
 .bk-row{display:grid;grid-template-columns:88px 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--bd);}

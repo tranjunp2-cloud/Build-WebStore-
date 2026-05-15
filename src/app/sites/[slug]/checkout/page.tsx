@@ -7,6 +7,12 @@ import { CheckoutClient } from './CheckoutClient'
 // Force dynamic — reads request headers (custom domain) and DB at runtime
 export const dynamic = 'force-dynamic'
 
+type ShippingConfig = {
+    westRate: number | null
+    eastRate: number | null
+    freeAbove: number | null
+}
+
 type InitialSiteData = {
     siteId: string
     tenantId: string
@@ -16,6 +22,7 @@ type InitialSiteData = {
     bankName: string | null
     bankAccountNo: string | null
     bankAccountHolder: string | null
+    shippingConfig: ShippingConfig | null
 }
 
 export default async function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -55,7 +62,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
             const siteResult = await payload.find({
                 collection: 'sites',
                 where: { tenant: { equals: tenant.id } },
-                limit: 1, depth: 1, select: { id: true, paymentConfig: true, theme: true }, overrideAccess: true,
+                limit: 1, depth: 1, select: { id: true, paymentConfig: true, shippingConfig: true, theme: true }, overrideAccess: true,
             })
             const site = siteResult.docs[0]
 
@@ -93,6 +100,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                     bankName: paymentConfig?.bankName ?? null,
                     bankAccountNo: paymentConfig?.bankAccountNo ?? null,
                     bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
+                    shippingConfig: (site as any).shippingConfig ?? null,
                 }
             }
         }
