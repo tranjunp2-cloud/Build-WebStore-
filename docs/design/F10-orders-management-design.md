@@ -2,8 +2,11 @@
 
 > **Epic:** Orders Management
 > **Feature Code:** F10
+> **Version:** 2.2 (v2.2 — Manual Payment Verification per PD-018)
+> **Updated:** 2026-05-15
 > **Figma Design:** [\[Link\]](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30955-193&t=uZzasU8b0pQAt0lH-4)
 > **Figma Prototype:** [\[Link\]](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=lSTYBLQUIJcW42vr-1&preview-route=%2Forders)
+> **Decisions:** [PD-018](../decisions/decisions-log.md#pd-018--manual-payment-bank-transfer-verification-flow) · Issue [#1004](https://github.com/primeproduction/ech-prime-web-v2/issues/1004)
 
 Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng Quản lý Đơn hàng (F10), bám sát các luồng đã định nghĩa trong PRD và User Stories. Tất cả giao diện tuân thủ **F18 CMS Global Layout** (Sidebar trái và Topbar giữ nguyên).
 
@@ -39,6 +42,24 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 │              │ └──────────────────────────────────────────────┘ │
 └──────────────┴──────────────────────────────────────────┘
 ```
+
+---
+
+## 1.1. **[v2.2]** Quick Filter Chip — Awaiting Verification
+
+Bên phải Status Stats Bar, thêm distinct chip màu amber/orange (separate visually từ status filter thường):
+
+```text
+┌─ Quick Filters (v2.2) ─────────────────────┐
+│ [⏳ Awaiting Verification (4)] ← amber chip │
+│ Click → list filtered by                    │
+│         paymentStatus = pending_verification│
+└─────────────────────────────────────────────┘
+```
+
+- Position: cạnh phải Status Stats Bar, hoặc dưới một dòng nếu narrow
+- Visual: distinct background (amber/orange #F59E0B với 10% opacity) + count badge
+- State khi count = 0: hiển thị "Awaiting Verification (0)" với muted color, vẫn clickable để show empty state
 
 ---
 
@@ -82,6 +103,90 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
        │ └────────────────────────────────────────────┘ │
        └────────────────────────────────────────────────┘
 ```
+
+---
+
+## 2.1. **[v2.2]** Manual Payment Verification Block (Order Detail Drawer)
+
+Hiển thị **CHỈ KHI** `paymentMethod = bank_transfer` AND `paymentStatus = pending_verification`. Block thay thế "Thông tin Thanh toán (QR Banking)" cũ.
+
+```text
+       ┌─ ⏳ Manual Payment Verification ───────────┐
+       │                                            │
+       │ Reference Code:  BT-A3K9P2  [📋 Copy]      │ ← font mono, large
+       │ Amount Expected: RM 187.02                 │
+       │                                            │
+       │ Buyer Note (paymentReference seller-side): │
+       │ ┌──────────────────────────────────────┐   │
+       │ │ (optional textarea — seller can note │   │
+       │ │  actual amount if mismatch, etc.)    │   │
+       │ └──────────────────────────────────────┘   │
+       │                                            │
+       │ ┌─ Proof Image ──────────────────────┐     │
+       │ │                                    │     │
+       │ │     [LARGE PROOF PREVIEW]          │     │ ← ~400px tall, clickable
+       │ │      Click → Full-Screen Viewer    │     │
+       │ │                                    │     │
+       │ └────────────────────────────────────┘     │
+       │                                            │
+       │ Buyer Quick Info:                          │
+       │ 👤 Ali Baba   📞 +60 123456789  [Call/WA]  │
+       │                                            │
+       │ ┌──────────────────────────────────────┐   │
+       │ │ [✓ APPROVE]            [✗ REJECT]    │   │ ← green + red buttons
+       │ └──────────────────────────────────────┘   │
+       │     ↑ 1-click           ↑ opens modal      │
+       │                                            │
+       └────────────────────────────────────────────┘
+```
+
+**State khi `paymentStatus = paid`:** Block hiển thị success state — checkmark + `paymentVerifiedAt` + `paymentVerifiedBy` (audit trail).
+
+**State khi `paymentStatus = awaiting_payment` (sau Reject hoặc init):** Block hiển thị "Waiting for buyer to upload proof" + last rejection reason (nếu có).
+
+---
+
+## 2.2. **[v2.2]** Modal: Reject Payment
+
+Mở khi seller bấm Reject button trong Manual Payment Verification Block.
+
+```text
+       ┌─ ✗ Reject Payment Proof #P-1001 ─────────[X]┐
+       │                                              │
+       │ Buyer sẽ nhận email "Payment Rejected"      │
+       │ kèm link upload mới (TTL extends 24h).      │
+       │                                              │
+       │ Lý do từ chối (bắt buộc — single select):   │
+       │                                              │
+       │   ⦿ Ảnh mờ — không đọc được                  │
+       │   ◯ Sai số tiền                              │
+       │   ◯ Trùng đơn                                │
+       │   ◯ Khác (vui lòng ghi chi tiết)             │
+       │                                              │
+       │ Chi tiết (chỉ hiện khi chọn "Khác"):         │
+       │ ┌────────────────────────────────────────┐   │
+       │ │ (textarea — bắt buộc ≥10 chars)        │   │
+       │ └────────────────────────────────────────┘   │
+       │                                              │
+       │                  [ Quay lại ] [ Submit ]     │
+       └──────────────────────────────────────────────┘
+```
+
+- Single-select radio (D-05 — không multi)
+- Submit disabled khi: chưa chọn reason; chọn "Khác" mà freetext <10 chars
+- Sau submit: toast green "Payment rejected — buyer notified" + drawer refresh
+
+---
+
+## 2.3. **[v2.2]** Full-Screen Proof Viewer
+
+Click ảnh proof → open full-screen modal:
+- Centered image với max-height = 90vh
+- Zoom in/out controls (+/- buttons, mouse wheel)
+- Rotate 90° button
+- Download button
+- ESC để close
+- Backdrop click để close
 
 ---
 
@@ -167,3 +272,141 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 1. **Empty State:** Hiển thị Illustration dạng "xe giao hàng lủi thủi" + thông điệp: "Bạn chưa có đơn hàng nào. Hãy chia sẻ link store!".
 2. **Loading State:** Thay vì trắng màn hình, hiển thị Skeleton Loading Lines (tạo khung viền) cho danh sách đơn để giảm bounce rate.
 3. **Notification (Toast):** Gửi Toast Message xanh lá "Order #P-1001 updated successfully!" kèm tiếng PING nhẹ báo hiệu khi đơn hàng từ khách mới được đặt thành công (Real-time).
+4. **[v2.2] Verification Toast:** "Payment approved — buyer notified" (green) hoặc "Payment rejected — buyer notified with reason" (amber).
+5. **[v2.2] Awaiting Verification Empty State:** Khi filter chip click mà count = 0: hiển thị "Tất cả thanh toán đã được xác minh ✓".
+
+---
+
+## 6. **[v2.2]** Storefront — Post-Order Upload Page
+
+Buyer-facing page tại `/sites/[slug]/orders/[id]?token=<JWT>`. Magic link từ email trỏ đây.
+
+### 6.1. State: `awaiting_payment` (default)
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│             ⏳ Order Received!                          │
+│             Awaiting Payment                            │
+│                                                         │
+│  Đơn hàng #P-1001 của bạn đã được tạo.                  │
+│  Vui lòng chuyển khoản và upload bằng chứng để chúng    │
+│  tôi xác nhận đơn hàng.                                 │
+│                                                         │
+│  ⏰ Hết hạn trong: 23h 47m  (countdown live)            │
+│                                                         │
+│ ┌─ Order Summary ───────────────────────────────────┐   │
+│ │ #P-1001  •  Total: RM 187.02  •  Items: 2         │   │
+│ └───────────────────────────────────────────────────┘   │
+│                                                         │
+│ ┌─ Payment Instructions ────────────────────────────┐   │
+│ │                                                   │   │
+│ │        ┌─────────────────────┐                    │   │
+│ │        │                     │                    │   │
+│ │        │  [MERCHANT QR IMG]  │ ← DuitNow QR       │   │
+│ │        │  (200x200 px)       │   from tenant      │   │
+│ │        │                     │                    │   │
+│ │        └─────────────────────┘                    │   │
+│ │                                                   │   │
+│ │  Bank:           Maybank                          │   │
+│ │  Account No:     1234567890                       │   │
+│ │  Account Name:   CTY TNHH ABC                     │   │
+│ │                                                   │   │
+│ │  Reference Code: ┌──────────────┐ [📋 Copy]       │   │
+│ │                  │  BT-A3K9P2   │                 │   │
+│ │                  └──────────────┘                 │   │
+│ │  ⚠ Vui lòng nhập "BT-A3K9P2" vào ghi chú         │   │
+│ │     khi chuyển khoản để đối soát nhanh hơn.       │   │
+│ └───────────────────────────────────────────────────┘   │
+│                                                         │
+│ ┌─ Upload Receipt ──────────────────────────────────┐   │
+│ │                                                   │   │
+│ │   ┌──────────────────────────────────────────┐    │   │
+│ │   │   📤 Drag-drop or Click to Upload         │    │   │
+│ │   │   JPG/PNG/PDF, max 2MB                    │    │   │
+│ │   └──────────────────────────────────────────┘    │   │
+│ │                                                   │   │
+│ │   [ UPLOAD RECEIPT ] ← large CTA button          │   │
+│ └───────────────────────────────────────────────────┘   │
+│                                                         │
+│ ⚠️  Cố ý gửi bằng chứng giả mạo có thể dẫn đến việc    │
+│    hủy đơn hoặc khóa quyền mua hàng vĩnh viễn.         │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 6.2. State: `pending_verification`
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│             ⏳ Awaiting Seller Verification             │
+│                                                         │
+│  Cảm ơn! Seller sẽ xác minh thanh toán trong 1-12 giờ. │
+│  Bạn sẽ nhận email khi đơn được duyệt.                  │
+│                                                         │
+│ ┌─ Order Summary ───────────────────────────────────┐   │
+│ │ #P-1001  •  Total: RM 187.02                      │   │
+│ │ Payment proof uploaded ✓ at 14:25                 │   │
+│ └───────────────────────────────────────────────────┘   │
+│                                                         │
+│ ┌─ Uploaded Proof ──────────────────────────────────┐   │
+│ │   [thumbnail of uploaded proof]   [🔄 Replace]    │   │
+│ └───────────────────────────────────────────────────┘   │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 6.3. State: `paid` (after Approve)
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│             ✓ Payment Confirmed!                        │
+│             Order #P-1001 is confirmed                  │
+│                                                         │
+│  Cảm ơn bạn đã thanh toán. Đơn hàng đang được chuẩn bị. │
+│                                                         │
+│  [ Continue Shopping ]  [ Track Order ]                 │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 6.4. State: `cancelled` (after Reject hoặc TTL expired)
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│             ✗ Order Cancelled                           │
+│                                                         │
+│  Order #P-1001 đã bị hủy.                               │
+│                                                         │
+│  Lý do: <paymentRejectionReason or "Quá hạn thanh toán">│
+│  Chi tiết: <paymentRejectionDetail nếu có>              │
+│                                                         │
+│  [ Tạo đơn mới ]  [ Liên hệ shop ]                     │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 6.5. State: Invalid / Expired Token
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│             🔒 Link không hợp lệ hoặc đã hết hạn        │
+│                                                         │
+│  Link bạn đang dùng đã hết hạn hoặc không hợp lệ.       │
+│                                                         │
+│  [ Liên hệ shop ]  [ Tạo đơn mới ]                     │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 6.6. Mobile responsive (< 768px)
+
+- Full-width stack layout
+- QR image trung tâm, max 280x280
+- Reference Code block sticky-ish (luôn visible)
+- Upload button full-width sticky bottom (giống Sticky Bottom Bar pattern F10)
+- Fraud warning collapse-able (default expanded; dismissable)
