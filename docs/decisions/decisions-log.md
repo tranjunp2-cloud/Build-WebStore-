@@ -216,11 +216,11 @@
 
 | | |
 |---|---|
-| **Date** | 2026-05-14 |
-| **Decision** | Bank Transfer dùng **3-step async flow** với verification gate. Buyer Place Order → Awaiting Payment → upload proof qua magic link → Pending Verification → seller Approve/Reject → Paid/Cancelled. |
+| **Date** | 2026-05-14 (init) · 2026-05-15 (D-06 dropped, D-13 decided) |
+| **Decision** | Bank Transfer dùng **3-step async flow** với verification gate. Buyer Place Order → Awaiting Payment → upload proof qua magic link → Pending Verification → seller Approve/Reject → Paid/Cancelled. **Wave 8+ sẽ thêm Auto-verify Open Banking** (D-13) — schema Wave 6 dự phòng fields cho backward-compat. |
 | **Issue** | [#1004](https://github.com/primeproduction/ech-prime-web-v2/issues/1004) — `docs(F10/F19): rewrite manual payment verification rules` |
 | **Driver** | Lỗ hổng fake orders (ảnh đen/meme/hóa đơn cũ) — PRD hiện hành (F10 BR-Payment-01) auto-mark `Paid` khi upload thành công → seller ngập đơn ảo + sai tồn kho. |
-| **Status** | ✅ Decided 12/14 — PRD revision ready to draft. 2 câu defer (xem cuối). |
+| **Status** | ✅ Decided 13/14 — PRD revision ready. D-14 (Bulk Approve) defer. |
 
 ### Sub-decisions chốt với PM (2026-05-14)
 
@@ -231,26 +231,26 @@
 | **D-03** | Re-upload behavior | **Replace allowed khi đang `pending_verification`. Re-open khi seller Reject** (cho buyer "kháng cáo") | Tránh deadlock UX; cho buyer fix ảnh mờ/sai mà không phải tạo đơn mới. |
 | **D-04** | Fast-path upload-at-checkout | **Bỏ hẳn — strict 3-step async only** | KISS code path. Giảm cart abandonment. Đảm bảo order persist trước khi nhận file. |
 | **D-05** | Reject reason picker | **Enum cố định + Free text** — `Ảnh mờ`, `Sai số tiền`, `Trùng đơn`, `Khác (kèm freetext)` | Hỗ trợ analytics + UX seller cân bằng. |
-| **D-06** | Anti-fraud warning copy | **Draft:** "Cố ý gửi bằng chứng giả mạo có thể dẫn đến việc hủy đơn hoặc khóa quyền mua hàng vĩnh viễn" | BA xác nhận tính pháp lý phù hợp thị trường Malaysia trước khi ship. |
+| ~~**D-06**~~ | ~~Anti-fraud warning copy~~ | **BỎ — không hiển thị warning** (PM updated 2026-05-15) | Đơn giản hóa UX Post-Order Upload page; trust signal đến từ reference code + verification gate, không cần cảnh báo bằng chữ. FR-24 dropped khỏi F10 PRD. |
 | **D-07** | Email trigger timing | **Gửi ngay sau Place Order** với status "Order Received — Awaiting Payment" | Fire-and-forget pattern (`email-smtp.md`). Buyer cần link upload ngay. |
 | **D-08** | DuitNow Reference Code | **Auto-generate 6 chars** cho mọi Bank Transfer order | Seller đối soát nhanh trên app ngân hàng. Format chốt khi viết PRD. |
 | **D-09** | Email template scope | **Đồng nhất Bank Transfer + COD** (cùng nhận instructions tiếp theo) | UX nhất quán; COD chỉ khác phần payment instructions. |
 | **D-10** | Confirmation route | **`/sites/[slug]/orders/[id]?token=...`** | REST-style, định danh cao, gắn slug tenant rõ ràng. |
 | **D-11** | Payment Status enum (final) | Thêm `awaiting_payment` + `pending_verification` vào enum hiện tại. Code phải align với PRD (hiện code có `processing` không đúng PRD). | Cover full lifecycle. |
 | **D-12** | COD parity | **COD giữ nguyên logic — KHÔNG cần upload proof** (physical handover, không có fraud risk tương đương) | YAGNI — không over-engineer flow COD. |
+| **D-13** | Wave 8+ Auto-verify Open Banking | **CÓ — sẽ implement Wave 8+** (PM + CTO chốt 2026-05-15) | Schema Wave 6 dự phòng 3 fields: `autoVerifiedAt` (timestamp), `bankTransactionId` (text — external bank ref), `verificationSource` (enum `manual` \| `auto`). Default `manual` cho Wave 6. Wave 8+ Open Banking API match `paymentReference` → set `auto` + transaction ID. Backward-compat: manual flow vẫn hoạt động song song. |
 
 ### Pending decisions (defer)
 
 | # | Question | Status |
 |---|----------|--------|
-| **D-13** | Roadmap Wave 8+: Auto-verify via Open Banking API match reference code (3s verify)? | ⏳ Defer — schema design Wave 6 cần backward-compat nếu Wave 8 có. PM check với CTO. |
 | **D-14** | Bulk Approve cho đơn `pending_verification` (1 click duyệt N đơn)? | ⏳ Defer — UX trade-off vs fraud risk. Revisit sau khi seller dashboard ship. |
 
 ### Implementation impact
 
-- `docs/prd/F10-orders-management.md` — rewrite BR-Payment-01 + thêm BR mới (TTL, magic link, reject reason)
+- `docs/prd/F10-orders-management.md` — rewrite BR-Payment-01 + thêm BR mới (TTL, magic link, reject reason) + schema fields dự phòng cho D-13
 - `docs/prd/F19-store-configuration.md` — thêm DuitNow Reference Code spec
 - `docs/prd/F09-storefront-commerce.md` — variant Thank You page cho Bank Transfer
 - `docs/stories/F10-orders-stories.md` — US mới: seller verify; buyer post-order upload
-- Schema migration (separate issue sau khi PRD merge): enum `awaiting_payment` + `pending_verification`, fields `paymentExpiresAt`, `paymentRejectionReason`, `paymentReference` utilization
+- Schema migration (separate issue sau khi PRD merge): enum `awaiting_payment` + `pending_verification`, fields `paymentExpiresAt`, `paymentRejectionReason`, `paymentReference`, `paymentVerifiedAt`, `paymentVerifiedBy`, `magicLinkSecret`, **`autoVerifiedAt`, `bankTransactionId`, `verificationSource`** (Wave 8+ pre-build)
 

@@ -220,7 +220,6 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10-06-13** | `[Negative]` | Upload file gia mao MIME (Magic Byte) | 1. Upload `.exe` doi duoi thanh `.jpg`. | - Server detect Magic Byte mismatch.<br>- HTTP 400. | Blocker | [ ] |
 | **TC-F10-06-14** | `[State]` | Re-upload (replace) khi awaiting_payment | 1. Mo link.<br>2. Upload proof 1.<br>3. (status: pending_verification) Mo lai link.<br>4. Upload proof 2 (replace). | - File proof 2 duoc luu thay the file 1.<br>- paymentStatus van `pending_verification`. | High | [ ] |
 | **TC-F10-06-15** | `[Positive]` | Reference Code display + copy button | 1. Mo magic link state awaiting_payment. | - Reference Code `BT-XXXXXX` hien thi font mono, copy button hoat dong.<br>- Instruction "Vui long nhap BT-XXXXXX vao ghi chu" hien thi. | High | [ ] |
-| **TC-F10-06-16** | `[UI]` | Anti-fraud warning copy hien thi | 1. Mo magic link state awaiting_payment. | - Warning text "Co y gui bang chung gia mao co the dan den viec huy don hoac khoa quyen mua hang vinh vien" hien thi (FR-24). | High | [ ] |
 | **TC-F10-06-17** | `[Mobile]` | Post-Order Upload page mobile 375px | 1. Mo link tren mobile viewport 375px. | - Layout stack day du.<br>- QR centered, max 280x280.<br>- Upload button full-width sticky bottom. | High | [ ] |
 
 ### Nhom 6C — Seller Verification (Step 3) — Approve
@@ -261,6 +260,17 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **TC-F10-06-34** | `[Val]` | Reference Code khong chua 0/O/I/1 | 1. Tao 100 orders.<br>2. Kiem tra paymentReference. | - Khong ky tu `0`, `O`, `I`, `1` xuat hien trong 6 chars (anti-confusion). | High | [ ] |
 | **TC-F10-06-35** | `[Concurrency]` | Reference Code unique per tenant | 1. Tao 10,000 orders simultaneously cung tenant. | - Khong co duplicate paymentReference.<br>- DB unique constraint enforce. | Blocker | [ ] |
 | **TC-F10-06-36** | `[Positive]` | Custom prefix tu F19 | 1. F19: set paymentReferencePrefix = `ECH`.<br>2. Tao Bank Transfer order. | - paymentReference format `ECH-XXXXXX`. | Medium | [ ] |
+
+### Nhom 6G — [D-13] Wave 8+ Backward-Compat Schema Fields
+
+> Wave 6 chua implement Auto-verify Open Banking nhung schema pre-build 3 fields. TCs nay verify defaults + nullable.
+
+| TC ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Mức | Trạng Thái |
+|---|---|---|---|---|---|---|
+| **TC-F10-06-37** | `[Schema]` | `verificationSource` default = `manual` | 1. Tao Bank Transfer order moi. | - DB column `verification_source` = 'manual'. | High | [ ] |
+| **TC-F10-06-38** | `[Schema]` | `autoVerifiedAt` nullable, default NULL | 1. Tao Bank Transfer order.<br>2. Seller Approve manual. | - `auto_verified_at` van NULL.<br>- `payment_verified_at` set. | High | [ ] |
+| **TC-F10-06-39** | `[Schema]` | `bankTransactionId` nullable, default NULL | 1. Tao + verify manual Bank Transfer order. | - `bank_transaction_id` NULL ca chu ky Wave 6. | High | [ ] |
+| **TC-F10-06-40** | `[Schema]` | `verificationSource` enum constraint | 1. Try insert `verification_source = 'invalid'` qua SQL. | - DB reject voi enum constraint error. | Medium | [ ] |
 
 ---
 

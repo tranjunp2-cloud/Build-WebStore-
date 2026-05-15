@@ -90,8 +90,11 @@ COD giữ nguyên logic — không cần upload proof (physical handover).
 - WhatsApp Business API (P1 — Wave 7+)
 - Đồng bộ webhook tự động từ 3rd Party Logistics API (Phase sau)
 - Stripe Card / FPX (F13 owns — Wave 6)
-- Auto-verify Bank Transfer qua Open Banking API match reference code (Wave 8+ — pending PM/CTO decision D-13)
 - Bulk Approve cho `pending_verification` orders (defer — D-14, revisit sau seller dashboard ship)
+
+### Roadmap Wave 8+ (decided D-13 — 2026-05-15)
+
+- **Auto-verify via Open Banking API**: Match `paymentReference` với bank transaction history → auto-set `paymentStatus = paid` + `verificationSource = auto` + lưu `bankTransactionId`. Schema Wave 6 **đã pre-build** 3 fields dự phòng (`autoVerifiedAt`, `bankTransactionId`, `verificationSource`) — backward-compat zero migration sau khi Open Banking integration ship.
 
 ---
 
@@ -137,7 +140,7 @@ SO THAT tôi quản lý fulfilment hiệu quả
 | FR-13 | **[Mobile]** Chi tiết đơn hàng mở thành dạng Fullscreen thay vì Drawer, với các nút Action (Update Status, Cancel) sticky ở mép dưới màn hình. | US-F10-05 | P1 | Thumb-friendly |
 | **FR-14** | **Bank Transfer Place Order:** Buyer chọn Bank Transfer + bấm Place Order **KHÔNG cần upload proof tại checkout** → order tạo với `paymentStatus = awaiting_payment`, `paymentExpiresAt = now + 24h`, auto-generated 6-char `paymentReference` (e.g. `BT-A3K9P2`). | US-F10-02, US-F10-07 | P0 | **[v2.2 D-04 D-08 D-11]** Drop fast-path upload-at-checkout. |
 | **FR-15** | **Magic Link Email:** Sau Place Order, hệ thống gửi email confirmation kèm magic link `/sites/[slug]/orders/[id]?token=<JWT>` (signed JWT, expiry = `paymentExpiresAt`). Email content cho cả Bank Transfer + COD đồng nhất template. | US-F10-07 | P0 | **[v2.2 D-01 D-07 D-09 D-10]** Fire-and-forget pattern. |
-| **FR-16** | **Post-Order Upload Page:** Magic link mở persistent route hiển thị: order summary, QR/STK merchant, **6-char Reference Code instruction** ("Vui lòng nhập `BT-XXXXXX` vào ghi chú khi chuyển khoản"), Upload Receipt button, anti-fraud warning copy. | US-F10-07 | P0 | **[v2.2 D-01 D-06 D-08]** Route bookmark được + sharable. |
+| **FR-16** | **Post-Order Upload Page:** Magic link mở persistent route hiển thị: order summary, QR/STK merchant, **6-char Reference Code instruction** ("Vui lòng nhập `BT-XXXXXX` vào ghi chú khi chuyển khoản"), Upload Receipt button. | US-F10-07 | P0 | **[v2.2 D-01 D-08 D-10]** Route bookmark được + sharable. |
 | **FR-17** | **Upload Proof → Pending Verification:** Khi buyer upload proof thành công (file ≤2MB, JPG/PNG/PDF) → `paymentStatus = pending_verification`. **KHÔNG auto-mark Paid** (đảo BR-Payment-01 cũ). | US-F10-07 | P0 | **[v2.2 D-11]** Verification gate. |
 | **FR-18** | **Re-upload Behavior:** Buyer được phép replace proof khi `paymentStatus IN (awaiting_payment, pending_verification)`. Khi seller Reject, status quay về `awaiting_payment` → buyer có thể re-upload (kháng cáo). | US-F10-07 | P0 | **[v2.2 D-03]** Tránh deadlock UX. |
 | **FR-19** | **Seller Verify Drawer:** Order detail Bank Transfer hiển thị: large proof preview (click → full-screen modal), `paymentReference` rõ ràng để seller đối soát app bank, 2 nút **Approve** + **Reject**. | US-F10-06 | P0 | **[v2.2]** Replace Image Viewer cũ. |
@@ -145,7 +148,7 @@ SO THAT tôi quản lý fulfilment hiệu quả
 | **FR-21** | **Reject Flow:** Seller bấm Reject → modal yêu cầu chọn **reason** từ enum: `Ảnh mờ`, `Sai số tiền`, `Trùng đơn`, `Khác (kèm freetext bắt buộc ≥10 chars)`. Sau submit → `paymentRejectionReason` + `paymentRejectionDetail` lưu, status về `awaiting_payment`, gửi email "Payment Rejected — please re-upload" kèm magic link mới. | US-F10-06 | P0 | **[v2.2 D-05]** Single-select enum + Khác freetext. |
 | **FR-22** | **Stock Reservation TTL + Auto-Cancel:** Bank Transfer order **reserve stock** (KHÔNG decrement immediate). Background job quét order có `paymentStatus IN (awaiting_payment, pending_verification)` AND `paymentExpiresAt < now` → auto-cancel + restock + gửi email "Order expired". | US-F10-07 | P0 | **[v2.2 D-02]** TTL 24h. Job tần suất ≤ 15 phút. |
 | **FR-23** | **Awaiting Verification Filter Chip:** Orders Dashboard hiển thị quick-filter chip "Awaiting Verification" (count badge) bên cạnh Status Stats Bar. Click → list lọc orders có `paymentStatus = pending_verification`. | US-F10-06 | P0 | **[v2.2]** Seller daily workflow. |
-| **FR-24** | **Anti-Fraud Warning Copy:** Post-Order Upload page (FR-16) hiển thị warning text: "Cố ý gửi bằng chứng giả mạo có thể dẫn đến việc hủy đơn hoặc khóa quyền mua hàng vĩnh viễn." | US-F10-07 | P0 | **[v2.2 D-06]** BA verify legal wording trước launch. |
+| ~~**FR-24**~~ | ~~Anti-Fraud Warning Copy~~ | ~~US-F10-07~~ | ~~P0~~ | **[v2.2 D-06 DROPPED 2026-05-15]** PM chốt bỏ — trust signal đến từ reference code + verification gate. |
 
 ---
 
@@ -458,9 +461,12 @@ Order Collection (Payload CMS) cần lưu rõ các Fields:
 | `paymentProofImage` | upload → media | Already exists (v2.1). v2.2 cho phép replace khi `paymentStatus IN (awaiting_payment, pending_verification)`. |
 | `paymentRejectionReason` | enum | **[v2.2 D-05]** `null` \| `image_blurry` \| `wrong_amount` \| `duplicate_order` \| `other` |
 | `paymentRejectionDetail` | text | **[v2.2]** Freetext ≥10 chars nếu `paymentRejectionReason='other'`. |
-| `paymentVerifiedAt` | timestamp | **[v2.2]** Set khi seller Approve. |
-| `paymentVerifiedBy` | relation → users | **[v2.2]** Audit trail. |
+| `paymentVerifiedAt` | timestamp | **[v2.2]** Set khi seller Approve hoặc auto-verify match. |
+| `paymentVerifiedBy` | relation → users | **[v2.2]** Audit trail. NULL khi `verificationSource = auto`. |
 | `magicLinkSecret` | varchar | **[v2.2]** Per-order JWT signing salt. Rotated khi Reject (invalidate old link). |
+| **`verificationSource`** | enum | **[v2.2 D-13]** `manual` (default) \| `auto`. Phân biệt seller manual verify vs Open Banking auto-match. Wave 6 chỉ `manual`. |
+| **`autoVerifiedAt`** | timestamp | **[v2.2 D-13]** Pre-build cho Wave 8+. Set khi Open Banking API match reference code. NULL ở Wave 6. |
+| **`bankTransactionId`** | varchar | **[v2.2 D-13]** Pre-build cho Wave 8+. External bank transaction reference từ Open Banking API. NULL ở Wave 6. |
 | `paymentDetails` | group/json | Legacy field — thumbnail URL + transaction notes. |
 
 ### 13.3 **[v2.2]** Schema migration plan (separate issue post-PRD-merge)
@@ -468,6 +474,7 @@ Order Collection (Payload CMS) cần lưu rõ các Fields:
 - **Migration 1**: enum extension `paymentStatus` add `awaiting_payment`, `pending_verification`
 - **Migration 2**: add columns `paymentReference`, `paymentExpiresAt`, `paymentRejectionReason`, `paymentRejectionDetail`, `paymentVerifiedAt`, `paymentVerifiedBy`, `magicLinkSecret`
 - **Migration 3**: enum rename `paymentMethod` từ `qr_banking` → `bank_transfer` + data backfill
+- **Migration 4** (D-13 Wave 8+ pre-build): add columns `verificationSource` (enum default `manual`), `autoVerifiedAt`, `bankTransactionId`
 - All migrations follow `.claude/rules/database-schema.md` — `ALTER TABLE ... IF NOT EXISTS`, no `DROP TABLE`
 
 ### 13.3 API Endpoints

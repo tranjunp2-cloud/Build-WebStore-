@@ -397,7 +397,6 @@ THEN  the page shows:
   - Reference Code BT-XXXXXX with copy button
   - Instruction: "Vui lòng nhập BT-XXXXXX vào ghi chú khi chuyển khoản"
   - Upload Receipt button (large CTA)
-  - Anti-fraud warning copy (FR-24)
 ```
 
 #### AC-3: Auto-cancel on TTL expiry
@@ -440,7 +439,6 @@ THEN  paymentStatus = 'awaiting_payment' again
 - [ ] Token expiry = paymentExpiresAt per BR-Payment-05
 - [ ] Email confirmation fires immediately after Place Order per D-07 (fire-and-forget)
 - [ ] Email template unified for COD + Bank Transfer (template variant by paymentMethod) per D-09
-- [ ] Anti-fraud warning text verified by BA for Malaysia legal context (D-06 pending)
 - [ ] Mobile 375px tested
 
 ### Definition of Done

@@ -329,9 +329,6 @@ Buyer-facing page tại `/sites/[slug]/orders/[id]?token=<JWT>`. Magic link từ
 │ │   [ UPLOAD RECEIPT ] ← large CTA button          │   │
 │ └───────────────────────────────────────────────────┘   │
 │                                                         │
-│ ⚠️  Cố ý gửi bằng chứng giả mạo có thể dẫn đến việc    │
-│    hủy đơn hoặc khóa quyền mua hàng vĩnh viễn.         │
-│                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -409,4 +406,3 @@ Buyer-facing page tại `/sites/[slug]/orders/[id]?token=<JWT>`. Magic link từ
 - QR image trung tâm, max 280x280
 - Reference Code block sticky-ish (luôn visible)
 - Upload button full-width sticky bottom (giống Sticky Bottom Bar pattern F10)
-- Fraud warning collapse-able (default expanded; dismissable)
