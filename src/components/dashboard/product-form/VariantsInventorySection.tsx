@@ -266,7 +266,7 @@ export function VariantsInventorySection() {
                                         <div className="flex flex-col gap-2 w-full">
                                             <span className="text-[14px] font-medium text-[#F8FAFC] m-0">
                                                 {t.dashboard.products.form.sections?.optionNameLabel || 'Option name'}
-                                                {index === 0 && <span className="text-red-400 ml-0.5">*</span>}
+                                                {index === 0 && <span className="text-[#F8FAFC] ml-0.5">*</span>}
                                             </span>
                                             <input
                                                 {...register(`tiers.${index}.name`)}
@@ -292,7 +292,7 @@ export function VariantsInventorySection() {
                                         <div className="flex flex-col gap-2">
                                             <span className="text-[14px] font-medium text-[#F8FAFC] m-0">
                                                 {t.dashboard.products.form.sections?.valuesLabel || 'Values'}
-                                                {index === 0 && <span className="text-red-400 ml-0.5">*</span>}
+                                                {index === 0 && <span className="text-[#F8FAFC] ml-0.5">*</span>}
                                             </span>
                                             <div className="flex flex-col gap-3">
                                                 {tier.options.map((opt, oIdx) => {

@@ -12,6 +12,7 @@ describe('GH-935: Variant Tier Schema Validation (superRefine behavior)', () => 
         basePrice: 50,
         baseSku: 'SKU-123',
         baseInventory: 10,
+        urlSlug: 'test-product',
     }
 
     describe('Empty tier handling (fully empty tiers should be skipped)', () => {

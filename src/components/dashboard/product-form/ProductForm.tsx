@@ -38,7 +38,18 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 : values;
             return zodResolver(schema)(payload, context, options);
         },
-        defaultValues: initialData || {
+        defaultValues: initialData ? {
+            ...initialData,
+            // Derive slug from product name for existing products that predate the required-slug constraint
+            urlSlug: initialData.urlSlug ||
+                (initialData.name ?? '')
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                    .slice(0, 60),
+        } : {
             name: '',
             categoryIds: [],
             images: [],
@@ -141,7 +152,8 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                     tiers: t.dashboard.products.form.fields.tiers || 'Variant Options',
                     basePrice: t.dashboard.products.form.fields.basePrice || 'Price',
                     baseSku: t.dashboard.products.form.fields.baseSku || 'SKU Code',
-                    baseInventory: t.dashboard.products.form.fields.baseInventory || 'Inventory'
+                    baseInventory: t.dashboard.products.form.fields.baseInventory || 'Inventory',
+                    urlSlug: t.dashboard.products.form.sections?.urlSlug || 'URL Slug',
                 }
                 return map[key] || key
             })
