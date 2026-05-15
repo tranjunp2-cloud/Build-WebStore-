@@ -108,7 +108,7 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
         autoGenerateSeo: z.boolean().default(false),
         metaTitle: z.string().max(70, errorT.seoTitleMax || 'SEO Title should not exceed 70 characters').optional(),
         metaDescription: z.string().max(160, errorT.seoDescMax || 'SEO description should not exceed 160 characters').optional(),
-        urlSlug: z.string().trim().regex(/^[a-z0-9-]+$/, errorT.urlSlugInvalid || 'Slug must be lowercase alphanumeric with hyphens').optional(),
+        urlSlug: z.string().trim().min(1, errorT.urlSlugRequired || 'URL Slug is required').regex(/^[a-z0-9-]+$/, errorT.urlSlugInvalid || 'Slug must be lowercase alphanumeric with hyphens'),
 
         // Attributes (key/value pairs, max 20)
         attributes: z.array(z.object({

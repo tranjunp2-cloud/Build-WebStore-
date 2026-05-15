@@ -173,7 +173,7 @@ export function DescriptionSeoSection() {
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        <label className="text-[14px] font-medium text-[#F8FAFC] m-0">{t.dashboard.products.form.sections?.urlSlug || 'URL Slug'}</label>
+                        <label className="text-[14px] font-medium text-[#F8FAFC] m-0">{t.dashboard.products.form.sections?.urlSlug || 'URL Slug'} <span className="text-[#F8FAFC]">*</span></label>
                         <input
                             {...register('urlSlug')}
                             placeholder="product-url"

@@ -940,6 +940,7 @@
           "priceMax": "Harga terlalu besar",
           "stockMin": "Stok mesti 0 atau lebih",
           "stockMax": "Stok terlalu besar",
+          "urlSlugRequired": "URL Slug diperlukan",
           "urlSlugMin": "URL Slug terlalu pendek",
           "urlSlugMax": "URL Slug terlalu panjang",
           "urlSlugInvalid": "Slug mesti huruf kecil alfanumerik mengandungi sempang",

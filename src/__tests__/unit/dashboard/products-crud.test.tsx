@@ -43,6 +43,7 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         basePrice: 50,
         baseSku: 'SKU-123',
         baseInventory: 10,
+        urlSlug: 'valid-product-name',
     })
 
     it('returns errors when required fields are empty', () => {
@@ -118,6 +119,22 @@ describe('Products CRUD Form Zod Validation Logic', () => {
             expect(result.error.flatten().fieldErrors.images?.[0]).toMatch(/Maximum 5 images/)
         }
     })
+
+    it('[TC-F08-01-30] returns error when urlSlug is empty', () => {
+        const result = productFormSchema.safeParse({ ...getValidBaseData(), urlSlug: '' })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.urlSlug?.[0]).toMatch(/URL Slug is required/)
+        }
+    })
+
+    it('[TC-F08-01-31] returns error when urlSlug has invalid format', () => {
+        const result = productFormSchema.safeParse({ ...getValidBaseData(), urlSlug: 'Invalid Slug!' })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.urlSlug?.[0]).toMatch(/lowercase alphanumeric/)
+        }
+    })
 })
 
 describe('Product Price Formatting', () => {
@@ -154,6 +171,7 @@ describe('TC-F08-06: Attributes schema validation', () => {
         basePrice: 50,
         baseSku: 'SKU-123',
         baseInventory: 10,
+        urlSlug: 'valid-product-name',
     })
 
     it('TC-F08-06-01: passes when attributes is omitted (optional field)', () => {

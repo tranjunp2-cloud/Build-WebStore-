@@ -1445,6 +1445,15 @@ export default function EditorPage() {
                                     void saveWithRetry({ showToast: false, refreshPreview: false })
                                 }, 600)
                             }}
+                            onFooterInlineEdit={(changes) => {
+                                // Update store only — no iframe push so contentEditable cursor stays intact
+                                updateFooterBlock(changes)
+                                if (footerUpdateSaveTimerRef.current) clearTimeout(footerUpdateSaveTimerRef.current)
+                                footerUpdateSaveTimerRef.current = setTimeout(() => {
+                                    footerUpdateSaveTimerRef.current = null
+                                    void saveWithRetry({ showToast: false, refreshPreview: false })
+                                }, 600)
+                            }}
                             onFooterEditStop={() => {
                                 // Only save if a debounce is pending — if it already fired, the save is done
                                 const hadPending = !!footerUpdateSaveTimerRef.current
