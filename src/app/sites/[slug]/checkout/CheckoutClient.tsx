@@ -13,7 +13,7 @@ import {
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
-import { type CheckoutForm } from '@/lib/storefront'
+import { type CheckoutForm, validateEmail, validatePhone } from '@/lib/storefront'
 
 type GeoState = { id: number; name: string; state_code: string; zone: string }
 type GeoDistrict = { id: number; name: string }
@@ -80,6 +80,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const router = useRouter()
     const [isPlacing, setIsPlacing] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [fieldErrors, setFieldErrors] = useState<{ email?: string; phone?: string }>({})
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
@@ -157,8 +158,22 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const tax = Math.round(sub * 0.06 * 100) / 100
     const total = sub + shippingFee + tax
 
-    const updateField = (field: keyof CheckoutForm, value: string) =>
+    const updateField = (field: keyof CheckoutForm, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
+        if (field === 'email' || field === 'phone') {
+            setFieldErrors(prev => ({ ...prev, [field]: undefined }))
+        }
+    }
+
+    const handleEmailBlur = () => {
+        const err = validateEmail(form.email)
+        if (err) setFieldErrors(prev => ({ ...prev, email: err }))
+    }
+
+    const handlePhoneBlur = () => {
+        const err = validatePhone(form.phone)
+        if (err) setFieldErrors(prev => ({ ...prev, phone: err }))
+    }
 
     const handleStateChange = (stateId: string) => {
         setSelectedStateId(stateId)
@@ -340,11 +355,17 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className="ck-row c2">
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.emailAddress}</label>
-                                    <div className="ck-iw"><input type="email" value={form.email} onChange={e => updateField('email', e.target.value)} placeholder="ahmad@email.com" /></div>
+                                    <div className={`ck-iw${fieldErrors.email ? ' err' : ''}`}>
+                                        <input type="email" value={form.email} onChange={e => updateField('email', e.target.value)} onBlur={handleEmailBlur} placeholder="ahmad@email.com" />
+                                    </div>
+                                    {fieldErrors.email && <p className="ck-ferr">{fieldErrors.email}</p>}
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.phone} (+60)</label>
-                                    <div className="ck-iw"><input type="tel" value={form.phone} onChange={e => updateField('phone', e.target.value)} placeholder="+60 12 345 6789" /></div>
+                                    <div className={`ck-iw${fieldErrors.phone ? ' err' : ''}`}>
+                                        <input type="tel" value={form.phone} onChange={e => updateField('phone', e.target.value)} onBlur={handlePhoneBlur} placeholder="+60 12 345 6789" />
+                                    </div>
+                                    {fieldErrors.phone && <p className="ck-ferr">{fieldErrors.phone}</p>}
                                 </div>
                             </div>
                         </div>
@@ -634,6 +655,7 @@ const CK_CSS = `
 .ck-row.c2>* .ck-iw,.ck-row.c3>* .ck-iw{margin-top:auto;}
 /* Error */
 .ck-err{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;font-size:13px;color:#dc2626;display:flex;align-items:center;gap:10px;}
+.ck-ferr{font-size:11.5px;color:#dc2626;margin:3px 0 0;display:flex;align-items:center;gap:4px;font-weight:500;}
 /* Payment methods */
 .pm-list{display:flex;flex-direction:column;gap:12px;}
 .pm{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px 18px;cursor:pointer;transition:all .18s cubic-bezier(.22,1,.36,1);position:relative;}

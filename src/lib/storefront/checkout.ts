@@ -16,13 +16,31 @@ export interface CheckoutForm {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+// Matches Malaysian mobile (01X) and landline (02-09) with optional +60 prefix, separators allowed
+const MY_PHONE_REGEX = /^(\+?60[\s-]?|0)(1[0-9]|[2-9]\d?)[\s-]?\d{3,4}[\s-]?\d{4}$/
+
+/** Validates email format; returns null if valid, error string if invalid. Empty string → null (required checked separately). */
+export function validateEmail(email: string): string | null {
+    const v = email.trim()
+    if (!v) return null
+    if (!EMAIL_REGEX.test(v)) return 'Invalid email format'
+    return null
+}
+
+/** Validates Malaysian phone format; returns null if valid or empty (phone is optional). */
+export function validatePhone(phone: string): string | null {
+    const v = phone.trim()
+    if (!v) return null
+    if (!MY_PHONE_REGEX.test(v)) return 'Invalid phone number (e.g. 012-345 6789)'
+    return null
+}
+
 export function validateCheckoutForm(form: CheckoutForm): { valid: boolean; errors: string[] } {
     const errors: string[] = []
     if (!form.name.trim()) errors.push('Name is required')
     if (!form.email.trim()) errors.push('Email is required')
-    if (form.email && !EMAIL_REGEX.test(form.email)) {
-        errors.push('Invalid email format')
-    }
+    if (form.email && !EMAIL_REGEX.test(form.email)) errors.push('Invalid email format')
+    if (form.phone && !MY_PHONE_REGEX.test(form.phone.trim())) errors.push('Invalid phone format')
     return { valid: errors.length === 0, errors }
 }
 

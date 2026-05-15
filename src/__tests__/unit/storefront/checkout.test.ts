@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { formatPrice } from '@/lib/utils'
 import {
     validateCheckoutForm,
+    validateEmail,
+    validatePhone,
     calculateOrderTotals,
     generateOrderNumber,
 } from '@/lib/storefront'
@@ -268,6 +270,79 @@ describe('[TC-F09.11] Price Formatting — Malaysia RM (formatPrice)', () => {
     it('TC-F09.11: defaults to USD format for unknown currency', () => {
         // Act + Assert
         expect(formatPrice(29.90, 'USD')).toBe('$29.90')
+    })
+})
+
+// ─── TC-F09.24: Phone Format Validation ─────────────────────────────────────
+describe('[TC-F09.24] Phone Format Validation (validatePhone)', () => {
+    it('TC-F09.24: returns null for empty phone (phone is optional)', () => {
+        expect(validatePhone('')).toBeNull()
+        expect(validatePhone('   ')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts local mobile format (012-3456789)', () => {
+        expect(validatePhone('012-3456789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts local mobile without separator (0123456789)', () => {
+        expect(validatePhone('0123456789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts international format (+60 12 345 6789)', () => {
+        expect(validatePhone('+60 12 345 6789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts international without spaces (+601234567890)', () => {
+        expect(validatePhone('+6012-3456789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts 011 prefix with 8 digits (011-12345678)', () => {
+        expect(validatePhone('011-12345678')).toBeNull()
+    })
+
+    it('TC-F09.24: rejects too-short number (0123)', () => {
+        expect(validatePhone('0123')).not.toBeNull()
+    })
+
+    it('TC-F09.24: rejects non-MY format (starts with 1 directly)', () => {
+        expect(validatePhone('12345678')).not.toBeNull()
+    })
+
+    it('TC-F09.24: validateCheckoutForm includes phone format error when phone is invalid', () => {
+        const form = {
+            name: 'Ahmad', email: 'ahmad@email.com', phone: 'invalid-phone',
+            line1: '', line2: '', city: '', state: '', postcode: '',
+        }
+        const result = validateCheckoutForm(form)
+        expect(result.valid).toBe(false)
+        expect(result.errors).toContain('Invalid phone format')
+    })
+
+    it('TC-F09.24: validateCheckoutForm passes when phone is empty (optional)', () => {
+        const form = {
+            name: 'Ahmad', email: 'ahmad@email.com', phone: '',
+            line1: '', line2: '', city: '', state: '', postcode: '',
+        }
+        const { errors } = validateCheckoutForm(form)
+        expect(errors).not.toContain('Invalid phone format')
+    })
+})
+
+// ─── TC-F09.24: Email Format Validation (standalone) ────────────────────────
+describe('[TC-F09.24] Email Format Validation (validateEmail)', () => {
+    it('TC-F09.24: returns null for empty email (required handled separately)', () => {
+        expect(validateEmail('')).toBeNull()
+    })
+
+    it('TC-F09.24: returns null for valid email', () => {
+        expect(validateEmail('user@example.com')).toBeNull()
+        expect(validateEmail('user+tag@domain.co.my')).toBeNull()
+    })
+
+    it('TC-F09.24: returns error string for invalid email', () => {
+        expect(validateEmail('not-an-email')).not.toBeNull()
+        expect(validateEmail('abc@.com')).not.toBeNull()
+        expect(validateEmail('@nodomain')).not.toBeNull()
     })
 })
 
