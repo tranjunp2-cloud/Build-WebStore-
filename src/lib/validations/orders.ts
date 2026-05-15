@@ -10,9 +10,9 @@ export const stripeCheckoutSchema = z.object({
     siteId: z.union([z.string(), z.number()]),
     items: z.array(z.object({
         productId: z.union([z.string(), z.number()]),
-        quantity: z.number().int().min(1),
+        quantity: z.number().int().min(1).max(100),
         variant: z.string().optional(),
-    })).min(1),
+    })).min(1).max(MAX_CHECKOUT_ITEMS),
     customer: z.object({
         name: z.string().min(1),
         email: z.string().email(),

@@ -10,6 +10,7 @@ export type PaymentUpdates = {
     qr_image?: string | number | null;
     payment_card?: boolean;
     payment_fpx?: boolean;
+    account_holder_name?: string | null;
     bank_name?: string | null;
     account_number?: string | null;
 };
@@ -83,19 +84,33 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
             }
         }
 
+        if (updates.account_holder_name !== undefined) {
+            if (updates.account_holder_name === null) {
+                cleanUpdates.account_holder_name = null;
+            } else if (typeof updates.account_holder_name === 'string' && updates.account_holder_name.length <= 150) {
+                cleanUpdates.account_holder_name = updates.account_holder_name;
+            } else {
+                return { success: false, error: 'Invalid account_holder_name: must be string, max 150 chars.' };
+            }
+        }
+
         if (updates.bank_name !== undefined) {
-            if (updates.bank_name === null || typeof updates.bank_name === 'string') {
+            if (updates.bank_name === null) {
+                cleanUpdates.bank_name = null;
+            } else if (typeof updates.bank_name === 'string' && updates.bank_name.length <= 100) {
                 cleanUpdates.bank_name = updates.bank_name;
             } else {
-                return { success: false, error: 'Invalid type for bank_name. Expected string.' };
+                return { success: false, error: 'Invalid bank_name: must be string, max 100 chars.' };
             }
         }
 
         if (updates.account_number !== undefined) {
-            if (updates.account_number === null || typeof updates.account_number === 'string') {
+            if (updates.account_number === null) {
+                cleanUpdates.account_number = null;
+            } else if (typeof updates.account_number === 'string' && updates.account_number.length <= 50) {
                 cleanUpdates.account_number = updates.account_number;
             } else {
-                return { success: false, error: 'Invalid type for account_number. Expected string.' };
+                return { success: false, error: 'Invalid account_number: must be string, max 50 chars.' };
             }
         }
 
@@ -162,8 +177,7 @@ export async function uploadQrMedia(formData: FormData) {
     }
 }
 
-/** Update card/FPX enabled flags on the site's paymentConfig (Stripe payment methods). */
-export async function updateSitePaymentConfig(updates: { cardEnabled?: boolean; fpxEnabled?: boolean }) {
+export async function disconnectStripe() {
     try {
         const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();
@@ -172,26 +186,20 @@ export async function updateSitePaymentConfig(updates: { cardEnabled?: boolean; 
             return { success: false, error: 'Unauthorized' };
         }
 
-        const sites = await payload.find({
-            collection: 'sites',
-            where: { tenant: { equals: tenantId } },
-            limit: 1,
-        });
-
-        const site = sites.docs[0];
-        if (!site) {
-            return { success: false, error: 'Site not found' };
-        }
-
         await payload.update({
-            collection: 'sites',
-            id: site.id,
-            data: { paymentConfig: updates } as any,
+            collection: 'tenants',
+            id: tenantId,
+            data: {
+                stripeAccountId: null,
+                stripeOnboardingComplete: false,
+                payments: { payment_card: false, payment_fpx: false },
+            } as any,
         });
 
         return { success: true };
     } catch (error: unknown) {
-        console.error("Failed to update site payment config:", error);
+        console.error('Disconnect Stripe error:', error);
         return { success: false, error: 'Internal server error' };
     }
 }
+

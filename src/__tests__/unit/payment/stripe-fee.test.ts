@@ -32,8 +32,8 @@ describe('createStripeCheckoutSession — application fee calculation', () => {
         paymentMethodTypes: ['card'] as ['card'],
     }
 
-    // TC-F13.03: 3% platform fee on RM100 = 300 sen
-    it('[TC-F13.03] application fee 3% on RM100 total = 300 sen', async () => {
+    // TC-F13.04: 3% platform fee on RM100 = 300 sen
+    it('[TC-F13.04] application fee 3% on RM100 total = 300 sen', async () => {
         // Arrange — 1 item at 10000 sen = RM100
         await createStripeCheckoutSession({
             ...BASE_PARAMS,
@@ -45,8 +45,8 @@ describe('createStripeCheckoutSession — application fee calculation', () => {
         expect(args.payment_intent_data.application_fee_amount).toBe(300)
     })
 
-    // TC-F13.20: rounding — 3333 sen × 3% = 99.99 sen → rounds to 100 sen
-    it('[TC-F13.20] rounds 99.99 sen → 100 sen (RM33.33 × 3%)', async () => {
+    // TC-F13.05: rounding — 3333 sen × 3% = 99.99 sen → rounds to 100 sen
+    it('[TC-F13.05] rounds 99.99 sen → 100 sen (RM33.33 × 3%)', async () => {
         // Arrange — 3333 sen × 3% = 99.99 sen
         await createStripeCheckoutSession({
             ...BASE_PARAMS,
@@ -58,7 +58,8 @@ describe('createStripeCheckoutSession — application fee calculation', () => {
         expect(args.payment_intent_data.application_fee_amount).toBe(100)
     })
 
-    it('honors custom applicationFeePercent (5% of RM100 = 500 sen)', async () => {
+    // TC-F13.63: Fee rounding and MYR sen — multiple edge amounts are integer
+    it('[TC-F13.63] honors custom applicationFeePercent (5% of RM100 = 500 sen)', async () => {
         await createStripeCheckoutSession({
             ...BASE_PARAMS,
             items: [{ name: 'Product', price: 10000, quantity: 1 }],
@@ -99,6 +100,46 @@ describe('createStripeCheckoutSession — application fee calculation', () => {
                 paymentMethodTypes: [],
             }),
         ).rejects.toThrow(/paymentMethodTypes must contain/)
+    })
+
+    // TC-F13.92: Max order total RM 99,999.99 — JS Number safe, Stripe accepts integer
+    it('[TC-F13.92] max order RM 99,999.99 (9999999 sen) fee = 300000 sen — no overflow', async () => {
+        // Arrange — 9999999 sen = RM 99,999.99
+        await createStripeCheckoutSession({
+            ...BASE_PARAMS,
+            items: [{ name: 'Product', price: 9999999, quantity: 1 }],
+        })
+
+        // Assert — Math.round(9999999 * 0.03) = 300000
+        const args = mockCreate.mock.calls[0][0]
+        expect(args.payment_intent_data.application_fee_amount).toBe(300000)
+        expect(Number.isSafeInteger(args.payment_intent_data.application_fee_amount)).toBe(true)
+    })
+
+    // TC-F13.130: Fee precision edge — RM 0.33 (33 sen) → fee 1 sen (Math.round(0.99) = 1)
+    it('[TC-F13.130] micro-order RM 0.33 (33 sen) × 3% = 0.99 → rounds to 1 sen', async () => {
+        // Arrange
+        await createStripeCheckoutSession({
+            ...BASE_PARAMS,
+            items: [{ name: 'Product', price: 33, quantity: 1 }],
+        })
+
+        // Assert — Math.round(33 * 0.03) = Math.round(0.99) = 1
+        const args = mockCreate.mock.calls[0][0]
+        expect(args.payment_intent_data.application_fee_amount).toBe(1)
+    })
+
+    // TC-F13.131: Fee = 0 for micro-order RM 0.10 (10 sen) — platform takes nothing
+    it('[TC-F13.131] micro-order RM 0.10 (10 sen) × 3% = 0.3 → rounds to 0 sen', async () => {
+        // Arrange
+        await createStripeCheckoutSession({
+            ...BASE_PARAMS,
+            items: [{ name: 'Product', price: 10, quantity: 1 }],
+        })
+
+        // Assert — Math.round(10 * 0.03) = Math.round(0.3) = 0
+        const args = mockCreate.mock.calls[0][0]
+        expect(args.payment_intent_data.application_fee_amount).toBe(0)
     })
 
     it('fee orderId appears in payment_intent_data metadata', async () => {

@@ -3952,6 +3952,7 @@ const MIGRATIONS = [
   // ── F13: Bank Transfer bank_name + account_number for DuitNow QR section ──
   { name: 'tenants.payments_bank_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_bank_name varchar;` },
   { name: 'tenants.payments_account_number', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_number varchar;` },
+  { name: 'tenants.payments_account_holder_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_holder_name varchar;` },
 ];
 
 async function runMigrations(pool) {

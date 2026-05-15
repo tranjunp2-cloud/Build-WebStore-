@@ -27,6 +27,9 @@ export interface CheckoutParams {
     stripeAccountId: string
     /** Platform fee percentage (default: 3%) */
     applicationFeePercent?: number
+    /** Override fee in cents — when set, applicationFeePercent is ignored.
+     *  Use when items includes non-product line items (shipping, tax) to charge fee on product subtotal only. */
+    applicationFeeAmountCents?: number
     /** Stripe payment methods enabled for this checkout. MUST be non-empty.
      *  Built by backend from tenant.payment_card/fpx filtered by site.paymentConfig. */
     paymentMethodTypes: StripePaymentMethod[]

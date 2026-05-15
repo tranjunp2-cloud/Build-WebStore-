@@ -234,14 +234,14 @@ describe('normalizeStripeEvent', () => {
         expect(event.connectedAccountId).toBeUndefined()
     })
 
-    it('throws on unknown/unhandled event types', () => {
-        expect(() =>
-            normalizeStripeEvent({
-                id: 'evt_unknown',
-                type: 'some.unknown.event',
-                data: { object: { id: 'obj_123' } },
-            } as any),
-        ).toThrow('Unhandled Stripe event type: some.unknown.event')
+    it('[TC-F13.65] returns null for unknown/unhandled event types (RT-8 fix — not throw)', () => {
+        const result = normalizeStripeEvent({
+            id: 'evt_unknown',
+            type: 'some.unknown.event',
+            data: { object: { id: 'obj_123' } },
+        } as any)
+
+        expect(result).toBeNull()
     })
 })
 

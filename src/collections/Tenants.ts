@@ -256,9 +256,9 @@ export const Tenants: CollectionConfig = {
                     },
                     hooks: {
                         beforeChange: [
-                            ({ value, data }) => {
+                            ({ value, originalDoc }) => {
                                 // Block enabling if Stripe onboarding not complete (defense-in-depth)
-                                if (value && data?.stripeOnboardingComplete !== true) return false
+                                if (value && originalDoc?.stripeOnboardingComplete !== true) return false
                                 return value
                             },
                         ],
@@ -275,8 +275,8 @@ export const Tenants: CollectionConfig = {
                     },
                     hooks: {
                         beforeChange: [
-                            ({ value, data }) => {
-                                if (value && data?.stripeOnboardingComplete !== true) return false
+                            ({ value, originalDoc }) => {
+                                if (value && originalDoc?.stripeOnboardingComplete !== true) return false
                                 return value
                             },
                         ],
@@ -333,6 +333,14 @@ export const Tenants: CollectionConfig = {
                     label: 'Bank Name',
                     admin: {
                         description: 'Shown to buyers as fallback if QR fails (e.g. Maybank Berhad)',
+                    },
+                },
+                {
+                    name: 'account_holder_name',
+                    type: 'text',
+                    label: 'Account Holder Name',
+                    admin: {
+                        description: 'Must match exactly the name on the bank account (shown to buyers for transfer reference)',
                     },
                 },
                 {

@@ -16,7 +16,8 @@ describe('GET /api/storefront/site-by-slug [TC-F05-11-12]', () => {
         mockFind
             .mockResolvedValueOnce({ docs: [{ id: 42 }] })   // tenant find by slug
             .mockResolvedValueOnce({ docs: [{ id: 99, paymentConfig: { cardEnabled: true, fpxEnabled: false } }] }) // site find
-        mockFindByID.mockResolvedValueOnce({ id: 42, stripeOnboardingComplete: true }) // tenant full
+        // payments.payment_card=true enables card at tenant level; fpx not enabled
+        mockFindByID.mockResolvedValueOnce({ id: 42, stripeOnboardingComplete: true, payments: { payment_card: true, payment_fpx: false } }) // tenant full
         const req = new Request('http://localhost/api/storefront/site-by-slug?slug=mybakery')
         const res = await GET(req)
         const body = await res.json()

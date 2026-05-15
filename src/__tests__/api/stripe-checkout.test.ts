@@ -5,12 +5,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockFindByID = vi.fn()
 const mockCreate = vi.fn()
 const mockUpdate = vi.fn()
+const mockDelete = vi.fn()
 
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
         findByID: mockFindByID,
         create: mockCreate,
         update: mockUpdate,
+        delete: mockDelete,
     })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -112,6 +114,7 @@ const VALID_REQUEST_BODY = {
 describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockDelete.mockResolvedValue({})
     })
 
     // ─── TC-F13.01: FPX checkout success ─────────────────────────────
@@ -150,8 +153,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         )
     })
 
-    // ─── TC-F13.19: Currency & smallest unit (sen) ──────────────────
-    it('[TC-F13.19] converts product price RM 29.90 to 2990 sen for Stripe', async () => {
+    // ─── TC-F13.03: Currency & smallest unit (sen) ──────────────────
+    it('[TC-F13.03] converts product price RM 29.90 to 2990 sen for Stripe', async () => {
         // Arrange
         mockFindByID
             .mockResolvedValueOnce(VALID_SITE)
@@ -178,8 +181,9 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         )
     })
 
-    // ─── TC-F13.26: FPX disabled ────────────────────────────────────
-    it('[TC-F13.26] returns 422 METHOD_DISABLED when FPX is disabled', async () => {
+    // ─── Site-level layer-2 guard: FPX disabled by site config ────────
+    // (2-layer toggle: tenant.payment_fpx=true but site.paymentConfig.fpxEnabled=false)
+    it('returns 422 METHOD_DISABLED when site config disables FPX (layer-2 guard)', async () => {
         // Arrange — tenant has ONLY fpx; site disables fpx → no method left → METHOD_DISABLED
         const siteWithFpxDisabled = {
             ...VALID_SITE,
@@ -201,8 +205,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
-    // ─── TC-F13.27: Card disabled ───────────────────────────────────
-    it('[TC-F13.27] returns 422 METHOD_DISABLED when card is disabled', async () => {
+    // ─── Site-level layer-2 guard: Card disabled by site config ───────
+    it('returns 422 METHOD_DISABLED when site config disables card (layer-2 guard)', async () => {
         // Arrange — tenant has ONLY card; site disables card → no method left → METHOD_DISABLED
         const siteWithCardDisabled = {
             ...VALID_SITE,
@@ -224,8 +228,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
-    // ─── TC-F13.37: Both tenant flags off → NO_PAYMENT_METHODS ─────
-    it('[TC-F13.37] returns 422 NO_PAYMENT_METHODS when both tenant payment flags are off', async () => {
+    // ─── TC-F13.16: Both tenant flags off → NO_PAYMENT_METHODS ─────
+    it('[TC-F13.16] returns 422 NO_PAYMENT_METHODS when both tenant payment flags are off', async () => {
         // Arrange — tenant explicitly disables both card and fpx
         const tenantBothOff = { ...VALID_TENANT, payment_card: false, payment_fpx: false }
         mockFindByID
@@ -262,8 +266,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
-    // ─── TC-F13.18: Stripe onboarding incomplete ────────────────────
-    it('[TC-F13.18] returns 422 STRIPE_NOT_READY when stripeOnboardingComplete=false', async () => {
+    // ─── TC-F13.58: Stripe onboarding incomplete ────────────────────
+    it('[TC-F13.58] returns 422 STRIPE_NOT_READY when stripeOnboardingComplete=false', async () => {
         // Arrange
         const tenantIncomplete = {
             ...VALID_TENANT,
@@ -337,8 +341,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(body.error.code).toBe('STRIPE_NOT_CONNECTED')
     })
 
-    // ─── Edge: buildOrderItems returns error ──────────────────────────
-    it('returns error when buildOrderItems fails (no valid products)', async () => {
+    // ─── TC-F13.59: buildOrderItems returns error ──────────────────────
+    it('[TC-F13.59] returns error when buildOrderItems fails (no valid products)', async () => {
         // Arrange
         mockFindByID
             .mockResolvedValueOnce(VALID_SITE)
@@ -363,8 +367,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
     })
 
-    // ─── Card checkout (alternative payment method) ──────────────────
-    it('creates card checkout session with correct payment method metadata', async () => {
+    // ─── TC-F13.61: Connected account passed to Stripe request ──────────
+    it('[TC-F13.61] creates card checkout session with connected account in Stripe request', async () => {
         // Arrange
         mockFindByID
             .mockResolvedValueOnce(VALID_SITE)
@@ -396,8 +400,8 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         )
     })
 
-    // ─── Session ID persistence ─────────────────────────────────────
-    it('updates order with stripeSessionId for idempotent webhook processing', async () => {
+    // ─── TC-F13.84: Session ID persistence for idempotent webhook ──────
+    it('[TC-F13.84] updates order with stripeSessionId for idempotent webhook processing', async () => {
         // Arrange
         mockFindByID
             .mockResolvedValueOnce(VALID_SITE)
@@ -425,6 +429,63 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
                 data: expect.objectContaining({ stripeSessionId: 'cs_test_123' }),
             }),
         )
+    })
+
+    // ─── TC-F13.62: Success/cancel URLs include storefront slug ─────────
+    it('[TC-F13.62] success_url contains site slug and cancel_url has stripe_cancelled param', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ price_data: { currency: 'myr', product_data: { name: 'Widget' }, unit_amount: 5000 }, quantity: 1 }],
+            subtotal: 5000,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockResolvedValue(VALID_CHECKOUT_SESSION)
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest(VALID_REQUEST_BODY)
+        await POST(req)
+
+        // Assert — URLs must include site slug and required params
+        expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+            expect.objectContaining({
+                successUrl: expect.stringContaining('/sites/test-store/'),
+                cancelUrl: expect.stringContaining('stripe_cancelled=1'),
+            }),
+        )
+    })
+
+    // ─── TC-F13.98: Stripe API timeout → 502 STRIPE_API_ERROR ──────────
+    it('[TC-F13.98] returns 502 STRIPE_API_ERROR when Stripe API throws during session create', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Widget', quantity: 1, unitPrice: 5000 }],
+            checkoutItems: [{ price_data: { currency: 'myr', product_data: { name: 'Widget' }, unit_amount: 5000 }, quantity: 1 }],
+            subtotal: 5000,
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue(VALID_ORDER)
+        mockCreateCheckoutSession.mockRejectedValue(new Error('Stripe timeout'))
+        mockUpdate.mockResolvedValue({})
+
+        // Act
+        const req = mockRequest(VALID_REQUEST_BODY)
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert — Stripe error → 502, not 500; pending order cleaned up
+        expect(res.status).toBe(502)
+        expect(body.error.code).toBe('STRIPE_API_ERROR')
     })
 
     // ─── Error handling ──────────────────────────────────────────────

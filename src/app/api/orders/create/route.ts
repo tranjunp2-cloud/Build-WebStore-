@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { randomBytes } from 'crypto'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { orderCreateSchema } from '@/lib/validations/orders'
@@ -106,7 +107,7 @@ export const POST = withAuth(async (_user, request) => {
         }
 
         // Generate order number
-        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
+        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
 
         // Tax (SST 6% for Malaysia)
         const tax = Math.round(subtotal * 0.06 * 100) / 100
@@ -169,7 +170,25 @@ export const POST = withAuth(async (_user, request) => {
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = (tenant as any).slug || tenantId
 
-        const paymentMethodTypes = buildPaymentMethodTypes(tenant as any)
+        // Layer 1: tenant master gate
+        let types = buildPaymentMethodTypes(tenant as any)
+        if (types.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'NO_PAYMENT_METHODS', message: 'Seller has not enabled Card or FPX' } },
+                { status: 422 },
+            )
+        }
+
+        // Layer 2: site-level guard
+        const paymentConfig = (site as any).paymentConfig ?? {}
+        if (paymentConfig.cardEnabled === false) types = types.filter(t => t !== 'card')
+        if (paymentConfig.fpxEnabled === false) types = types.filter(t => t !== 'fpx')
+        if (types.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'METHOD_DISABLED', message: 'No payment method is enabled for this site' } },
+                { status: 422 },
+            )
+        }
 
         const checkout = await createStripeCheckoutSession({
             orderId: order.id as string,
@@ -179,7 +198,7 @@ export const POST = withAuth(async (_user, request) => {
             successUrl: `${baseUrl}/sites/${siteSlug}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
             cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout/cancel`,
             stripeAccountId,
-            paymentMethodTypes: paymentMethodTypes.length > 0 ? paymentMethodTypes : ['card'],
+            paymentMethodTypes: types,
             metadata: {
                 siteId: String(siteId),
                 tenantId: String(tenantId),

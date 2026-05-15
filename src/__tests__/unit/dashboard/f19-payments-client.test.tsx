@@ -19,7 +19,6 @@ vi.mock('@/app/(dashboard)/settings/payments/actions', () => ({
     getPaymentSettings: vi.fn().mockResolvedValue({ success: true, payments: { payment_cod: false, payment_qr: false, qr_image: null } }),
     updatePaymentSettings: vi.fn().mockResolvedValue({ success: true }),
     uploadQrMedia: vi.fn().mockResolvedValue({ success: true, doc: { id: 'img-123', url: 'https://example.com/qr.png' } }),
-    updateSitePaymentConfig: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 import { PaymentsFormClient } from '@/app/(dashboard)/settings/payments/PaymentsFormClient';
@@ -72,7 +71,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         fireEvent.click(qrSwitch);
 
         await waitFor(() => {
-            expect(screen.getByText('Upload QR Code Image')).toBeInTheDocument();
+            expect(screen.getByText('Click to upload QR Code')).toBeInTheDocument();
         });
     });
 
@@ -138,9 +137,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         });
 
         const qrSwitch = container.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement; // Stripe not connected → COD[0], QR[1]
-        const removeBtns = container.querySelectorAll('button');
-        
-        const removeBtn = (Array.from(removeBtns) as HTMLButtonElement[]).find(btn => btn.innerHTML.includes('lucide-x'));
+        const removeBtn = container.querySelector('button[title="Remove"]') as HTMLButtonElement | null;
         if (removeBtn) {
             fireEvent.click(removeBtn);
         }

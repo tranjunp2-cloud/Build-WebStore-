@@ -42,17 +42,18 @@ export function getStripeClient(): Stripe {
 export async function createConnectedAccount(
     email: string,
     businessName: string,
+    idempotencyKey?: string,
 ): Promise<string> {
     const stripe = getStripeClient()
 
-    const account = await stripe.accounts.create({
-        type: 'standard',
-        email,
-        country: 'MY', // Malaysia
-        business_profile: {
-            name: businessName,
-        },
-    })
+    const account = idempotencyKey
+        ? await stripe.accounts.create(
+              { type: 'standard', email, country: 'MY', business_profile: { name: businessName } },
+              { idempotencyKey },
+          )
+        : await stripe.accounts.create({
+              type: 'standard', email, country: 'MY', business_profile: { name: businessName },
+          })
 
     return account.id
 }
@@ -113,12 +114,16 @@ export async function createStripeCheckoutSession(
         throw new Error('paymentMethodTypes must contain at least one method')
     }
 
-    const feePercent = params.applicationFeePercent ?? 3
     const totalAmount = params.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
     )
-    const applicationFeeAmount = Math.round(totalAmount * (feePercent / 100))
+    // Use explicit cents override if provided, else compute from percent (default 3%).
+    // Route passes applicationFeeAmountCents=0 for US→MY cross-border (Stripe restriction).
+    const applicationFeeAmount =
+        params.applicationFeeAmountCents !== undefined
+            ? params.applicationFeeAmountCents
+            : Math.round(totalAmount * (params.applicationFeePercent ?? 3) / 100)
 
     const session = await stripe.checkout.sessions.create(
         {
@@ -177,12 +182,14 @@ export function verifyStripeWebhook(
     const stripe = getStripeClient()
 
     const secret = isConnectWebhook
-        ? process.env.STRIPE_CONNECT_WEBHOOK_SECRET
+        ? (process.env.STRIPE_CONNECT_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET)
         : process.env.STRIPE_WEBHOOK_SECRET
 
     if (!secret) {
         throw new Error(
-            `${isConnectWebhook ? 'STRIPE_CONNECT_WEBHOOK_SECRET' : 'STRIPE_WEBHOOK_SECRET'} is not set`,
+            isConnectWebhook
+                ? 'STRIPE_CONNECT_WEBHOOK_SECRET (or STRIPE_WEBHOOK_SECRET fallback) is not set'
+                : 'STRIPE_WEBHOOK_SECRET is not set',
         )
     }
 
@@ -193,10 +200,11 @@ export function verifyStripeWebhook(
 
 /**
  * Normalize a Stripe event into our unified PaymentWebhookEvent format.
+ * Returns null for event types we don't handle — caller should return 200 to prevent retries.
  */
 export function normalizeStripeEvent(
     event: Stripe.Event,
-): PaymentWebhookEvent {
+): PaymentWebhookEvent | null {
     const typeMap: Record<string, PaymentEventType> = {
         'checkout.session.completed': 'payment_success',
         'payment_intent.payment_failed': 'payment_failed',
@@ -208,7 +216,7 @@ export function normalizeStripeEvent(
     const normalizedType = typeMap[event.type]
 
     if (!normalizedType) {
-        throw new Error(`Unhandled Stripe event type: ${event.type}`)
+        return null
     }
 
     return {

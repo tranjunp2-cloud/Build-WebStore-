@@ -227,6 +227,7 @@ export const Orders: CollectionConfig = {
                 { label: 'FPX (Online Banking)', value: 'fpx' },
                 { label: 'Bank Transfer', value: 'bank' },
                 { label: 'e-Wallet', value: 'ewallet' },
+                { label: 'Free (100% discount)', value: 'free' },
             ],
         },
         {

@@ -29,11 +29,11 @@ export const POST = withAuth(async (user, request) => {
             )
         }
 
-        // Verify user owns this tenant
+        // Verify user owns this tenant (normalize to string — Payload returns integer IDs)
         const userTenantIds = ((user as any).tenants || []).map((t: any) =>
-            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+            String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
         )
-        if (!userTenantIds.includes(tenantId)) {
+        if (!userTenantIds.includes(String(tenantId))) {
             return NextResponse.json(
                 { success: false, error: { code: 'FORBIDDEN', message: 'You do not own this tenant' } },
                 { status: 403 },
@@ -57,8 +57,8 @@ export const POST = withAuth(async (user, request) => {
             // Already has account — just create a new onboarding link (for retry/refresh)
             const accountLinkUrl = await createAccountLink(
                 (tenant as any).stripeAccountId,
-                `${baseUrl}/dashboard/settings/payments?stripe=refresh`,
-                `${baseUrl}/dashboard/settings/payments?stripe=complete`,
+                `${baseUrl}/settings/payments?stripe=refresh`,
+                `${baseUrl}/settings/payments?stripe=complete`,
             )
 
             return NextResponse.json({
@@ -70,10 +70,11 @@ export const POST = withAuth(async (user, request) => {
             })
         }
 
-        // Create new connected account
+        // Create new connected account — idempotency key prevents duplicate accounts on concurrent/retried requests
         const accountId = await createConnectedAccount(
             user.email || '',
             (tenant as any).name || 'Merchant',
+            `stripe-connect-tenant-${tenantId}`,
         )
 
         // Save to tenant
@@ -89,8 +90,8 @@ export const POST = withAuth(async (user, request) => {
         // Create onboarding link
         const accountLinkUrl = await createAccountLink(
             accountId,
-            `${baseUrl}/dashboard/settings/payments?stripe=refresh`,
-            `${baseUrl}/dashboard/settings/payments?stripe=complete`,
+            `${baseUrl}/settings/payments?stripe=refresh`,
+            `${baseUrl}/settings/payments?stripe=complete`,
         )
 
         return NextResponse.json({

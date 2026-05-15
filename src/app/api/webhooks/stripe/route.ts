@@ -17,6 +17,7 @@ interface OrderDoc {
     customerName: string
     customerEmail: string
     currency: string
+    status: string
     total: number
     subtotal: number
     tax: number
@@ -62,7 +63,13 @@ export async function POST(request: NextRequest) {
     let event: PaymentWebhookEvent
     try {
         const stripeEvent = verifyStripeWebhook(rawBody, signature, isConnect)
-        event = normalizeStripeEvent(stripeEvent)
+        const normalized = normalizeStripeEvent(stripeEvent)
+        if (!normalized) {
+            // Unknown event type — not subscribed, return 200 so Stripe won't retry
+            console.log(`[Stripe Webhook] Ignoring unhandled event type: ${stripeEvent.type}`)
+            return new Response('OK', { status: 200 })
+        }
+        event = normalized
     } catch (err: any) {
         console.error('[Stripe Webhook] Signature verification failed:', err.message)
         return new Response('Webhook signature verification failed', { status: 400 })
@@ -120,18 +127,32 @@ async function handleCheckoutCompleted(
         return
     }
 
-    // Idempotency: check if order already processed (status already 'new')
+    // Idempotency: if stripeSessionId is already written to any order (regardless of status),
+    // the webhook was already processed successfully — do not re-run side-effects.
+    // Relies on the DB-level UNIQUE constraint on stripeSessionId (Orders collection).
     const existing = await payload.find({
         collection: 'orders',
         where: {
             stripeSessionId: { equals: stripeSessionId },
-            status: { equals: 'new' },
         },
         limit: 1,
     })
 
     if (existing.docs.length > 0) {
         console.log(`[Stripe Webhook] Order already processed for session ${stripeSessionId}`)
+        return
+    }
+
+    // Guard: verify the order is still pending before triggering side-effects.
+    // Combined with the stripeSessionId check above, this minimises the concurrent-delivery race window.
+    const targetOrder = await payload.findByID({ collection: 'orders', id: orderId })
+    if (!targetOrder) {
+        console.warn(`[Stripe Webhook] Order ${orderId} not found`)
+        return
+    }
+    const existingStatus = (targetOrder as any).status
+    if (existingStatus && existingStatus !== 'pending') {
+        console.log(`[Stripe Webhook] Order ${orderId} already in status '${existingStatus}' — skipping`)
         return
     }
 
@@ -257,7 +278,13 @@ async function handlePaymentFailed(
 
     const order = orders.docs[0] as unknown as OrderDoc
 
-    // Save the PaymentIntent ID for future reference
+    // Skip if order already moved past payment stage (late-arriving event, out-of-order delivery)
+    const skipStatuses = ['new', 'confirmed', 'ready_to_ship', 'shipped', 'completed', 'refunded', 'payment_failed']
+    if (skipStatuses.includes(order.status)) {
+        console.log(`[Stripe Webhook] Order ${order.id} already in ${order.status} — skipping payment_failed`)
+        return
+    }
+
     await payload.update({
         collection: 'orders',
         id: order.id,
@@ -345,10 +372,13 @@ async function handleAccountDeauthorized(
     await payload.update({
         collection: 'tenants',
         id: tenants.docs[0].id,
-        data: { stripeOnboardingComplete: false },
+        data: {
+            stripeOnboardingComplete: false,
+            payments: { payment_card: false, payment_fpx: false },
+        },
     })
 
-    console.log(`[Stripe Webhook] Tenant ${tenants.docs[0].id} deauthorized — toggles locked`)
+    console.log(`[Stripe Webhook] Tenant ${tenants.docs[0].id} deauthorized — onboarding + payment flags reset`)
 }
 
 async function handleAccountUpdated(
@@ -371,7 +401,7 @@ async function handleAccountUpdated(
     }
 
     const isOnboardingComplete =
-        account.charges_enabled && account.payouts_enabled && account.details_submitted
+        account.charges_enabled && account.details_submitted
 
     await payload.update({
         collection: 'tenants',
@@ -387,9 +417,10 @@ async function handleAccountUpdated(
 }
 
 /**
- * Decrement product inventory using optimistic locking with retry.
+ * Decrement product inventory with error-based retry.
  * Uses Payload's native API (no raw SQL) — hooks fire normally.
- * Retries up to maxRetries times if concurrent update detected.
+ * Note: read-then-write is not atomic; concurrent webhook retries may under-decrement.
+ * Retries up to maxRetries times on API/validation errors.
  */
 async function decrementStock(
     payload: any,

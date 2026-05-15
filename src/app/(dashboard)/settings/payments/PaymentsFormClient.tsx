@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
-import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, type PaymentUpdates } from './actions';
+import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, type PaymentUpdates } from './actions';
 import { useI18n } from '@/i18n';
 import { StripeConnectBlock } from './StripeConnectBlock';
 import { StripeConnectedBar } from './StripeConnectedBar';
@@ -58,6 +59,7 @@ export function PaymentsFormClient({
     initialCardEnabled?: boolean;
     initialFpxEnabled?: boolean;
 }) {
+    const router = useRouter();
     const [paymentCod, setPaymentCod] = useState(false);
     const [paymentQr, setPaymentQr] = useState(false);
     const [cardEnabled, setCardEnabled] = useState(initialCardEnabled);
@@ -66,10 +68,17 @@ export function PaymentsFormClient({
     const [qrImageId, setQrImageId] = useState<string | number | null>(null);
     const [qrPreviewUrl, setQrPreviewUrl] = useState<string | null>(null);
     const [qrFileName, setQrFileName] = useState<string | null>(null);
+    const [accountHolderName, setAccountHolderName] = useState('');
     const [bankName, setBankName] = useState('');
     const [accountNumber, setAccountNumber] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isConnecting, setIsConnecting] = useState(false);
+    // 3-state Stripe Connect: no account → pending verify → verified
+    const [isVerified, setIsVerified] = useState(stripeOnboardingComplete);
+    const [hasAccount, setHasAccount] = useState(!!stripeAccountId);
+    const [isVerifying, setIsVerifying] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const accountHolderNameSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const bankNameSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const accountNumberSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { t } = useI18n();
@@ -91,6 +100,7 @@ export function PaymentsFormClient({
                             setQrFileName((img as any).filename);
                         }
                     }
+                    if (d.account_holder_name) setAccountHolderName(d.account_holder_name as string);
                     if (d.bank_name) setBankName(d.bank_name as string);
                     if (d.account_number) setAccountNumber(d.account_number as string);
                 }
@@ -98,6 +108,79 @@ export function PaymentsFormClient({
             .catch(console.error)
             .finally(() => setIsLoading(false));
     }, [tenantId]);
+
+    // Handle ?stripe=complete or ?stripe=refresh return from Stripe onboarding (TC-F13.26, 27, 28)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        const stripeReturn = params.get('stripe');
+        if (!stripeReturn) return;
+
+        if (stripeReturn === 'complete') {
+            setHasAccount(true); // ensure Verify button is shown
+            if (isVerified) {
+                toast.success(pt.stripeReturnSuccess);
+            } else {
+                toast.info(pt.stripeReturnKycPending);
+            }
+        } else if (stripeReturn === 'refresh') {
+            setHasAccount(true);
+            toast.warning(pt.stripeReturnRefresh);
+        }
+
+        router.replace('/settings/payments');
+    }, []); // intentionally once on mount
+
+    // Initiate Stripe Connect onboarding (TC-F13.24, 25) — POST then redirect to onboardingUrl
+    const handleConnectStripe = async () => {
+        if (!tenantId || isConnecting) return;
+        setIsConnecting(true);
+        try {
+            const res = await fetch('/api/stripe/connect/onboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tenantId }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                toast.error(data.error?.message || pt.failConnectStripe);
+                return;
+            }
+            window.open(data.data.onboardingUrl, '_blank', 'noopener,noreferrer');
+        } catch {
+            toast.error(pt.failConnectStripe);
+        } finally {
+            setIsConnecting(false);
+        }
+    };
+
+    // Check Stripe account status and unlock UI if approved (TC-F13.26)
+    const handleVerifyStripe = async () => {
+        if (!tenantId || isVerifying) return;
+        setIsVerifying(true);
+        try {
+            const res = await fetch(`/api/stripe/connect/status?tenantId=${tenantId}`);
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                toast.error(pt.failVerifyStripe);
+                return;
+            }
+            if (data.data.onboardingComplete) {
+                setIsVerified(true);
+                toast.success(pt.stripeReturnSuccess);
+            } else if (!data.data.detailsSubmitted) {
+                // Onboarding incomplete — drop back to connect mode so user can resume
+                setHasAccount(false);
+                toast.warning(pt.stripeVerifyPending);
+            } else {
+                toast.warning(pt.stripeVerifyPending);
+            }
+        } catch {
+            toast.error(pt.failVerifyStripe);
+        } finally {
+            setIsVerifying(false);
+        }
+    };
 
     const saveSettings = async (updates: PaymentUpdates) => {
         try {
@@ -178,6 +261,15 @@ export function PaymentsFormClient({
         else toast.error(pt.failClearQR);
     };
 
+    const handleAccountHolderNameChange = useCallback((val: string) => {
+        setAccountHolderName(val);
+        if (accountHolderNameSaveTimer.current) clearTimeout(accountHolderNameSaveTimer.current);
+        accountHolderNameSaveTimer.current = setTimeout(async () => {
+            const res = await updatePaymentSettings({ account_holder_name: val });
+            if (!res.success) toast.error(pt.failSaveSettings);
+        }, 800);
+    }, [pt.failSaveSettings]);
+
     const handleBankNameChange = useCallback((val: string) => {
         setBankName(val);
         if (bankNameSaveTimer.current) clearTimeout(bankNameSaveTimer.current);
@@ -211,8 +303,8 @@ export function PaymentsFormClient({
                 </div>
             </div>
 
-            {/* ─── Both-OFF warning (Stripe connected but both Card+FPX disabled) ─── */}
-            {stripeOnboardingComplete && !cardEnabled && !fpxEnabled && (
+            {/* ─── Both-OFF warning (Stripe verified but both Card+FPX disabled) ─── */}
+            {isVerified && !cardEnabled && !fpxEnabled && (
                 <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-amber-500/[0.24] bg-amber-500/[0.06]">
                     <div className="w-10 h-10 rounded-[10px] bg-amber-500/[0.12] border border-amber-500/[0.22] text-amber-400 grid place-items-center shrink-0">
                         <AlertTriangle className="w-[18px] h-[18px]" />
@@ -234,13 +326,33 @@ export function PaymentsFormClient({
                     <span className="ml-auto text-[12px] text-slate-500">{pt.stripeSectionDesc}</span>
                 </div>
 
-                {stripeOnboardingComplete ? (
-                    <StripeConnectedBar accountId={stripeAccountId} />
+                {isVerified ? (
+                    <StripeConnectedBar accountId={stripeAccountId} onDisconnect={async () => {
+                        const res = await disconnectStripe();
+                        if (res.success) {
+                            setIsVerified(false);
+                            setHasAccount(false);
+                            setCardEnabled(false);
+                            setFpxEnabled(false);
+                        } else {
+                            toast.error('Failed to disconnect Stripe');
+                        }
+                    }} />
+                ) : hasAccount ? (
+                    <StripeConnectBlock
+                        mode="verify"
+                        onVerify={handleVerifyStripe}
+                        isVerifying={isVerifying}
+                    />
                 ) : (
-                    <StripeConnectBlock />
+                    <StripeConnectBlock
+                        mode="connect"
+                        onConnect={handleConnectStripe}
+                        isConnecting={isConnecting}
+                    />
                 )}
 
-                {stripeOnboardingComplete && (
+                {isVerified && (
                     <div className="space-y-[12px]">
                         <div className="anim-pay-card-d1">
                             <PaymentMethodCard
@@ -300,21 +412,26 @@ export function PaymentsFormClient({
                         icon={<Banknote className="w-5 h-5" />}
                         iconTone="amber"
                         title={pt.codTitle}
-                        desc={pt.codSubtitle}
+                        desc={pt.codDesc}
                         on={paymentCod}
                         onChange={handleToggleCod}
                         highlight={paymentCod}
+                        statusExtra={paymentCod ? (
+                            <span className="inline-flex items-center gap-[5px] text-[12px] text-slate-500">
+                                <MapPin className="w-3 h-3" />
+                                {pt.codStatusMeta}
+                            </span>
+                        ) : undefined}
                     />
 
                     <PaymentMethodCard
                         icon={<QrCode className="w-5 h-5" />}
                         iconTone="teal"
                         title={pt.bankTransferTitle}
-                        desc={pt.bankTransferSubtitle}
+                        desc={pt.bankTransferDesc}
                         on={paymentQr}
                         onChange={handleToggleQr}
                         highlight={paymentQr}
-                        statusExtra={<span className="text-teal-400 font-medium">{pt.duitnowLabel}</span>}
                     >
                         {(paymentQr || qrWidgetExpanded) && (
                             <div className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed rgba(255,255,255,0.10)' }}>
@@ -379,6 +496,35 @@ export function PaymentsFormClient({
 
                                 <input type="file" accept="image/png, image/jpeg" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
 
+                                {/* Account holder name */}
+                                <div className="flex flex-col gap-[6px] mt-[16px]">
+                                    <label className="flex items-center text-[13px] font-semibold text-slate-300">
+                                        {pt.accountHolderNameLabel}
+                                        <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">Required</span>
+                                    </label>
+                                    <div
+                                        className="flex items-center rounded-[10px] overflow-hidden transition-all"
+                                        style={{ background: '#0d1525', border: '1px solid rgba(255,255,255,0.08)' }}
+                                        onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                        onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                                    >
+                                        <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                            <User className="w-[14px] h-[14px] text-slate-400 opacity-70" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={accountHolderName}
+                                            onChange={e => handleAccountHolderNameChange(e.target.value)}
+                                            placeholder={pt.accountHolderNamePlaceholder}
+                                            className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-medium placeholder:text-slate-600 min-w-0"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
+                                        <Info className="w-[12px] h-[12px]" />
+                                        <span>{pt.accountHolderNameHelper}</span>
+                                    </div>
+                                </div>
+
                                 {/* Bank name + Account number */}
                                 <div className="grid grid-cols-2 gap-[16px] mt-[16px]">
                                     <div className="flex flex-col gap-[6px]">
@@ -436,7 +582,7 @@ export function PaymentsFormClient({
             {/* Info banner */}
             <div className="flex items-start gap-4 p-[20px_22px] rounded-[14px] border border-sky-500/[0.18] bg-sky-500/[0.06]">
                 <div className="w-9 h-9 shrink-0 flex items-center justify-center rounded-[10px] bg-sky-500/10">
-                    <CreditCard className="w-4 h-4 text-sky-400" />
+                    <Info className="w-4 h-4 text-sky-400" />
                 </div>
                 <div>
                     <h4 className="text-[14px] font-semibold text-slate-100">{pt.infoTitle}</h4>

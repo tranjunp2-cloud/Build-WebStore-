@@ -59,11 +59,12 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
             { status: 400 },
         )
     }
-    if (order.status !== 'paid') {
+    const refundableStatuses = ['new', 'paid', 'confirmed', 'ready_to_ship', 'shipped', 'completed']
+    if (!refundableStatuses.includes(order.status)) {
         return NextResponse.json(
             {
                 success: false,
-                error: { code: 'ORDER_NOT_PAID', message: 'Order must be in paid status to refund' },
+                error: { code: 'ORDER_NOT_REFUNDABLE', message: 'Order cannot be refunded in its current status' },
             },
             { status: 400 },
         )

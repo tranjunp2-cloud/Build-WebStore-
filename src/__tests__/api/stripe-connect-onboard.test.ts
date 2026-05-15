@@ -38,16 +38,16 @@ function makeRequest(body: Record<string, unknown>): Request {
     })
 }
 
-// ─── TC-F13.26, TC-F13.27: Stripe Connect Onboard API ────────────────
+// ─── TC-F13.24, TC-F13.25, TC-F13.29, TC-F13.30: Stripe Connect Onboard API ─
 
-describe('POST /api/stripe/connect/onboard [TC-F13.26..27]', () => {
+describe('POST /api/stripe/connect/onboard [TC-F13.24..30]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.stubEnv('NEXT_PUBLIC_SERVER_URL', 'https://staging.example.com')
     })
 
-    // TC-F13.26: New account creation
-    it('[TC-F13.26] creates new Stripe account when tenant has none', async () => {
+    // TC-F13.24: First Connect CTA — creates Stripe Standard account
+    it('[TC-F13.24] creates new Stripe account when tenant has none', async () => {
         // Arrange
         mockFindByID.mockResolvedValue({ id: 't1', name: 'Shop A' })
         mockCreateConnectedAccount.mockResolvedValue('acct_new')
@@ -62,7 +62,7 @@ describe('POST /api/stripe/connect/onboard [TC-F13.26..27]', () => {
         expect(json.success).toBe(true)
         expect(json.data.accountId).toBe('acct_new')
         expect(json.data.onboardingUrl).toBe('https://stripe/onboarding-url')
-        expect(mockCreateConnectedAccount).toHaveBeenCalledWith('seller@x.com', 'Shop A')
+        expect(mockCreateConnectedAccount).toHaveBeenCalledWith('seller@x.com', 'Shop A', 'stripe-connect-tenant-t1')
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'tenants',
@@ -75,8 +75,8 @@ describe('POST /api/stripe/connect/onboard [TC-F13.26..27]', () => {
         )
     })
 
-    // TC-F13.27: Retry — reuses existing stripeAccountId, skips account creation
-    it('[TC-F13.27] reuses existing stripeAccountId on retry — no duplicate account', async () => {
+    // TC-F13.25: Retry onboarding — reuses existing stripeAccountId, no duplicate account
+    it('[TC-F13.25] reuses existing stripeAccountId on retry — no duplicate account', async () => {
         // Arrange — tenant already has account
         mockFindByID.mockResolvedValue({ id: 't1', stripeAccountId: 'acct_existing' })
         mockCreateAccountLink.mockResolvedValue('https://stripe/retry-url')
@@ -92,8 +92,8 @@ describe('POST /api/stripe/connect/onboard [TC-F13.26..27]', () => {
         expect(json.data.onboardingUrl).toBe('https://stripe/retry-url')
     })
 
-    // Return URLs must target /dashboard/settings/payments (locked architecture decision)
-    it('return URLs target /dashboard/settings/payments with correct stripe param', async () => {
+    // TC-F13.29: Backend return URLs — refresh + complete targets correct path
+    it('[TC-F13.29] return URLs target /dashboard/settings/payments with correct stripe param', async () => {
         // Arrange
         mockFindByID.mockResolvedValue({ id: 't1', name: 'Shop' })
         mockCreateConnectedAccount.mockResolvedValue('acct_x')
@@ -104,11 +104,12 @@ describe('POST /api/stripe/connect/onboard [TC-F13.26..27]', () => {
 
         // Assert — createAccountLink receives correct refresh + return URLs
         const [, refreshUrl, returnUrl] = mockCreateAccountLink.mock.calls[0]
-        expect(refreshUrl).toBe('https://staging.example.com/dashboard/settings/payments?stripe=refresh')
-        expect(returnUrl).toBe('https://staging.example.com/dashboard/settings/payments?stripe=complete')
+        expect(refreshUrl).toBe('https://staging.example.com/settings/payments?stripe=refresh')
+        expect(returnUrl).toBe('https://staging.example.com/settings/payments?stripe=complete')
     })
 
-    it('returns 403 FORBIDDEN when user does not own the tenant', async () => {
+    // TC-F13.30: Tenant isolation — user from other tenant cannot onboard
+    it('[TC-F13.30] returns 403 FORBIDDEN when user does not own the tenant', async () => {
         // Arrange — user owns 't1' but requesting 'other-tenant'
         const res = await POST(makeRequest({ tenantId: 'other-tenant' }) as any, {} as any)
         const json = await res.json()

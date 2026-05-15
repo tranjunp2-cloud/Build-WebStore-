@@ -6,12 +6,14 @@ import { useI18n } from '@/i18n';
 
 interface Props {
     accountId: string | null;
+    onDisconnect?: () => void;
 }
 
-export function StripeConnectedBar({ accountId }: Props) {
+export function StripeConnectedBar({ accountId, onDisconnect }: Props) {
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const [showModal, setShowModal] = useState(false);
+    const [isDisconnecting, setIsDisconnecting] = useState(false);
 
     useEffect(() => {
         if (!showModal) return;
@@ -92,8 +94,13 @@ export function StripeConnectedBar({ accountId }: Props) {
                                 {pt.disconnectKeep}
                             </button>
                             <button
-                                onClick={() => setShowModal(false)}
-                                className="inline-flex items-center gap-2 h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110"
+                                onClick={async () => {
+                                    setIsDisconnecting(true);
+                                    onDisconnect?.();
+                                    setShowModal(false);
+                                }}
+                                disabled={isDisconnecting}
+                                className="inline-flex items-center gap-2 h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-wait"
                                 style={{ background: 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 0 0 1px rgba(239,68,68,0.45) inset, 0 6px 16px -4px rgba(239,68,68,0.45)' }}
                             >
                                 {pt.stripeDisconnect}

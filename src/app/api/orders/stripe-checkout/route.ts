@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomBytes } from 'crypto'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -38,8 +39,9 @@ export async function POST(request: NextRequest) {
 
     const parse = stripeCheckoutSchema.safeParse(rawBody)
     if (!parse.success) {
+        console.warn('[stripe-checkout] validation error:', parse.error.message)
         return NextResponse.json(
-            { success: false, error: { code: 'INVALID_BODY', message: parse.error.message } },
+            { success: false, error: { code: 'INVALID_BODY', message: 'Invalid request body' } },
             { status: 400 },
         )
     }
@@ -149,7 +151,7 @@ export async function POST(request: NextRequest) {
         const shippingFee = 10
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + shippingFee + tax
-        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
+        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
 
         // TC-F13.103: free order (coupon 100% off or zero-priced) — skip Stripe
         if (total <= 0) {
@@ -217,17 +219,27 @@ export async function POST(request: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = (tenant as any).slug || tenantId
 
+        const applicationFeeAmountCents = 0 // cross-border fee unsupported (US platform + MY connected account)
+
+        // Include shipping and tax as Stripe line items so buyer is charged the full order total
+        const allCheckoutItems = [
+            ...checkoutItems,
+            ...(shippingFee > 0 ? [{ name: 'Shipping', price: Math.round(shippingFee * 100), quantity: 1, images: [] }] : []),
+            ...(tax > 0 ? [{ name: 'SST (6%)', price: Math.round(tax * 100), quantity: 1, images: [] }] : []),
+        ]
+
         let checkout
         try {
             checkout = await createStripeCheckoutSession({
                 orderId: order.id as string,
-                items: checkoutItems,
+                items: allCheckoutItems,
                 currency: currency as 'MYR' | 'USD' | 'SGD',
                 customerEmail: customer.email,
                 successUrl: `${baseUrl}/sites/${siteSlug}/order/${order.id}/confirm?session_id={CHECKOUT_SESSION_ID}`,
                 cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout?stripe_cancelled=1`,
                 stripeAccountId,
                 paymentMethodTypes: types,
+                applicationFeeAmountCents,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },
             })
         } catch (stripeErr: any) {

@@ -118,7 +118,7 @@ describe('POST /api/orders/[id]/refund [TC-F13]', () => {
 
         // Assert
         expect(res.status).toBe(400)
-        expect(body.error.code).toBe('ORDER_NOT_PAID')
+        expect(body.error.code).toBe('ORDER_NOT_REFUNDABLE')
         expect(mockRefundsCreate).not.toHaveBeenCalled()
     })
 
