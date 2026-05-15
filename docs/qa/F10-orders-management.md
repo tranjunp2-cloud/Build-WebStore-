@@ -1,7 +1,8 @@
 # Tai Lieu Kiem Thu: F10 - Quan Ly Don Hang (Orders Management)
-> **Phien ban:** 6.0 (Comprehensive) | **Cap nhat:** 2026-04-06 | **Thuc hien:** QA Team
-> **Nguon:** PRD F10 v2.1, User Stories US-F10-01 -> US-F10-05 (13 FRs, 7 BRs, 9 ACs)
+> **Phien ban:** 7.0 (v2.2 — Manual Payment Verification) | **Cap nhat:** 2026-05-15 | **Thuc hien:** QA Team
+> **Nguon:** PRD F10 v2.2, User Stories US-F10-01 -> US-F10-07 (24 FRs, 13 BRs, 9 ACs)
 > **Ky thuat:** BVA, State Transition (State Machine), Error Guessing, Concurrency/Idempotency, UI/UX States (10-Point)
+> **Decisions:** [PD-018](../decisions/decisions-log.md#pd-018--manual-payment-bank-transfer-verification-flow) - Issue [#1004](https://github.com/primeproduction/ech-prime-web-v2/issues/1004)
 
 ---
 
@@ -193,6 +194,86 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 
 ---
 
+## 4.1. [v2.2] Manual Payment Verification — Test Cases (US-F10-06, US-F10-07)
+
+### Nhom 6A — Bank Transfer Place Order (Step 1)
+
+| TC ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Mức | Trạng Thái |
+|---|---|---|---|---|---|---|
+| **TC-F10-06-01** | `[Positive]` | Place Order Bank Transfer KHONG can upload proof | 1. Buyer chon Bank Transfer + dien form.<br>2. Bam Place Order. | - Order tao thanh cong voi paymentStatus = `awaiting_payment`.<br>- KHONG yeu cau upload tai checkout (D-04). | Blocker | [ ] |
+| **TC-F10-06-02** | `[Positive]` | Reference Code auto-generate | 1. Place Order Bank Transfer. | - paymentReference format `BT-XXXXXX` (6 chars uppercase alphanum, exclude 0/O/I/1).<br>- Unique per tenant. | High | [ ] |
+| **TC-F10-06-03** | `[Positive]` | paymentExpiresAt = createdAt + 24h | 1. Place Order luc 14:00.<br>2. Check DB. | - paymentExpiresAt = 14:00 + 24h (next day). | High | [ ] |
+| **TC-F10-06-04** | `[Positive]` | Stock reserved (NOT decremented) | 1. Place Order Bank Transfer.<br>2. Check stock cua product trong order. | - Stock count KHONG thay doi (chua decrement). | Blocker | [ ] |
+| **TC-F10-06-05** | `[Negative]` | Place Order khi tenant tat Bank Transfer | 1. F19: tenant.payment_bank_transfer = false.<br>2. Buyer load checkout page. | - Radio Bank Transfer KHONG hien thi (REQ-F19-08.2). | Blocker | [ ] |
+| **TC-F10-06-06** | `[Negative]` | Place Order khi tenant thieu bank details | 1. F19: bank_transfer ON nhung thieu account_number.<br>2. Buyer checkout. | - Backend reject create order voi error `INCOMPLETE_BANK_CONFIG`. | High | [ ] |
+
+### Nhom 6B — Magic Link & Post-Order Upload (Step 2)
+
+| TC ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Mức | Trạng Thái |
+|---|---|---|---|---|---|---|
+| **TC-F10-06-07** | `[Positive]` | Email confirmation co magic link | 1. Place Order Bank Transfer. | - Email gui trong < 60s.<br>- Link format `/sites/{slug}/orders/{id}?token={JWT}`.<br>- Link mo duoc va land tren Post-Order Upload page. | Blocker | [ ] |
+| **TC-F10-06-08** | `[Security]` | Magic link JWT signed verify | 1. Sua token (replace 1 char).<br>2. Mo link. | - Hien thi error state "Invalid link".<br>- KHONG cho phep upload. | Blocker | [ ] |
+| **TC-F10-06-09** | `[Security]` | Magic link expiry | 1. Cho order qua paymentExpiresAt + 1s.<br>2. Mo magic link. | - Hien thi "Order expired" state.<br>- KHONG cho phep upload. | Blocker | [ ] |
+| **TC-F10-06-10** | `[Security]` | Magic link CROSS-tenant access | 1. Lay token cua order tenant A.<br>2. Goi voi tenant B context. | - HTTP 403 hoac error invalid token.<br>- KHONG lo thong tin order. | Blocker | [ ] |
+| **TC-F10-06-11** | `[Positive]` | Upload proof <=2MB JPG/PNG/PDF | 1. Mo magic link.<br>2. Upload file proof 1.5MB JPG. | - Upload thanh cong.<br>- paymentStatus chuyen sang `pending_verification`.<br>- Seller nhan notification. | Blocker | [ ] |
+| **TC-F10-06-12** | `[Negative]` | Upload file > 2MB | 1. Upload file 5MB. | - Toast error "File qua lon. Max 2MB".<br>- File khong duoc luu. | High | [ ] |
+| **TC-F10-06-13** | `[Negative]` | Upload file gia mao MIME (Magic Byte) | 1. Upload `.exe` doi duoi thanh `.jpg`. | - Server detect Magic Byte mismatch.<br>- HTTP 400. | Blocker | [ ] |
+| **TC-F10-06-14** | `[State]` | Re-upload (replace) khi awaiting_payment | 1. Mo link.<br>2. Upload proof 1.<br>3. (status: pending_verification) Mo lai link.<br>4. Upload proof 2 (replace). | - File proof 2 duoc luu thay the file 1.<br>- paymentStatus van `pending_verification`. | High | [ ] |
+| **TC-F10-06-15** | `[Positive]` | Reference Code display + copy button | 1. Mo magic link state awaiting_payment. | - Reference Code `BT-XXXXXX` hien thi font mono, copy button hoat dong.<br>- Instruction "Vui long nhap BT-XXXXXX vao ghi chu" hien thi. | High | [ ] |
+| **TC-F10-06-17** | `[Mobile]` | Post-Order Upload page mobile 375px | 1. Mo link tren mobile viewport 375px. | - Layout stack day du.<br>- QR centered, max 280x280.<br>- Upload button full-width sticky bottom. | High | [ ] |
+
+### Nhom 6C — Seller Verification (Step 3) — Approve
+
+| TC ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Mức | Trạng Thái |
+|---|---|---|---|---|---|---|
+| **TC-F10-06-18** | `[Positive]` | Approve happy path | 1. Mo order pending_verification.<br>2. Bam Approve. | - paymentStatus = `paid`.<br>- paymentVerifiedAt set = now.<br>- paymentVerifiedBy set = currentUserId.<br>- orderStatus auto-promote `pending` -> `confirmed`.<br>- Stock decrement (commit). | Blocker | [ ] |
+| **TC-F10-06-19** | `[Positive]` | Email buyer "Payment Confirmed" sau Approve | 1. Approve don. | - Buyer nhan email `Payment Confirmed - Order #XXX`. | High | [ ] |
+| **TC-F10-06-20** | `[Negative]` | Khong cho Approve khi paymentStatus != pending_verification | 1. Mo order `awaiting_payment`.<br>2. Goi API Approve. | - HTTP 400 `INVALID_STATE_TRANSITION`. | Blocker | [ ] |
+| **TC-F10-06-21** | `[UI]` | Awaiting Verification filter chip | 1. Tao 3 don pending_verification.<br>2. Vao /orders. | - Chip "Awaiting Verification (3)" mau amber hien thi.<br>- Click -> list loc dung. | High | [ ] |
+| **TC-F10-06-22** | `[UI]` | Audit trail visible | 1. Mo don da `paid` qua manual verify. | - Drawer hien thi paymentVerifiedAt + paymentVerifiedBy. | High | [ ] |
+
+### Nhom 6D — Seller Verification — Reject
+
+| TC ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Mức | Trạng Thái |
+|---|---|---|---|---|---|---|
+| **TC-F10-06-23** | `[Positive]` | Reject voi reason enum (Anh mo) | 1. Mo order pending_verification.<br>2. Bam Reject -> chon "Anh mo" -> Submit. | - paymentRejectionReason = `image_blurry`.<br>- paymentRejectionDetail = null.<br>- paymentStatus revert `awaiting_payment`.<br>- paymentExpiresAt extends + 24h.<br>- magicLinkSecret rotated (old link invalidated).<br>- Email buyer "Payment Rejected: Anh mo" voi link moi. | Blocker | [ ] |
+| **TC-F10-06-24** | `[Positive]` | Reject voi reason "Khac" + freetext | 1. Reject -> chon "Khac" -> nhap 15 chars detail -> Submit. | - paymentRejectionReason = `other`.<br>- paymentRejectionDetail saved. | High | [ ] |
+| **TC-F10-06-25** | `[Negative]` | Khac freetext < 10 chars bi chan | 1. Reject -> chon "Khac" -> nhap 5 chars -> bam Submit. | - Submit button disabled hoac error "Detail phai >=10 chars". | High | [ ] |
+| **TC-F10-06-26** | `[Negative]` | Reject KHONG chon reason | 1. Mo modal Reject -> KHONG chon gi -> bam Submit. | - Submit disabled. | High | [ ] |
+| **TC-F10-06-27** | `[Security]` | Old magic link invalidated sau Reject | 1. Save magic link cu.<br>2. Reject don.<br>3. Mo link cu. | - Link cu hien thi "Invalid link".<br>- Buyer phai dung link moi tu email Rejection. | Blocker | [ ] |
+| **TC-F10-06-28** | `[State]` | Buyer re-upload sau Reject (khang cao) | 1. Reject don.<br>2. Buyer mo email moi -> link moi.<br>3. Upload proof khac. | - paymentStatus = `pending_verification`.<br>- Seller thay proof moi + history rejection.<br>- Cycle Approve/Reject lap lai duoc. | High | [ ] |
+
+### Nhom 6E — TTL Auto-Cancel (Background Job)
+
+| TC ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Mức | Trạng Thái |
+|---|---|---|---|---|---|---|
+| **TC-F10-06-29** | `[Positive]` | Auto-cancel order awaiting_payment qua han | 1. Tao order awaiting_payment.<br>2. Set paymentExpiresAt < now (manual DB).<br>3. Cho job chay (<= 15 phut). | - orderStatus = `cancelled`.<br>- paymentStatus = `cancelled`.<br>- Stock restock.<br>- Email "Order Expired" gui buyer. | Blocker | [ ] |
+| **TC-F10-06-30** | `[Positive]` | Auto-cancel order pending_verification qua han | 1. Order pending_verification, paymentExpiresAt < now (seller quen verify).<br>2. Cho job chay. | - Order van bi cancel + restock.<br>- Email gui ca buyer va seller. | High | [ ] |
+| **TC-F10-06-31** | `[Negative]` | KHONG cancel order da `paid` | 1. Order da approved (paymentStatus paid), paymentExpiresAt < now.<br>2. Job chay. | - Order van paid + confirmed.<br>- Job skip don nay. | Blocker | [ ] |
+| **TC-F10-06-32** | `[Concurrency]` | Job chay song song (race) | 1. Spawn 2 job instance simultaneously voi same order. | - Chi 1 instance cancel order.<br>- DB consistency (no double restock). | Blocker | [ ] |
+| **TC-F10-06-33** | `[Perf]` | Job hieu nang 10k orders | 1. Tao 10,000 orders awaiting_payment expired.<br>2. Run job. | - Job complete < 5 phut.<br>- Khong OOM. | Medium | [ ] |
+
+### Nhom 6F — Reference Code Edge Cases
+
+| TC ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Mức | Trạng Thái |
+|---|---|---|---|---|---|---|
+| **TC-F10-06-34** | `[Val]` | Reference Code khong chua 0/O/I/1 | 1. Tao 100 orders.<br>2. Kiem tra paymentReference. | - Khong ky tu `0`, `O`, `I`, `1` xuat hien trong 6 chars (anti-confusion). | High | [ ] |
+| **TC-F10-06-35** | `[Concurrency]` | Reference Code unique per tenant | 1. Tao 10,000 orders simultaneously cung tenant. | - Khong co duplicate paymentReference.<br>- DB unique constraint enforce. | Blocker | [ ] |
+| **TC-F10-06-36** | `[Positive]` | Custom prefix tu F19 | 1. F19: set paymentReferencePrefix = `ECH`.<br>2. Tao Bank Transfer order. | - paymentReference format `ECH-XXXXXX`. | Medium | [ ] |
+
+### Nhom 6G — [D-13] Wave 8+ Backward-Compat Schema Fields
+
+> Wave 6 chua implement Auto-verify Open Banking nhung schema pre-build 3 fields. TCs nay verify defaults + nullable.
+
+| TC ID | Loai | Tieu De | Buoc | Ket Qua Mong Doi | Mức | Trạng Thái |
+|---|---|---|---|---|---|---|
+| **TC-F10-06-37** | `[Schema]` | `verificationSource` default = `manual` | 1. Tao Bank Transfer order moi. | - DB column `verification_source` = 'manual'. | High | [ ] |
+| **TC-F10-06-38** | `[Schema]` | `autoVerifiedAt` nullable, default NULL | 1. Tao Bank Transfer order.<br>2. Seller Approve manual. | - `auto_verified_at` van NULL.<br>- `payment_verified_at` set. | High | [ ] |
+| **TC-F10-06-39** | `[Schema]` | `bankTransactionId` nullable, default NULL | 1. Tao + verify manual Bank Transfer order. | - `bank_transaction_id` NULL ca chu ky Wave 6. | High | [ ] |
+| **TC-F10-06-40** | `[Schema]` | `verificationSource` enum constraint | 1. Try insert `verification_source = 'invalid'` qua SQL. | - DB reject voi enum constraint error. | Medium | [ ] |
+
+---
+
 ## 5. Quality Gates
 
 | Nhom | Trang Thai | Ghi Chu |
@@ -202,6 +283,7 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | **3. Concurrency & Idempotency** | [ ] Not Run | Race Condition DB Lock, Idempotency Restock, Double Submit, Inventory Release |
 | **4. Performance** | [ ] Not Run | Notification < 60s, Bulk OOM, Search Debounce, Stats Bar Cache |
 | **5. Mobile UX** | [ ] Not Run | 320px Cards, Sticky CTA, Word-wrap, Loading Skeleton |
+| **6. [v2.2] Manual Payment Verification** | [ ] Not Run | 3-step async flow, magic link JWT, TTL auto-cancel, Reject reason, Reference Code |
 
 > **Khuyen Nghi Release:** Tat ca 10 diem Checklist va 5 Quality Gates phai dat **100% Passed** truoc khi trien khai Production. Dac biet P0 Blockers: State Machine, IDOR, Idempotency, Price Integrity, Inventory Release.
 

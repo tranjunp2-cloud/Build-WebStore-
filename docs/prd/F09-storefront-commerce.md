@@ -1,8 +1,9 @@
 # PRD: Storefront Commerce (F09)
-> **Version:** 2.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
-> **Priority:** P0 🌟 | **Sprint:** Wave 5 | **Size:** XL
+> **Version:** 2.2 | **Updated:** 2026-05-15 | **Agent:** `project-planner`
+> **Priority:** P0 🌟 | **Sprint:** Wave 6 (v2.2 Bank Transfer confirmation variant) · Wave 5 (v2.1 base)
 > **Depends on:** F08 Products CRUD ✅, F10 Orders ✅ | **Blocks:** F13 Payment Gateway, F14 Shipping
 > **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — §6 Trust Signals, §4 Payment
+> **Decisions Log:** [PD-018](../decisions/decisions-log.md#pd-018--manual-payment-bank-transfer-verification-flow) · Issue [#1004](https://github.com/primeproduction/ech-prime-web-v2/issues/1004)
 
 ---
 
@@ -53,8 +54,8 @@ Public storefront pages dưới `/sites/[slug]/`: products listing, product deta
 - Phân trang (Pagination) tối đa 10 sản phẩm/trang ở danh sách sản phẩm (US-F09-01)
 - Product detail (PDP) với Ảnh Gallery, Variant Selector (2-tier), Bảng Attributes, Rich Text Description và JSON-LD schema (US-F09-01)
 - Cart drawer slide-in + localStorage persistence (US-F09-02)
-- Guest checkout đủ thông tin Shipping: name/email/phone/address line 1/city/state/postcode + Payment Method (COD, QR) (US-F09-03)
-- Bắt buộc Upload proof image (<2MB) nếu Payment Method là QR Banking (US-F09-03)
+- Guest checkout đủ thông tin Shipping: name/email/phone/address line 1/city/state/postcode + Payment Method (COD, Bank Transfer) (US-F09-03)
+- **[v2.2]** Bank Transfer: KHÔNG bắt buộc upload tại checkout (D-04 PD-018). Proof upload chuyển sang Post-Order page via magic link.
 - SST 6% calculation + Malaysian state dropdown (US-F09-03)
 - Shipping by state: West MY = RM 8, East MY = RM 15 (US-F09-03)
 - Order confirmation page (US-F09-04)
@@ -100,14 +101,17 @@ SO THAT tôi mua hàng và seller nhận được đơn
 | FR-03 | Product detail: image gallery, stock status, JSON-LD schema | US-F09-01 | P0 | |
 | FR-04 | Add to Cart → cart drawer slides in từ phải | US-F09-02 | P0 | |
 | FR-05 | Cart quantity controls (+/-), subtotal realtime, localStorage persist | US-F09-02 | P0 | |
-| FR-06 | Checkout form details: name*, email*, phone*, address line 1*, line 2, city*, state (MY)*, postcode*, Payment Method (COD, QR) | US-F09-03 | P0 | Stripe tạm ẩn |
-| FR-06.1 | Bắt buộc khách hàng upload receipt ảnh (<2MB, JPG/PNG) nếu chọn QR Banking | US-F09-03 | P0 | |
+| FR-06 | Checkout form details: name*, email*, phone*, address line 1*, line 2, city*, state (MY)*, postcode*, Payment Method (COD, Bank Transfer). Stripe Card/FPX qua F13. | US-F09-03 | P0 | |
+| ~~FR-06.1~~ | ~~Bắt buộc khách hàng upload receipt ảnh (<2MB, JPG/PNG) nếu chọn QR Banking~~ | ~~US-F09-03~~ | ~~P0~~ | **DEPRECATED v2.2 (D-04)** — upload moved post-order via magic link. F10 FR-14 → FR-16 handle. |
+| **FR-06.2** | **[v2.2]** Storefront checkout Bank Transfer option visibility tuân thủ tenant settings (`payment_bank_transfer` toggle ON + bank details complete). Nếu OFF → ẩn radio Bank Transfer. | US-F09-03 | P0 | Fix audit gap G-01 |
 | FR-07 | Guest checkout — không cần auth | US-F09-03 | P0 | |
 | FR-08 | SST 6% auto-calculated on subtotal | US-F09-03 | P0 | MY market |
 | FR-09 | Shipping: West MY = RM 8, East MY (Sabah/Sarawak) = RM 15 | US-F09-03 | P0 | MY market |
 | FR-10 | Place Order → order created, order number ORD-XXXXXXXX | US-F09-03 | P0 | |
 | FR-11 | Cart preserved nếu payment fail | US-F09-03 | P0 | |
-| FR-12 | Confirmation page: order number, items, total | US-F09-04 | P0 | |
+| FR-12 | Confirmation page: order number, items, total. Persistent route `/sites/[slug]/orders/[id]?token=...` (v2.2 — bookmark-able + share-able). | US-F09-04 | P0 | |
+| **FR-12.1** | **[v2.2] Confirmation page COD variant:** Headline "Order Received!" + delivery expectations + tracking placeholder. | US-F09-04 | P0 | D-09 unified template |
+| **FR-12.2** | **[v2.2] Confirmation page Bank Transfer variant** = Post-Order Upload page (F10 FR-16): Headline "Order Received! Awaiting Payment" + expiry timer + QR/STK + reference code + Upload Receipt button + anti-fraud warning. Đồng nhất route + token-based auth. | US-F09-04 | P0 | D-04 D-10 |
 | FR-13 | WhatsApp floating button (nếu store owner set phone) | US-F09-01 | P1 | MY market |
 | FR-14 | Trust signals footer: Halal badge, SSM number, payment icons | US-F09-01 | P1 | MY market |
 | FR-15 | **[Mobile]** PDP hỗ trợ Sticky Bottom Bar cho nút Add to Cart. | US-F09-05 | P1 | Conversion Booster |

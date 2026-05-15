@@ -114,7 +114,22 @@ Bộ test case vét cạn 100% Acceptance Criteria của F19, bao gồm: Quản 
 | **TC-F19.53** | `[UI State]` | Empty State trong khung upload QR khi chưa có ảnh | 1. Vào Payments tab khi chưa upload ảnh QR lần nào. | - Khung upload hiển thị placeholder rõ ràng (icon + hướng dẫn: *"Upload ảnh QR ngân hàng"*).<br>- Có nút kích hoạt chọn file hoặc vùng Drag & Drop. | Medium | [ ] |
 | **TC-F19.54** | `[UI State]` | Loading skeleton khi trang Payments đang fetch dữ liệu | 1. Làm chậm mạng (Devtools throttling).<br>2. Điều hướng vào tab Payments. | - Hiển thị skeleton loading, không trang trắng.<br>- Sau khi load xong, Toggle và ảnh hiển thị đúng trạng thái đã lưu. | Medium | [ ] |
 | **TC-F19.55** | `[Cancel]` | Kéo thả ảnh ngoài vùng Dropzone | 1. Chọn file ảnh từ máy tính.<br>2. Thả ảnh ra ngoài vùng Dropzone (vào giữa trang). | - Trình duyệt không mở tab mới với ảnh.<br>- Upload không được kích hoạt ngoài ý muốn. | Medium | [ ] |
-| **TC-F19.56** | `[Storefront]` | Tắt hết cả COD lẫn QR Banking — Storefront vẫn ổn định | 1. Tắt Toggle COD về OFF.<br>2. Tắt Toggle QR Banking về OFF. | - Trang CMS lưu thành công.<br>- Trang Checkout của Storefront vẫn render, không crash.<br>- Hiển thị thông báo: *"Chưa có phương thức thanh toán"* hoặc ẩn bước thanh toán. | High | [ ] |
+| **TC-F19.56** | `[Storefront]` | Tắt hết cả COD lẫn Bank Transfer — Storefront vẫn ổn định | 1. Tắt Toggle COD về OFF.<br>2. Tắt Toggle Bank Transfer về OFF. | - Trang CMS lưu thành công.<br>- Trang Checkout của Storefront vẫn render, không crash.<br>- Hiển thị thông báo: *"Chưa có phương thức thanh toán"* hoặc ẩn bước thanh toán. | High | [ ] |
+
+#### Nhóm 3E — **[v1.1 PD-018]** Bank Details Fields & Reference Prefix
+
+> **Context:** v1.1 expand "QR Banking" → "Bank Transfer" với 3 bank detail fields bắt buộc (bankName, bankAccountNumber, bankAccountHolderName) + optional `paymentReferencePrefix`. Toggle ON chỉ khả dụng khi 4 input valid.
+
+| ID | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F19.57** | `[Negative]` | Không thể bật Bank Transfer khi thiếu bank details | 1. Upload QR hợp lệ nhưng để trống bankName.<br>2. Gạt Toggle ON. | - Toggle giật về OFF.<br>- Hiển thị inline error "Vui lòng điền đầy đủ thông tin ngân hàng". | Blocker | [ ] |
+| **TC-F19.58** | `[Positive]` | Bật Bank Transfer thành công khi đủ 4 fields | 1. Upload QR.<br>2. Điền bankName = "Maybank", bankAccountNumber = "1234567890", bankAccountHolderName = "CTY ABC".<br>3. Toggle ON. | - Toggle xanh.<br>- Save thành công.<br>- Storefront checkout hiển thị Bank Transfer option. | Blocker | [ ] |
+| **TC-F19.59** | `[Val]` | bankAccountNumber chỉ accept alphanumeric | 1. Nhập "123-abc-456" hoặc "123 456".<br>2. Save. | - Inline error: "Số tài khoản chỉ chứa số/chữ, không khoảng trắng hoặc ký tự đặc biệt". | High | [ ] |
+| **TC-F19.60** | `[Positive]` | paymentReferencePrefix default = `BT` | 1. Vào Payments tab lần đầu.<br>2. Kiểm tra input prefix. | - Default value = "BT".<br>- Preview text: "Reference Code sẽ có dạng `BT-XXXXXX`". | Medium | [ ] |
+| **TC-F19.61** | `[Val]` | paymentReferencePrefix 2-4 chars uppercase | 1. Nhập prefix = "A" (1 char).<br>2. Nhập = "abcde" (5 chars).<br>3. Nhập = "bt" (lowercase). | - 1 char: error "Tối thiểu 2 ký tự".<br>- 5 chars: error "Tối đa 4 ký tự".<br>- Lowercase: auto-uppercase thành "BT". | High | [ ] |
+| **TC-F19.62** | `[Storefront]` | Bank Transfer OFF → ẩn radio ở Checkout | 1. Tenant tắt Bank Transfer ở Payments tab.<br>2. Buyer mở /sites/{slug}/checkout. | - Radio "Bank Transfer" KHÔNG hiển thị.<br>- (Fix audit gap G-01) | Blocker | [ ] |
+| **TC-F19.63** | `[Storefront]` | Bank Transfer ON → buyer nhìn thấy bank details + reference code ở Post-Order Upload | 1. Tenant bật Bank Transfer với đủ thông tin.<br>2. Buyer place order Bank Transfer → mở magic link. | - Page hiển thị: QR image, bankName, accountNumber, accountHolderName, reference code BT-XXXXXX (REQ-F19-08.3). | Blocker | [ ] |
+| **TC-F19.64** | `[State]` | Xóa QR image khi Bank Transfer đang ON | 1. Bank Transfer ON + đủ bank details.<br>2. Xóa QR image. | - Toggle tự revert OFF (BR-Payment-04 trong F10).<br>- Bank details vẫn lưu (không xóa). | High | [ ] |
 
 ---
 
