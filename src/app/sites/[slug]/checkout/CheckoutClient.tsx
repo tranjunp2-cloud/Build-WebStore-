@@ -8,7 +8,7 @@ import { trackEvent } from '@/lib/analytics/track-event'
 import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
     ShieldCheck, ChevronRight, Rocket, MapPin, Truck,
-    QrCode, UploadCloud, FileImage, Tag, Info, Lock, AlertTriangle,
+    QrCode, UploadCloud, FileImage, Info, Lock, AlertTriangle,
     Landmark, Copy, CheckCheck, Check,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
@@ -643,12 +643,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 ))}
                             </ul>
 
-                            <div className="sum-promo">
-                                <Tag size={13} />
-                                <input placeholder="Promo or gift card code" />
-                                <button className="sp-ap" disabled>Apply</button>
-                            </div>
-
                             <div className="sum-row"><span className="sr-l">{ck.subtotal} ({items.length})</span><span className="sr-v">{formatPrice(sub, currency)}</span></div>
                             <div className="sum-row"><span className="sr-l">{ck.sst}</span><span className="sr-v">{formatPrice(tax, currency)}</span></div>
                             <div className="sum-row">
@@ -806,11 +800,6 @@ const CK_CSS = `
 .s-mt{font-size:11px;color:var(--f3);margin:3px 0 0;}
 .s-qty{display:inline-block;padding:1px 6px;background:var(--inp);border-radius:999px;font-size:10px;color:var(--f2);margin-right:4px;font-family:monospace;}
 .s-pr{font-size:13px;font-weight:700;color:var(--f2);white-space:nowrap;font-family:monospace;padding-top:1px;}
-.sum-promo{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--inp);border:1.5px dashed var(--bd);border-radius:10px;margin-bottom:10px;}
-.sum-promo svg{color:var(--f4);flex-shrink:0;}
-.sum-promo input{flex:1;border:none;background:transparent;outline:none;font-size:13px;color:var(--f1);font-family:inherit;min-width:0;}
-.sum-promo input::placeholder{color:var(--f4);}
-.sp-ap{flex-shrink:0;font-size:12px;font-weight:700;color:var(--tl);background:transparent;border:none;padding:0;opacity:.4;cursor:not-allowed;}
 .sum-nudge{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;background:var(--tl5);border:1px solid var(--tl2);border-radius:8px;font-size:12px;color:var(--f3);margin:6px 0;}
 .sum-nudge svg{margin-top:2px;}
 .sum-nudge svg{color:var(--tl);flex-shrink:0;}
