@@ -224,10 +224,11 @@ describe('updateProductFieldAction', () => {
             user: expect.objectContaining({ id: 'u1' }),
         }))
         // Assert — update uses overrideAccess:true to bypass Payload/Neon WHERE bug for variant docs
+        // data also contains variants/variantConfigs (stripped of auto-managed 'id')
         expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'products',
             id: 42,
-            data: { deletedAt: null },
+            data: expect.objectContaining({ deletedAt: null }),
             overrideAccess: true,
         }))
     })
@@ -239,5 +240,44 @@ describe('updateProductFieldAction', () => {
         // Act & Assert
         await expect(updateProductFieldAction(42, { status: 'active' })).rejects.toThrow('Product not found or access denied')
         expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    // ── Payload 3.79 variant id-strip ─────────────────────────────────────────
+
+    it('[TC-F08-01-32] product with variants → auto-managed id stripped from variants/variantConfigs before update', async () => {
+        // Arrange — product with variants that have Payload's auto-managed UUID 'id' on each row
+        mockFindByID.mockResolvedValue({
+            id: 42,
+            name: 'Test Product',
+            tenant: 68,
+            variants: [
+                { id: 'uuid-v1', name: 'Red/S', sku: 'P-R-S', price: 10, stock: 5 },
+                { id: 'uuid-v2', name: 'Blue/M', sku: 'P-B-M', price: 10, stock: 3 },
+            ],
+            variantConfigs: [
+                {
+                    id: 'uuid-vc1',
+                    name: 'Color',
+                    options: [
+                        { id: 'uuid-o1', value: 'Red' },
+                        { id: 'uuid-o2', value: 'Blue' },
+                    ],
+                },
+            ],
+        })
+
+        // Act
+        await updateProductFieldAction(42, { status: 'active' })
+
+        // Assert — auto-managed 'id' must not reach payload.update (Payload 3.79 traverseFields bug)
+        const call = mockUpdate.mock.calls[0][0]
+        expect(call.data.variants[0]).not.toHaveProperty('id')
+        expect(call.data.variants[1]).not.toHaveProperty('id')
+        expect(call.data.variantConfigs[0]).not.toHaveProperty('id')
+        expect(call.data.variantConfigs[0].options[0]).not.toHaveProperty('id')
+        expect(call.data.variantConfigs[0].options[1]).not.toHaveProperty('id')
+        // Non-id fields must be preserved
+        expect(call.data.variants[0]).toMatchObject({ name: 'Red/S', sku: 'P-R-S', price: 10, stock: 5 })
+        expect(call.data.variantConfigs[0]).toMatchObject({ name: 'Color' })
     })
 })
