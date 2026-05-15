@@ -71,6 +71,13 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             )
         }
 
+        if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Request body must be a JSON object' } },
+                { status: 400 }
+            )
+        }
+
         const { enabled, westRateRm, eastRateRm, freeAboveRm } = body
 
         if (typeof enabled !== 'boolean' || westRateRm === undefined || eastRateRm === undefined) {

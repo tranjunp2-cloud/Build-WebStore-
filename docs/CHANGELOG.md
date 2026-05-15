@@ -38,6 +38,7 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 **Bug fixes:**
 - TC-F14.13: PATCH `/api/sites/[siteId]/shipping-config` now properly validates: negative rates rejected, null freeAbove interpreted as disabled (not invalid), boundary conditions ≤RATE_MAX enforced
+- `src/app/api/orders/calculate-shipping/route.ts`: added null/array body guard returning 400 instead of 500 (fixes TC-F14.85, TC-F14.95)
 - Public response filtering: `GET /api/storefront/site-by-slug` no longer leaks `shippingConfig` object (moved to authed shipping-config endpoint)
 - `src/app/api/orders/calculate-shipping/route.ts`: integer guard for subtotalSen, removed pre-formatted hint message (now client-side), removed dead code
 - `src/lib/shipping/classify-region.ts`: delegates to `isEastState()` helper — DRY refactor
@@ -53,7 +54,7 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 - Existing `Sites.shippingConfig` schema retained; backfill migration sets `freeAbove = 10000` (RM 100) for null values in `scripts/db-setup.js`
 - Wave 6 scope: merchant self-delivery only (no carrier API calls). Tracking number manual entry deferred to Wave 7.
 
-**Tests:** 20 TC-IDs (TC-F14.01–20) covering calculation logic, region classification, free shipping thresholds, settings CRUD, validation, mobile responsive, state change recalc. All CI tests pass.
+**Tests:** 20 TC-IDs (TC-F14.01–20) covering calculation logic, region classification, free shipping thresholds, settings CRUD, validation, mobile responsive, state change recalc. All CI tests pass. Unit tests: `src/__tests__/api/orders-calculate-shipping.test.ts` (17 tests: TC-F14.23, TC-F14.50, TC-F14.85, TC-F14.95 + edge cases), `src/__tests__/unit/hooks/use-debounce.test.ts` (3 tests for 300ms debounce behavior). E2E: `e2e/f14-shipping.spec.ts` with US-F14-05 describe block (TC-PW-F14.05 state change recalc, TC-PW-F14.06 debounce batching, TC-PW-F14.09 error→retry UI, guarded by `E2E_CHECKOUT_URL` env var).
 
 **Review fixes (GH-962 follow-up):**
 - Validation: `src/lib/validations/orders.ts` — integer quantity validation, 50-item cap

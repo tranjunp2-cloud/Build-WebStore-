@@ -4,8 +4,8 @@ import {
     validateCheckoutForm,
     calculateOrderTotals,
     generateOrderNumber,
-    MY_STATES,
 } from '@/lib/storefront'
+import { MY_STATES } from '@/lib/shipping'
 
 // ─── TC-F09.23, TC-F09.24: Checkout Form Validation ────────────────────────
 describe('[TC-F09.23/TC-F09.24] Checkout Form Validation (validateCheckoutForm)', () => {
