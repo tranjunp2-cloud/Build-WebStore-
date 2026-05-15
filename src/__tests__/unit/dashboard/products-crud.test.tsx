@@ -120,7 +120,7 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         }
     })
 
-    it('GH-935: returns error when urlSlug is empty', () => {
+    it('[TC-F08-01-30] returns error when urlSlug is empty', () => {
         const result = productFormSchema.safeParse({ ...getValidBaseData(), urlSlug: '' })
         expect(result.success).toBe(false)
         if (!result.success) {
@@ -128,7 +128,7 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         }
     })
 
-    it('GH-935: returns error when urlSlug has invalid format', () => {
+    it('[TC-F08-01-31] returns error when urlSlug has invalid format', () => {
         const result = productFormSchema.safeParse({ ...getValidBaseData(), urlSlug: 'Invalid Slug!' })
         expect(result.success).toBe(false)
         if (!result.success) {

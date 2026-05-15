@@ -240,7 +240,7 @@ export default function ProductsPage() {
 
     const handleRestore = async (id: string) => {
         try {
-            await updateProductFieldAction(id, { deletedAt: null }, { overrideAccess: true })
+            await updateProductFieldAction(id, { deletedAt: null })
             toast.success(t.dashboard.products.form.restored)
             loadProducts()
         } catch(e: unknown) {
