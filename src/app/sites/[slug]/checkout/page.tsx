@@ -596,8 +596,8 @@ const CK_CSS = `
 .ck-iw{background:var(--inp);border-radius:8px;border:1.5px solid transparent;transition:background .15s,border-color .15s,box-shadow .15s;}
 .ck-iw input,.ck-iw select{display:block;width:100%;height:44px;background:transparent;border:none;outline:none;padding:0 14px;font-size:14px;color:var(--f1);font-weight:500;letter-spacing:-.005em;font-family:inherit;box-sizing:border-box;}
 .ck-iw input::placeholder{color:var(--f4);font-weight:400;}
-.ck-iw:focus-within{background:var(--inp);border-color:var(--tlb);box-shadow:0 0 0 3px rgba(var(--accent-rgb,14,117,86),.10);}
-.ck-iw.err{border-color:#fca5a5;background:var(--inp);}
+.ck-iw:focus-within{background:var(--card);border-color:var(--tlb);box-shadow:0 0 0 3px rgba(var(--accent-rgb,14,117,86),.10);}
+.ck-iw.err{border-color:#fca5a5;background:var(--card);}
 .ck-iw.err:focus-within{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.12);}
 .ck-sel{position:relative;}
 .ck-sel select{appearance:none;padding-right:36px;cursor:pointer;}
