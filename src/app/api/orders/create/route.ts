@@ -113,6 +113,27 @@ export const POST = withAuth(async (_user, request) => {
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + tax
 
+        // Resolve payment method types BEFORE creating the order to avoid orphan pending orders
+        // Layer 1: tenant master gate
+        let types = buildPaymentMethodTypes(tenant as any)
+        if (types.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'NO_PAYMENT_METHODS', message: 'Seller has not enabled Card or FPX' } },
+                { status: 422 },
+            )
+        }
+
+        // Layer 2: site-level guard
+        const paymentConfig = (site as any).paymentConfig ?? {}
+        if (paymentConfig.cardEnabled === false) types = types.filter(t => t !== 'card')
+        if (paymentConfig.fpxEnabled === false) types = types.filter(t => t !== 'fpx')
+        if (types.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'METHOD_DISABLED', message: 'No payment method is enabled for this site' } },
+                { status: 422 },
+            )
+        }
+
         // TC-F13.103: free order (coupon 100% off) — skip Stripe, mark paid immediately
         if (total <= 0) {
             const freeOrder = await payload.create({
@@ -139,7 +160,7 @@ export const POST = withAuth(async (_user, request) => {
             })
         }
 
-        // Create order in PENDING status (will be updated to 'paid' by webhook)
+        // Create order in PENDING status (will be updated to 'new' by webhook)
         const order = await payload.create({
             collection: 'orders',
             data: {
@@ -169,26 +190,6 @@ export const POST = withAuth(async (_user, request) => {
         // Create Stripe Checkout Session (Direct Charges on merchant's connected account)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = (tenant as any).slug || tenantId
-
-        // Layer 1: tenant master gate
-        let types = buildPaymentMethodTypes(tenant as any)
-        if (types.length === 0) {
-            return NextResponse.json(
-                { success: false, error: { code: 'NO_PAYMENT_METHODS', message: 'Seller has not enabled Card or FPX' } },
-                { status: 422 },
-            )
-        }
-
-        // Layer 2: site-level guard
-        const paymentConfig = (site as any).paymentConfig ?? {}
-        if (paymentConfig.cardEnabled === false) types = types.filter(t => t !== 'card')
-        if (paymentConfig.fpxEnabled === false) types = types.filter(t => t !== 'fpx')
-        if (types.length === 0) {
-            return NextResponse.json(
-                { success: false, error: { code: 'METHOD_DISABLED', message: 'No payment method is enabled for this site' } },
-                { status: 422 },
-            )
-        }
 
         const checkout = await createStripeCheckoutSession({
             orderId: order.id as string,
