@@ -2959,8 +2959,11 @@
     },
     "cart": {
       "title": "Cart",
+      "drawerTitle": "Your Shopping Cart",
       "empty": "Your cart is empty",
       "subtotal": "Subtotal",
+      "subtitle": "Curated pieces ready for checkout",
+      "shippingNote": "Shipping fees and SST (6%) are not included. Final total calculated at checkout.",
       "proceedToCheckout": "Proceed to Checkout",
       "checkoutUnavailable": "Checkout feature is coming soon",
       "qty": "Qty:"

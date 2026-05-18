@@ -10,6 +10,9 @@ vi.mock('@/i18n', () => ({
             storefront: {
                 cart: {
                     title: 'Cart',
+                    drawerTitle: 'Cart',
+                    subtitle: '',
+                    shippingNote: '',
                     empty: 'Your cart is empty',
                     subtotal: 'Subtotal',
                     proceedToCheckout: 'Proceed to Checkout',
@@ -73,10 +76,10 @@ describe('Site Global Settings & Widgets (TC-F05.20 to TC-F05.28)', () => {
         // the Proceed to Checkout button should call toast.info()
         render(<CartDrawer siteSlug="" />)
 
-        expect(screen.getByText('Proceed to Checkout')).toBeInTheDocument()
+        expect(screen.getByText('PROCEED TO CHECKOUT')).toBeInTheDocument()
         
         // Act: click checkout
-        fireEvent.click(screen.getByText('Proceed to Checkout'))
+        fireEvent.click(screen.getByText('PROCEED TO CHECKOUT'))
         
         // Assert: fallback toast triggers to prevent navigation inside Iframe Editor.
         expect(toast.info).toHaveBeenCalledWith('Checkout feature is coming soon')
