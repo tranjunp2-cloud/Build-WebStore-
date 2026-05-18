@@ -6,6 +6,8 @@ import {
     validatePhone,
     calculateOrderTotals,
     generateOrderNumber,
+    validatePaymentProof,
+    PROOF_MAX_SIZE_BYTES,
 } from '@/lib/storefront'
 import { MY_STATES } from '@/lib/shipping'
 
@@ -344,6 +346,65 @@ describe('[TC-F09.24] Email Format Validation (validateEmail)', () => {
         expect(validateEmail('not-an-email')).not.toBeNull()
         expect(validateEmail('abc@.com')).not.toBeNull()
         expect(validateEmail('@nodomain')).not.toBeNull()
+    })
+})
+
+// ─── TC-F09.188: Payment Proof File Validator ───────────────────────────────
+describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
+    it('TC-F09.188: accepts JPEG file within size limit', () => {
+        // Arrange
+        const file = { type: 'image/jpeg', size: 1 * 1024 * 1024 } // 1 MB
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: accepts PNG file within size limit', () => {
+        // Arrange
+        const file = { type: 'image/png', size: 500 * 1024 } // 500 KB
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: rejects file exceeding 2 MB limit', () => {
+        // Arrange — 1 byte over limit
+        const file = { type: 'image/jpeg', size: PROOF_MAX_SIZE_BYTES + 1 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('FILE_TOO_LARGE')
+    })
+
+    it('TC-F09.188: accepts file exactly at 2 MB boundary (inclusive)', () => {
+        // Arrange — exactly at limit
+        const file = { type: 'image/png', size: PROOF_MAX_SIZE_BYTES }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: rejects PDF (unsupported type)', () => {
+        // Arrange
+        const file = { type: 'application/pdf', size: 500 * 1024 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+
+    it('TC-F09.188: rejects GIF (unsupported type)', () => {
+        // Arrange
+        const file = { type: 'image/gif', size: 100 * 1024 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+
+    it('TC-F09.188: INVALID_TYPE takes precedence over FILE_TOO_LARGE', () => {
+        // Arrange — wrong type AND oversized
+        const file = { type: 'application/pdf', size: PROOF_MAX_SIZE_BYTES + 1 }
+
+        // Act + Assert — type checked first
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
     })
 })
 

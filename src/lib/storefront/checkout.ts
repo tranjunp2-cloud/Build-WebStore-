@@ -56,3 +56,15 @@ export function calculateOrderTotals(items: Array<{ price: number; quantity: num
 export function generateOrderNumber(): string {
     return `ORD-${Date.now().toString(36).toUpperCase()}`
 }
+
+export const PROOF_ACCEPTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png']
+export const PROOF_MAX_SIZE_BYTES = 2 * 1024 * 1024 // 2 MB
+
+export type ProofValidationError = 'INVALID_TYPE' | 'FILE_TOO_LARGE'
+
+/** Validates QR Banking payment proof file. Returns null if valid, error code otherwise. */
+export function validatePaymentProof(file: { type: string; size: number }): ProofValidationError | null {
+    if (!PROOF_ACCEPTED_TYPES.includes(file.type)) return 'INVALID_TYPE'
+    if (file.size > PROOF_MAX_SIZE_BYTES) return 'FILE_TOO_LARGE'
+    return null
+}

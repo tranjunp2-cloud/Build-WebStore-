@@ -287,6 +287,30 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         }))
     })
 
+    it('[TC-F09.162] QR Banking order created with paymentStatus=paid immediately', async () => {
+        // Arrange
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
+            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 }) // restock check
+        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 50, inventory: 10 }))
+        mockCreate.mockResolvedValue({ id: 'order-qr-1' })
+        mockUpdate.mockResolvedValue({})
+
+        const body = { ...validBody, paymentMethod: 'qr_banking', paymentProofImage: 'media-42' }
+
+        // Act
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+
+        // Assert — QR Banking orders are immediately marked paid (seller verifies after)
+        expect(res.status).toBe(200)
+        expect(data.success).toBe(true)
+        expect(data.data.paymentMethod).toBe('qr_banking')
+        const createdPayload = mockCreate.mock.calls[0][0].data
+        expect(createdPayload.paymentStatus).toBe('paid')
+        expect(createdPayload.paymentProofImage).toBe('media-42')
+    })
+
     it('[TC-F14-RF01.02 RF-01] soft-deleted product (deletedAt set) returns 404 — find() where clause verified', async () => {
         mockFindByID.mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
         mockFind.mockResolvedValueOnce(EMPTY_FIND) // deletedAt filter excludes soft-deleted products

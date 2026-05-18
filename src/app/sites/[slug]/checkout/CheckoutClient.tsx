@@ -15,7 +15,7 @@ import {
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
-import { type CheckoutForm, validateEmail, validatePhone } from '@/lib/storefront'
+import { type CheckoutForm, validateEmail, validatePhone, validatePaymentProof, PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront'
 
 type GeoState = { id: number; name: string; state_code: string; zone: string }
 type GeoDistrict = { id: number; name: string }
@@ -56,8 +56,8 @@ const initialForm: CheckoutForm = {
     name: '', email: '', phone: '', line1: '', line2: '', city: '', state: '', postcode: '',
 }
 
-const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
-const MAX_FILE_SIZE = 2 * 1024 * 1024
+const ACCEPTED_IMAGE_TYPES = PROOF_ACCEPTED_TYPES
+const MAX_FILE_SIZE = PROOF_MAX_SIZE_BYTES
 
 export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, initialFontBody, initialSiteData }: CheckoutClientProps) {
     const { t } = useI18n()
@@ -250,10 +250,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         const file = e.target.files?.[0]
         setProofError(null)
         if (!file) return
-        if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        const proofErr = validatePaymentProof(file)
+        if (proofErr === 'INVALID_TYPE') {
             setProofError(ck.invalidImage); setProofFile(null); setProofPreview(null); return
         }
-        if (file.size > MAX_FILE_SIZE) {
+        if (proofErr === 'FILE_TOO_LARGE') {
             setProofError(ck.fileTooLarge); setProofFile(null); setProofPreview(null); return
         }
         setProofFile(file)
@@ -520,7 +521,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                             <div className={`pm-rad${paymentMethod === 'qr_banking' ? ' on' : ''}`} />
                                             <div className="pm-body">
                                                 <h3 className="pm-title">Bank Transfer / DuitNow QR</h3>
-                                                <p className="pm-desc">Scan DuitNow QR or transfer to seller's bank. Upload receipt to confirm.</p>
+                                                <p className="pm-desc">Scan DuitNow QR or transfer to seller&apos;s bank. Upload receipt to confirm.</p>
                                                 <div className="pm-mini-marks">
                                                     <span className="pm-mini-mark mark-qr"><QrCode size={12} /></span>
                                                     <span className="pm-mini-mark mark-bnk"><Landmark size={12} /></span>
