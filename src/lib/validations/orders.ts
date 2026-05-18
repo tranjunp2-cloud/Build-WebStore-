@@ -24,11 +24,11 @@ export const orderCreateSchema = z.object({
             country: z.string().optional(),
         }).optional(),
     }),
-    paymentMethod: z.enum(['cod', 'qr_banking']),
+    paymentMethod: z.enum(['cod', 'bank_transfer']),
     paymentProofImage: z.string().optional(),
 }).refine(
-    data => data.paymentMethod !== 'qr_banking' || !!data.paymentProofImage,
-    { message: 'Payment proof image is required for QR Banking', path: ['paymentProofImage'] }
+    data => data.paymentMethod !== 'bank_transfer' || !data.paymentProofImage,
+    { message: 'Payment proof is not accepted at checkout for bank transfer', path: ['paymentProofImage'] }
 )
 
 // --- Update Order Status ---

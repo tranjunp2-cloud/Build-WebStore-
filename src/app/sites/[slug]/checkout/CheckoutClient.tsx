@@ -91,7 +91,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [selectedDistrictId, setSelectedDistrictId] = useState('')
     const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
     const [postcodesLoading, setPostcodesLoading] = useState(false)
-    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'qr_banking'>('cod')
+    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bank_transfer'>('cod')
     const [proofFile, setProofFile] = useState<File | null>(null)
     const [proofPreview, setProofPreview] = useState<string | null>(null)
     const [proofError, setProofError] = useState<string | null>(null)
@@ -144,7 +144,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 const data = await res.json()
                 if (data.siteId) setSiteId(String(data.siteId))
                 if (data.merchantQrCodeUrl) setMerchantQrUrl(data.merchantQrCodeUrl)
-                if (data.enableCod === false) { setEnableCod(false); setPaymentMethod('qr_banking') }
+                if (data.enableCod === false) { setEnableCod(false); setPaymentMethod('bank_transfer') }
                 if (data.enableQrBanking === false) setEnableQrBanking(false)
                 if (data.bankName) setBankName(data.bankName)
                 if (data.bankAccountNo) setBankAccountNo(data.bankAccountNo)
@@ -273,24 +273,15 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
         form.city && form.postcode && items.length > 0 &&
-        (paymentMethod === 'cod' || (paymentMethod === 'qr_banking' && proofFile))
+        (paymentMethod === 'cod' || paymentMethod === 'bank_transfer')
     )
 
     const handlePlaceOrder = async () => {
         if (!canPlaceOrder) return
         setIsPlacing(true)
         try {
-            let paymentProofImageId: string | undefined
-            if (paymentMethod === 'qr_banking' && proofFile) {
-                const fd = new FormData()
-                fd.append('file', proofFile)
-                fd.append('alt', `Payment proof - ${form.name}`)
-                const uploadRes = await fetch('/api/media', { method: 'POST', body: fd })
-                if (!uploadRes.ok) throw new Error(ck.uploadFailed)
-                const uploadData = await uploadRes.json()
-                paymentProofImageId = uploadData.doc?.id
-            }
-            const payload: Record<string, unknown> = {
+            // bank_transfer: no pre-checkout upload — proof submitted post-order via magic link
+            const checkoutPayload: Record<string, unknown> = {
                 siteId,
                 items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
                 customer: {
@@ -299,10 +290,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 },
                 paymentMethod,
             }
-            if (paymentProofImageId) payload.paymentProofImage = paymentProofImageId
 
             const res = await fetch('/api/orders/checkout', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checkoutPayload),
             })
             const data = await res.json()
 
@@ -314,7 +304,12 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                         currency: data.data.currency, itemCount: items.length,
                     }})
                 }
-                router.push(`/sites/${slug}/order/${data.data.orderId}/confirm`)
+                // bank_transfer: redirect to upload page via magic link; fallback to confirm page
+                if (data.data.redirectUrl) {
+                    router.push(data.data.redirectUrl)
+                } else {
+                    router.push(`/sites/${slug}/order/${data.data.orderId}/confirm`)
+                }
             } else {
                 toast.error(data.error?.message || 'Failed to place order')
             }
@@ -516,9 +511,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 )}
 
                                 {enableQrBanking && (
-                                    <div className={`pm${paymentMethod === 'qr_banking' ? ' active' : ''}`} onClick={() => setPaymentMethod('qr_banking')}>
+                                    <div className={`pm${paymentMethod === 'bank_transfer' ? ' active' : ''}`} onClick={() => setPaymentMethod('bank_transfer')}>
                                         <div className="pm-row">
-                                            <div className={`pm-rad${paymentMethod === 'qr_banking' ? ' on' : ''}`} />
+                                            <div className={`pm-rad${paymentMethod === 'bank_transfer' ? ' on' : ''}`} />
                                             <div className="pm-body">
                                                 <h3 className="pm-title">Bank Transfer / DuitNow QR</h3>
                                                 <p className="pm-desc">Scan DuitNow QR or transfer to seller&apos;s bank. Upload receipt to confirm.</p>
@@ -533,7 +528,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                             </div>
                                         </div>
 
-                                        {paymentMethod === 'qr_banking' && (
+                                        {paymentMethod === 'bank_transfer' && (
                                             <div className="qr-panel" onClick={e => e.stopPropagation()}>
                                                 {/* QR + meta */}
                                                 <div className="qr-row">
@@ -587,34 +582,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                                 )}
                                                 <div className="bk-note">
                                                     <Info size={12} style={{ flexShrink: 0 }} />
-                                                    Transfer the exact amount then upload your receipt below to confirm payment.
+                                                    Place your order and transfer the exact amount. You&apos;ll receive an email with a link to upload your payment receipt.
                                                 </div>
-
-                                                {/* Upload */}
-                                                <div className="ru">
-                                                    <div className="ru-hd">
-                                                        <span>Upload Payment Receipt</span>
-                                                        <span className="ru-req">Required</span>
-                                                    </div>
-                                                    {proofPreview ? (
-                                                        <div className="ru-file">
-                                                            <div className="ru-thumb"><FileImage size={20} /></div>
-                                                            <div className="ru-info">
-                                                                <p className="ru-name">{proofFile?.name}</p>
-                                                                <p className="ru-sz">{proofFile ? `${Math.round(proofFile.size / 1024)} KB` : ''} · ready to submit</p>
-                                                            </div>
-                                                            <button className="ru-x" onClick={removeProof}><X size={16} /></button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="ru-drop" onClick={() => fileInputRef.current?.click()}>
-                                                            <div className="ru-icon"><UploadCloud size={22} /></div>
-                                                            <p className="ru-t">Click to upload a receipt image</p>
-                                                            <p className="ru-s">JPG or PNG · Max 2 MB</p>
-                                                        </div>
-                                                    )}
-                                                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/png" onChange={handleProofUpload} style={{ display: 'none' }} />
-                                                    {proofError && <p className="ru-err"><AlertCircle size={12} /> {proofError}</p>}
-                                                </div>
+                                                {/* No pre-checkout upload for bank_transfer — receipt uploaded post-order via magic link */}
                                             </div>
                                         )}
                                     </div>
@@ -680,9 +650,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
                             {PlaceOrderBtn}
 
-                            <div className={`sum-trust${paymentMethod === 'qr_banking' ? ' note' : ''}`}>
-                                {paymentMethod === 'qr_banking'
-                                    ? <><Info size={11} style={{ flexShrink: 0 }} /> {"You'll upload your payment proof in the next step after your order is confirmed."}</>
+                            <div className={`sum-trust${paymentMethod === 'bank_transfer' ? ' note' : ''}`}>
+                                {paymentMethod === 'bank_transfer'
+                                    ? <><Info size={11} style={{ flexShrink: 0 }} /> {"You'll receive an email with payment instructions and a link to upload your receipt."}</>
                                     : <><ShieldCheck size={11} /> Encrypted Checkout</>}
                             </div>
                         </div>
