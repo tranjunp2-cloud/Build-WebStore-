@@ -109,7 +109,10 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                                 border: `1px solid rgba(var(--brand-primary-rgb, 192,200,199), 0.2)`,
                                                 borderRadius: '4px',
                                             }}>
-                                                <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d' }}>
+                                                <button
+                                                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                                                    disabled={item.quantity <= 1}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: item.quantity <= 1 ? 0.3 : 1 }}>
                                                     <Minus size={7} />
                                                 </button>
                                                 <span style={{ fontSize: '14px', fontWeight: 600, color: '#191c1d', padding: '4px 12px', lineHeight: '20px' }}>
