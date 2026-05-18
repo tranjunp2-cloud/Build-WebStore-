@@ -158,27 +158,24 @@ async function handleCheckoutCompleted(
 
     // Find the pending order by ID and update it
     try {
-        // Map Stripe payment method to our enum value (fpx → 'fpx', anything else → 'card')
-        const rawMethod = session.payment_method_types?.[0]
-        const paymentMethod = rawMethod === 'fpx' ? 'fpx' : 'card'
+        // payment_method_types is the enabled list, not the method buyer actually used.
+        // Accurate only when length === 1 (single-method tenant). Multi-method defaults 'card'
+        // until stripeChargeId expansion is available (Wave 7).
+        const enabledTypes = session.payment_method_types ?? []
+        const paymentMethod: 'card' | 'fpx' =
+            enabledTypes.length === 1 && enabledTypes[0] === 'fpx' ? 'fpx' : 'card'
 
-        // stripeChargeId is available when payment_intent is expanded as an object
-        const stripeChargeId: string | undefined =
-            typeof session.payment_intent === 'object' && session.payment_intent !== null
-                ? (session.payment_intent as any).latest_charge ?? undefined
-                : undefined
-
+        // session.payment_intent is always a string in webhook events (not expanded).
+        // stripeChargeId requires expand: ['payment_intent'] — deferred to Wave 7.
         await payload.update({
             collection: 'orders',
             id: orderId,
             data: {
                 status: 'new',
                 stripeSessionId,
-                stripePaymentIntentId:
-                    typeof session.payment_intent === 'string'
-                        ? session.payment_intent
-                        : (session.payment_intent as any)?.id ?? undefined,
-                stripeChargeId,
+                stripePaymentIntentId: typeof session.payment_intent === 'string'
+                    ? session.payment_intent
+                    : (session.payment_intent as any)?.id ?? undefined,
                 paymentMethod,
             },
         })

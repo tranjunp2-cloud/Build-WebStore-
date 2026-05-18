@@ -240,8 +240,10 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         )
     })
 
-    // ─── TC-F13.11: stripeChargeId extraction from payment_intent ─────
-    it('[TC-F13.11] extracts stripeChargeId from expanded payment_intent.latest_charge', async () => {
+    // ─── TC-F13.11: payment_intent is always a string in webhook — stripeChargeId deferred Wave 7 ──
+    it('[TC-F13.11] persists stripePaymentIntentId from string payment_intent (no expand)', async () => {
+        // Stripe webhook events always send payment_intent as a string ID, not an expanded object.
+        // stripeChargeId extraction requires expand: ['payment_intent'] — deferred to Wave 7.
         // Arrange
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
@@ -250,10 +252,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
                 id: 'sess_charge_123',
                 client_reference_id: 'order-charge',
                 payment_method_types: ['fpx'],
-                payment_intent: {
-                    id: 'pi_with_charge',
-                    latest_charge: 'ch_test_charge_abc123',
-                },
+                payment_intent: 'pi_with_charge', // string — as Stripe actually sends it
             },
         })
         mockFind.mockResolvedValue({ docs: [] })
@@ -274,8 +273,8 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({
-                    stripeChargeId: 'ch_test_charge_abc123',
                     stripePaymentIntentId: 'pi_with_charge',
+                    paymentMethod: 'fpx',
                 }),
             }),
         )

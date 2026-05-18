@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 6: Validate products, check stock, build line items
-        const built = await buildOrderItems(payload, items, siteIdNum)
+        const built = await buildOrderItems(payload, items, tenantId)
         if (built.errorResponse) return built.errorResponse
 
         const { orderItems, checkoutItems, subtotal, currency } = built

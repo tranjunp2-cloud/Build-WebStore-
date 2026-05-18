@@ -25,12 +25,12 @@ export interface BuildResult {
 
 /**
  * Validate products, check stock, and build order + Stripe checkout line items.
- * Returns an errorResponse if any product is missing, out of stock, or belongs to a different site.
+ * Returns an errorResponse if any product is missing, out of stock, or belongs to a different tenant.
  */
 export async function buildOrderItems(
     payload: any,
     items: Array<{ productId: string | number; quantity: number; variant?: string }>,
-    siteId?: number | string,
+    tenantId?: number | string,
 ): Promise<BuildResult> {
     const orderItems: OrderItemRow[] = []
     const checkoutItems: CheckoutItemRow[] = []
@@ -54,11 +54,11 @@ export async function buildOrderItems(
             }
         }
 
-        // Cross-tenant IDOR guard: ensure product belongs to the requested site
+        // Cross-tenant IDOR guard: ensure product belongs to the requesting tenant
         const p = product as any
-        if (siteId !== undefined && p.site !== undefined) {
-            const productSiteId = typeof p.site === 'object' ? p.site?.id : p.site
-            if (String(productSiteId) !== String(siteId)) {
+        if (tenantId !== undefined && p.tenant !== undefined) {
+            const productTenantId = typeof p.tenant === 'object' ? p.tenant?.id : p.tenant
+            if (String(productTenantId) !== String(tenantId)) {
                 return {
                     orderItems: [], checkoutItems: [], subtotal: 0, currency,
                     errorResponse: NextResponse.json(
