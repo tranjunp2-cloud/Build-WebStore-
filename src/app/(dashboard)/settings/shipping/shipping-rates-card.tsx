@@ -1,12 +1,14 @@
 "use client"
 
+import { useState } from 'react'
 import { Truck } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { WEST_MY_STATES } from '@/lib/shipping'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LivePreviewPanel } from './live-preview-panel'
 
-const WEST_STATES_DISPLAY = ['Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan']
-const WEST_STATES_HIDDEN = WEST_MY_STATES.length - WEST_STATES_DISPLAY.length
+const WEST_STATES_PREVIEW = WEST_MY_STATES.slice(0, 5)
+const WEST_STATES_HIDDEN = WEST_MY_STATES.length - WEST_STATES_PREVIEW.length
 const EAST_STATES_DISPLAY = ['Sabah', 'Sarawak', 'Labuan']
 
 type Props = {
@@ -39,6 +41,8 @@ export function ShippingRatesCard({
 }: Props) {
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping
+    const [westExpanded, setWestExpanded] = useState(false)
+    const westStates = westExpanded ? WEST_MY_STATES : WEST_STATES_PREVIEW
     return (
         <div className="flex flex-col p-6 rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-5">
             {/* Card header */}
@@ -58,9 +62,14 @@ export function ShippingRatesCard({
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-2">
                         <span className="text-[14px] font-medium text-slate-200">{s.westMalaysia}</span>
-                        <span className="rounded-full bg-cyan-500/15 border border-cyan-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-400 tracking-wide">
-                            {s.westBadge}
-                        </span>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span tabIndex={0} className="cursor-default rounded-full bg-cyan-500/15 border border-cyan-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-400 tracking-wide">
+                                    {s.westBadge}
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>{s.westBadgeTooltip}</TooltipContent>
+                        </Tooltip>
                     </div>
                     <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400 select-none pointer-events-none">
@@ -80,10 +89,27 @@ export function ShippingRatesCard({
                     </div>
                     {westError && <p className="mt-1 text-xs text-destructive">{westError}</p>}
                     <div className="flex flex-wrap gap-1.5">
-                        {WEST_STATES_DISPLAY.map(s => (
-                            <span key={s} className={CHIP_CLS}>{s}</span>
+                        {westStates.map(state => (
+                            <span key={state} className={CHIP_CLS}>{state}</span>
                         ))}
-                        <span className={CHIP_CLS + ' text-slate-500'}>{s.moreStates.replace('{count}', String(WEST_STATES_HIDDEN))}</span>
+                        {!westExpanded && (
+                            <button
+                                type="button"
+                                onClick={() => setWestExpanded(true)}
+                                className={CHIP_CLS + ' cursor-pointer text-slate-500 hover:text-slate-300 hover:border-white/20 transition-colors'}
+                            >
+                                {s.moreStates.replace('{count}', String(WEST_STATES_HIDDEN))}
+                            </button>
+                        )}
+                        {westExpanded && (
+                            <button
+                                type="button"
+                                onClick={() => setWestExpanded(false)}
+                                className={CHIP_CLS + ' cursor-pointer text-slate-500 hover:text-slate-300 hover:border-white/20 transition-colors'}
+                            >
+                                {s.showLess}
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -91,9 +117,14 @@ export function ShippingRatesCard({
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-2">
                         <span className="text-[14px] font-medium text-slate-200">{s.eastMalaysia}</span>
-                        <span className="rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-fuchsia-400 tracking-wide">
-                            {s.eastBadge}
-                        </span>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span tabIndex={0} className="cursor-default rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-fuchsia-400 tracking-wide">
+                                    {s.eastBadge}
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>{s.eastBadgeTooltip}</TooltipContent>
+                        </Tooltip>
                     </div>
                     <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400 select-none pointer-events-none">

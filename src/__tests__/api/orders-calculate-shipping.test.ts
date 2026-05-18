@@ -90,6 +90,39 @@ describe('POST /api/orders/calculate-shipping — happy path [TC-F14]', () => {
         expect(body.data.isFree).toBe(false)
         expect(body.data.hint).toBeUndefined()
     })
+
+    it('[TC-F14.52] subtotal=0 + freeAbove=0 → fee=0, isFree=true (boundary inclusive >=)', async () => {
+        // Arrange
+        mockSite({ enabled: true, westRate: 800, eastRate: 1500, freeAbove: 0 })
+
+        // Act
+        const res = await callPost({ siteId: 'site-1', state: 'Sabah', subtotalSen: 0 })
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(body.data.fee).toBe(0)
+        expect(body.data.isFree).toBe(true)
+        expect(body.data.hint).toBeUndefined()
+    })
+
+    it('[TC-F14.53] subtotal=0 + freeAbove=10000 → hint.gap=10000 (no "Add RM 0 more", no NaN)', async () => {
+        // Arrange
+        mockSite({ enabled: true, westRate: 800, eastRate: 1500, freeAbove: 10_000 })
+
+        // Act
+        const res = await callPost({ siteId: 'site-1', state: 'Selangor', subtotalSen: 0 })
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(body.data.fee).toBe(800)
+        expect(body.data.isFree).toBe(false)
+        expect(body.data.hint).toBeDefined()
+        expect(body.data.hint.gap).toBe(10_000)
+        expect(body.data.hint.tier).toBe('neutral')
+        expect(Number.isFinite(body.data.hint.gap)).toBe(true)
+    })
 })
 
 describe('POST /api/orders/calculate-shipping — validation [TC-F14]', () => {
