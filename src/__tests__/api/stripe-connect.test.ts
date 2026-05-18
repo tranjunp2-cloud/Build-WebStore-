@@ -15,8 +15,10 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 
 vi.mock('@/lib/payment/stripe', () => ({
-    createConnectedAccount: vi.fn().mockResolvedValue('acct_new_123'),
-    createAccountLink: vi.fn().mockResolvedValue('https://connect.stripe.com/onboard/xyz'),
+    getStripeOAuthUrl: vi.fn(
+        (tenantId: string) =>
+            `https://connect.stripe.com/oauth/authorize?client_id=ca_test&state=${tenantId}&response_type=code&scope=read_write`,
+    ),
     getConnectedAccountStatus: vi.fn().mockResolvedValue({
         accountId: 'acct_existing',
         chargesEnabled: true,
@@ -28,63 +30,65 @@ vi.mock('@/lib/payment/stripe', () => ({
 import { POST as onboardPOST } from '@/app/api/stripe/connect/onboard/route'
 import { GET as statusGET } from '@/app/api/stripe/connect/status/route'
 
-// ─── TC-F13.03: Stripe Connect onboarding ─────────────────────────────
-// ─── TC-F13.09: Webhook signature verification (tested in webhook file)
+// ─── TC-F13.24: Stripe Connect OAuth onboarding — DISABLED stub ───────
+// Route returns 503 DISABLED while Stripe Connect is temporarily off.
+// Full OAuth tests preserved below in STRIPE_CONNECT_DISABLED block.
 
-describe('POST /api/stripe/connect/onboard [TC-F13.03]', () => {
+describe('POST /api/stripe/connect/onboard [TC-F13.24]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('creates new connected account and returns onboarding URL', async () => {
-        // Arrange
-        mockFindByID.mockResolvedValue({ id: 'tenant-1', name: 'Test Store' })
-        mockUpdate.mockResolvedValue({})
-
+    it('returns 503 DISABLED for all requests while Connect is off', async () => {
         // Act
         const req = { json: () => Promise.resolve({ tenantId: 'tenant-1' }) } as unknown as Request
         const res = await onboardPOST(req, {} as any)
         const body = await res.json()
 
         // Assert
-        expect(res.status).toBe(200)
-        expect(body.success).toBe(true)
-        expect(body.data.accountId).toBe('acct_new_123')
-        expect(body.data.onboardingUrl).toContain('stripe.com')
+        expect(res.status).toBe(503)
+        expect(body.success).toBe(false)
+        expect(body.error.code).toBe('DISABLED')
+        expect(mockUpdate).not.toHaveBeenCalled()
+    })
+})
+
+/* STRIPE_CONNECT_DISABLED — full onboard tests preserved below.
+ * Restore by re-enabling onboard/route.ts and getStripeOAuthUrl in stripe.ts.
+ *
+describe('POST /api/stripe/connect/onboard [TC-F13.24] — full', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
     })
 
-    it('returns refresh link when account already exists', async () => {
-        // Arrange — tenant already has stripeAccountId
-        mockFindByID.mockResolvedValue({ id: 'tenant-1', stripeAccountId: 'acct_existing' })
-
-        // Act
+    it('[TC-F13.24] returns OAuth URL with tenantId as state', async () => {
         const req = { json: () => Promise.resolve({ tenantId: 'tenant-1' }) } as unknown as Request
         const res = await onboardPOST(req, {} as any)
         const body = await res.json()
 
-        // Assert
-        expect(body.data.accountId).toBe('acct_existing')
-        expect(body.data.onboardingUrl).toBeDefined()
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(body.data.oauthUrl).toContain('connect.stripe.com/oauth/authorize')
+        expect(body.data.oauthUrl).toContain('state=tenant-1')
+        expect(body.data.oauthUrl).toContain('scope=read_write')
+        expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     it('returns 422 when tenantId missing', async () => {
-        // Act
         const req = { json: () => Promise.resolve({}) } as unknown as Request
         const res = await onboardPOST(req, {} as any)
 
-        // Assert
         expect(res.status).toBe(422)
     })
 
-    it('returns 403 when user does not own tenant [TC-F19.38]', async () => {
-        // Act — requesting tenant user doesn't own
+    it('[TC-F13.30] returns 403 when user does not own tenant', async () => {
         const req = { json: () => Promise.resolve({ tenantId: 'other-tenant' }) } as unknown as Request
         const res = await onboardPOST(req, {} as any)
 
-        // Assert
         expect(res.status).toBe(403)
     })
 })
+*/
 
 describe('GET /api/stripe/connect/status [TC-F13.03]', () => {
     beforeEach(() => {

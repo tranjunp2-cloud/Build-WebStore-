@@ -131,8 +131,13 @@ export function PaymentsFormClient({
         router.replace('/settings/payments');
     }, []); // intentionally once on mount
 
-    // Initiate Stripe Connect onboarding (TC-F13.24, 25) — POST then redirect to onboardingUrl
+    // Initiate Stripe Connect onboarding (TC-F13.24, 25) — POST then redirect to oauthUrl
     const handleConnectStripe = async () => {
+        /* STRIPE_CONNECT_DISABLED — OAuth Connect flow temporarily disabled.
+         * Restore by uncommenting implementation in:
+         *   src/app/api/stripe/connect/onboard/route.ts
+         *   src/lib/payment/stripe.ts (getStripeOAuthUrl, exchangeOAuthCode)
+         *
         if (!tenantId || isConnecting) return;
         setIsConnecting(true);
         try {
@@ -142,20 +147,27 @@ export function PaymentsFormClient({
                 body: JSON.stringify({ tenantId }),
             });
             const data = await res.json();
-            if (!res.ok || !data.success) {
+            if (!res.ok || !data.success || !data.data?.oauthUrl) {
                 toast.error(data.error?.message || pt.failConnectStripe);
+                setIsConnecting(false);
                 return;
             }
-            window.open(data.data.onboardingUrl, '_blank', 'noopener,noreferrer');
+            // Same-tab redirect — OAuth callback needs session cookies; new tab may lose them
+            window.location.href = data.data.oauthUrl;
+            // Leave isConnecting=true intentionally — page is unloading
         } catch {
             toast.error(pt.failConnectStripe);
-        } finally {
             setIsConnecting(false);
         }
+        */
     };
 
     // Check Stripe account status and unlock UI if approved (TC-F13.26)
     const handleVerifyStripe = async () => {
+        /* STRIPE_CONNECT_DISABLED — verify status flow temporarily disabled.
+         * Restore by uncommenting implementation in:
+         *   src/app/api/stripe/connect/status/route.ts
+         *
         if (!tenantId || isVerifying) return;
         setIsVerifying(true);
         try {
@@ -180,6 +192,7 @@ export function PaymentsFormClient({
         } finally {
             setIsVerifying(false);
         }
+        */
     };
 
     const saveSettings = async (updates: PaymentUpdates) => {
@@ -303,8 +316,8 @@ export function PaymentsFormClient({
                 </div>
             </div>
 
-            {/* ─── Both-OFF warning (Stripe verified but both Card+FPX disabled) ─── */}
-            {isVerified && !cardEnabled && !fpxEnabled && (
+            {/* STRIPE_CONNECT_DISABLED — Both-OFF warning hidden while Stripe section is off */}
+            {/* {isVerified && !cardEnabled && !fpxEnabled && (
                 <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-amber-500/[0.24] bg-amber-500/[0.06]">
                     <div className="w-10 h-10 rounded-[10px] bg-amber-500/[0.12] border border-amber-500/[0.22] text-amber-400 grid place-items-center shrink-0">
                         <AlertTriangle className="w-[18px] h-[18px]" />
@@ -316,10 +329,16 @@ export function PaymentsFormClient({
                         </p>
                     </div>
                 </div>
-            )}
+            )} */}
 
-            {/* ─── Stripe Payment Methods ─── */}
-            <section className="space-y-[14px]">
+            {/* STRIPE_CONNECT_DISABLED — Stripe Payment Methods section hidden.
+                Restore by uncommenting this section and re-enabling:
+                  src/lib/payment/stripe.ts (OAuth functions)
+                  src/app/api/stripe/connect/onboard/route.ts
+                  src/app/api/stripe/connect/callback/route.ts
+                  handleConnectStripe + handleVerifyStripe handlers above
+            */}
+            {/* <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
                     <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" style={{ boxShadow: '0 0 10px #38bdf8' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.stripeSectionTitle}</h2>
@@ -397,7 +416,7 @@ export function PaymentsFormClient({
                         </div>
                     </div>
                 )}
-            </section>
+            </section> */}
 
             {/* ─── Manual Methods ─── */}
             <section className="space-y-[14px]">

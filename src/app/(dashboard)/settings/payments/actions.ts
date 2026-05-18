@@ -3,6 +3,7 @@
 import { getPayload } from 'payload';
 import config from '@payload-config';
 import { getCurrentTenantId } from '@/lib/auth';
+// import { deauthorizeStripeAccount } from '@/lib/payment/stripe'; // STRIPE_CONNECT_DISABLED
 
 export type PaymentUpdates = {
     payment_cod?: boolean;
@@ -185,6 +186,19 @@ export async function disconnectStripe() {
         if (!tenantId) {
             return { success: false, error: 'Unauthorized' };
         }
+
+        /* STRIPE_CONNECT_DISABLED — deauthorize call temporarily disabled
+        const tenant = await payload.findByID({ collection: 'tenants', id: tenantId });
+        const currentAccountId = (tenant as any)?.stripeAccountId as string | null | undefined;
+
+        if (currentAccountId) {
+            try {
+                await deauthorizeStripeAccount(currentAccountId);
+            } catch (deauthErr) {
+                console.warn('[disconnectStripe] deauthorize failed (continuing with DB cleanup):', deauthErr);
+            }
+        }
+        */
 
         await payload.update({
             collection: 'tenants',

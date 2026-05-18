@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mock Stripe before importing anything ────────────────────────────
 const mockCheckoutSessionCreate = vi.fn()
-const mockAccountCreate = vi.fn()
 const mockAccountLinkCreate = vi.fn()
 const mockAccountRetrieve = vi.fn()
 const mockConstructEvent = vi.fn()
+const mockOAuthToken = vi.fn()
+const mockOAuthDeauth = vi.fn()
 
 vi.mock('stripe', () => {
     return {
@@ -14,7 +15,6 @@ vi.mock('stripe', () => {
                 sessions: { create: mockCheckoutSessionCreate },
             },
             accounts: {
-                create: mockAccountCreate,
                 retrieve: mockAccountRetrieve,
             },
             accountLinks: {
@@ -23,14 +23,18 @@ vi.mock('stripe', () => {
             webhooks: {
                 constructEvent: mockConstructEvent,
             },
+            oauth: {
+                token: mockOAuthToken,
+                deauthorize: mockOAuthDeauth,
+            },
         })),
     }
 })
 
 // Import AFTER mocking
+// STRIPE_CONNECT_DISABLED: getStripeOAuthUrl, exchangeOAuthCode, deauthorizeStripeAccount omitted (functions commented out in stripe.ts)
 import {
     getStripeClient,
-    createConnectedAccount,
     createAccountLink,
     getConnectedAccountStatus,
     createStripeCheckoutSession,
@@ -60,24 +64,85 @@ describe('Stripe Client', () => {
     })
 })
 
-describe('Stripe Connect', () => {
+/* STRIPE_CONNECT_DISABLED — OAuth function tests temporarily disabled.
+ * Restore by re-enabling getStripeOAuthUrl, exchangeOAuthCode, deauthorizeStripeAccount
+ * in src/lib/payment/stripe.ts and re-importing them above.
+ *
+describe('getStripeOAuthUrl [TC-F13.24]', () => {
+    beforeEach(() => {
+        vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
+        vi.stubEnv('STRIPE_CLIENT_ID', 'ca_test_123')
+        vi.clearAllMocks()
+    })
+
+    it('builds authorize URL with state, scope=read_write, response_type=code', () => {
+        const url = getStripeOAuthUrl('tenant-42')
+
+        expect(url).toContain('connect.stripe.com/oauth/authorize')
+        expect(url).toContain('client_id=ca_test_123')
+        expect(url).toContain('state=tenant-42')
+        expect(url).toContain('scope=read_write')
+        expect(url).toContain('response_type=code')
+    })
+
+    it('throws when STRIPE_CLIENT_ID not set', () => {
+        vi.stubEnv('STRIPE_CLIENT_ID', '')
+        expect(() => getStripeOAuthUrl('t1')).toThrow('STRIPE_CLIENT_ID is not set')
+    })
+})
+
+describe('exchangeOAuthCode', () => {
     beforeEach(() => {
         vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
         vi.clearAllMocks()
     })
 
-    it('createConnectedAccount creates Standard account for Malaysia', async () => {
-        mockAccountCreate.mockResolvedValue({ id: 'acct_test_123' })
-
-        const accountId = await createConnectedAccount('merchant@example.com', 'Kedai Kopi')
-
-        expect(accountId).toBe('acct_test_123')
-        expect(mockAccountCreate).toHaveBeenCalledWith({
-            type: 'standard',
-            email: 'merchant@example.com',
-            country: 'MY',
-            business_profile: { name: 'Kedai Kopi' },
+    it('returns stripeUserId from oauth.token response', async () => {
+        mockOAuthToken.mockResolvedValueOnce({
+            stripe_user_id: 'acct_oauth_xxx',
+            access_token: 'sk_test_xxx',
         })
+
+        const result = await exchangeOAuthCode('ac_code_123')
+
+        expect(result).toEqual({ stripeUserId: 'acct_oauth_xxx' })
+        expect(mockOAuthToken).toHaveBeenCalledWith({
+            grant_type: 'authorization_code',
+            code: 'ac_code_123',
+        })
+    })
+
+    it('throws when response missing stripe_user_id', async () => {
+        mockOAuthToken.mockResolvedValueOnce({})
+
+        await expect(exchangeOAuthCode('ac_x')).rejects.toThrow(/missing stripe_user_id/)
+    })
+})
+
+describe('deauthorizeStripeAccount', () => {
+    beforeEach(() => {
+        vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
+        vi.stubEnv('STRIPE_CLIENT_ID', 'ca_test_123')
+        vi.clearAllMocks()
+    })
+
+    it('calls oauth.deauthorize with client_id and stripe_user_id', async () => {
+        mockOAuthDeauth.mockResolvedValueOnce({})
+
+        await deauthorizeStripeAccount('acct_abc')
+
+        expect(mockOAuthDeauth).toHaveBeenCalledWith({
+            client_id: 'ca_test_123',
+            stripe_user_id: 'acct_abc',
+        })
+    })
+})
+*/
+
+describe('Stripe Connect — createAccountLink / getConnectedAccountStatus', () => {
+    beforeEach(() => {
+        vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
+        vi.clearAllMocks()
     })
 
     it('createAccountLink returns onboarding URL', async () => {

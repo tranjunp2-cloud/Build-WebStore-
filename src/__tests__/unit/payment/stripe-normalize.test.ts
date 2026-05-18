@@ -103,7 +103,7 @@ describe('normalizeStripeEvent [TC-F13.65]', () => {
     })
 
     // TC-F13.122: Connect account country=MY hardcoded (static guard)
-    // (normalizeStripeEvent itself does not control country; tested via createConnectedAccount)
+    // (normalizeStripeEvent itself does not control country; country controlled by connected account's settings)
 
     // TC-F13.141: Stripe SDK default tolerance 300s (constructEvent is the validator)
     // (tolerance is in verifyStripeWebhook; normalizeStripeEvent works on already-verified events)

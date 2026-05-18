@@ -35,28 +35,50 @@ export function getStripeClient(): Stripe {
 
 // ── Connect Account Management ───────────────────────────────────────
 
-/**
- * Create a Standard connected account for a merchant.
- * Standard accounts: Stripe handles onboarding UI, merchant manages their own dashboard.
- */
-export async function createConnectedAccount(
-    email: string,
-    businessName: string,
-    idempotencyKey?: string,
-): Promise<string> {
-    const stripe = getStripeClient()
+/* STRIPE_CONNECT_DISABLED — OAuth Connect flow temporarily disabled
+ * Uncomment to re-enable seller OAuth Connect (requires STRIPE_CLIENT_ID env var).
+ *
+export function getStripeOAuthUrl(tenantId: string): string {
+    const clientId = process.env.STRIPE_CLIENT_ID
+    if (!clientId) throw new Error('STRIPE_CLIENT_ID is not set')
 
-    const account = idempotencyKey
-        ? await stripe.accounts.create(
-              { type: 'standard', email, country: 'MY', business_profile: { name: businessName } },
-              { idempotencyKey },
-          )
-        : await stripe.accounts.create({
-              type: 'standard', email, country: 'MY', business_profile: { name: businessName },
-          })
+    const params = new URLSearchParams({
+        client_id: clientId,
+        response_type: 'code',
+        scope: 'read_write',
+        state: tenantId,
+    })
 
-    return account.id
+    return `https://connect.stripe.com/oauth/authorize?${params.toString()}`
 }
+
+export async function exchangeOAuthCode(
+    code: string,
+): Promise<{ stripeUserId: string }> {
+    const stripe = getStripeClient()
+    const response = await stripe.oauth.token({
+        grant_type: 'authorization_code',
+        code,
+    })
+
+    if (!response.stripe_user_id) {
+        throw new Error('Stripe OAuth response missing stripe_user_id')
+    }
+
+    return { stripeUserId: response.stripe_user_id }
+}
+
+export async function deauthorizeStripeAccount(accountId: string): Promise<void> {
+    const stripe = getStripeClient()
+    const clientId = process.env.STRIPE_CLIENT_ID
+    if (!clientId) throw new Error('STRIPE_CLIENT_ID is not set')
+
+    await stripe.oauth.deauthorize({
+        client_id: clientId,
+        stripe_user_id: accountId,
+    })
+}
+*/
 
 /**
  * Create an Account Link for Stripe-hosted onboarding.
