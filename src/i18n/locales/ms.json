@@ -2959,8 +2959,11 @@
     },
     "cart": {
       "title": "Troli",
+      "drawerTitle": "Troli Beli-Belah Anda",
       "empty": "Troli anda kosong",
       "subtotal": "Jumlah kecil",
+      "subtitle": "Produk pilihan sedia untuk pembayaran",
+      "shippingNote": "Yuran penghantaran dan SST (6%) tidak termasuk. Jumlah akhir dikira semasa pembayaran.",
       "proceedToCheckout": "Teruskan ke Pembayaran",
       "checkoutUnavailable": "Ciri pembayaran akan datang tidak lama lagi",
       "qty": "Kuantiti:"
