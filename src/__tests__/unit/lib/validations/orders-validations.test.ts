@@ -27,11 +27,10 @@ describe('orderCreateSchema [TC-F10.09, TC-F10.13]', () => {
         expect(result.success).toBe(true)
     })
 
-    it('accepts valid QR banking order with payment proof [TC-F10.13]', () => {
+    it('accepts valid bank_transfer order without payment proof [TC-F10.13]', () => {
         const result = orderCreateSchema.safeParse({
             ...validOrder,
-            paymentMethod: 'qr_banking',
-            paymentProofImage: 'media-123',
+            paymentMethod: 'bank_transfer',
         })
         expect(result.success).toBe(true)
     })
