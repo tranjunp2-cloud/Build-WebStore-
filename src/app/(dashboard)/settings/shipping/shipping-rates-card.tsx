@@ -7,7 +7,7 @@ import { WEST_MY_STATES } from '@/lib/shipping'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LivePreviewPanel } from './live-preview-panel'
 
-const WEST_STATES_PREVIEW = ['Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan'] as const
+const WEST_STATES_PREVIEW = WEST_MY_STATES.slice(0, 5)
 const WEST_STATES_HIDDEN = WEST_MY_STATES.length - WEST_STATES_PREVIEW.length
 const EAST_STATES_DISPLAY = ['Sabah', 'Sarawak', 'Labuan']
 
@@ -42,7 +42,7 @@ export function ShippingRatesCard({
     const { t } = useI18n()
     const s = t.dashboard.settings.shipping
     const [westExpanded, setWestExpanded] = useState(false)
-    const westStates = westExpanded ? [...WEST_MY_STATES] : WEST_STATES_PREVIEW
+    const westStates = westExpanded ? WEST_MY_STATES : WEST_STATES_PREVIEW
     return (
         <div className="flex flex-col p-6 rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-5">
             {/* Card header */}
@@ -64,7 +64,7 @@ export function ShippingRatesCard({
                         <span className="text-[14px] font-medium text-slate-200">{s.westMalaysia}</span>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <span className="cursor-default rounded-full bg-cyan-500/15 border border-cyan-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-400 tracking-wide">
+                                <span tabIndex={0} className="cursor-default rounded-full bg-cyan-500/15 border border-cyan-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-400 tracking-wide">
                                     {s.westBadge}
                                 </span>
                             </TooltipTrigger>
@@ -119,7 +119,7 @@ export function ShippingRatesCard({
                         <span className="text-[14px] font-medium text-slate-200">{s.eastMalaysia}</span>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <span className="cursor-default rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-fuchsia-400 tracking-wide">
+                                <span tabIndex={0} className="cursor-default rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-fuchsia-400 tracking-wide">
                                     {s.eastBadge}
                                 </span>
                             </TooltipTrigger>
