@@ -26,6 +26,8 @@ export const cartWidgetMeta = {
     quickActions: ['Open cart', 'Toggle cart label'],
     aiVisible: true,
     category: 'commerce' as const,
+    scope: 'global' as const,
+    scopeTooltip: 'Hiển thị trên toàn bộ site khi có sản phẩm. Chỉ cần cấu hình 1 lần.',
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

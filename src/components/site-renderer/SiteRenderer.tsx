@@ -2,6 +2,9 @@ import { blockRegistry } from '@/blocks/registry'
 import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
+import { detectCommercePresence } from '@/lib/site-renderer/detect-commerce-presence'
+import { extractFirstGlobalBlock } from '@/lib/site-renderer/extract-first-global-block'
+import { hasHeaderCart } from '@/lib/site-renderer/has-header-cart'
 import {
     BROKEN_URL_PREFIX,
     HOMEPAGE_ALIASES,
@@ -27,7 +30,7 @@ import { FloatingContainerProvider } from './FloatingContainerContext'
 // socialWidget/cartWidget are camelCase (BLOCK_TYPES registry); whatsapp-button/announcement-bar are kebab.
 const FLOATING_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget', 'announcement-bar'])
 
-export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null; status?: string }
+export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null; status?: string; layout?: unknown[]; isHomepage?: boolean }
 
 export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null; children?: NavLinkItem[] };
 type PreviewBlock = {
@@ -79,6 +82,7 @@ export type SiteRendererProps = {
 function applyGlobalSystemBlocks(
     blocks: PreviewBlock[],
     site: SiteRendererProps['site'],
+    pages: Array<{ layout?: unknown[] }> = [],
 ): PreviewBlock[] {
     const siteHeaderBlock = site.headerBlock as PreviewBlock | null | undefined
     const siteFooterBlock = site.footerBlock as PreviewBlock | null | undefined
@@ -128,6 +132,39 @@ function applyGlobalSystemBlocks(
         nextBlocks.splice(navIdx >= 0 ? navIdx + 1 : 0, 0, breadcrumbBlock)
     }
 
+    // Global floating cart — inject when commerce blocks are detected on any page
+    // and no header-level cart button is already present.
+    if (detectCommercePresence(pages) && !hasHeaderCart(siteHeaderBlock)) {
+        const hasFloatingCart = nextBlocks.some(
+            b => b.blockType === 'cartWidget' && (b as Record<string, unknown>).variant !== 'inline',
+        )
+        if (!hasFloatingCart) {
+            nextBlocks.push({ blockType: 'cartWidget', variant: 'floating', __editorBlockIndex: -1 })
+        }
+    }
+
+    // Page-level promote: first whatsapp-button config found across pages → inject globally.
+    const whatsappBlock = extractFirstGlobalBlock(pages, 'whatsapp-button')
+    if (whatsappBlock) {
+        const hasFloatingWhatsapp = nextBlocks.some(
+            b => b.blockType === 'whatsapp-button' && (b as Record<string, unknown>).variant !== 'inline',
+        )
+        if (!hasFloatingWhatsapp) {
+            nextBlocks.push({ ...whatsappBlock, blockType: 'whatsapp-button', __editorBlockIndex: -1 })
+        }
+    }
+
+    // Page-level promote: first socialWidget config found across pages → inject globally.
+    const socialBlock = extractFirstGlobalBlock(pages, 'socialWidget')
+    if (socialBlock) {
+        const hasFloatingSocial = nextBlocks.some(
+            b => b.blockType === 'socialWidget' && (b as Record<string, unknown>).variant !== 'inline',
+        )
+        if (!hasFloatingSocial) {
+            nextBlocks.push({ ...socialBlock, blockType: 'socialWidget', __editorBlockIndex: -1 })
+        }
+    }
+
     return nextBlocks
 }
 
@@ -155,7 +192,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         ...block,
         __editorBlockIndex: block.__editorBlockIndex ?? index,
     }))
-    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site).map(b => {
+    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site, pages).map(b => {
         if (b.blockType !== 'breadcrumb') return b
         // Pass page slug so breadcrumb renders correct path (in editor, usePathname returns /preview/... not the real slug)
         // Runtime check required: Payload may store slug as null; type cast alone doesn't guard this
@@ -193,7 +230,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             slugToPageId.set(rawSlug.replace(/^\//, ''), pid)
         }
     }
-    const homepage = pages.find((p) => (p as NavPage & { isHomepage?: boolean }).isHomepage) ?? pages[0]
+    const homepage = pages.find((p) => p.isHomepage) ?? pages[0]
     if (homepage) {
         const homepageId = String(homepage.id)
         slugToPageId.set('/', homepageId)

@@ -111,6 +111,8 @@ export function BlockLibraryPanel({
                 description: blockTranslations?.[b.slug]?.description || b.description,
                 icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
                 defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
+                scope: b.scope ?? 'page',
+                scopeTooltip: b.scopeTooltip,
             })).filter(item => {
                 if (!keyword) return true
                 return (
@@ -198,7 +200,18 @@ export function BlockLibraryPanel({
                                                     {item.icon}
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="truncate text-[13px] font-medium text-slate-200">{item.name}</p>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <p className="truncate text-[13px] font-medium text-slate-200">{item.name}</p>
+                                                        {item.scope === 'global' && (
+                                                            <span
+                                                                title={item.scopeTooltip ?? 'Block toàn site'}
+                                                                className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold leading-none"
+                                                                style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}
+                                                            >
+                                                                🌐
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className="truncate text-[11px] text-slate-500">{item.description}</p>
                                                 </div>
                                                 <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
