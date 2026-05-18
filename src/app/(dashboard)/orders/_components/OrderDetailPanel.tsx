@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
+import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
 
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
@@ -19,6 +20,10 @@ export interface OrderDetail {
     paymentStatus: string
     paymentMethod: string
     paymentProofImage?: string | { url?: string } | null
+    paymentReference?: string
+    paymentRejectionReason?: string
+    paymentVerifiedAt?: string
+    paymentVerifiedBy?: string | { id: string; email?: string } | null
     subtotal: number
     shippingFee: number
     tax: number
@@ -36,6 +41,7 @@ export interface OrderDetail {
         country?: string
     }
     items: {
+        product?: string | number
         productName: string
         variant?: string
         quantity: number
@@ -941,6 +947,14 @@ export function OrderDetailPanel({
                     <div className="z-20 md:static md:p-0 md:m-0 md:bg-transparent">
                         <ActionButtons order={order} onUpdate={() => { fetchOrder(); onUpdate?.(); }} />
                     </div>
+
+                    {/* BT Verification Block */}
+                    {(order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'pending_verification') || (order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'paid') ? (
+                        <ManualPaymentVerificationBlock
+                            order={order}
+                            onUpdate={() => { fetchOrder(); onUpdate?.(); }}
+                        />
+                    ) : null}
 
                     {/* Customer Information */}
                     <CustomerInformation order={order} />

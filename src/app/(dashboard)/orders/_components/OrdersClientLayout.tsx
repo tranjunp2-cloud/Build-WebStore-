@@ -7,6 +7,7 @@ import { OrdersMetrics } from './OrdersMetrics'
 import { OrdersActionBar } from './OrdersActionBar'
 import { OrdersTable, Order } from './OrdersTable'
 import { OrderDetailPanel } from './OrderDetailPanel'
+import { AwaitingVerificationChip } from './AwaitingVerificationChip'
 
 // ─── ORDERS CLIENT LAYOUT ───
 // Table stays full width at all times.
@@ -82,6 +83,7 @@ export function OrdersClientLayout() {
             </div>
 
             <OrdersMetrics refreshCounter={refreshCounter} />
+            <AwaitingVerificationChip />
             <OrdersActionBar
                 pendingCount={pendingCount}
                 onBulkConfirm={handleBulkConfirm}

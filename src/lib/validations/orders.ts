@@ -55,3 +55,12 @@ export const orderBulkUpdateSchema = z.object({
         'completed', 'cancelled',
     ]),
 })
+
+// --- Reject Payment (Bank Transfer) ---
+export const rejectPaymentSchema = z.object({
+    reason: z.enum(['image_blurry', 'wrong_amount', 'duplicate_order', 'other']),
+    detail: z.string().optional(),
+}).refine(
+    d => d.reason !== 'other' || (d.detail != null && d.detail.trim().length >= 10),
+    { message: 'Detail required (≥10 chars) when reason is other', path: ['detail'] }
+)
