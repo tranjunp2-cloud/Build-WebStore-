@@ -2,8 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { formatPrice } from '@/lib/utils'
 import {
     validateCheckoutForm,
+    validateEmail,
+    validatePhone,
     calculateOrderTotals,
     generateOrderNumber,
+    validatePaymentProof,
+    PROOF_MAX_SIZE_BYTES,
 } from '@/lib/storefront'
 import { MY_STATES } from '@/lib/shipping'
 
@@ -272,33 +276,136 @@ describe('[TC-F09.11] Price Formatting — Malaysia RM (formatPrice)', () => {
     })
 })
 
-// ─── TC-F09.26: Malaysian States Dropdown ───────────────────────────────────
-describe('[TC-F09.26] Malaysian States List (MY_STATES)', () => {
-    it('TC-F09.26: contains exactly 16 states and territories', () => {
-        // Assert — Malaysia has 13 states + 3 federal territories
-        expect(MY_STATES).toHaveLength(16)
+// ─── TC-F09.24: Phone Format Validation ─────────────────────────────────────
+describe('[TC-F09.24] Phone Format Validation (validatePhone)', () => {
+    it('TC-F09.24: returns null for empty phone (phone is optional)', () => {
+        expect(validatePhone('')).toBeNull()
+        expect(validatePhone('   ')).toBeNull()
     })
 
-    it('TC-F09.26: includes all major states required for Malaysia market', () => {
-        // Assert — TC-F09.26 specifically requires: Selangor, Johor, Penang, Sabah, Sarawak
-        expect(MY_STATES).toContain('Kuala Lumpur')
-        expect(MY_STATES).toContain('Selangor')
-        expect(MY_STATES).toContain('Johor')
-        expect(MY_STATES).toContain('Sabah')
-        expect(MY_STATES).toContain('Sarawak')
-        expect(MY_STATES).toContain('Penang')
+    it('TC-F09.24: accepts local mobile format (012-3456789)', () => {
+        expect(validatePhone('012-3456789')).toBeNull()
     })
 
-    it('TC-F09.26: includes East Malaysia states (Sabah + Sarawak for shipping zone)', () => {
-        // Assert — TC-F09.34 references East MY for different shipping rate (RM 15.00)
-        expect(MY_STATES).toContain('Sabah')
-        expect(MY_STATES).toContain('Sarawak')
+    it('TC-F09.24: accepts local mobile without separator (0123456789)', () => {
+        expect(validatePhone('0123456789')).toBeNull()
     })
 
-    it('TC-F09.26: includes federal territories (KL, Labuan, Putrajaya)', () => {
-        // Assert
-        expect(MY_STATES).toContain('Kuala Lumpur')
-        expect(MY_STATES).toContain('Labuan')
-        expect(MY_STATES).toContain('Putrajaya')
+    it('TC-F09.24: accepts international format (+60 12 345 6789)', () => {
+        expect(validatePhone('+60 12 345 6789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts international without spaces (+601234567890)', () => {
+        expect(validatePhone('+6012-3456789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts 011 prefix with 8 digits (011-12345678)', () => {
+        expect(validatePhone('011-12345678')).toBeNull()
+    })
+
+    it('TC-F09.24: rejects too-short number (0123)', () => {
+        expect(validatePhone('0123')).not.toBeNull()
+    })
+
+    it('TC-F09.24: rejects non-MY format (starts with 1 directly)', () => {
+        expect(validatePhone('12345678')).not.toBeNull()
+    })
+
+    it('TC-F09.24: validateCheckoutForm includes phone format error when phone is invalid', () => {
+        const form = {
+            name: 'Ahmad', email: 'ahmad@email.com', phone: 'invalid-phone',
+            line1: '', line2: '', city: '', state: '', postcode: '',
+        }
+        const result = validateCheckoutForm(form)
+        expect(result.valid).toBe(false)
+        expect(result.errors).toContain('Invalid phone format')
+    })
+
+    it('TC-F09.24: validateCheckoutForm passes when phone is empty (optional)', () => {
+        const form = {
+            name: 'Ahmad', email: 'ahmad@email.com', phone: '',
+            line1: '', line2: '', city: '', state: '', postcode: '',
+        }
+        const { errors } = validateCheckoutForm(form)
+        expect(errors).not.toContain('Invalid phone format')
     })
 })
+
+// ─── TC-F09.24: Email Format Validation (standalone) ────────────────────────
+describe('[TC-F09.24] Email Format Validation (validateEmail)', () => {
+    it('TC-F09.24: returns null for empty email (required handled separately)', () => {
+        expect(validateEmail('')).toBeNull()
+    })
+
+    it('TC-F09.24: returns null for valid email', () => {
+        expect(validateEmail('user@example.com')).toBeNull()
+        expect(validateEmail('user+tag@domain.co.my')).toBeNull()
+    })
+
+    it('TC-F09.24: returns error string for invalid email', () => {
+        expect(validateEmail('not-an-email')).not.toBeNull()
+        expect(validateEmail('abc@.com')).not.toBeNull()
+        expect(validateEmail('@nodomain')).not.toBeNull()
+    })
+})
+
+// ─── TC-F09.188: Payment Proof File Validator ───────────────────────────────
+describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
+    it('TC-F09.188: accepts JPEG file within size limit', () => {
+        // Arrange
+        const file = { type: 'image/jpeg', size: 1 * 1024 * 1024 } // 1 MB
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: accepts PNG file within size limit', () => {
+        // Arrange
+        const file = { type: 'image/png', size: 500 * 1024 } // 500 KB
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: rejects file exceeding 2 MB limit', () => {
+        // Arrange — 1 byte over limit
+        const file = { type: 'image/jpeg', size: PROOF_MAX_SIZE_BYTES + 1 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('FILE_TOO_LARGE')
+    })
+
+    it('TC-F09.188: accepts file exactly at 2 MB boundary (inclusive)', () => {
+        // Arrange — exactly at limit
+        const file = { type: 'image/png', size: PROOF_MAX_SIZE_BYTES }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: rejects PDF (unsupported type)', () => {
+        // Arrange
+        const file = { type: 'application/pdf', size: 500 * 1024 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+
+    it('TC-F09.188: rejects GIF (unsupported type)', () => {
+        // Arrange
+        const file = { type: 'image/gif', size: 100 * 1024 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+
+    it('TC-F09.188: INVALID_TYPE takes precedence over FILE_TOO_LARGE', () => {
+        // Arrange — wrong type AND oversized
+        const file = { type: 'application/pdf', size: PROOF_MAX_SIZE_BYTES + 1 }
+
+        // Act + Assert — type checked first
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+})
+
+// TC-F09.26: MY_STATES static list removed — states now served from DB via GET /api/geo/states

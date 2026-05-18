@@ -358,6 +358,48 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'paymentConfig',
+            type: 'group',
+            label: 'Payment Configuration',
+            fields: [
+                {
+                    name: 'merchantQrCode',
+                    type: 'upload',
+                    relationTo: 'media',
+                    label: 'Merchant QR Code',
+                    admin: { description: 'QR code image for QR Banking payments. Shown to customer at checkout.' },
+                },
+                {
+                    name: 'enableCod',
+                    type: 'checkbox',
+                    label: 'Enable Cash on Delivery',
+                    defaultValue: true,
+                },
+                {
+                    name: 'enableQrBanking',
+                    type: 'checkbox',
+                    label: 'Enable QR Banking',
+                    defaultValue: true,
+                },
+                {
+                    name: 'bankName',
+                    type: 'text',
+                    label: 'Bank Name',
+                    admin: { description: 'e.g. Maybank, CIMB, Public Bank' },
+                },
+                {
+                    name: 'bankAccountNo',
+                    type: 'text',
+                    label: 'Account Number',
+                },
+                {
+                    name: 'bankAccountHolder',
+                    type: 'text',
+                    label: 'Account Holder Name',
+                },
+            ],
+        },
+        {
             name: 'headerBlock',
             type: 'json',
             admin: { description: 'Global header/navigation block for all pages' },

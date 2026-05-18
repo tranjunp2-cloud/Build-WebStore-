@@ -78,27 +78,43 @@ function getNewFieldsFromDiff() {
     const filePath = `src/collections/${filename}`
 
     try {
-      // Get only ADDED lines in collection file
-      const diff = execSync(
-        `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" | grep "name:" || true`,
+      // Pages.ts has a unique shape handled by checkNewPagesBlockFields.
+      if (filename === 'Pages.ts') continue
+
+      // Get full added-line diff to detect group fields (groups don't create DB columns).
+      const fullDiff = execSync(
+        `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" || true`,
         { encoding: 'utf8' }
       ).trim()
 
-      if (!diff) continue
+      if (!fullDiff) continue
 
-      // Pages.ts has a unique shape: the collection has many nested
-      // block definitions (NavigationBlock, ContactBlock, ...). A `name:`
-      // inside a block maps to `pages_blocks_{slug}`, NOT `pages`. The
-      // generic field extraction can't tell them apart from the diff
-      // alone, so `checkNewPagesBlockFields` handles Pages.ts separately
-      // (it parses the whole file, resolves which block owns each added
-      // field, and validates the right `pages_blocks_*.{col}` migration).
-      if (filename === 'Pages.ts') continue
+      // Identify group-typed fields from the diff so we can skip them.
+      // Strategy: for each added `name: 'xxx'` line, look at nearby lines (±6)
+      // for a sibling `type: 'group'` at the same indentation.
+      const diffLines = fullDiff.split('\n')
+      const groupFieldNames = new Set()
+      for (let i = 0; i < diffLines.length; i++) {
+        const nameMatch = diffLines[i].match(/^\+(\s*)name:\s*['"](\w+)['"]/)
+        if (!nameMatch) continue
+        const indent = nameMatch[1].length
+        const fieldName = nameMatch[2]
+        for (let j = Math.max(0, i - 2); j <= Math.min(diffLines.length - 1, i + 8); j++) {
+          if (j === i) continue
+          const typeMatch = diffLines[j].match(/^\+(\s*)type:\s*['"](\w+)['"]/)
+          if (typeMatch && typeMatch[1].length === indent && typeMatch[2] === 'group') {
+            groupFieldNames.add(fieldName)
+            break
+          }
+        }
+      }
 
-      // Extract field names from added lines
+      // Extract field names from added `name:` lines, skipping group fields.
+      const nameDiff = diffLines.filter(l => l.includes('name:')).join('\n')
       const regex = /name:\s*['"](\w+)['"]/g
       let match
-      while ((match = regex.exec(diff)) !== null) {
+      while ((match = regex.exec(nameDiff)) !== null) {
+        if (groupFieldNames.has(match[1])) continue // groups have no DB column
         newFields.push({
           field: match[1],
           snake: toSnakeCase(match[1]),
@@ -130,8 +146,13 @@ function getNewFieldsFromDiff() {
   return newFields
 }
 
-// Known Payload group field prefixes — only strip these when matching migrations
-const KNOWN_GROUP_PREFIXES = ['theme', 'seo', 'payments', 'badge', 'ai_generation_metadata', 'shipping_config']
+// Known Payload group field prefixes — only strip these when matching migrations.
+// When a column like `payment_config_merchant_qr_code_id` exists, also register
+// the unprefixed form `merchant_qr_code_id` and (for uploads) `merchant_qr_code`.
+const KNOWN_GROUP_PREFIXES = [
+  'theme', 'seo', 'payments', 'badge', 'ai_generation_metadata',
+  'payment_config', 'shipping_config',
+]
 
 function getMigrationColumns() {
   const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
@@ -144,11 +165,16 @@ function getMigrationColumns() {
     const table = match[1]
     const col = match[2]
     columns.add(`${table}.${col}`)
-    // Also register without known group prefix (e.g., theme_accent_color → accent_color)
+    // Also register without known group prefix (e.g., payment_config_enable_cod → enable_cod).
+    // For upload/relationship columns ending in _id, also register without the _id suffix
+    // so diff-based checks (which use bare field names) can match them.
     for (const prefix of KNOWN_GROUP_PREFIXES) {
       if (col.startsWith(`${prefix}_`)) {
         const withoutPrefix = col.slice(prefix.length + 1)
         columns.add(`${table}.${withoutPrefix}`)
+        if (withoutPrefix.endsWith('_id')) {
+          columns.add(`${table}.${withoutPrefix.slice(0, -3)}`)
+        }
         break
       }
     }

@@ -47,6 +47,21 @@ export async function POST(request: Request) {
 
         const tenantId = typeof site.tenant === 'object' ? (site.tenant as any).id : site.tenant
 
+        // Enforce per-site payment method configuration
+        const pc = (site as any).paymentConfig
+        if (paymentMethod === 'cod' && pc?.enableCod === false) {
+            return NextResponse.json(
+                { success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'COD is not available for this store' } },
+                { status: 422 }
+            )
+        }
+        if (paymentMethod === 'qr_banking' && pc?.enableQrBanking === false) {
+            return NextResponse.json(
+                { success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'QR Banking is not available for this store' } },
+                { status: 422 }
+            )
+        }
+
         // Validate products, check stock, and calculate totals
         const orderItems = []
         let subtotal = 0
@@ -153,6 +168,7 @@ export async function POST(request: Request) {
                 currency,
                 status: 'pending',
                 paymentMethod,
+                paymentStatus: paymentMethod === 'qr_banking' ? 'paid' : 'unpaid',
                 ...(paymentProofImage ? { paymentProofImage } : {}),
                 customerEmail: customer.email,
                 customerName: customer.name,

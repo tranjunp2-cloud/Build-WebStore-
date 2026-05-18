@@ -22,6 +22,25 @@ export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
 export const Orders: CollectionConfig = {
     slug: 'orders',
     hooks: {
+        beforeChange: [
+            async ({ data, originalDoc }) => {
+                // COD: seller marks completed → auto paymentStatus=paid
+                if (
+                    data.status === 'completed' &&
+                    originalDoc?.status !== 'completed' &&
+                    originalDoc?.paymentMethod === 'cod'
+                ) {
+                    data.paymentStatus = 'paid'
+                }
+                // Any method cancelled → paymentStatus=cancelled (if still unpaid)
+                if (data.status === 'cancelled' && originalDoc?.status !== 'cancelled') {
+                    if (!data.paymentStatus || data.paymentStatus === 'unpaid') {
+                        data.paymentStatus = 'cancelled'
+                    }
+                }
+                return data
+            },
+        ],
         afterChange: [
             async ({ doc, operation, req }) => {
                 if (operation !== 'create') return doc
@@ -183,6 +202,19 @@ export const Orders: CollectionConfig = {
             ],
         },
         // --- Payment ---
+        {
+            name: 'paymentStatus',
+            type: 'select',
+            defaultValue: 'unpaid',
+            index: true,
+            options: [
+                { label: 'Unpaid', value: 'unpaid' },
+                { label: 'Paid', value: 'paid' },
+                { label: 'Failed', value: 'failed' },
+                { label: 'Refunded', value: 'refunded' },
+                { label: 'Cancelled', value: 'cancelled' },
+            ],
+        },
         {
             name: 'paymentMethod',
             type: 'select',

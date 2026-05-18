@@ -67,7 +67,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
     it('restocks inventory on cancellation', async () => {
         mockFindByID
             .mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', items: [{ product: 'prod-1', quantity: 3 }] }) // order
-            .mockResolvedValueOnce({ id: 'prod-1', inventory: 5 }) // product for restock
+            .mockResolvedValueOnce({ id: 'prod-1', stock: 5 }) // product for restock (stock field, not inventory)
         mockUpdate
             .mockResolvedValueOnce({ id: 'order-1', status: 'cancelled', customer: {} }) // cancel
             .mockResolvedValueOnce({}) // restock
@@ -78,5 +78,84 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
 
         expect(body.success).toBe(true)
         expect(body.restock).toBeDefined()
+    })
+
+    it('[TC-F10.16-FIX-1] Cancellation email sent to customerEmail field', async () => {
+        const { sendEmail } = await import('@/lib/email/send')
+
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'order-1', status: 'pending', items: [], customerEmail: 'test@example.com', customerName: 'John Doe' })
+        mockUpdate
+            .mockResolvedValueOnce({ id: 'order-1', status: 'cancelled', customerEmail: 'test@example.com', customerName: 'John Doe' })
+
+        const req = { json: () => Promise.resolve({ reason: 'Customer request' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        // Verify email was sent to customerEmail field (not customer.email)
+        expect(sendEmail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                to: 'test@example.com'
+            })
+        )
+    })
+
+    it('[TC-F10.16-FIX-2] Restock updates stock field (not inventory)', async () => {
+        mockFindByID
+            .mockResolvedValueOnce({ id: 'order-1', status: 'confirmed', items: [{ product: 'prod-2', quantity: 2 }] })
+            .mockResolvedValueOnce({ id: 'prod-2', stock: 10 }) // stock field
+        mockUpdate
+            .mockResolvedValueOnce({ id: 'order-1', status: 'cancelled' })
+            .mockResolvedValueOnce({}) // restock update
+
+        const req = { json: () => Promise.resolve({ reason: 'Test' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+
+        expect(res.status).toBe(200)
+        // Verify second update call used stock field (10 + 2 = 12)
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    stock: 12 // Updated stock: 10 + 2 items
+                })
+            })
+        )
+    })
+
+    it('[TC-F10.16-FIX-3] Cancel QR Banking order → paymentStatus set to cancelled', async () => {
+        mockFindByID
+            .mockResolvedValueOnce({
+                id: 'order-3',
+                status: 'pending',
+                items: [],
+                paymentMethod: 'qr_banking',
+                paymentStatus: 'unpaid',
+                customerEmail: 'qr@test.com',
+                customerName: 'QR Customer'
+            })
+        mockUpdate
+            .mockResolvedValueOnce({
+                id: 'order-3',
+                status: 'cancelled',
+                paymentStatus: 'cancelled'
+            })
+
+        const req = { json: () => Promise.resolve({ reason: 'Customer changed mind' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        // Verify update call included status: cancelled
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    status: 'cancelled',
+                    cancelReason: 'Customer changed mind'
+                })
+            })
+        )
     })
 })

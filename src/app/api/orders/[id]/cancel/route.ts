@@ -96,11 +96,11 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                     continue
                 }
 
-                const currentStock = (product as any).inventory || 0
+                const currentStock = (product as any).stock ?? 0
                 await payload.update({
                     collection: 'products',
                     id: productId,
-                    data: { inventory: currentStock + item.quantity } as any,
+                    data: { stock: currentStock + item.quantity } as any,
                 })
 
                 restockResults.push({ productId: String(productId), restocked: item.quantity })
@@ -113,14 +113,14 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
 
         // Send cancellation email to customer
         try {
-            const customerEmail = updated.customer?.email
+            const customerEmail = (updated as any).customerEmail
             if (customerEmail) {
                 await sendEmail({
                     to: customerEmail,
-                    subject: `[Order Cancelled] Your Order #${updated.id} has been cancelled`,
+                    subject: `[Order Cancelled] Your Order #${(updated as any).orderNumber || updated.id} has been cancelled`,
                     html: `
-                        <p>Hi ${updated.customer?.name || 'Customer'},</p>
-                        <p>Your order <strong>#${updated.id}</strong> has been cancelled by the store administrator.</p>
+                        <p>Hi ${(updated as any).customerName || 'Customer'},</p>
+                        <p>Your order <strong>#${(updated as any).orderNumber || updated.id}</strong> has been cancelled by the store administrator.</p>
                         <p><strong>Reason:</strong> ${reason}</p>
                         <p>If you have any questions, please contact our support team.</p>
                     `

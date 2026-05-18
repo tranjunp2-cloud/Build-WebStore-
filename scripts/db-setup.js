@@ -18,6 +18,7 @@
  */
 const { spawn } = require('child_process');
 const { bootstrapSeed } = require('./bootstrap-seed');
+const { seedMalaysiaGeo } = require('./seed-malaysia-geo-boot');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -3806,6 +3807,23 @@ const MIGRATIONS = [
   // Remove 'tenant-owner' from users_roles for users who have tenant memberships but are not an owner
   // in any of them. Owners (users_tenants.role = 'owner') are unaffected.
   { name: 'users_roles.strip_tenant_owner_from_non_owners', sql: `DELETE FROM users_roles WHERE value = 'tenant-owner' AND parent_id IN (SELECT DISTINCT u.id FROM users u WHERE EXISTS (SELECT 1 FROM users_tenants ut WHERE ut._parent_id = u.id) AND NOT EXISTS (SELECT 1 FROM users_tenants ut WHERE ut._parent_id = u.id AND ut.role = 'owner'));` },
+  // GH-961: paymentStatus — separate payment tracking field for COD/QR Banking orders
+  { name: 'orders.payment_status', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status varchar DEFAULT 'unpaid';` },
+  { name: 'orders.payment_status_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_status_idx ON orders (payment_status);` },
+  // GH-961: Sites paymentConfig group — merchant QR code + payment method toggles per site
+  { name: 'sites.payment_config_merchant_qr_code_id', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_merchant_qr_code_id integer;` },
+  { name: 'sites.payment_config_enable_cod', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_enable_cod boolean DEFAULT true;` },
+  { name: 'sites.payment_config_enable_qr_banking', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_enable_qr_banking boolean DEFAULT true;` },
+  { name: 'sites.payment_config_bank_name', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_bank_name varchar;` },
+  { name: 'sites.payment_config_bank_account_no', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_bank_account_no varchar;` },
+  { name: 'sites.payment_config_bank_account_holder', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_bank_account_holder varchar;` },
+  // GH-961: Malaysia geo reference tables for checkout cascade dropdowns (state → district → postcode)
+  { name: 'malaysia_states.create_table', sql: `CREATE TABLE IF NOT EXISTS malaysia_states (id serial PRIMARY KEY, name varchar(60) NOT NULL UNIQUE, state_code varchar(5) NOT NULL UNIQUE, zone varchar(5) NOT NULL DEFAULT 'west');` },
+  { name: 'malaysia_states.create_idx', sql: `CREATE INDEX IF NOT EXISTS idx_malaysia_states_code ON malaysia_states(state_code);` },
+  { name: 'malaysia_districts.create_table', sql: `CREATE TABLE IF NOT EXISTS malaysia_districts (id serial PRIMARY KEY, state_id integer NOT NULL REFERENCES malaysia_states(id), name varchar(100) NOT NULL);` },
+  { name: 'malaysia_districts.create_idx', sql: `CREATE INDEX IF NOT EXISTS idx_malaysia_districts_state ON malaysia_districts(state_id);` },
+  { name: 'malaysia_postcodes.create_table', sql: `CREATE TABLE IF NOT EXISTS malaysia_postcodes (id serial PRIMARY KEY, postcode varchar(5) NOT NULL UNIQUE, district_id integer NOT NULL REFERENCES malaysia_districts(id));` },
+  { name: 'malaysia_postcodes.create_idx', sql: `CREATE INDEX IF NOT EXISTS idx_malaysia_postcodes_district ON malaysia_postcodes(district_id);` },
 
   // GH-960 — _pages_v column required by CI check (billing_toggle is a block field, harmless extra col)
   { name: '_pages_v.version_billing_toggle', sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_billing_toggle varchar;` },
@@ -4017,6 +4035,18 @@ async function runBootstrapSeed(pool) {
     } else {
       console.warn(`[db-setup]   ⚠️  ${r.label}: error during bootstrap`);
     }
+  }
+
+  console.log('[db-setup] Bootstrap: seeding Malaysia geo data...');
+  try {
+    const geo = await seedMalaysiaGeo(pool);
+    if (geo.action === 'exists') {
+      console.log(`[db-setup]   ✅ Malaysia geo: EXISTS (${geo.count} states) — skipped`);
+    } else {
+      console.log(`[db-setup]   ✅ Malaysia geo: SEEDED — ${geo.states} states, ${geo.districts} districts, ${geo.postcodes} postcodes`);
+    }
+  } catch (e) {
+    console.warn('[db-setup]   ⚠️  Malaysia geo seed failed (non-blocking):', e.message);
   }
 }
 

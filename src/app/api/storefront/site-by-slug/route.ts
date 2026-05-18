@@ -37,8 +37,8 @@ export async function GET(req: Request) {
             collection: 'sites',
             where: { tenant: { equals: tenant.id } },
             limit: 1,
-            depth: 0,
-            select: { id: true },
+            depth: 1,
+            select: { id: true, paymentConfig: true, theme: true },
             overrideAccess: true,
         })
 
@@ -47,9 +47,23 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
         }
 
+        const paymentConfig = (site as any).paymentConfig
+        const merchantQrCode = paymentConfig?.merchantQrCode
+        const merchantQrCodeUrl = merchantQrCode && typeof merchantQrCode === 'object'
+            ? (merchantQrCode.url ?? null)
+            : null
+
         return NextResponse.json({
             siteId: site.id,
             tenantId: tenant.id,
+            merchantQrCodeUrl,
+            enableCod: paymentConfig?.enableCod ?? true,
+            enableQrBanking: paymentConfig?.enableQrBanking ?? true,
+            bankName: paymentConfig?.bankName ?? null,
+            bankAccountNo: paymentConfig?.bankAccountNo ?? null,
+            bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
+            shippingConfig: (site as any).shippingConfig ?? null,
+            theme: (site as any).theme ?? null,
         })
     } catch (error) {
         console.error('[Storefront site-by-slug]', error)
