@@ -488,6 +488,35 @@ describe('POST /api/orders/stripe-checkout [TC-F13]', () => {
         expect(body.error.code).toBe('STRIPE_API_ERROR')
     })
 
+    // ─── TC-F13.103: Free order (total <= 0) — skip Stripe ──────────
+    it('[TC-F13.103] returns 200 paid status for free order without creating Stripe session', async () => {
+        // Arrange — zero-price product: subtotal=0, tax=0, shipping=10 BUT total rounded to 10
+        // Use subtotal=-10 to simulate coupon bringing total to <=0
+        mockFindByID
+            .mockResolvedValueOnce(VALID_SITE)
+            .mockResolvedValueOnce(VALID_TENANT)
+        mockBuildOrderItems.mockResolvedValue({
+            orderItems: [{ product: 'prod-1', productName: 'Free Item', quantity: 1, unitPrice: 0 }],
+            checkoutItems: [],
+            subtotal: -10, // coupon discount drives total <= 0
+            currency: 'MYR',
+            errorResponse: null,
+        })
+        mockCreate.mockResolvedValue({ id: 'order-free', orderNumber: 'ORD-FREE123' })
+
+        // Act
+        const req = mockRequest(VALID_REQUEST_BODY)
+        const res = await POST(req)
+        const body = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        expect(body.data.status).toBe('paid')
+        expect(body.data.sessionUrl).toBeNull()
+        expect(mockCreateCheckoutSession).not.toHaveBeenCalled()
+    })
+
     // ─── Error handling ──────────────────────────────────────────────
     it('returns 500 INTERNAL_ERROR on unexpected exception', async () => {
         // Arrange

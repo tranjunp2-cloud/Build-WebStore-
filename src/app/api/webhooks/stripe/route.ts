@@ -279,7 +279,7 @@ async function handlePaymentFailed(
     const order = orders.docs[0] as unknown as OrderDoc
 
     // Skip if order already moved past payment stage (late-arriving event, out-of-order delivery)
-    const skipStatuses = ['new', 'confirmed', 'ready_to_ship', 'shipped', 'completed', 'refunded', 'payment_failed']
+    const skipStatuses = ['new', 'confirmed', 'ready_to_ship', 'shipped', 'completed', 'refunded', 'payment_failed', 'cancelled']
     if (skipStatuses.includes(order.status)) {
         console.log(`[Stripe Webhook] Order ${order.id} already in ${order.status} — skipping payment_failed`)
         return

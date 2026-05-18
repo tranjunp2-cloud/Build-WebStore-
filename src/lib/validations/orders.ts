@@ -14,9 +14,9 @@ export const stripeCheckoutSchema = z.object({
         variant: z.string().optional(),
     })).min(1).max(MAX_CHECKOUT_ITEMS),
     customer: z.object({
-        name: z.string().min(1),
+        name: z.string().min(1).max(150),
         email: z.string().email(),
-        phone: z.string().optional(),
+        phone: z.string().max(30).optional(),
         address: z.object({
             line1: z.string().optional(),
             line2: z.string().optional(),

@@ -90,8 +90,8 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // TC-F13.88: suspended or banned tenant cannot accept payments
-        if ((tenant as any).status === 'suspended' || (tenant as any).bannedAt) {
+        // TC-F13.88: suspended tenant cannot accept payments
+        if ((tenant as any).status === 'suspended') {
             return NextResponse.json(
                 { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
                 { status: 403 },
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 6: Validate products, check stock, build line items
-        const built = await buildOrderItems(payload, items)
+        const built = await buildOrderItems(payload, items, siteIdNum)
         if (built.errorResponse) return built.errorResponse
 
         const { orderItems, checkoutItems, subtotal, currency } = built
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
         // Calculate totals (SST 6% + flat shipping — #962 will replace shipping calc)
         const shippingFee = 10
         const tax = Math.round(subtotal * 0.06 * 100) / 100
-        const total = subtotal + shippingFee + tax
+        const total = Math.round((subtotal + shippingFee + tax) * 100) / 100
         const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
 
         // TC-F13.103: free order (coupon 100% off or zero-priced) — skip Stripe
