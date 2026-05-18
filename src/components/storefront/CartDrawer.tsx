@@ -115,12 +115,15 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                                 <span style={{ fontSize: '14px', fontWeight: 600, color: '#191c1d', padding: '4px 12px', lineHeight: '20px' }}>
                                                     {item.quantity}
                                                 </span>
-                                                <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d' }}>
+                                                <button
+                                                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                                                    disabled={item.inventory !== undefined && item.quantity >= item.inventory}
+                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', display: 'flex', alignItems: 'center', color: '#191c1d', opacity: (item.inventory !== undefined && item.quantity >= item.inventory) ? 0.3 : 1 }}>
                                                     <Plus size={7} />
                                                 </button>
                                             </div>
                                             <span style={{ fontSize: '16px', fontWeight: 700, color: CSS_VARS.primary, lineHeight: '24px', fontFamily: CSS_VARS.fontHeading }}>
-                                                {formatPrice(item.price, currency)}
+                                                {formatPrice(item.price, item.currency)}
                                             </span>
                                         </div>
                                     </div>
