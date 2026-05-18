@@ -3936,6 +3936,20 @@ const MIGRATIONS = [
   },
   { name: 'pages_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "pages_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
+
+  // GH-1004: F10 v2.2 Bank Transfer verification schema fields
+  { name: 'orders.payment_reference_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_reference_idx ON orders (payment_reference);` },
+  { name: 'orders.payment_expires_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_expires_at timestamp;` },
+  { name: 'orders.payment_expires_at_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_expires_at_idx ON orders (payment_expires_at);` },
+  { name: 'orders.payment_rejection_reason', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_rejection_reason varchar;` },
+  { name: 'orders.payment_rejection_detail', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_rejection_detail text;` },
+  { name: 'orders.payment_verified_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_at timestamp;` },
+  { name: 'orders.payment_verified_by_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_by_id integer;` },
+  { name: 'orders.magic_link_secret', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS magic_link_secret varchar;` },
+  { name: 'orders.verification_source', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS verification_source varchar DEFAULT 'manual';` },
+  { name: 'orders.auto_verified_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS auto_verified_at timestamp;` },
+  { name: 'orders.bank_transaction_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS bank_transaction_id varchar;` },
+  { name: 'orders.backfill_bank_transfer_method', sql: `UPDATE orders SET payment_method='bank_transfer' WHERE payment_method='qr_banking' AND payment_status NOT IN ('paid','cancelled','refunded') AND created_at > NOW() - INTERVAL '7 days';` },
 ];
 
 async function runMigrations(pool) {
@@ -4415,6 +4429,9 @@ async function main() {
   -- F10 Array/Nested Bypass
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS variant
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_proof_image
+  -- F10 v2.2 Relationship Bypass: paymentVerifiedBy → Payload uses payment_verified_by_id column;
+  -- bare name registered here so check-migrations CI can match the field name.
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_by
 
   -- F19 Payments Group Bypass
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments
