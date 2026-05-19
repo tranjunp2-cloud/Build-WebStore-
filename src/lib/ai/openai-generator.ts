@@ -58,6 +58,37 @@ export type SSEEvent = {
 }
 
 /**
+ * Detect language from user's business info input text.
+ * Used to route 'auto' language requests: if input is Malay or Vietnamese,
+ * skip template-first (English-only templates) and use AI-first instead.
+ */
+function guessLanguageFromInput(info: BusinessInfoInput): 'ms' | 'vi' | 'en' {
+    const text = [info.businessName, info.shortDescription, info.products, info.industry]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+    // Vietnamese: diacritical marks not found in Malay or English
+    if (/[àáâãèéêìíòóôõùúýăđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/.test(text)) {
+        return 'vi'
+    }
+
+    // Malay grammar/function words — reliable indicators that won't appear in
+    // English descriptions of Malaysian businesses. Require 2+ matches to avoid
+    // false positives from single loanwords like "roti" or "nasi".
+    const MALAY_FUNCTION_WORDS = new Set([
+        'dan', 'atau', 'untuk', 'yang', 'dengan', 'tidak', 'kami', 'anda',
+        'kepada', 'dari', 'juga', 'dalam', 'akan', 'boleh', 'sudah', 'adalah',
+        'keperluan', 'perkhidmatan', 'menyediakan', 'menggunakan', 'ialah',
+    ])
+    const tokens = text.split(/\W+/).filter(Boolean)
+    const malayMatches = tokens.filter(t => MALAY_FUNCTION_WORDS.has(t)).length
+    if (malayMatches >= 2) return 'ms'
+
+    return 'en'
+}
+
+/**
  * Generate a complete website using OpenAI GPT-4o with streaming.
  * Falls back to rule-based generation if API key missing or AI fails.
  *
@@ -122,7 +153,11 @@ export async function generateSiteWithAI(
     const genMode = process.env.GEN_MODE?.trim() || 'template-first'
     const hasCustomInput = Boolean(extraInstructions?.trim()) || Boolean(referencePrompt?.trim())
 
-    if (genMode === 'template-first' && !hasCustomInput) {
+    // Template-first uses hardcoded English templates — only hero/SEO are GPT-personalized.
+    // Skip it for explicit non-English languages and for 'auto' when user's input text
+    // is detected as Malay/Vietnamese so AI-first generates fully localized content.
+    const detectedLang = language === 'auto' ? guessLanguageFromInput(businessInfo) : language
+    if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en') {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
         const templateResult = await generateTemplateFirst(
