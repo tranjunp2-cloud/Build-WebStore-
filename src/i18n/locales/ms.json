@@ -2470,7 +2470,8 @@
         },
         "cartWidget": {
           "name": "Butang Troli",
-          "description": "Widget troli beli-belah"
+          "description": "Widget troli beli-belah",
+          "scopeTooltip": "Komponen ini muncul di seluruh laman web apabila halaman mempunyai produk, membantu pelanggan menyemak troli dan membuat pembayaran di mana-mana sahaja."
         },
         "contact": {
           "name": "Hubungi",
@@ -2482,7 +2483,8 @@
         },
         "whatsapp-button": {
           "name": "Butang WhatsApp",
-          "description": "Butang hubungi WhatsApp"
+          "description": "Butang hubungi WhatsApp",
+          "scopeTooltip": "Butang sembang sokongan akan dipaparkan secara automatik di semua halaman laman web selepas anda menambahkannya."
         },
         "stats": {
           "name": "Statistik",
@@ -2494,7 +2496,8 @@
         },
         "socialWidget": {
           "name": "Media Sosial",
-          "description": "Widget pautan media sosial"
+          "description": "Widget pautan media sosial",
+          "scopeTooltip": "Ikon media sosial akan muncul secara serentak di seluruh laman web membantu meningkatkan sambungan."
         },
         "team": {
           "name": "Pasukan",
@@ -2508,7 +2511,12 @@
           "name": "Bar Pengumuman",
           "description": "Sepanduk atas untuk promosi"
         }
-      }
+      },
+      "globalScopeTooltipDefault": "Komponen ini muncul secara global di semua halaman laman web.",
+      "pageScopeTooltipDefault": "Komponen ini hanya muncul di halaman yang anda seret masuk.",
+      "globalScopeLabel": "Global",
+      "pageScopeLabel": "Peringkat Halaman",
+      "alreadyAddedHint": "Sudah ditambah — klik untuk edit tetapan"
     },
     "inlineEdit": {
       "title": "Suntingan AI Sebaris",
@@ -2794,7 +2802,8 @@
       "pricingYesDiscard": "Ya, buang",
       "pricingIncludedToggle": "Disertakan — klik untuk kecualikan",
       "pricingExcludedToggle": "Dikecualikan — klik untuk sertakan",
-      "pricingDeleteRow": "Padam baris {n}"
+      "pricingDeleteRow": "Padam baris {n}",
+      "cartDeleteLocked": "Troli diperlukan apabila blok produk hadir"
     },
     "statusBar": {
       "connected": "Disambungkan",

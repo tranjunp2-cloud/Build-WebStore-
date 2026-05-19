@@ -1,5 +1,5 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F09 - Storefront Commerce
-> **Phiên bản:** 5.4 | **Cập nhật:** 2026-05-15 (thêm TC-F09.182..204 — Checkout design coverage ledger + live UI flows) | **Thực hiện:** QA Team
+> **Phiên bản:** 5.5 | **Cập nhật:** 2026-05-18 (thêm TC-F09.205..222 — GH-1023 Floating Cart Global Injection + Commerce Detection + Scope Tags) | **Thực hiện:** QA Team
 > **Nguồn Tham chiếu:** PRD (`F09-storefront-commerce.md`), User Stories (14 Core ACs), Figma (Node 30905:1342)
 > **Kỹ năng ứng dụng (.agent):** BDD (Gherkin), Malaysia Market Context (SST/MY Shipping), Mobile Native UX, Security QR Proof Validation.
 
@@ -372,5 +372,114 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **4. Security & Sanitization** | [x] PARTIAL | Price spoofing (TC-F09.74), neg qty (TC-F09.75), sort/limit/page injection (TC-F09.87–90), PII leak (TC-F09.91), slug XSS (TC-F09.97–98) — automated. MIME spoof + IDOR confirm — defer Wave 7+. |
 | **5. E2E UAT Approval** | [ ] NOT RUN | Cần đồng thuận từ PO/BA dựa trên 100 cases. |
 | **6. Edge & Race (v5.1)** | [x] DOCUMENTED | TC-F09.74..100 = 27 auto tests, 74/74 PASS. Race stock (TC-F09.82) document hiện trạng cần hardening Wave 7+. |
+| **7. GH-1023 Global Injection (v5.5)** | [ ] PENDING | TC-F09.205..222 — unit + BlockMeta scope, pending tester run. |
 
 > **Khuyến Nghị Release:** Bộ **100 TCs** (TC-F09.01..100) phủ 14 ACs + 30 edge/security gaps từ ck:scenario audit. 27 TCs mới đều auto-run (74/74 PASS). Sẵn sàng UAT.
+
+---
+
+## GH-1023 — Floating Cart Global Injection & Commerce Detection [TC-F09.205..222]
+
+> **Thêm v5.5 (2026-05-18)** — Unit tests cho `detectCommercePresence`, `extractFirstGlobalBlock`, `hasHeaderCart`, `applyGlobalSystemBlocks` extension, CartDrawer entry points, BlockMeta scope.
+
+### A) detectCommercePresence [TC-F09.205..208]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F09.205** | Unit | High | detectCommercePresence — pages rỗng → false | `detectCommercePresence([])` trả về `false` | GH-1023 P1 |
+| **TC-F09.206** | Unit | High | detectCommercePresence — pages không có commerce block → false | Không có products-grid/products-featured/product-quick-view | GH-1023 P1 |
+| **TC-F09.207** | Unit | Critical | detectCommercePresence — 1 page có products-grid → true | `layout: [{blockType:'products-grid'}]` | GH-1023 P1 |
+| **TC-F09.208** | Unit | Medium | detectCommercePresence — layout malformed (non-array) → false (no crash) | Graceful fallback khi `layout` không phải array | GH-1023 P1 |
+
+### B) hasHeaderCart [TC-F09.209..211]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F09.209** | Unit | High | hasHeaderCart — null headerBlock → false | Không crash khi headerBlock là null | GH-1023 P1 |
+| **TC-F09.210** | Unit | High | hasHeaderCart — headerBlock có `showCart: true` → true | Phát hiện cart button trên header | GH-1023 P1 |
+| **TC-F09.211** | Unit | High | hasHeaderCart — headerBlock không có cart field → false | Nav hiện tại không có cart field | GH-1023 P1 |
+
+### C) applyGlobalSystemBlocks extension [TC-F09.212..218]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F09.212** | Unit | Critical | applyGlobalSystemBlocks — commerce detected + no header cart → inject cartWidget | blocks kết quả có `blockType:'cartWidget', variant:'floating'` | GH-1023 P1 |
+| **TC-F09.213** | Unit | Critical | applyGlobalSystemBlocks — commerce detected + header cart present → NO inject | `hasHeaderCart` trả true → không inject cart | GH-1023 P1 |
+| **TC-F09.214** | Unit | Critical | applyGlobalSystemBlocks — no commerce → NO cart inject | `detectCommercePresence` trả false → không inject | GH-1023 P1 |
+| **TC-F09.215** | Unit | High | applyGlobalSystemBlocks — whatsAppBlock found → inject globally | blocks có `blockType:'whatsapp-button'` từ first-found page | GH-1023 P1 |
+| **TC-F09.216** | Unit | High | applyGlobalSystemBlocks — socialBlock found → inject globally | blocks có `blockType:'socialWidget'` từ first-found page | GH-1023 P1 |
+| **TC-F09.217** | Unit | High | applyGlobalSystemBlocks — page đã có floating cartWidget → NO dupe inject | Dedupe: không inject trùng | GH-1023 P1 |
+| **TC-F09.218** | Unit | High | applyGlobalSystemBlocks — whatsapp/social commerce-independent | Inject dù không có commerce blocks | GH-1023 P1 |
+
+### D) CartDrawer — checkout routing [TC-F09.219..220]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F09.219** | Unit | Critical | CartDrawer — giỏ trống → checkout button disabled | `disabled` attribute + background #d1d5db | GH-1023 P2, TC-F09.18 |
+| **TC-F09.220** | Unit | High | CartDrawer — có items + siteSlug → checkout link href đúng route | `href=/sites/{siteSlug}/checkout` | GH-1023 P2 |
+
+### E) BlockMeta scope [TC-F09.221..222]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F09.221** | Unit | High | cartWidgetMeta.scope === 'global' | Scope tag đúng cho global block | GH-1023 P3 |
+| **TC-F09.222** | Unit | Medium | heroMeta.scope === undefined (default page) | Block thông thường không có scope tag | GH-1023 P3 |
+
+### F) globalBlocks architecture — pure helpers, store actions, API IO [TC-F10-GBL-001..040]
+
+#### F.1 mergeGlobalBlocks [TC-F10-GBL-001..004]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F10-GBL-001** | Unit | Critical | mergeGlobalBlocks(null, {cartWidget}) → returns {cartWidget} | null prev merges correctly | GH-1023 Phase05 |
+| **TC-F10-GBL-002** | Unit | Critical | mergeGlobalBlocks({cart,wa}, {cart:null}) → only wa preserved | null key removes that entry only | GH-1023 Phase05 |
+| **TC-F10-GBL-003** | Unit | Critical | mergeGlobalBlocks({...}, null) → null full wipe | patch===null wipes all | GH-1023 Phase05 |
+| **TC-F10-GBL-004** | Unit | High | mergeGlobalBlocks(prev, {cartWidget: newConfig}) → other keys preserved | Partial patch preserves unmentioned keys | GH-1023 Phase05 |
+
+#### F.2 applyGlobalBlock [TC-F10-GBL-010..015]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F10-GBL-010** | Unit | Critical | globalEntry present → injected with __editorBlockIndex:-1, variant:floating | Global path injects correctly | GH-1023 Phase05 |
+| **TC-F10-GBL-011** | Unit | Critical | globalEntry present + stale floating in layout → deduped to 1 | No duplicate floating blocks | GH-1023 Phase05 |
+| **TC-F10-GBL-012** | Unit | High | globalEntry present + legacy copy in layout → deduplicated to 1 global floating | Inline variant removed; all stale copies stripped | GH-1023 Phase05 |
+| **TC-F10-GBL-013** | Unit | High | globalEntry undefined + page-scan hit → BC fallback injects from page | Legacy sites continue to work | GH-1023 Phase05 |
+| **TC-F10-GBL-014** | Unit | High | globalEntry undefined + no page-scan + autoInject + commerce → auto-inject | Cart auto-inject for commerce sites | GH-1023 Phase05 |
+| **TC-F10-GBL-015** | Unit | Medium | globalEntry undefined + no page-scan + autoInject=false → nothing added | No inject when autoInject disabled | GH-1023 Phase05 |
+| **TC-F10-GBL-016** | Unit | Critical | globalEntry null (explicitly deleted) → block removed, all fallbacks skipped | Preview sync works on delete | GH-1023 Phase05 |
+
+#### F.3 EditorStore globalBlocks actions [TC-F10-GBL-020..028]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F10-GBL-020** | Unit | Critical | init(…, globalBlocks) → state populated | Hydration from editor-data works | GH-1023 Phase05 |
+| **TC-F10-GBL-021** | Unit | Critical | updateGlobalBlock merges patch + pushes undo snapshot | Patch merged, history entry created | GH-1023 Phase05 |
+| **TC-F10-GBL-022** | Unit | High | updateGlobalBlock on missing key creates entry | First-time activation works | GH-1023 Phase05 |
+| **TC-F10-GBL-023** | Unit | High | deleteGlobalBlock sets entry to null + snapshot | Deletion tracked in undo history | GH-1023 Phase05 |
+| **TC-F10-GBL-024** | Unit | High | undo after updateGlobalBlock restores globalBlocks | Undo/redo parity maintained | GH-1023 Phase05 |
+| **TC-F10-GBL-025** | Unit | Critical | flipBlockVariant floating→inline: globalBlocks cleared, blocks gains inline | Atomic variant flip | GH-1023 Phase05 |
+| **TC-F10-GBL-026** | Unit | Critical | flipBlockVariant inline→floating: blocks spliced, globalBlocks set | Atomic promotion to global | GH-1023 Phase05 |
+| **TC-F10-GBL-027** | Unit | High | performSave body includes globalBlocks when non-null | Non-null state sent to API | GH-1023 Phase05 |
+| **TC-F10-GBL-028** | Unit | High | performSave body omits globalBlocks when null | Legacy sites not wiped on save | GH-1023 Phase05 |
+| **TC-F10-GBL-029** | Unit | Critical | addBlock commerce type + cartWidget null → cart auto-restored to floating | Cart re-appears when product block added after cart deleted | GH-1023 Phase05 |
+
+#### F.4 Save API — partial-update semantics [TC-F10-GBL-030..033]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F10-GBL-030** | Integration | Critical | PATCH {globalBlocks:{cartWidget:{}}} → payload.update has cartWidget | New entry persisted | GH-1023 Phase05 |
+| **TC-F10-GBL-031** | Integration | Critical | PATCH {globalBlocks:{cartWidget:null}} → cartWidget removed from update | Null key deletes entry | GH-1023 Phase05 |
+| **TC-F10-GBL-032** | Integration | High | PATCH with globalBlocks omitted → DB field unchanged | Omission preserves existing state | GH-1023 Phase05 |
+| **TC-F10-GBL-033** | Integration | High | PATCH with malformed globalBlocks string → 400 | Zod validation rejects wrong type | GH-1023 Phase05 |
+
+#### F.5 Editor-data API [TC-F10-GBL-034]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F10-GBL-034** | Integration | Critical | GET editor-data → response.site.globalBlocks matches seeded fixture | Round-trip shape verified | GH-1023 Phase05 |
+
+#### F.6 SiteRenderer BC parity [TC-F10-GBL-040]
+
+| ID | Loại | Pri | Tiêu đề | Kỳ vọng | Refs |
+|:---|:---|:---|:---|:---|:---|
+| **TC-F10-GBL-040** | Unit | High | site with globalBlocks:null + legacy pages[] → same nextBlocks as pre-change baseline | BC fallback produces identical output | GH-1023 Phase05 |

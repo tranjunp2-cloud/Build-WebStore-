@@ -14,7 +14,7 @@ import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
 import { EDITOR_SIDEBAR_WIDTH, SETTINGS_PANEL_WIDTH } from '@/components/editor/layout-constants'
@@ -100,6 +100,7 @@ export default function EditorPage() {
 
     const { t, ti } = useI18n()
     const [selectedBlock, setSelectedBlock] = useState<number | null>(null)
+    const [selectedGlobalBlockType, setSelectedGlobalBlockType] = useState<string | null>(null)
     const [site, setSite] = useState<SiteData | null>(null)
     const [page, setPage] = useState<LoadedPageData | null>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -159,6 +160,7 @@ export default function EditorPage() {
     const updateSiteName = useEditorStore(state => state.updateSiteName)
     const headerBlock = useEditorStore(state => state.headerBlock)
     const footerBlock = useEditorStore(state => state.footerBlock)
+    const globalBlocks = useEditorStore(state => state.globalBlocks)
     const updateHeaderBlock = useEditorStore(state => state.updateHeaderBlock)
     const updateFooterBlock = useEditorStore(state => state.updateFooterBlock)
     const undo = useEditorStore(state => state.undo)
@@ -170,10 +172,15 @@ export default function EditorPage() {
     const setIsSaving = useEditorStore(state => state.setIsSaving)
     const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
 
-    const currentBlock = useMemo(
-        () => (selectedBlock !== null ? blocks[selectedBlock] || null : null),
-        [blocks, selectedBlock],
-    )
+    const currentBlock = useMemo(() => {
+        if (selectedBlock === null) return null
+        if (selectedBlock === -1) {
+            const key = selectedGlobalBlockType ? BLOCK_TYPE_TO_KEY[selectedGlobalBlockType] : undefined
+            const data = key ? globalBlocks?.[key] : null
+            return data ? { ...data, __editorBlockIndex: -1 } : null
+        }
+        return blocks[selectedBlock] || null
+    }, [blocks, selectedBlock, selectedGlobalBlockType, globalBlocks])
     const isPublished = site?.status === 'published'
     const wasPublished = !isPublished && !!site?.publishedAt
     const siteUrl = useMemo(() => {
@@ -265,7 +272,14 @@ export default function EditorPage() {
                     setCurrentPageId('')
                 }
 
-                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null)
+                // Normalize sparse server GlobalBlocks to dense GlobalBlocksState — server may omit
+                // keys that were never configured, but the store requires explicit null per key so that
+                // addBlock auto-restore can distinguish "never configured" from "user deleted".
+                const rawGb = data.site?.globalBlocks as { cartWidget?: BlockData | null; whatsappButton?: BlockData | null; socialWidget?: BlockData | null } | null | undefined
+                const normalizedGb = rawGb
+                    ? { cartWidget: rawGb.cartWidget ?? null, whatsappButton: rawGb.whatsappButton ?? null, socialWidget: rawGb.socialWidget ?? null }
+                    : null
+                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null, normalizedGb)
 
                 if (pagesRes.ok) {
                     const pagesData = await pagesRes.json()
@@ -365,6 +379,7 @@ export default function EditorPage() {
                     theme: currentTheme,
                     headerBlock: snapshot.headerBlock,
                     footerBlock: snapshot.footerBlock,
+                    ...(snapshot.globalBlocks !== null && { globalBlocks: snapshot.globalBlocks }),
                     isDraft: true,
                 }),
             })
@@ -447,6 +462,11 @@ export default function EditorPage() {
         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_PAGES', pages })
     }, [pages])
 
+    // Sync globalBlocks changes to preview iframe (covers all mutation paths: add, delete, undo, redo, settings).
+    useEffect(() => {
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks })
+    }, [globalBlocks])
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement
@@ -462,6 +482,7 @@ export default function EditorPage() {
                         redo()
                         const redoState = useEditorStore.getState()
                         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: redoState.blocks })
+                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: redoState.globalBlocks })
                         if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.headerBlock })
                         if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.footerBlock })
                     }
@@ -472,6 +493,7 @@ export default function EditorPage() {
                     undo()
                     const undoState = useEditorStore.getState()
                     previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: undoState.blocks })
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: undoState.globalBlocks })
                     if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.headerBlock })
                     if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.footerBlock })
                 }
@@ -691,6 +713,12 @@ export default function EditorPage() {
     }, [siteId])
 
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
+        const globalKey = BLOCK_TYPE_TO_KEY[blockData.blockType]
+        if (blockData.variant === 'floating' && globalKey) {
+            useEditorStore.getState().updateGlobalBlock(globalKey, { blockType: blockData.blockType, variant: 'floating' })
+            return
+        }
+
         const nextBlock = normalizeAddSectionBlock(
             {
                 instruction: `Add ${blockData.blockType} block`,
@@ -707,9 +735,14 @@ export default function EditorPage() {
         setSelectedBlock(index)
 
         setTimeout(() => {
+            const { blocks: latestBlocks, globalBlocks: latestGlobalBlocks } = useEditorStore.getState()
             previewFrameSendRef.current?.sendToIframe({
                 type: 'UPDATE_FULL_LAYOUT',
-                bodyBlocks: useEditorStore.getState().blocks
+                bodyBlocks: latestBlocks
+            })
+            previewFrameSendRef.current?.sendToIframe({
+                type: 'UPDATE_GLOBAL_BLOCKS',
+                globalBlocks: latestGlobalBlocks
             })
         }, 0)
 
@@ -816,10 +849,13 @@ export default function EditorPage() {
         // otherwise a page reload would lose the undo.
         // setTimeout lets Zustand state settle before reading snapshot.
         setTimeout(() => {
-            const currentBlocks = useEditorStore.getState().blocks
+            const { blocks: currentBlocks, globalBlocks: currentGlobalBlocks } = useEditorStore.getState()
             // Perform a seamless update for layout modifications
             if (['add_block', 'delete_block', 'reorder_blocks', 'update_multiple_blocks', 'undo'].includes(action.action)) {
                 previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: currentBlocks })
+                // Sync globalBlocks alongside layout — covers cases where addBlock mutates globalBlocks
+                // (e.g. commerce block auto-restoring cart) and undo/redo of globalBlock changes.
+                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: currentGlobalBlocks })
                 if (action.action === 'add_block') {
                     const afterIndex = action.afterIndex ?? (blocks.length - 1)
                     previewFrameSendRef.current?.setScrollToBlock?.(Math.max(0, afterIndex + 1))
@@ -1156,11 +1192,13 @@ export default function EditorPage() {
     const handleBlockSelectWithContext = useCallback((blockIndex: number | null, blockType?: string) => {
         if (blockType === 'navigation' || blockType === 'footer' || blockType === 'breadcrumb') {
             setSelectedBlock(null)
+            setSelectedGlobalBlockType(null)
             // Use unique key to force re-trigger even on repeated clicks
             const sectionMap: Record<string, string> = { breadcrumb: 'breadcrumb', footer: 'footer' }
             setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: blockType ? sectionMap[blockType] : undefined })
         } else {
             setSelectedBlock(blockIndex)
+            setSelectedGlobalBlockType(blockIndex === -1 ? (blockType ?? null) : null)
             setSettingsRequestedTab(null)
         }
     }, [])
@@ -1204,6 +1242,10 @@ export default function EditorPage() {
                     selectedBlock={selectedBlock}
                     onBlockSelect={handleMobileBlockSelect}
                     onAIAction={handleAIAction}
+                    onEditGlobalBlock={(blockType) => {
+                        handleBlockSelectWithContext(-1, blockType)
+                        if (!rightSidebarVisible) useWorkspaceStore.getState().toggleRight()
+                    }}
                 />
             ) : null}
 

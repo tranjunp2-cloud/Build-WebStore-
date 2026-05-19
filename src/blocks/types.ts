@@ -142,6 +142,10 @@ export type BlockMeta = {
      * appear in the user-facing Editor block palette. Phase 3 consumer.
      */
     isSystem?: boolean
+    /** Editor-only: 'global' = rendered once site-wide, 'page' = per-page block. Defaults to 'page'. */
+    scope?: 'global' | 'page'
+    /** Tooltip shown on hover over scope badge in Component Library (Vietnamese). */
+    scopeTooltip?: string
 }
 
 // ── CTA Button (shared across blocks) ────────────────────────────────────────
