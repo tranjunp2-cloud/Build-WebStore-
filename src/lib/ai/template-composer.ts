@@ -373,7 +373,8 @@ function featuresFromProducts(
   })
 }
 
-export function buildFeatures(biz: BusinessSample, category: string): Record<string, unknown> {
+export function buildFeatures(biz: BusinessSample, category: string, language?: string): Record<string, unknown> {
+  const i18n = getBlockStrings(language)
   const featureMap: Record<string, { icon: string; title: string; description: string }[]> = {
     restaurant: [
       { icon: 'Utensils', title: 'Authentic Recipes', description: 'Traditional recipes passed down through generations, using only the freshest local ingredients.' },
@@ -459,7 +460,7 @@ export function buildFeatures(biz: BusinessSample, category: string): Record<str
   return {
     blockType: 'features',
     variant: 'grid-3',
-    headline: `Why Choose ${biz.name}`,
+    headline: i18n.features.headlineWhyChoose(biz.name),
     subheadline: biz.tagline,
     features,
   }
@@ -473,6 +474,7 @@ export function buildTestimonials(content: CategoryContent, bizName?: string, la
     blockType: 'testimonials',
     variant: 'cards',
     headline: headlineFull,
+    subheadline: i18n.testimonials.subheadline,
     testimonials: content.testimonials.slice(0, 6).map((t) => ({
       quote: t.quote,
       name: t.name,

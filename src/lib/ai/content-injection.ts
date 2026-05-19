@@ -380,7 +380,7 @@ export function buildBlockFromLibrary(
             // so same-category businesses diverge. Fallback to legacy Phase 03
             // shuffle pool on error (defensive).
             try {
-                return composerBuildFeatures(mergedBiz, category)
+                return composerBuildFeatures(mergedBiz, category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildFeatures failed, falling back:', err)
             }

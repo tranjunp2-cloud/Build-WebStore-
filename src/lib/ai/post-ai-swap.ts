@@ -80,6 +80,36 @@ function normalizeNavLinks(
     })
 }
 
+/** Patch contact block labels from i18n without replacing user-supplied data. */
+function normalizeContactLabels(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'contact') return block
+        return {
+            ...block,
+            submitLabel: i18n.contact.submitLabel,
+            phoneLabel: i18n.contact.phoneLabel,
+            addressLabel: i18n.contact.addressLabel,
+            emailLabel: i18n.contact.emailLabel,
+        }
+    })
+}
+
+/** Patch client-logos headline from i18n without replacing logo data. */
+function normalizeClientLogosHeadline(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'client-logos') return block
+        return { ...block, headline: i18n.clientLogos.headline }
+    })
+}
+
 /** Block types eligible for post-AI swap. Other blocks are passed through. */
 export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
     'hero',
@@ -119,7 +149,7 @@ function callComposerBuilder(
         case 'hero':
             return composerBuildHero(biz, category, 0, mood)
         case 'features':
-            return composerBuildFeatures(biz, category)
+            return composerBuildFeatures(biz, category, language)
         case 'testimonials':
             return content ? composerBuildTestimonials(content, biz.name, language) : null
         case 'faq':
@@ -219,10 +249,14 @@ export function postAISwapStep(
         return { ...composed, ...preservedVariant }
     })
 
-    // Normalize nav link labels for known URL slugs (covers AI-first path
-    // where GPT may output English labels despite the language instruction).
-    const normalized = language ? normalizeNavLinks(swapped, language) : swapped
-    return { blocks: normalized, telemetry }
+    if (!language) return { blocks: swapped, telemetry }
+
+    // Normalize structural labels on any block type — covers GPT-generated blocks
+    // that weren't swapped but still have English structural strings.
+    const nav = normalizeNavLinks(swapped, language)
+    const contact = normalizeContactLabels(nav, language)
+    const final = normalizeClientLogosHeadline(contact, language)
+    return { blocks: final, telemetry }
 }
 
 /**

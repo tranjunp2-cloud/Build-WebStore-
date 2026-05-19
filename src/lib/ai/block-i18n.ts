@@ -73,6 +73,9 @@ export interface BlockStrings {
         subheadline: (name: string) => string
         ctaLabel: string
     }
+    clientLogos: {
+        headline: string
+    }
     gallery: {
         headline: string
     }
@@ -90,6 +93,7 @@ export interface BlockStrings {
     testimonials: {
         headline: string
         headlineWithBiz: (biz: string) => string
+        subheadline: string
     }
 }
 
@@ -146,6 +150,7 @@ const STRINGS: Record<string, BlockStrings> = {
             subheadline: 'The people behind the magic.',
         },
         serviceCards: { headline: 'Our Services', subheadline: (name) => `Discover what ${name} can do for you.`, ctaLabel: 'Learn More' },
+        clientLogos: { headline: 'Trusted By' },
         gallery: { headline: 'Our Work' },
         newsletter: {
             headlineStayUpdated: (name) => `Stay Updated with ${name}`,
@@ -161,6 +166,7 @@ const STRINGS: Record<string, BlockStrings> = {
         testimonials: {
             headline: 'What Our Customers Say',
             headlineWithBiz: (biz) => `What Our Customers Say About ${biz}`,
+            subheadline: 'Genuine reviews from our customers',
         },
     },
 
@@ -216,6 +222,7 @@ const STRINGS: Record<string, BlockStrings> = {
             subheadline: 'Orang-orang di sebalik kejayaan kami.',
         },
         serviceCards: { headline: 'Perkhidmatan Kami', subheadline: (name) => `Temui apa yang ${name} boleh lakukan untuk anda.`, ctaLabel: 'Ketahui Lebih Lanjut' },
+        clientLogos: { headline: 'Dipercayai Oleh' },
         gallery: { headline: 'Kerja-kerja Kami' },
         newsletter: {
             headlineStayUpdated: (name) => `Ikuti Perkembangan Terbaru ${name}`,
@@ -231,6 +238,7 @@ const STRINGS: Record<string, BlockStrings> = {
         testimonials: {
             headline: 'Apa Kata Pelanggan Kami',
             headlineWithBiz: (biz) => `Apa Kata Pelanggan ${biz}`,
+            subheadline: 'Ulasan tulen daripada pelanggan kami',
         },
     },
 
@@ -286,6 +294,7 @@ const STRINGS: Record<string, BlockStrings> = {
             subheadline: 'Những con người tạo nên điều kỳ diệu.',
         },
         serviceCards: { headline: 'Dịch Vụ Của Chúng Tôi', subheadline: (name) => `Khám phá những gì ${name} có thể làm cho bạn.`, ctaLabel: 'Tìm Hiểu Thêm' },
+        clientLogos: { headline: 'Được Tin Tưởng Bởi' },
         gallery: { headline: 'Tác Phẩm Của Chúng Tôi' },
         newsletter: {
             headlineStayUpdated: (name) => `Cập Nhật Mới Nhất Từ ${name}`,
@@ -301,6 +310,7 @@ const STRINGS: Record<string, BlockStrings> = {
         testimonials: {
             headline: 'Khách Hàng Nói Gì',
             headlineWithBiz: (biz) => `Khách Hàng Nói Gì Về ${biz}`,
+            subheadline: 'Đánh giá thực từ khách hàng của chúng tôi',
         },
     },
 }
