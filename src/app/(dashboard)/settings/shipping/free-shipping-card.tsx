@@ -3,9 +3,7 @@
 import { Gift, Info, AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-
-// Allows in-progress numeric input with optional comma or dot decimal (max 2 places)
-const INPUT_FILTER = /^\d*[.,]?\d{0,2}$/
+import { INPUT_FILTER } from '@/lib/shipping/validate-rate'
 
 type Props = {
     freeEnabled: boolean
@@ -89,8 +87,9 @@ export function FreeShippingCard({ freeEnabled, freeAboveRm, freeAboveError, onT
                             const raw = e.clipboardData.getData('text').trim()
                             // Strip "RM " prefix from Excel/Sheets copy-paste (AC-11)
                             const stripped = raw.replace(/^RM\s*/i, '')
-                            onAmountChange(INPUT_FILTER.test(stripped) ? stripped : '')
-                            onAmountBlur(stripped)
+                            const filtered = INPUT_FILTER.test(stripped) ? stripped : ''
+                            onAmountChange(filtered)
+                            onAmountBlur(filtered)
                         }}
                     />
                 </div>

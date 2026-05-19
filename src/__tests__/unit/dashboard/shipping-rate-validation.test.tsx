@@ -197,12 +197,14 @@ describe('ShippingSettingsClient [TC-F14.34..F14.39]', () => {
         })
     }
 
-    it('[TC-F14.34] pasting -1 into west rate shows errorNegative + aria-invalid', () => {
+    it('[TC-F14.34] pasting -1 into west rate silently rejects — field cleared, no error shown', () => {
         renderClient()
         const input = screen.getByPlaceholderText('8.00')
         pasteText(input, '-1')
-        expect(screen.getByText('Cannot be negative')).toBeInTheDocument()
-        expect(input).toHaveAttribute('aria-invalid', 'true')
+        // INPUT_FILTER rejects leading "-" → filtered='', onBlur('') → no error
+        expect(input).toHaveValue('')
+        expect(screen.queryByRole('alert')).toBeNull()
+        expect(input).not.toHaveAttribute('aria-invalid')
     })
 
     it('[TC-F14.35] blurring west input after typing 8 auto-formats to 8.00', () => {
@@ -213,10 +215,12 @@ describe('ShippingSettingsClient [TC-F14.34..F14.39]', () => {
         expect(input).toHaveValue('8.00')
     })
 
-    it('[TC-F14.36] aria-describedby links to error paragraph id + role=alert', () => {
+    it('[TC-F14.36] aria-describedby links to error paragraph id + role=alert (triggered via blur)', () => {
         renderClient()
         const input = screen.getByPlaceholderText('8.00')
-        pasteText(input, '-1')
+        // Trigger error via blur with a value that passes INPUT_FILTER but fails validation
+        fireEvent.change(input, { target: { value: '1000.01' } })
+        fireEvent.blur(input)
         expect(input).toHaveAttribute('aria-describedby', 'ship-rate-west-err')
         const errEl = document.getElementById('ship-rate-west-err')
         expect(errEl).not.toBeNull()

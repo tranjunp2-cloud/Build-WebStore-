@@ -81,7 +81,9 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
     const handleWestBlur = (raw = westRateRm) => {
         const r = validateRate(raw, { maxSen: RATE_MAX, messages: msgs })
         setWestRateError(r.error)
-        if (!r.error) {
+        if (r.error) {
+            setWestRateWarning('')
+        } else {
             const p = parseRateRm(raw)
             if (p !== null && raw.trim() !== '') setWestRateRm(p.toFixed(2))
             setWestRateWarning(r.warning ?? '')
@@ -92,7 +94,9 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
     const handleEastBlur = (raw = eastRateRm) => {
         const r = validateRate(raw, { maxSen: RATE_MAX, messages: msgs })
         setEastRateError(r.error)
-        if (!r.error) {
+        if (r.error) {
+            setEastRateWarning('')
+        } else {
             const p = parseRateRm(raw)
             if (p !== null && raw.trim() !== '') setEastRateRm(p.toFixed(2))
             setEastRateWarning(r.warning ?? '')
@@ -103,7 +107,9 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
     const handleFreeBlur = (raw = freeAboveRm) => {
         const r = validateRate(raw, { maxSen: FREE_ABOVE_MAX, minSen: 1, required: freeEnabled, messages: freeMsgs })
         setFreeAboveError(r.error)
-        if (!r.error) {
+        if (r.error) {
+            setFreeAboveWarning('')
+        } else {
             const p = parseRateRm(raw)
             if (p !== null && raw.trim() !== '') setFreeAboveRm(p.toFixed(2))
         }

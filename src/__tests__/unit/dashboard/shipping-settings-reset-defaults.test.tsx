@@ -94,13 +94,15 @@ describe('ShippingSettingsClient — Reset [TC-F14.40..F14.42]', () => {
     it('[TC-F14.40] Reset after west rate error clears error + aria-invalid', () => {
         renderClient()
         const input = screen.getByPlaceholderText('8.00')
-        pasteText(input, '-1')
-        expect(screen.getByText('Cannot be negative')).toBeInTheDocument()
+        // Trigger error via change+blur (value passes INPUT_FILTER, fails validateRate max check)
+        fireEvent.change(input, { target: { value: '1000.01' } })
+        fireEvent.blur(input)
+        expect(screen.getByText('Maximum RM 1,000')).toBeInTheDocument()
         expect(input).toHaveAttribute('aria-invalid', 'true')
 
         fireEvent.click(screen.getByTestId('reset-btn'))
 
-        expect(screen.queryByText('Cannot be negative')).toBeNull()
+        expect(screen.queryByText('Maximum RM 1,000')).toBeNull()
         expect(input).not.toHaveAttribute('aria-invalid', 'true')
     })
 

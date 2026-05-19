@@ -3,6 +3,9 @@
 // for values like "-5", which gives better UX than a generic format error.
 const RATE_PATTERN = /^-?\d+([.,]\d+)?$/
 
+// Shared across card components — allows in-progress numeric input with optional comma/dot decimal (max 2 places)
+export const INPUT_FILTER = /^\d*[.,]?\d{0,2}$/
+
 export type RateValidationMessages = {
     errorEmpty: string
     errorNegative: string

@@ -4,15 +4,13 @@ import { useState } from 'react'
 import { Truck, AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { WEST_MY_STATES } from '@/lib/shipping'
+import { INPUT_FILTER } from '@/lib/shipping/validate-rate'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LivePreviewPanel } from './live-preview-panel'
 
 const WEST_STATES_PREVIEW = WEST_MY_STATES.slice(0, 5)
 const WEST_STATES_HIDDEN = WEST_MY_STATES.length - WEST_STATES_PREVIEW.length
 const EAST_STATES_DISPLAY = ['Sabah', 'Sarawak', 'Labuan']
-
-// Allows in-progress numeric input with optional comma or dot decimal (max 2 places)
-const INPUT_FILTER = /^\d*[.,]?\d{0,2}$/
 
 type Props = {
     westRateRm: string
@@ -108,8 +106,9 @@ export function ShippingRatesCard({
                                 const raw = e.clipboardData.getData('text').trim()
                                 // Strip "RM " prefix from Excel/Sheets copy-paste (AC-11)
                                 const stripped = raw.replace(/^RM\s*/i, '')
-                                onWestChange(INPUT_FILTER.test(stripped) ? stripped : '')
-                                onWestBlur(stripped)
+                                const filtered = INPUT_FILTER.test(stripped) ? stripped : ''
+                                onWestChange(filtered)
+                                onWestBlur(filtered)
                             }}
                         />
                     </div>
@@ -178,8 +177,9 @@ export function ShippingRatesCard({
                                 const raw = e.clipboardData.getData('text').trim()
                                 // Strip "RM " prefix from Excel/Sheets copy-paste (AC-11)
                                 const stripped = raw.replace(/^RM\s*/i, '')
-                                onEastChange(INPUT_FILTER.test(stripped) ? stripped : '')
-                                onEastBlur(stripped)
+                                const filtered = INPUT_FILTER.test(stripped) ? stripped : ''
+                                onEastChange(filtered)
+                                onEastBlur(filtered)
                             }}
                         />
                     </div>
