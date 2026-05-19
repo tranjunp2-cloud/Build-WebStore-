@@ -46,12 +46,12 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
             return { success: false, error: 'Unauthorized: No tenant found for current session.' };
         }
 
-        // Whitelist safe fields before saving
-        const cleanUpdates: PaymentUpdates = {};
+        // Whitelist and validate fields, then send nested under payments group
+        const paymentsData: Record<string, any> = {}
 
         if (updates.payment_cod !== undefined) {
             if (typeof updates.payment_cod === 'boolean') {
-                cleanUpdates.payment_cod = updates.payment_cod;
+                paymentsData.payment_cod = updates.payment_cod;
             } else {
                 return { success: false, error: 'Invalid type for payment_cod. Expected boolean.' };
             }
@@ -59,19 +59,19 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
         if (updates.payment_qr !== undefined) {
             if (typeof updates.payment_qr === 'boolean') {
-                cleanUpdates.payment_qr = updates.payment_qr;
+                paymentsData.payment_qr = updates.payment_qr;
             } else {
                 return { success: false, error: 'Invalid type for payment_qr. Expected boolean.' };
             }
         }
 
         if (updates.qr_image !== undefined) {
-            cleanUpdates.qr_image = updates.qr_image;
+            paymentsData.qr_image = updates.qr_image;
         }
 
         if (updates.payment_card !== undefined) {
             if (typeof updates.payment_card === 'boolean') {
-                cleanUpdates.payment_card = updates.payment_card;
+                paymentsData.payment_card = updates.payment_card;
             } else {
                 return { success: false, error: 'Invalid type for payment_card. Expected boolean.' };
             }
@@ -79,7 +79,7 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
         if (updates.payment_fpx !== undefined) {
             if (typeof updates.payment_fpx === 'boolean') {
-                cleanUpdates.payment_fpx = updates.payment_fpx;
+                paymentsData.payment_fpx = updates.payment_fpx;
             } else {
                 return { success: false, error: 'Invalid type for payment_fpx. Expected boolean.' };
             }
@@ -87,9 +87,9 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
         if (updates.account_holder_name !== undefined) {
             if (updates.account_holder_name === null) {
-                cleanUpdates.account_holder_name = null;
+                paymentsData.account_holder_name = null;
             } else if (typeof updates.account_holder_name === 'string' && updates.account_holder_name.length <= 150) {
-                cleanUpdates.account_holder_name = updates.account_holder_name;
+                paymentsData.account_holder_name = updates.account_holder_name;
             } else {
                 return { success: false, error: 'Invalid account_holder_name: must be string, max 150 chars.' };
             }
@@ -97,9 +97,9 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
         if (updates.bank_name !== undefined) {
             if (updates.bank_name === null) {
-                cleanUpdates.bank_name = null;
+                paymentsData.bank_name = null;
             } else if (typeof updates.bank_name === 'string' && updates.bank_name.length <= 100) {
-                cleanUpdates.bank_name = updates.bank_name;
+                paymentsData.bank_name = updates.bank_name;
             } else {
                 return { success: false, error: 'Invalid bank_name: must be string, max 100 chars.' };
             }
@@ -107,24 +107,22 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
         if (updates.account_number !== undefined) {
             if (updates.account_number === null) {
-                cleanUpdates.account_number = null;
+                paymentsData.account_number = null;
             } else if (typeof updates.account_number === 'string' && updates.account_number.length <= 50) {
-                cleanUpdates.account_number = updates.account_number;
+                paymentsData.account_number = updates.account_number;
             } else {
                 return { success: false, error: 'Invalid account_number: must be string, max 50 chars.' };
             }
         }
 
-        if (Object.keys(cleanUpdates).length === 0) {
+        if (Object.keys(paymentsData).length === 0) {
             return { success: false, error: 'No valid payment fields provided' };
         }
 
         await payload.update({
             collection: 'tenants',
             id: tenantId,
-            data: {
-                payments: cleanUpdates,
-            },
+            data: { payments: paymentsData } as any,
         });
 
         return { success: true };

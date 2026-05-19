@@ -4,8 +4,10 @@ import { test, expect } from '@playwright/test'
  * TC-F13.05 — Cancel from Stripe redirects to ?stripe_cancelled=1, cart preserved
  *
  * Fixture required: fixture-both (tenant with card+fpx enabled, Stripe connected)
+ * TODO: seed fixture-both tenant before enabling (tracked in GH issue)
  */
 test('[TC-F13.05] cancel from Stripe redirects to ?stripe_cancelled=1 with cart preserved', async ({ page }) => {
+    test.skip(true, 'fixture-both seed not yet provisioned — enable after seed script is merged')
     // Add item to cart
     await page.goto('/sites/fixture-both/p/sample-product')
     await page.getByRole('button', { name: /add to cart/i }).click()

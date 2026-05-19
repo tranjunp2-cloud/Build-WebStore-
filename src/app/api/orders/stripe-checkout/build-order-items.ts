@@ -54,11 +54,11 @@ export async function buildOrderItems(
             }
         }
 
-        // Cross-tenant IDOR guard: ensure product belongs to the requesting tenant
+        // Cross-tenant IDOR guard: reject if product has no tenant or belongs to a different tenant
         const p = product as any
-        if (tenantId !== undefined && p.tenant !== undefined) {
+        if (tenantId !== undefined) {
             const productTenantId = typeof p.tenant === 'object' ? p.tenant?.id : p.tenant
-            if (String(productTenantId) !== String(tenantId)) {
+            if (!productTenantId || String(productTenantId) !== String(tenantId)) {
                 return {
                     orderItems: [], checkoutItems: [], subtotal: 0, currency,
                     errorResponse: NextResponse.json(
