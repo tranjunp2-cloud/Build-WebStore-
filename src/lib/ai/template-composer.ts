@@ -183,7 +183,7 @@ function buildNavigation(
   pages: string[],
   category: string = 'business',
   mood?: ThemeMood,
-  language?: ContentLang,
+  language?: string,
 ): Record<string, unknown> {
   const i18n = getBlockStrings(language)
   const SLUG_LABELS: Record<string, string> = {
@@ -465,7 +465,7 @@ export function buildFeatures(biz: BusinessSample, category: string): Record<str
   }
 }
 
-export function buildTestimonials(content: CategoryContent, bizName?: string, language?: ContentLang): Record<string, unknown> {
+export function buildTestimonials(content: CategoryContent, bizName?: string, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
   const headlineFull = bizName ? i18n.testimonials.headlineWithBiz(bizName) : i18n.testimonials.headline
   // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
@@ -486,7 +486,7 @@ export function buildTestimonials(content: CategoryContent, bizName?: string, la
   }
 }
 
-function buildContact(biz: BusinessSample, language?: ContentLang): Record<string, unknown> {
+function buildContact(biz: BusinessSample, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
   return {
     blockType: 'contact',
@@ -568,7 +568,7 @@ function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unkno
   }
 }
 
-export function buildStats(category: string, language?: ContentLang): Record<string, unknown> {
+export function buildStats(category: string, language?: string): Record<string, unknown> {
   const statsMap: Record<string, { value: string; label: string; suffix?: string }[]> = {
     restaurant: [
       { value: '15', label: 'Years Serving', suffix: '+' },
@@ -662,7 +662,7 @@ function buildGallery(biz: BusinessSample): Record<string, unknown> {
   }
 }
 
-export function buildFAQ(content: CategoryContent, bizName?: string, language?: ContentLang): Record<string, unknown> {
+export function buildFAQ(content: CategoryContent, bizName?: string, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
   return {
     blockType: 'faq',
@@ -676,7 +676,7 @@ export function buildCTA(
   biz: BusinessSample,
   category: string = 'business',
   mood?: ThemeMood,
-  language?: ContentLang,
+  language?: string,
 ): Record<string, unknown> {
   const i18n = getBlockStrings(language)
   const primaryCTA = resolveCTA(mood, category, 'primary')
@@ -692,7 +692,7 @@ export function buildCTA(
   }
 }
 
-export function buildAbout(biz: BusinessSample, language?: ContentLang): Record<string, unknown> {
+export function buildAbout(biz: BusinessSample, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
   return {
     blockType: 'about',
@@ -703,7 +703,7 @@ export function buildAbout(biz: BusinessSample, language?: ContentLang): Record<
   }
 }
 
-export function buildPricing(category: string, language?: ContentLang): Record<string, unknown> {
+export function buildPricing(category: string, language?: string): Record<string, unknown> {
   const pricingMap: Record<string, { name: string; price: string; period: string; features: string[]; highlighted: boolean }[]> = {
     tech: [
       { name: 'Starter', price: 'RM 99', period: '/month', features: ['1 Website', '5 GB Storage', 'SSL Certificate', 'Email Support'], highlighted: false },
@@ -811,7 +811,7 @@ export function buildPricing(category: string, language?: ContentLang): Record<s
   }
 }
 
-export function buildTeam(category: string, language?: ContentLang): Record<string, unknown> {
+export function buildTeam(category: string, language?: string): Record<string, unknown> {
   const teamMap: Record<string, { name: string; role: string; bio: string }[]> = {
     health: [
       { name: 'Dr. Tan Wei Ming', role: 'General Practitioner', bio: 'MBBS (UM), 15 years experience in family medicine.' },
@@ -1146,7 +1146,7 @@ function buildPortfolioGrid(): Record<string, unknown> {
   }
 }
 
-export function buildServiceCards(biz: BusinessSample, category: string, language?: ContentLang): Record<string, unknown> {
+export function buildServiceCards(biz: BusinessSample, category: string, language?: string): Record<string, unknown> {
   const servicesMap: Record<string, { title: string; description: string; icon: string; price?: string; priceUnit?: string }[]> = {
     business: [
       { title: 'Strategy Consulting', description: 'C-suite advisory and market strategy development.', icon: 'BarChart', price: 'RM 500', priceUnit: '/hour' },

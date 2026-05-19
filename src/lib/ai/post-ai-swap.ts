@@ -48,7 +48,6 @@ import {
     buildCTA as composerBuildCTA,
 } from './template-composer'
 import { hasUserDataReference, isGenericContent } from './content-rules'
-import type { ContentLang } from './content-rules'
 import type { ThemeMood } from './theme-moods'
 import { getBlockStrings } from './block-i18n'
 
@@ -59,7 +58,7 @@ import { getBlockStrings } from './block-i18n'
  */
 function normalizeNavLinks(
     blocks: Record<string, unknown>[],
-    language: ContentLang,
+    language: string,
 ): Record<string, unknown>[] {
     const i18n = getBlockStrings(language)
     const urlToLabel: Record<string, string> = {
@@ -114,7 +113,7 @@ function callComposerBuilder(
     category: string,
     content: CategoryContent | null,
     mood?: ThemeMood,
-    language?: ContentLang,
+    language?: string,
 ): Record<string, unknown> | null {
     switch (blockType) {
         case 'hero':
@@ -146,7 +145,7 @@ export function postAISwapStep(
     category: string,
     mood?: ThemeMood,
     seed: number = 0,
-    language?: ContentLang,
+    language?: string,
 ): PostAISwapResult {
     const telemetry: SwapTelemetry[] = []
     const content = getCategoryContent(category) ?? null

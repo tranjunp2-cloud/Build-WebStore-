@@ -13,7 +13,6 @@
 
 import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
-import type { ContentLang } from './content-rules'
 import { getBlockStrings } from './block-i18n'
 import { pickLogosByCategory } from './content/client-logos-library'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
@@ -52,8 +51,8 @@ export interface InjectionContext {
      * "Contact Us" labels remain when mood is absent.
      */
     mood?: ThemeMood
-    /** Target content language — drives language-specific static strings (e.g. testimonials headline). */
-    language?: ContentLang
+    /** ISO 639-1 code for block-i18n string selection — any language franc can detect. */
+    language?: string
 }
 
 // ── Plan 07 helpers — threading user data into canned library blocks ─────

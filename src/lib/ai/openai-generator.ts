@@ -135,9 +135,9 @@ export async function generateSiteWithAI(
     // is detected as Malay/Vietnamese so AI-first generates fully localized content.
     const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
         .filter(Boolean).join(' ')
-    const { contentLang: detectedLang, gpLang } = language === 'auto'
+    const { contentLang: detectedLang, gpLang, blockLang } = language === 'auto'
         ? detectLanguage(inputText)
-        : { contentLang: language as ContentLang, gpLang: EXPLICIT_LANG_NAMES[language] ?? 'English' }
+        : { contentLang: language as ContentLang, gpLang: EXPLICIT_LANG_NAMES[language] ?? 'English', blockLang: language }
     if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en') {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
@@ -393,7 +393,7 @@ export async function generateSiteWithAI(
                 // when GPT output is thin and needs padding.
                 userBiz: enforcerBizOverride,
                 mood: themeMood,
-                language: contentLang,
+                language: blockLang,
             }
 
             for (let p = 0; p < rawPages.length; p++) {
@@ -413,7 +413,7 @@ export async function generateSiteWithAI(
                         detectedCategory,
                         themeMood,
                         themeSeed,
-                        contentLang,
+                        blockLang,
                     )
                     pageBlocks = swapResult.blocks as typeof pageBlocks
                     swapTelemetry.push(...swapResult.telemetry)
@@ -528,7 +528,7 @@ export async function generateSiteWithAI(
                     detectedCategory,
                     themeMood,
                     themeSeed,
-                    contentLang,
+                    blockLang,
                 )
                 validBlocks = swapResult.blocks as typeof validBlocks
                 swapTelemetry.push(...swapResult.telemetry)
@@ -543,7 +543,7 @@ export async function generateSiteWithAI(
                     // Plan 07 — same userBiz + mood threading as the multi-page branch.
                     userBiz: enforcerBizOverride,
                     mood: themeMood,
-                    language: contentLang,
+                    language: blockLang,
                 }
                 validBlocks = enforceMinimumStructure(
                     validBlocks as Record<string, unknown>[],

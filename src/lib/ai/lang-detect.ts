@@ -22,6 +22,8 @@ export interface DetectedLanguage {
     contentLang: ContentLang
     /** For GPT instruction — any language name, e.g. "Chinese (Mandarin)", "Arabic". */
     gpLang: string
+    /** ISO 639-1 code for block-i18n string selection — covers any language franc can detect. */
+    blockLang: string
 }
 
 // Vietnamese-exclusive diacritical marks — not shared with French/Spanish/Portuguese.
@@ -42,6 +44,69 @@ const MALAY_FUNCTION_WORDS = new Set([
     'kepada', 'dari', 'juga', 'dalam', 'akan', 'boleh', 'sudah', 'adalah',
     'produk',
 ])
+
+// franc ISO 639-3 codes → ISO 639-1 for block-i18n string selection.
+// Covers languages franc-min can detect. Unmapped → falls back to 'en'.
+const ISO_TO_BLOCK_LANG: Record<string, string> = {
+    vie: 'vi',
+    msa: 'ms', zsm: 'ms', ind: 'id',
+    eng: 'en',
+    cmn: 'zh', zho: 'zh', yue: 'zh',
+    ara: 'ar',
+    tha: 'th',
+    kor: 'ko',
+    jpn: 'ja',
+    hin: 'hi',
+    ben: 'bn',
+    urd: 'ur',
+    tam: 'ta',
+    tel: 'te',
+    kan: 'kn',
+    mal: 'ml',
+    pan: 'pa',
+    guj: 'gu',
+    mar: 'mr',
+    sin: 'si',
+    mya: 'my',
+    khm: 'km',
+    lao: 'lo',
+    tgl: 'tl',
+    jav: 'jv',
+    por: 'pt',
+    spa: 'es',
+    fra: 'fr',
+    deu: 'de',
+    rus: 'ru',
+    ukr: 'uk',
+    pol: 'pl',
+    ita: 'it',
+    nld: 'nl',
+    swe: 'sv',
+    nor: 'no',
+    dan: 'da',
+    fin: 'fi',
+    ron: 'ro',
+    hun: 'hu',
+    ces: 'cs',
+    slk: 'sk',
+    hrv: 'hr',
+    bul: 'bg',
+    ell: 'el',
+    heb: 'he',
+    fas: 'fa',
+    tur: 'tr',
+    uzb: 'uz',
+    kaz: 'kk',
+    aze: 'az',
+    srp: 'sr',
+    cat: 'ca',
+    lit: 'lt',
+    lav: 'lv',
+    est: 'et',
+    slv: 'sl',
+    swa: 'sw',
+    afr: 'af',
+}
 
 // franc ISO 639-3 codes → content pipeline language
 const ISO_TO_CONTENT_LANG: Record<string, ContentLang> = {
@@ -134,7 +199,7 @@ const ISO_TO_LANG_NAME: Record<string, string> = {
 export function detectLanguage(text: string): DetectedLanguage {
     // Vietnamese: exclusive diacritical marks (zero false-positives)
     if (VI_DIACRITICS_RE.test(text)) {
-        return { contentLang: 'vi', gpLang: 'Vietnamese' }
+        return { contentLang: 'vi', gpLang: 'Vietnamese', blockLang: 'vi' }
     }
 
     const lower = text.toLowerCase()
@@ -142,31 +207,32 @@ export function detectLanguage(text: string): DetectedLanguage {
 
     // Malay: high-precision business nouns (1 match sufficient)
     if ([...tokens].some(t => MALAY_HIGH_PRECISION.has(t))) {
-        return { contentLang: 'ms', gpLang: 'Malay (Bahasa Melayu)' }
+        return { contentLang: 'ms', gpLang: 'Malay (Bahasa Melayu)', blockLang: 'ms' }
     }
 
     // Malay: function words (need 2+ distinct matches)
     const fnMatches = [...tokens].filter(t => MALAY_FUNCTION_WORDS.has(t)).length
     if (fnMatches >= 2) {
-        return { contentLang: 'ms', gpLang: 'Malay (Bahasa Melayu)' }
+        return { contentLang: 'ms', gpLang: 'Malay (Bahasa Melayu)', blockLang: 'ms' }
     }
 
     // franc-min for all other languages
     const iso = franc(text, { minLength: 3 })
     if (iso === 'und') {
-        return { contentLang: 'en', gpLang: 'English' }
+        return { contentLang: 'en', gpLang: 'English', blockLang: 'en' }
     }
 
     const contentLang = ISO_TO_CONTENT_LANG[iso]
+    const blockLang = ISO_TO_BLOCK_LANG[iso] ?? 'en'
     if (contentLang) {
         const gpLang = contentLang === 'vi'
             ? 'Vietnamese'
             : contentLang === 'ms'
                 ? 'Malay (Bahasa Melayu)'
                 : 'English'
-        return { contentLang, gpLang }
+        return { contentLang, gpLang, blockLang }
     }
 
     const gpLang = ISO_TO_LANG_NAME[iso] ?? 'English'
-    return { contentLang: 'en', gpLang }
+    return { contentLang: 'en', gpLang, blockLang }
 }

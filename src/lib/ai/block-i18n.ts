@@ -11,8 +11,6 @@
  * Usage: getBlockStrings(lang).contact.headline
  */
 
-import type { ContentLang } from './content-rules'
-
 export interface BlockStrings {
     navigation: {
         home: string
@@ -95,7 +93,7 @@ export interface BlockStrings {
     }
 }
 
-const STRINGS: Record<ContentLang, BlockStrings> = {
+const STRINGS: Record<string, BlockStrings> = {
     en: {
         navigation: {
             home: 'Home',
@@ -307,7 +305,13 @@ const STRINGS: Record<ContentLang, BlockStrings> = {
     },
 }
 
-/** Get all block UI strings for the given content language. Defaults to English. */
-export function getBlockStrings(lang?: ContentLang): BlockStrings {
-    return STRINGS[lang ?? 'en'] ?? STRINGS.en
+/**
+ * Get block UI strings for any language code (ISO 639-1 or BCP 47).
+ * Falls back by stripping region tag (e.g. "zh-TW" → "zh"), then to English.
+ */
+export function getBlockStrings(lang?: string): BlockStrings {
+    if (!lang) return STRINGS.en
+    if (STRINGS[lang]) return STRINGS[lang]
+    const prefix = lang.split('-')[0]
+    return STRINGS[prefix] ?? STRINGS.en
 }
