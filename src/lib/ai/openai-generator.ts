@@ -61,24 +61,34 @@ export type SSEEvent = {
 // Characters like é/à/â shared with Romance languages are excluded intentionally.
 const VI_DIACRITICS_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/
 
-// Malay function words and common nouns — reliable indicators of Malay input.
-// Includes both grammar words (high precision, low recall) and common business
-// nouns (kedai, makanan, etc.) to catch short noun-only inputs from SMB operators.
-const MALAY_WORDS = new Set([
-    // grammar/function words
+// Tiered Malay word sets for language detection (see guessLanguageFromInput).
+//
+// HIGH_PRECISION: exclusively Malay/Indonesian — 1 match is sufficient.
+// Common business-type words that cannot plausibly appear in English/French text.
+const MALAY_HIGH_PRECISION = new Set([
+    'kedai', 'warung', 'restoran', 'klinik', 'syarikat', 'perniagaan', 'butik',
+    'jenama', 'jualan', 'pelanggan', 'tempatan', 'berkualiti', 'terbaik',
+    'segar', 'makanan', 'murah', 'harga', 'perkhidmatan', 'menyediakan',
+    'menggunakan', 'ialah', 'keperluan', 'kecantikan', 'pergigian', 'pakaian',
+    'perabot', 'runcit', 'borong', 'khidmat', 'pemborong', 'hartanah',
+])
+
+// LOW_PRECISION: grammar/function words that need 2+ distinct matches to avoid
+// false positives from coincidental matches in non-Malay text (e.g. names).
+const MALAY_FUNCTION_WORDS = new Set([
     'dan', 'atau', 'untuk', 'yang', 'dengan', 'tidak', 'kami', 'anda',
     'kepada', 'dari', 'juga', 'dalam', 'akan', 'boleh', 'sudah', 'adalah',
-    'keperluan', 'perkhidmatan', 'menyediakan', 'menggunakan', 'ialah',
-    // common business/noun words distinctive to Malay
-    'kedai', 'makanan', 'perniagaan', 'jualan', 'pelanggan', 'warung',
-    'restoran', 'butik', 'klinik', 'syarikat', 'tempatan', 'harga',
-    'murah', 'berkualiti', 'jenama', 'produk', 'terbaik', 'segar',
+    'produk',
 ])
 
 /**
  * Detect language from user's business info input text.
  * Used to route 'auto' language requests: if input is Malay or Vietnamese,
  * skip template-first (English-only templates) and use AI-first instead.
+ *
+ * Tiered scoring:
+ *  - 1+ HIGH_PRECISION Malay word  → 'ms' (kedai, restoran, klinik, etc.)
+ *  - 2+ distinct FUNCTION words    → 'ms' (grammar words need higher bar to avoid name false-positives)
  */
 function guessLanguageFromInput(info: BusinessInfoInput): 'ms' | 'vi' | 'en' {
     const text = [info.businessName, info.shortDescription, info.products, info.industry]
@@ -89,11 +99,16 @@ function guessLanguageFromInput(info: BusinessInfoInput): 'ms' | 'vi' | 'en' {
     // Vietnamese-exclusive diacritical marks — not shared with Romance languages
     if (VI_DIACRITICS_RE.test(text)) return 'vi'
 
-    // Count distinct Malay words (not repetitions) to avoid false positives from
-    // a single repeated word. Require 2+ distinct matches.
     const tokens = new Set(text.split(/\W+/).filter(Boolean))
-    const malayMatches = [...tokens].filter(t => MALAY_WORDS.has(t)).length
-    if (malayMatches >= 2) return 'ms'
+
+    // Single high-precision anchor is enough — these words cannot realistically
+    // appear in English/French business descriptions
+    if ([...tokens].some(t => MALAY_HIGH_PRECISION.has(t))) return 'ms'
+
+    // Function words: require 2+ distinct matches to avoid false positives
+    // from non-Malay names that happen to contain one Malay function word
+    const fnMatches = [...tokens].filter(t => MALAY_FUNCTION_WORDS.has(t)).length
+    if (fnMatches >= 2) return 'ms'
 
     return 'en'
 }
