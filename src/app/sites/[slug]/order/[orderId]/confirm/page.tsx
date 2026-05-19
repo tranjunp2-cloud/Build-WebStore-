@@ -20,9 +20,9 @@ export default async function OrderConfirmPage({
         where: { slug: { equals: slug } },
         limit: 1,
         overrideAccess: true,
-        depth: 0,
+        depth: 1,
     })
-    const tenant = tenantResult.docs[0]
+    const tenant = tenantResult.docs[0] as any
     if (!tenant) notFound()
 
     const siteResult = await payload.find({
@@ -58,11 +58,11 @@ export default async function OrderConfirmPage({
     const fonts = [thFontHeading, thFontBody].filter((v, i, a) => a.indexOf(v) === i).map(sanitizeFont)
     const googleFontsHref = `https://fonts.googleapis.com/css2?${fonts.map(f => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@300;400;500;600;700;800;900`).join('&')}&subset=latin,vietnamese&display=swap`
 
-    const pc = site.paymentConfig ?? {}
-    const bankName: string = pc.bankName ?? ''
-    const bankAccountNo: string = pc.bankAccountNo ?? ''
-    const bankAccountHolder: string = pc.bankAccountHolder ?? ''
-    const _qr = pc.merchantQrCode
+    const pc = tenant.payments ?? {}
+    const bankName: string = pc.bank_name ?? ''
+    const bankAccountNo: string = pc.account_number ?? ''
+    const bankAccountHolder: string = pc.account_holder_name ?? ''
+    const _qr = pc.qr_image
     const merchantQrUrl: string = (_qr && typeof _qr === 'object') ? (_qr.url ?? '') : ''
 
     let order: ConfirmOrder | null = null
