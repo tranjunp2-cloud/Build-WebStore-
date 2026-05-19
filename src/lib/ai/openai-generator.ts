@@ -57,6 +57,24 @@ export type SSEEvent = {
     data: Record<string, unknown>
 }
 
+// Vietnamese-exclusive diacritical marks — not present in Malay, English, French, Spanish, or Portuguese.
+// Characters like é/à/â shared with Romance languages are excluded intentionally.
+const VI_DIACRITICS_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/
+
+// Malay function words and common nouns — reliable indicators of Malay input.
+// Includes both grammar words (high precision, low recall) and common business
+// nouns (kedai, makanan, etc.) to catch short noun-only inputs from SMB operators.
+const MALAY_WORDS = new Set([
+    // grammar/function words
+    'dan', 'atau', 'untuk', 'yang', 'dengan', 'tidak', 'kami', 'anda',
+    'kepada', 'dari', 'juga', 'dalam', 'akan', 'boleh', 'sudah', 'adalah',
+    'keperluan', 'perkhidmatan', 'menyediakan', 'menggunakan', 'ialah',
+    // common business/noun words distinctive to Malay
+    'kedai', 'makanan', 'perniagaan', 'jualan', 'pelanggan', 'warung',
+    'restoran', 'butik', 'klinik', 'syarikat', 'tempatan', 'harga',
+    'murah', 'berkualiti', 'jenama', 'produk', 'terbaik', 'segar',
+])
+
 /**
  * Detect language from user's business info input text.
  * Used to route 'auto' language requests: if input is Malay or Vietnamese,
@@ -68,21 +86,13 @@ function guessLanguageFromInput(info: BusinessInfoInput): 'ms' | 'vi' | 'en' {
         .join(' ')
         .toLowerCase()
 
-    // Vietnamese: diacritical marks not found in Malay or English
-    if (/[àáâãèéêìíòóôõùúýăđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/.test(text)) {
-        return 'vi'
-    }
+    // Vietnamese-exclusive diacritical marks — not shared with Romance languages
+    if (VI_DIACRITICS_RE.test(text)) return 'vi'
 
-    // Malay grammar/function words — reliable indicators that won't appear in
-    // English descriptions of Malaysian businesses. Require 2+ matches to avoid
-    // false positives from single loanwords like "roti" or "nasi".
-    const MALAY_FUNCTION_WORDS = new Set([
-        'dan', 'atau', 'untuk', 'yang', 'dengan', 'tidak', 'kami', 'anda',
-        'kepada', 'dari', 'juga', 'dalam', 'akan', 'boleh', 'sudah', 'adalah',
-        'keperluan', 'perkhidmatan', 'menyediakan', 'menggunakan', 'ialah',
-    ])
-    const tokens = text.split(/\W+/).filter(Boolean)
-    const malayMatches = tokens.filter(t => MALAY_FUNCTION_WORDS.has(t)).length
+    // Count distinct Malay words (not repetitions) to avoid false positives from
+    // a single repeated word. Require 2+ distinct matches.
+    const tokens = new Set(text.split(/\W+/).filter(Boolean))
+    const malayMatches = [...tokens].filter(t => MALAY_WORDS.has(t)).length
     if (malayMatches >= 2) return 'ms'
 
     return 'en'
@@ -219,7 +229,7 @@ export async function generateSiteWithAI(
         }
         const userPromptText = buildUserPrompt(businessInfo, {
             extraInstructions: sanitizedExtra,
-            language,
+            language: detectedLang,
             referencePrompt: sanitizedRef,
             mood: themeMood,
             recipe: layoutRecipe,
