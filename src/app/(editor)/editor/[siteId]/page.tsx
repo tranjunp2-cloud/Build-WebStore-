@@ -174,10 +174,11 @@ export default function EditorPage() {
 
     const currentBlock = useMemo(() => {
         if (selectedBlock === null) return null
-        if (selectedBlock === -1) {
+        // All floating global blocks use negative indices (cartWidget=-1, whatsapp-button=-2, socialWidget=-3)
+        if (selectedBlock < 0) {
             const key = selectedGlobalBlockType ? BLOCK_TYPE_TO_KEY[selectedGlobalBlockType] : undefined
             const data = key ? globalBlocks?.[key] : null
-            return data ? { ...data, __editorBlockIndex: -1 } : null
+            return data ? { ...data, __editorBlockIndex: selectedBlock } : null
         }
         return blocks[selectedBlock] || null
     }, [blocks, selectedBlock, selectedGlobalBlockType, globalBlocks])
@@ -938,9 +939,16 @@ export default function EditorPage() {
                 return
             }
 
+            // Send current store state so publish route uses authoritative client values
+            // rather than relying on pending DB reads (unreliable if migration missing).
+            const { globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap } = useEditorStore.getState()
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: currentlyPublished ? 'DELETE' : 'PATCH',
                 credentials: 'include',
+                ...(currentlyPublished ? {} : {
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap }),
+                }),
             })
 
             if (!res.ok) {
@@ -1044,9 +1052,13 @@ export default function EditorPage() {
                 return
             }
 
+            // Send current store state — same pattern as handlePublish
+            const { globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap } = useEditorStore.getState()
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: 'PATCH',
                 credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap }),
             })
 
             if (!res.ok) {
@@ -1198,13 +1210,17 @@ export default function EditorPage() {
             setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: blockType ? sectionMap[blockType] : undefined })
         } else {
             setSelectedBlock(blockIndex)
-            setSelectedGlobalBlockType(blockIndex === -1 ? (blockType ?? null) : null)
+            // All floating global blocks have negative blockIndex (cartWidget=-1, whatsapp-button=-2, socialWidget=-3)
+            setSelectedGlobalBlockType(blockIndex !== null && blockIndex < 0 ? (blockType ?? null) : null)
             setSettingsRequestedTab(null)
         }
     }, [])
 
     const handleMobileBlockSelect = useCallback((blockIndex: number | null) => {
         setSelectedBlock(blockIndex)
+        // Floating blocks route via onEditGlobalBlock → handleBlockSelectWithContext, not here.
+        // Guard clears global type state when switching to a page block (index >= 0 or null).
+        if (blockIndex === null || blockIndex >= 0) setSelectedGlobalBlockType(null)
         if (isCompactLayout && blockIndex !== null) {
             setIsMobileSettingsOpen(true)
         }

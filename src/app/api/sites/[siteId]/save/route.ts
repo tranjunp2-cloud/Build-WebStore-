@@ -114,9 +114,9 @@ export async function PATCH(
             name: unknown;
             locale: "en" | "ms";
             shippingConfig: unknown;
-            headerBlock: unknown;
-            footerBlock: unknown;
-            globalBlocks: unknown;
+            pendingHeaderBlock: unknown;
+            pendingFooterBlock: unknown;
+            pendingGlobalBlocks: unknown;
             contactInfo: unknown;
             socialLinks: unknown;
             branding: unknown;
@@ -127,12 +127,20 @@ export async function PATCH(
         if (siteName) siteUpdateData.name = siteName as string
         if (locale) siteUpdateData.locale = locale
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
-        if (headerBlock !== undefined) siteUpdateData.headerBlock = headerBlock
-        if (footerBlock !== undefined) siteUpdateData.footerBlock = footerBlock
-        if (globalBlocks !== undefined) siteUpdateData.globalBlocks = mergeGlobalBlocks(
-            existingSite.globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks,
-            globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks,
-        )
+        // Draft saves write to pending fields — only promoted to live on publish.
+        // Prevents in-progress header/footer edits from immediately affecting the live storefront.
+        if (headerBlock !== undefined) siteUpdateData.pendingHeaderBlock = headerBlock
+        if (footerBlock !== undefined) siteUpdateData.pendingFooterBlock = footerBlock
+        if (globalBlocks !== undefined) {
+            // Draft saves write to pendingGlobalBlocks — only promoted to globalBlocks on publish.
+            // This prevents in-progress edits from immediately affecting the live storefront.
+            const existingPending = existingSite.pendingGlobalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks
+            const existingLive = existingSite.globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks
+            siteUpdateData.pendingGlobalBlocks = mergeGlobalBlocks(
+                existingPending ?? existingLive,
+                globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks,
+            )
+        }
         if (contactInfo) siteUpdateData.contactInfo = contactInfo
         if (socialLinks) siteUpdateData.socialLinks = socialLinks
         if (branding) siteUpdateData.branding = branding

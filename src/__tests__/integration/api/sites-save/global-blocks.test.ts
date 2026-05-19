@@ -106,8 +106,8 @@ describe('PATCH /api/sites/[siteId]/save — globalBlocks', () => {
     })
 
     // ── TC-F10-GBL-030 ─────────────────────────────────────────────────
-    it('[TC-F10-GBL-030] PATCH with cartWidget entry → payload.update receives globalBlocks with cartWidget', async () => {
-        // Arrange
+    it('[TC-F10-GBL-030] PATCH with cartWidget entry → payload.update receives pendingGlobalBlocks with cartWidget', async () => {
+        // Arrange — draft save (isDraft implied); globalBlocks writes to pendingGlobalBlocks, not live globalBlocks
         const req = makeRequest({ globalBlocks: { cartWidget: CART_ENTRY } })
 
         // Act
@@ -122,18 +122,21 @@ describe('PATCH /api/sites/[siteId]/save — globalBlocks', () => {
         )
         expect(sitesUpdateCall).toBeDefined()
         const updateData = (sitesUpdateCall![0] as Record<string, unknown>).data as Record<string, unknown>
-        expect(updateData.globalBlocks).toBeDefined()
-        expect((updateData.globalBlocks as Record<string, unknown>).cartWidget).toEqual(CART_ENTRY)
+        // Save writes to pendingGlobalBlocks — live globalBlocks unchanged until publish
+        expect(updateData.pendingGlobalBlocks).toBeDefined()
+        expect((updateData.pendingGlobalBlocks as Record<string, unknown>).cartWidget).toEqual(CART_ENTRY)
+        expect(updateData).not.toHaveProperty('globalBlocks')
     })
 
     // ── TC-F10-GBL-031 ─────────────────────────────────────────────────
-    it('[TC-F10-GBL-031] PATCH { cartWidget: null } after existing cart → cartWidget is null (explicit sentinel, not absent)', async () => {
-        // Arrange — site already has cartWidget
+    it('[TC-F10-GBL-031] PATCH { cartWidget: null } → pendingGlobalBlocks has cartWidget as explicit null sentinel', async () => {
+        // Arrange — site has live cartWidget; pending falls back to live for merge base
         mockPayloadInstance.findByID.mockResolvedValue({
             id: '42',
             name: 'Test Site',
             tenant: { id: 'tenant-1' },
             globalBlocks: { cartWidget: CART_ENTRY, whatsappButton: null, socialWidget: null },
+            pendingGlobalBlocks: null,
             theme: {},
         })
         const req = makeRequest({ globalBlocks: { cartWidget: null } })
@@ -147,11 +150,12 @@ describe('PATCH /api/sites/[siteId]/save — globalBlocks', () => {
             (c: unknown[]) => (c[0] as Record<string, unknown>).collection === 'sites',
         )
         expect(sitesUpdateCall).toBeDefined()
-        const gb = ((sitesUpdateCall![0] as Record<string, unknown>).data as Record<string, unknown>).globalBlocks as Record<string, unknown> | null
-        // mergeGlobalBlocks keeps cartWidget as explicit null so SiteRenderer's BC sentinel is NOT reactivated.
-        // Absent key would be treated as undefined → BC page-scan fallback fires → deleted cart reappears.
-        expect(gb).not.toBeNull()
-        expect(gb).toHaveProperty('cartWidget', null)
+        const pending = ((sitesUpdateCall![0] as Record<string, unknown>).data as Record<string, unknown>).pendingGlobalBlocks as Record<string, unknown> | null
+        // cartWidget is kept as explicit null sentinel — absent key would reactivate BC page-scan fallback
+        expect(pending).not.toBeNull()
+        expect(pending).toHaveProperty('cartWidget', null)
+        // Live globalBlocks NOT updated — only promoted to live on publish
+        expect(((sitesUpdateCall![0] as Record<string, unknown>).data as Record<string, unknown>)).not.toHaveProperty('globalBlocks')
     })
 
     // ── TC-F10-GBL-032 ─────────────────────────────────────────────────

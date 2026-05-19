@@ -1641,9 +1641,10 @@ function PreviewFrameInner({
 
             {/* Delete block confirmation modal */}
             {(() => {
-                const isGlobalDelete = deleteConfirmIndex === -1
+                // Floating global blocks use negative indices (-1=cartWidget, -2=whatsapp-button, -3=socialWidget)
+                const isGlobalDelete = deleteConfirmIndex !== null && deleteConfirmIndex < 0
                 const deleteBlockType = isGlobalDelete
-                    ? (blockLayouts.find(l => l.blockIndex === -1)?.blockType ?? 'block')
+                    ? (blockLayouts.find(l => l.blockIndex === deleteConfirmIndex)?.blockType ?? 'block')
                     : (deleteConfirmIndex !== null ? (blocks[deleteConfirmIndex]?.blockType ?? 'block') : 'block')
                 return (
                     <DeleteBlockConfirm

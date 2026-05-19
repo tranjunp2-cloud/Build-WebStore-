@@ -106,7 +106,7 @@ describe('applyGlobalBlock', () => {
         const wa = result.find(b => b.blockType === 'whatsapp-button')
         expect(wa).toBeDefined()
         expect(wa?.variant).toBe('floating')
-        expect(wa?.__editorBlockIndex).toBe(-1)
+        expect(wa?.__editorBlockIndex).toBe(-2) // whatsapp-button uses -2 (unique per-type to avoid blockIndex collision)
         expect(wa?.phoneNumber).toBe('+60123456789')
     })
 
