@@ -23,11 +23,10 @@ export function mergeGlobalBlocks(
 
     for (const key of ['cartWidget', 'whatsappButton', 'socialWidget'] as const) {
         if (!(key in patch)) continue
-        if (patch[key] === null) {
-            delete base[key]
-        } else {
-            base[key] = patch[key]
-        }
+        // Keep null as an explicit value — an absent key would be treated as `undefined`
+        // by SiteRenderer's BC sentinel logic, reactivating the page-scan fallback for
+        // a block the user intentionally disabled.
+        base[key] = patch[key]
     }
 
     return Object.keys(base).length === 0 ? null : base

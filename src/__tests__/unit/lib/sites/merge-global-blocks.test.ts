@@ -29,7 +29,7 @@ describe('mergeGlobalBlocks', () => {
     })
 
     // ── TC-F10-GBL-002 ─────────────────────────────────────────────────
-    it('[TC-F10-GBL-002] patch key === null removes only that key; others preserved', () => {
+    it('[TC-F10-GBL-002] patch key === null sets key to null (explicit sentinel); others preserved', () => {
         // Arrange
         const prev = { cartWidget: CART, whatsappButton: WA }
         const patch = { cartWidget: null }
@@ -37,9 +37,9 @@ describe('mergeGlobalBlocks', () => {
         // Act
         const result = mergeGlobalBlocks(prev, patch)
 
-        // Assert
-        expect(result).toEqual({ whatsappButton: WA })
-        expect(result).not.toHaveProperty('cartWidget')
+        // Assert — cartWidget stays in the object as null so SiteRenderer's BC fallback is NOT reactivated
+        expect(result?.cartWidget).toBeNull()
+        expect(result?.whatsappButton).toEqual(WA)
     })
 
     // ── TC-F10-GBL-003 ─────────────────────────────────────────────────
@@ -79,10 +79,12 @@ describe('mergeGlobalBlocks', () => {
         expect(result?.socialWidget).toEqual(SOCIAL)
     })
 
-    it('removing all keys returns null', () => {
+    it('setting only key to null keeps explicit null; does not return null', () => {
+        // null key is preserved — returning null would reactivate BC page-scan fallback
         const prev = { cartWidget: CART }
         const result = mergeGlobalBlocks(prev, { cartWidget: null })
-        expect(result).toBeNull()
+        expect(result).not.toBeNull()
+        expect(result?.cartWidget).toBeNull()
     })
 
     it('null prev + empty patch object returns null (no keys)', () => {

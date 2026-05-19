@@ -127,7 +127,7 @@ describe('PATCH /api/sites/[siteId]/save — globalBlocks', () => {
     })
 
     // ── TC-F10-GBL-031 ─────────────────────────────────────────────────
-    it('[TC-F10-GBL-031] PATCH { cartWidget: null } after existing cart → cartWidget absent from merged result', async () => {
+    it('[TC-F10-GBL-031] PATCH { cartWidget: null } after existing cart → cartWidget is null (explicit sentinel, not absent)', async () => {
         // Arrange — site already has cartWidget
         mockPayloadInstance.findByID.mockResolvedValue({
             id: '42',
@@ -148,9 +148,10 @@ describe('PATCH /api/sites/[siteId]/save — globalBlocks', () => {
         )
         expect(sitesUpdateCall).toBeDefined()
         const gb = ((sitesUpdateCall![0] as Record<string, unknown>).data as Record<string, unknown>).globalBlocks as Record<string, unknown> | null
-        // mergeGlobalBlocks removes the null-patched key; other null-value keys remain in the object
+        // mergeGlobalBlocks keeps cartWidget as explicit null so SiteRenderer's BC sentinel is NOT reactivated.
+        // Absent key would be treated as undefined → BC page-scan fallback fires → deleted cart reappears.
         expect(gb).not.toBeNull()
-        expect(gb).not.toHaveProperty('cartWidget')
+        expect(gb).toHaveProperty('cartWidget', null)
     })
 
     // ── TC-F10-GBL-032 ─────────────────────────────────────────────────

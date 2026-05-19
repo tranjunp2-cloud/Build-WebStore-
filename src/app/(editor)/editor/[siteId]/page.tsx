@@ -272,7 +272,14 @@ export default function EditorPage() {
                     setCurrentPageId('')
                 }
 
-                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null, data.site?.globalBlocks || null)
+                // Normalize sparse server GlobalBlocks to dense GlobalBlocksState — server may omit
+                // keys that were never configured, but the store requires explicit null per key so that
+                // addBlock auto-restore can distinguish "never configured" from "user deleted".
+                const rawGb = data.site?.globalBlocks as { cartWidget?: BlockData | null; whatsappButton?: BlockData | null; socialWidget?: BlockData | null } | null | undefined
+                const normalizedGb = rawGb
+                    ? { cartWidget: rawGb.cartWidget ?? null, whatsappButton: rawGb.whatsappButton ?? null, socialWidget: rawGb.socialWidget ?? null }
+                    : null
+                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null, normalizedGb)
 
                 if (pagesRes.ok) {
                     const pagesData = await pagesRes.json()
