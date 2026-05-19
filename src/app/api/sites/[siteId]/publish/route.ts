@@ -54,11 +54,13 @@ export async function PATCH(
         // being written to live site fields via the publish body.
         // Note: cannot use saveSiteSchema.pick() — .refine() wraps it as ZodEffects (no .pick).
         const publishBodySchema = z.object({
+            // .passthrough() on the outer object preserves unknown keys (future floating block types)
+            // so they are not silently dropped when a new widget type is added before schema is updated.
             globalBlocks: z.object({
                 cartWidget: z.object({ blockType: z.literal('cartWidget') }).passthrough().nullable().optional(),
                 whatsappButton: z.object({ blockType: z.literal('whatsapp-button') }).passthrough().nullable().optional(),
                 socialWidget: z.object({ blockType: z.literal('socialWidget') }).passthrough().nullable().optional(),
-            }).nullable().optional(),
+            }).passthrough().nullable().optional(),
             headerBlock: z.record(z.unknown()).nullable().optional(),
             footerBlock: z.record(z.unknown()).nullable().optional(),
         }).partial()
@@ -76,6 +78,8 @@ export async function PATCH(
                 if ('globalBlocks' in pb) { bodyGlobalBlocks = pb.globalBlocks; hasBodyGlobalBlocks = true }
                 if ('headerBlock' in pb) { bodyHeaderBlock = pb.headerBlock; hasBodyHeaderBlock = true }
                 if ('footerBlock' in pb) { bodyFooterBlock = pb.footerBlock; hasBodyFooterBlock = true }
+            } else {
+                console.warn('[publish] body schema validation failed — using DB fallback', parsed.error.flatten())
             }
         } catch {
             // Body not present or not JSON — proceed with DB fallback
