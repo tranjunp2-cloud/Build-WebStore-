@@ -80,7 +80,10 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
             overrideAccess: false,
         })
 
-        const siteSlug = typeof order.site === 'object' ? (order.site as any).slug : ''
+        // Slug lives on the tenant, not the site — sites collection has no slug field
+        const siteObj = typeof order.site === 'object' ? (order.site as any) : null
+        const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
+        const siteSlug = tenantObj?.slug ?? ''
         const orderPageUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/sites/${siteSlug}/orders/${id}`
 
         const emailPayload = paymentConfirmedEmail({

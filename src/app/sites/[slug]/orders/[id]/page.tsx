@@ -24,9 +24,20 @@ export default async function OrderUploadPage({
     const { token } = await searchParams
     const payload = await getPayload({ config })
 
+    // Resolve tenant slug → tenant → site (sites collection has no slug field)
+    const tenantResult = await payload.find({
+        collection: 'tenants',
+        where: { slug: { equals: slug } },
+        limit: 1,
+        overrideAccess: true,
+        depth: 0,
+    })
+    const tenant = tenantResult.docs[0] as any
+    if (!tenant) notFound()
+
     const siteResult = await payload.find({
         collection: 'sites',
-        where: { slug: { equals: slug } },
+        where: { tenant: { equals: tenant.id } },
         limit: 1,
         overrideAccess: true,
         depth: 1,

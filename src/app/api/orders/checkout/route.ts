@@ -238,7 +238,9 @@ export async function POST(request: Request) {
                 secret: magicLinkSecret,
                 expSec,
             })
-            const siteSlug = (site as any).slug ?? String(siteId)
+            // Slug lives on the tenant, not the site — sites collection has no slug field
+            const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
+            const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
             const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
             redirectUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.id}?token=${token}`
             const plainUploadUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.id}`

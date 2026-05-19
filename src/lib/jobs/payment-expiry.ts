@@ -14,7 +14,7 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
         },
         sort: 'paymentExpiresAt',
         limit: opts.limit,
-        depth: 1,
+        depth: 2,           // depth:2 to resolve site.tenant.slug for productListUrl
         overrideAccess: true,
     })
 
@@ -34,7 +34,10 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                 overrideAccess: true,
             })
 
-            const siteSlug = typeof order.site === 'object' ? order.site?.slug : ''
+            // Slug lives on the tenant, not the site — sites collection has no slug field
+            const siteObj = typeof order.site === 'object' ? order.site : null
+            const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
+            const siteSlug = (tenantObj as any)?.slug ?? ''
             payload
                 .sendEmail(
                     orderExpiredEmail({

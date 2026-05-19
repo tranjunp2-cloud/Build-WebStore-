@@ -69,7 +69,10 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             expSec: Math.floor(newExpires.getTime() / 1000),
         })
 
-        const siteSlug = typeof order.site === 'object' ? (order.site as any).slug : ''
+        // Slug lives on the tenant, not the site — sites collection has no slug field
+        const siteObj = typeof order.site === 'object' ? (order.site as any) : null
+        const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
+        const siteSlug = tenantObj?.slug ?? ''
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
         const magicLinkUrl = `${baseUrl}/sites/${siteSlug}/orders/${id}?token=${token}`
         const plainUploadUrl = `${baseUrl}/sites/${siteSlug}/orders/${id}`
