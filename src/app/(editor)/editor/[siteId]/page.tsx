@@ -938,9 +938,17 @@ export default function EditorPage() {
                 return
             }
 
+            // Send current store globalBlocks so publish route uses authoritative client
+            // state rather than relying on pendingGlobalBlocks DB read (unreliable if
+            // migration is missing or write was dropped by Drizzle silently).
+            const globalBlocksSnapshot = useEditorStore.getState().globalBlocks
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: currentlyPublished ? 'DELETE' : 'PATCH',
                 credentials: 'include',
+                ...(currentlyPublished ? {} : {
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ globalBlocks: globalBlocksSnapshot }),
+                }),
             })
 
             if (!res.ok) {
@@ -1044,9 +1052,13 @@ export default function EditorPage() {
                 return
             }
 
+            // Send current store globalBlocks — same pattern as handlePublish
+            const globalBlocksSnapshot = useEditorStore.getState().globalBlocks
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: 'PATCH',
                 credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ globalBlocks: globalBlocksSnapshot }),
             })
 
             if (!res.ok) {

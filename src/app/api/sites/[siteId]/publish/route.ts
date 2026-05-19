@@ -45,6 +45,21 @@ export async function PATCH(
         const payload = await getPayload({ config })
         const { siteId } = await params
 
+        // Parse optional globalBlocks from request body.
+        // Client sends authoritative state (post-flush) so publish uses it directly,
+        // bypassing the pendingGlobalBlocks DB read which can fail if migration is missing.
+        let bodyGlobalBlocks: unknown = undefined
+        let hasBodyGlobalBlocks = false
+        try {
+            const body = await req.json() as Record<string, unknown>
+            if (body && typeof body === 'object' && 'globalBlocks' in body) {
+                bodyGlobalBlocks = body.globalBlocks
+                hasBodyGlobalBlocks = true
+            }
+        } catch {
+            // Body not present or not JSON — proceed with DB fallback
+        }
+
         // Verify site exists
         const existing = await payload.findByID({ collection: 'sites', id: siteId })
         if (!existing) {
@@ -228,17 +243,24 @@ export async function PATCH(
         }
 
         // Publish the site AFTER all pages promoted successfully.
-        // Promote pendingGlobalBlocks → globalBlocks so the live storefront reflects
-        // the editor's latest draft state, then clear the pending field.
-        const siteForPublish = await payload.findByID({ collection: 'sites', id: siteId })
-        const pendingGb = (siteForPublish as Record<string, unknown>).pendingGlobalBlocks
+        // Promote globalBlocks from client body (primary — client sends authoritative
+        // post-flush state) or from pendingGlobalBlocks in DB (fallback for older clients).
         const publishData: Record<string, unknown> = {
             status: 'published',
             publishedAt: new Date().toISOString(),
         }
-        if (pendingGb !== undefined && pendingGb !== null) {
-            publishData.globalBlocks = pendingGb
+        if (hasBodyGlobalBlocks) {
+            // Client sent authoritative state — write directly, clear pending
+            publishData.globalBlocks = bodyGlobalBlocks
             publishData.pendingGlobalBlocks = null
+        } else {
+            // Fallback: promote pendingGlobalBlocks from DB
+            const siteForPublish = await payload.findByID({ collection: 'sites', id: siteId })
+            const pendingGb = (siteForPublish as Record<string, unknown>).pendingGlobalBlocks
+            if (pendingGb !== undefined && pendingGb !== null) {
+                publishData.globalBlocks = pendingGb
+                publishData.pendingGlobalBlocks = null
+            }
         }
 
         const site = await payload.update({
