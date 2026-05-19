@@ -136,33 +136,40 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                     )}
                 </div>
 
-                {/* Footer */}
-                {items.length > 0 && (
-                    <div style={{ paddingTop: '32px' }}>
-                        <div style={{ borderTop: `1px solid ${CSS_VARS.surface}`, paddingTop: '33px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                <span style={{ fontSize: '16px', color: '#71717a' }}>{t.storefront.cart.subtotal}</span>
-                                <span style={{ fontSize: '24px', fontWeight: 800, color: '#191c1d', fontFamily: CSS_VARS.fontHeading }}>{formatPrice(subtotal(), currency)}</span>
-                            </div>
-                            <p style={{ fontSize: '11px', color: '#71717a', margin: '0 0 25px', lineHeight: '1.6' }}>
-                                {t.storefront.cart.shippingNote}
-                            </p>
-                            {hasCheckoutRoute ? (
-                                <a href={`/sites/${siteSlug}/checkout`}
-                                    onClick={() => {
-                                        if (siteId) trackEvent({ siteId, event: 'checkout', metadata: { itemCount: items.length, subtotal: subtotal() }, isOwner })
-                                    }}
-                                    style={ctaBtnStyle}>
-                                    {t.storefront.cart.proceedToCheckout.toUpperCase()}
-                                </a>
-                            ) : (
-                                <button type="button" onClick={() => toast.info(t.storefront.cart.checkoutUnavailable)} style={ctaBtnStyle}>
-                                    {t.storefront.cart.proceedToCheckout.toUpperCase()}
-                                </button>
-                            )}
-                        </div>
+                {/* Footer — always visible so empty-cart state shows disabled checkout */}
+                <div style={{ paddingTop: '32px' }}>
+                    <div style={{ borderTop: `1px solid ${CSS_VARS.surface}`, paddingTop: '33px' }}>
+                        {items.length > 0 && (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                    <span style={{ fontSize: '16px', color: '#71717a' }}>{t.storefront.cart.subtotal}</span>
+                                    <span style={{ fontSize: '24px', fontWeight: 800, color: '#191c1d', fontFamily: CSS_VARS.fontHeading }}>{formatPrice(subtotal(), currency)}</span>
+                                </div>
+                                <p style={{ fontSize: '11px', color: '#71717a', margin: '0 0 25px', lineHeight: '1.6' }}>
+                                    {t.storefront.cart.shippingNote}
+                                </p>
+                            </>
+                        )}
+                        {hasCheckoutRoute && items.length > 0 ? (
+                            <a href={`/sites/${siteSlug}/checkout`}
+                                onClick={() => {
+                                    if (siteId) trackEvent({ siteId, event: 'checkout', metadata: { itemCount: items.length, subtotal: subtotal() }, isOwner })
+                                }}
+                                style={ctaBtnStyle}>
+                                {t.storefront.cart.proceedToCheckout.toUpperCase()}
+                            </a>
+                        ) : (
+                            <button
+                                type="button"
+                                disabled={items.length === 0}
+                                onClick={items.length > 0 ? () => toast.info(t.storefront.cart.checkoutUnavailable) : undefined}
+                                style={{ ...ctaBtnStyle, background: items.length === 0 ? '#d1d5db' : CSS_VARS.accent, color: items.length === 0 ? '#9ca3af' : '#fff', cursor: items.length === 0 ? 'not-allowed' : 'pointer', boxShadow: 'none' }}
+                            >
+                                {t.storefront.cart.proceedToCheckout.toUpperCase()}
+                            </button>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
         </>
     )

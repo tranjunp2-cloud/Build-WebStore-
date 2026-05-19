@@ -15,6 +15,34 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### GH-1023 — Floating Cart Global Visibility & Checkout Auto-sync
+
+**Features:**
+- Cart widget, WhatsApp button, and social media blocks now support global scope: auto-injected into all pages regardless of where configured, reducing editor redundancy
+- Cart drawer footer always visible (even with empty cart) to reinforce checkout affordance; "Checkout" button disabled when cart is empty
+- Global block detection and injection via `applyGlobalSystemBlocks()` in `SiteRenderer`; scans pages for commerce blocks and auto-applies globally if marked `scope: 'global'`
+- Block registry exposes scope metadata (`scope`, `scopeTooltip`) for admin UI classification
+- Editor UI: 🌐 badge on global-scope blocks in Block Library Panel for visual distinction
+
+**Code changes:**
+- New library: `src/lib/site-renderer/` — pure utility functions: `detect-commerce-presence.ts` (scans pages for commerce block types), `extract-first-global-block.ts` (finds first block instance of given type), `has-header-cart.ts` (checks if header navigation includes cart button)
+- `src/components/site-renderer/SiteRenderer.tsx` — `applyGlobalSystemBlocks()` extended; `NavPage` type updated with `layout?` + `isHomepage?` metadata
+- `src/components/storefront/CartDrawer.tsx` — checkout footer visibility + button disabled state when cart empty
+- `src/blocks/types.ts` — `BlockMeta` gains `scope?: 'global'|'page'` + `scopeTooltip?: string`
+- Block configs updated (`cart-widget`, `social-widget`, `whatsapp-button`, `navigation`, `footer`): added `scope: 'global'`
+- `src/lib/admin/block-registry-reader.ts` — `NormalizedBlock` gains `scope` + `scopeTooltip` fields
+- `src/components/editor/BlockLibraryPanel.tsx` — renders 🌐 badge for global-scope blocks
+
+**Benefits:**
+- Eliminates manual repetition of global UI elements (cart, contact, social) across pages
+- Improves commerce UX by always showing checkout affordance
+- Reduces editor cognitive load for multi-page sites
+
+**Non-breaking:**
+- Pure enhancement; existing page-scoped blocks remain unchanged. Global blocks are opt-in via config.
+
+---
+
 ### GH-962 — Shipping Flat-Rate Configuration (F14)
 
 **Features:**

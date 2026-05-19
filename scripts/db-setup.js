@@ -199,6 +199,22 @@ const MIGRATIONS = [
     name: 'sites.footer_block',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block jsonb;`,
   },
+  {
+    name: 'sites.global_blocks',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS global_blocks jsonb;`,
+  },
+  {
+    name: 'sites.pending_global_blocks',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_global_blocks jsonb;`,
+  },
+  {
+    name: 'sites.pending_header_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_header_block jsonb;`,
+  },
+  {
+    name: 'sites.pending_footer_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_footer_block jsonb;`,
+  },
   // ── Sites: Branding + Contact Info ──
   { name: 'sites.branding', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding varchar;' },
   { name: 'sites.contact_info', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info varchar;' },
@@ -3951,6 +3967,19 @@ const MIGRATIONS = [
   { name: 'orders.bank_transaction_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS bank_transaction_id varchar;` },
   { name: 'orders.enum_payment_method_bank_transfer', sql: `DO $$ BEGIN ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'bank_transfer'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
   { name: 'orders.backfill_bank_transfer_method', sql: `UPDATE orders SET payment_method='bank_transfer' WHERE payment_method='qr_banking' AND payment_status NOT IN ('paid','cancelled','refunded') AND created_at > NOW() - INTERVAL '7 days';` },
+  // ── F13: FPX + Card payment via Stripe Checkout Session (issue #963) ──
+  { name: 'orders.stripe_charge_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_charge_id varchar;` },
+  { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
+  { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },
+  { name: 'sites.payment_config_fpx_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_fpx_enabled boolean DEFAULT true;` },
+  // ── F13: Tenant-level Card/FPX master toggles (docs/architecture/F13-payment-gateway.md §4) ──
+  { name: 'tenants.payments_payment_card', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_payment_card boolean DEFAULT false;` },
+  { name: 'tenants.payments_payment_fpx', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_payment_fpx boolean DEFAULT false;` },
+  { name: 'tenants.payments_payment_card.backfill_onboarded', sql: `UPDATE tenants SET payments_payment_card = true WHERE stripe_onboarding_complete = true AND payments_payment_card = false;` },
+  // ── F13: Bank Transfer bank_name + account_number for DuitNow QR section ──
+  { name: 'tenants.payments_bank_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_bank_name varchar;` },
+  { name: 'tenants.payments_account_number', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_number varchar;` },
+  { name: 'tenants.payments_account_holder_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_holder_name varchar;` },
 ];
 
 async function runMigrations(pool) {

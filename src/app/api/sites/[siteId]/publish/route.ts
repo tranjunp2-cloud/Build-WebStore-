@@ -7,6 +7,7 @@ import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { revalidateTag } from 'next/cache'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+import { z } from 'zod'
 
 /**
  * PATCH /api/sites/[siteId]/publish
@@ -44,6 +45,45 @@ export async function PATCH(
 
         const payload = await getPayload({ config })
         const { siteId } = await params
+
+        // Parse and validate optional pending fields from request body.
+        // Client sends authoritative state (post-flush) so publish uses it directly,
+        // bypassing pendingXxx DB reads which can silently return undefined if migration
+        // is not yet applied on this environment.
+        // Zod validates the same shapes as the save route — prevents malformed JSON from
+        // being written to live site fields via the publish body.
+        // Note: cannot use saveSiteSchema.pick() — .refine() wraps it as ZodEffects (no .pick).
+        const publishBodySchema = z.object({
+            // .passthrough() on the outer object preserves unknown keys (future floating block types)
+            // so they are not silently dropped when a new widget type is added before schema is updated.
+            globalBlocks: z.object({
+                cartWidget: z.object({ blockType: z.literal('cartWidget') }).passthrough().nullable().optional(),
+                whatsappButton: z.object({ blockType: z.literal('whatsapp-button') }).passthrough().nullable().optional(),
+                socialWidget: z.object({ blockType: z.literal('socialWidget') }).passthrough().nullable().optional(),
+            }).passthrough().nullable().optional(),
+            headerBlock: z.record(z.unknown()).nullable().optional(),
+            footerBlock: z.record(z.unknown()).nullable().optional(),
+        }).partial()
+        let bodyGlobalBlocks: unknown = undefined
+        let hasBodyGlobalBlocks = false
+        let bodyHeaderBlock: unknown = undefined
+        let hasBodyHeaderBlock = false
+        let bodyFooterBlock: unknown = undefined
+        let hasBodyFooterBlock = false
+        try {
+            const rawBody = await req.json()
+            const parsed = publishBodySchema.safeParse(rawBody)
+            if (parsed.success) {
+                const pb = parsed.data
+                if ('globalBlocks' in pb) { bodyGlobalBlocks = pb.globalBlocks; hasBodyGlobalBlocks = true }
+                if ('headerBlock' in pb) { bodyHeaderBlock = pb.headerBlock; hasBodyHeaderBlock = true }
+                if ('footerBlock' in pb) { bodyFooterBlock = pb.footerBlock; hasBodyFooterBlock = true }
+            } else {
+                console.warn('[publish] body schema validation failed — using DB fallback', parsed.error.flatten())
+            }
+        } catch {
+            // Body not present or not JSON — proceed with DB fallback
+        }
 
         // Verify site exists
         const existing = await payload.findByID({ collection: 'sites', id: siteId })
@@ -227,14 +267,57 @@ export async function PATCH(
             )
         }
 
-        // Publish the site AFTER all pages promoted successfully
+        // Publish the site AFTER all pages promoted successfully.
+        // Promote header/footer/globalBlocks from client body (primary — authoritative
+        // post-flush state) or from pending DB fields (fallback for older clients).
+        const publishData: Record<string, unknown> = {
+            status: 'published',
+            publishedAt: new Date().toISOString(),
+        }
+
+        // Reuse `existing` (fetched above for site-existence check) as the pending-fields source.
+        // Avoids a redundant findByID round-trip and closes a tiny TOCTOU window.
+        const sitePending = (!hasBodyGlobalBlocks || !hasBodyHeaderBlock || !hasBodyFooterBlock)
+            ? (existing as Record<string, unknown>)
+            : null
+
+        if (hasBodyGlobalBlocks) {
+            publishData.globalBlocks = bodyGlobalBlocks
+            publishData.pendingGlobalBlocks = null
+        } else {
+            const pendingGb = sitePending?.pendingGlobalBlocks
+            if (pendingGb !== undefined && pendingGb !== null) {
+                publishData.globalBlocks = pendingGb
+                publishData.pendingGlobalBlocks = null
+            }
+        }
+
+        if (hasBodyHeaderBlock) {
+            publishData.headerBlock = bodyHeaderBlock
+            publishData.pendingHeaderBlock = null
+        } else {
+            const pendingHb = sitePending?.pendingHeaderBlock
+            if (pendingHb !== undefined && pendingHb !== null) {
+                publishData.headerBlock = pendingHb
+                publishData.pendingHeaderBlock = null
+            }
+        }
+
+        if (hasBodyFooterBlock) {
+            publishData.footerBlock = bodyFooterBlock
+            publishData.pendingFooterBlock = null
+        } else {
+            const pendingFb = sitePending?.pendingFooterBlock
+            if (pendingFb !== undefined && pendingFb !== null) {
+                publishData.footerBlock = pendingFb
+                publishData.pendingFooterBlock = null
+            }
+        }
+
         const site = await payload.update({
             collection: 'sites',
             id: siteId,
-            data: {
-                status: 'published',
-                publishedAt: new Date().toISOString(),
-            },
+            data: publishData,
         })
 
         // Get tenant slug for the domain URL

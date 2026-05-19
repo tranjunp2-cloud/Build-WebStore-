@@ -246,6 +246,43 @@ export const Tenants: CollectionConfig = {
             type: 'group',
             fields: [
                 {
+                    name: 'payment_card',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Credit / Debit Card (via Stripe)',
+                    admin: {
+                        description:
+                            'Master toggle: accept Card via Stripe Checkout across all sites. Requires Stripe Connect onboarding complete. Each site can override via its paymentConfig.cardEnabled (layer-2 guard).',
+                    },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                // Block enabling if Stripe onboarding not complete (defense-in-depth)
+                                if (value && originalDoc?.stripeOnboardingComplete !== true) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'payment_fpx',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'FPX Online Banking (via Stripe)',
+                    admin: {
+                        description:
+                            'Master toggle: accept FPX Online Banking (Malaysia) across all sites. Requires Stripe Connect onboarding complete. Each site can override via its paymentConfig.fpxEnabled (layer-2 guard).',
+                    },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && originalDoc?.stripeOnboardingComplete !== true) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
                     name: 'payment_cod',
                     type: 'checkbox',
                     defaultValue: false,
@@ -288,6 +325,30 @@ export const Tenants: CollectionConfig = {
                                 return value
                             },
                         ],
+                    },
+                },
+                {
+                    name: 'bank_name',
+                    type: 'text',
+                    label: 'Bank Name',
+                    admin: {
+                        description: 'Shown to buyers as fallback if QR fails (e.g. Maybank Berhad)',
+                    },
+                },
+                {
+                    name: 'account_holder_name',
+                    type: 'text',
+                    label: 'Account Holder Name',
+                    admin: {
+                        description: 'Must match exactly the name on the bank account (shown to buyers for transfer reference)',
+                    },
+                },
+                {
+                    name: 'account_number',
+                    type: 'text',
+                    label: 'Account Number',
+                    admin: {
+                        description: 'Masked at checkout — only last 4 digits shown to buyers',
                     },
                 },
             ],

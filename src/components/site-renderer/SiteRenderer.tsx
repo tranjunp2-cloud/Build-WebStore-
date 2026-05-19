@@ -2,6 +2,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
+import { applyGlobalBlock } from '@/lib/site-renderer/apply-global-block'
 import {
     BROKEN_URL_PREFIX,
     HOMEPAGE_ALIASES,
@@ -27,7 +28,7 @@ import { FloatingContainerProvider } from './FloatingContainerContext'
 // socialWidget/cartWidget are camelCase (BLOCK_TYPES registry); whatsapp-button/announcement-bar are kebab.
 const FLOATING_BLOCK_TYPES = new Set(['socialWidget', 'whatsapp-button', 'cartWidget', 'announcement-bar'])
 
-export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null; status?: string }
+export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null; status?: string; layout?: unknown[]; isHomepage?: boolean }
 
 export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null; children?: NavLinkItem[] };
 type PreviewBlock = {
@@ -43,6 +44,11 @@ export type SiteRendererProps = {
     site: {
         headerBlock?: Record<string, unknown> | null
         footerBlock?: Record<string, unknown> | null
+        globalBlocks?: {
+            cartWidget?: Record<string, unknown> | null
+            whatsappButton?: Record<string, unknown> | null
+            socialWidget?: Record<string, unknown> | null
+        } | null
         theme?: {
             primaryColor?: string
             secondaryColor?: string
@@ -79,6 +85,7 @@ export type SiteRendererProps = {
 function applyGlobalSystemBlocks(
     blocks: PreviewBlock[],
     site: SiteRendererProps['site'],
+    pages: Array<{ layout?: unknown[] }> = [],
 ): PreviewBlock[] {
     const siteHeaderBlock = site.headerBlock as PreviewBlock | null | undefined
     const siteFooterBlock = site.footerBlock as PreviewBlock | null | undefined
@@ -128,6 +135,26 @@ function applyGlobalSystemBlocks(
         nextBlocks.splice(navIdx >= 0 ? navIdx + 1 : 0, 0, breadcrumbBlock)
     }
 
+    const gb = site.globalBlocks
+
+    if (process.env.NODE_ENV !== 'production' && gb === undefined && pages.length > 0) {
+        console.warn('[SiteRenderer] site.globalBlocks not configured — BC page-scan fallback active')
+    }
+
+    // When gb is null (full wipe via mergeGlobalBlocks), treat every key as null (explicit delete)
+    // so BC page-scan fallback is suppressed. When gb is undefined (column missing from DB), pass
+    // undefined to each key to activate BC fallback for legacy sites.
+    const cartEntry   = gb === null ? null : gb?.cartWidget
+    const waEntry     = gb === null ? null : gb?.whatsappButton
+    const socialEntry = gb === null ? null : gb?.socialWidget
+
+    nextBlocks = applyGlobalBlock(nextBlocks, 'cartWidget', cartEntry, pages, {
+        autoInject: true,
+        siteHeaderBlock,
+    })
+    nextBlocks = applyGlobalBlock(nextBlocks, 'whatsapp-button', waEntry, pages)
+    nextBlocks = applyGlobalBlock(nextBlocks, 'socialWidget', socialEntry, pages)
+
     return nextBlocks
 }
 
@@ -155,7 +182,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
         ...block,
         __editorBlockIndex: block.__editorBlockIndex ?? index,
     }))
-    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site).map(b => {
+    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site, pages).map(b => {
         if (b.blockType !== 'breadcrumb') return b
         // Pass page slug so breadcrumb renders correct path (in editor, usePathname returns /preview/... not the real slug)
         // Runtime check required: Payload may store slug as null; type cast alone doesn't guard this
@@ -193,7 +220,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
             slugToPageId.set(rawSlug.replace(/^\//, ''), pid)
         }
     }
-    const homepage = pages.find((p) => (p as NavPage & { isHomepage?: boolean }).isHomepage) ?? pages[0]
+    const homepage = pages.find((p) => p.isHomepage) ?? pages[0]
     if (homepage) {
         const homepageId = String(homepage.id)
         slugToPageId.set('/', homepageId)
@@ -652,10 +679,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                             </FloatingContainerProvider>
                         )
                         if (isEditor) {
+                            // Preserve __editorBlockIndex as data attribute when set (e.g. -1 for global injected blocks).
+                            const dataBlockIndex = typeof floatingBlock.__editorBlockIndex === 'number'
+                                ? floatingBlock.__editorBlockIndex
+                                : editorIdx
                             return (
                                 <div
                                     key={blockIndex}
-                                    data-block-index={editorIdx}
+                                    data-block-index={dataBlockIndex}
                                     data-block-type={floatingBlock.blockType}
                                     className="group/block relative"
                                 >
