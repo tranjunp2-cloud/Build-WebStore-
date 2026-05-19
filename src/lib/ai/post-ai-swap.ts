@@ -48,6 +48,7 @@ import {
     buildCTA as composerBuildCTA,
 } from './template-composer'
 import { hasUserDataReference, isGenericContent } from './content-rules'
+import type { ContentLang } from './content-rules'
 import type { ThemeMood } from './theme-moods'
 
 /** Block types eligible for post-AI swap. Other blocks are passed through. */
@@ -83,6 +84,7 @@ function callComposerBuilder(
     category: string,
     content: CategoryContent | null,
     mood?: ThemeMood,
+    language?: ContentLang,
 ): Record<string, unknown> | null {
     switch (blockType) {
         case 'hero':
@@ -90,7 +92,7 @@ function callComposerBuilder(
         case 'features':
             return composerBuildFeatures(biz, category)
         case 'testimonials':
-            return content ? composerBuildTestimonials(content, biz.name) : null
+            return content ? composerBuildTestimonials(content, biz.name, language) : null
         case 'faq':
             return content ? composerBuildFAQ(content, biz.name) : null
         case 'about':
@@ -114,6 +116,7 @@ export function postAISwapStep(
     category: string,
     mood?: ThemeMood,
     seed: number = 0,
+    language?: ContentLang,
 ): PostAISwapResult {
     const telemetry: SwapTelemetry[] = []
     const content = getCategoryContent(category) ?? null
@@ -149,7 +152,7 @@ export function postAISwapStep(
         // Composer dispatch
         let composed: Record<string, unknown> | null = null
         try {
-            composed = callComposerBuilder(bt, biz, category, content, mood)
+            composed = callComposerBuilder(bt, biz, category, content, mood, language)
         } catch (err) {
             console.warn(`[post-ai-swap] ${bt} composer threw, keeping AI block:`, err)
             telemetry.push({

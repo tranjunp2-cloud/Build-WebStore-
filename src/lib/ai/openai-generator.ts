@@ -436,6 +436,7 @@ export async function generateSiteWithAI(
                 // when GPT output is thin and needs padding.
                 userBiz: enforcerBizOverride,
                 mood: themeMood,
+                language: contentLang,
             }
 
             for (let p = 0; p < rawPages.length; p++) {
@@ -455,6 +456,7 @@ export async function generateSiteWithAI(
                         detectedCategory,
                         themeMood,
                         themeSeed,
+                        contentLang,
                     )
                     pageBlocks = swapResult.blocks as typeof pageBlocks
                     swapTelemetry.push(...swapResult.telemetry)
@@ -569,6 +571,7 @@ export async function generateSiteWithAI(
                     detectedCategory,
                     themeMood,
                     themeSeed,
+                    contentLang,
                 )
                 validBlocks = swapResult.blocks as typeof validBlocks
                 swapTelemetry.push(...swapResult.telemetry)
@@ -583,6 +586,7 @@ export async function generateSiteWithAI(
                     // Plan 07 — same userBiz + mood threading as the multi-page branch.
                     userBiz: enforcerBizOverride,
                     mood: themeMood,
+                    language: contentLang,
                 }
                 validBlocks = enforceMinimumStructure(
                     validBlocks as Record<string, unknown>[],

@@ -455,12 +455,24 @@ export function buildFeatures(biz: BusinessSample, category: string): Record<str
   }
 }
 
-export function buildTestimonials(content: CategoryContent, bizName?: string): Record<string, unknown> {
+export function buildTestimonials(content: CategoryContent, bizName?: string, language?: ContentLang): Record<string, unknown> {
+  const headlineBase = language === 'ms'
+    ? 'Apa Kata Pelanggan Kami'
+    : language === 'vi'
+      ? 'Khách Hàng Nói Gì'
+      : 'What Our Customers Say'
+  const headlineFull = bizName
+    ? language === 'ms'
+      ? `Apa Kata Pelanggan ${bizName}`
+      : language === 'vi'
+        ? `Khách Hàng Nói Gì Về ${bizName}`
+        : `What Our Customers Say About ${bizName}`
+    : headlineBase
   // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
   return {
     blockType: 'testimonials',
     variant: 'cards',
-    headline: bizName ? `What Our Customers Say About ${bizName}` : 'What Our Customers Say',
+    headline: headlineFull,
     testimonials: content.testimonials.slice(0, 6).map((t) => ({
       quote: t.quote,
       name: t.name,

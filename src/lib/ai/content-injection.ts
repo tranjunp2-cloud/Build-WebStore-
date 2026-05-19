@@ -13,6 +13,7 @@
 
 import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
+import type { ContentLang } from './content-rules'
 import { pickLogosByCategory } from './content/client-logos-library'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
 import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
@@ -50,6 +51,8 @@ export interface InjectionContext {
      * "Contact Us" labels remain when mood is absent.
      */
     mood?: ThemeMood
+    /** Target content language — drives language-specific static strings (e.g. testimonials headline). */
+    language?: ContentLang
 }
 
 // ── Plan 07 helpers — threading user data into canned library blocks ─────
@@ -296,13 +299,19 @@ export function buildBlockFromLibrary(
                     ?? `${name} is dedicated to delivering exceptional experiences to every customer.`,
             }
 
-        case 'testimonials':
+        case 'testimonials': {
+            const testimonialsHeadline = ctx.language === 'ms'
+                ? 'Apa Kata Pelanggan Kami'
+                : ctx.language === 'vi'
+                    ? 'Khách Hàng Nói Gì'
+                    : 'What Our Customers Say'
             return {
                 blockType: 'testimonials',
                 variant: 'cards',
-                headline: 'What Our Customers Say',
+                headline: testimonialsHeadline,
                 testimonials: testimonialSlice.slice(0, 4).map(mapTestimonial),
             }
+        }
 
         case 'faq':
             return {

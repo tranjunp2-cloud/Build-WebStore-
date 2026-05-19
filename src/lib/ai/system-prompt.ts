@@ -279,7 +279,7 @@ export type BusinessInfoInput = {
 
 import type { ThemeMood } from './theme-moods'
 import type { CategoryRecipe } from './category-recipes'
-import { SUGGESTED_CTA_BY_CATEGORY } from './suggested-cta-by-category'
+import { getCTAsByLang } from './suggested-cta-by-category'
 
 export type BuildUserPromptOptions = {
   extraInstructions?: string
@@ -403,8 +403,9 @@ export function buildUserPrompt(
   // industry-specific CTAs instead of generic "Xem thêm" / "Learn More".
   // Skipped for reference-prompt path (recreation mode uses source content).
   if (!referencePrompt && category) {
-    const suggestedCtaList = SUGGESTED_CTA_BY_CATEGORY[category]
-    if (suggestedCtaList && suggestedCtaList.length > 0) {
+    const ctaLang = (language === 'ms' || language === 'vi') ? language : 'en'
+    const suggestedCtaList = getCTAsByLang(category, ctaLang)
+    if (suggestedCtaList.length > 0) {
       parts.push(
         `\nPREFERRED CTA LABELS for ${category} (use these in hero, navigation, and CTA blocks):\n${suggestedCtaList.map((c) => `  - "${c}"`).join('\n')}\nAvoid generic labels like: learn more, read more, click here, xem thêm, tìm hiểu thêm, đọc thêm`,
       )
