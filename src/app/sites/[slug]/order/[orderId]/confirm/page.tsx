@@ -1,194 +1,124 @@
+import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import Link from 'next/link'
-import { CheckCircle, XCircle, Clock } from 'lucide-react'
+import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
+import { generateUploadToken } from '@/lib/orders/upload-token'
+import ConfirmClient, { type ConfirmOrder } from './ConfirmClient'
 
-function formatPrice(price: number, currency: string) {
-    if (currency === 'MYR') return `RM ${price.toFixed(2)}`
-    if (currency === 'SGD') return `S$${price.toFixed(2)}`
-    return `$${price.toFixed(2)}`
-}
-
-export default async function ConfirmPage({
+export default async function OrderConfirmPage({
     params,
 }: {
     params: Promise<{ slug: string; orderId: string }>
 }) {
-    const { slug, orderId } = await params
+    const { slug, orderId: rawId } = await params
     const payload = await getPayload({ config })
+    const orderId = isNaN(Number(rawId)) ? rawId : Number(rawId)
 
-    let order: any = null
+    // Resolve tenant slug → tenant → site (sites collection has no slug field)
+    const tenantResult = await payload.find({
+        collection: 'tenants',
+        where: { slug: { equals: slug } },
+        limit: 1,
+        overrideAccess: true,
+        depth: 0,
+    })
+    const tenant = tenantResult.docs[0]
+    if (!tenant) notFound()
+
+    const siteResult = await payload.find({
+        collection: 'sites',
+        where: { tenant: { equals: tenant.id } },
+        limit: 1,
+        overrideAccess: true,
+        depth: 1,
+    })
+    const site = siteResult.docs[0] as any
+    if (!site) notFound()
+
+    const siteTheme = site.theme ?? null
+    const themeCSS = siteTheme
+        ? generateThemeCSS(resolveTheme({
+            primaryColor: siteTheme.primaryColor,
+            secondaryColor: siteTheme.secondaryColor,
+            accentColor: siteTheme.accentColor,
+            surfaceColor: siteTheme.surfaceColor,
+            textColor: siteTheme.textColor,
+            mutedColor: siteTheme.mutedColor,
+            fontPairingId: siteTheme.fontPairingId,
+            fontHeading: siteTheme.fontHeading,
+            fontBody: siteTheme.fontBody,
+            colorMode: siteTheme.colorMode,
+            backgroundColor: siteTheme.backgroundColor,
+        }))
+        : ''
+
+    const thFontHeading = siteTheme?.fontHeading || 'Outfit'
+    const thFontBody = siteTheme?.fontBody || 'Inter'
+    const sanitizeFont = (f: string) => f.replace(/[^a-zA-Z0-9 -]/g, '')
+    const fonts = [thFontHeading, thFontBody].filter((v, i, a) => a.indexOf(v) === i).map(sanitizeFont)
+    const googleFontsHref = `https://fonts.googleapis.com/css2?${fonts.map(f => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@300;400;500;600;700;800;900`).join('&')}&subset=latin,vietnamese&display=swap`
+
+    const pc = site.paymentConfig ?? {}
+    const bankName: string = pc.bankName ?? ''
+    const bankAccountNo: string = pc.bankAccountNo ?? ''
+    const bankAccountHolder: string = pc.bankAccountHolder ?? ''
+    const _qr = pc.merchantQrCode
+    const merchantQrUrl: string = (_qr && typeof _qr === 'object') ? (_qr.url ?? '') : ''
+
+    let order: ConfirmOrder | null = null
     try {
-        order = await payload.findByID({
+        const result = await payload.find({
             collection: 'orders',
-            id: orderId,
-            depth: 0,
+            where: { id: { equals: orderId }, site: { equals: site.id } },
+            limit: 1,
             overrideAccess: true,
+            depth: 2, // depth:2 to resolve items[].product.images[].image.url
         })
+        const raw = result.docs[0] as any
+        if (raw) {
+            order = {
+                id: raw.id,
+                orderNumber: raw.orderNumber,
+                items: (raw.items ?? []).map((item: any) => ({
+                    productName: item.productName,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    variant: item.variant,
+                    imageUrl: item.product?.images?.[0]?.image?.url ?? undefined,
+                })),
+                subtotal: raw.subtotal,
+                shippingFee: raw.shippingFee,
+                tax: raw.tax,
+                total: raw.total,
+                currency: raw.currency,
+                paymentMethod: raw.paymentMethod,
+                stripePaymentIntentId: raw.stripePaymentIntentId,
+                customerName: raw.customerName,
+                customerEmail: raw.customerEmail,
+                shippingAddress: raw.shippingAddress,
+            }
+        }
     } catch { }
+    if (!order) notFound()
 
-    const paymentLabel =
-        order?.paymentMethod === 'fpx' ? 'FPX (Online Banking)' :
-            order?.paymentMethod === 'card' ? 'Credit / Debit Card' : 'Online Payment'
+    const uploadToken = generateUploadToken(order.id)
 
-    // Determine UI state based on order status
-    const status = order?.status
-    const isFailed = status === 'payment_failed'
-    const isPending = !status || status === 'pending'
-    const isSuccess = status === 'paid' || status === 'confirmed'
-
-    const containerStyle = {
-        fontFamily: 'Inter, sans-serif', minHeight: '100vh',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#fafafa', padding: '24px',
-    }
-
-    const cardStyle = {
-        textAlign: 'center' as const, maxWidth: '480px', width: '100%', padding: '48px 32px',
-        background: 'white', borderRadius: '24px', boxShadow: '0 4px 24px rgba(0,0,0,0.05)',
-    }
-
-    // Payment failed state
-    if (isFailed) {
-        return (
-            <div style={containerStyle}>
-                <div style={cardStyle}>
-                    <div style={{
-                        width: '64px', height: '64px', borderRadius: '50%', background: '#fee2e2',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
-                    }}>
-                        <XCircle size={32} color="#ef4444" />
-                    </div>
-
-                    <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px' }}>
-                        Pembayaran Gagal
-                    </h1>
-                    <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>
-                        Pembayaran gagal. Sila cuba lagi.
-                    </p>
-
-                    {order?.orderNumber && (
-                        <div style={{
-                            background: '#fef2f2', borderRadius: '12px', padding: '16px', marginBottom: '24px',
-                        }}>
-                            <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>Order Reference</p>
-                            <p style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>{order.orderNumber}</p>
-                        </div>
-                    )}
-
-                    <Link
-                        href={`/sites/${slug}/checkout`}
-                        style={{
-                            display: 'inline-block', padding: '12px 32px',
-                            background: '#111', color: 'white', borderRadius: '12px',
-                            textDecoration: 'none', fontSize: '14px', fontWeight: 600,
-                        }}
-                    >
-                        Cuba Lagi
-                    </Link>
-                </div>
-            </div>
-        )
-    }
-
-    // Payment pending — webhook may be delayed
-    if (isPending) {
-        return (
-            <div style={containerStyle}>
-                <div style={cardStyle}>
-                    <div style={{
-                        width: '64px', height: '64px', borderRadius: '50%', background: '#fef9c3',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
-                    }}>
-                        <Clock size={32} color="#eab308" />
-                    </div>
-
-                    <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px' }}>
-                        Processing Payment
-                    </h1>
-                    <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>
-                        Your payment is being processed. Please wait a moment — you will receive a confirmation email shortly.
-                    </p>
-
-                    {order?.orderNumber && (
-                        <div style={{
-                            background: '#f8fafc', borderRadius: '12px', padding: '16px', marginBottom: '24px',
-                        }}>
-                            <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>Order Reference</p>
-                            <p style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>{order.orderNumber}</p>
-                        </div>
-                    )}
-
-                    <Link
-                        href={`/sites/${slug}/products`}
-                        style={{
-                            display: 'inline-block', padding: '12px 32px',
-                            background: '#111', color: 'white', borderRadius: '12px',
-                            textDecoration: 'none', fontSize: '14px', fontWeight: 600,
-                        }}
-                    >
-                        Continue Shopping
-                    </Link>
-                </div>
-            </div>
-        )
-    }
-
-    // Success state
     return (
-        <div style={containerStyle}>
-            <div style={cardStyle}>
-                <div style={{
-                    width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
-                }}>
-                    <CheckCircle size={32} color="#22c55e" />
-                </div>
-
-                <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 8px' }}>
-                    Payment Successful!
-                </h1>
-                <p style={{ fontSize: '14px', color: '#666', margin: '0 0 24px' }}>
-                    Thank you for your purchase. Your order is being processed.
-                </p>
-
-                {order && (
-                    <div style={{
-                        background: '#f8fafc', borderRadius: '12px', padding: '20px', marginBottom: '24px',
-                    }}>
-                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>Order Number</p>
-                        <p style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 12px', letterSpacing: '1px' }}>
-                            {order.orderNumber}
-                        </p>
-                        {order.total != null && (
-                            <>
-                                <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>Total</p>
-                                <p style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 12px' }}>
-                                    {formatPrice(order.total, order.currency || 'MYR')}
-                                </p>
-                            </>
-                        )}
-                        <p style={{ fontSize: '13px', color: '#999', margin: 0 }}>
-                            Payment via {paymentLabel}
-                        </p>
-                    </div>
-                )}
-
-                <p style={{ fontSize: '13px', color: '#999' }}>
-                    A confirmation email will be sent to your inbox shortly.
-                </p>
-
-                <Link
-                    href={`/sites/${slug}/products`}
-                    style={{
-                        display: 'inline-block', marginTop: '24px', padding: '12px 32px',
-                        background: '#111', color: 'white', borderRadius: '12px',
-                        textDecoration: 'none', fontSize: '14px', fontWeight: 600,
-                    }}
-                >
-                    Continue Shopping
-                </Link>
-            </div>
-        </div>
+        <>
+            <link rel="preconnect" href="https://fonts.googleapis.com" />
+            <link crossOrigin="anonymous" href="https://fonts.gstatic.com" rel="preconnect" />
+            {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+            <link rel="stylesheet" href={googleFontsHref} />
+            {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
+            <ConfirmClient
+                order={order}
+                slug={slug}
+                bankName={bankName}
+                bankAccountNo={bankAccountNo}
+                bankAccountHolder={bankAccountHolder}
+                merchantQrUrl={merchantQrUrl}
+                uploadToken={uploadToken}
+            />
+        </>
     )
 }
