@@ -10,7 +10,7 @@ import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
     ShieldCheck, ChevronRight, Rocket, MapPin, Truck,
     QrCode, UploadCloud, FileImage, /* Tag, */ Info, Lock, AlertTriangle,
-    Landmark, Copy, CheckCheck, Check,
+    Landmark, Check,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
@@ -29,12 +29,8 @@ type ShippingConfig = {
 type InitialSiteData = {
     siteId: string
     tenantId: string
-    merchantQrCodeUrl: string | null
     enableCod: boolean
     enableQrBanking: boolean
-    bankName: string | null
-    bankAccountNo: string | null
-    bankAccountHolder: string | null
     shippingConfig: ShippingConfig | null
 }
 
@@ -66,13 +62,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [isOwner, setIsOwner] = useState(false)
     const { items, subtotal, clearCart } = useCartStore()
 
-    const [merchantQrUrl, setMerchantQrUrl] = useState<string | null>(initialSiteData?.merchantQrCodeUrl ?? null)
     const [enableCod, setEnableCod] = useState(initialSiteData?.enableCod ?? true)
     const [enableQrBanking, setEnableQrBanking] = useState(initialSiteData?.enableQrBanking ?? true)
-    const [bankName, setBankName] = useState(initialSiteData?.bankName ?? '')
-    const [bankAccountNo, setBankAccountNo] = useState(initialSiteData?.bankAccountNo ?? '')
-    const [bankAccountHolder, setBankAccountHolder] = useState(initialSiteData?.bankAccountHolder ?? '')
-    const [copiedField, setCopiedField] = useState<string | null>(null)
     // Shipping rates in RM (shippingConfig stores sen; divide by 100)
     const sc = initialSiteData?.shippingConfig
     const [shippingWestRM, setShippingWestRM] = useState((sc?.westRate ?? 800) / 100)
@@ -143,12 +134,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 if (!res.ok) { setError('Unable to load store. Please refresh.'); return }
                 const data = await res.json()
                 if (data.siteId) setSiteId(String(data.siteId))
-                if (data.merchantQrCodeUrl) setMerchantQrUrl(data.merchantQrCodeUrl)
                 if (data.enableCod === false) { setEnableCod(false); setPaymentMethod('bank_transfer') }
                 if (data.enableQrBanking === false) setEnableQrBanking(false)
-                if (data.bankName) setBankName(data.bankName)
-                if (data.bankAccountNo) setBankAccountNo(data.bankAccountNo)
-                if (data.bankAccountHolder) setBankAccountHolder(data.bankAccountHolder)
                 if (data.shippingConfig) {
                     const s = data.shippingConfig
                     if (s.westRate != null) setShippingWestRM(s.westRate / 100)
@@ -203,14 +190,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const handlePhoneBlur = () => {
         const err = validatePhone(form.phone)
         if (err) setFieldErrors(prev => ({ ...prev, phone: err }))
-    }
-
-    const copyToClipboard = async (text: string, field: string) => {
-        try {
-            await navigator.clipboard.writeText(text)
-            setCopiedField(field)
-            setTimeout(() => setCopiedField(null), 2000)
-        } catch { /* clipboard API may be blocked in some browsers */ }
     }
 
     const handleStateChange = (stateId: string) => {
@@ -365,8 +344,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                         <span>Cart</span><ChevronRight size={12} />
                         <strong>Checkout</strong><ChevronRight size={12} />
                         <span>Confirmation</span>
-                        <span className="ck-ssl"><ShieldCheck size={11} /> SSL Secure</span>
+                        <span className="ck-ssl" style={{ marginLeft: 16 }}><ShieldCheck size={11} /> SSL Secure</span>
                     </div>
+                    <span className="ck-ssl ck-ssl-sm" style={{ marginLeft: 'auto' }}><Lock size={11} /> Secure</span>
                 </header>
 
                 <div className="ck-shell">
@@ -516,7 +496,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                             <div className={`pm-rad${paymentMethod === 'bank_transfer' ? ' on' : ''}`} />
                                             <div className="pm-body">
                                                 <h3 className="pm-title">Bank Transfer / DuitNow QR</h3>
-                                                <p className="pm-desc">Scan DuitNow QR or transfer to seller&apos;s bank. Upload receipt to confirm.</p>
+                                                <p className="pm-desc">Transfer to seller&apos;s bank or scan a DuitNow QR. Receipt verified manually.</p>
                                                 <div className="pm-mini-marks">
                                                     <span className="pm-mini-mark mark-qr"><QrCode size={12} /></span>
                                                     <span className="pm-mini-mark mark-bnk"><Landmark size={12} /></span>
@@ -528,65 +508,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                             </div>
                                         </div>
 
-                                        {paymentMethod === 'bank_transfer' && (
-                                            <div className="qr-panel" onClick={e => e.stopPropagation()}>
-                                                {/* QR + meta */}
-                                                <div className="qr-row">
-                                                    {merchantQrUrl ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={merchantQrUrl} alt="DuitNow QR" className="qr-img" />
-                                                    ) : (
-                                                        <div className="qr-ph">
-                                                            <QrCode size={36} />
-                                                            <span>Scan to pay</span>
-                                                        </div>
-                                                    )}
-                                                    <div className="qr-meta">
-                                                        <h4>Scan DuitNow QR</h4>
-                                                        <p>Open any MY banking or e-wallet app and confirm <strong>{formatPrice(total, currency)}</strong>.</p>
-                                                        <span className="qr-apps">Maybank2u · TNG · Boost · GrabPay</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Bank account details */}
-                                                {(bankName || bankAccountNo || bankAccountHolder) && (
-                                                    <ul className="bk-rows">
-                                                        {bankName && (
-                                                            <li className="bk-row">
-                                                                <span className="bk-lbl">Bank</span>
-                                                                <span className="bk-val">{bankName}</span>
-                                                                <button className="bk-copy" onClick={() => copyToClipboard(bankName, 'bank')}>
-                                                                    {copiedField === 'bank' ? <><CheckCheck size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
-                                                                </button>
-                                                            </li>
-                                                        )}
-                                                        {bankAccountNo && (
-                                                            <li className="bk-row">
-                                                                <span className="bk-lbl">Account No</span>
-                                                                <span className="bk-val mono">{bankAccountNo}</span>
-                                                                <button className="bk-copy" onClick={() => copyToClipboard(bankAccountNo, 'acct')}>
-                                                                    {copiedField === 'acct' ? <><CheckCheck size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
-                                                                </button>
-                                                            </li>
-                                                        )}
-                                                        {bankAccountHolder && (
-                                                            <li className="bk-row">
-                                                                <span className="bk-lbl">Holder</span>
-                                                                <span className="bk-val">{bankAccountHolder}</span>
-                                                                <button className="bk-copy" onClick={() => copyToClipboard(bankAccountHolder, 'holder')}>
-                                                                    {copiedField === 'holder' ? <><CheckCheck size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
-                                                                </button>
-                                                            </li>
-                                                        )}
-                                                    </ul>
-                                                )}
-                                                <div className="bk-note">
-                                                    <Info size={12} style={{ flexShrink: 0 }} />
-                                                    Place your order and transfer the exact amount. You&apos;ll receive an email with a link to upload your payment receipt.
-                                                </div>
-                                                {/* No pre-checkout upload for bank_transfer — receipt uploaded post-order via magic link */}
-                                            </div>
-                                        )}
                                     </div>
                                 )}
                             </div>
@@ -652,7 +573,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
                             <div className={`sum-trust${paymentMethod === 'bank_transfer' ? ' note' : ''}`}>
                                 {paymentMethod === 'bank_transfer'
-                                    ? <><Info size={11} style={{ flexShrink: 0 }} /> {"You'll receive an email with payment instructions and a link to upload your receipt."}</>
+                                    ? <><Info size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {"You'll upload your payment proof in the next step after your order is created."}</>
                                     : <><ShieldCheck size={11} /> Encrypted Checkout</>}
                             </div>
                         </div>
@@ -688,7 +609,9 @@ const CK_CSS = `
 .ck-h1{font-family:var(--hf);font-size:18px;font-weight:800;letter-spacing:-.005em;margin:0;color:var(--f1);}
 .ck-crumbs{font-size:12px;color:var(--f3);margin-left:auto;display:flex;align-items:center;gap:8px;}
 .ck-crumbs strong{color:var(--tl);font-weight:700;}
-.ck-ssl{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tl);background:var(--tl5);border:1px solid var(--tl2);border-radius:999px;margin-left:8px;}
+.ck-crumbs > svg{color:var(--f4);}
+.ck-ssl{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tl);background:var(--tl5);border:1px solid var(--tl2);border-radius:999px;}
+.ck-ssl-sm{display:none;}
 /* Shell */
 .ck-shell{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:28px;padding:28px;align-items:start;}
 .ck-form{display:flex;flex-direction:column;gap:22px;min-width:0;}
@@ -739,16 +662,6 @@ const CK_CSS = `
 .pm-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--f3);padding:4px 10px;border-radius:999px;background:var(--inp);border:1px solid var(--bd);white-space:nowrap;}
 .pm-pill.teal{background:var(--tl5);border-color:var(--tl2);color:var(--tl7);}
 /* QR expand panel */
-.qr-panel{margin-top:14px;padding-top:14px;border-top:1px dashed #d8dde2;display:flex;flex-direction:column;gap:14px;}
-.qr-row{display:flex;align-items:center;gap:16px;padding:16px;background:var(--card);border:1px solid var(--bd);border-radius:12px;}
-.qr-img{width:120px;height:120px;object-fit:contain;border-radius:8px;border:1px solid var(--bd);flex-shrink:0;}
-.qr-ph{width:120px;height:120px;flex-shrink:0;border:2px dashed var(--tlb);border-radius:8px;background:var(--tlt);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--tl);}
-.qr-ph span{font-size:11px;font-weight:600;}
-.qr-meta{flex:1;min-width:0;}
-.qr-meta h4{font-family:var(--hf);font-size:14px;font-weight:700;margin:0 0 4px;color:var(--f1);}
-.qr-meta p{font-size:12.5px;color:var(--f3);margin:0;line-height:1.5;}
-.qr-meta strong{color:var(--tl7);font-weight:800;}
-.qr-apps{display:block;font-size:11px;color:var(--tl);font-weight:600;margin-top:6px;}
 /* Receipt upload */
 .ru{display:flex;flex-direction:column;gap:8px;}
 .ru-hd{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:var(--f2);}
@@ -804,7 +717,8 @@ const CK_CSS = `
 .po-btn:hover:not(.dis){background:var(--tl7);transform:translateY(-1px);}
 .po-btn.dis{background:#d9dde2;color:#8a929b;box-shadow:none;cursor:not-allowed;}
 .sum-trust{margin-top:12px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
-.sum-trust.note{font-size:11px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--f3);text-align:center;line-height:1.5;}
+.sum-trust.note{font-size:11.5px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--f3);text-align:left;align-items:flex-start;line-height:1.5;padding:0 4px;white-space:normal;}
+.sum-trust.note svg{color:#8a5c0a;}
 @keyframes spin{to{transform:rotate(360deg);}}.spin{animation:spin .7s linear infinite;}
 /* Responsive */
 @media(max-width:768px){
@@ -817,6 +731,7 @@ const CK_CSS = `
 @media(max-width:480px){
   .ck-hd{padding:14px 16px;}
   .ck-crumbs{display:none;}
+  .ck-ssl-sm{display:inline-flex;}
   .ck-row.c3{grid-template-columns:1fr;}
 }
 /* Payment brand badges */
@@ -855,13 +770,4 @@ const CK_CSS = `
 .sn-bar{height:4px;border-radius:999px;background:rgba(var(--accent-rgb,14,117,86),.15);overflow:hidden;display:block;margin:2px 0 6px;}
 .sn-fill{display:block;height:4px;background:var(--tl);border-radius:999px;transition:width .4s ease;}
 /* Bank detail rows (#2) */
-.bk-rows{list-style:none;margin:0;padding:0;background:var(--inp);border:1px solid var(--bd);border-radius:12px;overflow:hidden;}
-.bk-row{display:grid;grid-template-columns:88px 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--bd);}
-.bk-row:last-child{border-bottom:none;}
-.bk-lbl{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--f3);}
-.bk-val{font-size:13px;font-weight:600;color:var(--f1);}
-.bk-val.mono{font-family:monospace;letter-spacing:.02em;}
-.bk-copy{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--tl7);background:var(--tl5);border:1px solid var(--tl2);border-radius:7px;cursor:pointer;transition:all .12s;white-space:nowrap;}
-.bk-copy:hover{background:var(--tl2);}
-.bk-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:#fff4dc;border:1px solid #f1d693;border-radius:10px;color:#8a5c0a;font-size:12px;line-height:1.5;}
 `
