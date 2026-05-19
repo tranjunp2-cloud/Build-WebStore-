@@ -308,9 +308,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const newBlocks = [...blocks]
         newBlocks.splice(safeAfterIndex + 1, 0, block)
 
-        // Auto-restore cart when a commerce block is added and cart was explicitly deleted.
-        // null = user had deleted it; restoring to default floating so the cart re-appears.
-        const needsCartRestore = COMMERCE_BLOCK_TYPES.has(block.blockType) && globalBlocks?.cartWidget === null
+        // Auto-restore cart when a commerce block is added, unless cart is already active.
+        // globalBlocks === null: fresh site (never configured) — restore.
+        // globalBlocks.cartWidget === null: user explicitly deleted — restore.
+        // globalBlocks.cartWidget = {...}: already configured — no restore needed.
+        const cartAlreadyActive = globalBlocks !== null && globalBlocks.cartWidget != null
+        const needsCartRestore = COMMERCE_BLOCK_TYPES.has(block.blockType) && !cartAlreadyActive
         const effectiveGlobalBlocks = needsCartRestore
             ? { ...globalBlocks, cartWidget: { blockType: 'cartWidget', variant: 'floating' } as BlockData }
             : globalBlocks

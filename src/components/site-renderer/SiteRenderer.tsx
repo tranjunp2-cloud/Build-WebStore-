@@ -137,16 +137,23 @@ function applyGlobalSystemBlocks(
 
     const gb = site.globalBlocks
 
-    if (process.env.NODE_ENV !== 'production' && !gb && pages.length > 0) {
-        console.warn('[SiteRenderer] site.globalBlocks is null — using legacy page-scan fallback')
+    if (process.env.NODE_ENV !== 'production' && gb === undefined && pages.length > 0) {
+        console.warn('[SiteRenderer] site.globalBlocks not configured — BC page-scan fallback active')
     }
 
-    nextBlocks = applyGlobalBlock(nextBlocks, 'cartWidget', gb?.cartWidget, pages, {
+    // When gb is null (full wipe via mergeGlobalBlocks), treat every key as null (explicit delete)
+    // so BC page-scan fallback is suppressed. When gb is undefined (column missing from DB), pass
+    // undefined to each key to activate BC fallback for legacy sites.
+    const cartEntry   = gb === null ? null : gb?.cartWidget
+    const waEntry     = gb === null ? null : gb?.whatsappButton
+    const socialEntry = gb === null ? null : gb?.socialWidget
+
+    nextBlocks = applyGlobalBlock(nextBlocks, 'cartWidget', cartEntry, pages, {
         autoInject: true,
         siteHeaderBlock,
     })
-    nextBlocks = applyGlobalBlock(nextBlocks, 'whatsapp-button', gb?.whatsappButton, pages)
-    nextBlocks = applyGlobalBlock(nextBlocks, 'socialWidget', gb?.socialWidget, pages)
+    nextBlocks = applyGlobalBlock(nextBlocks, 'whatsapp-button', waEntry, pages)
+    nextBlocks = applyGlobalBlock(nextBlocks, 'socialWidget', socialEntry, pages)
 
     return nextBlocks
 }

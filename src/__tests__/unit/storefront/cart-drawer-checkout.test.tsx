@@ -1,406 +1,186 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import React from 'react'
 
-// Module state for mocking
-let mockCartItems: any[] = []
+// ── Mutable state driving useCartStore mock ───────────────────────────────
+let mockItems: import('@/store/cartStore').CartItem[] = []
 let mockIsOpen = false
 
-// Mock stores and dependencies first
+// ── Top-level mocks (vi.mock hoisted before imports) ─────────────────────
 vi.mock('@/store/cartStore', () => ({
-    useCartStore: vi.fn(() => {
-        const state = {
-            items: mockCartItems,
-            isOpen: mockIsOpen,
-            closeCart: vi.fn(() => {
-                mockIsOpen = false
-            }),
-            removeItem: vi.fn(),
-            updateQuantity: vi.fn(),
-            subtotal: vi.fn(() => mockCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)),
-            itemCount: vi.fn(() => mockCartItems.reduce((sum, item) => sum + item.quantity, 0)),
-        }
-        return state
-    }),
+    useCartStore: vi.fn(() => ({
+        items: mockItems,
+        isOpen: mockIsOpen,
+        closeCart: vi.fn(),
+        removeItem: vi.fn(),
+        updateQuantity: vi.fn(),
+        subtotal: vi.fn(() => mockItems.reduce((s, i) => s + i.price * i.quantity, 0)),
+        itemCount: vi.fn(() => mockItems.reduce((s, i) => s + i.quantity, 0)),
+    })),
 }))
 
-vi.mock('@/lib/analytics/track-event', () => ({
-    trackEvent: vi.fn(),
+vi.mock('@/lib/analytics/track-event', () => ({ trackEvent: vi.fn() }))
+vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))
+vi.mock('@/components/site-renderer/OwnerContext', () => ({ useIsOwner: vi.fn(() => false) }))
+vi.mock('@/lib/theme/resolve', () => ({
+    CSS_VARS: {
+        fontBody: 'sans-serif', fontHeading: 'sans-serif',
+        primary: '#000000', accent: '#007bff', accentRgb: '0,123,255', surface: '#f0f0f0',
+    },
 }))
-
 vi.mock('@/i18n', () => ({
     useI18n: vi.fn(() => ({
         t: {
             storefront: {
                 cart: {
-                    title: 'Shopping Cart',
+                    drawerTitle: 'Shopping Cart',
+                    subtitle: 'Your items',
+                    subtotal: 'Subtotal',
+                    shippingNote: 'Shipping calculated at checkout',
+                    proceedToCheckout: 'Proceed to Checkout',
                     empty: 'Your cart is empty',
-                    checkout: 'Go to Checkout',
+                    checkoutUnavailable: 'Checkout not available',
                 },
             },
         },
     })),
 }))
 
-vi.mock('@/components/site-renderer/OwnerContext', () => ({
-    useIsOwner: vi.fn(() => false),
-}))
+// ── Component under test ──────────────────────────────────────────────────
+import { CartDrawer } from '@/components/storefront/CartDrawer'
 
-import type { CartItem } from '@/store/cartStore'
-
-// Helper to set cart state for tests
-function setCartState(items: any[], isOpen: boolean) {
-    mockCartItems = items
-    mockIsOpen = isOpen
+// ── Fixtures ──────────────────────────────────────────────────────────────
+const ITEM_ONE: import('@/store/cartStore').CartItem = {
+    productId: 'prod-1',
+    productSlug: 'test-product',
+    name: 'Test Product',
+    price: 99.99,
+    currency: 'MYR',
+    imageUrl: '/image.jpg',
+    quantity: 1,
 }
 
-// Mock CartDrawer component for testing
-function MockCartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: string }) {
-    const isDisabled = mockCartItems.length === 0
-    return mockIsOpen ? (
-        <div data-testid="cart-drawer">
-            <div>Your cart is empty</div>
-            <a
-                href={isDisabled ? '' : `/sites/${siteSlug}/checkout`}
-                disabled={isDisabled}
-                data-testid="checkout-button"
-            >
-                Go to Checkout
-            </a>
-        </div>
-    ) : null
-}
-
-// TC-F09.219..220 — CartDrawer checkout routing tests
+// ── TC-F09.219 / TC-F09.220 — CartDrawer checkout routing ─────────────────
 describe('CartDrawer — checkout routing', () => {
     beforeEach(() => {
-        mockCartItems = []
+        mockItems = []
         mockIsOpen = false
         vi.clearAllMocks()
     })
 
     afterEach(() => {
-        mockCartItems = []
+        mockItems = []
         mockIsOpen = false
     })
 
-    describe('TC-F09.219: Empty cart → checkout button disabled', () => {
-        it('should disable checkout button when cart is empty', () => {
+    // ── TC-F09.219: Empty cart ─────────────────────────────────────────────
+    describe('TC-F09.219: Empty cart → footer visible, checkout disabled', () => {
+        it('renders null when drawer is closed', () => {
             // Arrange
-            setCartState([], true)
-
+            mockItems = []
+            mockIsOpen = false
             // Act
-            const isDisabled = mockCartItems.length === 0
-
+            const { container } = render(<CartDrawer siteSlug="test-site" />)
             // Assert
-            expect(isDisabled).toBe(true)
+            expect(container.firstChild).toBeNull()
         })
 
-        it('should not provide checkout href when items count is zero', () => {
+        it('renders footer even when cart is empty', () => {
             // Arrange
-            setCartState([], true)
-
+            mockItems = []
+            mockIsOpen = true
             // Act
-            const href = mockCartItems.length === 0 ? '' : '/sites/test-site/checkout'
-
-            // Assert
-            expect(href).toBe('')
+            render(<CartDrawer siteSlug="test-site" />)
+            // Assert — footer CTA is always rendered (not gated by items.length)
+            expect(screen.getByRole('button', { name: /proceed to checkout/i })).toBeInTheDocument()
         })
 
-        it('should indicate empty state with items length check', () => {
+        it('checkout button is disabled when cart is empty', () => {
             // Arrange
-            setCartState([], true)
-
+            mockItems = []
+            mockIsOpen = true
             // Act
-            const isEmpty = mockCartItems.length === 0
-
+            render(<CartDrawer siteSlug="test-site" />)
             // Assert
-            expect(isEmpty).toBe(true)
+            const btn = screen.getByRole('button', { name: /proceed to checkout/i })
+            expect(btn).toBeDisabled()
         })
 
-        it('should track empty cart state', () => {
+        it('shows empty-cart message when no items', () => {
             // Arrange
-            setCartState([], true)
-
+            mockItems = []
+            mockIsOpen = true
             // Act
-            const itemCount = mockCartItems.length
-
+            render(<CartDrawer siteSlug="test-site" />)
             // Assert
-            expect(itemCount).toBe(0)
+            expect(screen.getByText('Your cart is empty')).toBeInTheDocument()
         })
 
-        it('should render empty state message when items array is empty', () => {
+        it('does not render subtotal when cart is empty', () => {
             // Arrange
-            setCartState([], true)
-
+            mockItems = []
+            mockIsOpen = true
             // Act
-            const shouldShowEmpty = mockCartItems.length === 0
-
+            render(<CartDrawer siteSlug="test-site" />)
             // Assert
-            expect(shouldShowEmpty).toBe(true)
+            expect(screen.queryByText('Subtotal')).not.toBeInTheDocument()
         })
     })
 
-    describe('TC-F09.220: Items + siteSlug → correct checkout href', () => {
-        it('should generate correct checkout route with siteSlug when items exist', () => {
+    // ── TC-F09.220: Items + siteSlug → checkout link ───────────────────────
+    describe('TC-F09.220: Cart has items → checkout renders as link with correct href', () => {
+        it('renders checkout as <a> when items exist and siteSlug provided', () => {
             // Arrange
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'test-product',
-                name: 'Test Product',
-                price: 99.99,
-                currency: 'MYR',
-                imageUrl: '/image.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
             // Act
-            const expectedHref = `/sites/bella-bakery/checkout`
-            const hasItems = mockCartItems.length > 0
-
-            // Assert
-            expect(hasItems).toBe(true)
-            expect(expectedHref).toBe('/sites/bella-bakery/checkout')
+            render(<CartDrawer siteSlug="bella-bakery" />)
+            // Assert — link, not button
+            const link = screen.getByRole('link', { name: /proceed to checkout/i })
+            expect(link).toBeInTheDocument()
+            expect(link).toHaveAttribute('href', '/sites/bella-bakery/checkout')
         })
 
-        it('should build href with correct siteSlug format', () => {
+        it('includes correct siteSlug in checkout href', () => {
             // Arrange
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'item',
-                name: 'Item',
-                price: 50,
-                currency: 'MYR',
-                imageUrl: '/img.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-            const siteSlug = 'shop-a'
-
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
             // Act
-            const generatedHref = `/sites/${siteSlug}/checkout`
-
+            render(<CartDrawer siteSlug="shop-alpha" />)
             // Assert
-            expect(generatedHref).toBe('/sites/shop-a/checkout')
+            expect(screen.getByRole('link', { name: /proceed to checkout/i }))
+                .toHaveAttribute('href', '/sites/shop-alpha/checkout')
         })
 
-        it('should not be disabled when cart contains 1 item', () => {
+        it('shows subtotal section when items exist', () => {
             // Arrange
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'product',
-                name: 'Product',
-                price: 100,
-                currency: 'MYR',
-                imageUrl: '/p.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
             // Act
-            const isDisabled = mockCartItems.length === 0
-
+            render(<CartDrawer siteSlug="test-site" />)
             // Assert
-            expect(isDisabled).toBe(false)
+            expect(screen.getByText('Subtotal')).toBeInTheDocument()
         })
 
-        it('should not be disabled when cart has multiple items', () => {
+        it('does not show empty-cart message when items present', () => {
             // Arrange
-            const mockItems: CartItem[] = [
-                {
-                    productId: 'prod-1',
-                    productSlug: 'item1',
-                    name: 'Item 1',
-                    price: 49.99,
-                    currency: 'MYR',
-                    imageUrl: '/i1.jpg',
-                    quantity: 2,
-                },
-                {
-                    productId: 'prod-2',
-                    productSlug: 'item2',
-                    name: 'Item 2',
-                    price: 29.99,
-                    currency: 'MYR',
-                    imageUrl: '/i2.jpg',
-                    quantity: 1,
-                },
-            ]
-            setCartState(mockItems, true)
-
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
             // Act
-            const isDisabled = mockCartItems.length === 0
-
+            render(<CartDrawer siteSlug="test-site" />)
             // Assert
-            expect(isDisabled).toBe(false)
+            expect(screen.queryByText('Your cart is empty')).not.toBeInTheDocument()
         })
 
-        it('should maintain correct href path structure', () => {
-            // Arrange
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'p',
-                name: 'P',
-                price: 10,
-                currency: 'MYR',
-                imageUrl: '/p.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-            const siteSlug = 'my-site-slug-123'
-
+        it('renders disabled button (not link) when siteSlug is empty string', () => {
+            // Arrange — empty siteSlug → hasCheckoutRoute = false
+            mockItems = [ITEM_ONE]
+            mockIsOpen = true
             // Act
-            const href = `/sites/${siteSlug}/checkout`
-
-            // Assert
-            expect(href).toMatch(/^\/sites\/[\w-]+\/checkout$/)
-            expect(href).toBe('/sites/my-site-slug-123/checkout')
-        })
-
-        it('should work with different siteSlug values', () => {
-            // Arrange
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'item',
-                name: 'Item',
-                price: 50,
-                currency: 'MYR',
-                imageUrl: '/img.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-
-            // Act
-            const href1 = `/sites/shop-a/checkout`
-            const href2 = `/sites/shop-b/checkout`
-
-            // Assert
-            expect(href1).toBe('/sites/shop-a/checkout')
-            expect(href2).toBe('/sites/shop-b/checkout')
-            expect(href1).not.toBe(href2)
-        })
-
-        it('should include siteId context (if needed for rendering)', () => {
-            // Arrange
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'product',
-                name: 'Product',
-                price: 100,
-                currency: 'MYR',
-                imageUrl: '/p.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-            const siteId = 'site-uuid-123'
-
-            // Act
-            // siteId doesn't affect checkout URL route, only siteSlug does
-            const isDisabled = mockCartItems.length === 0
-
-            // Assert
-            expect(isDisabled).toBe(false)
-        })
-    })
-
-    describe('Checkout routing — state logic validation', () => {
-        it('should correctly determine disabled state from item count', () => {
-            // Arrange
-            setCartState([], true)
-
-            // Act
-            const emptyCartDisabled = mockCartItems.length === 0
-
-            // Assert
-            expect(emptyCartDisabled).toBe(true)
-        })
-
-        it('should enable checkout button when transitioning from empty to filled', () => {
-            // Arrange
-            setCartState([], true)
-            expect(mockCartItems.length === 0).toBe(true)
-
-            // Act
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'p',
-                name: 'P',
-                price: 10,
-                currency: 'MYR',
-                imageUrl: '/p.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-
-            // Assert
-            expect(mockCartItems.length === 0).toBe(false)
-        })
-
-        it('should format checkout URL correctly with arbitrary siteSlug', () => {
-            // Arrange
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'p',
-                name: 'P',
-                price: 10,
-                currency: 'MYR',
-                imageUrl: '/p.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-
-            // Act
-            const siteSlugs = ['my-site-2024', 'shop_beta', 'store123']
-            const hrefResults = siteSlugs.map(slug => `/sites/${slug}/checkout`)
-
-            // Assert
-            expect(hrefResults).toEqual([
-                '/sites/my-site-2024/checkout',
-                '/sites/shop_beta/checkout',
-                '/sites/store123/checkout',
-            ])
-        })
-
-        it('should render drawer only when isOpen is true', () => {
-            // Arrange
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'p',
-                name: 'P',
-                price: 10,
-                currency: 'MYR',
-                imageUrl: '/p.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], false) // Not open
-
-            // Act
-            const shouldRender = mockIsOpen
-
-            // Assert
-            expect(shouldRender).toBe(false)
-        })
-
-        it('should handle cart state transitions correctly', () => {
-            // Arrange
-            setCartState([], true)
-            expect(mockCartItems.length === 0).toBe(true)
-
-            // Act
-            const mockItem: CartItem = {
-                productId: 'prod-1',
-                productSlug: 'item',
-                name: 'Item',
-                price: 50,
-                currency: 'MYR',
-                imageUrl: '/img.jpg',
-                quantity: 1,
-            }
-            setCartState([mockItem], true)
-            const itemCountAfter = mockCartItems.length
-
-            // Assert
-            expect(itemCountAfter).toBe(1)
-            expect(mockCartItems.length === 0).toBe(false)
+            render(<CartDrawer siteSlug="" />)
+            // Assert — no checkout link; fallback button rendered
+            expect(screen.queryByRole('link', { name: /proceed to checkout/i })).not.toBeInTheDocument()
+            expect(screen.getByRole('button', { name: /proceed to checkout/i })).toBeInTheDocument()
         })
     })
 })
