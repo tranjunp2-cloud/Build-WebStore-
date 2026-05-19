@@ -412,7 +412,12 @@ export const Sites: CollectionConfig = {
         {
             name: 'globalBlocks',
             type: 'json',
-            admin: { description: 'Global floating widgets (cart, whatsapp, social) shared across all pages' },
+            admin: { description: 'Global floating widgets (cart, whatsapp, social) — published/live version' },
+        },
+        {
+            name: 'pendingGlobalBlocks',
+            type: 'json',
+            admin: { description: 'Draft global floating widgets — copied to globalBlocks on publish. null = no pending changes.' },
         },
     ],
     timestamps: true,

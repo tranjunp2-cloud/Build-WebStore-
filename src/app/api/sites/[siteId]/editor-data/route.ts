@@ -120,7 +120,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 seo: site.seo || {},
                 headerBlock: site.headerBlock || null,
                 footerBlock: site.footerBlock || null,
-                globalBlocks: site.globalBlocks || null,
+                // Editor loads pending draft state when available; falls back to published.
+                globalBlocks: (site.pendingGlobalBlocks as typeof site.globalBlocks) || site.globalBlocks || null,
                 shippingConfig: site.shippingConfig || {},
                 publishedAt: site.publishedAt || null,
                 tenantSlug: (typeof site.tenant === 'object' && site.tenant !== null)

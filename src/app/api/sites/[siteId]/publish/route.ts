@@ -227,14 +227,24 @@ export async function PATCH(
             )
         }
 
-        // Publish the site AFTER all pages promoted successfully
+        // Publish the site AFTER all pages promoted successfully.
+        // Promote pendingGlobalBlocks → globalBlocks so the live storefront reflects
+        // the editor's latest draft state, then clear the pending field.
+        const siteForPublish = await payload.findByID({ collection: 'sites', id: siteId })
+        const pendingGb = (siteForPublish as Record<string, unknown>).pendingGlobalBlocks
+        const publishData: Record<string, unknown> = {
+            status: 'published',
+            publishedAt: new Date().toISOString(),
+        }
+        if (pendingGb !== undefined && pendingGb !== null) {
+            publishData.globalBlocks = pendingGb
+            publishData.pendingGlobalBlocks = null
+        }
+
         const site = await payload.update({
             collection: 'sites',
             id: siteId,
-            data: {
-                status: 'published',
-                publishedAt: new Date().toISOString(),
-            },
+            data: publishData,
         })
 
         // Get tenant slug for the domain URL
