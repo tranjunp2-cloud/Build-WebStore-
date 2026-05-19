@@ -183,18 +183,27 @@ function buildNavigation(
   pages: string[],
   category: string = 'business',
   mood?: ThemeMood,
+  language?: ContentLang,
 ): Record<string, unknown> {
-  const links = pages.map((p) => ({
-    label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
-    url: p === '/' ? '/' : `/${p}`,
-  }))
+  const i18n = getBlockStrings(language)
+  const SLUG_LABELS: Record<string, string> = {
+    '/': i18n.navigation.home,
+    'about': i18n.navigation.about,
+    'services': i18n.navigation.services,
+    'contact': i18n.navigation.contact,
+  }
+  const links = pages.map((p) => {
+    const slug = p === '/' ? '/' : p.replace(/^\/+/, '').toLowerCase()
+    const label = SLUG_LABELS[slug] ?? (p.charAt(0).toUpperCase() + p.slice(1))
+    return { label, url: p === '/' ? '/' : `/${slug}` }
+  })
   return {
     blockType: 'navigation',
     logoText: biz.name,
     links,
     ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: resolveNavCtaUrl(pages) },
     ariaLabel: `${biz.name} main navigation`,
-    breadcrumbConfig: { showOnAllPages: true, homeLabel: 'Home', separator: '/' },
+    breadcrumbConfig: { showOnAllPages: true, homeLabel: i18n.navigation.home, separator: '/' },
   }
 }
 
@@ -487,6 +496,10 @@ function buildContact(biz: BusinessSample, language?: ContentLang): Record<strin
     email: biz.email,
     phone: biz.phone,
     address: biz.address,
+    submitLabel: i18n.contact.submitLabel,
+    phoneLabel: i18n.contact.phoneLabel,
+    addressLabel: i18n.contact.addressLabel,
+    emailLabel: i18n.contact.emailLabel,
     formFields: [
       { label: i18n.contact.nameLabel, fieldName: 'name', fieldType: 'text', placeholder: i18n.contact.namePlaceholder, required: true },
       { label: i18n.contact.emailLabel, fieldName: 'email', fieldType: 'email', placeholder: 'your@email.com', required: true },
@@ -1133,7 +1146,7 @@ function buildPortfolioGrid(): Record<string, unknown> {
   }
 }
 
-export function buildServiceCards(biz: BusinessSample, category: string): Record<string, unknown> {
+export function buildServiceCards(biz: BusinessSample, category: string, language?: ContentLang): Record<string, unknown> {
   const servicesMap: Record<string, { title: string; description: string; icon: string; price?: string; priceUnit?: string }[]> = {
     business: [
       { title: 'Strategy Consulting', description: 'C-suite advisory and market strategy development.', icon: 'BarChart', price: 'RM 500', priceUnit: '/hour' },
@@ -1207,6 +1220,7 @@ export function buildServiceCards(biz: BusinessSample, category: string): Record
     ],
   }
 
+  const i18n = getBlockStrings(language)
   const canned = servicesMap[category] ?? servicesMap['business']!
 
   // Plan 260414-2249 phase-01: when user supplies ≥2 products, emit them as
@@ -1220,18 +1234,18 @@ export function buildServiceCards(biz: BusinessSample, category: string): Record
           title: card.title,
           description: card.description,
           icon: card.icon,
-          cta: { label: 'Learn More', url: '/contact' },
+          cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
         }))
       : canned.map((s) => ({
           ...s,
-          cta: { label: 'Learn More', url: '/contact' },
+          cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
         }))
 
   return {
     blockType: 'service-cards',
     variant: 'grid',
-    headline: `Our Services`,
-    subheadline: `Discover what ${biz.name} can do for you.`,
+    headline: i18n.serviceCards.headline,
+    subheadline: i18n.serviceCards.subheadline(biz.name),
     services,
   }
 }

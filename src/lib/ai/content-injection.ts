@@ -348,6 +348,10 @@ export function buildBlockFromLibrary(
                 // null not '' — Payload email-type field validates format even without required:true,
                 // so empty string causes ValidationError on publish.
                 email: userEmail ?? biz?.email ?? null,
+                submitLabel: i18n.contact.submitLabel,
+                phoneLabel: i18n.contact.phoneLabel,
+                addressLabel: i18n.contact.addressLabel,
+                emailLabel: i18n.contact.emailLabel,
                 formFields: [
                     { fieldName: 'name', label: i18n.contact.nameLabel, fieldType: 'text', required: true },
                     { fieldName: 'email', label: i18n.contact.emailLabel, fieldType: 'email', required: true },
@@ -477,7 +481,7 @@ export function buildBlockFromLibrary(
             // for fnb; "Dental Implants" for health; etc). Composer also reads
             // biz.products so user-supplied services drive output when provided.
             try {
-                return composerBuildServiceCards(mergedBiz, category)
+                return composerBuildServiceCards(mergedBiz, category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildServiceCards failed, falling back:', err)
             }

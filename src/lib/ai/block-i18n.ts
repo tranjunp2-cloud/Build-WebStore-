@@ -40,9 +40,11 @@ export interface BlockStrings {
         nameLabel: string
         emailLabel: string
         phoneLabel: string
+        addressLabel: string
         messageLabel: string
         namePlaceholder: string
         messagePlaceholder: string
+        submitLabel: string
     }
     footer: {
         allRightsReserved: string
@@ -70,6 +72,8 @@ export interface BlockStrings {
     }
     serviceCards: {
         headline: string
+        subheadline: (name: string) => string
+        ctaLabel: string
     }
     gallery: {
         headline: string
@@ -117,9 +121,11 @@ const STRINGS: Record<ContentLang, BlockStrings> = {
             nameLabel: 'Name',
             emailLabel: 'Email',
             phoneLabel: 'Phone',
+            addressLabel: 'Address',
             messageLabel: 'Message',
             namePlaceholder: 'Your full name',
             messagePlaceholder: 'How can we help you?',
+            submitLabel: 'Send Message',
         },
         footer: {
             allRightsReserved: 'All rights reserved.',
@@ -141,7 +147,7 @@ const STRINGS: Record<ContentLang, BlockStrings> = {
             headline: 'Meet Our Team',
             subheadline: 'The people behind the magic.',
         },
-        serviceCards: { headline: 'Our Services' },
+        serviceCards: { headline: 'Our Services', subheadline: (name) => `Discover what ${name} can do for you.`, ctaLabel: 'Learn More' },
         gallery: { headline: 'Our Work' },
         newsletter: {
             headlineStayUpdated: (name) => `Stay Updated with ${name}`,
@@ -185,9 +191,11 @@ const STRINGS: Record<ContentLang, BlockStrings> = {
             nameLabel: 'Nama',
             emailLabel: 'E-mel',
             phoneLabel: 'Telefon',
+            addressLabel: 'Alamat',
             messageLabel: 'Mesej',
             namePlaceholder: 'Nama penuh anda',
             messagePlaceholder: 'Bagaimana kami boleh membantu anda?',
+            submitLabel: 'Hantar Mesej',
         },
         footer: {
             allRightsReserved: 'Hak cipta terpelihara.',
@@ -209,7 +217,7 @@ const STRINGS: Record<ContentLang, BlockStrings> = {
             headline: 'Pasukan Kami',
             subheadline: 'Orang-orang di sebalik kejayaan kami.',
         },
-        serviceCards: { headline: 'Perkhidmatan Kami' },
+        serviceCards: { headline: 'Perkhidmatan Kami', subheadline: (name) => `Temui apa yang ${name} boleh lakukan untuk anda.`, ctaLabel: 'Ketahui Lebih Lanjut' },
         gallery: { headline: 'Kerja-kerja Kami' },
         newsletter: {
             headlineStayUpdated: (name) => `Ikuti Perkembangan Terbaru ${name}`,
@@ -253,9 +261,11 @@ const STRINGS: Record<ContentLang, BlockStrings> = {
             nameLabel: 'Họ và Tên',
             emailLabel: 'Email',
             phoneLabel: 'Điện Thoại',
+            addressLabel: 'Địa Chỉ',
             messageLabel: 'Tin Nhắn',
             namePlaceholder: 'Họ và tên đầy đủ của bạn',
             messagePlaceholder: 'Chúng tôi có thể giúp gì cho bạn?',
+            submitLabel: 'Gửi Tin Nhắn',
         },
         footer: {
             allRightsReserved: 'Bản quyền thuộc về.',
@@ -277,7 +287,7 @@ const STRINGS: Record<ContentLang, BlockStrings> = {
             headline: 'Đội Ngũ Của Chúng Tôi',
             subheadline: 'Những con người tạo nên điều kỳ diệu.',
         },
-        serviceCards: { headline: 'Dịch Vụ Của Chúng Tôi' },
+        serviceCards: { headline: 'Dịch Vụ Của Chúng Tôi', subheadline: (name) => `Khám phá những gì ${name} có thể làm cho bạn.`, ctaLabel: 'Tìm Hiểu Thêm' },
         gallery: { headline: 'Tác Phẩm Của Chúng Tôi' },
         newsletter: {
             headlineStayUpdated: (name) => `Cập Nhật Mới Nhất Từ ${name}`,

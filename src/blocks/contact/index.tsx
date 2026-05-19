@@ -321,7 +321,7 @@ function SubmitButton({ label = 'Send Message →', isSubmitting = false }: { la
 
 export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) {
     const mergedBlock = mergeContactInfoWithSite(block, site?.contactInfo)
-    const { headline, subtext, email, phone, address, formFields = [], variant = 'form' } = mergedBlock
+    const { headline, subtext, email, phone, address, formFields = [], variant = 'form', submitLabel, phoneLabel = 'Phone', addressLabel = 'Address', emailLabel = 'Email' } = mergedBlock
     const siteId = site?.id ? String(site.id) : undefined
 
     // ── Card Float variant ────────────────────────────────────────────────
@@ -345,7 +345,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                             border: `1px solid rgba(var(--brand-primary-rgb), 0.12)`,
                         }}
                     >
-                        <ContactForm formFields={formFields} siteId={siteId} />
+                        <ContactForm formFields={formFields} siteId={siteId} submitLabel={submitLabel} />
                     </div>
 
                     {/* Plan 260415 contact-bugfix — Info chips giờ là interactive
@@ -441,7 +441,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
 
                     {/* Contact form — GlassCard unchanged */}
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                        <ContactForm formFields={formFields} siteId={siteId} />
+                        <ContactForm formFields={formFields} siteId={siteId} submitLabel={submitLabel} />
                     </GlassCard>
                 </div>
             </ContactSection>
@@ -484,9 +484,9 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
             <ContactSection>
                 <ContactHeader headline={headline} subtext={subtext} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                    {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" layout="center" iconBoxSize="lg" />}
-                    {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" layout="center" iconBoxSize="lg" />}
-                    {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" layout="center" iconBoxSize="lg" />}
+                    {email && <ContactInfoCard icon={Mail} label={emailLabel} value={email} type="email" layout="center" iconBoxSize="lg" />}
+                    {phone && <ContactInfoCard icon={Phone} label={phoneLabel} value={phone} type="phone" layout="center" iconBoxSize="lg" />}
+                    {address && <ContactInfoCard icon={MapPin} label={addressLabel} value={address} type="address" layout="center" iconBoxSize="lg" />}
                 </div>
             </ContactSection>
         )
@@ -501,13 +501,13 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
                     {/* Form */}
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                        <ContactForm formFields={formFields} siteId={siteId} />
+                        <ContactForm formFields={formFields} siteId={siteId} submitLabel={submitLabel} />
                     </GlassCard>
                     {/* Contact Info */}
                     <div className="space-y-6 pt-8">
-                        {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
-                        {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
-                        {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
+                        {email && <ContactInfoCard icon={Mail} label={emailLabel} value={email} type="email" />}
+                        {phone && <ContactInfoCard icon={Phone} label={phoneLabel} value={phone} type="phone" />}
+                        {address && <ContactInfoCard icon={MapPin} label={addressLabel} value={address} type="address" />}
                     </div>
                 </div>
             </ContactSection>
@@ -527,21 +527,21 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                     {/* Contact Info */}
                     <div className="lg:col-span-1 space-y-6">
-                        {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
-                        {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
-                        {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
+                        {email && <ContactInfoCard icon={Mail} label={emailLabel} value={email} type="email" />}
+                        {phone && <ContactInfoCard icon={Phone} label={phoneLabel} value={phone} type="phone" />}
+                        {address && <ContactInfoCard icon={MapPin} label={addressLabel} value={address} type="address" />}
                     </div>
                     {/* Contact Form */}
                     <div className="lg:col-span-2">
                         <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                            <ContactForm formFields={formFields} siteId={siteId} />
+                            <ContactForm formFields={formFields} siteId={siteId} submitLabel={submitLabel} />
                         </GlassCard>
                     </div>
                 </div>
             ) : (
                 <div className="max-w-xl mx-auto">
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                        <ContactForm formFields={formFields} siteId={siteId} />
+                        <ContactForm formFields={formFields} siteId={siteId} submitLabel={submitLabel} />
                     </GlassCard>
                 </div>
             )}

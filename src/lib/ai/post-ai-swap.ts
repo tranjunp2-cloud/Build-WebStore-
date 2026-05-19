@@ -50,6 +50,36 @@ import {
 import { hasUserDataReference, isGenericContent } from './content-rules'
 import type { ContentLang } from './content-rules'
 import type { ThemeMood } from './theme-moods'
+import { getBlockStrings } from './block-i18n'
+
+/**
+ * Replace nav link labels for known URL slugs with i18n equivalents.
+ * Runs after the main swap loop so AI-generated nav labels are corrected
+ * without a full block replacement (nav carries user logo text / mood CTA).
+ */
+function normalizeNavLinks(
+    blocks: Record<string, unknown>[],
+    language: ContentLang,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    const urlToLabel: Record<string, string> = {
+        '/': i18n.navigation.home,
+        '/about': i18n.navigation.about,
+        '/services': i18n.navigation.services,
+        '/contact': i18n.navigation.contact,
+    }
+    return blocks.map((block) => {
+        if (block.blockType !== 'navigation') return block
+        const links = Array.isArray(block.links) ? block.links : []
+        const normalizedLinks = links.map((link: unknown) => {
+            const l = link as Record<string, unknown>
+            const url = typeof l.url === 'string' ? l.url : ''
+            const translated = urlToLabel[url]
+            return translated ? { ...l, label: translated } : l
+        })
+        return { ...block, links: normalizedLinks }
+    })
+}
 
 /** Block types eligible for post-AI swap. Other blocks are passed through. */
 export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
@@ -190,7 +220,10 @@ export function postAISwapStep(
         return { ...composed, ...preservedVariant }
     })
 
-    return { blocks: swapped, telemetry }
+    // Normalize nav link labels for known URL slugs (covers AI-first path
+    // where GPT may output English labels despite the language instruction).
+    const normalized = language ? normalizeNavLinks(swapped, language) : swapped
+    return { blocks: normalized, telemetry }
 }
 
 /**
