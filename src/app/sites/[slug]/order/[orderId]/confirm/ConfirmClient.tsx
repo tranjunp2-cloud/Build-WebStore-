@@ -3,9 +3,10 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
-    Banknote, Clock, Mail, Calendar, ShoppingBag, ReceiptText,
+    Clock, Mail, Calendar, ShoppingBag, ReceiptText,
     Truck, MapPin, Hash, Info,
     UploadCloud, FileImage, X, RotateCcw, Hourglass, AlertCircle,
+    PhoneCall, PackageX, HandCoins, Banknote,
 } from 'lucide-react'
 import { TY_CSS } from './confirm-styles'
 
@@ -55,6 +56,12 @@ const ICON_OK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" str
 const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'application/pdf']
 const MAX_BYTES = 5 * 1024 * 1024
 
+const CopyIcon = () => (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+)
+
 export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken }: Props) {
     const [uploadStatus, setUploadStatus] = useState<UploadStatus>('empty')
     const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -94,11 +101,10 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const maskedEmail = maskEmail(order.customerEmail)
     const ccySymbol = currency === 'MYR' ? 'RM' : currency === 'SGD' ? 'S$' : '$'
 
-    // Hero — changes after receipt submitted
-    const heroCheckClass = isSubmitted ? 'info' : isBT ? 'warning' : isCod ? 'blue' : ''
+    const heroCheckClass = isSubmitted ? 'info' : isBT ? 'warning' : ''
     const heroClass = isSubmitted ? ' submitted' : isBT ? ' pending' : ''
     const heroTitle = isSubmitted
-        ? 'Order placed — Awaiting seller confirmation.'
+        ? 'The order has been placed — Awaiting seller confirmation.'
         : isBT ? 'Order placed — Awaiting payment' : 'Order Successfully Placed!'
     const heroSub = isSubmitted
         ? "Thanks! We've received your receipt. The seller will verify your transfer against bank records and confirm your order shortly — you'll get an email update."
@@ -112,7 +118,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const badgeIcon = isSubmitted ? <Hourglass size={11} /> : isBT ? <Clock size={11} /> : isCod ? <Banknote size={11} /> : <Check size={11} />
     const heroIcon = isSubmitted
         ? <Hourglass size={36} strokeWidth={2} />
-        : isBT ? <Clock size={36} strokeWidth={2.5} /> : isCod ? <Banknote size={36} strokeWidth={2} /> : <Check size={36} strokeWidth={3} />
+        : isBT ? <Clock size={36} strokeWidth={2.5} /> : <Check size={36} strokeWidth={3} />
 
     const sumStatus = isSubmitted
         ? { tone: 'blue', s1: 'Awaiting seller confirmation', s2: 'Seller will verify your transfer shortly.' }
@@ -124,7 +130,6 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
 
     const shipsText = isCod ? 'After phone verification' : isBT ? 'Within 24 h after verification' : 'Within 24 h'
 
-    // Upload handlers
     const validateFile = (f: File): boolean => {
         if (!ACCEPTED_MIME.includes(f.type)) {
             setUploadError('Invalid file type. Please upload a JPEG, PNG, or PDF.')
@@ -224,8 +229,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
 
                     {/* ── Bank Transfer: Transfer Details ── */}
                     {isBT && (
-                        <div className="ty-block ty-block-compact">
-                            <div className="ty-block-hd ty-block-hd-compact">
+                        <div className="ty-bank-block ty-bank-block-compact">
+                            <div className="ty-block-head ty-block-head-compact">
                                 <span className="ty-block-num">01</span>
                                 <div className="ty-block-titles"><h3>Transfer Details</h3></div>
                                 <span className="ty-amount-chip">
@@ -233,60 +238,59 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                     {order.total.toFixed(2)}
                                 </span>
                             </div>
-                            <div className="ty-bank-top">
-                                <div className="ty-qr-side">
+                            <div className="manual-top" style={{ marginTop: 4 }}>
+                                <div className="qr-side">
                                     {merchantQrUrl
+                                        // eslint-disable-next-line @next/next/no-img-element
                                         ? <img src={merchantQrUrl} alt="DuitNow QR" className="ty-qr-img" />
                                         : <div className="ty-qr-ph"><svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="4" height="4" rx="1" /><rect x="19" y="19" width="2" height="2" rx="0.5" /></svg></div>
                                     }
-                                    <div className="ty-qr-hint">Scan with Maybank2u · TNG · Boost · GrabPay</div>
+                                    <div className="scan-hint">Scan with Maybank2u · TNG · Boost · GrabPay</div>
                                 </div>
-                                <div className="ty-bank-side">
-                                    <ul className="ty-bank-rows">
+                                <div className="bank-side">
+                                    <ul className="bank-rows compact">
                                         {bankName && (
-                                            <li className="ty-bank-row">
-                                                <span className="ty-bk-lbl">Bank</span>
-                                                <span className="ty-bk-val">{bankName}</span>
+                                            <li className="bank-row">
+                                                <span className="bk-label">Bank</span>
+                                                <span className="bk-value">{bankName}</span>
                                             </li>
                                         )}
                                         {bankAccountHolder && (
-                                            <li className="ty-bank-row">
-                                                <span className="ty-bk-lbl">Holder</span>
-                                                <span className="ty-bk-val">{bankAccountHolder}</span>
+                                            <li className="bank-row">
+                                                <span className="bk-label">Holder</span>
+                                                <span className="bk-value">{bankAccountHolder}</span>
                                             </li>
                                         )}
                                         {bankAccountNo && (
-                                            <li className="ty-bank-row ty-copy-row">
-                                                <span className="ty-bk-lbl">Account No.</span>
-                                                <span className="ty-bk-val mono">{bankAccountNo}</span>
-                                                <button className="ty-copy-btn-row" data-copy={bankAccountNo} aria-label="Copy account number">
-                                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                                                    Copy
+                                            <li className="bank-row copy-row">
+                                                <span className="bk-label">Account No.</span>
+                                                <span className="bk-value accent mono">{bankAccountNo}</span>
+                                                <button className="copy-btn" data-copy={bankAccountNo} aria-label="Copy account number">
+                                                    <CopyIcon /> Copy
                                                 </button>
                                             </li>
                                         )}
-                                        <li className="ty-bank-row ty-copy-row">
-                                            <span className="ty-bk-lbl">Order ID</span>
-                                            <span className="ty-bk-val mono accent">{order.orderNumber}</span>
-                                            <button className="ty-copy-btn-row" data-copy={order.orderNumber} aria-label="Copy order reference">
-                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                                                Copy
+                                        <li className="bank-row copy-row">
+                                            <span className="bk-label">ORDER ID</span>
+                                            <span className="bk-value accent mono">{order.orderNumber}</span>
+                                            <button className="copy-btn" data-copy={order.orderNumber} aria-label="Copy order reference">
+                                                <CopyIcon /> Copy
                                             </button>
                                         </li>
                                     </ul>
                                     <div className="ty-memo-note">
                                         <Info size={13} />
-                                        <span>Please paste this <strong>Order ID</strong> into your bank transfer&apos;s <strong>description</strong> field — it&apos;s how we match your payment to this order.</span>
+                                        <span>Please paste this <strong>Order ID</strong> into your bank transfer&apos;s <strong>reference / description</strong> field — it&apos;s how we match your payment to this order.</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* ── Bank Transfer: Upload Receipt (inline) ── */}
+                    {/* ── Bank Transfer: Upload Receipt ── */}
                     {isBT && uploadStatus !== 'success' && (
-                        <div className={`ty-block ty-block-compact${uploadStatus === 'empty' || uploadStatus === 'staged' ? ' ty-upload-required' : ''}`}>
-                            <div className="ty-block-hd ty-block-hd-compact">
+                        <div className={`ty-upload-block${uploadStatus === 'empty' || uploadStatus === 'staged' ? ' ty-upload-required' : ''}`}>
+                            <div className="ty-block-head ty-block-head-compact">
                                 <span className="ty-block-num">02</span>
                                 <div className="ty-block-titles"><h3>Upload Payment Receipt</h3></div>
                                 <span className="ty-step-pill pending"><AlertCircle size={11} /> Action required</span>
@@ -300,8 +304,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 onChange={handleFileSelect}
                             />
 
-                            {/* Empty — dropzone */}
-                            {(uploadStatus === 'empty') && (
+                            {uploadStatus === 'empty' && (
                                 <div
                                     className={`ty-dropzone horizontal${dragging ? ' dragging' : ''}`}
                                     onClick={() => fileInputRef.current?.click()}
@@ -324,7 +327,6 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 </div>
                             )}
 
-                            {/* Staged — file selected */}
                             {(uploadStatus === 'staged' || uploadStatus === 'uploading') && uploadFile && (
                                 <div className="ty-file-card">
                                     <div className="ty-file-thumb"><FileImage size={20} /></div>
@@ -340,17 +342,15 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 </div>
                             )}
 
-                            {uploadError && (
-                                <p className="ty-upload-error">{uploadError}</p>
-                            )}
+                            {uploadError && <p className="ty-upload-error">{uploadError}</p>}
 
                             <div className="ty-upload-actions">
                                 {(uploadStatus === 'staged' || uploadStatus === 'uploading') && (
                                     <>
-                                        <button className="ty-ul-btn ghost" onClick={resetUpload} disabled={uploadStatus === 'uploading'}>
+                                        <button className="ty-btn ghost" onClick={resetUpload} disabled={uploadStatus === 'uploading'}>
                                             <RotateCcw size={13} /> Replace
                                         </button>
-                                        <button className="ty-ul-btn primary" onClick={handleUpload} disabled={uploadStatus === 'uploading'} aria-busy={uploadStatus === 'uploading'}>
+                                        <button className="ty-btn primary" onClick={handleUpload} disabled={uploadStatus === 'uploading'} aria-busy={uploadStatus === 'uploading'}>
                                             {uploadStatus === 'uploading'
                                                 ? <><span className="ty-spin">↻</span> Uploading…</>
                                                 : <><Check size={13} /> Done · Submit Receipt</>
@@ -362,15 +362,15 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
 
                             <div className="ty-email-note">
                                 <Mail size={14} />
-                                <span>A copy of your order details has been sent to <strong>{maskedEmail}</strong> for your records.</span>
+                                <span>A copy of your order details and a re-upload link has been sent to <strong>{maskedEmail}</strong>.</span>
                             </div>
                         </div>
                     )}
 
                     {/* ── Bank Transfer: Upload success state ── */}
                     {isBT && uploadStatus === 'success' && (
-                        <div className="ty-block ty-block-compact">
-                            <div className="ty-block-hd ty-block-hd-compact">
+                        <div className="ty-upload-block">
+                            <div className="ty-block-head ty-block-head-compact">
                                 <span className="ty-block-num">02</span>
                                 <div className="ty-block-titles"><h3>Upload Payment Receipt</h3></div>
                                 <span className="ty-step-pill done"><Check size={11} /> Submitted</span>
@@ -383,7 +383,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 </div>
                             </div>
                             <div className="ty-upload-actions">
-                                <button className="ty-ul-btn ghost" onClick={resetUpload}>
+                                <button className="ty-btn ghost" onClick={resetUpload}>
                                     <RotateCcw size={13} /> Upload a different file
                                 </button>
                             </div>
@@ -392,69 +392,67 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
 
                     {/* ── Stripe: Payment Confirmed ── */}
                     {isStripe && (
-                        <div className="ty-block">
-                            <div className="ty-block-hd">
+                        <div className="ty-bank-block ty-unified">
+                            <div className="ty-block-head no-num">
                                 <div className="ty-block-titles">
                                     <h3>Payment &amp; Order Status</h3>
-                                    <p>Payment captured — your order is now being prepared for shipment.</p>
+                                    <p>Payment captured by Stripe — your order is now being prepared for shipment.</p>
                                 </div>
                                 <span className="ty-step-pill done"><Check size={11} /> Confirmed</span>
                             </div>
                             <div className="ty-paid-card">
                                 <div className="ty-paid-icon"><Check size={22} strokeWidth={3} /></div>
                                 <div className="ty-paid-body">
-                                    <p className="ty-paid-title">Payment of <strong>{formatPrice(order.total, currency)}</strong> processed successfully.</p>
+                                    <p className="ty-paid-title">Your payment of <strong>{formatPrice(order.total, currency)}</strong> has been processed successfully via Stripe.</p>
                                     <p className="ty-paid-sub">Funds settle to the seller within 1–2 business days.</p>
                                 </div>
                                 <div className="ty-paid-brands" aria-hidden="true">
-                                    <span className="ty-brand visa">VISA</span>
-                                    <span className="ty-brand mc"><span className="mc-c" /><span className="mc-c" /></span>
-                                    <span className="ty-brand amex">AMEX</span>
-                                    <span className="ty-brand fpx">FPX</span>
+                                    <span className="brand-mark visa">VISA</span>
+                                    <span className="brand-mark mc"><span className="mc-circles"><span /><span /></span></span>
+                                    <span className="brand-mark amex">AMEX</span>
+                                    <span className="brand-mark fpx">FPX</span>
                                 </div>
                             </div>
                             {order.stripePaymentIntentId && (
                                 <ul className="ty-paid-meta">
                                     <li>
-                                        <span className="ty-pm-lbl"><Hash size={12} /> Transaction ID</span>
-                                        <span className="ty-pm-val mono">{order.stripePaymentIntentId}</span>
-                                        <button className="ty-copy-btn-row" data-copy={order.stripePaymentIntentId} aria-label="Copy transaction ID">
-                                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                                            Copy
+                                        <span className="lbl"><Hash size={12} /> Transaction ID</span>
+                                        <span className="val mono">{order.stripePaymentIntentId}</span>
+                                        <button className="copy-btn" data-copy={order.stripePaymentIntentId} aria-label="Copy transaction ID">
+                                            <CopyIcon /> Copy
                                         </button>
                                     </li>
                                 </ul>
                             )}
                             <div className="ty-email-note">
                                 <Mail size={14} />
-                                <span>A receipt and tracking link will reach <strong>{maskedEmail}</strong> once your parcel is picked up.</span>
+                                <span>A receipt + tracking link will reach <strong>{maskedEmail}</strong> the moment the courier picks up your parcel.</span>
                             </div>
                         </div>
                     )}
 
                     {/* ── COD: Pay on Delivery ── */}
                     {isCod && (
-                        <div className="ty-block">
-                            <div className="ty-block-hd">
+                        <div className="ty-bank-block ty-unified">
+                            <div className="ty-block-head no-num">
                                 <div className="ty-block-titles">
                                     <h3>Pay on Delivery</h3>
                                     <p>Cash hand-off when the courier arrives — no app required.</p>
                                 </div>
-                                <span className="ty-step-pill blue">
-                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.99 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.9 1.17h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
-                                    Pending verification
+                                <span className="ty-step-pill pending">
+                                    <PhoneCall size={11} /> Pending verification
                                 </span>
                             </div>
                             <div className="ty-cod-card">
-                                <div className="ty-cod-icon"><Banknote size={26} /></div>
+                                <div className="ty-cod-icon"><HandCoins size={26} /></div>
                                 <div className="ty-cod-body">
                                     <p className="ty-cod-title">Please prepare exactly <strong>{formatPrice(order.total, currency)}</strong> in cash.</p>
                                     <p className="ty-cod-sub">You&apos;ll pay the courier rider when you receive your package. They cannot provide change for amounts above RM 200.</p>
                                 </div>
                             </div>
                             <ul className="ty-cod-tips">
-                                <li><Banknote size={14} /><span>Small notes preferred — couriers don&apos;t carry change.</span></li>
-                                <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><line x1="12" y1="22" x2="12" y2="12" /><path d="m3.3 7 8.7 5 8.7-5" /></svg><span>Two failed delivery attempts will auto-cancel the order.</span></li>
+                                <li><Banknote size={14} /><span>Small notes preferred · couriers don&apos;t carry change.</span></li>
+                                <li><PackageX size={14} /><span>Two failed delivery attempts will auto-cancel the order.</span></li>
                             </ul>
                             <div className="ty-email-note">
                                 <Mail size={14} />
@@ -464,8 +462,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                     )}
 
                     {/* ── Order Items ── */}
-                    <div className="ty-block">
-                        <div className="ty-block-hd" style={{ marginBottom: 14 }}>
+                    <div className="ty-bank-block">
+                        <div className="ty-block-head" style={{ marginBottom: 14 }}>
                             <div className="ty-block-titles">
                                 <h3>Order Items</h3>
                                 <p>{order.items.length} item{order.items.length !== 1 ? 's' : ''} in this order</p>
@@ -496,55 +494,56 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
 
                 {/* ── Summary ── */}
                 <div className="ty-right">
-                    <div className="sum-card">
-                        <h3 className="sum-hd">Order Summary</h3>
-                        <ul className="sum-items">
+                    <div className="summary-card">
+                        <h3 className="summary-head">Order Summary</h3>
+                        <ul className="summary-items">
                             {order.items.map((item, idx) => (
-                                <li key={idx} className="sum-item">
-                                    <div className="s-th">
+                                <li key={idx} className="summary-item">
+                                    <div className="item-thumb">
                                         {item.imageUrl
                                             // eslint-disable-next-line @next/next/no-img-element
                                             ? <img src={item.imageUrl} alt={item.productName} />
                                             : <ShoppingBag size={18} />}
                                     </div>
-                                    <div className="s-info">
-                                        <div className="s-top" data-tooltip={item.productName}>
-                                            <p className="s-nm">{item.productName}</p>
-                                            <span className="s-pr">{formatPrice(item.unitPrice * item.quantity, currency)}</span>
+                                    <div className="item-info">
+                                        <p className="item-name">{item.productName}</p>
+                                        <div className="item-meta">
+                                            <span className="qty">×{item.quantity}</span>
+                                            {item.variant || formatPrice(item.unitPrice, currency)}
                                         </div>
-                                        <p className="s-mt"><span className="s-qty">×{item.quantity}</span> {formatPrice(item.unitPrice, currency)}</p>
                                     </div>
+                                    <span className="item-price">{formatPrice(item.unitPrice * item.quantity, currency)}</span>
                                 </li>
                             ))}
                         </ul>
-                        <div className="sum-row"><span className="sr-l">Subtotal</span><span className="sr-v">{formatPrice(order.subtotal, currency)}</span></div>
-                        <div className="sum-row"><span className="sr-l">SST (6%)</span><span className="sr-v">{formatPrice(order.tax, currency)}</span></div>
-                        <div className="sum-row"><span className="sr-l">Shipping</span><span className="sr-v">{formatPrice(shippingFee, currency)}</span></div>
-                        <div className="sum-total">
-                            <span className="st-l">Total</span>
-                            <span className="st-v"><span className="st-ccy">{ccySymbol}</span>{order.total.toFixed(2)}</span>
+                        <div className="summary-line"><span className="lbl">Subtotal</span><span className="val">{formatPrice(order.subtotal, currency)}</span></div>
+                        <div className="summary-line"><span className="lbl">SST (6%)</span><span className="val">{formatPrice(order.tax, currency)}</span></div>
+                        <div className="summary-line"><span className="lbl">Shipping</span><span className="val">{formatPrice(shippingFee, currency)}</span></div>
+                        <div className="summary-total">
+                            <span className="t-lbl">Total</span>
+                            <span className="t-val"><span className="ccy">{ccySymbol}</span>{order.total.toFixed(2)}</span>
                         </div>
-                        <div className={`ty-sum-status tone-${sumStatus.tone}`}>
-                            <span className="ty-dot" aria-hidden="true" />
+                        <div className={`ty-summary-status tone-${sumStatus.tone}`}>
+                            <span className="ty-status-dot" aria-hidden="true" />
                             <div>
-                                <p className="ty-s1">{sumStatus.s1}</p>
-                                <p className="ty-s2">{sumStatus.s2}</p>
+                                <div className="ty-status-line1">{sumStatus.s1}</div>
+                                <div className="ty-status-line2">{sumStatus.s2}</div>
                             </div>
                         </div>
-                        <div className="ty-meta">
-                            <div className="ty-mr"><Calendar size={13} /><span><strong>Placed</strong> · {placed}</span></div>
-                            <div className="ty-mr"><Truck size={13} /><span><strong>Ships</strong> · {shipsText}</span></div>
-                            {addrLine && <div className="ty-mr"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
+                        <div className="ty-summary-meta">
+                            <div className="ty-meta-row"><Calendar size={13} /><span><strong>Placed</strong> · {placed}</span></div>
+                            <div className="ty-meta-row"><Truck size={13} /><span><strong>Ships</strong> · {shipsText}</span></div>
+                            {addrLine && <div className="ty-meta-row"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
                         </div>
-                        <div className="ty-ctas">
-                            <Link href={`/sites/${slug}/products`} className="ty-cta primary">
+                        <div className="ty-cta-row">
+                            <Link href={`/sites/${slug}/products`} className="ty-btn primary lg">
                                 <ShoppingBag size={15} /> Continue Shopping
                             </Link>
-                            <Link href={`/sites/${slug}/orders/${order.id}`} className="ty-cta secondary">
+                            <Link href={`/sites/${slug}/orders/${order.id}`} className="ty-btn outline lg">
                                 <ReceiptText size={15} /> View My Orders
                             </Link>
                         </div>
-                        <div className="sum-trust"><ShieldCheck size={11} /> Encrypted Checkout · Order Locked</div>
+                        <div className="summary-trust"><ShieldCheck size={11} /> Encrypted Checkout · Order Locked</div>
                     </div>
                 </div>
             </div>
