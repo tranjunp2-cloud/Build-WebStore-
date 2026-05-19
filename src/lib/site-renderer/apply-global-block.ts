@@ -4,6 +4,18 @@ import { hasHeaderCart } from './has-header-cart'
 
 type PreviewBlock = { blockType: string; __editorBlockIndex?: number; [key: string]: unknown }
 
+// Each floating global block type gets a unique negative editor index so the editor
+// can distinguish them by blockIndex (avoiding the "first -1 wins" lookup bug).
+// These values must stay stable — they're stored in data-block-index attributes.
+const FLOATING_BLOCK_EDITOR_INDICES: Record<string, number> = {
+    cartWidget: -1,
+    'whatsapp-button': -2,
+    socialWidget: -3,
+}
+function floatingEditorIndex(blockType: string): number {
+    return FLOATING_BLOCK_EDITOR_INDICES[blockType] ?? -1
+}
+
 /**
  * Applies a single global floating block (cart, whatsapp, social) to nextBlocks.
  *
@@ -24,7 +36,7 @@ export function applyGlobalBlock(
     if (globalEntry) {
         // Strip any stale copies of this block type, then push the authoritative global entry.
         const deduped = nextBlocks.filter(b => b.blockType !== blockType)
-        deduped.push({ ...globalEntry, blockType, variant: 'floating', __editorBlockIndex: -1 })
+        deduped.push({ ...globalEntry, blockType, variant: 'floating', __editorBlockIndex: floatingEditorIndex(blockType) })
         return deduped
     }
 
@@ -39,7 +51,7 @@ export function applyGlobalBlock(
     if (placedBlock) {
         const alreadyPresent = nextBlocks.some(b => b.blockType === blockType)
         if (!alreadyPresent) {
-            return [...nextBlocks, { blockType, ...placedBlock, variant: 'floating', __editorBlockIndex: -1 }]
+            return [...nextBlocks, { blockType, ...placedBlock, variant: 'floating', __editorBlockIndex: floatingEditorIndex(blockType) }]
         }
         return nextBlocks
     }
@@ -47,7 +59,7 @@ export function applyGlobalBlock(
     if (options?.autoInject && detectCommercePresence(pages) && !hasHeaderCart(options.siteHeaderBlock)) {
         const alreadyPresent = nextBlocks.some(b => b.blockType === blockType)
         if (!alreadyPresent) {
-            return [...nextBlocks, { blockType, variant: 'floating', __editorBlockIndex: -1 }]
+            return [...nextBlocks, { blockType, variant: 'floating', __editorBlockIndex: floatingEditorIndex(blockType) }]
         }
     }
 
