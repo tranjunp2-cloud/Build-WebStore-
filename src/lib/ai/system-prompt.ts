@@ -303,6 +303,12 @@ export type BuildUserPromptOptions = {
    */
   blockPromptOverrides?: Record<string, { prompt: string }>
   /**
+   * Human-readable language name for GPT instruction (e.g. "Chinese (Mandarin)", "Arabic").
+   * When provided, overrides the language-enum-derived instruction so GPT generates
+   * content in any language beyond the vi/ms/en pipeline trio.
+   */
+  gpLang?: string
+  /**
    * Plan 260429-1032 Phase 5 — resolved composer category (e.g. "restaurant",
    * "education"). When provided, injects preferred CTA labels for this category
    * so GPT avoids generic fallbacks like "Xem thêm" or "Learn More".
@@ -323,6 +329,7 @@ export function buildUserPrompt(
   let recipe: CategoryRecipe | undefined
   let blockPromptOverrides: Record<string, { prompt: string }> | undefined
   let category: string | undefined
+  let gpLang: string | undefined
   if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
     extraInstructions = extraInstructionsOrOptions
   } else {
@@ -331,6 +338,7 @@ export function buildUserPrompt(
     recipe = extraInstructionsOrOptions.recipe
     blockPromptOverrides = extraInstructionsOrOptions.blockPromptOverrides
     category = extraInstructionsOrOptions.category
+    gpLang = extraInstructionsOrOptions.gpLang
     if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
     if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
   }
@@ -418,9 +426,11 @@ export function buildUserPrompt(
     parts.push('\nIMPORTANT: Use the EXACT text from the REFERENCE CONTENT above. Do NOT invent new content or paraphrase. This is a recreation of an existing website.')
   }
 
-  const langInstruction = language === 'auto'
-    ? "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
-    : `Generate in ${language === 'ms' ? 'Malay (Bahasa Melayu)' : language === 'vi' ? 'Vietnamese' : 'English'}.`
+  const resolvedLangName = gpLang
+    ?? (language === 'ms' ? 'Malay (Bahasa Melayu)' : language === 'vi' ? 'Vietnamese' : language === 'auto' ? null : 'English')
+  const langInstruction = resolvedLangName
+    ? `Generate ALL content in ${resolvedLangName}. Every word of the website must be in ${resolvedLangName} — do not mix languages.`
+    : "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
 
   parts.push(`\n${langInstruction} Make it look premium and professional.`)
 

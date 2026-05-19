@@ -37,6 +37,7 @@ import {
     MIN_BLOCKS_PER_PAGE,
     type ContentLang,
 } from './content-rules'
+import { detectLanguage } from './lang-detect'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -57,60 +58,11 @@ export type SSEEvent = {
     data: Record<string, unknown>
 }
 
-// Vietnamese-exclusive diacritical marks — not present in Malay, English, French, Spanish, or Portuguese.
-// Characters like é/à/â shared with Romance languages are excluded intentionally.
-const VI_DIACRITICS_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/
-
-// Tiered Malay word sets for language detection (see guessLanguageFromInput).
-//
-// HIGH_PRECISION: exclusively Malay/Indonesian — 1 match is sufficient.
-// Common business-type words that cannot plausibly appear in English/French text.
-const MALAY_HIGH_PRECISION = new Set([
-    'kedai', 'warung', 'restoran', 'klinik', 'syarikat', 'perniagaan', 'butik',
-    'jenama', 'jualan', 'pelanggan', 'tempatan', 'berkualiti', 'terbaik',
-    'segar', 'makanan', 'murah', 'harga', 'perkhidmatan', 'menyediakan',
-    'menggunakan', 'ialah', 'keperluan', 'kecantikan', 'pergigian', 'pakaian',
-    'perabot', 'runcit', 'borong', 'khidmat', 'pemborong', 'hartanah',
-])
-
-// LOW_PRECISION: grammar/function words that need 2+ distinct matches to avoid
-// false positives from coincidental matches in non-Malay text (e.g. names).
-const MALAY_FUNCTION_WORDS = new Set([
-    'dan', 'atau', 'untuk', 'yang', 'dengan', 'tidak', 'kami', 'anda',
-    'kepada', 'dari', 'juga', 'dalam', 'akan', 'boleh', 'sudah', 'adalah',
-    'produk',
-])
-
-/**
- * Detect language from user's business info input text.
- * Used to route 'auto' language requests: if input is Malay or Vietnamese,
- * skip template-first (English-only templates) and use AI-first instead.
- *
- * Tiered scoring:
- *  - 1+ HIGH_PRECISION Malay word  → 'ms' (kedai, restoran, klinik, etc.)
- *  - 2+ distinct FUNCTION words    → 'ms' (grammar words need higher bar to avoid name false-positives)
- */
-function guessLanguageFromInput(info: BusinessInfoInput): 'ms' | 'vi' | 'en' {
-    const text = [info.businessName, info.shortDescription, info.products, info.industry]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-    // Vietnamese-exclusive diacritical marks — not shared with Romance languages
-    if (VI_DIACRITICS_RE.test(text)) return 'vi'
-
-    const tokens = new Set(text.split(/\W+/).filter(Boolean))
-
-    // Single high-precision anchor is enough — these words cannot realistically
-    // appear in English/French business descriptions
-    if ([...tokens].some(t => MALAY_HIGH_PRECISION.has(t))) return 'ms'
-
-    // Function words: require 2+ distinct matches to avoid false positives
-    // from non-Malay names that happen to contain one Malay function word
-    const fnMatches = [...tokens].filter(t => MALAY_FUNCTION_WORDS.has(t)).length
-    if (fnMatches >= 2) return 'ms'
-
-    return 'en'
+// Language names for explicit user selections (not 'auto').
+const EXPLICIT_LANG_NAMES: Record<string, string> = {
+    en: 'English',
+    ms: 'Malay (Bahasa Melayu)',
+    vi: 'Vietnamese',
 }
 
 /**
@@ -181,7 +133,11 @@ export async function generateSiteWithAI(
     // Template-first uses hardcoded English templates — only hero/SEO are GPT-personalized.
     // Skip it for explicit non-English languages and for 'auto' when user's input text
     // is detected as Malay/Vietnamese so AI-first generates fully localized content.
-    const detectedLang = language === 'auto' ? guessLanguageFromInput(businessInfo) : language
+    const inputText = [businessInfo.businessName, businessInfo.shortDescription, businessInfo.products, businessInfo.industry]
+        .filter(Boolean).join(' ')
+    const { contentLang: detectedLang, gpLang } = language === 'auto'
+        ? detectLanguage(inputText)
+        : { contentLang: language as ContentLang, gpLang: EXPLICIT_LANG_NAMES[language] ?? 'English' }
     if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en') {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
@@ -245,6 +201,7 @@ export async function generateSiteWithAI(
         const userPromptText = buildUserPrompt(businessInfo, {
             extraInstructions: sanitizedExtra,
             language: detectedLang,
+            gpLang,
             referencePrompt: sanitizedRef,
             mood: themeMood,
             recipe: layoutRecipe,
