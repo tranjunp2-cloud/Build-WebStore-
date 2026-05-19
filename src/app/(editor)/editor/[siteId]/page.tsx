@@ -1218,6 +1218,9 @@ export default function EditorPage() {
 
     const handleMobileBlockSelect = useCallback((blockIndex: number | null) => {
         setSelectedBlock(blockIndex)
+        // Floating blocks route via onEditGlobalBlock → handleBlockSelectWithContext, not here.
+        // Guard clears global type state when switching to a page block (index >= 0 or null).
+        if (blockIndex === null || blockIndex >= 0) setSelectedGlobalBlockType(null)
         if (isCompactLayout && blockIndex !== null) {
             setIsMobileSettingsOpen(true)
         }

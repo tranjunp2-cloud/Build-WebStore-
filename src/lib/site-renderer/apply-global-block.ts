@@ -13,7 +13,13 @@ const FLOATING_BLOCK_EDITOR_INDICES: Record<string, number> = {
     socialWidget: -3,
 }
 function floatingEditorIndex(blockType: string): number {
-    return FLOATING_BLOCK_EDITOR_INDICES[blockType] ?? -1
+    const idx = FLOATING_BLOCK_EDITOR_INDICES[blockType]
+    if (idx === undefined) {
+        // Unregistered block type — defaulting to -1 would collide with cartWidget.
+        // Add the new type to FLOATING_BLOCK_EDITOR_INDICES above.
+        throw new Error(`floatingEditorIndex: unknown floating block type "${blockType}" — add it to FLOATING_BLOCK_EDITOR_INDICES`)
+    }
+    return idx
 }
 
 /**

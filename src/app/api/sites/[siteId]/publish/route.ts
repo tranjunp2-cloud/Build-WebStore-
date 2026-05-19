@@ -7,6 +7,7 @@ import { stripArrayItemIds } from '@/lib/payload/strip-block-ids'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 import { revalidateTag } from 'next/cache'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+import { z } from 'zod'
 
 /**
  * PATCH /api/sites/[siteId]/publish
@@ -45,10 +46,22 @@ export async function PATCH(
         const payload = await getPayload({ config })
         const { siteId } = await params
 
-        // Parse optional pending fields from request body.
+        // Parse and validate optional pending fields from request body.
         // Client sends authoritative state (post-flush) so publish uses it directly,
         // bypassing pendingXxx DB reads which can silently return undefined if migration
         // is not yet applied on this environment.
+        // Zod validates the same shapes as the save route — prevents malformed JSON from
+        // being written to live site fields via the publish body.
+        // Note: cannot use saveSiteSchema.pick() — .refine() wraps it as ZodEffects (no .pick).
+        const publishBodySchema = z.object({
+            globalBlocks: z.object({
+                cartWidget: z.object({ blockType: z.literal('cartWidget') }).passthrough().nullable().optional(),
+                whatsappButton: z.object({ blockType: z.literal('whatsapp-button') }).passthrough().nullable().optional(),
+                socialWidget: z.object({ blockType: z.literal('socialWidget') }).passthrough().nullable().optional(),
+            }).nullable().optional(),
+            headerBlock: z.record(z.unknown()).nullable().optional(),
+            footerBlock: z.record(z.unknown()).nullable().optional(),
+        }).partial()
         let bodyGlobalBlocks: unknown = undefined
         let hasBodyGlobalBlocks = false
         let bodyHeaderBlock: unknown = undefined
@@ -56,11 +69,13 @@ export async function PATCH(
         let bodyFooterBlock: unknown = undefined
         let hasBodyFooterBlock = false
         try {
-            const body = await req.json() as Record<string, unknown>
-            if (body && typeof body === 'object') {
-                if ('globalBlocks' in body) { bodyGlobalBlocks = body.globalBlocks; hasBodyGlobalBlocks = true }
-                if ('headerBlock' in body) { bodyHeaderBlock = body.headerBlock; hasBodyHeaderBlock = true }
-                if ('footerBlock' in body) { bodyFooterBlock = body.footerBlock; hasBodyFooterBlock = true }
+            const rawBody = await req.json()
+            const parsed = publishBodySchema.safeParse(rawBody)
+            if (parsed.success) {
+                const pb = parsed.data
+                if ('globalBlocks' in pb) { bodyGlobalBlocks = pb.globalBlocks; hasBodyGlobalBlocks = true }
+                if ('headerBlock' in pb) { bodyHeaderBlock = pb.headerBlock; hasBodyHeaderBlock = true }
+                if ('footerBlock' in pb) { bodyFooterBlock = pb.footerBlock; hasBodyFooterBlock = true }
             }
         } catch {
             // Body not present or not JSON — proceed with DB fallback
