@@ -283,12 +283,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                         currency: data.data.currency, itemCount: items.length,
                     }})
                 }
-                // bank_transfer: redirect to upload page via magic link; fallback to confirm page
-                if (data.data.redirectUrl) {
-                    router.push(data.data.redirectUrl)
-                } else {
-                    router.push(`/sites/${slug}/order/${data.data.orderId}/confirm`)
-                }
+                router.push(`/sites/${slug}/order/${data.data.orderId}/confirm`)
             } else {
                 toast.error(data.error?.message || 'Failed to place order')
             }
