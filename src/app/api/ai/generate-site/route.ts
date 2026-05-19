@@ -735,7 +735,9 @@ export async function POST(req: NextRequest) {
         // Use i18n nav labels for known slugs so the force-replace step (ensureNavigationBlocks)
         // does not overwrite GPT-generated / postAISwap-corrected Malay/Vietnamese nav labels
         // with English page titles.
-        const siteNavLang = String(result.language || language)
+        // Prefer blockLang (franc-detected, reliable) > explicit language input > GPT-returned language.
+        // result.language is GPT-returned and may default to 'en' even for Malay/Vietnamese input.
+        const siteNavLang = String(result.blockLang || (language !== 'auto' ? language : result.language) || 'en')
         const siteI18n = getBlockStrings(siteNavLang)
         const SLUG_NAV_LABELS: Record<string, string> = {
             '/': siteI18n.navigation.home,

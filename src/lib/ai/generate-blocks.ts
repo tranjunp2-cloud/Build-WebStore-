@@ -50,6 +50,7 @@ export type GenerationResult = {
     pages?: GeneratedPage[]
     seo: { title: string; description: string }
     language?: 'en' | 'ms' | 'vi'
+    blockLang?: string
     theme: {
         primaryColor: string
         secondaryColor: string

@@ -110,6 +110,35 @@ function normalizeClientLogosHeadline(
     })
 }
 
+/**
+ * Patch features headline on ALL features blocks regardless of swap status.
+ * Needed because non-generic GPT features are kept (not swapped) but still
+ * have the English "Why Choose X" prefix from GPT's training default.
+ */
+function normalizeFeaturesHeadline(
+    blocks: Record<string, unknown>[],
+    language: string,
+    bizName: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'features') return block
+        return { ...block, headline: i18n.features.headlineWhyChoose(bizName) }
+    })
+}
+
+/** Patch testimonials subheadline on non-swapped testimonials blocks. */
+function normalizeTestimonialsSubheadline(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'testimonials') return block
+        return { ...block, subheadline: i18n.testimonials.subheadline }
+    })
+}
+
 /** Block types eligible for post-AI swap. Other blocks are passed through. */
 export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
     'hero',
@@ -255,7 +284,9 @@ export function postAISwapStep(
     // that weren't swapped but still have English structural strings.
     const nav = normalizeNavLinks(swapped, language)
     const contact = normalizeContactLabels(nav, language)
-    const final = normalizeClientLogosHeadline(contact, language)
+    const logos = normalizeClientLogosHeadline(contact, language)
+    const features = normalizeFeaturesHeadline(logos, language, biz.name)
+    const final = normalizeTestimonialsSubheadline(features, language)
     return { blocks: final, telemetry }
 }
 

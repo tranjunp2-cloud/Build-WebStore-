@@ -595,6 +595,7 @@ export async function generateSiteWithAI(
             pages: generatedPages,
             seo,
             language: (['en', 'ms', 'vi'] as const).includes(parsed.language as 'en' | 'ms' | 'vi') ? (parsed.language as 'en' | 'ms' | 'vi') : 'en',
+            blockLang,
             theme,
             // Plan 260415 Phase 04 — swap telemetry surfaced for Phase 07 harness.
             postAISwap: {
