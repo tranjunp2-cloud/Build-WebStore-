@@ -314,8 +314,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         // globalBlocks.cartWidget = {...}: already configured — no restore needed.
         const cartAlreadyActive = globalBlocks !== null && globalBlocks.cartWidget != null
         const needsCartRestore = COMMERCE_BLOCK_TYPES.has(block.blockType) && !cartAlreadyActive
-        const effectiveGlobalBlocks = needsCartRestore
-            ? { ...globalBlocks, cartWidget: { blockType: 'cartWidget', variant: 'floating' } as BlockData }
+        const effectiveGlobalBlocks: GlobalBlocksState = needsCartRestore
+            ? {
+                  cartWidget: { blockType: 'cartWidget', variant: 'floating' } as BlockData,
+                  whatsappButton: globalBlocks?.whatsappButton ?? null,
+                  socialWidget: globalBlocks?.socialWidget ?? null,
+              }
             : globalBlocks
 
         const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual', effectiveGlobalBlocks)
