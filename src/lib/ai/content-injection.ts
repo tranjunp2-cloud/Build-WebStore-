@@ -14,6 +14,7 @@
 import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
 import type { ContentLang } from './content-rules'
+import { getBlockStrings } from './block-i18n'
 import { pickLogosByCategory } from './content/client-logos-library'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
 import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
@@ -225,6 +226,8 @@ export function buildBlockFromLibrary(
         ...(userBiz ?? {}),
     }
 
+    const i18n = getBlockStrings(ctx.language)
+
     switch (blockType) {
         case 'navigation':
             return {
@@ -232,12 +235,12 @@ export function buildBlockFromLibrary(
                 variant: 'pill',
                 logoText: name,
                 links: [
-                    { label: 'Home', url: '/' },
-                    { label: 'About', url: '/about' },
-                    { label: 'Services', url: '/services' },
-                    { label: 'Contact', url: '/contact' },
+                    { label: i18n.navigation.home, url: '/' },
+                    { label: i18n.navigation.about, url: '/about' },
+                    { label: i18n.navigation.services, url: '/services' },
+                    { label: i18n.navigation.contact, url: '/contact' },
                 ],
-                ctaButton: { show: true, label: 'Get Started', url: '/contact' },
+                ctaButton: { show: true, label: i18n.navigation.getStarted, url: '/contact' },
             }
 
         case 'hero': {
@@ -292,32 +295,26 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'about',
                 variant: 'simple',
-                headline: `About ${name}`,
+                headline: `${i18n.about.headlinePrefix} ${name}`,
                 // Plan 07 — prefer user description, fall back to canned pool.
                 body: userDescription
                     ?? biz?.description
                     ?? `${name} is dedicated to delivering exceptional experiences to every customer.`,
             }
 
-        case 'testimonials': {
-            const testimonialsHeadline = ctx.language === 'ms'
-                ? 'Apa Kata Pelanggan Kami'
-                : ctx.language === 'vi'
-                    ? 'Khách Hàng Nói Gì'
-                    : 'What Our Customers Say'
+        case 'testimonials':
             return {
                 blockType: 'testimonials',
                 variant: 'cards',
-                headline: testimonialsHeadline,
+                headline: i18n.testimonials.headline,
                 testimonials: testimonialSlice.slice(0, 4).map(mapTestimonial),
             }
-        }
 
         case 'faq':
             return {
                 blockType: 'faq',
                 variant: 'accordion',
-                headline: 'Frequently Asked Questions',
+                headline: i18n.faq.headline,
                 faqs: faqSlice.slice(0, 5).map(mapFaq),
             }
 
@@ -325,13 +322,13 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'cta',
                 variant: 'banner',
-                headline: `Ready to experience ${name}?`,
+                headline: i18n.cta.headlineReady(name),
                 // Plan 07 — user tagline > canned tagline > generic.
                 subheadline:
                     userTagline
                     ?? (userDescription ? truncateOnWord(userDescription, 140) : undefined)
                     ?? biz?.tagline
-                    ?? 'Get in touch today and let us exceed your expectations.',
+                    ?? i18n.cta.subheadline,
                 ctaButton: {
                     label: resolveLibraryCTA(ctx.mood, category, 'primary'),
                     url: '/contact',
@@ -343,8 +340,8 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'contact',
                 variant: 'form',
-                headline: 'Get in Touch',
-                subheadline: 'We would love to hear from you. Send us a message.',
+                headline: i18n.contact.headline,
+                subheadline: i18n.contact.subheadline,
                 // Plan 07 — user-supplied contact fields win over canned pool.
                 address: userAddress ?? biz?.address ?? '',
                 phone: userPhone ?? biz?.phone ?? '',
@@ -352,9 +349,9 @@ export function buildBlockFromLibrary(
                 // so empty string causes ValidationError on publish.
                 email: userEmail ?? biz?.email ?? null,
                 formFields: [
-                    { fieldName: 'name', label: 'Name', fieldType: 'text', required: true },
-                    { fieldName: 'email', label: 'Email', fieldType: 'email', required: true },
-                    { fieldName: 'message', label: 'Message', fieldType: 'textarea', required: true },
+                    { fieldName: 'name', label: i18n.contact.nameLabel, fieldType: 'text', required: true },
+                    { fieldName: 'email', label: i18n.contact.emailLabel, fieldType: 'email', required: true },
+                    { fieldName: 'message', label: i18n.contact.messageLabel, fieldType: 'textarea', required: true },
                 ],
             }
 
@@ -365,10 +362,10 @@ export function buildBlockFromLibrary(
                 logoText: name,
                 // Plan 07 — user tagline/description wins over canned.
                 tagline: userTagline ?? (userDescription ? truncateOnWord(userDescription, 90) : biz?.tagline ?? ''),
-                copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`,
+                copyrightText: `© ${new Date().getFullYear()} ${name}. ${i18n.footer.allRightsReserved}`,
                 columns: [
-                    { title: 'Explore', links: [{ label: 'Home', url: '/' }, { label: 'About', url: '/about' }] },
-                    { title: 'Contact', links: [{ label: 'Contact Us', url: '/contact' }] },
+                    { title: i18n.footer.explore, links: [{ label: i18n.navigation.home, url: '/' }, { label: i18n.navigation.about, url: '/about' }] },
+                    { title: i18n.navigation.contact, links: [{ label: i18n.footer.aboutUs, url: '/contact' }] },
                 ],
             }
 
@@ -413,7 +410,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'features',
                 variant: 'grid-3',
-                headline: `Why Choose ${name}`,
+                headline: i18n.features.headlineWhyChoose(name),
                 features,
             }
         }
@@ -423,7 +420,7 @@ export function buildBlockFromLibrary(
             // buildStats for category-curated stats (20+ Years / 15000+ Patients
             // Treated for health; 50000+ Customers for restaurant; etc).
             try {
-                return composerBuildStats(category)
+                return composerBuildStats(category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildStats failed, falling back:', err)
             }
@@ -440,7 +437,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'stats',
                 variant: 'row',
-                headline: 'Our Impact',
+                headline: i18n.stats.headline,
                 stats: shuffled.slice(0, 3),
             }
         }
@@ -452,7 +449,7 @@ export function buildBlockFromLibrary(
             // Note: Payload schema uses `image` field (not `avatar`) — composer
             // bios don't set image, media pipeline fills via BLOCK_IMAGE_SPEC.team.
             try {
-                return composerBuildTeam(category)
+                return composerBuildTeam(category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildTeam failed, falling back:', err)
             }
@@ -469,7 +466,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'team',
                 variant: 'grid',
-                headline: 'Meet Our Team',
+                headline: i18n.team.headline,
                 members: shuffled.slice(0, 3),
             }
         }
@@ -499,7 +496,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'service-cards',
                 variant: 'grid',
-                headline: 'Our Services',
+                headline: i18n.serviceCards.headline,
                 services: shuffled.slice(0, 4),
             }
         }
@@ -508,7 +505,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'gallery',
                 variant: 'grid',
-                headline: 'Our Work',
+                headline: i18n.gallery.headline,
                 // Empty images array — media-injector fills from Unsplash
                 images: Array.from({ length: 6 }, () => ({})),
             }
@@ -517,12 +514,12 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'newsletter',
                 variant: 'banner',
-                headline: `Stay Updated with ${name}`,
+                headline: i18n.newsletter.headlineStayUpdated(name),
                 subheadline:
                     userTagline
                     ?? (userDescription ? truncateOnWord(userDescription, 140) : undefined)
-                    ?? 'Subscribe for exclusive news and offers.',
-                buttonLabel: 'Subscribe',
+                    ?? i18n.newsletter.subheadlineFallback,
+                buttonLabel: i18n.newsletter.subscribeLabel,
                 placeholder: 'your@email.com',
             }
 
@@ -532,7 +529,7 @@ export function buildBlockFromLibrary(
             // for beauty, "Executive Checkup RM 1200" for health, etc). Composer
             // has 7 category-specific maps + RM default for other categories.
             try {
-                return composerBuildPricing(category)
+                return composerBuildPricing(category, ctx.language)
             } catch (err) {
                 console.warn('[content-injection] composerBuildPricing failed, falling back:', err)
             }
@@ -540,7 +537,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'pricing',
                 variant: 'cards',
-                headline: 'Simple Pricing',
+                headline: i18n.pricing.headline,
                 plans: [
                     {
                         name: 'Starter',

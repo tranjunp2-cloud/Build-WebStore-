@@ -14,6 +14,7 @@ function resolveFontNames(pairingId: string | undefined): { heading?: string; bo
 import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
+import { getBlockStrings } from './block-i18n'
 import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
 import { getBlogSeeds } from './content/blog-seeds'
 import { pickLogosByCategory } from './content/client-logos-library'
@@ -456,18 +457,8 @@ export function buildFeatures(biz: BusinessSample, category: string): Record<str
 }
 
 export function buildTestimonials(content: CategoryContent, bizName?: string, language?: ContentLang): Record<string, unknown> {
-  const headlineBase = language === 'ms'
-    ? 'Apa Kata Pelanggan Kami'
-    : language === 'vi'
-      ? 'Khách Hàng Nói Gì'
-      : 'What Our Customers Say'
-  const headlineFull = bizName
-    ? language === 'ms'
-      ? `Apa Kata Pelanggan ${bizName}`
-      : language === 'vi'
-        ? `Khách Hàng Nói Gì Về ${bizName}`
-        : `What Our Customers Say About ${bizName}`
-    : headlineBase
+  const i18n = getBlockStrings(language)
+  const headlineFull = bizName ? i18n.testimonials.headlineWithBiz(bizName) : i18n.testimonials.headline
   // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
   return {
     blockType: 'testimonials',
@@ -486,20 +477,21 @@ export function buildTestimonials(content: CategoryContent, bizName?: string, la
   }
 }
 
-function buildContact(biz: BusinessSample): Record<string, unknown> {
+function buildContact(biz: BusinessSample, language?: ContentLang): Record<string, unknown> {
+  const i18n = getBlockStrings(language)
   return {
     blockType: 'contact',
     variant: 'split',
-    headline: 'Get In Touch',
-    subtext: `We\'d love to hear from you. Reach out to ${biz.name} today.`,
+    headline: i18n.contact.headline,
+    subtext: i18n.contact.subheadlineWithBiz(biz.name),
     email: biz.email,
     phone: biz.phone,
     address: biz.address,
     formFields: [
-      { label: 'Name', fieldName: 'name', fieldType: 'text', placeholder: 'Your full name', required: true },
-      { label: 'Email', fieldName: 'email', fieldType: 'email', placeholder: 'your@email.com', required: true },
-      { label: 'Phone', fieldName: 'phone', fieldType: 'phone', placeholder: '+60 12-345 6789', required: false },
-      { label: 'Message', fieldName: 'message', fieldType: 'textarea', placeholder: 'How can we help you?', required: true },
+      { label: i18n.contact.nameLabel, fieldName: 'name', fieldType: 'text', placeholder: i18n.contact.namePlaceholder, required: true },
+      { label: i18n.contact.emailLabel, fieldName: 'email', fieldType: 'email', placeholder: 'your@email.com', required: true },
+      { label: i18n.contact.phoneLabel, fieldName: 'phone', fieldType: 'phone', placeholder: '+60 12-345 6789', required: false },
+      { label: i18n.contact.messageLabel, fieldName: 'message', fieldType: 'textarea', placeholder: i18n.contact.messagePlaceholder, required: true },
     ],
   }
 }
@@ -563,7 +555,7 @@ function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unkno
   }
 }
 
-export function buildStats(category: string): Record<string, unknown> {
+export function buildStats(category: string, language?: ContentLang): Record<string, unknown> {
   const statsMap: Record<string, { value: string; label: string; suffix?: string }[]> = {
     restaurant: [
       { value: '15', label: 'Years Serving', suffix: '+' },
@@ -632,10 +624,11 @@ export function buildStats(category: string): Record<string, unknown> {
       { value: '30', label: 'Menu Items', suffix: '+' },
     ],
   }
+  const i18n = getBlockStrings(language)
   return {
     blockType: 'stats',
     variant: 'row',
-    headline: 'Our Numbers Speak',
+    headline: i18n.stats.headline,
     stats: statsMap[category] ?? statsMap['business']!,
   }
 }
@@ -656,11 +649,12 @@ function buildGallery(biz: BusinessSample): Record<string, unknown> {
   }
 }
 
-export function buildFAQ(content: CategoryContent, bizName?: string): Record<string, unknown> {
+export function buildFAQ(content: CategoryContent, bizName?: string, language?: ContentLang): Record<string, unknown> {
+  const i18n = getBlockStrings(language)
   return {
     blockType: 'faq',
     variant: 'accordion',
-    headline: bizName ? `${bizName} — FAQ` : 'Frequently Asked Questions',
+    headline: bizName ? i18n.faq.headlineWithBiz(bizName) : i18n.faq.headline,
     items: content.faqItems.map((f) => ({ question: f.question, answer: f.answer })),
   }
 }
@@ -669,34 +663,34 @@ export function buildCTA(
   biz: BusinessSample,
   category: string = 'business',
   mood?: ThemeMood,
+  language?: ContentLang,
 ): Record<string, unknown> {
+  const i18n = getBlockStrings(language)
   const primaryCTA = resolveCTA(mood, category, 'primary')
-  // Mood-aware headline when mood supplied — otherwise keep the legacy wording.
-  const headline = mood
-    ? `Discover ${biz.name}`
-    : `Ready to Get Started with ${biz.name}?`
+  const headline = mood ? i18n.cta.headlineDiscover(biz.name) : i18n.cta.headlineReady(biz.name)
   return {
     blockType: 'cta',
     variant: 'banner',
     headline,
-    subheadline: 'Contact us today and let us help you achieve your goals.',
+    subheadline: i18n.cta.subheadline,
     ctaLabel: primaryCTA,
     ctaUrl: '/contact',
     ctaStyle: 'primary',
   }
 }
 
-export function buildAbout(biz: BusinessSample): Record<string, unknown> {
+export function buildAbout(biz: BusinessSample, language?: ContentLang): Record<string, unknown> {
+  const i18n = getBlockStrings(language)
   return {
     blockType: 'about',
     variant: 'split',
-    headline: `About ${biz.name}`,
+    headline: `${i18n.about.headlinePrefix} ${biz.name}`,
     body: biz.description,
     layout: 'image-right',
   }
 }
 
-export function buildPricing(category: string): Record<string, unknown> {
+export function buildPricing(category: string, language?: ContentLang): Record<string, unknown> {
   const pricingMap: Record<string, { name: string; price: string; period: string; features: string[]; highlighted: boolean }[]> = {
     tech: [
       { name: 'Starter', price: 'RM 99', period: '/month', features: ['1 Website', '5 GB Storage', 'SSL Certificate', 'Email Support'], highlighted: false },
@@ -784,26 +778,27 @@ export function buildPricing(category: string): Record<string, unknown> {
   // because Payload tries to `feature.text = ...` on each item assuming it
   // is an object. Normalize to the required shape here so downstream code
   // paths don't have to branch on string vs object.
+  const i18n = getBlockStrings(language)
   const plans = (pricingMap[category] ?? defaultPlans).map((p) => ({
     ...p,
     features: (p.features ?? []).map((f) =>
       typeof f === 'string' ? { text: f, included: true } : f,
     ),
     isPopular: p.highlighted,
-    ctaLabel: p.highlighted ? 'Get Started' : 'Learn More',
+    ctaLabel: p.highlighted ? i18n.pricing.getStarted : i18n.pricing.learnMore,
     ctaUrl: '/contact',
   }))
 
   return {
     blockType: 'pricing',
     variant: 'cards',
-    headline: 'Our Pricing',
-    subheadline: 'Transparent pricing with no hidden fees.',
+    headline: i18n.pricing.headline,
+    subheadline: i18n.pricing.subheadline,
     plans,
   }
 }
 
-export function buildTeam(category: string): Record<string, unknown> {
+export function buildTeam(category: string, language?: ContentLang): Record<string, unknown> {
   const teamMap: Record<string, { name: string; role: string; bio: string }[]> = {
     health: [
       { name: 'Dr. Tan Wei Ming', role: 'General Practitioner', bio: 'MBBS (UM), 15 years experience in family medicine.' },
@@ -883,11 +878,12 @@ export function buildTeam(category: string): Record<string, unknown> {
     { name: 'Marketing Lead', role: 'Head of Marketing', bio: 'Growing the brand through digital marketing and community building.' },
   ]
 
+  const i18n = getBlockStrings(language)
   return {
     blockType: 'team',
     variant: 'grid',
-    headline: 'Meet Our Team',
-    subheadline: 'The people behind the magic.',
+    headline: i18n.team.headline,
+    subheadline: i18n.team.subheadline,
     members: (teamMap[category] ?? defaultTeam).map((m) => ({
       name: m.name,
       role: m.role,

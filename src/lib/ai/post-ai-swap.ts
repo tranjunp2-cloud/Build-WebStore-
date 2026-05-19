@@ -94,11 +94,11 @@ function callComposerBuilder(
         case 'testimonials':
             return content ? composerBuildTestimonials(content, biz.name, language) : null
         case 'faq':
-            return content ? composerBuildFAQ(content, biz.name) : null
+            return content ? composerBuildFAQ(content, biz.name, language) : null
         case 'about':
-            return composerBuildAbout(biz)
+            return composerBuildAbout(biz, language)
         case 'cta':
-            return composerBuildCTA(biz, category, mood)
+            return composerBuildCTA(biz, category, mood, language)
         default:
             return null
     }
