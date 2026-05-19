@@ -372,6 +372,7 @@ export default function EditorPage() {
                     theme: currentTheme,
                     headerBlock: snapshot.headerBlock,
                     footerBlock: snapshot.footerBlock,
+                    ...(snapshot.globalBlocks !== null && { globalBlocks: snapshot.globalBlocks }),
                     isDraft: true,
                 }),
             })

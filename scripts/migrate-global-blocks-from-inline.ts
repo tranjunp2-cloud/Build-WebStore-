@@ -368,9 +368,19 @@ async function migrateSocialWidget(client: pg.PoolClient, summary: MigrationSumm
         }
     }
 
-    // Draft cleanup — also remove child link rows
+    // Draft cleanup — also remove child link rows.
+    // _uuid may not exist in the draft table (added after initial creation) — check first.
+    const { rows: draftColCheck } = await client.query<{ exists: boolean }>(`
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = '_pages_v_blocks_social_widget' AND column_name = '_uuid'
+        ) AS exists
+    `)
+    const draftHasUuid = draftColCheck[0]?.exists ?? false
+    const draftUuidSelect = draftHasUuid ? '_uuid' : 'id AS _uuid'
+
     const { rows: draftBlocks } = await client.query<{ id: string; _uuid: string }>(
-        `SELECT id, _uuid FROM _pages_v_blocks_social_widget WHERE variant = 'inline'`,
+        `SELECT id, ${draftUuidSelect} FROM _pages_v_blocks_social_widget WHERE variant = 'inline'`,
     )
     if (draftBlocks.length > 0) {
         logDry(`Would delete ${draftBlocks.length} inline social_widget draft row(s) + their links`)
