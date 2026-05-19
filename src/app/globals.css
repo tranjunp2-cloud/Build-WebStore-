@@ -47,7 +47,357 @@
 
   /* Navigation height — synced with src/lib/design-tokens.ts NAV_HEIGHT */
   --nav-height: 64px;
+
+  /* Dashboard semantic tokens — light mode (default) */
+  --dash-bg: #F8FAFC;
+  --dash-surface: #FFFFFF;
+  --dash-surface-hover: #F1F5F9;
+  --dash-text: #0F172A;
+  --dash-text-muted: #64748B;
+  --dash-border: #E2E8F0;
+  --dash-accent: #2563EB;
+  --dash-overlay: rgba(0, 0, 0, 0.35);
+  --dash-secondary-bg: #F1F5F9;
 }
+
+/* Dashboard semantic tokens — dark mode overrides */
+.dark {
+  --dash-bg: #0B1120;
+  --dash-surface: #161E2E;
+  --dash-surface-hover: #1F2937;
+  --dash-text: #FFFFFF;
+  --dash-text-muted: #9CA3AF;
+  --dash-border: #1F2937;
+  --dash-accent: #2563EB;
+  --dash-overlay: rgba(0, 0, 0, 0);
+  --dash-secondary-bg: #1F2937;
+}
+
+/* ── Dashboard Shell — Legacy Color Overrides ────────────────────────────── */
+/* Remaps hardcoded Tailwind dark utilities to dash-* semantic tokens.
+   Scoped to .dash-shell so storefront/studio are unaffected.
+   New components should use dash-* tokens directly instead of zinc/slate. */
+.dash-shell .bg-zinc-950,
+.dash-shell .bg-\[\#0B1120\] { background-color: var(--dash-bg); }
+.dash-shell .bg-zinc-900,
+.dash-shell .bg-slate-900,
+.dash-shell .bg-\[\#161E2E\] { background-color: var(--dash-surface); }
+.dash-shell .bg-zinc-800,
+.dash-shell .bg-slate-800,
+.dash-shell .bg-\[\#1E293B\],
+.dash-shell .bg-\[\#1e293b\],
+.dash-shell .bg-\[\#1F2937\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .hover\:bg-zinc-900:hover,
+.dash-shell .hover\:bg-zinc-800:hover,
+.dash-shell .hover\:bg-zinc-700:hover,
+.dash-shell .hover\:bg-slate-800:hover,
+.dash-shell .hover\:bg-slate-700:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .border-zinc-700,
+.dash-shell .border-zinc-800,
+.dash-shell .border-slate-700,
+.dash-shell .border-slate-800,
+.dash-shell .border-white\/\[0\.08\],
+.dash-shell .border-white\/\[0\.06\],
+.dash-shell .border-white\/30,
+.dash-shell .border-\[\#1F2937\],
+.dash-shell .border-\[\#334155\] { border-color: var(--dash-border); }
+.dash-shell .text-zinc-100,
+.dash-shell .text-zinc-200,
+.dash-shell .text-slate-100,
+.dash-shell .text-slate-50 { color: var(--dash-text); }
+.dash-shell .text-slate-50\/60,
+.dash-shell .text-slate-50\/50 { color: var(--dash-text-muted); }
+.dash-shell .text-zinc-400,
+.dash-shell .text-zinc-500,
+.dash-shell .text-slate-400,
+.dash-shell .text-slate-500,
+.dash-shell .text-\[\#9CA3AF\],
+.dash-shell .text-gray-500 { color: var(--dash-text-muted); }
+/* text-white: remap to theme text, but preserve white on gradient/colored backgrounds */
+.dash-shell .text-white { color: var(--dash-text); }
+.dash-shell [class*="from-"].text-white,
+.dash-shell [class*="from-"] .text-white,
+.dash-shell [class*="bg-gradient"].text-white,
+.dash-shell [class*="bg-gradient"] .text-white,
+.dash-shell [style*="linear-gradient"].text-white,
+.dash-shell [style*="linear-gradient"] .text-white,
+.dash-shell .bg-blue-600 .text-white,
+.dash-shell .bg-blue-500 .text-white,
+.dash-shell .bg-red-600 .text-white,
+.dash-shell .bg-green-600 .text-white { color: #fff !important; }
+/* bg-white/opacity → light mode only: white-on-white → dark tint; dark mode keeps original white shimmer */
+html:not(.dark) .dash-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .dash-shell .bg-white\/5 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-white\/8 { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .bg-white\/10 { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .dash-shell .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .dash-shell .hover\:bg-white\/5:hover,
+html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07); }
+.dash-shell .hover\:border-white\/20:hover { border-color: var(--dash-border); }
+/* text-gray-200/300 (dark-mode text, nearly invisible on white) */
+.dash-shell .text-gray-200,
+.dash-shell .text-gray-300 { color: var(--dash-text); }
+/* bg-slate-800/60 opacity variant — include md: responsive variant (OrdersTable container) */
+.dash-shell .bg-slate-800\/60,
+.dash-shell .md\:bg-slate-800\/60 { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-slate-800\/50 { background-color: var(--dash-secondary-bg); }
+/* Gap 1: bg-[#0F172A] used as modal/panel bg → remap to surface */
+.dash-shell .bg-\[\#0F172A\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#0F172A\]\/95 { background-color: var(--dash-surface); }
+/* Gap 2: bg-[#0B1120] opacity variants — light mode only; dark mode keeps original depth overlay */
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/50 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/60 { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/80 { background-color: rgba(0,0,0,0.06); }
+/* Gap 3: divide-white/opacity → invisible dividers on white bg */
+.dash-shell .divide-white\/5 > * + * { border-color: var(--dash-border); }
+.dash-shell .divide-white\/10 > * + * { border-color: var(--dash-border); }
+.dash-shell .divide-white\/\[0\.05\] > * + * { border-color: var(--dash-border); }
+/* Gap 4: border-white/10 → invisible border on white bg */
+.dash-shell .border-white\/10 { border-color: var(--dash-border); }
+/* Gap 5: placeholder too light on white bg */
+.dash-shell .placeholder\:text-slate-50\/30::placeholder { color: var(--dash-text-muted); }
+/* rgba() className patterns — text */
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.6\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.5\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.4\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.3\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.2\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.8\)\] { color: var(--dash-text); }
+/* rgba() className patterns — border */
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.1\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.16\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.3\)\] { border-color: var(--dash-border); }
+/* rgba() className patterns — bg (light mode only for rgba(0,0,0,...) values) */
+html:not(.dark) .dash-shell .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-\[rgba\(255\,255\,255\,0\.05\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-\[rgba\(255\,255\,255\,0\.1\)\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .bg-\[rgba\(255\,255\,255\,0\.2\)\] { background-color: rgba(0,0,0,0.08); }
+.dash-shell .bg-\[rgba\(30\,41\,59\,0\.60\)\] { background-color: var(--dash-secondary-bg); }
+html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-color: rgba(0,0,0,0.06); }
+/* fill (SVG step indicator inactive) */
+.dash-shell .fill-\[rgba\(255\,255\,255\,0\.1\)\] { fill: var(--dash-border); }
+/* Group A: new hex bg values (ProductQuickViewModal, CategoryManager, PaymentsForm) */
+.dash-shell .bg-\[\#111827\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[\#191C22\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#1D2026\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#10131A\] { background-color: var(--dash-bg); }
+.dash-shell .bg-\[\#0b1b36\] { background-color: var(--dash-surface); }
+/* Group B: hover variants of dark hex values */
+.dash-shell .hover\:bg-\[\#1E293B\]:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .hover\:bg-\[\#1E293B\]\/80:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .hover\:bg-\[\#161E2E\]:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .hover\:bg-\[\#0B1120\]\/80:hover { background-color: var(--dash-surface-hover); }
+html:not(.dark) .dash-shell .hover\:bg-\[\#0B1120\]\/50:hover { background-color: rgba(0,0,0,0.04); }
+.dash-shell .hover\:bg-\[\#283548\]:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .hover\:bg-\[\#1C263B\]:hover { background-color: var(--dash-surface-hover); }
+/* Group C: remaining dark bg hex — one-shot complete sweep */
+.dash-shell .bg-\[\#000000\],
+.dash-shell .bg-\[\#0b1120\],
+.dash-shell .bg-\[\#0B0E14\],
+.dash-shell .bg-\[\#0F141E\] { background-color: var(--dash-bg); }
+/* after:bg-[#0b1120] — timeline line masking pseudo-element (customer-detail-panel) */
+.dash-shell .after\:bg-\[\#0b1120\]::after { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#161e2e\],
+.dash-shell .bg-\[\#172033\],
+.dash-shell .bg-\[\#1A2236\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#1C263B\],
+.dash-shell .bg-\[\#1E2536\],
+.dash-shell .bg-\[\#272A31\],
+.dash-shell .bg-\[\#283548\],
+.dash-shell .bg-\[\#374151\] { background-color: var(--dash-secondary-bg); }
+/* AC-5: modal overlay — Light: rgba(0,0,0,0.4) / Dark: rgba(0,0,0,0.7) per Design System */
+.dash-shell .bg-black\/60 { background-color: rgba(0,0,0,0.4); }
+.dash-shell .bg-black\/80 { background-color: rgba(0,0,0,0.4); }
+.dark .dash-shell .bg-black\/60 { background-color: rgba(0,0,0,0.7); }
+.dark .dash-shell .bg-black\/80 { background-color: rgba(0,0,0,0.7); }
+/* Design System §3: card shadow — Light: subtle / Dark: deeper */
+.dash-shell .shadow-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0/0.1), 0 1px 2px -1px rgb(0 0 0/0.1); }
+.dark .dash-shell .shadow-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0/0.5); }
+
+/* ── Text color sweep — Design System §1 ─────────────────────────────────── */
+/* Dark text values (fine in light, invisible in dark → remap to dash-text) */
+.dash-shell .text-\[\#0b1120\],
+.dash-shell .text-\[\#0B1120\],
+.dash-shell .text-\[\#0F172A\] { color: var(--dash-text); }
+/* Dark-ish muted (fine in light, invisible in dark → remap to dash-text-muted) */
+.dash-shell .text-\[\#374151\],
+.dash-shell .text-\[\#6B7280\],
+.dash-shell .text-\[\#737373\] { color: var(--dash-text-muted); }
+/* Light gray text (invisible in light mode → remap to dash-text-muted) */
+.dash-shell .text-\[\#9CA3AF\],
+.dash-shell .text-\[\#9ca3af\],
+.dash-shell .text-\[\#9f9fa9\],
+.dash-shell .text-\[\#9F9FA9\],
+.dash-shell .text-\[\#99A1AF\],
+.dash-shell .text-\[\#94a3b8\],
+.dash-shell .text-\[\#94A3B8\],
+.dash-shell .text-\[\#c1c6d7\],
+.dash-shell .text-\[\#C1C6D7\],
+.dash-shell .text-\[\#c2c6d6\],
+.dash-shell .text-\[\#CBD5E1\],
+.dash-shell .text-\[\#E5E7EB\] { color: var(--dash-text-muted); }
+/* Pastel badge text (designed for dark bg — too light on white) */
+.dash-shell .text-\[\#B9F8CF\] { color: #059669; }
+.dash-shell .text-\[\#C4B5FD\] { color: #7c3aed; }
+/* Near-white text (invisible in light mode → remap to dash-text) */
+.dash-shell .text-\[\#dde2f8\],
+.dash-shell .text-\[\#DDE2F8\],
+.dash-shell .text-\[\#e1e2eb\],
+.dash-shell .text-\[\#E1E2EB\],
+.dash-shell .text-\[\#F1F5F9\],
+.dash-shell .text-\[\#f8fafc\],
+.dash-shell .text-\[\#F8FAFC\],
+.dash-shell .md\:text-\[\#F8FAFC\],
+.dash-shell .text-\[\#FAFAFA\],
+.dash-shell .text-\[\#FFFFFF\] { color: var(--dash-text); }
+
+/* ── Border color sweep ───────────────────────────────────────────────────── */
+.dash-shell .border-\[\#0b1120\],
+.dash-shell .border-\[\#374151\],
+.dash-shell .border-\[\#414754\] { border-color: var(--dash-border); }
+/* Near-white border (invisible on white bg) */
+.dash-shell .border-\[\#F8FAFC\] { border-color: var(--dash-border); }
+/* Near-white border opacity variants (invisible on white bg) */
+.dash-shell .border-\[\#F8FAFC\]\/30,
+.dash-shell .border-\[\#F8FAFC\]\/20,
+.dash-shell .border-\[\#F8FAFC\]\/10 { border-color: var(--dash-border); }
+
+/* ── Text opacity variants of near-white (invisible on light bg) ─────────── */
+.dash-shell .text-\[\#F8FAFC\]\/90,
+.dash-shell .text-\[\#F8FAFC\]\/80 { color: var(--dash-text); }
+.dash-shell .text-\[\#F8FAFC\]\/60,
+.dash-shell .text-\[\#F8FAFC\]\/50 { color: var(--dash-text-muted); }
+.dash-shell .text-\[\#F8FAFC\]\/40,
+.dash-shell .text-\[\#F8FAFC\]\/30 { color: var(--dash-text-muted); }
+
+/* ── Placeholder sweep ───────────────────────────────────────────────────── */
+/* Near-white placeholders (invisible on white bg) */
+.dash-shell .placeholder\:text-\[\#F8FAFC\]::placeholder,
+.dash-shell .placeholder\:text-\[\#F8FAFC\]\/40::placeholder,
+.dash-shell .placeholder\:text-\[rgba\(248\,250\,252\,0\.4\)\]::placeholder,
+.dash-shell .placeholder-\[rgba\(248\,250\,252\,0\.4\)\]::placeholder { color: var(--dash-text-muted); }
+/* placeholder:text-white/* opacity variants (invisible on white bg) */
+.dash-shell .placeholder\:text-white\/40::placeholder,
+.dash-shell .placeholder\:text-white\/50::placeholder,
+.dash-shell .placeholder\:text-white\/60::placeholder { color: var(--dash-text-muted); }
+/* Light gray placeholders (low contrast on white) */
+.dash-shell .placeholder-\[\#9f9fa9\]::placeholder,
+.dash-shell .placeholder-\[\#9F9FA9\]::placeholder,
+.dash-shell .placeholder-\[rgba\(159\,159\,169\,1\)\]::placeholder,
+.dash-shell .placeholder-\[\#374151\]::placeholder { color: var(--dash-text-muted); }
+
+/* ── Phase 06: hover text sweep (near-white → readable in light mode) ───── */
+.dash-shell .hover\:text-white:hover,
+.dash-shell .hover\:text-\[\#E5E7EB\]:hover,
+.dash-shell .hover\:text-\[\#F8FAFC\]:hover { color: var(--dash-text); }
+
+/* ── Phase 06: text-white/* opacity variants (invisible on light bg) ─────── */
+.dash-shell .text-white\/90,
+.dash-shell .text-white\/80 { color: var(--dash-text); }
+.dash-shell .text-white\/70,
+.dash-shell .text-white\/60,
+.dash-shell .text-white\/50,
+.dash-shell .text-white\/40,
+.dash-shell .text-white\/30,
+.dash-shell .text-white\/20 { color: var(--dash-text-muted); }
+
+/* ── Phase 06: rgba 0.6 near-white text (complement to 0.7/0.9 above) ───── */
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.6\)\] { color: var(--dash-text-muted); }
+
+/* ── Phase 06: bg hex opacity variants (light mode only — dark mode keeps original depth) ── */
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/30,
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/40 { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/70,
+html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/90,
+html:not(.dark) .dash-shell .bg-\[\#0b1120\]\/50 { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .dash-shell .bg-\[\#0F172A\]\/30 { background-color: rgba(0,0,0,0.04); }
+.dash-shell .bg-\[\#0F172A\]\/80 { background-color: var(--dash-surface); }
+html:not(.dark) .dash-shell .bg-\[\#1E293B\]\/20,
+html:not(.dark) .dash-shell .bg-\[\#1E293B\]\/30,
+html:not(.dark) .dash-shell .bg-\[\#1E293B\]\/40 { background-color: rgba(0,0,0,0.03); }
+.dash-shell .bg-\[\#1E293B\]\/50,
+.dash-shell .bg-\[\#1E293B\]\/60,
+.dash-shell .bg-\[\#1e293b\]\/60,
+.dash-shell .bg-\[\#1E293B\]\/70,
+.dash-shell .bg-\[\#1E293B\]\/95 { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[\#000000\]\/60 { background-color: rgba(0,0,0,0.4); }
+.dash-shell .bg-\[\#0B0E14\]\/80 { background-color: var(--dash-bg); }
+.dash-shell .bg-\[\#272A31\]\/50 { background-color: var(--dash-secondary-bg); }
+
+/* ── Phase 06: border variants ───────────────────────────────────────────── */
+.dash-shell .border-\[\#1f2937\] { border-color: var(--dash-border); }
+.dash-shell .border-\[\#1E293B\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(65\,71\,84\,0\.1\)\],
+.dash-shell .border-\[rgba\(66\,71\,84\,0\.2\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(255\,255\,255\,0\.05\)\] { border-color: var(--dash-border); }
+.dash-shell .border-\[rgba\(248\,250\,252\,0\.15\)\] { border-color: var(--dash-border); }
+
+/* ── Phase 06: hover bg ──────────────────────────────────────────────────── */
+.dash-shell .hover\:bg-\[\#1F2937\]:hover { background-color: var(--dash-surface-hover); }
+
+/* ── Phase 06: rgba text ─────────────────────────────────────────────────── */
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.7\)\],
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.9\)\] { color: var(--dash-text); }
+.dash-shell .text-\[rgba\(248\,250\,252\,0\.5\)\],
+.dash-shell .text-\[rgba\(255\,255\,255\,0\.5\)\] { color: var(--dash-text-muted); }
+.dash-shell .text-\[\#737373\] { color: var(--dash-text-muted); }
+.dash-shell .hover\:bg-\[rgba\(248\,250\,252\,0\.05\)\]:hover { background-color: var(--dash-surface-hover); }
+
+/* ── Phase 06: rgba bg (light mode only — dark mode preserves original overlays) ── */
+html:not(.dark) .dash-shell .bg-\[rgba\(11\,17\,32\,0\.5\)\],
+html:not(.dark) .dash-shell .bg-\[rgba\(11\,17\,32\,0\.6\)\],
+html:not(.dark) .dash-shell .bg-\[rgba\(11\,17\,32\,0\.8\)\],
+html:not(.dark) .dash-shell .bg-\[rgba\(15\,23\,42\,0\.7\)\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.05\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-color: rgba(0,0,0,0.15); }
+
+/* ── Phase 06: portal modal hex variants (outside dash-shell scope fix) ─── */
+.dash-shell .bg-\[\#191C22\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#0B0E14\] { background-color: var(--dash-bg); }
+.dash-shell .bg-\[\#1D2026\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[\#1E2536\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#0F141E\],
+.dash-shell .bg-\[\#0f141e\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[\#374151\] { background-color: var(--dash-border); }
+.dash-shell .border-white\/5,
+.dash-shell .border-white\/\[0\.05\] { border-color: var(--dash-border); }
+
+/* ── TopHeader: force opaque background + z-index to prevent scroll overlap ─ */
+.dash-shell header {
+    z-index: 200;
+    background-color: var(--dash-surface) !important;
+}
+
+/* ── Phase 06: low-contrast slate text (invisible on white bg) ───────────── */
+.dash-shell .text-slate-300,
+.dash-shell .text-slate-400 { color: var(--dash-text-muted); }
+
+/* ── Phase 06: hover text slate (drag handle, arrows) ───────────────────── */
+.dash-shell .hover\:text-slate-300:hover,
+.dash-shell .hover\:text-slate-400:hover { color: var(--dash-text-muted); }
+
+/* ── Phase 06: near-white text variants ──────────────────────────────────── */
+.dash-shell .text-\[\#FAFAFA\] { color: var(--dash-text); }
+
+/* ── Phase 06: checkbox/input border-white/20 (invisible on white bg) ───── */
+.dash-shell .border-white\/20 { border-color: var(--dash-border); }
+
+/* ── Phase 06: row hover + cancel button bg (DashboardCustomizeModal) ───── */
+.dash-shell .hover\:bg-\[\#1C263B\]:hover { background-color: var(--dash-surface-hover); }
+.dash-shell .bg-\[\#172033\] { background-color: var(--dash-secondary-bg); }
+.dash-shell .bg-\[rgba\(248\,250\,252\,0\.6\)\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[rgba\(30\,41\,59\,0\.6\)\] { background-color: var(--dash-secondary-bg); }
+
+/* ── Phase 06: payments + shipping pages (light-mode gaps) ───────────────── */
+.dash-shell .text-slate-200 { color: var(--dash-text); }
+.dash-shell .text-\[\#e1e2eb\] { color: var(--dash-text); }
+.dash-shell .border-white\/\[0\.12\] { border-color: var(--dash-border); }
+html:not(.dark) .dash-shell .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .dash-shell .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.03); }
 
 /* ── Base Styles ──────────────────────────────────────────────────────────── */
 @layer base {
@@ -61,7 +411,8 @@
   }
 
   body {
-    @apply bg-zinc-950 text-zinc-100;
+    background-color: var(--dash-bg);
+    color: var(--dash-text);
     margin: 0;
     min-height: 100vh;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -138,19 +489,24 @@
     color: inherit;
   }
 
-  /* Override Chrome/Safari autofill light backgrounds on dark theme */
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
+  /* Override Chrome/Safari autofill backgrounds — dark mode only */
+  .dark input:-webkit-autofill,
+  .dark input:-webkit-autofill:hover,
+  .dark input:-webkit-autofill:focus,
+  .dark input:-webkit-autofill:active {
     -webkit-box-shadow: 0 0 0 1000px #0F172A inset !important;
     -webkit-text-fill-color: #fff !important;
     caret-color: #fff;
     transition: background-color 5000s ease-in-out 0s;
   }
 
-  /* Dark theme select/option styling */
+  /* Select/option styling */
   select option {
+    background-color: #fff;
+    color: #0F172A;
+  }
+
+  .dark select option {
     background-color: #1E293B;
     color: #fff;
   }
@@ -161,14 +517,26 @@
   }
 
   ::-webkit-scrollbar-track {
+    @apply bg-slate-200;
+  }
+
+  .dark ::-webkit-scrollbar-track {
     @apply bg-zinc-900;
   }
 
   ::-webkit-scrollbar-thumb {
+    @apply bg-slate-400 rounded-full;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
     @apply bg-zinc-600 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-500;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
     @apply bg-zinc-500;
   }
 }
@@ -209,7 +577,13 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-semibold hover:bg-white/20 hover:border-white/30 transition-all duration-200 active:scale-95;
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 active:scale-95;
+    background-color: var(--dash-secondary-bg);
+    border: 1px solid var(--dash-border);
+    color: var(--dash-text);
+  }
+  .btn-secondary:hover {
+    background-color: var(--dash-surface-hover);
   }
 
   .btn-accent {
@@ -218,31 +592,53 @@
 
   /* Input styles */
   .input {
-    @apply w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200;
+    @apply w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 transition-all duration-200;
+    background-color: var(--dash-surface);
+    border-color: var(--dash-border);
+    color: var(--dash-text);
+    --tw-ring-color: color-mix(in srgb, var(--dash-accent) 20%, transparent);
+  }
+  .input::placeholder {
+    color: var(--dash-text-muted);
+  }
+  .input:focus {
+    border-color: var(--dash-accent);
   }
 
   /* Card styles */
   .card {
-    @apply bg-zinc-900 border border-zinc-800 rounded-2xl;
+    @apply rounded-2xl border;
+    background-color: var(--dash-surface);
+    border-color: var(--dash-border);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   }
 
   .card-hover {
-    @apply hover:border-zinc-700 hover:bg-zinc-800/80 transition-all duration-200 cursor-pointer;
+    @apply transition-all duration-200 cursor-pointer;
+  }
+  .card-hover:hover {
+    background-color: var(--dash-surface-hover);
+    border-color: var(--dash-border);
   }
 
-  /* Shimmer loading effect */
+  /* Shimmer loading effect — light/dark gradient */
   .shimmer {
-    @apply animate-shimmer bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800;
+    @apply animate-shimmer bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-zinc-800 dark:via-zinc-700 dark:to-zinc-800;
     background-size: 200% 100%;
   }
 
   /* Sidebar navigation item */
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-zinc-400 text-sm font-medium hover:bg-white/5 hover:text-white transition-all duration-150;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150;
+    color: var(--dash-text-muted);
+  }
+  .nav-item:hover {
+    background-color: var(--dash-surface-hover);
+    color: var(--dash-text);
   }
 
   .nav-item-active {
-    @apply bg-sky-500/10 text-sky-400 border border-sky-500/20;
+    @apply bg-blue-600/10 text-blue-600 border border-blue-600/20 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20;
   }
 
 }

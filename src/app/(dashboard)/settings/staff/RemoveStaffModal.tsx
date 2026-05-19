@@ -38,25 +38,22 @@ export function RemoveStaffModal({
 
     return (
         <>
-            <div className="fixed inset-0 z-[100] bg-slate-950/60 animate-in fade-in duration-200" onClick={isPending ? undefined : onClose} />
+            <div className="fixed inset-0 z-[100] bg-[var(--dash-overlay)] animate-in fade-in duration-200" onClick={isPending ? undefined : onClose} />
 
             <div
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] flex flex-col w-[calc(100%-32px)] max-w-[448px] bg-[#1E293B] rounded-[16px] animate-in zoom-in-95 duration-200 shadow-2xl overflow-hidden"
-                style={{
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: '0px 25px 50px -12px rgba(251, 44, 54, 0.2)'
-                }}
+                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] flex flex-col w-[calc(100%-32px)] max-w-[448px] bg-dash-surface border border-dash-border rounded-[16px] animate-in zoom-in-95 duration-200 shadow-2xl overflow-hidden"
+                style={{ boxShadow: '0px 25px 50px -12px rgba(251, 44, 54, 0.2)' }}
             >
                 {/* Header */}
-                <div className="flex flex-col items-stretch px-[24px] py-[24px] pb-[23px]" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                    <h2 className="text-[24px] font-bold text-[#F8FAFC] leading-[1.333em] font-['Inter'] m-0 p-0 tracking-tight">
+                <div className="flex flex-col items-stretch px-[24px] py-[24px] pb-[23px] border-b border-dash-border">
+                    <h2 className="text-[24px] font-bold text-dash-text leading-[1.333em] font-['Inter'] m-0 p-0 tracking-tight">
                         {t?.Staff?.removeModal?.title || 'Remove Staff Access'}
                     </h2>
                 </div>
 
                 {/* Body Content */}
                 <div className="flex flex-col px-[24px] pt-[24px] pb-[32px] gap-[24px]">
-                    {/* Icon */}
+                    {/* Icon — warning amber, intentional status color, unchanged in both modes */}
                     <div className="flex justify-center">
                         <div className="w-[64px] h-[64px] rounded-full flex items-center justify-center bg-[rgba(240,177,0,0.1)] border-[2px] border-[rgba(240,177,0,0.3)]">
                             <ShieldAlert className="w-[32px] h-[32px] text-[#F0B100]" strokeWidth={1.5} />
@@ -65,17 +62,17 @@ export function RemoveStaffModal({
 
                     {/* Text Block */}
                     <div className="flex flex-col gap-[12px] text-center">
-                        <h3 className="text-[18px] font-bold text-[#F8FAFC] leading-[1.556em] font-['Inter'] m-0 p-0">
+                        <h3 className="text-[18px] font-bold text-dash-text leading-[1.556em] font-['Inter'] m-0 p-0">
                             {t?.Staff?.removeModal?.desc1 || 'Are you sure you want to remove access for this user?'}
                         </h3>
-                        <p className="text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter'] m-0 p-0 px-[8px]">
+                        <p className="text-[14px] font-normal text-dash-text-muted leading-[1.428em] font-['Inter'] m-0 p-0 px-[8px]">
                             {t?.Staff?.removeModal?.desc2 || 'This person will immediately lose access to the system and all store data. This action cannot be undone.'}
                         </p>
                     </div>
 
                     {/* User Card */}
                     <div className="w-full">
-                        <div className="w-full flex items-center justify-center gap-[12px] px-[20px] py-[12px] rounded-[12px] bg-[#0B1120]/50" style={{ border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <div className="w-full flex items-center justify-center gap-[12px] px-[20px] py-[12px] rounded-[12px] bg-dash-secondary-bg border border-dash-border">
                             {/* Avatar */}
                             {user.avatar ? (
                                 <img src={user.avatar} alt={displayName} className="h-[40px] w-[40px] rounded-[33px] object-cover" />
@@ -90,10 +87,10 @@ export function RemoveStaffModal({
 
                             {/* Details */}
                             <div className="flex flex-col justify-center">
-                                <span className="text-[14px] font-medium text-[#F8FAFC] leading-[1.428em] font-['Inter']">
+                                <span className="text-[14px] font-medium text-dash-text leading-[1.428em] font-['Inter']">
                                     {displayName}
                                 </span>
-                                <span className="text-[12px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.333em] font-['Inter']">
+                                <span className="text-[12px] font-normal text-dash-text-muted leading-[1.333em] font-['Inter']">
                                     {user.email}
                                 </span>
                             </div>
@@ -102,12 +99,12 @@ export function RemoveStaffModal({
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-[12px] px-[24px] py-[24px] bg-[#1E293B]" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <div className="flex items-center justify-end gap-[12px] px-[24px] py-[24px] bg-dash-surface border-t border-dash-border">
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={isPending}
-                        className="flex items-center justify-center h-[46px] px-[24px] rounded-[12px] bg-[#0B1120]/50 border border-white/[0.08] text-[16px] font-medium text-[#F8FAFC] hover:bg-[#0B1120]/80 transition-colors focus:outline-none"
+                        className="flex items-center justify-center h-[46px] px-[24px] rounded-[12px] bg-dash-secondary-bg border border-dash-border text-[16px] font-medium text-dash-text hover:bg-dash-surface-hover transition-colors focus:outline-none"
                     >
                         {t?.Staff?.removeModal?.cancel || 'Cancel'}
                     </button>

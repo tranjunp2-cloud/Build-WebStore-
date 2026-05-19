@@ -174,7 +174,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
             {/* Panel — bottom sheet on mobile, right sidebar on md+ */}
             <div
                 className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-[24px] min-h-[80vh] max-h-[90vh] md:min-h-0 md:max-h-none md:bottom-0 md:top-0 md:left-auto md:w-[500px] md:rounded-none border-t border-white/[0.08] md:border-l"
-                style={{ background: '#0b1120', backdropFilter: 'blur(20px)' }}
+                style={{ background: 'var(--dash-surface)', backdropFilter: 'blur(20px)' }}
             >
                 {/* Drag handle (mobile only) */}
                 <div className="md:hidden flex justify-center pt-3 pb-0 shrink-0">
@@ -207,7 +207,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     {/* Customer Information card */}
                     <div
                         className="flex flex-col gap-3 rounded-[16px] px-[17px] py-6 border"
-                        style={{ background: 'rgba(30,41,59,0.6)', borderColor: 'rgba(255,255,255,0.08)' }}
+                        style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                     >
                         {/* Section header + status */}
                         <div className="flex items-center justify-between">
@@ -269,7 +269,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                     {record.source === 'contact-form' && (
                         <div className="flex flex-col gap-6">
                             {/* Section title */}
-                            <div className="border-b pb-[17px]" style={{ borderColor: 'rgba(66,71,84,0.1)' }}>
+                            <div className="border-b pb-[17px]" style={{ borderColor: 'var(--dash-border)' }}>
                                 <p className="text-[14px] font-bold uppercase tracking-[1.4px] text-[#dde2f8]">
                                     {c.timeline}
                                 </p>
@@ -285,7 +285,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                 /* Vertical timeline */
                                 <div className="relative flex flex-col gap-10 pl-[26px]">
                                     {/* Vertical line — runs from top of container, stops at top-4 of the last item via overlay */}
-                                    <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: 'rgba(255,255,255,0.12)' }} />
+                                    <div className="absolute left-0 top-0 bottom-0 w-[2px]" style={{ background: 'var(--dash-border)' }} />
                                     {timeline.map((t, idx) => (
                                         <div
                                             key={t.id}
@@ -301,7 +301,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                                 {/* Title + date */}
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[12px] font-bold text-[#dde2f8]">{c.timelineEntry}</span>
-                                                    <span className="text-[10px]" style={{ color: 'rgba(194,198,214,0.5)' }}>
+                                                    <span className="text-[10px]" style={{ color: 'var(--dash-text-muted)' }}>
                                                         {formatLatestDate(t.createdAt)}
                                                     </span>
                                                 </div>
@@ -309,7 +309,7 @@ export function CustomerDetailPanel({ record, onClose, onStatusUpdate }: Props) 
                                                 {t.message && (
                                                     <div
                                                         className="rounded-[12px] p-[17px] border"
-                                                        style={{ background: 'rgba(36,42,58,0.5)', borderColor: 'rgba(66,71,84,0.1)' }}
+                                                        style={{ background: 'var(--dash-secondary-bg)', borderColor: 'var(--dash-border)' }}
                                                     >
                                                         <p className="text-[12px] text-[#c2c6d6] leading-[19.5px]">{t.message}</p>
                                                     </div>

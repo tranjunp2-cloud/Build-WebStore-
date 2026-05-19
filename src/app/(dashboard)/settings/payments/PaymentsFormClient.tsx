@@ -330,7 +330,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                                 />
                                 <div className={cn(
                                     "h-[32px] w-[56px] rounded-full border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/50 after:absolute after:left-[4px] after:top-[3px] after:h-[24px] after:w-[24px] after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-[24px] after:shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]",
-                                    paymentCod ? "bg-gradient-to-r from-blue-500 to-teal-400 border-transparent shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-[#1E293B] border-white/[0.12]"
+                                    paymentCod ? "bg-gradient-to-r from-blue-500 to-teal-400 border-transparent shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-slate-300 dark:bg-[#1E293B] border-slate-400 dark:border-white/[0.12]"
                                 )}></div>
                             </label>
                         </div>
@@ -378,7 +378,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                                 />
                                 <div className={cn(
                                     "h-[32px] w-[56px] rounded-full border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/50 after:absolute after:left-[4px] after:top-[3px] after:h-[24px] after:w-[24px] after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-[24px] after:shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]",
-                                    paymentQr ? "bg-gradient-to-r from-blue-500 to-teal-400 border-transparent shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-[#1E293B] border-white/[0.12]"
+                                    paymentQr ? "bg-gradient-to-r from-blue-500 to-teal-400 border-transparent shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-slate-300 dark:bg-[#1E293B] border-slate-400 dark:border-white/[0.12]"
                                 )}></div>
                             </label>
                         </div>

@@ -66,7 +66,7 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
                         className="overflow-hidden"
                     >
                         <div
-                            className="px-5 pb-4 text-[14px] text-[#9CA3AF] leading-[22px] [&_strong]:text-white [&_strong]:font-semibold"
+                            className="px-5 pb-4 text-[14px] text-[#9CA3AF] leading-[22px] [&_strong]:text-[var(--dash-text)] [&_strong]:font-semibold"
                             dangerouslySetInnerHTML={{ 
                                 __html: DOMPurify.sanitize(answer, { 
                                     ALLOWED_TAGS: ['strong', 'br', 'a', 'p', 'ul', 'ol', 'li', 'em', 'u'], 

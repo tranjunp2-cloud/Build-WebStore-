@@ -106,7 +106,8 @@ export function AnalyticsChart({ data }: { data: ChartData[] }) {
                         {/* Match HTML: No YAxis or Grid, just bottom labels */}
                         <XAxis
                             dataKey="date"
-                            stroke="#9CA3AF"
+                            stroke="var(--dash-text-muted)"
+                            tick={{ fill: 'var(--dash-text-muted)' }}
                             fontSize={10}
                             tickLine={false}
                             axisLine={false}

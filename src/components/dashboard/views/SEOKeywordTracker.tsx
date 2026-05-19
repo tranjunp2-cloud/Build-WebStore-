@@ -112,6 +112,7 @@ export function SEOKeywordTracker({ initialKeywords }: { initialKeywords: Tracke
 
             {/* Add Keyword Modal */}
             {mounted && createPortal(
+                <div className="dash-shell">
                 <AnimatePresence>
                     {isModalOpen && (
                         <motion.div
@@ -152,7 +153,8 @@ export function SEOKeywordTracker({ initialKeywords }: { initialKeywords: Tracke
                             </motion.div>
                         </motion.div>
                     )}
-                </AnimatePresence>,
+                </AnimatePresence>
+                </div>,
                 document.body
             )}
         </div>

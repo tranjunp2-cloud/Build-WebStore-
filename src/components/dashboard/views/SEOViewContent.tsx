@@ -90,7 +90,7 @@ export function SEOViewContent({
                     <div className="flex items-center gap-[24px] mb-[24px]">
                         <div className="relative w-[100px] h-[100px] shrink-0">
                             <svg className="w-full h-full rotate-90" viewBox="0 0 100 100">
-                                <circle cx="50" cy="50" r="42" fill="none" stroke="#374151" strokeWidth="8" opacity="0.6" />
+                                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--dash-border)" strokeWidth="8" opacity="0.6" />
                                 <circle
                                     cx="50" cy="50" r="42" fill="none" stroke="#2B7FFF" strokeWidth="8"
                                     strokeLinecap="round" strokeDasharray="263.89"

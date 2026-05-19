@@ -43,22 +43,22 @@ export function FilterDropdown({
         <div className={`relative ${className}`} ref={containerRef}>
             <button
                 type="button"
-                className="w-full h-full appearance-none bg-[#1E293B] border border-[rgba(255,255,255,0.08)] rounded-[16px] pl-[48px] pr-[40px] text-[#F8FAFC] text-[16px] font-[400] leading-[1.2102272510528564em] outline-none text-left flex items-center"
+                className="w-full h-full appearance-none bg-[var(--dash-secondary-bg)] border border-[var(--dash-border)] rounded-[16px] pl-[48px] pr-[40px] text-[var(--dash-text)] text-[16px] font-[400] leading-[1.2102272510528564em] outline-none text-left flex items-center"
                 onClick={() => setIsOpen(!isOpen)}
             >
                 {selectedOption ? selectedOption.label : placeholder}
             </button>
-            <ChevronDown className="absolute right-[10px] top-[15px] w-[20px] h-[20px] text-[rgba(248,250,252,0.4)] pointer-events-none" />
+            <ChevronDown className="absolute right-[10px] top-[15px] w-[20px] h-[20px] text-[var(--dash-text-muted)] pointer-events-none" />
 
             {isOpen && (
                 <div className="absolute top-[calc(100%+8px)] left-0 w-full z-50">
                     {/* SVG Arrow pointing up */}
                     <svg className="absolute -top-[6px] left-[22px] z-10" width="12" height="6" viewBox="0 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M6 0L12 6H0L6 0Z" fill="#1F2937" />
+                        <path d="M6 0L12 6H0L6 0Z" fill="var(--dash-secondary-bg)" />
                     </svg>
 
                     {/* Dropdown Container */}
-                    <div className="bg-[#1F2937] rounded-[8px] border border-[rgba(255,255,255,0.05)] shadow-[0px_8px_24px_0px_rgba(25,32,56,0.1)] py-[8px] flex flex-col w-full max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                    <div className="bg-[var(--dash-surface)] rounded-[8px] border border-[var(--dash-border)] shadow-[0px_8px_24px_0px_rgba(25,32,56,0.1)] py-[8px] flex flex-col w-full max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                         {options.map((opt) => (
                             <div
                                 key={opt.value}
@@ -66,10 +66,10 @@ export function FilterDropdown({
                                     onChange(opt.value)
                                     setIsOpen(false)
                                 }}
-                                className={`flex items-center px-[12px] py-[8px] cursor-pointer transition-colors ${value === opt.value ? 'bg-[#0B1120]' : 'hover:bg-[#0B1120]'
+                                className={`flex items-center px-[12px] py-[8px] cursor-pointer transition-colors ${value === opt.value ? 'bg-[var(--dash-surface-hover)]' : 'hover:bg-[var(--dash-surface-hover)]'
                                     }`}
                             >
-                                <span className="text-[#FFFFFF] text-[14px] font-[400] leading-[1.5714285714285714em] truncate w-full">
+                                <span className="text-[var(--dash-text)] text-[14px] font-[400] leading-[1.5714285714285714em] truncate w-full">
                                     {opt.label}
                                 </span>
                             </div>

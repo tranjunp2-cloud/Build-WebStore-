@@ -312,6 +312,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
     }[state]
 
     return createPortal(
+        <div className="dash-shell">
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-[4px] animate-in fade-in duration-200">
             <div className="flex flex-col w-full max-w-[672px] max-h-[85vh] bg-[#1E293B] border border-white/10 rounded-2xl shadow-[0px_25px_50px_-12px_rgba(59,130,246,0.2)] overflow-hidden animate-in zoom-in-95 duration-200 antialiased" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
 
@@ -403,7 +404,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1.5">
                                                     <span className="text-sm font-semibold text-white truncate">{fix.name}</span>
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1E293B] text-[#9CA3AF] uppercase font-medium">{fix.collection}</span>
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded uppercase font-medium" style={{ background: 'var(--dash-secondary-bg)', color: 'var(--dash-text-muted)', border: '1px solid var(--dash-border)' }}>{fix.collection}</span>
                                                     {hasReplace && (
                                                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-medium">{seo.proposedLabel}</span>
                                                     )}
@@ -497,6 +498,7 @@ export function AIFixModal({ isOpen, onClose, siteId, missingSeoItems = [] }: AI
                     </button>
                 </div>
             </div>
+        </div>
         </div>,
         document.body
     )

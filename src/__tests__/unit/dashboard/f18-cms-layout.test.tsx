@@ -38,6 +38,11 @@ vi.mock('@/app/(dashboard)/actions', () => ({
     logoutAction: vi.fn(() => Promise.resolve({ success: true })),
 }))
 
+vi.mock('@/providers/theme-provider', () => ({
+    useTheme: () => ({ theme: 'dark', toggle: vi.fn() }),
+    ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
 // ── Imports ─────────────────────────────────────────────────────────────
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { TopHeader } from '@/components/dashboard/TopHeader'

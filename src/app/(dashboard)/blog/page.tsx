@@ -694,7 +694,7 @@ export default function BlogListPage() {
                             className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                             style={{
                                 maxWidth: 347,
-                                background: 'linear-gradient(135deg, rgba(30,41,59,1) 0%, rgba(28,38,56,1) 11%, rgba(26,35,53,1) 22%, rgba(23,33,50,1) 33%, rgba(21,30,47,1) 44%, rgba(19,27,44,1) 56%, rgba(17,25,41,1) 67%, rgba(15,22,38,1) 78%, rgba(13,20,35,1) 89%, rgba(11,17,32,1) 100%)',
+                                background: 'var(--dash-surface)',
                                 border: '1px solid rgba(59,130,246,0.3)',
                             }}
                         >
@@ -768,7 +768,7 @@ export default function BlogListPage() {
                             className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                             style={{
                                 maxWidth: 347,
-                                background: 'linear-gradient(135deg, rgba(30,41,59,1) 0%, rgba(28,38,56,1) 11%, rgba(26,35,53,1) 22%, rgba(23,33,50,1) 33%, rgba(21,30,47,1) 44%, rgba(19,27,44,1) 56%, rgba(17,25,41,1) 67%, rgba(15,22,38,1) 78%, rgba(13,20,35,1) 89%, rgba(11,17,32,1) 100%)',
+                                background: 'var(--dash-surface)',
                                 border: '1px solid rgba(59,130,246,0.3)',
                             }}
                         >

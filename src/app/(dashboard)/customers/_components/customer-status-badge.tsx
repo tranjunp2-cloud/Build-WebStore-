@@ -4,12 +4,12 @@ import type { CustomerStatus } from '../_lib/customer-record'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 
-const STATUS_VISUAL: Record<CustomerStatus, { bg: string; border: string; text: string }> = {
-    new:        { bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.3)',   text: '#fbbf24' },
-    contacted:  { bg: 'rgba(45,212,191,0.1)',   border: 'rgba(45,212,191,0.3)',   text: '#2dd4bf' },
-    ignored:    { bg: 'rgba(156,163,175,0.1)',  border: 'rgba(156,163,175,0.3)',  text: '#9ca3af' },
-    subscribed: { bg: 'rgba(167,139,250,0.1)',  border: 'rgba(167,139,250,0.3)',  text: '#a78bfa' },
-    read:       { bg: 'rgba(129,140,248,0.1)',  border: 'rgba(129,140,248,0.3)',  text: '#818cf8' },
+const STATUS_CLASSES: Record<CustomerStatus, string> = {
+    new:        'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400',
+    contacted:  'bg-teal-50 border-teal-200 text-teal-700 dark:bg-teal-500/10 dark:border-teal-500/30 dark:text-teal-400',
+    ignored:    'bg-zinc-100 border-zinc-200 text-zinc-600 dark:bg-zinc-500/10 dark:border-zinc-500/30 dark:text-zinc-400',
+    subscribed: 'bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-500/10 dark:border-violet-500/30 dark:text-violet-400',
+    read:       'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-500/10 dark:border-indigo-500/30 dark:text-indigo-400',
 }
 
 export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
@@ -23,13 +23,11 @@ export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
         new: c.tooltipNew, read: c.tooltipRead, contacted: c.tooltipContacted,
         ignored: c.tooltipIgnored, subscribed: c.tooltipSubscribed,
     }
-    const s = STATUS_VISUAL[status]
     return (
         <Tooltip>
             <TooltipTrigger asChild>
                 <span
-                    className="inline-flex items-center rounded-[24px] px-3 py-[5px] text-[14px] font-medium border cursor-default transition-all duration-150 hover:brightness-110 hover:scale-[1.03]"
-                    style={{ background: s.bg, borderColor: s.border, color: s.text }}
+                    className={`inline-flex items-center rounded-[24px] px-3 py-[5px] text-[14px] font-medium border cursor-default transition-all duration-150 hover:brightness-110 hover:scale-[1.03] ${STATUS_CLASSES[status]}`}
                 >
                     {labelMap[status]}
                 </span>

@@ -207,7 +207,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     {/* Figma: layout_M50WQK / layout_3KGU3X — row, center, gap 12, px-16, radius 16, h-44 */}
                     <button
                         onClick={() => toggleGroup(item.href)}
-                        className="flex w-full items-center gap-3 rounded-[16px] px-4 h-[44px] bg-transparent border-none outline-none text-[14px] font-medium leading-[1.43] text-[rgba(248,250,252,0.7)] hover:bg-white/5 hover:text-white transition-colors cursor-pointer"
+                        className="flex w-full items-center gap-3 rounded-[16px] px-4 h-[44px] bg-transparent border-none outline-none text-[14px] font-medium leading-[1.43] text-dash-text-muted hover:bg-dash-surface-hover hover:text-dash-text transition-colors cursor-pointer"
                         aria-expanded={isGroupExpanded}
                         aria-label={label}
                     >
@@ -244,7 +244,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                                             'no-underline flex items-center gap-[18px] rounded-[12px] px-4 h-[40px] text-[14px] font-medium leading-[1.43] transition-colors',
                                             childActive
                                                 ? 'text-[#3B82F6]'
-                                                : 'text-[rgba(248,250,252,0.6)] hover:text-white'
+                                                : 'text-dash-text-muted hover:text-dash-text'
                                         )}
                                     >
                                         {/* Figma: Dot bullet — 6x6 circle at x=16 y=17 */}
@@ -276,7 +276,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     'no-underline flex items-center gap-3 rounded-[16px] px-4 h-[44px] text-[14px] font-medium leading-[1.43] transition-colors',
                     isActive
                         ? 'bg-[rgba(59,130,246,0.1)] text-[#3B82F6] shadow-[0_0_20px_rgba(59,130,246,0.3)]'
-                        : 'text-[rgba(248,250,252,0.7)] hover:bg-white/5 hover:text-white'
+                        : 'text-dash-text-muted hover:bg-dash-surface-hover hover:text-dash-text'
                 )}
                 aria-current={isActive ? 'page' : undefined}
             >
@@ -307,15 +307,15 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
 
             {/* Figma: Footer — layout_L26FAP — column, gap 12px, padding 17px 12px 0, h=125, border-top */}
             <div
-                className="flex flex-col gap-3 px-3 pt-[17px] border-t border-white/[0.08]"
+                className="flex flex-col gap-3 px-3 pt-[17px] border-t border-dash-border"
                 style={{ height: 125 }}
             >
                 {/* Figma: Language row — layout_6MREP8 — row, center, self-stretch, gap 8px */}
                 <div className="flex items-center gap-2">
-                    {/* Figma: Globe Icon 16x16, stroke rgba(248,250,252,0.5) */}
-                    <Globe className="h-4 w-4 shrink-0 text-[rgba(248,250,252,0.5)]" />
-                    {/* Figma: Pill — layout_38LVFC — bg #1E293B, border rgba(255,255,255,0.08), radius 16, px 4px, h=38 */}
-                    <div className="flex flex-1 items-center rounded-[16px] border border-white/[0.08] bg-[#1E293B] px-1 h-[38px]">
+                    {/* Figma: Globe Icon 16x16 */}
+                    <Globe className="h-4 w-4 shrink-0 text-dash-text-muted" />
+                    {/* Figma: Pill — language switcher */}
+                    <div className="flex flex-1 items-center rounded-[16px] border border-dash-border bg-dash-surface px-1 h-[38px]">
                         {/* Figma: MY button — layout_CR9BUZ — padding 6px 12px, radius 12, h=28 */}
                         <button
                             onClick={() => locale !== 'ms' && toggleLocale()}
@@ -323,7 +323,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                                 'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
                                 locale === 'ms'
                                     ? '!bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
-                                    : 'text-[rgba(248,250,252,0.6)] hover:text-white'
+                                    : 'text-dash-text-muted hover:text-dash-text'
                             )}
                         >
                             MY
@@ -335,7 +335,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                                 'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
                                 locale === 'en'
                                     ? '!bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
-                                    : 'text-[rgba(248,250,252,0.6)] hover:text-white'
+                                    : 'text-dash-text-muted hover:text-dash-text'
                             )}
                         >
                             EN
@@ -360,7 +360,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                             window.location.href = '/login'
                         }
                     }}
-                    className="flex items-center gap-3 rounded-[16px] border border-white/[0.08] bg-transparent outline-none pl-4 h-[44px] text-[14px] font-medium text-[#F8FAFC] hover:bg-white/5 cursor-pointer transition-colors"
+                    className="flex items-center gap-3 rounded-[16px] border border-dash-border bg-transparent outline-none pl-4 h-[44px] text-[14px] font-medium text-dash-text hover:bg-dash-surface-hover cursor-pointer transition-colors"
                 >
                     {/* Figma: Icon 16x16 */}
                     <LogOut className="h-4 w-4 shrink-0" />
@@ -382,14 +382,14 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                         onClick={() => setMobileOpen(false)}
                     />
                     {/* Sidebar drawer — same width 260px, below header */}
-                    <aside className="absolute left-0 top-[56px] bottom-0 z-10 flex w-[260px] flex-col border-r border-white/[0.08] bg-[#0B1120] shadow-2xl animate-in slide-in-from-left duration-200">
+                    <aside className="absolute left-0 top-[56px] bottom-0 z-10 flex w-[260px] flex-col border-r border-dash-border bg-dash-bg shadow-2xl animate-in slide-in-from-left duration-200">
                         {sidebarContent}
                     </aside>
                 </div>
             )}
 
-            {/* Figma: Desktop sidebar — 260px, bg #0B1120, border-right rgba(255,255,255,0.08) */}
-            <aside className="fixed left-0 top-[56px] z-40 hidden md:flex h-[calc(100vh-56px)] w-[260px] flex-col border-r border-white/[0.08] bg-[#0B1120]">
+            {/* Figma: Desktop sidebar — 260px, border-right */}
+            <aside className="fixed left-0 top-[56px] z-40 hidden md:flex h-[calc(100vh-56px)] w-[260px] flex-col border-r border-dash-border bg-dash-bg">
                 {sidebarContent}
             </aside>
         </>

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { cookies } from 'next/headers'
 
 export const metadata: Metadata = {
     title: {
@@ -43,28 +44,36 @@ export const viewport: Viewport = {
  * Payload CMS admin has its own RootLayout that adds data-theme
  * and other attributes. suppressHydrationWarning prevents conflicts.
  */
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
+    const cookieStore = await cookies()
+    const themeCookie = cookieStore.get('theme')?.value
+    // Default dark for backward compat — existing users see no change
+    const initialClass = themeCookie === 'light' ? '' : 'dark'
+
     return (
-        <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+        <html lang="en" className={initialClass} suppressHydrationWarning data-scroll-behavior="smooth">
             <head>
                 {/*
-                  * FOUC prevention for Studio admin — reads localStorage before
-                  * first paint to pre-apply theme/density/accent to <html>.
-                  * Must be inline (not async/deferred) so it runs before body renders.
-                  * Only active when visiting /studio/* routes.
+                  * FOUC prevention — reads localStorage before first paint.
+                  * `theme` key: dashboard light/dark (priority).
+                  * `pw_theme` key: studio admin theme fallback.
+                  * Handles both add (dark) and remove (explicit light) to prevent
+                  * cross-route class leakage between studio and dashboard.
                   */}
                 <script
                     dangerouslySetInnerHTML={{
                         __html: `(function(){try{
-var t=localStorage.getItem('pw_theme');
+var t=localStorage.getItem('theme');
+var pw=localStorage.getItem('pw_theme');
 var d=localStorage.getItem('pw_density');
 var a=localStorage.getItem('pw_accent');
 var el=document.documentElement;
-if(t==='dark'){el.classList.add('dark');}
+if(t==='dark'||(t==null&&pw==='dark')){el.classList.add('dark');}
+else if(t==='light'){el.classList.remove('dark');}
 if(d&&d!=='default'){el.dataset.density=d;}
 if(a&&a!=='blue'){el.dataset.accent=a;}
 }catch(e){}})();`,
