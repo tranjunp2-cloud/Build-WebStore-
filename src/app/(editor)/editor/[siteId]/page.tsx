@@ -174,10 +174,11 @@ export default function EditorPage() {
 
     const currentBlock = useMemo(() => {
         if (selectedBlock === null) return null
-        if (selectedBlock === -1) {
+        // All floating global blocks use negative indices (cartWidget=-1, whatsapp-button=-2, socialWidget=-3)
+        if (selectedBlock < 0) {
             const key = selectedGlobalBlockType ? BLOCK_TYPE_TO_KEY[selectedGlobalBlockType] : undefined
             const data = key ? globalBlocks?.[key] : null
-            return data ? { ...data, __editorBlockIndex: -1 } : null
+            return data ? { ...data, __editorBlockIndex: selectedBlock } : null
         }
         return blocks[selectedBlock] || null
     }, [blocks, selectedBlock, selectedGlobalBlockType, globalBlocks])
@@ -1209,7 +1210,8 @@ export default function EditorPage() {
             setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: blockType ? sectionMap[blockType] : undefined })
         } else {
             setSelectedBlock(blockIndex)
-            setSelectedGlobalBlockType(blockIndex === -1 ? (blockType ?? null) : null)
+            // All floating global blocks have negative blockIndex (cartWidget=-1, whatsapp-button=-2, socialWidget=-3)
+            setSelectedGlobalBlockType(blockIndex !== null && blockIndex < 0 ? (blockType ?? null) : null)
             setSettingsRequestedTab(null)
         }
     }, [])

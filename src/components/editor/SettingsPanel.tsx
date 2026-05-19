@@ -1209,12 +1209,13 @@ function SettingsPanelInner({
     const bt = block?.blockType
     const currentBlockIndex = blockIndex ?? 0
 
-    // Global block routing — when __editorBlockIndex === -1 the block is sourced from
-    // site.globalBlocks. Reads go to the live store entry; writes route to updateGlobalBlock.
+    // Global block routing — floating blocks use negative __editorBlockIndex
+    // (cartWidget=-1, whatsapp-button=-2, socialWidget=-3). Reads go to the live store
+    // entry; writes route to updateGlobalBlock.
     const storeGlobalBlocks = useEditorStore(state => state.globalBlocks)
     const storeUpdateGlobalBlock = useEditorStore(state => state.updateGlobalBlock)
 
-    const isGlobal = block?.__editorBlockIndex === -1
+    const isGlobal = block?.__editorBlockIndex !== undefined && (block.__editorBlockIndex as number) < 0
     const globalKey = bt ? BLOCK_TYPE_TO_KEY[bt] : undefined
     const effectiveBlock = (isGlobal && globalKey
         ? (storeGlobalBlocks?.[globalKey] ?? block)

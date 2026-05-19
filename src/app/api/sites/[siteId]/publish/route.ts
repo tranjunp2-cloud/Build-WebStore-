@@ -256,12 +256,11 @@ export async function PATCH(
             publishedAt: new Date().toISOString(),
         }
 
-        // Determine which fields need DB fallback (any field not in body)
-        const needsDbFallback = !hasBodyGlobalBlocks || !hasBodyHeaderBlock || !hasBodyFooterBlock
-        const siteForPublish = needsDbFallback
-            ? await payload.findByID({ collection: 'sites', id: siteId })
+        // Reuse `existing` (fetched above for site-existence check) as the pending-fields source.
+        // Avoids a redundant findByID round-trip and closes a tiny TOCTOU window.
+        const sitePending = (!hasBodyGlobalBlocks || !hasBodyHeaderBlock || !hasBodyFooterBlock)
+            ? (existing as Record<string, unknown>)
             : null
-        const sitePending = siteForPublish as Record<string, unknown> | null
 
         if (hasBodyGlobalBlocks) {
             publishData.globalBlocks = bodyGlobalBlocks
