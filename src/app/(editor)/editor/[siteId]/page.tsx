@@ -938,16 +938,15 @@ export default function EditorPage() {
                 return
             }
 
-            // Send current store globalBlocks so publish route uses authoritative client
-            // state rather than relying on pendingGlobalBlocks DB read (unreliable if
-            // migration is missing or write was dropped by Drizzle silently).
-            const globalBlocksSnapshot = useEditorStore.getState().globalBlocks
+            // Send current store state so publish route uses authoritative client values
+            // rather than relying on pending DB reads (unreliable if migration missing).
+            const { globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap } = useEditorStore.getState()
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: currentlyPublished ? 'DELETE' : 'PATCH',
                 credentials: 'include',
                 ...(currentlyPublished ? {} : {
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ globalBlocks: globalBlocksSnapshot }),
+                    body: JSON.stringify({ globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap }),
                 }),
             })
 
@@ -1052,13 +1051,13 @@ export default function EditorPage() {
                 return
             }
 
-            // Send current store globalBlocks — same pattern as handlePublish
-            const globalBlocksSnapshot = useEditorStore.getState().globalBlocks
+            // Send current store state — same pattern as handlePublish
+            const { globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap } = useEditorStore.getState()
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: 'PATCH',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ globalBlocks: globalBlocksSnapshot }),
+                body: JSON.stringify({ globalBlocks: globalBlocksSnap, headerBlock: headerBlockSnap, footerBlock: footerBlockSnap }),
             })
 
             if (!res.ok) {

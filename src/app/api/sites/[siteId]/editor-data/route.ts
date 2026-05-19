@@ -118,8 +118,9 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 socialLinks: site.socialLinks || {},
                 branding: site.branding || {},
                 seo: site.seo || {},
-                headerBlock: site.headerBlock || null,
-                footerBlock: site.footerBlock || null,
+                // Editor loads pending draft state when available; falls back to published.
+                headerBlock: (site.pendingHeaderBlock as typeof site.headerBlock) || site.headerBlock || null,
+                footerBlock: (site.pendingFooterBlock as typeof site.footerBlock) || site.footerBlock || null,
                 // Editor loads pending draft state when available; falls back to published.
                 globalBlocks: (site.pendingGlobalBlocks as typeof site.globalBlocks) || site.globalBlocks || null,
                 shippingConfig: site.shippingConfig || {},

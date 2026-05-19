@@ -45,16 +45,22 @@ export async function PATCH(
         const payload = await getPayload({ config })
         const { siteId } = await params
 
-        // Parse optional globalBlocks from request body.
+        // Parse optional pending fields from request body.
         // Client sends authoritative state (post-flush) so publish uses it directly,
-        // bypassing the pendingGlobalBlocks DB read which can fail if migration is missing.
+        // bypassing pendingXxx DB reads which can silently return undefined if migration
+        // is not yet applied on this environment.
         let bodyGlobalBlocks: unknown = undefined
         let hasBodyGlobalBlocks = false
+        let bodyHeaderBlock: unknown = undefined
+        let hasBodyHeaderBlock = false
+        let bodyFooterBlock: unknown = undefined
+        let hasBodyFooterBlock = false
         try {
             const body = await req.json() as Record<string, unknown>
-            if (body && typeof body === 'object' && 'globalBlocks' in body) {
-                bodyGlobalBlocks = body.globalBlocks
-                hasBodyGlobalBlocks = true
+            if (body && typeof body === 'object') {
+                if ('globalBlocks' in body) { bodyGlobalBlocks = body.globalBlocks; hasBodyGlobalBlocks = true }
+                if ('headerBlock' in body) { bodyHeaderBlock = body.headerBlock; hasBodyHeaderBlock = true }
+                if ('footerBlock' in body) { bodyFooterBlock = body.footerBlock; hasBodyFooterBlock = true }
             }
         } catch {
             // Body not present or not JSON — proceed with DB fallback
@@ -243,23 +249,50 @@ export async function PATCH(
         }
 
         // Publish the site AFTER all pages promoted successfully.
-        // Promote globalBlocks from client body (primary — client sends authoritative
-        // post-flush state) or from pendingGlobalBlocks in DB (fallback for older clients).
+        // Promote header/footer/globalBlocks from client body (primary — authoritative
+        // post-flush state) or from pending DB fields (fallback for older clients).
         const publishData: Record<string, unknown> = {
             status: 'published',
             publishedAt: new Date().toISOString(),
         }
+
+        // Determine which fields need DB fallback (any field not in body)
+        const needsDbFallback = !hasBodyGlobalBlocks || !hasBodyHeaderBlock || !hasBodyFooterBlock
+        const siteForPublish = needsDbFallback
+            ? await payload.findByID({ collection: 'sites', id: siteId })
+            : null
+        const sitePending = siteForPublish as Record<string, unknown> | null
+
         if (hasBodyGlobalBlocks) {
-            // Client sent authoritative state — write directly, clear pending
             publishData.globalBlocks = bodyGlobalBlocks
             publishData.pendingGlobalBlocks = null
         } else {
-            // Fallback: promote pendingGlobalBlocks from DB
-            const siteForPublish = await payload.findByID({ collection: 'sites', id: siteId })
-            const pendingGb = (siteForPublish as Record<string, unknown>).pendingGlobalBlocks
+            const pendingGb = sitePending?.pendingGlobalBlocks
             if (pendingGb !== undefined && pendingGb !== null) {
                 publishData.globalBlocks = pendingGb
                 publishData.pendingGlobalBlocks = null
+            }
+        }
+
+        if (hasBodyHeaderBlock) {
+            publishData.headerBlock = bodyHeaderBlock
+            publishData.pendingHeaderBlock = null
+        } else {
+            const pendingHb = sitePending?.pendingHeaderBlock
+            if (pendingHb !== undefined && pendingHb !== null) {
+                publishData.headerBlock = pendingHb
+                publishData.pendingHeaderBlock = null
+            }
+        }
+
+        if (hasBodyFooterBlock) {
+            publishData.footerBlock = bodyFooterBlock
+            publishData.pendingFooterBlock = null
+        } else {
+            const pendingFb = sitePending?.pendingFooterBlock
+            if (pendingFb !== undefined && pendingFb !== null) {
+                publishData.footerBlock = pendingFb
+                publishData.pendingFooterBlock = null
             }
         }
 

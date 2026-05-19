@@ -207,6 +207,14 @@ const MIGRATIONS = [
     name: 'sites.pending_global_blocks',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_global_blocks jsonb;`,
   },
+  {
+    name: 'sites.pending_header_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_header_block jsonb;`,
+  },
+  {
+    name: 'sites.pending_footer_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS pending_footer_block jsonb;`,
+  },
   // ── Sites: Branding + Contact Info ──
   { name: 'sites.branding', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding varchar;' },
   { name: 'sites.contact_info', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info varchar;' },

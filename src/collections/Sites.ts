@@ -402,12 +402,22 @@ export const Sites: CollectionConfig = {
         {
             name: 'headerBlock',
             type: 'json',
-            admin: { description: 'Global header/navigation block for all pages' },
+            admin: { description: 'Global header/navigation block — published/live version' },
+        },
+        {
+            name: 'pendingHeaderBlock',
+            type: 'json',
+            admin: { description: 'Draft header block — promoted to headerBlock on publish. null = no pending changes.' },
         },
         {
             name: 'footerBlock',
             type: 'json',
-            admin: { description: 'Global footer block for all pages' },
+            admin: { description: 'Global footer block — published/live version' },
+        },
+        {
+            name: 'pendingFooterBlock',
+            type: 'json',
+            admin: { description: 'Draft footer block — promoted to footerBlock on publish. null = no pending changes.' },
         },
         {
             name: 'globalBlocks',
