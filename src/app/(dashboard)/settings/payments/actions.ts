@@ -1,20 +1,26 @@
 "use server";
 
-import { getPayloadHMR } from '@payloadcms/next/utilities';
-import configPromise from '@payload-config';
+import { getPayload } from 'payload';
+import config from '@payload-config';
 import { getCurrentTenantId } from '@/lib/auth';
+// import { deauthorizeStripeAccount } from '@/lib/payment/stripe'; // STRIPE_CONNECT_DISABLED
 
 export type PaymentUpdates = {
     payment_cod?: boolean;
     payment_qr?: boolean;
     qr_image?: string | number | null;
+    payment_card?: boolean;
+    payment_fpx?: boolean;
+    account_holder_name?: string | null;
+    bank_name?: string | null;
+    account_number?: string | null;
 };
 
 export async function getPaymentSettings() {
     try {
-        const payload = await getPayloadHMR({ config: configPromise });
+        const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();
-        
+
         if (!tenantId) {
             return { success: false, error: 'Unauthorized: No tenant found for current session.' };
         }
@@ -33,46 +39,90 @@ export async function getPaymentSettings() {
 
 export async function updatePaymentSettings(updates: PaymentUpdates) {
     try {
-        const payload = await getPayloadHMR({ config: configPromise });
+        const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();
-        
+
         if (!tenantId) {
             return { success: false, error: 'Unauthorized: No tenant found for current session.' };
         }
 
-        // Whitelist safe fields before saving
-        const cleanUpdates: PaymentUpdates = {};
-        
+        // Whitelist and validate fields, then send nested under payments group
+        const paymentsData: Record<string, any> = {}
+
         if (updates.payment_cod !== undefined) {
             if (typeof updates.payment_cod === 'boolean') {
-                cleanUpdates.payment_cod = updates.payment_cod;
+                paymentsData.payment_cod = updates.payment_cod;
             } else {
                 return { success: false, error: 'Invalid type for payment_cod. Expected boolean.' };
             }
         }
-        
+
         if (updates.payment_qr !== undefined) {
             if (typeof updates.payment_qr === 'boolean') {
-                cleanUpdates.payment_qr = updates.payment_qr;
+                paymentsData.payment_qr = updates.payment_qr;
             } else {
                 return { success: false, error: 'Invalid type for payment_qr. Expected boolean.' };
             }
         }
-        
+
         if (updates.qr_image !== undefined) {
-            cleanUpdates.qr_image = updates.qr_image;
+            paymentsData.qr_image = updates.qr_image;
         }
 
-        if (Object.keys(cleanUpdates).length === 0) {
+        if (updates.payment_card !== undefined) {
+            if (typeof updates.payment_card === 'boolean') {
+                paymentsData.payment_card = updates.payment_card;
+            } else {
+                return { success: false, error: 'Invalid type for payment_card. Expected boolean.' };
+            }
+        }
+
+        if (updates.payment_fpx !== undefined) {
+            if (typeof updates.payment_fpx === 'boolean') {
+                paymentsData.payment_fpx = updates.payment_fpx;
+            } else {
+                return { success: false, error: 'Invalid type for payment_fpx. Expected boolean.' };
+            }
+        }
+
+        if (updates.account_holder_name !== undefined) {
+            if (updates.account_holder_name === null) {
+                paymentsData.account_holder_name = null;
+            } else if (typeof updates.account_holder_name === 'string' && updates.account_holder_name.length <= 150) {
+                paymentsData.account_holder_name = updates.account_holder_name;
+            } else {
+                return { success: false, error: 'Invalid account_holder_name: must be string, max 150 chars.' };
+            }
+        }
+
+        if (updates.bank_name !== undefined) {
+            if (updates.bank_name === null) {
+                paymentsData.bank_name = null;
+            } else if (typeof updates.bank_name === 'string' && updates.bank_name.length <= 100) {
+                paymentsData.bank_name = updates.bank_name;
+            } else {
+                return { success: false, error: 'Invalid bank_name: must be string, max 100 chars.' };
+            }
+        }
+
+        if (updates.account_number !== undefined) {
+            if (updates.account_number === null) {
+                paymentsData.account_number = null;
+            } else if (typeof updates.account_number === 'string' && updates.account_number.length <= 50) {
+                paymentsData.account_number = updates.account_number;
+            } else {
+                return { success: false, error: 'Invalid account_number: must be string, max 50 chars.' };
+            }
+        }
+
+        if (Object.keys(paymentsData).length === 0) {
             return { success: false, error: 'No valid payment fields provided' };
         }
 
         await payload.update({
             collection: 'tenants',
             id: tenantId,
-            data: {
-                payments: cleanUpdates,
-            },
+            data: { payments: paymentsData } as any,
         });
 
         return { success: true };
@@ -84,9 +134,9 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
 export async function uploadQrMedia(formData: FormData) {
     try {
-        const payload = await getPayloadHMR({ config: configPromise });
+        const payload = await getPayload({ config });
         const tenantId = await getCurrentTenantId();
-        
+
         if (!tenantId) {
             return { success: false, error: 'Unauthorized: No tenant session found.' };
         }
@@ -125,3 +175,43 @@ export async function uploadQrMedia(formData: FormData) {
         return { success: false, error: 'Internal server error' };
     }
 }
+
+export async function disconnectStripe() {
+    try {
+        const payload = await getPayload({ config });
+        const tenantId = await getCurrentTenantId();
+
+        if (!tenantId) {
+            return { success: false, error: 'Unauthorized' };
+        }
+
+        /* STRIPE_CONNECT_DISABLED — deauthorize call temporarily disabled
+        const tenant = await payload.findByID({ collection: 'tenants', id: tenantId });
+        const currentAccountId = (tenant as any)?.stripeAccountId as string | null | undefined;
+
+        if (currentAccountId) {
+            try {
+                await deauthorizeStripeAccount(currentAccountId);
+            } catch (deauthErr) {
+                console.warn('[disconnectStripe] deauthorize failed (continuing with DB cleanup):', deauthErr);
+            }
+        }
+        */
+
+        await payload.update({
+            collection: 'tenants',
+            id: tenantId,
+            data: {
+                stripeAccountId: null,
+                stripeOnboardingComplete: false,
+                payments: { payment_card: false, payment_fpx: false },
+            } as any,
+        });
+
+        return { success: true };
+    } catch (error: unknown) {
+        console.error('Disconnect Stripe error:', error);
+        return { success: false, error: 'Internal server error' };
+    }
+}
+

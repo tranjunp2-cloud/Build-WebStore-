@@ -23,6 +23,9 @@ type InitialSiteData = {
     bankAccountNo: string | null
     bankAccountHolder: string | null
     shippingConfig: ShippingConfig | null
+    cardEnabled: boolean
+    fpxEnabled: boolean
+    stripeEnabled: boolean
 }
 
 export default async function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -59,6 +62,13 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
         }
 
         if (tenant) {
+            const tenantFull = await payload.findByID({
+                collection: 'tenants',
+                id: tenant.id,
+                depth: 0,
+                overrideAccess: true,
+            })
+
             const siteResult = await payload.find({
                 collection: 'sites',
                 where: { tenant: { equals: tenant.id } },
@@ -89,6 +99,16 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
 
                 const paymentConfig = (site as any).paymentConfig
                 const merchantQrCode = paymentConfig?.merchantQrCode
+                const tenantPayments = (tenantFull as any)?.payments ?? {}
+
+                // Layer 1 — tenant master flags (default false: must be explicitly enabled)
+                const tenantCardEnabled = tenantPayments.payment_card === true
+                const tenantFpxEnabled = tenantPayments.payment_fpx === true
+
+                // Layer 2 — site-level guard (default true: permissive opt-out)
+                const siteCardEnabled = paymentConfig?.cardEnabled !== false
+                const siteFpxEnabled = paymentConfig?.fpxEnabled !== false
+
                 initialSiteData = {
                     siteId: String(site.id),
                     tenantId: String(tenant.id),
@@ -101,6 +121,9 @@ export default async function CheckoutPage({ params }: { params: Promise<{ slug:
                     bankAccountNo: paymentConfig?.bankAccountNo ?? null,
                     bankAccountHolder: paymentConfig?.bankAccountHolder ?? null,
                     shippingConfig: (site as any).shippingConfig ?? null,
+                    cardEnabled: tenantCardEnabled && siteCardEnabled,
+                    fpxEnabled: tenantFpxEnabled && siteFpxEnabled,
+                    stripeEnabled: (tenantFull as any)?.stripeOnboardingComplete === true,
                 }
             }
         }

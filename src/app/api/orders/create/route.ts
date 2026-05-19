@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
+import { randomBytes } from 'crypto'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
+import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 
 /**
  * POST /api/orders/create
@@ -41,6 +43,14 @@ export const POST = withAuth(async (_user, request) => {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Tenant not found' } },
                 { status: 404 }
+            )
+        }
+
+        // TC-F13.88: suspended or banned tenant cannot accept payments
+        if ((tenant as any).status === 'suspended' || (tenant as any).bannedAt) {
+            return NextResponse.json(
+                { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
+                { status: 403 },
             )
         }
 
@@ -97,13 +107,60 @@ export const POST = withAuth(async (_user, request) => {
         }
 
         // Generate order number
-        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
+        const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`
 
         // Tax (SST 6% for Malaysia)
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + tax
 
-        // Create order in PENDING status (will be updated to 'paid' by webhook)
+        // Resolve payment method types BEFORE creating the order to avoid orphan pending orders
+        // Layer 1: tenant master gate
+        let types = buildPaymentMethodTypes(tenant as any)
+        if (types.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'NO_PAYMENT_METHODS', message: 'Seller has not enabled Card or FPX' } },
+                { status: 422 },
+            )
+        }
+
+        // Layer 2: site-level guard
+        const paymentConfig = (site as any).paymentConfig ?? {}
+        if (paymentConfig.cardEnabled === false) types = types.filter(t => t !== 'card')
+        if (paymentConfig.fpxEnabled === false) types = types.filter(t => t !== 'fpx')
+        if (types.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'METHOD_DISABLED', message: 'No payment method is enabled for this site' } },
+                { status: 422 },
+            )
+        }
+
+        // TC-F13.103: free order (coupon 100% off) — skip Stripe, mark paid immediately
+        if (total <= 0) {
+            const freeOrder = await payload.create({
+                collection: 'orders',
+                data: {
+                    tenant: tenantId,
+                    site: siteId,
+                    orderNumber,
+                    items: orderItems,
+                    subtotal,
+                    tax,
+                    total: 0,
+                    currency,
+                    status: 'paid',
+                    paymentMethod: 'free',
+                    customerEmail: customer.email,
+                    customerName: customer.name,
+                    customerPhone: customer.phone || '',
+                } as any,
+            })
+            return NextResponse.json({
+                success: true,
+                data: { orderId: freeOrder.id, orderNumber, total: 0, currency, status: 'paid', checkoutUrl: null },
+            })
+        }
+
+        // Create order in PENDING status (will be updated to 'new' by webhook)
         const order = await payload.create({
             collection: 'orders',
             data: {
@@ -142,6 +199,7 @@ export const POST = withAuth(async (_user, request) => {
             successUrl: `${baseUrl}/sites/${siteSlug}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
             cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout/cancel`,
             stripeAccountId,
+            paymentMethodTypes: types,
             metadata: {
                 siteId: String(siteId),
                 tenantId: String(tenantId),

@@ -27,9 +27,9 @@ export const GET = withAuth(async (user, request) => {
 
         // Verify user owns this tenant
         const userTenantIds = ((user as any).tenants || []).map((t: any) =>
-            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+            String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
         )
-        if (!userTenantIds.includes(tenantId)) {
+        if (!userTenantIds.includes(String(tenantId))) {
             return NextResponse.json(
                 { success: false, error: { code: 'FORBIDDEN', message: 'You do not own this tenant' } },
                 { status: 403 },
@@ -70,7 +70,7 @@ export const GET = withAuth(async (user, request) => {
                 chargesEnabled: status.chargesEnabled,
                 payoutsEnabled: status.payoutsEnabled,
                 detailsSubmitted: status.detailsSubmitted,
-                onboardingComplete: status.chargesEnabled && status.payoutsEnabled && status.detailsSubmitted,
+                onboardingComplete: status.chargesEnabled && status.detailsSubmitted,
             },
         })
     } catch (error: any) {

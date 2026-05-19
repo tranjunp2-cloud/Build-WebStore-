@@ -27,6 +27,8 @@ export type NormalizedBlock = {
     editableFields: string[]
     aiVisible: boolean
     isSystem: boolean
+    scope: 'global' | 'page'
+    scopeTooltip?: string
 }
 
 // Vietnamese name map (curated for common blocks; others fall back to English)
@@ -121,6 +123,7 @@ export function listAllBlocks(): NormalizedBlock[] {
                 editableFields: [],
                 aiVisible: true,
                 isSystem: false,
+                scope: 'page' as const,
             }
         }
         return {
@@ -135,6 +138,8 @@ export function listAllBlocks(): NormalizedBlock[] {
             editableFields: meta.editableFields,
             aiVisible: meta.aiVisible ?? true,
             isSystem: meta.isSystem ?? false,
+            scope: meta.scope ?? 'page',
+            scopeTooltip: meta.scopeTooltip,
         }
     })
     return _cached

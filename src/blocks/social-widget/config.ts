@@ -12,7 +12,7 @@ export type SocialLinkItem = {
 
 export type SocialWidgetConfig = {
     blockType: 'socialWidget'
-    variant?: 'floating' | 'inline'
+    variant?: 'floating'
     headline?: string
     links: SocialLinkItem[]
 }
@@ -54,7 +54,7 @@ export function normalizeSocialWidgetConfig<T extends Record<string, unknown>>(b
 
 export const SocialWidgetConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('socialWidget'),
-    variant: z.enum(['floating', 'inline']).default('floating'),
+    variant: z.enum(['floating']).default('floating'),
     headline: z.string().optional(),
     links: z.array(
         z.object({
@@ -68,13 +68,15 @@ export const SocialWidgetConfigSchema = BaseBlockSchema.extend({
 export const socialWidgetMeta = {
     type: 'socialWidget' as const,
     name: 'Social Media',
-    description: 'Floating or inline social contact buttons',
+    description: 'Floating social contact buttons',
     icon: '💬',
-    variants: ['floating', 'inline'],
+    variants: ['floating'],
     defaultVariant: 'floating',
     editableFields: ['headline', 'links'],
     quickActions: ['Add social link', 'Update platform URLs'],
     category: 'widgets' as const,
+    scope: 'global' as const,
+    scopeTooltip: 'Các biểu tượng mạng xã hội sẽ xuất hiện đồng bộ xuyên suốt toàn bộ website giúp tăng khả năng kết nối.',
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

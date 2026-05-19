@@ -10,6 +10,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
 import { stripOrphanMediaRefs, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
 import { buildEnumSets } from '@/lib/theme/enums'
+import { mergeGlobalBlocks } from '@/lib/sites/merge-global-blocks'
 
 
 /** Only persist theme fields defined in the Sites collection schema.
@@ -90,7 +91,7 @@ export async function PATCH(
         const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
-        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
         // Navigation: allow draft links (empty/#) but reject malformed external URLs
         if (headerBlock && typeof headerBlock === 'object') {
             const hb = headerBlock as Record<string, unknown>
@@ -113,8 +114,9 @@ export async function PATCH(
             name: unknown;
             locale: "en" | "ms";
             shippingConfig: unknown;
-            headerBlock: unknown;
-            footerBlock: unknown;
+            pendingHeaderBlock: unknown;
+            pendingFooterBlock: unknown;
+            pendingGlobalBlocks: unknown;
             contactInfo: unknown;
             socialLinks: unknown;
             branding: unknown;
@@ -125,8 +127,20 @@ export async function PATCH(
         if (siteName) siteUpdateData.name = siteName as string
         if (locale) siteUpdateData.locale = locale
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
-        if (headerBlock !== undefined) siteUpdateData.headerBlock = headerBlock
-        if (footerBlock !== undefined) siteUpdateData.footerBlock = footerBlock
+        // Draft saves write to pending fields — only promoted to live on publish.
+        // Prevents in-progress header/footer edits from immediately affecting the live storefront.
+        if (headerBlock !== undefined) siteUpdateData.pendingHeaderBlock = headerBlock
+        if (footerBlock !== undefined) siteUpdateData.pendingFooterBlock = footerBlock
+        if (globalBlocks !== undefined) {
+            // Draft saves write to pendingGlobalBlocks — only promoted to globalBlocks on publish.
+            // This prevents in-progress edits from immediately affecting the live storefront.
+            const existingPending = existingSite.pendingGlobalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks
+            const existingLive = existingSite.globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks
+            siteUpdateData.pendingGlobalBlocks = mergeGlobalBlocks(
+                existingPending ?? existingLive,
+                globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks,
+            )
+        }
         if (contactInfo) siteUpdateData.contactInfo = contactInfo
         if (socialLinks) siteUpdateData.socialLinks = socialLinks
         if (branding) siteUpdateData.branding = branding

@@ -63,7 +63,7 @@ type SocialLinkAnchorProps = {
     extraClassName?: string
 }
 
-/** Shared anchor for both inline + floating variants. Meets TOUCH_TARGET.min. */
+/** Social platform link anchor. Meets TOUCH_TARGET.min. */
 function SocialLinkAnchor({ platform, url, showLabelAlways = false, extraClassName = '' }: SocialLinkAnchorProps) {
     const meta = PLATFORM_META[platform]
     const style = getPlatformStyles(platform)
@@ -99,31 +99,6 @@ export function SocialWidgetBlock({ block, site }: BlockProps<SocialWidgetConfig
     }
     const inContainer = useInFloatingContainer()
 
-    // ── Inline variant ───────────────────────────────────────────────────
-    if (block.variant === 'inline') {
-        return (
-            <section className="py-10">
-                <div data-no-text-edit className={SW_CONTAINER}>
-                    {normalizedBlock.headline ? (
-                        <Caption data-text-editable className="mb-3 block font-medium text-slate-400">{normalizedBlock.headline}</Caption>
-                    ) : null}
-                    <div data-no-text-edit className="flex flex-wrap gap-3">
-                        {links.map(item => (
-                            <SocialLinkAnchor
-                                key={item.platform}
-                                platform={item.platform}
-                                url={item.url}
-                                showLabelAlways
-                                extraClassName="shadow-[0_14px_32px_rgba(15,23,42,0.12)]"
-                            />
-                        ))}
-                    </div>
-                </div>
-            </section>
-        )
-    }
-
-    // ── Default: floating variant ────────────────────────────────────────
     return (
         <section className={inContainer ? '' : 'fixed bottom-6 right-6 z-40'}>
             <div data-no-text-edit className="flex flex-col items-end gap-3">

@@ -1,25 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
-import { CreditCard, Banknote, Upload, UploadCloud, X, Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
+import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, type PaymentUpdates } from './actions';
+import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, type PaymentUpdates } from './actions';
 import { useI18n } from '@/i18n';
+import { StripeConnectBlock } from './StripeConnectBlock';
+import { StripeConnectedBar } from './StripeConnectedBar';
+import { PaymentMethodCard } from './PaymentMethodCard';
 
-type Media = {
-    id: string | number;
-    url?: string;
-    thumbnailURL?: string;
-};
+type Media = { id: string | number; url?: string; thumbnailURL?: string };
 
 function getImageUrl(image: Media | string | null): string | null {
     if (!image || typeof image === 'string') return null;
     let url = image.url || image.thumbnailURL || null;
     if (!url) return null;
-
-    // Fix existing broken local URLs directly to S3 because MinIO stores them
     if (url.includes('/api/media/file/') || url.includes('minio:') || url.includes('localhost:9000')) {
         if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
             const filename = url.split('/').pop();
@@ -27,13 +24,10 @@ function getImageUrl(image: Media | string | null): string | null {
             url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`;
         }
     }
-
-    // CRITICAL: NextJS image optimization crashes if 'minio' is missing from next.config.ts after a cache clear.
-    // Browser also cannot resolve 'minio' natively. Map to localhost safely, specifically for Local Dev.
+    // minio hostname is not browser-resolvable; map to localhost for local dev
     if (process.env.NODE_ENV === 'development' && url.includes('minio:')) {
         url = url.replace(/minio:\d+/, 'localhost:9000');
     }
-
     return url;
 }
 
@@ -41,426 +35,579 @@ function isLocalOrBlob(urlStr: string | null): boolean {
     if (!urlStr) return false;
     if (urlStr.startsWith('blob:')) return true;
     try {
-        const url = new URL(urlStr);
-        return process.env.NODE_ENV === 'development' && ['localhost', '127.0.0.1'].includes(url.hostname);
-    } catch {
-        return false;
-    }
+        const u = new URL(urlStr);
+        return process.env.NODE_ENV === 'development' && ['localhost', '127.0.0.1'].includes(u.hostname);
+    } catch { return false; }
 }
 
-export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined }) {
+const FPX_BANKS = [
+    'Maybank2u', 'CIMB Clicks', 'Public Bank', 'RHB', 'Hong Leong',
+    'AmBank', 'Bank Islam', 'OCBC', 'HSBC', 'Standard Chartered',
+    'BSN', 'Affin Bank', 'Alliance', 'Bank Rakyat', 'UOB',
+];
+
+export function PaymentsFormClient({
+    tenantId,
+    stripeOnboardingComplete = false,
+    stripeAccountId = null,
+    initialCardEnabled = false,
+    initialFpxEnabled = false,
+}: {
+    tenantId?: string;
+    stripeOnboardingComplete?: boolean;
+    stripeAccountId?: string | null;
+    initialCardEnabled?: boolean;
+    initialFpxEnabled?: boolean;
+}) {
+    const router = useRouter();
     const [paymentCod, setPaymentCod] = useState(false);
     const [paymentQr, setPaymentQr] = useState(false);
+    const [cardEnabled, setCardEnabled] = useState(initialCardEnabled);
+    const [fpxEnabled, setFpxEnabled] = useState(initialFpxEnabled);
     const [qrWidgetExpanded, setQrWidgetExpanded] = useState(false);
     const [qrImageId, setQrImageId] = useState<string | number | null>(null);
     const [qrPreviewUrl, setQrPreviewUrl] = useState<string | null>(null);
-
+    const [qrFileName, setQrFileName] = useState<string | null>(null);
+    const [accountHolderName, setAccountHolderName] = useState('');
+    const [bankName, setBankName] = useState('');
+    const [accountNumber, setAccountNumber] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [isConnecting, setIsConnecting] = useState(false);
+    // 3-state Stripe Connect: no account → pending verify → verified
+    const [isVerified, setIsVerified] = useState(stripeOnboardingComplete);
+    const [hasAccount, setHasAccount] = useState(!!stripeAccountId);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const accountHolderNameSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const bankNameSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const accountNumberSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
 
-    const [isSaving, setIsSaving] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Fetch initial settings
     useEffect(() => {
-        if (!tenantId) {
-            setIsLoading(false);
-            return;
-        }
-
-        const fetchSettings = async () => {
-            try {
-                const res = await getPaymentSettings();
+        if (!tenantId) { setIsLoading(false); return; }
+        getPaymentSettings()
+            .then(res => {
                 if (res.success && res.payments) {
-                    const data = res.payments;
-                    setPaymentCod(data.payment_cod || false);
-                    setPaymentQr(data.payment_qr || false);
-
-                    if (data.qr_image) {
-                        const qrImg = data.qr_image;
-                        setQrImageId(typeof qrImg === 'string' ? qrImg : qrImg.id);
-
-                        const url = getImageUrl(qrImg as Media);
-                        setQrPreviewUrl(url);
+                    const d = res.payments;
+                    setPaymentCod(d.payment_cod || false);
+                    setPaymentQr(d.payment_qr || false);
+                    if (d.qr_image) {
+                        const img = d.qr_image;
+                        setQrImageId(typeof img === 'string' ? img : img.id);
+                        setQrPreviewUrl(getImageUrl(img as Media));
+                        if (typeof img === 'object' && (img as any).filename) {
+                            setQrFileName((img as any).filename);
+                        }
                     }
+                    if (d.account_holder_name) setAccountHolderName(d.account_holder_name as string);
+                    if (d.bank_name) setBankName(d.bank_name as string);
+                    if (d.account_number) setAccountNumber(d.account_number as string);
                 }
-            } catch (error) {
-                console.error("Failed to fetch tenant settings:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchSettings();
+            })
+            .catch(console.error)
+            .finally(() => setIsLoading(false));
     }, [tenantId]);
 
-    const saveTenantSettings = async (updates: PaymentUpdates) => {
-        if (!tenantId) return false;
+    // Handle ?stripe=complete or ?stripe=refresh return from Stripe onboarding (TC-F13.26, 27, 28)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        const stripeReturn = params.get('stripe');
+        if (!stripeReturn) return;
+
+        if (stripeReturn === 'complete') {
+            setHasAccount(true); // ensure Verify button is shown
+            if (isVerified) {
+                toast.success(pt.stripeReturnSuccess);
+            } else {
+                toast.info(pt.stripeReturnKycPending);
+            }
+        } else if (stripeReturn === 'refresh') {
+            setHasAccount(true);
+            toast.warning(pt.stripeReturnRefresh);
+        }
+
+        router.replace('/settings/payments');
+    }, []); // intentionally once on mount
+
+    // Initiate Stripe Connect onboarding (TC-F13.24, 25) — POST then redirect to oauthUrl
+    const handleConnectStripe = async () => {
+        /* STRIPE_CONNECT_DISABLED — OAuth Connect flow temporarily disabled.
+         * Restore by uncommenting implementation in:
+         *   src/app/api/stripe/connect/onboard/route.ts
+         *   src/lib/payment/stripe.ts (getStripeOAuthUrl, exchangeOAuthCode)
+         *
+        if (!tenantId || isConnecting) return;
+        setIsConnecting(true);
         try {
-            const res = await updatePaymentSettings({
-                payment_cod: paymentCod,
-                payment_qr: paymentQr,
-                qr_image: qrImageId,
-                ...updates
+            const res = await fetch('/api/stripe/connect/onboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tenantId }),
             });
-            if (!res.success) throw new Error(res.error || "Failed to save settings");
+            const data = await res.json();
+            if (!res.ok || !data.success || !data.data?.oauthUrl) {
+                toast.error(data.error?.message || pt.failConnectStripe);
+                setIsConnecting(false);
+                return;
+            }
+            // Same-tab redirect — OAuth callback needs session cookies; new tab may lose them
+            window.location.href = data.data.oauthUrl;
+            // Leave isConnecting=true intentionally — page is unloading
+        } catch {
+            toast.error(pt.failConnectStripe);
+            setIsConnecting(false);
+        }
+        */
+    };
+
+    // Check Stripe account status and unlock UI if approved (TC-F13.26)
+    const handleVerifyStripe = async () => {
+        /* STRIPE_CONNECT_DISABLED — verify status flow temporarily disabled.
+         * Restore by uncommenting implementation in:
+         *   src/app/api/stripe/connect/status/route.ts
+         *
+        if (!tenantId || isVerifying) return;
+        setIsVerifying(true);
+        try {
+            const res = await fetch(`/api/stripe/connect/status?tenantId=${tenantId}`);
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                toast.error(pt.failVerifyStripe);
+                return;
+            }
+            if (data.data.onboardingComplete) {
+                setIsVerified(true);
+                toast.success(pt.stripeReturnSuccess);
+            } else if (!data.data.detailsSubmitted) {
+                // Onboarding incomplete — drop back to connect mode so user can resume
+                setHasAccount(false);
+                toast.warning(pt.stripeVerifyPending);
+            } else {
+                toast.warning(pt.stripeVerifyPending);
+            }
+        } catch {
+            toast.error(pt.failVerifyStripe);
+        } finally {
+            setIsVerifying(false);
+        }
+        */
+    };
+
+    const saveSettings = async (updates: PaymentUpdates) => {
+        try {
+            const res = await updatePaymentSettings({ payment_cod: paymentCod, payment_qr: paymentQr, qr_image: qrImageId, ...updates });
+            if (!res.success) throw new Error(res.error || 'Failed to save');
             return true;
-        } catch (error: unknown) {
-            console.error("Save error:", error);
-            const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
-            toast.error(errorMessage);
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'Failed to save');
             return false;
         }
     };
 
-    const handleToggleCod = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const checked = e.target.checked;
-        setPaymentCod(checked);
-        const success = await saveTenantSettings({ payment_cod: checked });
-        if (success) {
-            toast.success(pt.successSave);
-        } else {
-            setPaymentCod(!checked);
-            toast.error(pt.failSaveSettings);
-        }
+    const handleToggleCard = async (checked: boolean) => {
+        setCardEnabled(checked);
+        const res = await updatePaymentSettings({ payment_card: checked });
+        if (res.success) toast.success(pt.successSave);
+        else { setCardEnabled(!checked); toast.error(pt.failSaveSettings); }
     };
 
-    const handleToggleQr = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const checked = e.target.checked;
-        if (checked && !qrImageId && !qrPreviewUrl) {
-            setQrWidgetExpanded(true);
-            return;
-        }
+    const handleToggleFpx = async (checked: boolean) => {
+        setFpxEnabled(checked);
+        const res = await updatePaymentSettings({ payment_fpx: checked });
+        if (res.success) toast.success(pt.successSave);
+        else { setFpxEnabled(!checked); toast.error(pt.failSaveSettings); }
+    };
+
+    const handleToggleCod = async (checked: boolean) => {
+        setPaymentCod(checked);
+        const ok = await saveSettings({ payment_cod: checked });
+        if (ok) toast.success(pt.successSave);
+        else { setPaymentCod(!checked); toast.error(pt.failSaveSettings); }
+    };
+
+    const handleToggleQr = async (checked: boolean) => {
+        if (checked && !qrImageId && !qrPreviewUrl) { setQrWidgetExpanded(true); return; }
         setPaymentQr(checked);
         if (!checked) setQrWidgetExpanded(false);
-
-        const success = await saveTenantSettings({ payment_qr: checked });
-        if (success) {
-            toast.success(pt.successSave);
-        } else {
-            setPaymentQr(!checked);
-            toast.error(pt.failSaveConfig);
-        }
+        const ok = await saveSettings({ payment_qr: checked });
+        if (ok) toast.success(pt.successSave);
+        else { setPaymentQr(!checked); toast.error(pt.failSaveConfig); }
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error(t.payments.imageTooLarge);
-            return;
-        }
-
-        // Preview instantly with blob URL
+        if (file.size > 2 * 1024 * 1024) { toast.error(t.payments.imageTooLarge); return; }
         const objectUrl = URL.createObjectURL(file);
         setQrPreviewUrl(objectUrl);
-        // Do not auto-activate here; wait until success
+        setQrFileName(file.name);
         toast.loading(pt.uploadingQr, { id: 'upload-qr' });
         try {
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const uploadRes = await uploadQrMedia(formData);
-
-            if (!uploadRes.success || !uploadRes.doc) {
-                throw new Error(uploadRes.error || "Upload failed");
-            }
-
+            const fd = new FormData();
+            fd.append('file', file);
+            const uploadRes = await uploadQrMedia(fd);
+            if (!uploadRes.success || !uploadRes.doc) throw new Error(uploadRes.error || 'Upload failed');
             const qrDocId = uploadRes.doc.id;
             setQrImageId(qrDocId);
-
-            // Update preview URL to the server URL so it persists after navigation.
-            // getImageUrl handles minio:9000 → localhost:9000 for local dev;
-            // on staging it returns the S3/CDN URL directly.
             const serverUrl = getImageUrl(uploadRes.doc as Media);
-            if (serverUrl) {
-                setQrPreviewUrl(serverUrl);
-            }
-            // If serverUrl is somehow unavailable, blob URL from above is already showing.
-
-            setPaymentQr(true); // Now activate
-
-            // Auto-save setting
-            const success = await saveTenantSettings({ payment_qr: true, qr_image: qrDocId });
-
+            if (serverUrl) setQrPreviewUrl(serverUrl);
+            setPaymentQr(true);
+            const ok = await saveSettings({ payment_qr: true, qr_image: qrDocId });
             toast.dismiss('upload-qr');
-            if (success) {
-                toast.success(pt.successSave);
-            } else {
-                toast.error(pt.failSaveConfig);
-                // Revert completely
-                setPaymentQr(false);
-                setQrPreviewUrl(null);
-                setQrImageId(null);
-            }
-
-        } catch (error: unknown) {
-            console.error("Upload error:", error);
+            if (ok) toast.success(pt.successSave);
+            else { toast.error(pt.failSaveConfig); setPaymentQr(false); setQrPreviewUrl(null); setQrImageId(null); }
+        } catch (e: unknown) {
             toast.dismiss('upload-qr');
-            const errorMessage = error instanceof Error ? error.message : "Failed to upload image";
-            toast.error(pt.uploadError + errorMessage);
+            toast.error(pt.uploadError + (e instanceof Error ? e.message : 'Upload failed'));
             setQrPreviewUrl(null);
-            setPaymentQr(false); // Revert state
+            setPaymentQr(false);
         }
     };
 
     const handleRemoveImage = async () => {
-        setQrImageId(null);
-        setQrPreviewUrl(null);
-        setPaymentQr(false); // Auto disable QR method if image removed
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
-
-        const success = await saveTenantSettings({ payment_qr: false, qr_image: null });
-        if (success) {
-            toast.success(pt.removeSuccess);
-        } else {
-            toast.error(pt.failClearQR);
-        }
+        setQrImageId(null); setQrPreviewUrl(null); setQrFileName(null); setPaymentQr(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        const ok = await saveSettings({ payment_qr: false, qr_image: null });
+        if (ok) toast.success(pt.removeSuccess);
+        else toast.error(pt.failClearQR);
     };
 
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!tenantId) return;
+    const handleAccountHolderNameChange = useCallback((val: string) => {
+        setAccountHolderName(val);
+        if (accountHolderNameSaveTimer.current) clearTimeout(accountHolderNameSaveTimer.current);
+        accountHolderNameSaveTimer.current = setTimeout(async () => {
+            const res = await updatePaymentSettings({ account_holder_name: val });
+            if (!res.success) toast.error(pt.failSaveSettings);
+        }, 800);
+    }, [pt.failSaveSettings]);
 
-        setIsSaving(true);
-        try {
-            const res = await fetch(`/api/tenants/${tenantId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    payments: {
-                        payment_cod: paymentCod,
-                        payment_qr: paymentQr,
-                        qr_image: qrImageId,
-                    }
-                }),
-                credentials: 'include',
-            });
+    const handleBankNameChange = useCallback((val: string) => {
+        setBankName(val);
+        if (bankNameSaveTimer.current) clearTimeout(bankNameSaveTimer.current);
+        bankNameSaveTimer.current = setTimeout(async () => {
+            const res = await updatePaymentSettings({ bank_name: val });
+            if (!res.success) toast.error(pt.failSaveSettings);
+        }, 800);
+    }, [pt.failSaveSettings]);
 
-            if (!res.ok) throw new Error("Failed to save settings");
-            toast.success(pt.successSave);
-        } catch (error) {
-            console.error(error);
-            toast.error(pt.failSaveSettings);
-        } finally {
-            setIsSaving(false);
-        }
-    };
+    const handleAccountNumberChange = useCallback((val: string) => {
+        setAccountNumber(val);
+        if (accountNumberSaveTimer.current) clearTimeout(accountNumberSaveTimer.current);
+        accountNumberSaveTimer.current = setTimeout(async () => {
+            const res = await updatePaymentSettings({ account_number: val });
+            if (!res.success) toast.error(pt.failSaveSettings);
+        }, 800);
+    }, [pt.failSaveSettings]);
 
-    if (isLoading) {
-        return <div className="p-8 text-white">{pt.loading}</div>;
-    }
+    if (isLoading) return <div className="p-8 text-white">{pt.loading}</div>;
 
     return (
-        <div className="w-full space-y-[28px]">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex h-[50px] w-[50px] items-center justify-center rounded-[16px] bg-[#2DD4BF]/10 border border-[#2DD4BF]/20 shrink-0">
-                    <CreditCard className="h-6 w-6 text-[#2DD4BF]" />
+        <div className="w-full space-y-[32px]">
+            {/* Page header */}
+            <div className="flex items-center gap-4">
+                <div className="w-[50px] h-[50px] flex items-center justify-center rounded-[16px] bg-teal-400/10 border border-teal-400/20 shrink-0">
+                    <CreditCard className="w-6 h-6 text-teal-400" />
                 </div>
                 <div>
-                    <h1 className="text-[24px] font-bold text-slate-50 heading-responsive">{pt.title}</h1>
-                    <p className="mt-1 text-[14px] text-slate-50/60 font-normal relative">{pt.subtitle}</p>
+                    <h1 className="text-[24px] font-bold text-slate-50">{pt.title}</h1>
+                    <p className="mt-1 text-[14px] text-slate-400">{pt.subtitle}</p>
                 </div>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-[16px]">
-
-                {/* Stripe / Card Section */}
-                <div className="flex flex-col p-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 transition-colors gap-[16px]">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-[50px] w-[50px] items-center justify-center rounded-[16px] bg-white/5 border border-white/[0.08] shrink-0">
-                                <CreditCard className="h-6 w-6 text-slate-200" />
-                            </div>
-                            <div>
-                                <h3 className="text-[18px] font-semibold text-slate-50">{pt.gatewayTitle}</h3>
-                                <p className="mt-1 text-[14px] text-slate-50/60 max-w-[320px]">{pt.gatewaySubtitle}</p>
-                            </div>
-                        </div>
-                        {/* Mock Stripe Toggle */}
-                        <div className="mt-4 sm:mt-0">
-                            <label className="relative inline-flex cursor-not-allowed items-center text-slate-50">
-                                <div className="h-[32px] w-[56px] rounded-full bg-[#1E293B] border border-white/[0.12] relative">
-                                    <div className="absolute left-[4px] top-[3px] h-[24px] w-[24px] rounded-full bg-slate-400/50 transition-all shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]"></div>
-                                </div>
-                            </label>
-                        </div>
+            {/* STRIPE_CONNECT_DISABLED — Both-OFF warning hidden while Stripe section is off */}
+            {/* {isVerified && !cardEnabled && !fpxEnabled && (
+                <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-amber-500/[0.24] bg-amber-500/[0.06]">
+                    <div className="w-10 h-10 rounded-[10px] bg-amber-500/[0.12] border border-amber-500/[0.22] text-amber-400 grid place-items-center shrink-0">
+                        <AlertTriangle className="w-[18px] h-[18px]" />
                     </div>
-                    {/* Status Pill matching Text alignment */}
                     <div>
-                        <div className="flex w-[79px] h-[34px] items-center justify-center rounded-[12px] border border-white/[0.05] bg-[#0B1120]/50">
-                            <span className="text-[14px] font-medium leading-none text-slate-50/50">{pt.inactive}</span>
-                        </div>
+                        <h4 className="text-[14px] font-semibold text-slate-100 m-0 mb-[3px]">No card payment methods active</h4>
+                        <p className="text-[13px] text-slate-400 m-0 leading-[1.55]">
+                            Your storefront is live, but Card and FPX are both off. Buyers can only pay by COD or bank transfer. Enable at least one Stripe method for the smoothest checkout.
+                        </p>
                     </div>
                 </div>
+            )} */}
 
-                {/* COD Card */}
-                <div className={cn(
-                    "flex flex-col p-[25px] rounded-[16px] transition-all duration-300 gap-[16px]",
-                    paymentCod ? "border-blue-500/30 bg-[#1E293B]/60 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "border-white/[0.08] bg-[#1E293B]/60"
-                )}>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className={cn(
-                                "flex h-[50px] w-[50px] items-center justify-center rounded-[16px] border shrink-0 transition-colors duration-300",
-                                paymentCod ? "bg-blue-500/10 border-blue-500/20" : "bg-white/5 border-white/[0.08]"
-                            )}>
-                                <Banknote className={cn("h-6 w-6 transition-colors duration-300", paymentCod ? "text-blue-500" : "text-slate-200")} />
-                            </div>
-                            <div>
-                                <h3 className="text-[18px] font-semibold text-slate-50">{pt.codTitle}</h3>
-                                <p className="mt-1 text-[14px] text-slate-50/60 max-w-[320px]">{pt.codSubtitle}</p>
-                            </div>
-                        </div>
-                        <div className="mt-4 sm:mt-0">
-                            <label className="relative inline-flex cursor-pointer items-center text-slate-50">
-                                <input
-                                    type="checkbox"
-                                    className="peer sr-only"
-                                    checked={paymentCod}
-                                    onChange={handleToggleCod}
-                                />
-                                <div className={cn(
-                                    "h-[32px] w-[56px] rounded-full border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/50 after:absolute after:left-[4px] after:top-[3px] after:h-[24px] after:w-[24px] after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-[24px] after:shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]",
-                                    paymentCod ? "bg-gradient-to-r from-blue-500 to-teal-400 border-transparent shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-[#1E293B] border-white/[0.12]"
-                                )}></div>
-                            </label>
-                        </div>
-                    </div>
-                    {/* Status Pill */}
-                    <div>
-                        {paymentCod ? (
-                            <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
-                                <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
-                                <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">{pt.active}</span>
-                            </div>
-                        ) : (
-                            <div className="flex w-[79px] h-[34px] items-center justify-center rounded-[12px] border border-white/[0.05] bg-[#0B1120]/50">
-                                <span className="text-[14px] font-medium leading-none text-slate-50/50">{pt.inactive}</span>
-                            </div>
-                        )}
-                    </div>
+            {/* STRIPE_CONNECT_DISABLED — Stripe Payment Methods section hidden.
+                Restore by uncommenting this section and re-enabling:
+                  src/lib/payment/stripe.ts (OAuth functions)
+                  src/app/api/stripe/connect/onboard/route.ts
+                  src/app/api/stripe/connect/callback/route.ts
+                  handleConnectStripe + handleVerifyStripe handlers above
+            */}
+            {/* <section className="space-y-[14px]">
+                <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
+                    <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" style={{ boxShadow: '0 0 10px #38bdf8' }} />
+                    <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.stripeSectionTitle}</h2>
+                    <span className="ml-auto text-[12px] text-slate-500">{pt.stripeSectionDesc}</span>
                 </div>
 
-                {/* QR Banking Card */}
-                <div className={cn(
-                    "flex flex-col p-[25px] rounded-[16px] transition-all duration-300 gap-[16px]",
-                    paymentQr ? "border-blue-500/30 bg-[#1E293B]/60 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "border-white/[0.08] bg-[#1E293B]/60"
-                )}>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className={cn(
-                                "flex h-[50px] w-[50px] items-center justify-center rounded-[16px] border shrink-0 transition-colors duration-300",
-                                paymentQr ? "bg-blue-500/10 border-blue-500/20" : "bg-white/5 border-white/[0.08]"
-                            )}>
-                                <Upload className={cn("h-6 w-6 transition-colors duration-300", paymentQr ? "text-blue-500" : "text-slate-200")} />
-                            </div>
-                            <div>
-                                <h3 className="text-[18px] font-semibold text-slate-50">{pt.bankTransferTitle}</h3>
-                                <p className="mt-1 text-[14px] text-slate-50/60 max-w-[320px]">{pt.bankTransferSubtitle}</p>
-                            </div>
-                        </div>
-                        <div className="mt-4 sm:mt-0">
-                            <label className="relative inline-flex cursor-pointer items-center text-slate-50">
-                                <input
-                                    type="checkbox"
-                                    className="peer sr-only"
-                                    checked={paymentQr}
-                                    onChange={handleToggleQr}
-                                />
-                                <div className={cn(
-                                    "h-[32px] w-[56px] rounded-full border peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500/50 after:absolute after:left-[4px] after:top-[3px] after:h-[24px] after:w-[24px] after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-[24px] after:shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]",
-                                    paymentQr ? "bg-gradient-to-r from-blue-500 to-teal-400 border-transparent shadow-[0_0_12px_rgba(59,130,246,0.4)]" : "bg-[#1E293B] border-white/[0.12]"
-                                )}></div>
-                            </label>
-                        </div>
-                    </div>
-                    {/* Status Pill */}
-                    <div>
-                        {paymentQr ? (
-                            <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
-                                <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
-                                <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">{pt.active}</span>
-                            </div>
-                        ) : (
-                            <div className="flex w-[79px] h-[34px] items-center justify-center rounded-[12px] border border-white/[0.05] bg-[#0B1120]/50">
-                                <span className="text-[14px] font-medium leading-none text-slate-50/50">{pt.inactive}</span>
-                            </div>
-                        )}
-                    </div>
+                {isVerified ? (
+                    <StripeConnectedBar accountId={stripeAccountId} onDisconnect={async () => {
+                        const res = await disconnectStripe();
+                        if (res.success) {
+                            setIsVerified(false);
+                            setHasAccount(false);
+                            setCardEnabled(false);
+                            setFpxEnabled(false);
+                        } else {
+                            toast.error('Failed to disconnect Stripe');
+                        }
+                    }} />
+                ) : hasAccount ? (
+                    <StripeConnectBlock
+                        mode="verify"
+                        onVerify={handleVerifyStripe}
+                        isVerifying={isVerifying}
+                    />
+                ) : (
+                    <StripeConnectBlock
+                        mode="connect"
+                        onConnect={handleConnectStripe}
+                        isConnecting={isConnecting}
+                    />
+                )}
 
-                    {/* QR Upload Widget */}
-                    {(paymentQr || qrWidgetExpanded) && (
-                        <div className="flex flex-col p-[17px] rounded-[16px] border border-white/5 bg-[#0B1120]/50 gap-[12px] animate-in fade-in slide-in-from-top-4 duration-300">
-                            <h4 className="text-[14px] font-medium text-slate-50">{pt.uploadQrTitle}</h4>
-                            <div className="flex flex-col w-full">
+                {isVerified && (
+                    <div className="space-y-[12px]">
+                        <div className="anim-pay-card-d1">
+                            <PaymentMethodCard
+                                icon={<CreditCard className="w-5 h-5" />}
+                                iconTone="brand"
+                                title={pt.cardTitle}
+                                feePill={pt.cardFee}
+                                desc={pt.cardDesc}
+                                on={cardEnabled}
+                                onChange={handleToggleCard}
+                                highlight={cardEnabled}
+                                statusExtra={<span>{pt.cardMeta}</span>}
+                            />
+                        </div>
+                        <div className="anim-pay-card-d2">
+                            <PaymentMethodCard
+                                icon={<Landmark className="w-5 h-5" />}
+                                iconTone="purple"
+                                title={pt.fpxTitle}
+                                feePill={pt.fpxFee}
+                                desc={pt.fpxDesc}
+                                on={fpxEnabled}
+                                onChange={handleToggleFpx}
+                                highlight={fpxEnabled}
+                                statusExtra={<span>{pt.fpxMeta}</span>}
+                            >
+                                {fpxEnabled && (
+                                    <div className="flex flex-wrap gap-[6px] mt-[14px]">
+                                        {FPX_BANKS.slice(0, 10).map(b => (
+                                            <span key={b} className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400">
+                                                {b}
+                                            </span>
+                                        ))}
+                                        {FPX_BANKS.length > 10 && (
+                                            <span className="text-[11.5px] px-[9px] py-[4px] rounded-full bg-white/[0.04] border border-white/[0.08] text-slate-400">
+                                                +{FPX_BANKS.length - 10} more
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </PaymentMethodCard>
+                        </div>
+                    </div>
+                )}
+            </section> */}
+
+            {/* ─── Manual Methods ─── */}
+            <section className="space-y-[14px]">
+                <div className="flex items-center gap-[10px] px-[4px]">
+                    <span className="w-[6px] h-[6px] rounded-full bg-purple-400 shrink-0" style={{ boxShadow: '0 0 10px #c084fc' }} />
+                    <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.manualSectionTitle}</h2>
+                    <span className="ml-auto text-[12px] text-slate-500">{pt.manualSectionDesc}</span>
+                </div>
+
+                <div className="space-y-[12px]">
+                    <PaymentMethodCard
+                        icon={<Banknote className="w-5 h-5" />}
+                        iconTone="amber"
+                        title={pt.codTitle}
+                        desc={pt.codDesc}
+                        on={paymentCod}
+                        onChange={handleToggleCod}
+                        highlight={paymentCod}
+                        statusExtra={paymentCod ? (
+                            <span className="inline-flex items-center gap-[5px] text-[12px] text-slate-500">
+                                <MapPin className="w-3 h-3" />
+                                {pt.codStatusMeta}
+                            </span>
+                        ) : undefined}
+                    />
+
+                    <PaymentMethodCard
+                        icon={<QrCode className="w-5 h-5" />}
+                        iconTone="teal"
+                        title={pt.bankTransferTitle}
+                        desc={pt.bankTransferDesc}
+                        on={paymentQr}
+                        onChange={handleToggleQr}
+                        highlight={paymentQr}
+                    >
+                        {(paymentQr || qrWidgetExpanded) && (
+                            <div className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed rgba(255,255,255,0.10)' }}>
+                                <label className="block text-[13px] font-semibold text-slate-300 mb-[10px]">{pt.qrCodeLabel}</label>
+
                                 {qrPreviewUrl ? (
-                                    <div className="relative inline-flex self-start border border-white/[0.08] rounded-2xl overflow-hidden bg-[#0B1120]/50 p-3">
-                                        <NextImage
-                                            src={qrPreviewUrl}
-                                            alt="QR Code"
-                                            width={192}
-                                            height={192}
-                                            unoptimized={isLocalOrBlob(qrPreviewUrl)}
-                                            className="object-contain bg-white rounded-xl shadow-inner"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={handleRemoveImage}
-                                            className="absolute top-2 right-2 p-1 bg-red-500/90 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
+                                    <div className="flex items-center gap-[16px] p-[14px] rounded-[12px] border border-white/[0.08] bg-[#0d1525]">
+                                        {/* QR thumb */}
+                                        <div className="w-[76px] h-[76px] rounded-[10px] shrink-0 overflow-hidden border-[4px] border-white bg-white">
+                                            <NextImage
+                                                src={qrPreviewUrl}
+                                                alt="QR Code"
+                                                width={76}
+                                                height={76}
+                                                unoptimized={isLocalOrBlob(qrPreviewUrl)}
+                                                className="object-cover w-full h-full"
+                                            />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[15px] font-bold text-slate-50 m-0 mb-[4px] truncate tracking-tight">
+                                                {qrFileName || 'duitnow-qr.png'}
+                                            </p>
+                                            <p className="font-mono text-[12px] text-slate-400 m-0">{pt.qrUploadedMeta}</p>
+                                        </div>
+                                        <div className="flex gap-[6px] shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveImage}
+                                                className="inline-flex items-center justify-center w-[36px] h-[36px] rounded-[8px] text-slate-400 border border-white/[0.08] hover:bg-red-500/[0.12] hover:text-red-400 hover:border-red-500/[0.24] transition-all"
+                                                title="Remove"
+                                            >
+                                                <Trash2 className="w-[14px] h-[14px]" />
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="flex flex-col items-center justify-center gap-[12px] w-full h-[200px] rounded-[16px] border-[2px] border-dashed border-white/[0.08] hover:border-blue-500/50 transition-colors cursor-pointer group"
+                                        className="flex flex-col items-center justify-center text-center rounded-[12px] cursor-pointer transition-all group"
+                                        style={{
+                                            padding: '32px 20px',
+                                            border: '1.5px dashed rgba(255,255,255,0.12)',
+                                            background: 'rgba(255,255,255,0.02)',
+                                            borderRadius: '12px',
+                                        }}
+                                        onMouseEnter={e => {
+                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(14,165,233,0.45)';
+                                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(14,165,233,0.04)';
+                                        }}
+                                        onMouseLeave={e => {
+                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.12)';
+                                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.02)';
+                                        }}
                                     >
-                                        <div className="p-4 rounded-full bg-blue-500/10 text-blue-500 group-hover:scale-110 group-hover:bg-blue-500/20 transition-all">
-                                            <UploadCloud className="h-6 w-6" />
+                                        <div className="w-[48px] h-[48px] rounded-full bg-sky-500/[0.10] text-sky-400 grid place-items-center mb-[12px]">
+                                            <UploadCloud className="w-5 h-5" />
                                         </div>
-                                        <div className="text-center">
-                                            <p className="text-[14px] font-medium text-[#F8FAFC]">{pt.uploadQrSub}</p>
-                                            <p className="text-[12px] font-medium text-slate-50/50 mt-[4px]">{pt.uploadHint}</p>
-                                        </div>
+                                        <p className="text-[13px] font-semibold text-slate-100 mb-[2px]">{pt.uploadQrSub}</p>
+                                        <p className="text-[11.5px] text-slate-500">{pt.uploadHint}</p>
                                     </div>
                                 )}
-                                <input
-                                    type="file"
-                                    accept="image/png, image/jpeg"
-                                    className="hidden"
-                                    ref={fileInputRef}
-                                    onChange={handleFileSelect}
-                                />
+
+                                <input type="file" accept="image/png, image/jpeg" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
+
+                                {/* Account holder name */}
+                                <div className="flex flex-col gap-[6px] mt-[16px]">
+                                    <label className="flex items-center text-[13px] font-semibold text-slate-300">
+                                        {pt.accountHolderNameLabel}
+                                        <span className="ml-auto text-[10px] font-bold text-slate-500 uppercase tracking-[0.08em] px-[7px] py-[2px] rounded-full bg-white/[0.04] border border-white/[0.08]">Required</span>
+                                    </label>
+                                    <div
+                                        className="flex items-center rounded-[10px] overflow-hidden transition-all"
+                                        style={{ background: '#0d1525', border: '1px solid rgba(255,255,255,0.08)' }}
+                                        onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                        onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                                    >
+                                        <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                            <User className="w-[14px] h-[14px] text-slate-400 opacity-70" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={accountHolderName}
+                                            onChange={e => handleAccountHolderNameChange(e.target.value)}
+                                            placeholder={pt.accountHolderNamePlaceholder}
+                                            className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-medium placeholder:text-slate-600 min-w-0"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
+                                        <Info className="w-[12px] h-[12px]" />
+                                        <span>{pt.accountHolderNameHelper}</span>
+                                    </div>
+                                </div>
+
+                                {/* Bank name + Account number */}
+                                <div className="grid grid-cols-2 gap-[16px] mt-[16px]">
+                                    <div className="flex flex-col gap-[6px]">
+                                        <label className="text-[13px] font-semibold text-slate-300">{pt.bankNameLabel}</label>
+                                        <div
+                                            className="flex items-center rounded-[10px] overflow-hidden transition-all"
+                                            style={{ background: '#0d1525', border: '1px solid rgba(255,255,255,0.08)' }}
+                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={bankName}
+                                                onChange={e => handleBankNameChange(e.target.value)}
+                                                placeholder="e.g. Maybank Berhad"
+                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-600"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
+                                            <Info className="w-[12px] h-[12px]" />
+                                            <span>{pt.bankNameHelper}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-[6px]">
+                                        <label className="text-[13px] font-semibold text-slate-300">{pt.accountNumberLabel}</label>
+                                        <div
+                                            className="flex items-center rounded-[10px] overflow-hidden transition-all"
+                                            style={{ background: '#0d1525', border: '1px solid rgba(255,255,255,0.08)' }}
+                                            onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
+                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                                        >
+                                            <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                                MYR
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={accountNumber}
+                                                onChange={e => handleAccountNumberChange(e.target.value)}
+                                                placeholder="5141 2287 ••••"
+                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-600 min-w-0"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
+                                            <Shield className="w-[12px] h-[12px]" />
+                                            <span>{pt.accountNumberHelper}</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </PaymentMethodCard>
                 </div>
+            </section>
 
-                {/* Info Box */}
-                <div className="flex items-start gap-4 p-[25px] rounded-[16px] border border-blue-500/20 bg-[#0b1b36] shadow-[0_4px_24px_rgba(59,130,246,0.1)]">
-                    <div className="flex h-[40px] w-[40px] items-center justify-center shrink-0 rounded-[12px] bg-blue-500/10">
-                        <CreditCard className="h-5 w-5 text-[#3B82F6]" />
-                    </div>
-                    <div>
-                        <h4 className="text-[16px] font-semibold text-slate-50 mt-[2px]">{pt.infoTitle}</h4>
-                        <p className="mt-1 text-[14px] text-slate-50/60 leading-relaxed w-full">
-                            {pt.infoDesc}
-                        </p>
-                    </div>
+            {/* Info banner */}
+            <div className="flex items-start gap-4 p-[20px_22px] rounded-[14px] border border-sky-500/[0.18] bg-sky-500/[0.06]">
+                <div className="w-9 h-9 shrink-0 flex items-center justify-center rounded-[10px] bg-sky-500/10">
+                    <Info className="w-4 h-4 text-sky-400" />
                 </div>
-
-
-            </form>
+                <div>
+                    <h4 className="text-[14px] font-semibold text-slate-100">{pt.infoTitle}</h4>
+                    <p className="mt-1 text-[13px] text-slate-400 leading-relaxed">{pt.infoDesc}</p>
+                </div>
+            </div>
         </div>
     );
 }

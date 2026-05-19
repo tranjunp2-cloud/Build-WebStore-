@@ -464,6 +464,130 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
         expect(res.headers.get('Retry-After')).toBeTruthy()
         expect(checkTwoTierRateLimit).toHaveBeenCalledWith('publish:user-1', 5, 30)
     })
+
+    // ── TC-F10-GBL-034..036: globalBlocks promotion on publish ─────────────
+
+    it('TC-F10-GBL-034: PATCH with globalBlocks body → writes directly to site.globalBlocks and clears pendingGlobalBlocks', async () => {
+        // Regression: publish route used to read pendingGlobalBlocks from DB which
+        // could silently return undefined if migration not applied, leaving live
+        // globalBlocks unchanged after user deleted a widget and clicked Update.
+        const { getPayload } = await import('payload')
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: vi.fn().mockResolvedValue({ docs: [], hasNextPage: false }),
+            update: updateSpy,
+        })
+
+        const cartWidget = { blockType: 'cartWidget', variant: 'floating', showCount: true }
+        const sentGlobalBlocks = { cartWidget, whatsappButton: null, socialWidget: null }
+        const req = new NextRequest('http://localhost:3000/api/sites/site-123/publish', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ globalBlocks: sentGlobalBlocks }),
+        })
+
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        const sitesUpdate = updateSpy.mock.calls.find(c => c[0].collection === 'sites')
+        expect(sitesUpdate).toBeDefined()
+        const data = sitesUpdate![0].data as Record<string, unknown>
+        expect(data.globalBlocks).toEqual(sentGlobalBlocks)
+        expect(data.pendingGlobalBlocks).toBeNull()
+    })
+
+    it('TC-F10-GBL-035: PATCH with cartWidget:null in body → null preserved in globalBlocks (no BC fallback)', async () => {
+        // cartWidget:null is the explicit sentinel meaning "user disabled cart".
+        // Absent key would reactivate BC page-scan fallback. Publish must keep null.
+        const { getPayload } = await import('payload')
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: vi.fn().mockResolvedValue({ docs: [], hasNextPage: false }),
+            update: updateSpy,
+        })
+
+        const removedGlobalBlocks = { cartWidget: null, whatsappButton: null, socialWidget: null }
+        const req = new NextRequest('http://localhost:3000/api/sites/site-123/publish', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ globalBlocks: removedGlobalBlocks }),
+        })
+
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        const sitesUpdate = updateSpy.mock.calls.find(c => c[0].collection === 'sites')
+        const data = sitesUpdate![0].data as Record<string, unknown>
+        const storedGb = data.globalBlocks as typeof removedGlobalBlocks
+        expect(storedGb).not.toBeNull()
+        expect(storedGb.cartWidget).toBeNull()
+    })
+
+    it('TC-F10-GBL-036: PATCH without body globalBlocks → falls back to pendingGlobalBlocks from DB', async () => {
+        // Old clients / tests that do not send body still get correct promotion
+        // via the DB fallback path (pendingGlobalBlocks → globalBlocks).
+        const { getPayload } = await import('payload')
+        const pending = { cartWidget: { blockType: 'cartWidget', variant: 'floating' }, whatsappButton: null, socialWidget: null }
+        mockSiteRecord = { ...mockSiteRecord, pendingGlobalBlocks: pending }
+        const updateSpy = vi.fn().mockImplementation(async ({ collection, id, data }) => {
+            if (collection === 'sites') {
+                mockSiteRecord = { ...mockSiteRecord, ...data }
+                return mockSiteRecord
+            }
+            return { id, ...data }
+        })
+        // @ts-ignore
+        vi.mocked(getPayload).mockResolvedValueOnce({
+            findByID: vi.fn().mockImplementation(async ({ collection, id, depth }) => {
+                if (collection === 'sites' && id === mockSiteRecord.id) {
+                    if (depth === 1) return { ...mockSiteRecord, tenant: { id: 'tenant-1', slug: 'coffee-shop' } }
+                    return mockSiteRecord
+                }
+                return null
+            }),
+            find: vi.fn().mockResolvedValue({ docs: [], hasNextPage: false }),
+            update: updateSpy,
+        })
+
+        // No body — old-style request
+        const req = makePatchReq('site-123')
+
+        const res = await PublishPATCH(req, { params: Promise.resolve({ siteId: 'site-123' }) })
+        expect(res.status).toBe(200)
+
+        const sitesUpdate = updateSpy.mock.calls.find(c => c[0].collection === 'sites')
+        const data = sitesUpdate![0].data as Record<string, unknown>
+        expect(data.globalBlocks).toEqual(pending)
+        expect(data.pendingGlobalBlocks).toBeNull()
+    })
 })
 
 // ── TC-F01-unpublish: DELETE /api/sites/[siteId]/publish ─────────────────────
