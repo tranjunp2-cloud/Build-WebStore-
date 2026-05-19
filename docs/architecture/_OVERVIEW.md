@@ -107,6 +107,7 @@ All feature-specific architecture lives in `docs/architecture/F*.md`:
 - **Media:** S3 upload → `Media` collection → CDN (Vercel edge + DO Spaces)
 - **Logging:** Payload logger (JSON structured) → Vercel log drain
 - **Caching:** Next.js route cache (ISR where applicable) + in-memory for AI prompts (short TTL)
+- **Email:** AWS SES via Payload SMTP; 7 templates indexed in [email-templates.md](architecture/email-templates.md)
 - **Rate limiting:** Upstash Redis (`@upstash/ratelimit`) for AI endpoints
 
 ## Related docs
