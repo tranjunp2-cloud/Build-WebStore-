@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
-import { SHIPPING_DEFAULTS, RATE_MAX } from '@/lib/shipping'
+import { SHIPPING_DEFAULTS, RATE_MAX, FREE_ABOVE_MAX } from '@/lib/shipping'
 
 export const maxDuration = 60
 
@@ -89,7 +89,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
 
         const w = parseOptionalSen(westRateRm)
         const e = parseOptionalSen(eastRateRm)
-        const f = parseOptionalSen(freeAboveRm, 10_000_000)
+        const f = parseOptionalSen(freeAboveRm, FREE_ABOVE_MAX)
 
         if (w.invalid || e.invalid) {
             return NextResponse.json(
@@ -117,18 +117,11 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
 
         const payload = await getPayload({ config })
 
-        const site = await payload.findByID({ collection: 'sites', id: siteId })
-        if (!site) {
+        const site = await payload.findByID({ collection: 'sites', id: siteId }).catch(() => null)
+        if (!site || !hasSiteAccess(user, site)) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
                 { status: 404 }
-            )
-        }
-
-        if (!hasSiteAccess(user, site)) {
-            return NextResponse.json(
-                { success: false, error: { code: 'FORBIDDEN', message: 'Forbidden' } },
-                { status: 403 }
             )
         }
 

@@ -15,54 +15,42 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
-### GH-962 — Shipping Flat-Rate Configuration (F14)
+### GH-962 — Shipping Flat-Rate Configuration (F14) — Phase 1–3
 
-**Features:**
-- Flat-rate shipping by Malaysian region (West/East): sellers configure rates in new dashboard settings page, buyers see dynamic fees at checkout
-- Three public API endpoints: `GET /api/sites/:siteId/shipping-config` (fetch seller config), `PATCH /api/sites/:siteId/shipping-config` (update rates), `POST /api/orders/calculate-shipping` (compute fee + hints)
-- Free shipping threshold: sellers set amount above which shipping cost becomes zero (e.g., ≥ RM 100); checkout displays hint "Add RM X more for FREE shipping" when gap ≤ RM 50
-- Dashboard settings card: form inputs for West Malaysia rate (default RM 8), East Malaysia rate (default RM 15), free shipping threshold toggle + input
-- Live checkout calculation: state selection triggers debounced shipping fee recalc; updates order summary and total dynamically
-- Supports 16 Malaysian states + Labuan (East region boundary test TC-F14.03)
+**Phase 1–2 Features (existing):**
+- Flat-rate shipping by Malaysian region (West RM 8 / East RM 15 default): sellers configure rates in dashboard, buyers see dynamic fees at checkout
+- Three API endpoints: `GET /api/sites/:siteId/shipping-config`, `PATCH /api/sites/:siteId/shipping-config` (authed), `POST /api/orders/calculate-shipping` (public)
+- Free shipping threshold: sellers set minimum order amount → shipping = RM 0 when subtotal ≥ threshold; checkout hint "Add RM X more for FREE shipping" (highlight tier when gap ≤ RM 50, neutral >RM 50)
+- Live checkout calculation: state selection debounces 300ms, recalc shipping fee without page reload, updates order summary dynamically
+- Supports 16 Malaysian states + Labuan territory; postcode validation regex `^\d{5}$` (format only)
+- Dashboard settings form: West/East rate inputs (RM 0.00–RM 1,000.00), free shipping toggle + threshold input, Reset to Defaults button
 
-**Code changes:**
-- New library: `src/lib/shipping/` — `classify-region.ts` (pure state→region fn), `calculate-fee.ts` (pure fee logic), `constants.ts` (region definitions, defaults, rates), `index.ts` (exports)
-- New API routes: `src/app/api/orders/calculate-shipping/route.ts` (public POST), `src/app/api/sites/[siteId]/shipping-config/route.ts` (public GET + authed PATCH with tenant member verification)
-- New dashboard page: `src/app/(dashboard)/settings/shipping/` with `ShippingSettingsCard` form component
-- Checkout integration: `src/app/sites/[slug]/checkout/page.tsx` — fetch config on mount, debounce state changes, display shipping fee + hint
-- Unit tests: `src/__tests__/unit/lib/shipping/calculate-fee.test.ts` (region classification, free threshold boundary, hint logic), `src/__tests__/api/orders-calculate-shipping.test.ts` (API validation, auth, edge cases)
+**Phase 3 Pure functions + Component wiring (NEW):**
+- `validateRate()` — validates RM input (13 edge cases: empty, negative, over-max, scientific notation, comma/dot decimals, multiple decimals, zero warning)
+- `parseRateRm()` — parses comma/dot decimals, trims whitespace, returns null on non-numeric
+- `validateCrossField()` — cross-field validation: warns if free threshold below max(westRate, eastRate)
+- Form input wiring: `onChange` filter rejects non-numeric, `onBlur` auto-formats to 2 decimals, paste normalization (trim+parse), `aria-invalid`/`aria-describedby` attributes, error paragraphs with `role=alert`
 
-**Security fixes:**
-- `src/lib/validations/orders.ts`: state field now validates against `MY_STATES` enum — blocks invalid state codes from being used to compute incorrect shipping rates
-- `src/app/api/orders/checkout/route.ts`: added cross-tenant product guard (404 for products from other sites), variant-aware item deduplication before stock check
+**Code changes (Phase 1–3):**
+- Library: `src/lib/shipping/` — `classify-region.ts`, `calculate-fee.ts`, `constants.ts`, plus new `validate-rate.ts`, `parse-rate.ts`, `validate-cross-field.ts` helpers
+- API routes: `src/app/api/orders/calculate-shipping/route.ts`, `src/app/api/sites/[siteId]/shipping-config/route.ts`
+- Dashboard: `src/app/(dashboard)/settings/shipping/shipping-settings-client.tsx` with form validation wiring, error display, accessibility attributes
+- Checkout: `src/app/sites/[slug]/checkout/page.tsx` — state selection triggers debounced calculate-shipping call, live fee update
 
-**Bug fixes:**
-- TC-F14.13: PATCH `/api/sites/[siteId]/shipping-config` now properly validates: negative rates rejected, null freeAbove interpreted as disabled (not invalid), boundary conditions ≤RATE_MAX enforced
-- `src/app/api/orders/calculate-shipping/route.ts`: added null/array body guard returning 400 instead of 500 (fixes TC-F14.85, TC-F14.95)
-- Public response filtering: `GET /api/storefront/site-by-slug` no longer leaks `shippingConfig` object (moved to authed shipping-config endpoint)
-- `src/app/api/orders/calculate-shipping/route.ts`: integer guard for subtotalSen, removed pre-formatted hint message (now client-side), removed dead code
-- `src/lib/shipping/classify-region.ts`: delegates to `isEastState()` helper — DRY refactor
-- `src/app/(dashboard)/settings/shipping/settings-footer.tsx`: fixed left offset 292→260px
-- `src/app/(dashboard)/settings/shipping/shipping-rates-card.tsx`: derived `WEST_STATES_HIDDEN` from `WEST_MY_STATES.length`
-- `src/app/sites/[slug]/checkout/page.tsx`: imports MY_STATES from lib, i18n string updates, ShippingHint type updated, useMemo for subtotal calculation
+**Security:**
+- PATCH rate validation: boundaries enforced (0 ≤ rate ≤ RM 1,000), tenant member check, cross-tenant 403 guard
+- State classification: invalid states rejected at API level (400 INVALID_STATE), fallback to West region
+- Body null guard: POST/PATCH return 400 on malformed JSON instead of 500
 
-**Improvements:**
-- Removed unused `RATE_MIN` constant from `src/lib/shipping/constants.ts`
-- New i18n keys in `src/i18n/locales/en.json` + `ms.json`: `storefront.checkout.calculatingShipping`, `retryShipping`, `estimatedDeliveryEast`, `freeShippingHint`
+**Tests (Phase 3 new):**
+- Unit: `src/__tests__/unit/dashboard/shipping-rate-validation.test.tsx` — TC-F14.21–F14.38 (13 validateRate edge cases + 5 component wiring tests covering paste, onBlur format, onChange filter, aria attributes)
+- Coverage: pure input validation (13 cases), parseRateRm, validateCrossField, form integration (paste handling, blur auto-format, onChange filter, ARIA labeling)
 
 **Non-breaking:**
-- Existing `Sites.shippingConfig` schema retained; backfill migration sets `freeAbove = 10000` (RM 100) for null values in `scripts/db-setup.js`
-- Wave 6 scope: merchant self-delivery only (no carrier API calls). Tracking number manual entry deferred to Wave 7.
+- Existing `Sites.shippingConfig` schema unchanged; `freeAbove` default = 10000 sen (RM 100)
+- Wave 6 scope: self-delivery tracking number = free-text (no carrier API)
 
-**Tests:** 20 TC-IDs (TC-F14.01–20) covering calculation logic, region classification, free shipping thresholds, settings CRUD, validation, mobile responsive, state change recalc. All CI tests pass. Unit tests: `src/__tests__/api/orders-calculate-shipping.test.ts` (17 tests: TC-F14.23, TC-F14.50, TC-F14.85, TC-F14.95 + edge cases), `src/__tests__/unit/hooks/use-debounce.test.ts` (3 tests for 300ms debounce behavior). E2E: `e2e/f14-shipping.spec.ts` with US-F14-05 describe block (TC-PW-F14.05 state change recalc, TC-PW-F14.06 debounce batching, TC-PW-F14.09 error→retry UI, guarded by `E2E_CHECKOUT_URL` env var).
-
-**Review fixes (GH-962 follow-up):**
-- Validation: `src/lib/validations/orders.ts` — integer quantity validation, 50-item cap
-- Checkout API: `src/app/api/orders/checkout/route.ts` — product eligibility via tenant/status/deletedAt filters, fixed `p.stock` → `p.inventory` field name bug, `maxDuration = 60`
-- Calculate-shipping API: `src/app/api/orders/calculate-shipping/route.ts` — `maxDuration = 60`, siteId length bound
-- Shipping-config API: `src/app/api/sites/[siteId]/shipping-config/route.ts` — `maxDuration = 60`
-- Dashboard: `src/app/(dashboard)/settings/shipping/shipping-settings-client.tsx` — preserve `enabled` state on save
-- E2E tests: new `e2e/f14-shipping.spec.ts` covering API reachability and auth (RF-03)
+**Total tests:** 138 TC-IDs (TC-F14.01–123b) covering calculation, API validation, edge cases, integration, unit validation. All Phase 1–3 tests pass.
 
 ---
 

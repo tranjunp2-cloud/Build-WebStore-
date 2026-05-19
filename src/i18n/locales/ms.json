@@ -1314,8 +1314,14 @@
         "saveChanges": "Simpan Perubahan",
         "savedSuccess": "Tetapan penghantaran disimpan",
         "saveError": "Gagal menyimpan tetapan",
-        "rateError": "Kadar mestilah 0 – RM 1,000",
-        "freeError": "Had mestilah RM 0.01 – RM 100,000"
+        "freeError": "Had mestilah RM 0.01 – RM 100,000",
+        "errorEmpty": "Wajib diisi",
+        "errorNegative": "Tidak boleh negatif",
+        "errorTooHigh": "Maksimum RM 1,000",
+        "errorFormat": "Hanya nombor, max 2 titik perpuluhan",
+        "warnFree": "Semua pesanan akan dihantar percuma",
+        "helperRange": "Julat: RM 0.00 – RM 1,000.00 (lalai RM 8.00)",
+        "warnThresholdBelowRate": "Ambang lebih rendah dari kadar — pembeli mungkin tidak mendapat penghantaran percuma"
       }
     },
     "blog": {
