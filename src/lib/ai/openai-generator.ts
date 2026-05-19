@@ -357,8 +357,9 @@ export async function generateSiteWithAI(
         const detectedCategory = typeof parsed.category === 'string' ? parsed.category : undefined
 
         // Normalize pipeline language for content-rules lookups.
-        // normalizeLang handles 'auto' → 'en' internally.
-        const contentLang: ContentLang = normalizeLang(language)
+        // Use detectedLang (never 'auto') so Malay/Vietnamese sites get the
+        // correct char limits and placeholder copy, not English fallback.
+        const contentLang: ContentLang = normalizeLang(detectedLang)
 
         // Helper: validate and sanitize an array of raw blocks.
         // Unsupported block drop list lives in ./unsupported-blocks for reuse
