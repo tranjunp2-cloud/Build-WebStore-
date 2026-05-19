@@ -62,12 +62,14 @@ interface BlockLibraryPanelProps {
     selectedBlock: number | null
     onBlockSelect: (index: number) => void
     onAIAction: (action: AIAction) => Promise<void> | void
+    onEditGlobalBlock?: (blockType: string) => void
 }
 
 export function BlockLibraryPanel({
     blocks,
     selectedBlock,
     onAIAction,
+    onEditGlobalBlock,
 }: BlockLibraryPanelProps) {
     const { t } = useI18n()
     const bl = t.editor.blockLibrary
@@ -202,18 +204,20 @@ export function BlockLibraryPanel({
                                             <button
                                                 type="button"
                                                 draggable={!isAlreadyGlobal}
-                                                disabled={isAlreadyGlobal}
                                                 onDragStart={(e) => {
                                                     if (isAlreadyGlobal) { e.preventDefault(); return }
                                                     const blockData = { blockType: item.type, variant: item.defaultVariant }
                                                     e.dataTransfer.setData('application/json', JSON.stringify(blockData))
                                                     e.dataTransfer.effectAllowed = 'copy'
                                                 }}
-                                                onClick={() => { if (!isAlreadyGlobal) handleAddBlock(item.type, item.defaultVariant) }}
+                                                onClick={() => {
+                                                    if (isAlreadyGlobal) { onEditGlobalBlock?.(item.type) }
+                                                    else handleAddBlock(item.type, item.defaultVariant)
+                                                }}
                                                 className={cn(
                                                     "group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all",
                                                     isAlreadyGlobal
-                                                        ? "opacity-50 cursor-not-allowed"
+                                                        ? "opacity-60 hover:border-white/[0.08] hover:bg-white/[0.06] cursor-pointer"
                                                         : "hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]",
                                                 )}
                                             >
@@ -259,7 +263,7 @@ export function BlockLibraryPanel({
                                             </TooltipTrigger>
                                             {isAlreadyGlobal && (
                                                 <TooltipContent side="right">
-                                                    Already added — edit the existing one
+                                                    {bl.alreadyAddedHint ?? 'Already added — click to edit settings'}
                                                 </TooltipContent>
                                             )}
                                             </Tooltip>

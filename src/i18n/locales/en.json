@@ -2515,7 +2515,8 @@
       "globalScopeTooltipDefault": "This component appears globally across all pages of the website.",
       "pageScopeTooltipDefault": "This component only appears on the page you drag it into.",
       "globalScopeLabel": "Global",
-      "pageScopeLabel": "Page-level"
+      "pageScopeLabel": "Page-level",
+      "alreadyAddedHint": "Already added — click to edit settings"
     },
     "inlineEdit": {
       "title": "Inline AI Edit",
@@ -2801,7 +2802,8 @@
       "pricingYesDiscard": "Yes, discard",
       "pricingIncludedToggle": "Included — click to exclude",
       "pricingExcludedToggle": "Excluded — click to include",
-      "pricingDeleteRow": "Delete row {n}"
+      "pricingDeleteRow": "Delete row {n}",
+      "cartDeleteLocked": "Cart is required when product blocks are present"
     },
     "statusBar": {
       "connected": "Connected",

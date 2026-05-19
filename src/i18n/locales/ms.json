@@ -2515,7 +2515,8 @@
       "globalScopeTooltipDefault": "Komponen ini muncul secara global di semua halaman laman web.",
       "pageScopeTooltipDefault": "Komponen ini hanya muncul di halaman yang anda seret masuk.",
       "globalScopeLabel": "Global",
-      "pageScopeLabel": "Peringkat Halaman"
+      "pageScopeLabel": "Peringkat Halaman",
+      "alreadyAddedHint": "Sudah ditambah — klik untuk edit tetapan"
     },
     "inlineEdit": {
       "title": "Suntingan AI Sebaris",
@@ -2801,7 +2802,8 @@
       "pricingYesDiscard": "Ya, buang",
       "pricingIncludedToggle": "Disertakan — klik untuk kecualikan",
       "pricingExcludedToggle": "Dikecualikan — klik untuk sertakan",
-      "pricingDeleteRow": "Padam baris {n}"
+      "pricingDeleteRow": "Padam baris {n}",
+      "cartDeleteLocked": "Troli diperlukan apabila blok produk hadir"
     },
     "statusBar": {
       "connected": "Disambungkan",

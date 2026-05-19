@@ -1234,6 +1234,10 @@ export default function EditorPage() {
                     selectedBlock={selectedBlock}
                     onBlockSelect={handleMobileBlockSelect}
                     onAIAction={handleAIAction}
+                    onEditGlobalBlock={(blockType) => {
+                        handleBlockSelectWithContext(-1, blockType)
+                        if (!rightSidebarVisible) useWorkspaceStore.getState().toggleRight()
+                    }}
                 />
             ) : null}
 
