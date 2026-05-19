@@ -1,4 +1,4 @@
-const COMMERCE_BLOCK_TYPES = new Set(['products-grid', 'products-featured', 'product-quick-view'])
+export const COMMERCE_BLOCK_TYPES = new Set(['products-grid', 'products-featured', 'product-quick-view'])
 
 export function detectCommercePresence(pages: Array<{ layout?: unknown[] }>): boolean {
     return pages.some(p =>

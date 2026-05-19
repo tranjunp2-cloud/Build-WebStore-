@@ -5,6 +5,7 @@
  */
 
 import { create } from 'zustand'
+import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -307,11 +308,19 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const newBlocks = [...blocks]
         newBlocks.splice(safeAfterIndex + 1, 0, block)
 
-        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual', globalBlocks)
+        // Auto-restore cart when a commerce block is added and cart was explicitly deleted.
+        // null = user had deleted it; restoring to default floating so the cart re-appears.
+        const needsCartRestore = COMMERCE_BLOCK_TYPES.has(block.blockType) && globalBlocks?.cartWidget === null
+        const effectiveGlobalBlocks = needsCartRestore
+            ? { ...globalBlocks, cartWidget: { blockType: 'cartWidget', variant: 'floating' } as BlockData }
+            : globalBlocks
+
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual', effectiveGlobalBlocks)
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
             blocks: newBlocks,
+            globalBlocks: effectiveGlobalBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
         })

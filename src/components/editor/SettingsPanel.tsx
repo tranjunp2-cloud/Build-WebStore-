@@ -254,8 +254,6 @@ interface SettingsPanelProps {
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
     /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
     requestedTab?: { tab: SettingsTab; key: number; section?: string } | null
-    /** Called when user flips a global block's variant (floating ↔ inline). Page handles store mutation + iframe sync + selectedBlock update. */
-    onVariantFlip?: (blockType: string, newVariant: 'inline' | 'floating', sourceIndex?: number) => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -263,7 +261,7 @@ function SettingsPanelInner({
     block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages, currentPageId,
     onThemeChange, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
-    requestedTab, onVariantFlip,
+    requestedTab,
 }: SettingsPanelProps) {
     const { t, ti } = useI18n()
     const pm = t.editor.pageManager
@@ -1215,7 +1213,6 @@ function SettingsPanelInner({
     // site.globalBlocks. Reads go to the live store entry; writes route to updateGlobalBlock.
     const storeGlobalBlocks = useEditorStore(state => state.globalBlocks)
     const storeUpdateGlobalBlock = useEditorStore(state => state.updateGlobalBlock)
-    const storeFlipBlockVariant = useEditorStore(state => state.flipBlockVariant)
 
     const isGlobal = block?.__editorBlockIndex === -1
     const globalKey = bt ? BLOCK_TYPE_TO_KEY[bt] : undefined
@@ -1236,18 +1233,6 @@ function SettingsPanelInner({
             storeUpdateGlobalBlock(globalKey, { [field]: value })
         } else {
             onBlockFieldChange(currentBlockIndex, field, value)
-        }
-    }
-
-    const handleVariantChange = (newVariant: string) => {
-        if (!bt) return
-        if (newVariant === (effectiveBlock?.variant || 'floating')) return
-        const variant = newVariant as 'inline' | 'floating'
-        const sourceIdx = isGlobal ? undefined : currentBlockIndex
-        if (onVariantFlip) {
-            onVariantFlip(bt, variant, sourceIdx)
-        } else {
-            storeFlipBlockVariant(bt, variant, sourceIdx)
         }
     }
 
@@ -2105,26 +2090,6 @@ function SettingsPanelInner({
                                                             placeholder={s.stayConnected}
                                                         />
                                                     </div>
-                                                    <div>
-                                                        <label className={labelCls}>{s.displayStyle}</label>
-                                                        <div className="mt-2 grid grid-cols-2 gap-2">
-                                                            {['floating', 'inline'].map(variant => (
-                                                                <button
-                                                                    key={variant}
-                                                                    type="button"
-                                                                    onClick={() => handleVariantChange(variant)}
-                                                                    className={cn(
-                                                                        'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                                                        ((effectiveBlock?.variant ?? block?.variant) || 'floating') === variant
-                                                                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                            : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                                    )}
-                                                                >
-                                                                    {variant}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
                                                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                                                         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
                                                             {s.platforms}
@@ -2195,26 +2160,6 @@ function SettingsPanelInner({
                                             <p className="mt-2 text-xs text-slate-400">
                                                 {s.checkoutDesc}
                                             </p>
-                                        </div>
-                                        <div>
-                                            <label className={labelCls}>{s.displayStyle}</label>
-                                            <div className="mt-2 grid grid-cols-2 gap-2">
-                                                {['floating', 'inline'].map(variant => (
-                                                    <button
-                                                        key={variant}
-                                                        type="button"
-                                                        onClick={() => handleVariantChange(variant)}
-                                                        className={cn(
-                                                            'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                                            ((effectiveBlock?.variant ?? block?.variant) || 'floating') === variant
-                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                        )}
-                                                    >
-                                                        {variant}
-                                                    </button>
-                                                ))}
-                                            </div>
                                         </div>
                                         <div>
                                             <label className={labelCls}>{s.buttonLabel}</label>
@@ -2297,43 +2242,26 @@ function SettingsPanelInner({
                                                 )
                                             })()}
                                         </div>
-                                        {/* Button text — inline only (issue #892) */}
-                                        {((effectiveBlock?.variant ?? block?.variant) || 'floating') === 'inline' && (
-                                            <div>
-                                                <label className={labelCls}>{s.buttonLabel}</label>
-                                                <Input
-                                                    defaultValue={(effectiveBlock?.label as string) || 'Chat with us'}
-                                                    key={`wa-label-${bk}`}
-                                                    onBlur={(e: FieldBlurEvent) => handleBlockFieldChange('label', sanitizeInput(e.target.value))}
-                                                    variant="editor"
-                                                    className={editorInputClassName}
-                                                    placeholder="Chat with us"
-                                                />
+                                        <div>
+                                            <label className={labelCls}>{s.whatsappPosition}</label>
+                                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                                {(['bottom-right', 'bottom-left'] as const).map(pos => (
+                                                    <button
+                                                        key={pos}
+                                                        type="button"
+                                                        onClick={() => handleBlockUpdate({ position: pos })}
+                                                        className={cn(
+                                                            'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                                                            ((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos
+                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
+                                                        )}
+                                                    >
+                                                        {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
+                                                    </button>
+                                                ))}
                                             </div>
-                                        )}
-                                        {/* Position — floating only */}
-                                        {((effectiveBlock?.variant ?? block?.variant) || 'floating') === 'floating' && (
-                                            <div>
-                                                <label className={labelCls}>{s.whatsappPosition}</label>
-                                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                                    {(['bottom-right', 'bottom-left'] as const).map(pos => (
-                                                        <button
-                                                            key={pos}
-                                                            type="button"
-                                                            onClick={() => handleBlockUpdate({ position: pos })}
-                                                            className={cn(
-                                                                'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                                                ((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos
-                                                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                            )}
-                                                        >
-                                                            {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                             )}

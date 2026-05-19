@@ -442,10 +442,11 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 |:---|:---|:---|:---|:---|:---|
 | **TC-F10-GBL-010** | Unit | Critical | globalEntry present → injected with __editorBlockIndex:-1, variant:floating | Global path injects correctly | GH-1023 Phase05 |
 | **TC-F10-GBL-011** | Unit | Critical | globalEntry present + stale floating in layout → deduped to 1 | No duplicate floating blocks | GH-1023 Phase05 |
-| **TC-F10-GBL-012** | Unit | High | globalEntry present + INLINE in layout → both preserved | Inline variant coexists with global floating | GH-1023 Phase05 |
-| **TC-F10-GBL-013** | Unit | High | globalEntry null + page-scan hit → BC fallback injects from page | Legacy sites continue to work | GH-1023 Phase05 |
-| **TC-F10-GBL-014** | Unit | High | globalEntry null + no page-scan + autoInject + commerce → auto-inject | Cart auto-inject for commerce sites | GH-1023 Phase05 |
-| **TC-F10-GBL-015** | Unit | Medium | globalEntry null + no page-scan + autoInject=false → nothing added | No inject when autoInject disabled | GH-1023 Phase05 |
+| **TC-F10-GBL-012** | Unit | High | globalEntry present + legacy copy in layout → deduplicated to 1 global floating | Inline variant removed; all stale copies stripped | GH-1023 Phase05 |
+| **TC-F10-GBL-013** | Unit | High | globalEntry undefined + page-scan hit → BC fallback injects from page | Legacy sites continue to work | GH-1023 Phase05 |
+| **TC-F10-GBL-014** | Unit | High | globalEntry undefined + no page-scan + autoInject + commerce → auto-inject | Cart auto-inject for commerce sites | GH-1023 Phase05 |
+| **TC-F10-GBL-015** | Unit | Medium | globalEntry undefined + no page-scan + autoInject=false → nothing added | No inject when autoInject disabled | GH-1023 Phase05 |
+| **TC-F10-GBL-016** | Unit | Critical | globalEntry null (explicitly deleted) → block removed, all fallbacks skipped | Preview sync works on delete | GH-1023 Phase05 |
 
 #### F.3 EditorStore globalBlocks actions [TC-F10-GBL-020..028]
 
@@ -460,6 +461,7 @@ Cung cấp ma trận kiểm thử **triệt để** cho Storefront Commerce (F09
 | **TC-F10-GBL-026** | Unit | Critical | flipBlockVariant inline→floating: blocks spliced, globalBlocks set | Atomic promotion to global | GH-1023 Phase05 |
 | **TC-F10-GBL-027** | Unit | High | performSave body includes globalBlocks when non-null | Non-null state sent to API | GH-1023 Phase05 |
 | **TC-F10-GBL-028** | Unit | High | performSave body omits globalBlocks when null | Legacy sites not wiped on save | GH-1023 Phase05 |
+| **TC-F10-GBL-029** | Unit | Critical | addBlock commerce type + cartWidget null → cart auto-restored to floating | Cart re-appears when product block added after cart deleted | GH-1023 Phase05 |
 
 #### F.4 Save API — partial-update semantics [TC-F10-GBL-030..033]
 

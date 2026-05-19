@@ -10,6 +10,7 @@
  *   TC-F10-GBL-026 → flipBlockVariant inline→floating: blocks spliced, globalBlocks set
  *   TC-F10-GBL-027 → performSave body includes globalBlocks when non-null
  *   TC-F10-GBL-028 → performSave body omits globalBlocks when state never set (null)
+ *   TC-F10-GBL-029 → addBlock commerce type + cartWidget null → cart auto-restored to floating
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
@@ -202,5 +203,34 @@ describe('EditorStore — globalBlocks actions', () => {
         const blocksBefore = useEditorStore.getState().blocks.length
         useEditorStore.getState().flipBlockVariant('unknown-type', 'floating', 1)
         expect(useEditorStore.getState().blocks.length).toBe(blocksBefore)
+    })
+
+    // ── TC-F10-GBL-029 ────────────────────────────────────────────────
+    it('[TC-F10-GBL-029] addBlock commerce type + cartWidget null → cart auto-restored to floating', () => {
+        // Arrange — site with cart explicitly deleted
+        const deletedCartGb = { cartWidget: null, whatsappButton: null, socialWidget: null }
+        useEditorStore.getState().init('site-1', [makeBlock('hero')], {}, 'Test', null, null, deletedCartGb)
+        expect(useEditorStore.getState().globalBlocks?.cartWidget).toBeNull()
+
+        // Act — add a commerce block
+        useEditorStore.getState().addBlock(0, makeBlock('products-grid'))
+
+        // Assert — cart restored to default floating entry
+        const cart = useEditorStore.getState().globalBlocks?.cartWidget
+        expect(cart).not.toBeNull()
+        expect((cart as Record<string, unknown>)?.blockType).toBe('cartWidget')
+        expect((cart as Record<string, unknown>)?.variant).toBe('floating')
+    })
+
+    it('[TC-F10-GBL-029b] addBlock non-commerce type + cartWidget null → cart stays null', () => {
+        // Arrange
+        const deletedCartGb = { cartWidget: null, whatsappButton: null, socialWidget: null }
+        useEditorStore.getState().init('site-1', [makeBlock('hero')], {}, 'Test', null, null, deletedCartGb)
+
+        // Act — add a non-commerce block
+        useEditorStore.getState().addBlock(0, makeBlock('testimonials'))
+
+        // Assert — cart stays null (no interference)
+        expect(useEditorStore.getState().globalBlocks?.cartWidget).toBeNull()
     })
 })
