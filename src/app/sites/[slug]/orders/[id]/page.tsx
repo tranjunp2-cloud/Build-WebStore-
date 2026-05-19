@@ -3,14 +3,20 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import OrderTrackingClient from './OrderTrackingClient'
+import UploadClient from './UploadClient'
 import { OT_CSS } from './order-tracking-styles'
+
+const UPLOAD_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
 
 export default async function OrderTrackingPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ slug: string; id: string }>
+    searchParams: Promise<{ token?: string }>
 }) {
-    const { slug, id } = await params
+    const [{ slug, id }, sp] = await Promise.all([params, searchParams])
+    const token = sp.token ?? ''
     const payload = await getPayload({ config })
 
     const tenantResult = await payload.find({
@@ -47,6 +53,76 @@ export default async function OrderTrackingPage({
     } catch { /* order stays null */ }
     if (!order) notFound()
 
+    const siteTheme = site.theme ?? null
+    const themeCSS = siteTheme
+        ? generateThemeCSS(resolveTheme({
+            primaryColor: siteTheme.primaryColor,
+            secondaryColor: siteTheme.secondaryColor,
+            accentColor: siteTheme.accentColor,
+            surfaceColor: siteTheme.surfaceColor,
+            textColor: siteTheme.textColor,
+            mutedColor: siteTheme.mutedColor,
+            fontPairingId: siteTheme.fontPairingId,
+            fontHeading: siteTheme.fontHeading,
+            fontBody: siteTheme.fontBody,
+            colorMode: siteTheme.colorMode,
+            backgroundColor: siteTheme.backgroundColor,
+        }))
+        : ''
+
+    const thFontHeading = siteTheme?.fontHeading ?? 'Outfit'
+    const thFontBody = siteTheme?.fontBody ?? 'Inter'
+    const sanitizeFont = (f: string) => f.replace(/[^a-zA-Z0-9 -]/g, '')
+    const fonts = [thFontHeading, thFontBody]
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .map(sanitizeFont)
+    const googleFontsHref = `https://fonts.googleapis.com/css2?${fonts.map(f => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@300;400;500;600;700;800;900`).join('&')}&subset=latin,vietnamese&display=swap`
+
+    const fontLinks = (
+        <>
+            <link rel="preconnect" href="https://fonts.googleapis.com" />
+            <link crossOrigin="anonymous" href="https://fonts.gstatic.com" rel="preconnect" />
+            {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+            <link rel="stylesheet" href={googleFontsHref} />
+            {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
+        </>
+    )
+
+    // Bank transfer pending payment — show upload interface
+    const isBtPending =
+        order.paymentMethod === 'bank_transfer' &&
+        UPLOAD_STATUSES.has(order.paymentStatus ?? '')
+
+    if (isBtPending) {
+        const pc = site.paymentConfig ?? {}
+        const _qr = pc.merchantQrCode
+        const qrUrl: string = (_qr && typeof _qr === 'object') ? (_qr.url ?? '') : ''
+        const expiresAt = order.paymentExpiresAt
+        const expiresAtIso: string = expiresAt
+            ? (typeof expiresAt === 'string' ? expiresAt : new Date(expiresAt).toISOString())
+            : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+
+        return (
+            <>
+                {fontLinks}
+                <UploadClient
+                    orderId={order.id}
+                    slug={slug}
+                    token={token}
+                    status={order.paymentStatus as 'awaiting_payment' | 'pending_verification'}
+                    paymentReference={order.paymentReference ?? ''}
+                    total={order.total ?? 0}
+                    currency={order.currency ?? 'MYR'}
+                    expiresAtIso={expiresAtIso}
+                    bankName={pc.bankName ?? ''}
+                    bankAccountNo={pc.bankAccountNo ?? ''}
+                    bankAccountHolder={pc.bankAccountHolder ?? ''}
+                    qrUrl={qrUrl || undefined}
+                />
+            </>
+        )
+    }
+
     const sanitizedOrder = {
         id: order.id,
         orderNumber: order.orderNumber,
@@ -78,40 +154,10 @@ export default async function OrderTrackingPage({
         },
     }
 
-    const siteTheme = site.theme ?? null
-    const themeCSS = siteTheme
-        ? generateThemeCSS(resolveTheme({
-            primaryColor: siteTheme.primaryColor,
-            secondaryColor: siteTheme.secondaryColor,
-            accentColor: siteTheme.accentColor,
-            surfaceColor: siteTheme.surfaceColor,
-            textColor: siteTheme.textColor,
-            mutedColor: siteTheme.mutedColor,
-            fontPairingId: siteTheme.fontPairingId,
-            fontHeading: siteTheme.fontHeading,
-            fontBody: siteTheme.fontBody,
-            colorMode: siteTheme.colorMode,
-            backgroundColor: siteTheme.backgroundColor,
-        }))
-        : ''
-
-    const thFontHeading = siteTheme?.fontHeading ?? 'Outfit'
-    const thFontBody = siteTheme?.fontBody ?? 'Inter'
-    const sanitizeFont = (f: string) => f.replace(/[^a-zA-Z0-9 -]/g, '')
-    const fonts = [thFontHeading, thFontBody]
-        .filter((v, i, a) => a.indexOf(v) === i)
-        .map(sanitizeFont)
-    const googleFontsHref = `https://fonts.googleapis.com/css2?${fonts.map(f => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@300;400;500;600;700;800;900`).join('&')}&subset=latin,vietnamese&display=swap`
-
     return (
         <>
-            <link rel="preconnect" href="https://fonts.googleapis.com" />
-            <link crossOrigin="anonymous" href="https://fonts.gstatic.com" rel="preconnect" />
-            {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-            <link rel="stylesheet" href={googleFontsHref} />
-            {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
+            {fontLinks}
             <style dangerouslySetInnerHTML={{ __html: OT_CSS }} />
-
             <OrderTrackingClient order={sanitizedOrder} slug={slug} />
         </>
     )
