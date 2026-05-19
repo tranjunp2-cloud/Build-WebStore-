@@ -2,9 +2,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { isNavBlock } from '@/lib/ai/ensure-navigation'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
-import { detectCommercePresence } from '@/lib/site-renderer/detect-commerce-presence'
-import { extractFirstGlobalBlock } from '@/lib/site-renderer/extract-first-global-block'
-import { hasHeaderCart } from '@/lib/site-renderer/has-header-cart'
+import { applyGlobalBlock } from '@/lib/site-renderer/apply-global-block'
 import {
     BROKEN_URL_PREFIX,
     HOMEPAGE_ALIASES,
@@ -46,6 +44,11 @@ export type SiteRendererProps = {
     site: {
         headerBlock?: Record<string, unknown> | null
         footerBlock?: Record<string, unknown> | null
+        globalBlocks?: {
+            cartWidget?: Record<string, unknown> | null
+            whatsappButton?: Record<string, unknown> | null
+            socialWidget?: Record<string, unknown> | null
+        } | null
         theme?: {
             primaryColor?: string
             secondaryColor?: string
@@ -132,38 +135,18 @@ function applyGlobalSystemBlocks(
         nextBlocks.splice(navIdx >= 0 ? navIdx + 1 : 0, 0, breadcrumbBlock)
     }
 
-    // Global floating cart — inject when commerce blocks are detected on any page
-    // and no header-level cart button is already present.
-    if (detectCommercePresence(pages) && !hasHeaderCart(siteHeaderBlock)) {
-        const hasFloatingCart = nextBlocks.some(
-            b => b.blockType === 'cartWidget' && (b as Record<string, unknown>).variant !== 'inline',
-        )
-        if (!hasFloatingCart) {
-            nextBlocks.push({ blockType: 'cartWidget', variant: 'floating', __editorBlockIndex: -1 })
-        }
+    const gb = site.globalBlocks
+
+    if (process.env.NODE_ENV !== 'production' && !gb && pages.length > 0) {
+        console.warn('[SiteRenderer] site.globalBlocks is null — using legacy page-scan fallback')
     }
 
-    // Page-level promote: first whatsapp-button config found across pages → inject globally.
-    const whatsappBlock = extractFirstGlobalBlock(pages, 'whatsapp-button')
-    if (whatsappBlock) {
-        const hasFloatingWhatsapp = nextBlocks.some(
-            b => b.blockType === 'whatsapp-button' && (b as Record<string, unknown>).variant !== 'inline',
-        )
-        if (!hasFloatingWhatsapp) {
-            nextBlocks.push({ ...whatsappBlock, blockType: 'whatsapp-button', __editorBlockIndex: -1 })
-        }
-    }
-
-    // Page-level promote: first socialWidget config found across pages → inject globally.
-    const socialBlock = extractFirstGlobalBlock(pages, 'socialWidget')
-    if (socialBlock) {
-        const hasFloatingSocial = nextBlocks.some(
-            b => b.blockType === 'socialWidget' && (b as Record<string, unknown>).variant !== 'inline',
-        )
-        if (!hasFloatingSocial) {
-            nextBlocks.push({ ...socialBlock, blockType: 'socialWidget', __editorBlockIndex: -1 })
-        }
-    }
+    nextBlocks = applyGlobalBlock(nextBlocks, 'cartWidget', gb?.cartWidget, pages, {
+        autoInject: true,
+        siteHeaderBlock,
+    })
+    nextBlocks = applyGlobalBlock(nextBlocks, 'whatsapp-button', gb?.whatsappButton, pages)
+    nextBlocks = applyGlobalBlock(nextBlocks, 'socialWidget', gb?.socialWidget, pages)
 
     return nextBlocks
 }
@@ -689,10 +672,14 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, isBuild
                             </FloatingContainerProvider>
                         )
                         if (isEditor) {
+                            // Preserve __editorBlockIndex as data attribute when set (e.g. -1 for global injected blocks).
+                            const dataBlockIndex = typeof floatingBlock.__editorBlockIndex === 'number'
+                                ? floatingBlock.__editorBlockIndex
+                                : editorIdx
                             return (
                                 <div
                                     key={blockIndex}
-                                    data-block-index={editorIdx}
+                                    data-block-index={dataBlockIndex}
                                     data-block-type={floatingBlock.blockType}
                                     className="group/block relative"
                                 >

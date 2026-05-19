@@ -76,7 +76,7 @@ export const socialWidgetMeta = {
     quickActions: ['Add social link', 'Update platform URLs'],
     category: 'widgets' as const,
     scope: 'global' as const,
-    scopeTooltip: 'Widget mạng xã hội nổi xuất hiện trên toàn bộ site. Cấu hình 1 lần từ bất kỳ trang nào.',
+    scopeTooltip: 'Các biểu tượng mạng xã hội sẽ xuất hiện đồng bộ xuyên suốt toàn bộ website giúp tăng khả năng kết nối.',
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

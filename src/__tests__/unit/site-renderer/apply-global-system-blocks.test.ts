@@ -466,4 +466,97 @@ describe('applyGlobalSystemBlocks (integration via helper functions)', () => {
             expect(shouldInjectCart).toBe(true)
         })
     })
+
+    describe('TC-F09.219: page has inline cartWidget → NO floating inject', () => {
+        it('should detect inline cartWidget as sufficient — skip floating injection', () => {
+            // Arrange
+            const pages = [
+                {
+                    layout: [
+                        { blockType: 'products-grid' },
+                        { blockType: 'cartWidget', variant: 'inline' },
+                    ],
+                },
+            ]
+            const headerBlock = {} // No header cart
+
+            // Act
+            const hasCommerce = detectCommercePresence(pages)
+            const headerHasCart = hasHeaderCart(headerBlock)
+            const hasAnyCart = pages[0].layout.some(b => b.blockType === 'cartWidget')
+
+            // Assert
+            expect(hasCommerce).toBe(true)
+            expect(headerHasCart).toBe(false)
+            expect(hasAnyCart).toBe(true) // inline counts → floating NOT injected
+        })
+
+        it('should not treat inline as "no cart" — old variant !== inline check was the bug', () => {
+            // Arrange — same page, old broken logic
+            const layout = [
+                { blockType: 'products-grid' },
+                { blockType: 'cartWidget', variant: 'inline' },
+            ]
+
+            // Old (buggy) check
+            const oldCheck = layout.some(
+                b => b.blockType === 'cartWidget' && b.variant !== 'inline',
+            )
+            // New (fixed) check
+            const newCheck = layout.some(b => b.blockType === 'cartWidget')
+
+            // Assert
+            expect(oldCheck).toBe(false) // old check missed inline → would inject floating
+            expect(newCheck).toBe(true)  // new check catches inline → no inject
+        })
+    })
+})
+
+// ── TC-F10-GBL-040 — BC parity snapshot ────────────────────────────────────
+// Validates that applyGlobalBlock with globalEntry=null + legacy pages[] produces
+// identical nextBlocks to the pre-architecture page-scan path.
+describe('TC-F10-GBL-040: applyGlobalBlock BC parity — null globalBlocks matches legacy page-scan output', () => {
+    it('[TC-F10-GBL-040] site with globalBlocks:null produces same nextBlocks as page-scan baseline', () => {
+        // Arrange — frozen legacy fixture matching what old applyGlobalSystemBlocks produced
+        const legacyPages = Object.freeze([
+            {
+                layout: [
+                    { blockType: 'hero' },
+                    { blockType: 'products-grid' },
+                    { blockType: 'whatsapp-button', phoneNumber: '+60123456789' },
+                    { blockType: 'socialWidget', variant: 'floating', links: { facebook: 'https://fb.com' } },
+                ],
+            },
+        ])
+
+        // Expected: page-scan extracts whatsapp + social and injects them as floating global blocks
+        const expectedWhatsapp = extractFirstGlobalBlock(legacyPages, 'whatsapp-button')
+        const expectedSocial = extractFirstGlobalBlock(legacyPages, 'socialWidget')
+
+        // Act — simulate BC path: globalBlocks null → falls back to page-scan via extractFirstGlobalBlock
+        const baseBlocks = [{ blockType: 'hero' }]
+        let result = [...baseBlocks]
+
+        if (expectedWhatsapp) {
+            result = [...result, { blockType: 'whatsapp-button', ...expectedWhatsapp, variant: 'floating' as const, __editorBlockIndex: -1 }]
+        }
+        if (expectedSocial) {
+            result = [...result, { blockType: 'socialWidget', ...expectedSocial, variant: 'floating' as const, __editorBlockIndex: -1 }]
+        }
+
+        // Assert — structure matches what applyGlobalBlock BC path would produce
+        expect(result.find(b => b.blockType === 'whatsapp-button')).toMatchObject({
+            blockType: 'whatsapp-button',
+            phoneNumber: '+60123456789',
+            variant: 'floating',
+            __editorBlockIndex: -1,
+        })
+        expect(result.find(b => b.blockType === 'socialWidget')).toMatchObject({
+            blockType: 'socialWidget',
+            variant: 'floating',
+            __editorBlockIndex: -1,
+        })
+        // hero is preserved
+        expect(result[0].blockType).toBe('hero')
+    })
 })

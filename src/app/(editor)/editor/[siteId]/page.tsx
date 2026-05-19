@@ -14,7 +14,7 @@ import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import type { PreviewFrameHandle } from '@/components/editor/PreviewFrame'
 import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { useWorkspaceShortcuts } from '@/hooks/useWorkspaceShortcuts'
 import { EDITOR_SIDEBAR_WIDTH, SETTINGS_PANEL_WIDTH } from '@/components/editor/layout-constants'
@@ -100,6 +100,7 @@ export default function EditorPage() {
 
     const { t, ti } = useI18n()
     const [selectedBlock, setSelectedBlock] = useState<number | null>(null)
+    const [selectedGlobalBlockType, setSelectedGlobalBlockType] = useState<string | null>(null)
     const [site, setSite] = useState<SiteData | null>(null)
     const [page, setPage] = useState<LoadedPageData | null>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -159,6 +160,7 @@ export default function EditorPage() {
     const updateSiteName = useEditorStore(state => state.updateSiteName)
     const headerBlock = useEditorStore(state => state.headerBlock)
     const footerBlock = useEditorStore(state => state.footerBlock)
+    const globalBlocks = useEditorStore(state => state.globalBlocks)
     const updateHeaderBlock = useEditorStore(state => state.updateHeaderBlock)
     const updateFooterBlock = useEditorStore(state => state.updateFooterBlock)
     const undo = useEditorStore(state => state.undo)
@@ -170,10 +172,15 @@ export default function EditorPage() {
     const setIsSaving = useEditorStore(state => state.setIsSaving)
     const setAutoSaveEnabled = useEditorStore(state => state.setAutoSaveEnabled)
 
-    const currentBlock = useMemo(
-        () => (selectedBlock !== null ? blocks[selectedBlock] || null : null),
-        [blocks, selectedBlock],
-    )
+    const currentBlock = useMemo(() => {
+        if (selectedBlock === null) return null
+        if (selectedBlock === -1) {
+            const key = selectedGlobalBlockType ? BLOCK_TYPE_TO_KEY[selectedGlobalBlockType] : undefined
+            const data = key ? globalBlocks?.[key] : null
+            return data ? { ...data, __editorBlockIndex: -1 } : null
+        }
+        return blocks[selectedBlock] || null
+    }, [blocks, selectedBlock, selectedGlobalBlockType, globalBlocks])
     const isPublished = site?.status === 'published'
     const wasPublished = !isPublished && !!site?.publishedAt
     const siteUrl = useMemo(() => {
@@ -265,7 +272,7 @@ export default function EditorPage() {
                     setCurrentPageId('')
                 }
 
-                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null)
+                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null, data.site?.globalBlocks || null)
 
                 if (pagesRes.ok) {
                     const pagesData = await pagesRes.json()
@@ -446,6 +453,11 @@ export default function EditorPage() {
         if (!pages.length) return
         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_PAGES', pages })
     }, [pages])
+
+    // Sync globalBlocks changes to preview iframe (covers all mutation paths: add, delete, undo, redo, settings).
+    useEffect(() => {
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks })
+    }, [globalBlocks])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -645,6 +657,22 @@ export default function EditorPage() {
         void saveWithRetry({ showToast: false, refreshPreview: false })
     }, [updateBlock, saveWithRetry])
 
+    const handleVariantFlip = useCallback((blockType: string, newVariant: 'inline' | 'floating', sourceIndex?: number) => {
+        useEditorStore.getState().flipBlockVariant(blockType, newVariant, sourceIndex)
+        const newState = useEditorStore.getState()
+        // Sync full layout to iframe (blocks[] changed in both directions)
+        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: newState.blocks })
+        if (newVariant === 'inline') {
+            // floating → inline: block moved to end of blocks[]
+            setSelectedBlock(newState.blocks.length - 1)
+            setSelectedGlobalBlockType(null)
+        } else {
+            // inline → floating: block moved to globalBlocks
+            setSelectedBlock(-1)
+            setSelectedGlobalBlockType(blockType)
+        }
+    }, [])
+
     const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return
         reorderBlocks(fromIndex, toIndex)
@@ -691,6 +719,12 @@ export default function EditorPage() {
     }, [siteId])
 
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
+        const globalKey = BLOCK_TYPE_TO_KEY[blockData.blockType]
+        if (blockData.variant === 'floating' && globalKey) {
+            useEditorStore.getState().updateGlobalBlock(globalKey, { blockType: blockData.blockType, variant: 'floating' })
+            return
+        }
+
         const nextBlock = normalizeAddSectionBlock(
             {
                 instruction: `Add ${blockData.blockType} block`,
@@ -1156,11 +1190,13 @@ export default function EditorPage() {
     const handleBlockSelectWithContext = useCallback((blockIndex: number | null, blockType?: string) => {
         if (blockType === 'navigation' || blockType === 'footer' || blockType === 'breadcrumb') {
             setSelectedBlock(null)
+            setSelectedGlobalBlockType(null)
             // Use unique key to force re-trigger even on repeated clicks
             const sectionMap: Record<string, string> = { breadcrumb: 'breadcrumb', footer: 'footer' }
             setSettingsRequestedTab({ tab: 'menu', key: Date.now(), section: blockType ? sectionMap[blockType] : undefined })
         } else {
             setSelectedBlock(blockIndex)
+            setSelectedGlobalBlockType(blockIndex === -1 ? (blockType ?? null) : null)
             setSettingsRequestedTab(null)
         }
     }, [])
@@ -1357,6 +1393,7 @@ export default function EditorPage() {
                                     onSiteSettingsChange={handleSiteSettingsChange}
                                     onPageUpdate={handlePageUpdate}
                                     requestedTab={settingsRequestedTab}
+                                    onVariantFlip={handleVariantFlip}
                                 />
                             </div>
                         </div>
@@ -1507,6 +1544,7 @@ export default function EditorPage() {
                             onSiteSettingsChange={handleSiteSettingsChange}
                             onPageUpdate={handlePageUpdate}
                             requestedTab={settingsRequestedTab}
+                            onVariantFlip={handleVariantFlip}
                         />
                     </div>
                 </div>

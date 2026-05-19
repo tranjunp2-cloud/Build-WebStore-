@@ -8,10 +8,12 @@ interface DeleteBlockConfirmProps {
     open: boolean
     onConfirm: () => void
     onCancel: () => void
+    scope?: 'page' | 'global'
 }
 
-export function DeleteBlockConfirm({ blockName, open, onConfirm, onCancel }: DeleteBlockConfirmProps) {
+export function DeleteBlockConfirm({ blockName, open, onConfirm, onCancel, scope = 'page' }: DeleteBlockConfirmProps) {
     const label = blockName.replace(/-/g, ' ')
+    const isGlobal = scope === 'global'
 
     return (
         <Dialog.Root open={open} onOpenChange={(v) => { if (!v) onCancel() }}>
@@ -34,14 +36,24 @@ export function DeleteBlockConfirm({ blockName, open, onConfirm, onCancel }: Del
                             {/* Text */}
                             <div className="mt-4 text-center">
                                 <Dialog.Title className="text-xl font-semibold text-white">
-                                    Delete block?
+                                    {isGlobal ? 'Remove from all pages?' : 'Delete block?'}
                                 </Dialog.Title>
                                 <Dialog.Description className="mt-2 text-sm leading-6 text-[#CBD5E1]">
-                                    Block{' '}
-                                    <span className="font-medium capitalize text-[#2DD4BF]">
-                                        &quot;{label}&quot;
-                                    </span>{' '}
-                                    will be permanently removed.
+                                    {isGlobal ? (
+                                        <>
+                                            The{' '}
+                                            <span className="font-medium capitalize text-[#2DD4BF]">{label}</span>{' '}
+                                            widget will be removed from every page on this site.
+                                        </>
+                                    ) : (
+                                        <>
+                                            Block{' '}
+                                            <span className="font-medium capitalize text-[#2DD4BF]">
+                                                &quot;{label}&quot;
+                                            </span>{' '}
+                                            will be permanently removed.
+                                        </>
+                                    )}
                                 </Dialog.Description>
                             </div>
 

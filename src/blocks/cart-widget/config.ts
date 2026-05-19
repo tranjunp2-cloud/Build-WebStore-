@@ -27,7 +27,7 @@ export const cartWidgetMeta = {
     aiVisible: true,
     category: 'commerce' as const,
     scope: 'global' as const,
-    scopeTooltip: 'Hiển thị trên toàn bộ site khi có sản phẩm. Chỉ cần cấu hình 1 lần.',
+    scopeTooltip: 'Thành phần hiển thị trên toàn bộ website khi trang có sản phẩm, giúp khách hàng kiểm tra giỏ hàng và thanh toán ở bất kỳ đâu.',
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

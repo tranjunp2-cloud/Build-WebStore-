@@ -2470,7 +2470,8 @@
         },
         "cartWidget": {
           "name": "Cart Button",
-          "description": "Shopping cart widget"
+          "description": "Shopping cart widget",
+          "scopeTooltip": "This component appears across the entire website when a page has products, helping customers check their cart and checkout from anywhere."
         },
         "contact": {
           "name": "Contact",
@@ -2482,7 +2483,8 @@
         },
         "whatsapp-button": {
           "name": "WhatsApp Button",
-          "description": "WhatsApp contact button"
+          "description": "WhatsApp contact button",
+          "scopeTooltip": "The support chat button will automatically appear fixed on all pages of the website after you add it."
         },
         "stats": {
           "name": "Stats",
@@ -2494,7 +2496,8 @@
         },
         "socialWidget": {
           "name": "Social Media",
-          "description": "Social media links widget"
+          "description": "Social media links widget",
+          "scopeTooltip": "Social media icons will appear synchronised throughout the entire website helping to increase connectivity."
         },
         "team": {
           "name": "Team",
@@ -2508,7 +2511,11 @@
           "name": "Announcement Bar",
           "description": "Top banner for promotions"
         }
-      }
+      },
+      "globalScopeTooltipDefault": "This component appears globally across all pages of the website.",
+      "pageScopeTooltipDefault": "This component only appears on the page you drag it into.",
+      "globalScopeLabel": "Global",
+      "pageScopeLabel": "Page-level"
     },
     "inlineEdit": {
       "title": "Inline AI Edit",

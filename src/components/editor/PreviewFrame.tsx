@@ -7,7 +7,7 @@ import { RichTextToolbar } from './RichTextToolbar'
 import { ImageToolbar } from './ImageToolbar'
 import { BlockActionBar } from './BlockActionBar'
 import { DeleteBlockConfirm } from './DeleteBlockConfirm'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 import { useWorkspaceStore } from '@/store/workspaceStore'
 import { cn } from '@/lib/utils'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
@@ -1351,8 +1351,8 @@ function PreviewFrameInner({
                                     <BlockActionBar
                                         blockIndex={selectedLayout.blockIndex}
                                         blockType={selectedLayout.blockType}
-                                        blockVariant={(blocks[selectedLayout.blockIndex] as Record<string, unknown>)?.variant as string | undefined}
-                                        blockName={blocks[selectedLayout.blockIndex]?.blockType || 'block'}
+                                        blockVariant={selectedLayout.blockIndex >= 0 ? (blocks[selectedLayout.blockIndex] as Record<string, unknown>)?.variant as string | undefined : undefined}
+                                        blockName={selectedLayout.blockIndex >= 0 ? (blocks[selectedLayout.blockIndex]?.blockType || 'block') : selectedLayout.blockType}
                                         totalBlocks={editableLayouts.length}
                                         isMobile={viewport === 'mobile'}
                                         onMoveUp={() => onReorderBlocks?.(selectedLayout.blockIndex, selectedLayout.blockIndex - 1)}
@@ -1633,28 +1633,41 @@ function PreviewFrameInner({
             </div>
 
             {/* Delete block confirmation modal */}
-            <DeleteBlockConfirm
-                open={deleteConfirmIndex !== null}
-                blockName={deleteConfirmIndex !== null ? (blocks[deleteConfirmIndex]?.blockType || 'block') : ''}
-                onConfirm={() => {
-                    if (deleteConfirmIndex === null) return
-                    const blockName = blocks[deleteConfirmIndex]?.blockType || 'block'
-                    onDeleteBlock?.(deleteConfirmIndex)
-                    onBlockSelect?.(null)
-                    setDeleteConfirmIndex(null)
-                    toast.success(`Deleted ${blockName.replace(/-/g, ' ')}`, {
-                        duration: 5000,
-                        action: {
-                            label: 'Undo',
-                            onClick: () => {
-                                const { undo: storeUndo } = useEditorStore.getState()
-                                storeUndo()
-                            },
-                        },
-                    })
-                }}
-                onCancel={() => setDeleteConfirmIndex(null)}
-            />
+            {(() => {
+                const isGlobalDelete = deleteConfirmIndex === -1
+                const deleteBlockType = isGlobalDelete
+                    ? (blockLayouts.find(l => l.blockIndex === -1)?.blockType ?? 'block')
+                    : (deleteConfirmIndex !== null ? (blocks[deleteConfirmIndex]?.blockType ?? 'block') : 'block')
+                return (
+                    <DeleteBlockConfirm
+                        open={deleteConfirmIndex !== null}
+                        blockName={deleteBlockType}
+                        scope={isGlobalDelete ? 'global' : 'page'}
+                        onConfirm={() => {
+                            if (deleteConfirmIndex === null) return
+                            if (isGlobalDelete) {
+                                const key = BLOCK_TYPE_TO_KEY[deleteBlockType]
+                                if (key) useEditorStore.getState().deleteGlobalBlock(key)
+                            } else {
+                                onDeleteBlock?.(deleteConfirmIndex)
+                            }
+                            onBlockSelect?.(null)
+                            setDeleteConfirmIndex(null)
+                            toast.success(`Deleted ${deleteBlockType.replace(/-/g, ' ')}`, {
+                                duration: 5000,
+                                action: {
+                                    label: 'Undo',
+                                    onClick: () => {
+                                        const { undo: storeUndo } = useEditorStore.getState()
+                                        storeUndo()
+                                    },
+                                },
+                            })
+                        }}
+                        onCancel={() => setDeleteConfirmIndex(null)}
+                    />
+                )
+            })()}
         </>
     )
 }

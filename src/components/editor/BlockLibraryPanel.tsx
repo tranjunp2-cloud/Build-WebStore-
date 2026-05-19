@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
 import { useI18n } from '@/i18n'
 import { listAllBlocks } from '@/lib/admin/block-registry-reader'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 
 // ── Category display config (i18n labels + icons, Malay) ──────────────────────
 
@@ -70,7 +72,7 @@ export function BlockLibraryPanel({
     const { t } = useI18n()
     const bl = t.editor.blockLibrary
     const categoryLabels = bl.categories as Record<string, string>
-    const blockTranslations = bl.blocks as Record<string, { name: string; description: string }>
+    const blockTranslations = bl.blocks as Record<string, { name: string; description: string; scopeTooltip?: string }>
     const [query, setQuery] = useState('')
     const [expandedCategory, setExpandedCategory] = useState<string>('basics')
 
@@ -112,7 +114,7 @@ export function BlockLibraryPanel({
                 icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
                 defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
                 scope: b.scope ?? 'page',
-                scopeTooltip: b.scopeTooltip,
+                scopeTooltip: blockTranslations?.[b.slug]?.scopeTooltip ?? b.scopeTooltip,
             })).filter(item => {
                 if (!keyword) return true
                 return (
@@ -130,19 +132,26 @@ export function BlockLibraryPanel({
         }).filter(category => category.items.length > 0 || !query.trim())
     }, [query, baseCategories, blockTranslations])
 
+    const globalBlocks = useEditorStore(state => state.globalBlocks)
+    const updateGlobalBlock = useEditorStore(state => state.updateGlobalBlock)
+
     const handleAddBlock = (blockType: string, variant: string) => {
+        const key = BLOCK_TYPE_TO_KEY[blockType]
+        if (variant === 'floating' && key) {
+            // Floating global block → goes into site.globalBlocks, not page.layout
+            updateGlobalBlock(key, { blockType, variant: 'floating' })
+            return
+        }
         const afterIndex = selectedBlock ?? (blocks.length - 1)
         void onAIAction({
             action: 'add_block',
             afterIndex,
-            block: {
-                blockType,
-                variant,
-            },
+            block: { blockType, variant },
         })
     }
 
     return (
+        <TooltipProvider delayDuration={200}>
         <div className="flex h-full flex-col bg-[#0F172A]">
             <div className="border-b border-white/[0.06] px-4 py-3">
                 <div className="relative">
@@ -183,18 +192,30 @@ export function BlockLibraryPanel({
 
                                 {isExpanded ? (
                                     <div className="mt-1 space-y-1 pb-2">
-                                        {category.items.map(item => (
+                                        {category.items.map(item => {
+                                            const globalKey = BLOCK_TYPE_TO_KEY[item.type]
+                                            const isAlreadyGlobal = item.scope === 'global' && item.defaultVariant === 'floating'
+                                                && !!globalKey && !!globalBlocks?.[globalKey]
+                                            return (
+                                            <Tooltip key={item.type} open={isAlreadyGlobal ? undefined : false}>
+                                            <TooltipTrigger asChild>
                                             <button
-                                                key={item.type}
                                                 type="button"
-                                                draggable={true}
+                                                draggable={!isAlreadyGlobal}
+                                                disabled={isAlreadyGlobal}
                                                 onDragStart={(e) => {
+                                                    if (isAlreadyGlobal) { e.preventDefault(); return }
                                                     const blockData = { blockType: item.type, variant: item.defaultVariant }
                                                     e.dataTransfer.setData('application/json', JSON.stringify(blockData))
                                                     e.dataTransfer.effectAllowed = 'copy'
                                                 }}
-                                                onClick={() => handleAddBlock(item.type, item.defaultVariant)}
-                                                className="group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]"
+                                                onClick={() => { if (!isAlreadyGlobal) handleAddBlock(item.type, item.defaultVariant) }}
+                                                className={cn(
+                                                    "group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all",
+                                                    isAlreadyGlobal
+                                                        ? "opacity-50 cursor-not-allowed"
+                                                        : "hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]",
+                                                )}
                                             >
                                                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15 text-lg">
                                                     {item.icon}
@@ -202,23 +223,48 @@ export function BlockLibraryPanel({
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5">
                                                         <p className="truncate text-[13px] font-medium text-slate-200">{item.name}</p>
-                                                        {item.scope === 'global' && (
-                                                            <span
-                                                                title={item.scopeTooltip ?? 'Block toàn site'}
-                                                                className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold leading-none"
-                                                                style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}
-                                                            >
-                                                                🌐
-                                                            </span>
-                                                        )}
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                {item.scope === 'global' ? (
+                                                                    <span
+                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
+                                                                        style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}
+                                                                    >
+                                                                        🌐 {bl.globalScopeLabel}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span
+                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
+                                                                        style={{ background: 'rgba(148,163,184,0.10)', color: '#94a3b8' }}
+                                                                    >
+                                                                        📄 {bl.pageScopeLabel}
+                                                                    </span>
+                                                                )}
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="right">
+                                                                {item.scope === 'global'
+                                                                    ? (item.scopeTooltip ?? bl.globalScopeTooltipDefault)
+                                                                    : (item.scopeTooltip ?? bl.pageScopeTooltipDefault)}
+                                                            </TooltipContent>
+                                                        </Tooltip>
                                                     </div>
                                                     <p className="truncate text-[11px] text-slate-500">{item.description}</p>
                                                 </div>
-                                                <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
-                                                    {bl.dragHint}
-                                                </span>
+                                                {!isAlreadyGlobal && (
+                                                    <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
+                                                        {bl.dragHint}
+                                                    </span>
+                                                )}
                                             </button>
-                                        ))}
+                                            </TooltipTrigger>
+                                            {isAlreadyGlobal && (
+                                                <TooltipContent side="right">
+                                                    Already added — edit the existing one
+                                                </TooltipContent>
+                                            )}
+                                            </Tooltip>
+                                            )
+                                        })}
                                     </div>
                                 ) : null}
                             </section>
@@ -233,5 +279,6 @@ export function BlockLibraryPanel({
                 </p>
             </div>
         </div>
+        </TooltipProvider>
     )
 }

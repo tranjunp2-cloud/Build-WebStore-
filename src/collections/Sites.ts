@@ -409,6 +409,11 @@ export const Sites: CollectionConfig = {
             type: 'json',
             admin: { description: 'Global footer block for all pages' },
         },
+        {
+            name: 'globalBlocks',
+            type: 'json',
+            admin: { description: 'Global floating widgets (cart, whatsapp, social) shared across all pages' },
+        },
     ],
     timestamps: true,
 }
