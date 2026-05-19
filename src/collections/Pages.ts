@@ -206,6 +206,10 @@ const ContactBlock = {
                 { name: 'placeholder', type: 'text' },
             ],
         },
+        { name: 'submitLabel', type: 'text', defaultValue: 'Send Message' },
+        { name: 'phoneLabel', type: 'text', defaultValue: 'Phone' },
+        { name: 'addressLabel', type: 'text', defaultValue: 'Address' },
+        { name: 'emailLabel', type: 'text', defaultValue: 'Email' },
         { name: 'showMap', type: 'checkbox', defaultValue: false },
         { name: 'mapEmbedUrl', type: 'text' },
     ],
@@ -358,6 +362,7 @@ const TestimonialsBlock = {
     labels: { singular: 'Testimonials Section', plural: 'Testimonials Sections' },
     fields: [
         { name: 'headline', type: 'text', defaultValue: 'What Our Customers Say' },
+        { name: 'subheadline', type: 'textarea' },
         {
             name: 'variant',
             type: 'select',
