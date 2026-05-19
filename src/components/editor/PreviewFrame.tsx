@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 import { useI18n } from '@/i18n'
+import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
 
 const ALLOWED_FOOTER_FIELDS = new Set(['copyrightText', 'tagline'])
 
@@ -244,6 +245,10 @@ function PreviewFrameInner({
 }: PreviewFrameProps) {
     const { t } = useI18n()
     const { blocks, updateBlock, performSave, setIsInlineEditing, theme: storeTheme } = useEditorStore()
+    const isCartLocked = useMemo(
+        () => blocks.some(b => COMMERCE_BLOCK_TYPES.has((b as Record<string, unknown>).blockType as string ?? '')),
+        [blocks],
+    )
     const leftSidebarVisible = useWorkspaceStore((s) => s.leftSidebarVisible)
     const rightSidebarVisible = useWorkspaceStore((s) => s.rightSidebarVisible)
     const blocksRef = useRef(blocks)
@@ -1365,6 +1370,8 @@ function PreviewFrameInner({
                                             onBlockAIEdit?.(selectedLayout.blockIndex, selectedLayout.blockType)
                                         }}
                                         onDelete={() => setDeleteConfirmIndex(selectedLayout.blockIndex)}
+                                        deleteDisabled={selectedLayout.blockType === 'cartWidget' && isCartLocked}
+                                        deleteDisabledTitle={t.editor.settings.cartDeleteLocked}
                                         onDragStart={disableDragDrop ? undefined : (event) => {
                                             const frameRect = frameElement?.getBoundingClientRect()
                                             if (!frameRect) return

@@ -474,6 +474,7 @@ export default function EditorPage() {
                         redo()
                         const redoState = useEditorStore.getState()
                         previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: redoState.blocks })
+                        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: redoState.globalBlocks })
                         if (redoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: redoState.headerBlock })
                         if (redoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: redoState.footerBlock })
                     }
@@ -484,6 +485,7 @@ export default function EditorPage() {
                     undo()
                     const undoState = useEditorStore.getState()
                     previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: undoState.blocks })
+                    previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: undoState.globalBlocks })
                     if (undoState.headerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_HEADER_BLOCK', blockData: undoState.headerBlock })
                     if (undoState.footerBlock) previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FOOTER_BLOCK', blockData: undoState.footerBlock })
                 }
@@ -657,22 +659,6 @@ export default function EditorPage() {
         void saveWithRetry({ showToast: false, refreshPreview: false })
     }, [updateBlock, saveWithRetry])
 
-    const handleVariantFlip = useCallback((blockType: string, newVariant: 'inline' | 'floating', sourceIndex?: number) => {
-        useEditorStore.getState().flipBlockVariant(blockType, newVariant, sourceIndex)
-        const newState = useEditorStore.getState()
-        // Sync full layout to iframe (blocks[] changed in both directions)
-        previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: newState.blocks })
-        if (newVariant === 'inline') {
-            // floating → inline: block moved to end of blocks[]
-            setSelectedBlock(newState.blocks.length - 1)
-            setSelectedGlobalBlockType(null)
-        } else {
-            // inline → floating: block moved to globalBlocks
-            setSelectedBlock(-1)
-            setSelectedGlobalBlockType(blockType)
-        }
-    }, [])
-
     const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return
         reorderBlocks(fromIndex, toIndex)
@@ -741,9 +727,14 @@ export default function EditorPage() {
         setSelectedBlock(index)
 
         setTimeout(() => {
+            const { blocks: latestBlocks, globalBlocks: latestGlobalBlocks } = useEditorStore.getState()
             previewFrameSendRef.current?.sendToIframe({
                 type: 'UPDATE_FULL_LAYOUT',
-                bodyBlocks: useEditorStore.getState().blocks
+                bodyBlocks: latestBlocks
+            })
+            previewFrameSendRef.current?.sendToIframe({
+                type: 'UPDATE_GLOBAL_BLOCKS',
+                globalBlocks: latestGlobalBlocks
             })
         }, 0)
 
@@ -850,10 +841,13 @@ export default function EditorPage() {
         // otherwise a page reload would lose the undo.
         // setTimeout lets Zustand state settle before reading snapshot.
         setTimeout(() => {
-            const currentBlocks = useEditorStore.getState().blocks
+            const { blocks: currentBlocks, globalBlocks: currentGlobalBlocks } = useEditorStore.getState()
             // Perform a seamless update for layout modifications
             if (['add_block', 'delete_block', 'reorder_blocks', 'update_multiple_blocks', 'undo'].includes(action.action)) {
                 previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_FULL_LAYOUT', bodyBlocks: currentBlocks })
+                // Sync globalBlocks alongside layout — covers cases where addBlock mutates globalBlocks
+                // (e.g. commerce block auto-restoring cart) and undo/redo of globalBlock changes.
+                previewFrameSendRef.current?.sendToIframe({ type: 'UPDATE_GLOBAL_BLOCKS', globalBlocks: currentGlobalBlocks })
                 if (action.action === 'add_block') {
                     const afterIndex = action.afterIndex ?? (blocks.length - 1)
                     previewFrameSendRef.current?.setScrollToBlock?.(Math.max(0, afterIndex + 1))
@@ -1393,7 +1387,6 @@ export default function EditorPage() {
                                     onSiteSettingsChange={handleSiteSettingsChange}
                                     onPageUpdate={handlePageUpdate}
                                     requestedTab={settingsRequestedTab}
-                                    onVariantFlip={handleVariantFlip}
                                 />
                             </div>
                         </div>
@@ -1544,7 +1537,6 @@ export default function EditorPage() {
                             onSiteSettingsChange={handleSiteSettingsChange}
                             onPageUpdate={handlePageUpdate}
                             requestedTab={settingsRequestedTab}
-                            onVariantFlip={handleVariantFlip}
                         />
                     </div>
                 </div>
