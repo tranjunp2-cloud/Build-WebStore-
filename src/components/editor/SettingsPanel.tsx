@@ -28,7 +28,7 @@ import type { PricingConfig } from '@/blocks/pricing/config'
 import { SETTINGS_PANEL_WIDTH } from './layout-constants'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
-import { useEditorStore } from '@/store/editorStore'
+import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
 import { toast } from 'sonner'
 import { buildSlugCanonicalMap, resolveInternalUrlPath } from '@/lib/navigation-url'
 import { checkHiddenPageUrl } from '@/lib/editor/check-hidden-page-url'
@@ -1209,23 +1209,50 @@ function SettingsPanelInner({
     const bt = block?.blockType
     const currentBlockIndex = blockIndex ?? 0
 
+    // Global block routing — when __editorBlockIndex === -1 the block is sourced from
+    // site.globalBlocks. Reads go to the live store entry; writes route to updateGlobalBlock.
+    const storeGlobalBlocks = useEditorStore(state => state.globalBlocks)
+    const storeUpdateGlobalBlock = useEditorStore(state => state.updateGlobalBlock)
+
+    const isGlobal = block?.__editorBlockIndex === -1
+    const globalKey = bt ? BLOCK_TYPE_TO_KEY[bt] : undefined
+    const effectiveBlock = (isGlobal && globalKey
+        ? (storeGlobalBlocks?.[globalKey] ?? block)
+        : block) as BlockData | null
+
+    const handleBlockUpdate = (changes: Record<string, unknown>) => {
+        if (isGlobal && globalKey) {
+            storeUpdateGlobalBlock(globalKey, changes)
+        } else {
+            onBlockUpdate(currentBlockIndex, changes)
+        }
+    }
+
+    const handleBlockFieldChange = (field: string, value: string) => {
+        if (isGlobal && globalKey) {
+            storeUpdateGlobalBlock(globalKey, { [field]: value })
+        } else {
+            onBlockFieldChange(currentBlockIndex, field, value)
+        }
+    }
+
     // Helper: update item in an array field
     const updateArrayItem = (field: string, index: number, key: string, val: unknown) => {
-        const arr = [...(((block?.[field] as Record<string, unknown>[] | undefined) || []))]
+        const arr = [...(((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || []))]
         arr[index] = { ...arr[index], [key]: val }
-        onBlockUpdate(currentBlockIndex, { [field]: arr })
+        handleBlockUpdate({ [field]: arr })
     }
 
     // Helper: add item to array field
     const addArrayItem = (field: string, template: Record<string, unknown>) => {
-        const arr = [...(((block?.[field] as Record<string, unknown>[] | undefined) || [])), template]
-        onBlockUpdate(currentBlockIndex, { [field]: arr })
+        const arr = [...(((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || [])), template]
+        handleBlockUpdate({ [field]: arr })
     }
 
     // Helper: remove item from array field
     const removeArrayItem = (field: string, index: number) => {
-        const arr = (((block?.[field] as Record<string, unknown>[] | undefined) || [])).filter((_: unknown, i: number) => i !== index)
-        onBlockUpdate(currentBlockIndex, { [field]: arr })
+        const arr = (((effectiveBlock?.[field] as Record<string, unknown>[] | undefined) || [])).filter((_: unknown, i: number) => i !== index)
+        handleBlockUpdate({ [field]: arr })
     }
 
     const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
@@ -1294,7 +1321,14 @@ function SettingsPanelInner({
                                 <p className="pt-[2px] text-[14px] font-semibold uppercase leading-5 tracking-normal text-[#2DD4BF]">{panelTitle}</p>
                             </div>
                             {activeTab === 'block' && block ? (
-                                <p className="mt-1 pl-7 text-[11px] text-slate-500">[{block.blockType}]</p>
+                                <div className="mt-1 pl-7 flex items-center gap-2">
+                                    <p className="text-[11px] text-slate-500">[{block.blockType}]</p>
+                                    {isGlobal && (
+                                        <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}>
+                                            🌐 Global
+                                        </span>
+                                    )}
+                                </div>
                             ) : null}
                         </div>
                     </div>
@@ -2040,7 +2074,7 @@ function SettingsPanelInner({
                             {bt === 'socialWidget' && (
                                 <div className={sectionCls}>
                                     {(() => {
-                                        const normalizedSocialBlock = normalizeSocialWidgetConfig(block as Record<string, unknown>)
+                                        const normalizedSocialBlock = normalizeSocialWidgetConfig((effectiveBlock ?? block) as Record<string, unknown>)
 
                                         return (
                                             <>
@@ -2050,31 +2084,11 @@ function SettingsPanelInner({
                                                         <label className={labelCls}>{s.headline}</label>
                                                         <Input
                                                             defaultValue={(normalizedSocialBlock.headline as string) || ''}
-                                                            onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
+                                                            onBlur={(e: FieldBlurEvent) => handleBlockFieldChange('headline', e.target.value)}
                                                             variant="editor"
                                                             className={editorInputClassName}
                                                             placeholder={s.stayConnected}
                                                         />
-                                                    </div>
-                                                    <div>
-                                                        <label className={labelCls}>{s.displayStyle}</label>
-                                                        <div className="mt-2 grid grid-cols-2 gap-2">
-                                                            {['floating', 'inline'].map(variant => (
-                                                                <button
-                                                                    key={variant}
-                                                                    type="button"
-                                                                    onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
-                                                                    className={cn(
-                                                                        'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                                                        (block.variant || 'floating') === variant
-                                                                            ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                            : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                                    )}
-                                                                >
-                                                                    {variant}
-                                                                </button>
-                                                            ))}
-                                                        </div>
                                                     </div>
                                                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                                                         <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
@@ -2148,30 +2162,10 @@ function SettingsPanelInner({
                                             </p>
                                         </div>
                                         <div>
-                                            <label className={labelCls}>{s.displayStyle}</label>
-                                            <div className="mt-2 grid grid-cols-2 gap-2">
-                                                {['floating', 'inline'].map(variant => (
-                                                    <button
-                                                        key={variant}
-                                                        type="button"
-                                                        onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
-                                                        className={cn(
-                                                            'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                                            (block.variant || 'floating') === variant
-                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                        )}
-                                                    >
-                                                        {variant}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div>
                                             <label className={labelCls}>{s.buttonLabel}</label>
                                             <Input
-                                                defaultValue={(block.label as string) || s.cart}
-                                                onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', e.target.value)}
+                                                defaultValue={(effectiveBlock?.label as string) || s.cart}
+                                                onBlur={(e: FieldBlurEvent) => handleBlockFieldChange('label', e.target.value)}
                                                 variant="editor"
                                                 className={editorInputClassName}
                                                 placeholder={s.cart}
@@ -2182,15 +2176,15 @@ function SettingsPanelInner({
                                             <div className="mt-2 flex items-center gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => onBlockUpdate(currentBlockIndex, { showLabel: !block.showLabel })}
+                                                    onClick={() => handleBlockUpdate({ showLabel: !effectiveBlock?.showLabel })}
                                                     className={cn(
                                                         'rounded-full px-3 py-2 text-xs font-medium transition-colors',
-                                                        block.showLabel
+                                                        effectiveBlock?.showLabel
                                                             ? 'bg-blue-500/15 text-blue-300'
                                                             : 'bg-white/5 text-slate-400 hover:bg-white/10',
                                                     )}
                                                 >
-                                                    {block.showLabel ? s.labelVisible : s.iconOnly}
+                                                    {effectiveBlock?.showLabel ? s.labelVisible : s.iconOnly}
                                                 </button>
                                                 <span className="text-[11px] text-slate-500">
                                                     {s.badgeDesc}
@@ -2209,9 +2203,9 @@ function SettingsPanelInner({
                                         <div>
                                             <label className={labelCls}>{s.phone}</label>
                                             {(() => {
-                                                const waCode = (block.countryCode as string) || '+60'
+                                                const waCode = (effectiveBlock?.countryCode as string) || '+60'
                                                 const waCountry = PHONE_COUNTRIES.find(c => c.code === waCode) ?? PHONE_COUNTRIES[0]
-                                                const phoneVal = (block.phoneNumber as string) || ''
+                                                const phoneVal = (effectiveBlock?.phoneNumber as string) || ''
                                                 const phoneEmpty = !phoneVal
                                                 const phoneTouched = phoneTouchedSet.has(bk)
                                                 const showPhoneError = phoneEmpty && phoneTouched
@@ -2221,8 +2215,7 @@ function SettingsPanelInner({
                                                             <PhoneCountryPicker
                                                                 value={waCode}
                                                                 onChange={code => {
-                                                                    // Not clearing phoneNumber here — would trigger showPhoneError prematurely when user switches country.
-                                                                    onBlockFieldChange(currentBlockIndex, 'countryCode', code)
+                                                                    handleBlockFieldChange('countryCode', code)
                                                                 }}
                                                             />
                                                             <div className="h-[31px] w-px shrink-0 bg-white/10" />
@@ -2236,7 +2229,7 @@ function SettingsPanelInner({
                                                                         toast.error(t.editor.settingsValidation.invalidPhone)
                                                                         return
                                                                     }
-                                                                    onBlockFieldChange(currentBlockIndex, 'phoneNumber', v)
+                                                                    handleBlockFieldChange('phoneNumber', v)
                                                                 }}
                                                                 className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#fafafa] placeholder:text-[#64748B] focus:outline-none"
                                                                 placeholder={waCountry.placeholder}
@@ -2249,43 +2242,26 @@ function SettingsPanelInner({
                                                 )
                                             })()}
                                         </div>
-                                        {/* Button text — inline only (issue #892) */}
-                                        {(block.variant || 'floating') === 'inline' && (
-                                            <div>
-                                                <label className={labelCls}>{s.buttonLabel}</label>
-                                                <Input
-                                                    defaultValue={(block.label as string) || 'Chat with us'}
-                                                    key={`wa-label-${bk}`}
-                                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', sanitizeInput(e.target.value))}
-                                                    variant="editor"
-                                                    className={editorInputClassName}
-                                                    placeholder="Chat with us"
-                                                />
+                                        <div>
+                                            <label className={labelCls}>{s.whatsappPosition}</label>
+                                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                                {(['bottom-right', 'bottom-left'] as const).map(pos => (
+                                                    <button
+                                                        key={pos}
+                                                        type="button"
+                                                        onClick={() => handleBlockUpdate({ position: pos })}
+                                                        className={cn(
+                                                            'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
+                                                            ((effectiveBlock?.position ?? block?.position) || 'bottom-right') === pos
+                                                                ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                                : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
+                                                        )}
+                                                    >
+                                                        {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
+                                                    </button>
+                                                ))}
                                             </div>
-                                        )}
-                                        {/* Position — floating only */}
-                                        {(block.variant || 'floating') === 'floating' && (
-                                            <div>
-                                                <label className={labelCls}>{s.whatsappPosition}</label>
-                                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                                    {(['bottom-right', 'bottom-left'] as const).map(pos => (
-                                                        <button
-                                                            key={pos}
-                                                            type="button"
-                                                            onClick={() => onBlockUpdate(currentBlockIndex, { position: pos })}
-                                                            className={cn(
-                                                                'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
-                                                                (block.position || 'bottom-right') === pos
-                                                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
-                                                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
-                                                            )}
-                                                        >
-                                                            {pos === 'bottom-right' ? '↘ Right' : '↙ Left'}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                             )}

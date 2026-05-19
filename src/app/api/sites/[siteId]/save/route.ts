@@ -10,6 +10,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
 import { stripOrphanMediaRefs, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
 import { buildEnumSets } from '@/lib/theme/enums'
+import { mergeGlobalBlocks } from '@/lib/sites/merge-global-blocks'
 
 
 /** Only persist theme fields defined in the Sites collection schema.
@@ -90,7 +91,7 @@ export async function PATCH(
         const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
-        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, globalBlocks, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
         // Navigation: allow draft links (empty/#) but reject malformed external URLs
         if (headerBlock && typeof headerBlock === 'object') {
             const hb = headerBlock as Record<string, unknown>
@@ -115,6 +116,7 @@ export async function PATCH(
             shippingConfig: unknown;
             headerBlock: unknown;
             footerBlock: unknown;
+            globalBlocks: unknown;
             contactInfo: unknown;
             socialLinks: unknown;
             branding: unknown;
@@ -127,6 +129,10 @@ export async function PATCH(
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
         if (headerBlock !== undefined) siteUpdateData.headerBlock = headerBlock
         if (footerBlock !== undefined) siteUpdateData.footerBlock = footerBlock
+        if (globalBlocks !== undefined) siteUpdateData.globalBlocks = mergeGlobalBlocks(
+            existingSite.globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks,
+            globalBlocks as import('@/lib/sites/merge-global-blocks').GlobalBlocks,
+        )
         if (contactInfo) siteUpdateData.contactInfo = contactInfo
         if (socialLinks) siteUpdateData.socialLinks = socialLinks
         if (branding) siteUpdateData.branding = branding

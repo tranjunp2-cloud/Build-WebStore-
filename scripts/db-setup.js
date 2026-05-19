@@ -199,6 +199,10 @@ const MIGRATIONS = [
     name: 'sites.footer_block',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block jsonb;`,
   },
+  {
+    name: 'sites.global_blocks',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS global_blocks jsonb;`,
+  },
   // ── Sites: Branding + Contact Info ──
   { name: 'sites.branding', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding varchar;' },
   { name: 'sites.contact_info', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info varchar;' },
