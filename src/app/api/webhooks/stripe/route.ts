@@ -7,6 +7,8 @@ import {
 } from '@/lib/payment/stripe'
 import { sendEmail } from '@/lib/email/send'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
+import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
+import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 
 /** Minimal shape of an order document for webhook notification logic. */
@@ -198,21 +200,39 @@ async function handleCheckoutCompleted(
             }
         }
 
-        // Send order confirmation email
+        // Resolve tenant for email templates (shop name + site slug for order page URL)
+        const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
+        const tenantDoc = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
+        const shopName = (tenantDoc as any)?.name ?? ''
+        const siteSlug = (tenantDoc as any)?.slug ?? ''
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+        const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.orderNumber}`
+        const dashboardOrderUrl = `${baseUrl}/orders`
+
+        // Buyer: order confirmation
         try {
             const emailData = orderConfirmationEmail({
+                shopName,
                 orderNumber: order.orderNumber,
                 customerName: order.customerName,
+                customerEmail: order.customerEmail,
+                customerPhone: (order as any).customerPhone ?? null,
+                customerAddress: (order as any).shippingAddress ?? null,
                 items: (order.items || []).map((item) => ({
-                    productName: item.productName,
+                    name: item.productName,
+                    variant: (item as any).variant ?? null,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
+                    lineTotal: item.quantity * item.unitPrice,
                 })),
                 subtotal: order.subtotal,
-                tax: order.tax || 0,
+                shippingFee: (order as any).shippingFee ?? 0,
                 total: order.total,
+                paymentMethod: 'stripe',
+                orderDate: (order as any).createdAt ?? new Date().toISOString(),
+                orderPageUrl,
                 currency: order.currency || 'MYR',
-                shippingAddress: order.shippingAddress,
+                buyerNote: (order as any).notes ?? null,
             })
 
             await sendEmail({
@@ -227,10 +247,21 @@ async function handleCheckoutCompleted(
             // Don't fail the webhook — email is non-critical
         }
 
-        // Fire-and-forget: ORDER_NEW notification for merchant (Stripe flow)
+        // Sellers: new order notification
+        getTenantOwnerEmails(payload, tenantId).then((emails) => {
+            const seller = newOrderSellerEmail({
+                shopName,
+                orderNumber: order.orderNumber,
+                customerName: order.customerName,
+                orderPageUrl: dashboardOrderUrl,
+            })
+            emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                .catch((err: unknown) => console.error('[Stripe Webhook] seller email failed', err)))
+        }).catch((err: unknown) => console.error('[Stripe Webhook] getTenantOwnerEmails failed', err))
+
+        // Fire-and-forget: ORDER_NEW in-app notification for merchant (Stripe flow)
         import('@/lib/notifications/notify-tenant-owners')
             .then(({ notifyTenantOwners }) => {
-                const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
                 return notifyTenantOwners(payload, tenantId, {
                     type: 'ORDER_NEW',
                     title: `New Order #${order.orderNumber} - ${order.currency || 'MYR'} ${(order.total ?? 0).toFixed(2)}`,

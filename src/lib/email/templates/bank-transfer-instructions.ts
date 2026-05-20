@@ -1,21 +1,52 @@
 /**
- * Email template: Bank Transfer Instructions (post-order magic link).
- * Sent immediately after a bank-transfer order is placed.
- * Includes: order summary, bank details, reference code, QR, magic-link CTA.
+ * Bank Transfer instructions email — buyer.
+ * Same layout as order-confirmation-buyer but with BT-specific sections:
+ * bank details, QR code, payment reference, 24h deadline warning.
  *
  * Related: TC-F10-06-07, TC-F10-06-15, PRD FR-15, FR-16
  */
 
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
+
+type EmailLocale = 'en' | 'ms'
+
+const locales = { en: en.email, ms: ms.email } as const
+
 export interface BankTransferInstructionsData {
+    shopName: string
     orderNumber: string
     customerName: string
+    customerEmail: string
+    customerPhone?: string | null
+    customerAddress?: {
+        line1?: string
+        line2?: string
+        city?: string
+        state?: string
+        postcode?: string
+        country?: string
+    } | null
+    items: Array<{
+        name: string
+        variant?: string | null
+        quantity: number
+        unitPrice: number
+        lineTotal: number
+    }>
+    subtotal: number
+    discountAmount?: number | null
+    discountCode?: string | null
+    shippingFee: number
     total: number
     currency: string
+    buyerNote?: string | null
+    orderDate: string
     /** BT-XXXXXX format — buyer must enter in transfer notes */
     paymentReference: string
     /** Signed JWT URL for post-order upload page */
     magicLinkUrl: string
-    /** Plaintext fallback URL (no token — shows instructions page) */
+    /** Plaintext fallback URL (no token) */
     plainUploadUrl: string
     /** ISO date string for payment deadline */
     expiresAtIso: string
@@ -23,135 +54,293 @@ export interface BankTransferInstructionsData {
     bankAccountNo: string | null
     bankAccountHolder: string | null
     merchantQrUrl?: string | null
+    locale?: EmailLocale
 }
 
 function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
 }
 
-function formatPrice(amount: number, currency: string): string {
-    if (currency === 'MYR') return `MYR ${amount.toFixed(2)}`
+function formatPrice(amount: number, currency: string, locale: EmailLocale): string {
+    if (currency === 'MYR') return locale === 'ms' ? `RM${amount.toFixed(2)}` : `MYR ${amount.toFixed(2)}`
     return `${currency} ${amount.toFixed(2)}`
 }
 
-function formatDeadline(isoDate: string): string {
+function formatDate(iso: string, locale: EmailLocale): string {
     try {
-        return new Date(isoDate).toLocaleString('en-MY', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
+        return new Date(iso).toLocaleString(locale === 'ms' ? 'en-MY' : 'en-GB', {
+            weekday: 'long', year: 'numeric', month: 'long',
+            day: 'numeric', hour: '2-digit', minute: '2-digit',
+        })
+    } catch {
+        return iso
+    }
+}
+
+function formatDeadline(iso: string): string {
+    try {
+        return new Date(iso).toLocaleString('en-MY', {
+            weekday: 'long', year: 'numeric', month: 'long',
+            day: 'numeric', hour: '2-digit', minute: '2-digit',
             timeZoneName: 'short',
         })
     } catch {
-        return isoDate
+        return iso
     }
+}
+
+function buildAddress(addr: BankTransferInstructionsData['customerAddress']): string {
+    if (!addr) return '—'
+    return [addr.line1, addr.line2, addr.city, addr.state, addr.postcode, addr.country]
+        .filter(Boolean)
+        .join(', ')
 }
 
 export function bankTransferInstructionsEmail(
     data: BankTransferInstructionsData,
 ): { subject: string; html: string } {
-    const hasBankDetails =
-        data.bankName || data.bankAccountNo || data.bankAccountHolder
+    const locale = data.locale ?? 'ms'
+    const tOrder = (locales[locale] ?? locales.ms).order
+    const tBT = (locales[locale] ?? locales.ms).bankTransfer
 
-    const bankDetailsHtml = hasBankDetails
-        ? `
-        <div style="margin-top: 24px; background: #f8fafc; border-radius: 8px; padding: 20px; border-left: 4px solid #0ea5e9;">
-            <p style="font-size: 12px; text-transform: uppercase; color: #64748b; margin: 0 0 12px; font-weight: 600; letter-spacing: 0.05em;">Bank Transfer Details</p>
-            <table style="width: 100%; border-collapse: collapse;">
-                ${data.bankName ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666; width: 140px;">Bank</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600;">${escapeHtml(data.bankName)}</td></tr>` : ''}
-                ${data.bankAccountNo ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666;">Account No.</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600; font-family: monospace;">${escapeHtml(data.bankAccountNo)}</td></tr>` : ''}
-                ${data.bankAccountHolder ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666;">Account Name</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600;">${escapeHtml(data.bankAccountHolder)}</td></tr>` : ''}
-            </table>
-        </div>`
-        : ''
+    const fp = (n: number) => formatPrice(n, data.currency, locale)
+    const esc = escapeHtml
 
-    const qrHtml =
-        data.merchantQrUrl
-            ? `
-        <div style="margin-top: 20px; text-align: center;">
-            <p style="font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 0.05em; margin: 0 0 12px;">Or Scan to Pay</p>
-            <img src="${escapeHtml(data.merchantQrUrl)}" alt="Payment QR Code" style="max-width: 200px; border-radius: 8px; border: 1px solid #e2e8f0;" />
-        </div>`
-        : ''
+    const subject = locale === 'ms'
+        ? `${esc(data.shopName)} - Lengkapkan pembayaran anda - ${esc(data.orderNumber)}`
+        : `${esc(data.shopName)} - Complete your payment - ${esc(data.orderNumber)}`
+
+    const itemRows = data.items.map((item) => `
+        <tr>
+            <td style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;line-height:20px;color:#0F172A;vertical-align:top;">
+                ${esc(item.name)}${item.variant ? `<br><span style="color:#94A3B8;font-size:12.5px;">${esc(item.variant)}</span>` : ''}
+            </td>
+            <td align="center" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;">${item.quantity}</td>
+            <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;">${fp(item.unitPrice)}</td>
+            <td align="right" style="padding:14px 12px;border-top:1px solid #EDEFF2;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;vertical-align:top;">${fp(item.lineTotal)}</td>
+        </tr>`).join('')
+
+    const discountRow = data.discountAmount
+        ? `<tr>
+            <td colspan="3" style="padding:6px 14px;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#0F172A;">
+                ${tOrder.discount}${data.discountCode ? ` <span style="display:inline-block;padding:3px 10px;border-radius:999px;background:#F1F5F9;color:#475569;font-size:12px;margin-left:6px;">${esc(data.discountCode)}</span>` : ''}
+            </td>
+            <td align="right" style="padding:6px 14px;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#EF4444;">-${fp(data.discountAmount)}</td>
+        </tr>` : ''
+
+    const hasBankDetails = data.bankName || data.bankAccountNo || data.bankAccountHolder
+    const bankDetailsHtml = hasBankDetails ? `
+      <!-- Bank details -->
+      <tr><td style="padding:18px 40px 10px;">
+        <div style="font-size:15px;font-weight:700;color:#0F172A;letter-spacing:-0.01em;">${tBT.bankDetailsHeading}</div>
+      </td></tr>
+      <tr><td style="padding:0 40px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;background:#F8FAFC;border-radius:10px;padding:16px;">
+          ${data.bankName ? `<tr><td width="140" style="padding:6px 16px;color:#0F172A;font-weight:500;">${tBT.bank}</td><td style="padding:6px 16px 6px 0;color:#475569;font-weight:600;">${esc(data.bankName)}</td></tr>` : ''}
+          ${data.bankAccountNo ? `<tr><td style="padding:6px 16px;color:#0F172A;font-weight:500;">${tBT.accountNo}</td><td style="padding:6px 16px 6px 0;color:#475569;font-weight:600;font-family:'Courier New',Courier,monospace;">${esc(data.bankAccountNo)}</td></tr>` : ''}
+          ${data.bankAccountHolder ? `<tr><td style="padding:6px 16px;color:#0F172A;font-weight:500;">${tBT.accountName}</td><td style="padding:6px 16px 6px 0;color:#475569;font-weight:600;">${esc(data.bankAccountHolder)}</td></tr>` : ''}
+        </table>
+      </td></tr>` : ''
+
+    const qrHtml = data.merchantQrUrl ? `
+      <!-- QR Code -->
+      <tr><td align="center" style="padding:14px 40px;">
+        <div style="font-size:13px;text-transform:uppercase;color:#94A3B8;font-weight:600;letter-spacing:0.05em;margin-bottom:12px;">${tBT.scanToPay}</div>
+        <img src="${esc(data.merchantQrUrl)}" alt="Payment QR Code" style="max-width:180px;border-radius:10px;border:1px solid #E5E7EB;" />
+      </td></tr>` : ''
 
     return {
-        subject: `Order #${data.orderNumber} received — please complete payment`,
-        html: `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
-<body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-        <div style="background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <!-- Header -->
-            <div style="background: linear-gradient(135deg, #0ea5e9, #6366f1); padding: 32px; text-align: center;">
-                <h1 style="color: white; font-size: 24px; margin: 0 0 8px;">Order Received!</h1>
-                <p style="color: rgba(255,255,255,0.8); font-size: 14px; margin: 0;">Please complete your payment to confirm this order</p>
-            </div>
+        subject,
+        html: `<!DOCTYPE html>
+<html lang="${locale}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${subject}</title>
+<style>
+  body{margin:0;background:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
+  img{max-width:100%;height:auto;display:block;}
+  .page-bg{background:#EEF3F8;padding:48px 16px;}
+  @media(max-width:640px){
+    .page-bg{padding:16px 10px;}
+    .page-bg table[width="600"]{width:100%!important;max-width:100%!important;border-radius:12px!important;}
+    .page-bg table[width="600"]>tbody>tr>td{padding-left:20px!important;padding-right:20px!important;}
+    .page-bg table[width="600"] table{width:100%!important;table-layout:auto;}
+    .page-bg table[width="600"] thead th,.page-bg table[width="600"] tbody td{font-size:13px!important;}
+  }
+  @media(max-width:420px){
+    .page-bg{padding:12px 6px;}
+    .page-bg table[width="600"]>tbody>tr>td{padding-left:16px!important;padding-right:16px!important;}
+  }
+</style>
+</head>
+<body>
+<div class="page-bg">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#EEF3F8;">
+    <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#FFFFFF;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,0.04);">
 
-            <!-- Body -->
-            <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${escapeHtml(data.customerName)},</p>
-                <p style="font-size: 14px; color: #666; margin: 0 0 24px;">Thank you for your order. To confirm it, please complete the bank transfer using the details below and upload your payment receipt.</p>
+      <!-- Shop name -->
+      <tr><td style="padding:36px 40px 8px;text-align:center;">
+        <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:22px;font-weight:700;color:#0F172A;">${esc(data.shopName)}</div>
+      </td></tr>
 
-                <!-- Order Summary -->
-                <div style="background: #f0f9ff; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 20px;">
-                    <p style="font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 4px;">Order Number</p>
-                    <p style="font-size: 22px; font-weight: 700; margin: 0 0 8px; letter-spacing: 1px;">${escapeHtml(data.orderNumber)}</p>
-                    <p style="font-size: 14px; color: #666; margin: 0 0 4px;">Total Amount</p>
-                    <p style="font-size: 20px; font-weight: 700; margin: 0; color: #0ea5e9;">${formatPrice(data.total, data.currency)}</p>
-                </div>
+      <!-- Greeting -->
+      <tr><td style="padding:18px 40px 6px;">
+        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${tOrder.greeting} ${esc(data.customerName)},</div>
+      </td></tr>
+      <tr><td style="padding:6px 40px 18px;">
+        <div style="font-size:14px;line-height:22px;color:#475569;">${tBT.body}</div>
+      </td></tr>
 
-                <!-- Bank Details -->
-                ${bankDetailsHtml}
+      <!-- Recipient info -->
+      <tr><td style="padding:18px 40px 10px;">
+        <div style="font-size:15px;font-weight:700;color:#0F172A;letter-spacing:-0.01em;">${tOrder.recipientInfoHeading}</div>
+      </td></tr>
+      <tr><td style="padding:0 40px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+          <tr>
+            <td width="120" style="padding:6px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tOrder.fullName}</td>
+            <td style="padding:6px 14px 6px 0;color:#94A3B8;vertical-align:top;">${esc(data.customerName)}</td>
+            <td width="80" style="padding:6px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tOrder.address}</td>
+            <td style="padding:6px 0;color:#94A3B8;vertical-align:top;line-height:22px;">${esc(buildAddress(data.customerAddress))}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tOrder.phone}</td>
+            <td style="padding:6px 14px 6px 0;color:#94A3B8;vertical-align:top;">${data.customerPhone ? esc(data.customerPhone) : '—'}</td>
+            <td style="vertical-align:top;">&nbsp;</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tOrder.email}</td>
+            <td style="padding:6px 14px 6px 0;color:#94A3B8;vertical-align:top;">${esc(data.customerEmail)}</td>
+            <td style="vertical-align:top;">&nbsp;</td>
+            <td></td>
+          </tr>
+        </table>
+      </td></tr>
 
-                <!-- QR Code -->
-                ${qrHtml}
+      <!-- Order info header -->
+      <tr><td style="padding:18px 40px 10px;">
+        <div style="font-size:15px;font-weight:700;color:#0F172A;letter-spacing:-0.01em;">${tOrder.orderInfoHeading} — ID: ${esc(data.orderNumber)}</div>
+      </td></tr>
+      <tr><td style="padding:4px 40px 4px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+          <tr>
+            <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tBT.orderStatusLabel}</td>
+            <td style="padding:8px 16px 8px 0;color:#F59E0B;vertical-align:top;font-weight:600;">${tBT.orderStatusAwaitingPayment}</td>
+            <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${tOrder.orderDate}</td>
+            <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
+          </tr>
+        </table>
+      </td></tr>
 
-                <!-- Reference Code — prominent box -->
-                <div style="margin-top: 24px; background: #fefce8; border: 2px solid #eab308; border-radius: 10px; padding: 20px; text-align: center;">
-                    <p style="font-size: 12px; text-transform: uppercase; color: #92400e; font-weight: 700; letter-spacing: 0.08em; margin: 0 0 8px;">IMPORTANT — Payment Reference</p>
-                    <p style="font-size: 28px; font-weight: 800; font-family: 'Courier New', Courier, monospace; letter-spacing: 3px; margin: 0 0 8px; color: #78350f;">${escapeHtml(data.paymentReference)}</p>
-                    <p style="font-size: 13px; color: #92400e; margin: 0;">Enter this code in your transfer notes / description field</p>
-                </div>
+      <!-- Product table -->
+      <tr><td style="padding:8px 40px 4px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:10px;border-collapse:separate;overflow:hidden;">
+          <thead>
+            <tr style="background:#F3F4F6;">
+              <th align="left" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${tOrder.productName}</th>
+              <th align="center" width="70" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${tOrder.quantity}</th>
+              <th align="right" width="90" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${tOrder.unitCost}</th>
+              <th align="right" width="100" style="padding:12px;font-size:13px;font-weight:600;color:#0F172A;">${tOrder.amount}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+            <tr><td colspan="4" style="padding:0;border-top:1px solid #EDEFF2;"></td></tr>
+            <tr>
+              <td colspan="3" style="padding:12px 14px 6px;font-size:13.5px;color:#0F172A;">${tOrder.subtotal}</td>
+              <td align="right" style="padding:12px 14px 6px;font-size:13.5px;color:#0F172A;">${fp(data.subtotal)}</td>
+            </tr>
+            ${discountRow}
+            <tr>
+              <td colspan="3" style="padding:6px 14px;font-size:13.5px;color:#0F172A;">${tOrder.shippingFee}</td>
+              <td align="right" style="padding:6px 14px;font-size:13.5px;color:#0F172A;">${fp(data.shippingFee)}</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding:6px 14px 14px;font-size:14px;font-weight:700;color:#0F172A;">${tOrder.total}</td>
+              <td align="right" style="padding:6px 14px 14px;font-size:14px;font-weight:700;color:#0F172A;">${fp(data.total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </td></tr>
 
-                <!-- Expiry Warning -->
-                <div style="margin-top: 16px; padding: 12px 16px; background: #fff7ed; border-radius: 8px; border-left: 4px solid #f97316;">
-                    <p style="font-size: 13px; color: #9a3412; margin: 0;">
-                        <strong>Payment required by:</strong> ${formatDeadline(data.expiresAtIso)}
-                    </p>
-                    <p style="font-size: 12px; color: #c2410c; margin: 6px 0 0;">Orders without payment confirmation will be automatically cancelled after 24 hours.</p>
-                </div>
+      <!-- Payment method + buyer note -->
+      <tr><td style="padding:14px 40px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
+          <tr>
+            <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${tOrder.paymentMethod}</td>
+            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${locale === 'ms' ? 'Pindahan Bank' : 'Bank Transfer'}</td>
+            <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${tOrder.buyerNote}</td>
+            <td align="right" style="padding:6px 0;color:#94A3B8;">${data.buyerNote ? esc(data.buyerNote) : '—'}</td>
+          </tr>
+        </table>
+      </td></tr>
 
-                <!-- Anti-fraud advisory -->
-                <div style="margin-top: 16px; padding: 12px 16px; background: #f1f5f9; border-radius: 8px;">
-                    <p style="font-size: 12px; color: #64748b; margin: 0;">
-                        <strong>Security reminder:</strong> We will never ask you to transfer money to a different account or via phone/WhatsApp. If you receive such requests, please ignore and report them.
-                    </p>
-                </div>
+      ${bankDetailsHtml}
+      ${qrHtml}
 
-                <!-- CTA Button -->
-                <div style="text-align: center; margin-top: 28px;">
-                    <a href="${data.magicLinkUrl}" style="display: inline-block; background: linear-gradient(135deg, #0ea5e9, #6366f1); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.02em;">Upload Payment Receipt</a>
-                </div>
+      <!-- Payment reference box -->
+      <tr><td style="padding:14px 40px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FEFCE8;border:2px solid #EAB308;border-radius:10px;text-align:center;">
+          <tr><td style="padding:20px 24px;">
+            <div style="font-size:12px;text-transform:uppercase;color:#92400E;font-weight:700;letter-spacing:0.08em;margin-bottom:10px;">${tBT.referenceHeading}</div>
+            <div style="font-size:26px;font-weight:800;font-family:'Courier New',Courier,monospace;letter-spacing:3px;color:#78350F;margin-bottom:10px;">${esc(data.paymentReference)}</div>
+            <div style="font-size:13px;color:#92400E;">${tBT.referenceInstruction}</div>
+          </td></tr>
+        </table>
+      </td></tr>
 
-                <!-- Plaintext fallback -->
-                <p style="font-size: 12px; color: #999; text-align: center; margin-top: 16px; word-break: break-all;">
-                    Or copy this link: <span style="color: #0ea5e9;">${data.plainUploadUrl}</span>
-                </p>
-            </div>
+      <!-- Payment deadline -->
+      <tr><td style="padding:6px 40px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FFF7ED;border-radius:8px;border-left:4px solid #F97316;">
+          <tr><td style="padding:14px 16px;">
+            <div style="font-size:13px;color:#9A3412;"><strong>${tBT.deadlineLabel}:</strong> ${formatDeadline(data.expiresAtIso)}</div>
+            <div style="font-size:12px;color:#C2410C;margin-top:6px;">${tBT.autoCancel}</div>
+          </td></tr>
+        </table>
+      </td></tr>
 
-            <!-- Footer -->
-            <div style="background: #fafafa; padding: 24px 32px; text-align: center; border-top: 1px solid #eee;">
-                <p style="font-size: 12px; color: #999; margin: 0;">If you did not place this order, please ignore this email or contact support.</p>
-            </div>
-        </div>
-    </div>
+      <!-- Security reminder -->
+      <tr><td style="padding:6px 40px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F1F5F9;border-radius:8px;">
+          <tr><td style="padding:12px 16px;">
+            <div style="font-size:12px;color:#64748B;">${tBT.securityReminder}</div>
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- CTA: Upload receipt -->
+      <tr><td align="center" style="padding:26px 40px 8px;">
+        <a href="${data.magicLinkUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tBT.uploadCta}</a>
+      </td></tr>
+
+      <!-- Plaintext fallback -->
+      <tr><td align="center" style="padding:4px 40px 14px;">
+        <div style="font-size:12px;color:#94A3B8;">${tBT.fallbackLink} <span style="color:#14C2BB;word-break:break-all;">${data.plainUploadUrl}</span></div>
+      </td></tr>
+
+      <!-- Farewell -->
+      <tr><td align="center" style="padding:10px 40px 6px;">
+        <div style="font-size:16px;font-weight:700;color:#0F172A;">${tOrder.farewell}</div>
+      </td></tr>
+
+      <!-- Footer -->
+      <tr><td align="center" style="padding:6px 40px 36px;">
+        <div style="font-size:12px;color:#94A3B8;">${tOrder.copyright} ${esc(data.shopName)}</div>
+      </td></tr>
+
+    </table>
+    </td></tr>
+  </table>
+</div>
 </body>
-</html>
-        `.trim(),
+</html>`.trim(),
     }
 }

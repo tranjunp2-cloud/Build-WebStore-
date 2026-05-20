@@ -9,6 +9,9 @@ import { generatePaymentReference } from '@/lib/payment/reference'
 import { signOrderToken } from '@/lib/auth/order-token'
 import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { bankTransferInstructionsEmail } from '@/lib/email/templates/bank-transfer-instructions'
+import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
+import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
+import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 
 export const maxDuration = 60
 
@@ -229,7 +232,51 @@ export async function POST(request: Request) {
             }
         }
 
-        // Fire-and-forget email + build redirectUrl for bank_transfer
+        // Resolve tenant slug + name once — used in both COD and bank_transfer email blocks
+        // Slug lives on the tenant, not the site — sites collection has no slug field
+        const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
+        const shopName = (tenantForSlug as any)?.name ?? ''
+        const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+        const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
+        const dashboardOrderUrl = `${baseUrl}/orders`
+
+        // COD: confirmation to buyer + new-order notification to seller(s)
+        if (paymentMethod === 'cod') {
+            const codEmail = orderConfirmationEmail({
+                shopName,
+                orderNumber: orderNumber,
+                customerName: customer.name,
+                customerEmail: customer.email,
+                customerPhone: customer.phone ?? null,
+                customerAddress: customer.address ?? null,
+                items: orderItems.map((item) => ({
+                    name: item.productName,
+                    variant: item.variant || null,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    lineTotal: item.quantity * item.unitPrice,
+                })),
+                subtotal,
+                shippingFee,
+                total,
+                paymentMethod: 'cod',
+                orderDate: new Date().toISOString(),
+                orderPageUrl,
+                currency,
+                buyerNote: (order as any).notes ?? null,
+            })
+            payload.sendEmail({ to: customer.email, subject: codEmail.subject, html: codEmail.html })
+                .catch((err: unknown) => console.error('[Email COD confirmation]', err))
+
+            getTenantOwnerEmails(payload, tenantId).then((emails) => {
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl })
+                emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                    .catch((err: unknown) => console.error('[Email seller notify COD]', err)))
+            }).catch(() => {})
+        }
+
+        // bank_transfer: instructions to buyer + new-order notification to seller(s) + magic link for proof upload
         let redirectUrl: string | undefined
 
         if (paymentMethod === 'bank_transfer' && magicLinkSecret && paymentExpiresAt) {
@@ -239,19 +286,30 @@ export async function POST(request: Request) {
                 secret: magicLinkSecret,
                 expSec,
             })
-            // Slug lives on the tenant, not the site — sites collection has no slug field
-            const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
-            const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
-            const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
             redirectUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}?token=${token}`
-            const plainUploadUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
+            const plainUploadUrl = orderPageUrl
 
             const pcConfig = (site as any).paymentConfig
-            payload.sendEmail(bankTransferInstructionsEmail({
+            const btEmail = bankTransferInstructionsEmail({
+                shopName,
                 orderNumber: order.orderNumber,
                 customerName: customer.name,
+                customerEmail: customer.email,
+                customerPhone: customer.phone ?? null,
+                customerAddress: customer.address ?? null,
+                items: orderItems.map((item) => ({
+                    name: item.productName,
+                    variant: item.variant || null,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    lineTotal: item.quantity * item.unitPrice,
+                })),
+                subtotal,
+                shippingFee,
                 total: order.total,
                 currency: order.currency ?? 'MYR',
+                buyerNote: (order as any).notes ?? null,
+                orderDate: new Date().toISOString(),
                 paymentReference: paymentReference!,
                 magicLinkUrl: redirectUrl,
                 plainUploadUrl,
@@ -260,7 +318,15 @@ export async function POST(request: Request) {
                 bankAccountNo: pcConfig?.bankAccountNo ?? null,
                 bankAccountHolder: pcConfig?.bankAccountHolder ?? null,
                 merchantQrUrl: pcConfig?.merchantQrCode?.url ?? null,
-            })).catch((err: unknown) => console.error('[Email BT instructions]', err))
+            })
+            payload.sendEmail({ to: customer.email, subject: btEmail.subject, html: btEmail.html })
+                .catch((err: unknown) => console.error('[Email BT instructions]', err))
+
+            getTenantOwnerEmails(payload, tenantId).then((emails) => {
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl })
+                emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                    .catch((err: unknown) => console.error('[Email seller notify BT]', err)))
+            }).catch(() => {})
         }
 
         const confirmToken = generateConfirmToken(order.id, orderNumber)

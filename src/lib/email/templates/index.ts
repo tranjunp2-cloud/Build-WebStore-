@@ -18,3 +18,4 @@ export {
     type RejectionReason,
 } from './payment-rejected'
 export { orderExpiredEmail, type OrderExpiredData } from './order-expired'
+export { newOrderSellerEmail, type NewOrderSellerData } from './new-order-seller'

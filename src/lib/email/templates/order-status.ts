@@ -8,7 +8,7 @@ import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 
 type EmailLocale = 'en' | 'ms'
-type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled'
+type OrderStatus = 'confirmed' | 'ready_to_ship' | 'processing' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
 
 const locales = { en: en.email, ms: ms.email } as const
 
@@ -23,17 +23,23 @@ interface OrderStatusEmailData {
 }
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
+    confirmed: '#14C2BB',
+    ready_to_ship: '#f59e0b',
     processing: '#f59e0b',
     shipped: '#3b82f6',
-    delivered: '#10b981',
+    completed: '#10b981',
     cancelled: '#ef4444',
+    refunded: '#8b5cf6',
 }
 
 const STATUS_EMOJIS: Record<OrderStatus, string> = {
+    confirmed: '✅',
+    ready_to_ship: '📦',
     processing: '⏳',
     shipped: '🚚',
-    delivered: '✅',
+    completed: '🎉',
     cancelled: '❌',
+    refunded: '↩️',
 }
 
 export function orderStatusEmail(data: OrderStatusEmailData): { subject: string; html: string } {

@@ -5,6 +5,10 @@ import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderStatusUpdateSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
+import { orderStatusEmail } from '@/lib/email/templates/order-status'
+
+// Statuses that trigger a buyer notification email
+const BUYER_EMAIL_STATUSES = new Set(['confirmed', 'shipped', 'completed', 'cancelled', 'refunded'])
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -70,8 +74,21 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             overrideAccess: false,
         })
 
-        // TODO: Send email notification based on status change
-        // (confirmed → confirmation email, shipped → shipped email, cancelled → cancellation email)
+        // Send buyer notification for relevant status changes
+        if (BUYER_EMAIL_STATUSES.has(newStatus) && (order as any).customerEmail) {
+            try {
+                const statusEmailData = orderStatusEmail({
+                    customerName: (order as any).customerName ?? '',
+                    orderNumber: (order as any).orderNumber ?? id,
+                    status: newStatus as any,
+                    trackingNumber: trackingNumber ?? (order as any).trackingNumber ?? undefined,
+                })
+                payload.sendEmail({ to: (order as any).customerEmail, subject: statusEmailData.subject, html: statusEmailData.html })
+                    .catch((err: unknown) => console.error('[Email status notify]', err))
+            } catch (err) {
+                console.error('[Email status build]', err)
+            }
+        }
 
         return NextResponse.json({
             success: true,

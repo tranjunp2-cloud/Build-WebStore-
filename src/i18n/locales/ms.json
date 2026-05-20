@@ -352,12 +352,67 @@
       "sst": "SST (6%)",
       "total": "Jumlah Besar",
       "shippingAddress": "Alamat Penghantaran",
-      "footer": "Dikuasakan oleh PrimeWeb"
+      "footer": "Dikuasakan oleh PrimeWeb",
+      "recipientInfoHeading": "Maklumat penerima",
+      "fullName": "Nama penuh",
+      "phone": "Telefon",
+      "email": "Emel",
+      "address": "Alamat",
+      "orderInfoHeading": "Maklumat pesanan",
+      "orderStatus": "Status pesanan",
+      "orderStatusSuccess": "Pesanan berjaya",
+      "orderDate": "Tarikh pesanan",
+      "productName": "Nama produk",
+      "quantity": "Kuantiti",
+      "unitCost": "Kos unit",
+      "discount": "Diskaun",
+      "shippingFee": "Kos penghantaran",
+      "prepaid": "Pra-bayar",
+      "codPayment": "Bayar semasa penghantaran",
+      "paymentMethod": "Kaedah pembayaran",
+      "shippingProvider": "Pembekal penghantaran",
+      "buyerNote": "Nota daripada pembeli",
+      "cta": "Klik sini untuk menyemak pesanan anda",
+      "farewell": "Jumpa anda di pesanan seterusnya!",
+      "copyright": "Hak cipta oleh"
+    },
+    "newOrder": {
+      "greeting": "Anda mempunyai pesanan baharu dari",
+      "body": "Sila semak dan proses pesanan dengan segera.",
+      "orderStatusLabel": "Status pesanan",
+      "orderStatusNew": "Pesanan Baharu",
+      "cta": "Lihat pesanan di sini",
+      "farewell": "Selamat menjual!"
+    },
+    "bankTransfer": {
+      "body": "Terima kasih atas pesanan anda. Sila lengkapkan pindahan bank menggunakan maklumat di bawah dan muat naik resit pembayaran anda untuk mengesahkan pesanan.",
+      "bankDetailsHeading": "Maklumat Pindahan Bank",
+      "bank": "Bank",
+      "accountNo": "No. Akaun",
+      "accountName": "Nama Akaun",
+      "scanToPay": "Atau Imbas untuk Bayar",
+      "referenceHeading": "PENTING — Rujukan Pembayaran",
+      "referenceInstruction": "Masukkan kod ini dalam nota / keterangan pindahan anda",
+      "deadlineLabel": "Pembayaran diperlukan sebelum",
+      "autoCancel": "Pesanan tanpa pengesahan pembayaran akan dibatalkan secara automatik selepas 24 jam.",
+      "securityReminder": "Peringatan keselamatan: Kami tidak akan meminta anda memindahkan wang ke akaun lain atau melalui telefon/WhatsApp. Jika anda menerima permintaan sedemikian, sila abaikan dan laporkan.",
+      "uploadCta": "Muat Naik Resit Pembayaran",
+      "fallbackLink": "Atau salin pautan ini:",
+      "orderStatusLabel": "Status pesanan",
+      "orderStatusAwaitingPayment": "Menunggu Pembayaran"
     },
     "status": {
       "greeting": "Hai",
       "orderNumber": "Nombor Pesanan",
       "tracking": "Penjejakan",
+      "confirmed": {
+        "title": "Pesanan Telah Disahkan",
+        "description": "Pesanan anda telah disahkan oleh penjual dan sedang disediakan."
+      },
+      "ready_to_ship": {
+        "title": "Pesanan Siap Dihantar",
+        "description": "Pesanan anda telah dibungkus dan sedia. Ia akan diserahkan kepada kurier tidak lama lagi."
+      },
       "processing": {
         "title": "Pesanan Sedang Diproses",
         "description": "Pesanan anda sedang disediakan. Kami akan memaklumkan anda apabila ia telah dihantar."
@@ -366,13 +421,17 @@
         "title": "Pesanan Telah Dihantar",
         "description": "Pesanan anda sedang dalam perjalanan. Anda boleh menjejaki penghantaran di bawah."
       },
-      "delivered": {
-        "title": "Pesanan Telah Dihantar",
-        "description": "Pesanan anda telah dihantar. Terima kasih atas pembelian anda!"
+      "completed": {
+        "title": "Pesanan Selesai",
+        "description": "Pesanan anda telah diterima. Terima kasih atas pembelian anda!"
       },
       "cancelled": {
         "title": "Pesanan Dibatalkan",
         "description": "Pesanan anda telah dibatalkan. Jika ada sebarang pertanyaan, sila hubungi kami."
+      },
+      "refunded": {
+        "title": "Pesanan Telah Dikembalikan",
+        "description": "Pesanan anda telah dikembalikan. Jumlah akan dikreditkan semula ke kaedah pembayaran asal anda."
       }
     }
   },
