@@ -1368,8 +1368,14 @@
         "saveChanges": "Save Changes",
         "savedSuccess": "Shipping settings saved",
         "saveError": "Failed to save settings",
-        "rateError": "Rate must be 0 – RM 1,000",
-        "freeError": "Threshold must be RM 0.01 – RM 100,000"
+        "freeError": "Threshold must be RM 0.01 – RM 100,000",
+        "errorEmpty": "Required",
+        "errorNegative": "Cannot be negative",
+        "errorTooHigh": "Maximum RM 1,000",
+        "errorFormat": "Numbers only, max 2 decimal places",
+        "warnFree": "All orders will ship free",
+        "helperRange": "Range: RM 0.00 – RM 1,000.00 (default RM 8.00)",
+        "warnThresholdBelowRate": "Threshold lower than shipping rate — buyers may never get free shipping"
       }
     },
     "blog": {

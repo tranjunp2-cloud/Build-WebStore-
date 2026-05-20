@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import type { ShippingConfig } from '@/lib/shipping'
-import { SHIPPING_DEFAULTS, RATE_MAX, FREE_ABOVE_MAX } from '@/lib/shipping'
+import { SHIPPING_DEFAULTS, RATE_MAX, FREE_ABOVE_MAX, validateRate, parseRateRm, validateCrossField } from '@/lib/shipping'
 import { ShippingRatesCard } from './shipping-rates-card'
 import { FreeShippingCard } from './free-shipping-card'
 import { SettingsFooter } from './settings-footer'
@@ -40,14 +40,16 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
     const [freeEnabled, setFreeEnabled] = useState(
         initial != null ? initial.freeAbove != null : DEFAULTS.freeEnabled
     )
-    const [freeAboveRm, setFreeAboveRm] = useState(
-        senToRm(initial?.freeAbove ?? 10000)
-    )
+    const [freeAboveRm, setFreeAboveRm] = useState(senToRm(initial?.freeAbove ?? 10000))
     const [westRateError, setWestRateError] = useState('')
     const [eastRateError, setEastRateError] = useState('')
     const [freeAboveError, setFreeAboveError] = useState('')
+    const [westRateWarning, setWestRateWarning] = useState('')
+    const [eastRateWarning, setEastRateWarning] = useState('')
+    const [freeAboveWarning, setFreeAboveWarning] = useState('')
     const [isSaving, setIsSaving] = useState(false)
     const [lastSaveSucceeded, setLastSaveSucceeded] = useState(false)
+    const savingRef = useRef(false)
 
     const snapshotRef = useRef<Snapshot>(snap(
         senToRm(initial?.westRate ?? 800),
@@ -60,33 +62,88 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
         JSON.stringify(snap(westRateRm, eastRateRm, freeEnabled, freeAboveRm)) !==
         JSON.stringify(snapshotRef.current)
 
+    const msgs = {
+        errorEmpty: s.errorEmpty,
+        errorNegative: s.errorNegative,
+        errorTooHigh: s.errorTooHigh,
+        errorFormat: s.errorFormat,
+        warnFree: s.warnFree,
+    }
+    // Free threshold has a different max (RM 100,000) so its too-high message uses freeError
+    const freeMsgs = { ...msgs, errorTooHigh: s.freeError }
+
+    const runCrossField = (w: string, e: string, fa: string) => {
+        const { warning } = validateCrossField(w, e, fa, freeEnabled, { warnThresholdBelowRate: s.warnThresholdBelowRate })
+        setFreeAboveWarning(warning ?? '')
+    }
+
+    // raw defaults to current state; paste handlers pass the new value directly to avoid stale closure
+    const handleWestBlur = (raw = westRateRm) => {
+        const r = validateRate(raw, { maxSen: RATE_MAX, messages: msgs })
+        setWestRateError(r.error)
+        if (r.error) {
+            setWestRateWarning('')
+        } else {
+            const p = parseRateRm(raw)
+            if (p !== null && raw.trim() !== '') setWestRateRm(p.toFixed(2))
+            setWestRateWarning(r.warning ?? '')
+        }
+        runCrossField(raw, eastRateRm, freeAboveRm)
+    }
+
+    const handleEastBlur = (raw = eastRateRm) => {
+        const r = validateRate(raw, { maxSen: RATE_MAX, messages: msgs })
+        setEastRateError(r.error)
+        if (r.error) {
+            setEastRateWarning('')
+        } else {
+            const p = parseRateRm(raw)
+            if (p !== null && raw.trim() !== '') setEastRateRm(p.toFixed(2))
+            setEastRateWarning(r.warning ?? '')
+        }
+        runCrossField(westRateRm, raw, freeAboveRm)
+    }
+
+    const handleFreeBlur = (raw = freeAboveRm) => {
+        const r = validateRate(raw, { maxSen: FREE_ABOVE_MAX, minSen: 1, required: freeEnabled, messages: freeMsgs })
+        setFreeAboveError(r.error)
+        if (r.error) {
+            setFreeAboveWarning('')
+        } else {
+            const p = parseRateRm(raw)
+            if (p !== null && raw.trim() !== '') setFreeAboveRm(p.toFixed(2))
+        }
+        runCrossField(westRateRm, eastRateRm, raw)
+    }
+
     const handleReset = () => {
         setWestRateRm(DEFAULTS.westRm)
         setEastRateRm(DEFAULTS.eastRm)
         setFreeAboveRm(DEFAULTS.freeAboveRm)
         setFreeEnabled(DEFAULTS.freeEnabled)
-        setWestRateError('')
-        setEastRateError('')
-        setFreeAboveError('')
+        setWestRateError(''); setEastRateError(''); setFreeAboveError('')
+        setWestRateWarning(''); setEastRateWarning(''); setFreeAboveWarning('')
     }
 
     const handleSave = async () => {
-        const w = parseFloat(westRateRm)
-        const e = parseFloat(eastRateRm)
-        const wErr = !isNaN(w) && (w < 0 || Math.round(w * 100) > RATE_MAX) ? s.rateError : ''
-        const eErr = !isNaN(e) && (e < 0 || Math.round(e * 100) > RATE_MAX) ? s.rateError : ''
-        setWestRateError(wErr)
-        setEastRateError(eErr)
-        let fErr = ''
-        if (freeEnabled && freeAboveRm !== '') {
-            const f = parseFloat(freeAboveRm)
-            if (isNaN(f) || f <= 0 || Math.round(f * 100) > FREE_ABOVE_MAX) fErr = s.freeError
+        if (savingRef.current) return
+        savingRef.current = true
+
+        const wR = validateRate(westRateRm, { maxSen: RATE_MAX, messages: msgs })
+        const eR = validateRate(eastRateRm, { maxSen: RATE_MAX, messages: msgs })
+        const fR = freeEnabled
+            ? validateRate(freeAboveRm, { maxSen: FREE_ABOVE_MAX, minSen: 1, required: true, messages: freeMsgs })
+            : { error: '' }
+        setWestRateError(wR.error)
+        setEastRateError(eR.error)
+        setFreeAboveError(fR.error)
+        if (wR.error || eR.error || fR.error) {
+            savingRef.current = false
+            return
         }
-        setFreeAboveError(fErr)
-        if (wErr || eErr || fErr) return
 
         // RF-05: preserve existing enabled state — saving rate settings must not silently re-enable disabled shipping
-        const shippingEnabled = initial?.enabled !== false
+        const shippingEnabled = initial == null ? true : initial.enabled !== false
 
         setIsSaving(true)
         try {
@@ -110,6 +167,7 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
             toast.error(err instanceof Error ? err.message : s.saveError)
         } finally {
             setIsSaving(false)
+            savingRef.current = false
         }
     }
 
@@ -129,13 +187,20 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
                     onEastChange={v => { setEastRateRm(v); setEastRateError('') }}
                     westError={westRateError}
                     eastError={eastRateError}
+                    onWestBlur={handleWestBlur}
+                    onEastBlur={handleEastBlur}
+                    westWarning={westRateWarning}
+                    eastWarning={eastRateWarning}
+                    helperText={s.helperRange}
                 />
                 <FreeShippingCard
                     freeEnabled={freeEnabled}
                     freeAboveRm={freeAboveRm}
                     freeAboveError={freeAboveError}
-                    onToggle={setFreeEnabled}
+                    onToggle={v => { setFreeEnabled(v); if (!v) { setFreeAboveError(''); setFreeAboveWarning('') } }}
                     onAmountChange={v => { setFreeAboveRm(v); setFreeAboveError('') }}
+                    onAmountBlur={handleFreeBlur}
+                    freeAboveWarning={freeAboveWarning}
                 />
             </div>
 

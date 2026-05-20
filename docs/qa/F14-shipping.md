@@ -748,6 +748,53 @@ Project hiện tại đã có `@playwright/test@^1.58.2` + `playwright.config.ts
 
 ---
 
+### 3.16 Validation Tests — Phase 3 (Pure functions + Component wiring)
+
+> **File nguồn:** `src/__tests__/unit/dashboard/shipping-rate-validation.test.tsx`
+>
+> **Phạm vi:** Unit tests cho `validateRate()` (13 edge cases), `parseRateRm()`, `validateCrossField()`, component integration (`ShippingSettingsClient` form wiring)
+
+#### validateRate edge cases (TC-F14.21–F14.33)
+
+| ID | Type | Title | Input | Expected | Refs |
+|---|---|---|---|---|---|
+| **TC-F14.21** | Unit | Empty + required → errorEmpty | validateRate('', {required:true}) | {error:'Required'} | FR-08, BR-04 |
+| **TC-F14.22** | Unit | Empty + optional → no error | validateRate('', {required:false}) | {error:''} | FR-08 |
+| **TC-F14.23** | Unit | Negative → errorNegative | validateRate('-5', opts) | {error:'Cannot be negative'} | FR-08 |
+| **TC-F14.24** | Unit | Over max (1001 RM) → errorTooHigh | validateRate('1001', {maxSen:100_000}) | {error:'Maximum RM 1,000'} | FR-08, BR-04 |
+| **TC-F14.25** | Unit | Scientific notation 1e3 → errorFormat | validateRate('1e3', opts) | {error:'Numbers only'} | FR-08 |
+| **TC-F14.26** | Unit | Non-numeric 'abc' → errorFormat | validateRate('abc', opts) | {error:'Numbers only'} | FR-08 |
+| **TC-F14.27** | Unit | Comma decimal 8,50 → valid | validateRate('8,50', opts) | {error:''} | FR-08 |
+| **TC-F14.28** | Unit | Whitespace padded "  8.5  " → valid | validateRate('  8.5  ', opts) | {error:''} | FR-08 |
+| **TC-F14.29** | Unit | >2 decimals 8.123 → errorFormat | validateRate('8.123', opts) | {error:'Numbers only'} | FR-08 |
+| **TC-F14.30** | Unit | Zero → no error + warnFree | validateRate('0', opts) | {error:'', warning:'All orders free'} | BR-04 |
+| **TC-F14.31** | Unit | Happy path 8.00 → no error | validateRate('8.00', opts) | {error:''} | FR-08 |
+| **TC-F14.32** | Unit | Multiple dots 1.2.3 → errorFormat | validateRate('1.2.3', opts) | {error:'Numbers only'} | FR-08 |
+| **TC-F14.33** | Unit | Sub-cent 0.001 + minSen=1 → errorNegative | validateRate('0.001', {minSen:1}) | {error:'Cannot be negative'} | FR-08 |
+
+#### Component wiring (TC-F14.34–F14.38)
+
+| ID | Type | Title | Action | Expected | Refs |
+|---|---|---|---|---|---|
+| **TC-F14.34** | Func | Paste -1 → shows errorNegative + aria-invalid | Paste '-1' into west rate input | Input has aria-invalid='true' + error visible | FR-08 |
+| **TC-F14.35** | Func | onBlur auto-format 8 → 8.00 | Type '8', then blur west input | Value auto-formatted to '8.00' | FR-06 |
+| **TC-F14.36** | Accessibility | aria-describedby + role=alert | Trigger validation error | Error paragraph has id='ship-rate-west-err', aria-describedby linked, role='alert' | A11y |
+| **TC-F14.37** | Func | Paste trim + format " 8,50 " → 8.50 | Paste ' 8,50 ' (with spaces) | Input value becomes '8.50' | FR-06 |
+| **TC-F14.38** | Func | onChange filter rejects letters | Type 'a' when input is empty | Input remains empty (filter blocked 'a') | FR-06 |
+| **TC-F14.39** | Func | Paste "RM 8.00" strips prefix → 8.00 (AC-11) | Paste 'RM 8.00' into west rate | Input value becomes '8.00', no error shown | FR-08 |
+
+#### Reset behavior (TC-F14.40–F14.42)
+
+> **File nguồn:** `src/__tests__/unit/dashboard/shipping-settings-reset-defaults.test.tsx`
+
+| ID | Type | Title | Action | Expected | Refs |
+|---|---|---|---|---|---|
+| **TC-F14.40** | Func | Reset clears error + aria-invalid | Paste '-1' → click Reset | Error text gone, aria-invalid removed | FR-08 |
+| **TC-F14.41** | Func | Reset clears warnFree + restores default | Type '0' → blur → click Reset | Warning gone, west input back to '8.00' | BR-04 |
+| **TC-F14.42** | Func | Reset restores both inputs to defaults | Change west+east → click Reset | West='8.00', East='15.00' | FR-06 |
+
+---
+
 ## 11. Open Questions
 
 1. **Wave 6 release date** — F14 còn bao xa? Nếu sắp ship → cần dev sprint emergency vì chưa impl business logic
