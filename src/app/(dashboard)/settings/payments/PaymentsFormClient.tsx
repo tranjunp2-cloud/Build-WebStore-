@@ -453,7 +453,7 @@ export function PaymentsFormClient({
                         highlight={paymentQr}
                     >
                         {(paymentQr || qrWidgetExpanded) && (
-                            <div className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed rgba(255,255,255,0.10)' }}>
+                            <div className="mt-[18px] pt-[18px]" style={{ borderTop: '1px dashed var(--dash-border)' }}>
                                 <label className="block text-[13px] font-semibold text-slate-300 mb-[10px]">{pt.qrCodeLabel}</label>
 
                                 {qrPreviewUrl ? (
@@ -492,8 +492,8 @@ export function PaymentsFormClient({
                                         className="flex flex-col items-center justify-center text-center rounded-[12px] cursor-pointer transition-all group"
                                         style={{
                                             padding: '32px 20px',
-                                            border: '1.5px dashed rgba(255,255,255,0.12)',
-                                            background: 'rgba(255,255,255,0.02)',
+                                            border: '1.5px dashed var(--dash-border)',
+                                            background: 'transparent',
                                             borderRadius: '12px',
                                         }}
                                         onMouseEnter={e => {
@@ -501,8 +501,8 @@ export function PaymentsFormClient({
                                             (e.currentTarget as HTMLDivElement).style.background = 'rgba(14,165,233,0.04)';
                                         }}
                                         onMouseLeave={e => {
-                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.12)';
-                                            (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.02)';
+                                            (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--dash-border)';
+                                            (e.currentTarget as HTMLDivElement).style.background = 'transparent';
                                         }}
                                     >
                                         <div className="w-[48px] h-[48px] rounded-full bg-sky-500/[0.10] text-sky-400 grid place-items-center mb-[12px]">
@@ -523,11 +523,11 @@ export function PaymentsFormClient({
                                     </label>
                                     <div
                                         className="flex items-center rounded-[10px] overflow-hidden transition-all"
-                                        style={{ background: '#0d1525', border: '1px solid rgba(255,255,255,0.08)' }}
+                                        style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
                                         onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
-                                        onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                                        onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                     >
-                                        <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
                                             <User className="w-[14px] h-[14px] text-slate-400 opacity-70" />
                                         </div>
                                         <input
@@ -550,9 +550,9 @@ export function PaymentsFormClient({
                                         <label className="text-[13px] font-semibold text-slate-300">{pt.bankNameLabel}</label>
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
-                                            style={{ background: '#0d1525', border: '1px solid rgba(255,255,255,0.08)' }}
+                                            style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
                                             onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
-                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                         >
                                             <input
                                                 type="text"
@@ -571,11 +571,11 @@ export function PaymentsFormClient({
                                         <label className="text-[13px] font-semibold text-slate-300">{pt.accountNumberLabel}</label>
                                         <div
                                             className="flex items-center rounded-[10px] overflow-hidden transition-all"
-                                            style={{ background: '#0d1525', border: '1px solid rgba(255,255,255,0.08)' }}
+                                            style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-border)' }}
                                             onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 1px #0ea5e9, 0 0 0 4px rgba(14,165,233,0.15)', e.currentTarget.style.borderColor = '#0ea5e9')}
-                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                                            onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                         >
-                                            <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                                            <div className="px-[12px] h-[40px] grid place-items-center font-mono text-[13px] text-slate-400 font-medium shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
                                                 MYR
                                             </div>
                                             <input

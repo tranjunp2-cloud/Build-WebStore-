@@ -111,6 +111,7 @@
 .dash-shell .text-zinc-300 { color: var(--dash-text-muted); }
 .dash-shell .text-zinc-400,
 .dash-shell .text-zinc-500,
+.dash-shell .text-slate-300,
 .dash-shell .text-slate-400,
 .dash-shell .text-slate-500,
 .dash-shell .text-\[\#9CA3AF\],
@@ -159,8 +160,9 @@ html:not(.dark) .dash-shell .bg-\[\#0B1120\]\/80 { background-color: rgba(0,0,0,
 .dash-shell .divide-white\/5 > * + * { border-color: var(--dash-border); }
 .dash-shell .divide-white\/10 > * + * { border-color: var(--dash-border); }
 .dash-shell .divide-white\/\[0\.05\] > * + * { border-color: var(--dash-border); }
-/* Gap 4: border-white/10 → invisible border on white bg */
+/* Gap 4: border-white/10,12 → invisible border on white bg */
 .dash-shell .border-white\/10 { border-color: var(--dash-border); }
+.dash-shell .border-white\/\[0\.12\] { border-color: var(--dash-border); }
 /* Gap 5: placeholder too light on white bg */
 .dash-shell .placeholder\:text-slate-50\/30::placeholder { color: var(--dash-text-muted); }
 /* rgba() className patterns — text */
@@ -202,12 +204,16 @@ html:not(.dark) .dash-shell .hover\:bg-\[\#0B1120\]\/50:hover { background-color
 .dash-shell .bg-\[\#000000\],
 .dash-shell .bg-\[\#0b1120\],
 .dash-shell .bg-\[\#0B0E14\],
-.dash-shell .bg-\[\#0F141E\] { background-color: var(--dash-bg); }
+.dash-shell .bg-\[\#0F141E\],
+.dash-shell .bg-\[\#0f1729\] { background-color: var(--dash-bg); }
 /* after:bg-[#0b1120] — timeline line masking pseudo-element (customer-detail-panel) */
 .dash-shell .after\:bg-\[\#0b1120\]::after { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#141e2e\],
+.dash-shell .bg-\[\#0d1525\],
 .dash-shell .bg-\[\#161e2e\],
 .dash-shell .bg-\[\#172033\],
 .dash-shell .bg-\[\#1A2236\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#1a2540\],
 .dash-shell .bg-\[\#1C263B\],
 .dash-shell .bg-\[\#1E2536\],
 .dash-shell .bg-\[\#272A31\],
