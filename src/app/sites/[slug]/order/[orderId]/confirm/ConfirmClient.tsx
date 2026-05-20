@@ -68,8 +68,10 @@ const CopyIcon = () => (
 export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken }: Props) {
     const router = useRouter()
 
-    const clearAndNavigate = useCallback(async (href: string) => {
-        await fetch(`/api/orders/${order.id}/clear-confirm-token`, { method: 'DELETE' }).catch(() => {})
+    const clearAndNavigate = useCallback(async (href: string, clearToken: boolean) => {
+        if (clearToken) {
+            await fetch(`/api/orders/${order.id}/clear-confirm-token`, { method: 'DELETE' }).catch(() => {})
+        }
         router.push(href)
     }, [order.id, router])
 
@@ -546,10 +548,10 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             {addrLine && <div className="ty-meta-row"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
                         </div>
                         <div className="ty-cta-row">
-                            <button className="ty-btn primary lg" onClick={() => clearAndNavigate(`/sites/${slug}/products`)}>
+                            <button className="ty-btn primary lg" onClick={() => clearAndNavigate(`/sites/${slug}/products`, isPaid)}>
                                 <ShoppingBag size={15} /> Continue Shopping
                             </button>
-                            <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.id}`)}>
+                            <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.id}`, isPaid)}>
                                 <ReceiptText size={15} /> View My Orders
                             </button>
                         </div>
