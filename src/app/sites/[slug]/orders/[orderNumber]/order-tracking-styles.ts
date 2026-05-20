@@ -133,7 +133,7 @@ export const OT_CSS = `
 .ot-eta-date{font-family:var(--hf);font-size:16px;font-weight:800;color:var(--f1);letter-spacing:-.01em;line-height:1.15;}
 .ot-eta-window{font-size:11.5px;color:var(--f3);margin-top:1px;}
 /* Mini map */
-.ot-mini-map{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--bd);align-self:stretch;background:radial-gradient(ellipse at 20% 30%,rgba(14,117,86,.14) 0%,transparent 55%),radial-gradient(ellipse at 78% 72%,rgba(14,117,86,.08) 0%,transparent 60%),repeating-linear-gradient(45deg,var(--inp) 0 12px,var(--card) 12px 24px);display:flex;flex-direction:column;cursor:pointer;transition:transform 200ms ease,box-shadow 200ms ease;}
+.ot-mini-map{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--bd);align-self:stretch;background:radial-gradient(ellipse at 20% 30%,#dcefe4 0%,transparent 55%),radial-gradient(ellipse at 78% 72%,#ecf6f0 0%,transparent 60%),repeating-linear-gradient(45deg,#f5f7f9 0 12px,#eef1f4 12px 24px);display:flex;flex-direction:column;cursor:pointer;transition:transform 200ms ease,box-shadow 200ms ease;}
 .ot-mini-map:hover{transform:translateY(-1px);box-shadow:var(--shp);}
 .ot-mini-map svg.roads{position:absolute;inset:0;width:100%;height:100%;}
 .ot-mini-map .map-route{fill:none;stroke:var(--tl);stroke-width:3;stroke-linecap:round;stroke-dasharray:0 6 200 9999;animation:otRouteDraw 1.6s ease-out forwards;}
@@ -143,7 +143,7 @@ export const OT_CSS = `
 .ot-mini-map .map-pin-to{bottom:22%;right:14%;background:var(--tl);box-shadow:0 4px 10px -4px rgba(14,117,86,.55);animation:otPinPulse 1.8s ease-in-out infinite;}
 @keyframes otPinPulse{0%,100%{transform:rotate(-45deg) scale(1);}50%{transform:rotate(-45deg) scale(1.12);}}
 .ot-mini-map .map-pin-from span,.ot-mini-map .map-pin-to span{transform:rotate(45deg);display:block;}
-.ot-mini-map .map-courier{position:absolute;top:50%;left:50%;width:30px;height:30px;margin:-15px 0 0 -15px;background:var(--card);border:2px solid var(--tl);border-radius:999px;display:grid;place-items:center;color:var(--tl);box-shadow:0 6px 14px -6px rgba(0,0,0,.18);animation:otCourierMove 4.5s ease-in-out infinite;}
+.ot-mini-map .map-courier{position:absolute;top:50%;left:50%;width:30px;height:30px;margin:-15px 0 0 -15px;background:#fff;border:2px solid var(--tl);border-radius:999px;display:grid;place-items:center;color:var(--tl);box-shadow:0 6px 14px -6px rgba(0,0,0,.18);animation:otCourierMove 4.5s ease-in-out infinite;}
 .ot-mini-map .map-courier svg{width:14px;height:14px;}
 @keyframes otCourierMove{0%{top:50%;left:50%;}50%{top:56%;left:60%;}100%{top:50%;left:50%;}}
 .ot-mini-map-foot{margin-top:auto;display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);backdrop-filter:blur(8px);border-top:1px solid var(--bd);z-index:2;}
