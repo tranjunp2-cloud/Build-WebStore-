@@ -73,7 +73,7 @@ export function bankTransferInstructionsEmail(
             ? `
         <div style="margin-top: 20px; text-align: center;">
             <p style="font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 0.05em; margin: 0 0 12px;">Or Scan to Pay</p>
-            <img src="${data.merchantQrUrl}" alt="Payment QR Code" style="max-width: 200px; border-radius: 8px; border: 1px solid #e2e8f0;" />
+            <img src="${escapeHtml(data.merchantQrUrl)}" alt="Payment QR Code" style="max-width: 200px; border-radius: 8px; border: 1px solid #e2e8f0;" />
         </div>`
         : ''
 
@@ -114,7 +114,7 @@ export function bankTransferInstructionsEmail(
                 <!-- Reference Code — prominent box -->
                 <div style="margin-top: 24px; background: #fefce8; border: 2px solid #eab308; border-radius: 10px; padding: 20px; text-align: center;">
                     <p style="font-size: 12px; text-transform: uppercase; color: #92400e; font-weight: 700; letter-spacing: 0.08em; margin: 0 0 8px;">IMPORTANT — Payment Reference</p>
-                    <p style="font-size: 28px; font-weight: 800; font-family: 'Courier New', Courier, monospace; letter-spacing: 3px; margin: 0 0 8px; color: #78350f;">${data.paymentReference}</p>
+                    <p style="font-size: 28px; font-weight: 800; font-family: 'Courier New', Courier, monospace; letter-spacing: 3px; margin: 0 0 8px; color: #78350f;">${escapeHtml(data.paymentReference)}</p>
                     <p style="font-size: 13px; color: #92400e; margin: 0;">Enter this code in your transfer notes / description field</p>
                 </div>
 

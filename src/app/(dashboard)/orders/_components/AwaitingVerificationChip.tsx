@@ -7,7 +7,7 @@ export function AwaitingVerificationChip() {
 
     useEffect(() => {
         let cancelled = false
-        fetch('/api/orders?where[paymentStatus][equals]=pending_verification&where[paymentMethod][equals]=bank_transfer&limit=0')
+        fetch('/api/orders?paymentStatus=pending_verification&paymentMethod=bank_transfer&limit=0')
             .then(r => r.json())
             .then(data => {
                 if (!cancelled) setCount(data?.totalDocs ?? 0)
