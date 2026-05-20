@@ -253,7 +253,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                                                 'h-1.5 w-1.5 shrink-0 rounded-full',
                                                 childActive
                                                     ? 'bg-[#3B82F6]'
-                                                    : 'bg-[rgba(248,250,252,0.6)]'
+                                                    : 'bg-[var(--dash-text-muted)]'
                                             )}
                                         />
                                         <span>{childLabel}</span>

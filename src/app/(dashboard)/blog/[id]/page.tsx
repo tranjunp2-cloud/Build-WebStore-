@@ -541,7 +541,7 @@ export default function BlogEditorPage() {
                                 </clipPath>
                             </defs>
                         </svg>
-                        <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.editor.aiAssistant}</span>
+                        <span className="hidden xl:inline font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.editor.aiAssistant}</span>
                     </button>
 
                     {/* Save Draft Button — icon-only on mobile per Figma */}
@@ -580,7 +580,7 @@ export default function BlogEditorPage() {
                                 </defs>
                             </svg>
                         )}
-                        <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.editor.publish}</span>
+                        <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.editor.publish}</span>
                     </button>
                 </div>
             </div>
@@ -847,8 +847,8 @@ export default function BlogEditorPage() {
                                 className="flex flex-row items-center justify-center w-[151.23px] h-[32px] gap-[8px] rounded-[12px] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] transition-transform hover:opacity-90 active:scale-95 disabled:opacity-50"
                                 style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(57,137,243,1) 7%, rgba(55,143,239,1) 14%, rgba(53,150,236,1) 21%, rgba(51,156,233,1) 29%, rgba(50,162,229,1) 36%, rgba(48,168,225,1) 43%, rgba(47,174,222,1) 50%, rgba(46,179,218,1) 57%, rgba(45,185,214,1) 64%, rgba(45,191,209,1) 71%, rgba(44,196,205,1) 79%, rgba(44,201,201,1) 86%, rgba(45,207,196,1) 93%, rgba(45,212,191,1) 100%)' }}
                             >
-                                {isGeneratingSEO ? <Loader2 className="w-[16px] h-[16px] text-white animate-spin" /> : <Sparkles className="w-[16px] h-[16px] text-[#FFFFFF]" strokeWidth={1.5} />}
-                                <span className="font-['Inter'] font-[600] text-[12px] leading-[1.3333333333333333em] text-[#FFFFFF]">{t.dashboard.blog.editor.generateSeo}</span>
+                                {isGeneratingSEO ? <Loader2 className="w-[16px] h-[16px] text-white animate-spin" /> : <Sparkles className="w-[16px] h-[16px] text-white" strokeWidth={1.5} />}
+                                <span className="font-['Inter'] font-[600] text-[12px] leading-[1.3333333333333333em] text-white">{t.dashboard.blog.editor.generateSeo}</span>
                             </button>
                         </div>
 

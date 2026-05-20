@@ -306,7 +306,7 @@ export default function BlogListPage() {
                     <p className="text-sm text-gray-400">{t.dashboard.blog.noPostsSubtitle}</p>
                     <button
                         onClick={() => router.push('/blog/new')}
-                        className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-400 transition-colors"
+                        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-teal-400 px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"
                     >
                         <Plus className="mr-2 h-4 w-4" />
                         {t.dashboard.blog.createPost}
@@ -342,9 +342,9 @@ export default function BlogListPage() {
                     </button>
                     <button
                         onClick={() => router.push('/blog/new')}
-                        className="flex flex-row items-center justify-center gap-[8px] rounded-[16px] px-[24px] py-[11px] bg-[linear-gradient(90deg,rgba(59,130,246,1)_0%,rgba(45,212,191,1)_100%)] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] text-[#FFFFFF] hover:opacity-90 transition-opacity"
+                        className="flex flex-row items-center justify-center gap-[8px] rounded-[16px] px-[24px] py-[11px] bg-gradient-to-r from-blue-500 to-teal-400 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] text-white hover:opacity-90 transition-opacity"
                     >
-                        <Plus className="w-[20px] h-[20px] text-[#FFFFFF]" />
+                        <Plus className="w-[20px] h-[20px] text-white" />
                         <span className="text-[16px] font-[600] leading-[1.5em] text-center">{t.dashboard.blog.createPost}</span>
                     </button>
                 </div>
@@ -689,7 +689,7 @@ export default function BlogListPage() {
             {/* Delete Confirmation Modal — AC-2, Figma: 31958-7172 */}
             {
                 deleteTarget && typeof document !== 'undefined' && createPortal(
-                    <div className="fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
+                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
                         <div
                             className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                             style={{
@@ -763,7 +763,7 @@ export default function BlogListPage() {
             {/* Bulk Delete Confirmation Modal — TC-F17-01-12, Figma: 31958-7197 */}
             {
                 showBulkDeleteModal && typeof document !== 'undefined' && createPortal(
-                    <div className="fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
+                    <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
                         <div
                             className="w-full flex flex-col items-center gap-[16px] rounded-[16px] p-[25px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                             style={{

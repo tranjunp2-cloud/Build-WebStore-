@@ -290,9 +290,9 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                 <button
                                     onClick={handleCreate}
                                     disabled={!newName.trim() || isCreating}
-                                    className="flex justify-center items-center px-0 py-0 w-[112px] h-[48px] rounded-[12px] bg-[linear-gradient(90deg,#2DD4BF_0%,#3B82F6_100%)] hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
+                                    className="flex justify-center items-center px-0 py-0 w-[112px] h-[48px] rounded-[12px] bg-gradient-to-r from-teal-400 to-blue-500 hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
                                 >
-                                    {isCreating ? <Loader2 className="w-[20px] h-[20px] text-white animate-spin" /> : <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.categoryModal.saveBtn}</span>}
+                                    {isCreating ? <Loader2 className="w-[20px] h-[20px] text-white animate-spin" /> : <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.categoryModal.saveBtn}</span>}
                                 </button>
                             </div>
                         </div>
@@ -354,9 +354,9 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                 className="flex flex-1 justify-center items-center gap-[8px] pt-[12px] pb-[14px] px-0 bg-[#FB2C36] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] rounded-[16px] hover:bg-opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
                             >
                                 {isDeleting ? (
-                                    <><Loader2 className="w-[20px] h-[20px] text-white animate-spin" /><span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.categoryModal.deletingBtn}</span></>
+                                    <><Loader2 className="w-[20px] h-[20px] text-white animate-spin" /><span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.categoryModal.deletingBtn}</span></>
                                 ) : (
-                                    <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.categoryModal.deleteBtn}</span>
+                                    <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.categoryModal.deleteBtn}</span>
                                 )}
                             </button>
                         </div>

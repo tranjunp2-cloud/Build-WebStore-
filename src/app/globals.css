@@ -69,8 +69,31 @@
   --dash-text-muted: #9CA3AF;
   --dash-border: #1F2937;
   --dash-accent: #2563EB;
-  --dash-overlay: rgba(0, 0, 0, 0);
+  --dash-overlay: rgba(0, 0, 0, 0.5);
   --dash-secondary-bg: #1F2937;
+}
+
+/* ── Theme Transition via @property (AC-2/3 #779) ───────────────────────── */
+/* Register dash-* tokens as typed <color> properties so the browser can
+   interpolate between light/dark values when .dark class toggles.
+   No JS tricks needed — transition fires automatically on :root. */
+@property --dash-bg         { syntax: '<color>'; initial-value: #F8FAFC; inherits: true; }
+@property --dash-surface    { syntax: '<color>'; initial-value: #FFFFFF; inherits: true; }
+@property --dash-surface-hover { syntax: '<color>'; initial-value: #F1F5F9; inherits: true; }
+@property --dash-text       { syntax: '<color>'; initial-value: #0F172A; inherits: true; }
+@property --dash-text-muted { syntax: '<color>'; initial-value: #64748B; inherits: true; }
+@property --dash-border     { syntax: '<color>'; initial-value: #E2E8F0; inherits: true; }
+@property --dash-secondary-bg { syntax: '<color>'; initial-value: #F1F5F9; inherits: true; }
+
+:root {
+  transition:
+    --dash-bg 150ms ease,
+    --dash-surface 150ms ease,
+    --dash-surface-hover 150ms ease,
+    --dash-text 150ms ease,
+    --dash-text-muted 150ms ease,
+    --dash-border 150ms ease,
+    --dash-secondary-bg 150ms ease;
 }
 
 /* ── Dashboard Shell — Legacy Color Overrides ────────────────────────────── */
@@ -107,6 +130,7 @@
 .dash-shell .text-slate-50 { color: var(--dash-text); }
 .dash-shell .text-slate-50\/60,
 .dash-shell .text-slate-50\/50 { color: var(--dash-text-muted); }
+.dash-shell .text-zinc-300 { color: var(--dash-text-muted); }
 .dash-shell .text-zinc-400,
 .dash-shell .text-zinc-500,
 .dash-shell .text-slate-400,
@@ -124,7 +148,9 @@
 .dash-shell .bg-blue-600 .text-white,
 .dash-shell .bg-blue-500 .text-white,
 .dash-shell .bg-red-600 .text-white,
-.dash-shell .bg-green-600 .text-white { color: #fff !important; }
+.dash-shell .bg-green-600 .text-white,
+.dash-shell .bg-\[\#FB2C36\] .text-white,
+.dash-shell .bg-cyan-500 .text-white { color: #fff !important; }
 /* bg-white/opacity → light mode only: white-on-white → dark tint; dark mode keeps original white shimmer */
 html:not(.dark) .dash-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
 html:not(.dark) .dash-shell .bg-white\/5 { background-color: rgba(0,0,0,0.04); }
@@ -132,6 +158,7 @@ html:not(.dark) .dash-shell .bg-white\/8 { background-color: rgba(0,0,0,0.06); }
 html:not(.dark) .dash-shell .bg-white\/10 { background-color: rgba(0,0,0,0.07); }
 html:not(.dark) .dash-shell .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.06); }
 html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(0,0,0,0.02); }
 html:not(.dark) .dash-shell .hover\:bg-white\/5:hover,
 html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.05\]:hover { background-color: rgba(0,0,0,0.04); }
 html:not(.dark) .dash-shell .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07); }
@@ -365,9 +392,8 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 .dash-shell .border-white\/5,
 .dash-shell .border-white\/\[0\.05\] { border-color: var(--dash-border); }
 
-/* ── TopHeader: force opaque background + z-index to prevent scroll overlap ─ */
+/* ── TopHeader: force opaque background to prevent scroll overlap ─ */
 .dash-shell header {
-    z-index: 200;
     background-color: var(--dash-surface) !important;
 }
 

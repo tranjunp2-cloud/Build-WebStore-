@@ -37,12 +37,10 @@ export function RemoveStaffModal({
         user.email.split('@')[0];
 
     return (
-        <>
-            <div className="fixed inset-0 z-[100] bg-[var(--dash-overlay)] animate-in fade-in duration-200" onClick={isPending ? undefined : onClose} />
-
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[var(--dash-overlay)] backdrop-blur-sm animate-in fade-in duration-200" onClick={isPending ? undefined : onClose}>
             <div
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] flex flex-col w-[calc(100%-32px)] max-w-[448px] bg-dash-surface border border-dash-border rounded-[16px] animate-in zoom-in-95 duration-200 shadow-2xl overflow-hidden"
-                style={{ boxShadow: '0px 25px 50px -12px rgba(251, 44, 54, 0.2)' }}
+                className="flex flex-col w-full max-w-[448px] bg-[var(--dash-surface)] border border-dash-border rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex flex-col items-stretch px-[24px] py-[24px] pb-[23px] border-b border-dash-border">
@@ -123,6 +121,6 @@ export function RemoveStaffModal({
                     </button>
                 </div>
             </div>
-        </>
+        </div>
     );
 }

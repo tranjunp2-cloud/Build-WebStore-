@@ -8,15 +8,12 @@ export function ThemeToggle() {
     const isDark = theme === 'dark'
     return (
         <button
+            type="button"
             onClick={toggle}
             aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            className={
-                isDark
-                    ? 'flex size-[38px] shrink-0 items-center justify-center rounded-[8px] border border-[#1F2937] bg-[#0B1120] p-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]'
-                    : 'flex size-[38px] shrink-0 items-center justify-center rounded-[8px] border border-[#9CA3AF] bg-white p-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]'
-            }
+            className="flex size-[38px] shrink-0 items-center justify-center rounded-[8px] border border-dash-border bg-dash-surface p-2 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dash-accent"
         >
-            {isDark ? <Moon size={20} className="text-amber-400" /> : <Sun size={20} className="text-amber-400" />}
+            {isDark ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-amber-400" />}
         </button>
     )
 }

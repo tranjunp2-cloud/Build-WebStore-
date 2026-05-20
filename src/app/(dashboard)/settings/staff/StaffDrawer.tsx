@@ -128,10 +128,8 @@ export function StaffDrawer({
     };
 
     return (
-        <>
-            <div className="fixed inset-0 z-[100] bg-[var(--dash-overlay)] animate-in fade-in duration-200" onClick={onClose} />
-
-            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] flex flex-col w-[calc(100%-32px)] sm:w-full max-w-[448px] max-h-[calc(100vh-32px)] bg-dash-surface border border-dash-border rounded-[16px] animate-in zoom-in-95 duration-200" style={{ boxShadow: '0 25px 50px -12px rgba(59,130,246,0.2)' }}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[var(--dash-overlay)] backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div className="flex flex-col w-full max-w-[448px] max-h-[calc(100vh-32px)] bg-[var(--dash-surface)] border border-dash-border rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-[24px] pt-[24px] pb-[16px]">
                     <h2 className="text-[24px] font-bold text-dash-text leading-[1.333em] font-['Inter']">
@@ -142,8 +140,6 @@ export function StaffDrawer({
                     </button>
                 </div>
 
-                {/* Header bottom divider (Above Email) */}
-                <div className="w-full h-[1px] bg-dash-border shrink-0" />
 
                 {/* Body Content */}
                 <div className="flex flex-col overflow-y-auto max-h-[70vh]">
@@ -264,8 +260,6 @@ export function StaffDrawer({
                     </div>
                 </div>
 
-                {/* Divider below Role Selection (Footer top line) */}
-                <div className="w-full h-[1px] bg-dash-border shrink-0" />
 
                 {/* Footer buttons */}
                 <div className="flex items-center justify-end gap-[12px] px-[24px] py-[24px]">
@@ -288,6 +282,6 @@ export function StaffDrawer({
                     </button>
                 </div>
             </div>
-        </>
+        </div>
     );
 }

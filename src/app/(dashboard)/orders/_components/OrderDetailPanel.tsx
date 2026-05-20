@@ -912,7 +912,7 @@ export function OrderDetailPanel({
 
                 {/* Close button — layout_HCW45V: 36×36, padding 8px 8px 0 */}
                 <button
-                    className="flex items-start justify-center hover:opacity-70 transition-opacity"
+                    className="flex items-start justify-center text-dash-text-muted hover:opacity-70 transition-opacity"
                     style={{
                         width: 36,
                         height: 36,
@@ -923,7 +923,7 @@ export function OrderDetailPanel({
                     onClick={onClose}
                 >
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M5 5L15 15M15 5L5 15" stroke="rgba(248,250,252,0.6)" strokeWidth="1.67" strokeLinecap="round" />
+                        <path d="M5 5L15 15M15 5L5 15" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" />
                     </svg>
                 </button>
             </div>
