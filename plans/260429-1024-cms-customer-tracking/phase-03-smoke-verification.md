@@ -3,7 +3,7 @@
 
 ## Context links
 - Plan: [plan.md](./plan.md)
-- Depends on: [phase-01-tenant-access-refactor.md](./phase-01-tenant-access-refactor.md), [phase-02-customers-virtual-collection.md](./phase-02-customers-virtual-collection.md)
+- Depends on: [phase-01-tenant-access-refactor.md](./phase-01-tenant-access-refactor.md), [phase-02-audience-virtual-collection.md](./phase-02-audience-virtual-collection.md)
 - TC reference: none yet — propose `TC-F24-001..005` (added by docs-manager post-merge)
 
 ## Overview
@@ -31,7 +31,7 @@
 | 7 | Detail tab links | tenant-owner A | clicking row → filtered ContactSubmissions list resolves | — |
 | 8 | Status update allowed | tenant-owner A | PATCH `/api/contact-submissions/:id` `{status:'replied'}` → 200 | — |
 | 9 | Field write blocked | tenant-owner A | PATCH `{email:'x@y.z'}` → 403 | — |
-| 10 | Subscriber row visibility | tenant-owner A | own-site subscribers visible in Customers as `isSubscriber=true` | — |
+| 10 | Subscriber row visibility | tenant-owner A | own-site subscribers visible in Audience as `isSubscriber=true` | — |
 | 11 | Empty state | tenant-owner with 0 sites | empty state message, no error | — |
 | 12 | Truncation banner | super-admin | with seed >5k contacts → warning visible | — (skip if no large dataset) |
 
@@ -41,8 +41,8 @@ N/A — verification only.
 ## Related code files
 **READ**
 - `src/access/tenant-scope.ts`
-- `src/collections/Customers.ts`
-- `src/components/admin/customers-list-view.tsx`
+- `src/collections/Audience.ts`
+- `src/components/admin/audience-list-view.tsx`
 - `scripts/db-setup.js` (verify migrations applied)
 
 **MODIFY** — none
@@ -52,7 +52,7 @@ N/A — verification only.
 ## Implementation steps
 1. **Seed prep**: ensure local DB has ≥2 tenants, each with ≥1 site, ≥3 contact submissions, ≥2 subscribers per site, with at least 1 email shared between contact + subscriber for the same site.
    - Use existing seed scripts if available; else create rows via Payload admin as super-admin.
-2. **Run** `npm run dev` (or local Payload), confirm Customers nav visible.
+2. **Run** `npm run dev` (or local Payload), confirm Audience nav visible.
 3. **Execute** matrix scenarios 1-11 in order. Capture screenshots/curl output for any failure.
 4. **Cross-tenant REST check** (scenario 3):
    ```bash
@@ -96,5 +96,5 @@ N/A — verification only.
 
 ## Next steps
 - code-reviewer reviews phase-01 + phase-02 diff together.
-- docs-manager creates `docs/architecture/F24-customer-tracking.md` + `docs/qa/F24-customer-tracking.md` (with TC-F24-001..005 derived from this matrix) + appends `docs/CHANGELOG.md`.
+- docs-manager creates `docs/architecture/F24-audience-tracking.md` + `docs/qa/F24-audience-tracking.md` (with TC-F24-001..005 derived from this matrix) + appends `docs/CHANGELOG.md`.
 - git-manager: PR title `feat(cms): per-tenant customer tracking view` → base `staging`.
