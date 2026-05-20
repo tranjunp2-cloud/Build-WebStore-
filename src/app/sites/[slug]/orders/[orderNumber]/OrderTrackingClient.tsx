@@ -16,6 +16,7 @@ type OrderItem = {
     variant: string | null
     quantity: number
     unitPrice: number
+    imageUrl?: string | null
 }
 
 type ShippingAddress = {
@@ -308,7 +309,12 @@ function OtItems({ order }: { order: OrderData }) {
             <ul className={`ot-items-list ${open ? 'open' : 'collapsed'}`}>
                 {order.items.map((item, idx) => (
                     <li key={idx} className="ot-item">
-                        <div className="ot-item-thumb"><Package size={26} /></div>
+                        <div className="ot-item-thumb">
+                            {item.imageUrl
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img src={item.imageUrl} alt={item.productName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                : <Package size={26} />}
+                        </div>
                         <div className="ot-item-info">
                             <p className="ot-item-name">{item.productName}</p>
                             <div className="ot-item-attr">

@@ -46,7 +46,7 @@ export default async function OrderTrackingPage({
             where: { orderNumber: { equals: orderNumber }, site: { equals: site.id } },
             limit: 1,
             overrideAccess: true,
-            depth: 1,
+            depth: 2,
         })
         order = result.docs[0] ?? null
     } catch { /* order stays null */ }
@@ -142,6 +142,7 @@ export default async function OrderTrackingPage({
             variant: item.variant ?? null,
             quantity: item.quantity ?? 1,
             unitPrice: item.unitPrice ?? 0,
+            imageUrl: item.product?.images?.[0]?.image?.url ?? null,
         })),
         shippingAddress: {
             line1: order.shippingAddress?.line1 ?? null,
