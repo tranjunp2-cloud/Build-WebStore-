@@ -39,8 +39,8 @@ Bảng này dùng để:
 | **Orders** | Pending/Shipping/Returned/Cancelled | F10 Orders | ✅ Same | **P0** US-MIGA-04 |
 | **Order Returns/Refunds Detail** | Có | ❌ Chỉ status field | ❌ MISSING | **P1** US-MIGA-15 |
 | **Inventory Log** (audit trail) | Có | ❌ Chỉ snapshot | ❌ MISSING | **P1** US-MIGA-14 |
-| **Customers** (separate entity, Rank) | Có | ❌ Chỉ nested in Orders | ❌ MISSING | **P0** Group B3 |
-| **Customer Addresses Book** (multiple/customer) | Có | ❌ Chỉ 1 trong Order | ❌ MISSING | **P0** US-MIGA-12 |
+| **Customers** (separate entity, Rank) | Có | F25 Customers | 🔧 Partial (PW2-built; ETL US-MIGA-12 pending) | **P0** Group B3 |
+| **Customer Addresses Book** (multiple/customer) | Có | F25 Customers | 🔧 Partial (PW2-built; ETL US-MIGA-12 pending) | **P0** US-MIGA-12 |
 | **Articles / Blog** | Có | F17 Blog | ✅ Same | P1 |
 | **Templates** (system) | Có | F07 Template Gallery | ✅ Same | P0 |
 | **Template Customizations** (Owner edits) | Có | ⚠️ Chưa scope | 🔧 Partial | **P2** US-MIGA-19 |
