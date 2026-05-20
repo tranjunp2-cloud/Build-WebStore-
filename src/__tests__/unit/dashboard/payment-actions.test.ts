@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia } from '@/app/(dashboard)/settings/payments/actions';
 import { getCurrentTenantId } from '@/lib/auth';
-import { getPayloadHMR } from '@payloadcms/next/utilities';
+import { getPayload } from 'payload';
 
 // --- Arrange: Mocks ---
 vi.mock('@/lib/auth', () => ({
     getCurrentTenantId: vi.fn(),
 }));
 
-vi.mock('@payloadcms/next/utilities', () => ({
-    getPayloadHMR: vi.fn(),
+vi.mock('payload', () => ({
+    getPayload: vi.fn(),
 }));
 
 vi.mock('@payload-config', () => ({
@@ -30,7 +30,7 @@ describe('Payment Actions', () => {
             create: vi.fn(),
         };
 
-        vi.mocked(getPayloadHMR).mockResolvedValue(mockPayloadContext as unknown as Awaited<ReturnType<typeof getPayloadHMR>>);
+        vi.mocked(getPayload).mockResolvedValue(mockPayloadContext as unknown as Awaited<ReturnType<typeof getPayload>>);
     });
 
     describe('getPaymentSettings', () => {

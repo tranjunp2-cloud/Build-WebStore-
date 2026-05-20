@@ -5,7 +5,8 @@ import type { CollectionConfig } from 'payload'
  * Exported for reuse in API route validation.
  */
 export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
-    pending: ['confirmed', 'cancelled'],
+    pending: ['new', 'confirmed', 'cancelled'],  // 'new' = Stripe webhook success target
+    new: ['confirmed', 'cancelled'],
     confirmed: ['ready_to_ship', 'cancelled'],
     ready_to_ship: ['shipped'],
     shipped: ['completed', 'refunded'],
@@ -189,6 +190,7 @@ export const Orders: CollectionConfig = {
             index: true,
             options: [
                 { label: 'Pending', value: 'pending' },
+                { label: 'New', value: 'new' },          // Stripe webhook success target (Architecture §2.1)
                 { label: 'Confirmed', value: 'confirmed' },
                 { label: 'Ready to Ship', value: 'ready_to_ship' },
                 { label: 'Shipped', value: 'shipped' },
@@ -222,8 +224,10 @@ export const Orders: CollectionConfig = {
                 { label: 'Cash on Delivery', value: 'cod' },
                 { label: 'QR Banking', value: 'qr_banking' },
                 { label: 'Credit Card', value: 'card' },
+                { label: 'FPX (Online Banking)', value: 'fpx' },
                 { label: 'Bank Transfer', value: 'bank' },
                 { label: 'e-Wallet', value: 'ewallet' },
+                { label: 'Free (100% discount)', value: 'free' },
             ],
         },
         {
@@ -249,6 +253,12 @@ export const Orders: CollectionConfig = {
             type: 'text',
             index: true,
             admin: { readOnly: true, description: 'Stripe PaymentIntent ID' },
+        },
+        {
+            name: 'stripeChargeId',
+            type: 'text',
+            index: true,
+            admin: { readOnly: true, description: 'Stripe Charge ID (from payment_intent.latest_charge)' },
         },
         // --- Customer ---
         {

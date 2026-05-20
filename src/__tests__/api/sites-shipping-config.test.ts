@@ -174,15 +174,15 @@ describe('PATCH /api/sites/[siteId]/shipping-config [TC-F14]', () => {
         expect(body.error.code).toBe('NOT_FOUND')
     })
 
-    it('returns 403 when user has no site access', async () => {
+    it('returns 404 when user has no site access (OWASP: no resource existence leak)', async () => {
         const alienSite = { id: 'site-99', tenant: 'other-tenant' }
         mockFindByID.mockResolvedValueOnce(alienSite)
 
         const res = await PATCH(mockReq(validBody), mockCtx('site-99'))
         const body = await res.json()
 
-        expect(res.status).toBe(403)
-        expect(body.error.code).toBe('FORBIDDEN')
+        expect(res.status).toBe(404)
+        expect(body.error.code).toBe('NOT_FOUND')
     })
 
     it('RM to sen conversion: Math.round(8.005 * 100) = 801', async () => {

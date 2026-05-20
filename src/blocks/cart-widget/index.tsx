@@ -7,7 +7,7 @@ import type { CartWidgetConfig } from './config'
 import { useCartStore } from '@/store/cartStore'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
-import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { useBlockEditCallback } from '@/components/site-renderer/BlockEditCallbackContext'
 import { useInFloatingContainer } from '@/components/site-renderer/FloatingContainerContext'
 
@@ -35,38 +35,6 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
         }
     }, [setSiteSlug, siteSlug])
 
-    // ── Inline variant ─────────────────────────────────────────────────
-    if (block.variant === 'inline') {
-        return (
-            <>
-                <section className="py-10">
-                    <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
-                        <button
-                            type="button"
-                            onClick={callback ? undefined : openCart}
-                            className={`inline-flex items-center gap-4 rounded-2xl border px-6 py-4 font-medium transition-all duration-200 hover:shadow-lg ${TOUCH_TARGET.min}`}
-                            style={{
-                                border: `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
-                                background: `rgba(var(--brand-primary-rgb), 0.04)`,
-                            }}
-                        >
-                            <ShoppingCart className="h-5 w-5" style={{ color: CSS_VARS.primary }} />
-                            <span className="font-semibold">{block.label || 'Cart'}</span>
-                            <span
-                                className="inline-flex min-h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-bold text-white"
-                                style={{ background: CSS_VARS.primary }}
-                            >
-                                {count}
-                            </span>
-                        </button>
-                    </div>
-                </section>
-                <CartDrawer siteSlug={siteSlug} siteId={site?.id ? String(site.id) : undefined} />
-            </>
-        )
-    }
-
-    // ── Default: floating ────────────────────────────────────────────────
     return (
         <>
             <section className={inContainer ? '' : 'fixed bottom-6 left-6 z-40'}>

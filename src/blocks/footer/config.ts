@@ -9,7 +9,7 @@ export const FooterConfigSchema = BaseBlockSchema.extend({
     tagline: z.string().optional(), columns: z.array(z.object({ title: z.string(), links: z.array(z.object({ label: z.string(), url: z.string(), style: z.enum(['internal', 'external']).optional() })) })).default([]),
     copyrightText: z.string().optional(), backgroundColor: z.string().optional(), socials: z.array(z.object({ platform: z.string(), url: z.string() })).optional(),
 })
-export const footerMeta = { type: 'footer' as const, name: 'Footer', description: 'Site footer with links, social media, and copyright', icon: '🔻', variants: ['simple', 'minimal', 'centered-stack', 'dark-gradient'], defaultVariant: 'simple', editableFields: ['logoText', 'tagline', 'columns', 'copyrightText', 'socials'], quickActions: ['Add column', 'Add social links'], category: 'nav' as const, isSystem: true }
+export const footerMeta = { type: 'footer' as const, name: 'Footer', description: 'Site footer with links, social media, and copyright', icon: '🔻', variants: ['simple', 'minimal', 'centered-stack', 'dark-gradient'], defaultVariant: 'simple', editableFields: ['logoText', 'tagline', 'columns', 'copyrightText', 'socials'], quickActions: ['Add column', 'Add social links'], category: 'nav' as const, isSystem: true, scope: 'global' as const, scopeTooltip: 'Chân trang tự động cho toàn bộ site. Cấu hình 1 lần trong cài đặt site.' }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */
 export const configSchema = FooterConfigSchema
