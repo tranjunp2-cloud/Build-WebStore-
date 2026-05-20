@@ -146,7 +146,7 @@ export const OT_CSS = `
 .ot-mini-map .map-courier{position:absolute;top:50%;left:50%;width:30px;height:30px;margin:-15px 0 0 -15px;background:#fff;border:2px solid var(--tl);border-radius:999px;display:grid;place-items:center;color:var(--tl);box-shadow:0 6px 14px -6px rgba(0,0,0,.18);animation:otCourierMove 4.5s ease-in-out infinite;}
 .ot-mini-map .map-courier svg{width:14px;height:14px;}
 @keyframes otCourierMove{0%{top:50%;left:50%;}50%{top:56%;left:60%;}100%{top:50%;left:50%;}}
-.ot-mini-map-foot{margin-top:auto;display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card);backdrop-filter:blur(8px);border-top:1px solid var(--bd);z-index:2;}
+.ot-mini-map-foot{margin-top:auto;display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-top:1px solid rgba(0,0,0,.08);z-index:2;}
 .ot-mini-map-foot .mm-route{font-size:11px;color:var(--f2);display:flex;align-items:center;gap:6px;min-width:0;flex:1;}
 .ot-mini-map-foot .mm-route svg{width:11px;height:11px;color:var(--f4);flex-shrink:0;}
 .ot-mini-map-foot .mm-route span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
