@@ -22,7 +22,7 @@ describe('[TC-CUST-26..27] CustomerStatusBadge', () => {
         const { container } = withI18n(<CustomerStatusBadge status="new" />)
         expect(screen.getByText('New')).toBeTruthy()
         const span = container.querySelector('span')!
-        expect(span.className).toContain('text-amber')
+        expect(span.className).toContain('text-amber-400')
     })
 
     it('[TC-CUST-26b] renders "Contacted" label with teal color', () => {

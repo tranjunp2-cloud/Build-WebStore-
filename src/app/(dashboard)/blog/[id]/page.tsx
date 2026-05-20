@@ -898,8 +898,7 @@ export default function BlogEditorPage() {
 
             {/* AI Generator Modal */}
             {showAIGenerator && typeof document !== 'undefined' && createPortal(
-                <div className="dash-shell">
-                <div className="fixed inset-0 w-screen h-screen z-[999] flex items-end xl:items-center justify-center bg-black/60 xl:p-4 animate-in fade-in duration-200">
+                <div className="dash-shell fixed inset-0 w-screen h-screen z-[999] flex items-end xl:items-center justify-center bg-black/60 xl:p-4 animate-in fade-in duration-200">
                     <div className={`flex flex-col w-full xl:w-[768px] h-[85vh] xl:h-auto ${(!isGenerating && generatedAiContent) ? 'xl:h-[826px]' : isGenerating ? 'xl:h-[763px]' : 'xl:h-[417px]'} p-[1px] bg-[#1E293B] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] border-t border-[rgba(255,255,255,0.08)] xl:border rounded-t-[24px] xl:rounded-[16px] transition-all duration-300 overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 xl:fade-in`}>
                         {/* Mobile drag handle */}
                         <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">
@@ -1079,7 +1078,6 @@ export default function BlogEditorPage() {
                             </div>
                         )}
                     </div>
-                </div>
                 </div>,
                 document.body
             )}

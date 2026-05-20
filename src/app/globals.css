@@ -78,6 +78,11 @@
 /* Remaps hardcoded Tailwind dark utilities to dash-* semantic tokens.
    Scoped to .dash-shell so storefront/studio are unaffected.
    New components should use dash-* tokens directly instead of zinc/slate. */
+.dash-shell {
+  background-color: var(--dash-bg);
+  color: var(--dash-text);
+}
+
 .dash-shell .bg-zinc-950,
 .dash-shell .bg-\[\#0B1120\] { background-color: var(--dash-bg); }
 .dash-shell .bg-zinc-900,
@@ -421,8 +426,6 @@ html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.04\]:hover { background-color
   }
 
   body {
-    background-color: var(--dash-bg);
-    color: var(--dash-text);
     margin: 0;
     min-height: 100vh;
     font-feature-settings: "rlig" 1, "calt" 1;

@@ -31,7 +31,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, userAvatarUr
 
     return (
         <UserAvatarProvider initialUrl={userAvatarUrl}>
-            <div className="dash-shell min-h-screen bg-dash-bg flex flex-col">
+            <div className="dash-shell min-h-screen bg-dash-bg flex flex-col overflow-x-hidden">
                 <TenantAccessWatcher />
                 <TopHeader
                     userName={userName}

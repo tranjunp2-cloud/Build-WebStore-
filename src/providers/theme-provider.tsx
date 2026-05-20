@@ -21,7 +21,7 @@ export function useTheme(): ThemeContextValue {
 function applyTheme(t: Theme) {
     document.documentElement.classList.toggle('dark', t === 'dark')
     localStorage.setItem('theme', t)
-    document.cookie = `theme=${t}; path=/; max-age=31536000; samesite=lax`
+    document.cookie = `theme=${t}; path=/; max-age=31536000; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`
 }
 
 export function ThemeProvider({
