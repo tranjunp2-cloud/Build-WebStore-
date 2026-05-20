@@ -60,6 +60,7 @@ export async function GET(req: Request) {
             images: doc.images,
             status: doc.status,
             hasVariants: doc.hasVariants ?? false,
+            inventory: typeof doc.inventory === 'number' ? doc.inventory : 0,
             variants: Array.isArray(doc.variants)
                 ? doc.variants.map((v: Record<string, unknown>) => ({
                       name: v.name,
