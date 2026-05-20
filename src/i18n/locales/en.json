@@ -745,6 +745,7 @@
         "confirmOrder": "Confirm Order",
         "readyToShip": "Ready to Ship",
         "shipOrder": "Ship Order",
+        "completeOrder": "Complete Order",
         "cancelOrder": "Cancel Order",
         "refund": "Refund"
       },

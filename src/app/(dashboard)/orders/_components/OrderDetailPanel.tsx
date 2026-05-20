@@ -745,11 +745,11 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
                 {/* Primary Action Button — always visible, disabled for terminal statuses */}
                 {(() => {
-                    const isTerminal = ['cancelled', 'refunded', 'completed', 'shipped'].includes(status)
+                    const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const primaryDisabled = isLoading || isTerminal
                     return (
                         <button
-                            onClick={() => handleAction(status === 'ready_to_ship' ? 'shipped' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')}
+                            onClick={() => handleAction(status === 'shipped' ? 'completed' : status === 'ready_to_ship' ? 'shipped' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')}
                             disabled={primaryDisabled}
                             className={`flex items-center justify-center transition-opacity font-bold ${primaryDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-90'}`}
                             style={{
@@ -771,7 +771,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 }}
                             >
                                 {isLoading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
-                                {status === 'ready_to_ship' ? a.shipOrder : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
+                                {status === 'shipped' ? a.completeOrder : status === 'ready_to_ship' ? a.shipOrder : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
                             </span>
                         </button>
                     )

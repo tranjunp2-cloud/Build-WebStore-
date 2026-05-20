@@ -745,6 +745,7 @@
         "confirmOrder": "Sahkan Pesanan",
         "readyToShip": "Sedia Dihantar",
         "shipOrder": "Hantar Pesanan",
+        "completeOrder": "Selesaikan Pesanan",
         "cancelOrder": "Batal Pesanan",
         "refund": "Bayaran Balik"
       },
