@@ -1,24 +1,13 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
-// import { getStripeOAuthUrl } from '@/lib/payment/stripe' // STRIPE_CONNECT_DISABLED
+import { getStripeOAuthUrl } from '@/lib/payment/stripe'
 
 /**
  * POST /api/stripe/connect/onboard
  *
- * STRIPE_CONNECT_DISABLED — OAuth Connect flow temporarily disabled.
- * Uncomment the implementation below and re-enable getStripeOAuthUrl import to restore.
- *
- * Original flow: returns Stripe OAuth authorize URL so seller can connect
- * an existing Stripe account. Auth: Required (tenant owner). Body: { tenantId }.
+ * Returns Stripe OAuth authorize URL so merchant can connect their Stripe account
+ * (login with existing or create new). Auth: Required (tenant owner). Body: { tenantId }.
  */
-export const POST = withAuth(async (_user, _request) => {
-    return NextResponse.json(
-        { success: false, error: { code: 'DISABLED', message: 'Stripe Connect is temporarily disabled' } },
-        { status: 503 },
-    )
-})
-
-/* STRIPE_CONNECT_DISABLED — original implementation preserved below
 export const POST = withAuth(async (user, request) => {
     try {
         const body = await request.json()
@@ -31,7 +20,6 @@ export const POST = withAuth(async (user, request) => {
             )
         }
 
-        // Verify user owns this tenant (normalize to string — Payload returns integer IDs)
         const userTenantIds = ((user as any).tenants || []).map((t: any) =>
             String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
         )
@@ -56,4 +44,3 @@ export const POST = withAuth(async (user, request) => {
         )
     }
 })
-*/

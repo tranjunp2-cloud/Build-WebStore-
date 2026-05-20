@@ -61,6 +61,18 @@ export const GET = withAuth(async (user, request) => {
         }
 
         const status = await getConnectedAccountStatus(stripeAccountId)
+        const onboardingComplete = status.chargesEnabled && status.detailsSubmitted
+
+        // Only flip false→true; downgrades handled by account.updated webhook to avoid racing the UI.
+        if (onboardingComplete && (tenant as any).stripeOnboardingComplete !== true) {
+            await payload.update({
+                collection: 'tenants',
+                id: tenantId,
+                data: { stripeOnboardingComplete: true } as any,
+            })
+        }
+
+        const dbOnboardingComplete = (tenant as any).stripeOnboardingComplete === true
 
         return NextResponse.json({
             success: true,
@@ -70,7 +82,7 @@ export const GET = withAuth(async (user, request) => {
                 chargesEnabled: status.chargesEnabled,
                 payoutsEnabled: status.payoutsEnabled,
                 detailsSubmitted: status.detailsSubmitted,
-                onboardingComplete: status.chargesEnabled && status.detailsSubmitted,
+                onboardingComplete: onboardingComplete || dbOnboardingComplete,
             },
         })
     } catch (error: any) {
