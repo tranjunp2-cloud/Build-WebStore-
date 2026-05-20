@@ -1,4 +1,6 @@
 import type { CollectionConfig } from 'payload'
+import { autoLinkCustomer } from './orders-hooks/auto-link-customer'
+import { syncCustomerSnapshot } from './orders-hooks/sync-customer-snapshot'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
@@ -24,6 +26,7 @@ export const Orders: CollectionConfig = {
     slug: 'orders',
     hooks: {
         beforeChange: [
+            autoLinkCustomer,
             async ({ data, originalDoc }) => {
                 // COD: seller marks completed → auto paymentStatus=paid
                 if (
@@ -62,6 +65,7 @@ export const Orders: CollectionConfig = {
                     .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))
                 return doc
             },
+            syncCustomerSnapshot,
         ],
     },
     admin: {
@@ -335,6 +339,16 @@ export const Orders: CollectionConfig = {
         {
             name: 'customerPhone',
             type: 'text',
+        },
+        {
+            name: 'customer',
+            type: 'relationship',
+            relationTo: 'customers',
+            index: true,
+            admin: {
+                description: 'Auto-linked customer record (matched by email + tenant).',
+                readOnly: true,
+            },
         },
         {
             name: 'shippingAddress',

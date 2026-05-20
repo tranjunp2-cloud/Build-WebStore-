@@ -4023,6 +4023,11 @@ const MIGRATIONS = [
   { name: 'payload_preferences_rels.customers_id',
     sql: `ALTER TABLE payload_preferences_rels
           ADD COLUMN IF NOT EXISTS customers_id integer;` },
+  // ── F25 phase-03: Orders → Customer FK ──
+  { name: 'orders.customer',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },
+  { name: 'orders.customer_id_index',
+    sql: `CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders (customer_id);` },
 ];
 
 async function runMigrations(pool) {
@@ -4506,6 +4511,10 @@ async function main() {
   -- F10 v2.2 Relationship Bypass: paymentVerifiedBy → Payload uses payment_verified_by_id column;
   -- bare name registered here so check-migrations CI can match the field name.
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_by
+
+  -- F25 phase-03 Relationship Bypass: customer → Payload uses customer_id column;
+  -- bare name registered here so check-migrations CI can match the field name.
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer
 
   -- F19 Payments Group Bypass
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments
