@@ -90,6 +90,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const router = useRouter()
     const [isPlacing, setIsPlacing] = useState(false)
+    const [showOverlay, setShowOverlay] = useState(false)
+    const [overlayTakingLong, setOverlayTakingLong] = useState(false)
+    const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const longTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [fieldErrors, setFieldErrors] = useState<{ email?: string; phone?: string }>({})
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
@@ -255,9 +259,22 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         (paymentMethod === 'cod' || paymentMethod === 'bank_transfer')
     )
 
+    const dismissOverlay = () => {
+        if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current)
+        if (longTimerRef.current) clearTimeout(longTimerRef.current)
+        setShowOverlay(false)
+        setOverlayTakingLong(false)
+    }
+
     const handlePlaceOrder = async () => {
         if (!canPlaceOrder) return
         setIsPlacing(true)
+        // Show overlay after 300ms if API still running (avoids flash on fast responses)
+        overlayTimerRef.current = setTimeout(() => {
+            setShowOverlay(true)
+            // Escape hatch after 10s
+            longTimerRef.current = setTimeout(() => setOverlayTakingLong(true), 10000)
+        }, 300)
         try {
             // bank_transfer: no pre-checkout upload — proof submitted post-order via magic link
             const checkoutPayload: Record<string, unknown> = {
@@ -283,11 +300,19 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                         currency: data.data.currency, itemCount: items.length,
                     }})
                 }
-                router.push(`/sites/${slug}/order/${data.data.orderId}/confirm`)
+                const confirmUrl = `/sites/${slug}/order/${data.data.orderId}/confirm`
+                dismissOverlay()
+                if ('startViewTransition' in document) {
+                    document.startViewTransition(() => { router.push(confirmUrl) })
+                } else {
+                    router.push(confirmUrl)
+                }
             } else {
+                dismissOverlay()
                 toast.error(data.error?.message || 'Failed to place order')
             }
         } catch (err: unknown) {
+            dismissOverlay()
             toast.error(err instanceof Error ? err.message : ck.networkError)
         } finally {
             setIsPlacing(false)
@@ -327,6 +352,28 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             <Toaster position="bottom-center" richColors />
             <GoogleFontsLoader fontHeading={fontHeading} fontBody={fontBody} />
             {themeCSS && <style dangerouslySetInnerHTML={{ __html: themeCSS }} />}
+
+            {/* ── Placing Order Overlay ── */}
+            {showOverlay && (
+                <div className="po-overlay" role="status" aria-live="polite">
+                    <div className="po-overlay-card">
+                        <div className="po-overlay-spinner">
+                            <Loader2 size={32} className="spin" />
+                        </div>
+                        <p className="po-overlay-title">Placing your order…</p>
+                        <p className="po-overlay-sub">Please don&apos;t close this page</p>
+                        {overlayTakingLong && (
+                            <div className="po-overlay-long">
+                                <p>Taking longer than expected.</p>
+                                <button className="po-overlay-cancel" onClick={() => { dismissOverlay(); setIsPlacing(false) }}>
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <div className="ck-page">
 
                 {/* ── Header ───────────────────────────────── */}
@@ -715,6 +762,22 @@ const CK_CSS = `
 .sum-trust.note{font-size:11.5px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--f3);text-align:left;align-items:flex-start;line-height:1.5;padding:0 4px;white-space:normal;}
 .sum-trust.note svg{color:#8a5c0a;}
 @keyframes spin{to{transform:rotate(360deg);}}.spin{animation:spin .7s linear infinite;}
+/* Placing order overlay */
+.po-overlay{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:po-fade-in .2s ease;}
+@keyframes po-fade-in{from{opacity:0}to{opacity:1}}
+.po-overlay-card{background:#fff;border-radius:16px;padding:36px 40px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:0 24px 60px -12px rgba(0,0,0,.35);min-width:260px;text-align:center;}
+.po-overlay-spinner{width:64px;height:64px;border-radius:999px;background:var(--tl5,#e6f7f1);display:grid;place-items:center;color:var(--tl,#0e7556);}
+.po-overlay-title{font-family:var(--hf,inherit);font-size:16px;font-weight:700;color:#111;margin:0;}
+.po-overlay-sub{font-size:13px;color:#6b7280;margin:0;}
+.po-overlay-long{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:4px;border-top:1px solid #f0f0f0;padding-top:14px;width:100%;}
+.po-overlay-long p{font-size:12px;color:#9ca3af;margin:0;}
+.po-overlay-cancel{font-size:12px;font-weight:600;color:#dc2626;background:none;border:1px solid #fca5a5;border-radius:6px;padding:5px 14px;cursor:pointer;}
+.po-overlay-cancel:hover{background:#fef2f2;}
+/* View Transition fade */
+@keyframes vt-fade-out{from{opacity:1}to{opacity:0}}
+@keyframes vt-fade-in{from{opacity:0}to{opacity:1}}
+::view-transition-old(root){animation:180ms ease vt-fade-out;}
+::view-transition-new(root){animation:220ms ease vt-fade-in;}
 /* Responsive */
 @media(max-width:768px){
   .ck-shell{grid-template-columns:1fr;padding:16px;}
