@@ -127,8 +127,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
             if (parsed) {
                 const errorsMap = t.dashboard.products.form.errors as Record<string, string>
                 for (const [path, entry] of Object.entries(parsed.fieldErrors)) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    methods.setError(path as any, { type: 'server', message: localizeFieldError(entry, errorsMap) })
+                    methods.setError(path as Parameters<typeof methods.setError>[0], { type: 'server', message: localizeFieldError(entry, errorsMap) })
                 }
                 const firstPath = Object.keys(parsed.fieldErrors)[0]
                 if (firstPath) {
