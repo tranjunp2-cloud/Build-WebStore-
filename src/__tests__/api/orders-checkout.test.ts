@@ -4,10 +4,23 @@ const mockFindByID = vi.fn()
 const mockFind = vi.fn()
 const mockCreate = vi.fn()
 const mockUpdate = vi.fn()
+const mockSendEmail = vi.fn(() => Promise.resolve())
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, find: mockFind, create: mockCreate, update: mockUpdate })),
+    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, find: mockFind, create: mockCreate, update: mockUpdate, sendEmail: mockSendEmail })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
+vi.mock('@/lib/auth/order-token', () => ({
+    signOrderToken: vi.fn(() => Promise.resolve('mock-jwt-token')),
+}))
+vi.mock('@/lib/email/templates/bank-transfer-instructions', () => ({
+    bankTransferInstructionsEmail: vi.fn(() => ({ subject: 'test', html: '<p>test</p>' })),
+}))
+vi.mock('@/lib/orders/upload-token', () => ({
+    generateUploadToken: vi.fn(() => 'mock-upload-token'),
+    verifyUploadToken: vi.fn(() => true),
+    generateConfirmToken: vi.fn(() => 'mock-confirm-token'),
+    verifyConfirmToken: vi.fn(() => true),
+}))
 
 import { POST } from '@/app/api/orders/checkout/route'
 import { MAX_CHECKOUT_ITEMS } from '@/lib/validations/orders'
@@ -55,7 +68,9 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
 
         expect(res.status).toBe(200)
         expect(body.success).toBe(true)
-        expect(body.data.status).toBe('pending')
+        // status field removed from response shape in v2.2 BT rewrite — orderId/paymentMethod present
+        expect(body.data.orderId).toBe('order-1')
+        expect(body.data.paymentMethod).toBe('cod')
     })
 
     it('returns 400 for invalid body (missing customer)', async () => {
@@ -287,28 +302,54 @@ describe('POST /api/orders/checkout [TC-F10]', () => {
         }))
     })
 
-    it('[TC-F09.162] QR Banking order created with paymentStatus=paid immediately', async () => {
-        // Arrange
+    it('[TC-F10-02-02] bank_transfer order created with paymentStatus=awaiting_payment, no proof at checkout', async () => {
+        // Arrange — bank_transfer: no proof upload, paymentReference uniqueness check via find()
         mockFindByID
             .mockResolvedValueOnce({ id: 'site-1', tenant: 'tenant-1' })
-            .mockResolvedValueOnce({ id: 'prod-1', inventory: 10 }) // restock check
-        mockFind.mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 50, inventory: 10 }))
-        mockCreate.mockResolvedValue({ id: 'order-qr-1' })
-        mockUpdate.mockResolvedValue({})
+        mockFind
+            .mockResolvedValueOnce(mockProduct({ id: 'prod-1', name: 'P', price: 50, inventory: 10 })) // product lookup
+            .mockResolvedValueOnce({ docs: [], totalDocs: 0 }) // paymentReference uniqueness check
+        mockCreate.mockResolvedValue({
+            id: 'order-bt-1',
+            orderNumber: 'ORD-BT1',
+            total: 59,
+            currency: 'MYR',
+        })
 
-        const body = { ...validBody, paymentMethod: 'qr_banking', paymentProofImage: 'media-42' }
+        const body = { ...validBody, paymentMethod: 'bank_transfer' }
 
         // Act
         const res = await POST(mockReq(body))
         const data = await res.json()
 
-        // Assert — QR Banking orders are immediately marked paid (seller verifies after)
+        // Assert — bank_transfer orders are created with awaiting_payment status
         expect(res.status).toBe(200)
         expect(data.success).toBe(true)
-        expect(data.data.paymentMethod).toBe('qr_banking')
-        const createdPayload = mockCreate.mock.calls[0][0].data
-        expect(createdPayload.paymentStatus).toBe('paid')
-        expect(createdPayload.paymentProofImage).toBe('media-42')
+        expect(data.data.paymentMethod).toBe('bank_transfer')
+        const createdData = mockCreate.mock.calls[0][0].data
+        expect(createdData.paymentStatus).toBe('awaiting_payment')
+        expect(createdData.paymentProofImage).toBeUndefined()
+        expect(createdData.paymentReference).toMatch(/^BT-[A-Z2-9]{6}$/)
+        expect(createdData.magicLinkSecret).toBeTruthy()
+        expect(createdData.paymentExpiresAt).toBeInstanceOf(Date)
+    })
+
+    it('[TC-F10-02-03] bank_transfer rejects paymentProofImage at checkout (Zod refine)', async () => {
+        // Sending proof at checkout for bank_transfer is forbidden
+        const body = { ...validBody, paymentMethod: 'bank_transfer', paymentProofImage: 'media-42' }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('[TC-F10-02-04] qr_banking (legacy) rejected by Zod — returns 400', async () => {
+        // qr_banking is no longer a valid enum value — client must send bank_transfer
+        const body = { ...validBody, paymentMethod: 'qr_banking', paymentProofImage: 'media-42' }
+        const res = await POST(mockReq(body))
+        const data = await res.json()
+        expect(res.status).toBe(400)
+        expect(data.error.code).toBe('VALIDATION_ERROR')
     })
 
     it('[TC-F14-RF01.02 RF-01] soft-deleted product (deletedAt set) returns 404 — find() where clause verified', async () => {

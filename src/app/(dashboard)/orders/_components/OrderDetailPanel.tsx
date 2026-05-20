@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
+import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
 
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
@@ -19,6 +20,10 @@ export interface OrderDetail {
     paymentStatus: string
     paymentMethod: string
     paymentProofImage?: string | { url?: string } | null
+    paymentReference?: string
+    paymentRejectionReason?: string
+    paymentVerifiedAt?: string
+    paymentVerifiedBy?: string | { id: string; email?: string } | null
     subtotal: number
     shippingFee: number
     tax: number
@@ -36,6 +41,7 @@ export interface OrderDetail {
         country?: string
     }
     items: {
+        product?: string | number
         productName: string
         variant?: string
         quantity: number
@@ -739,11 +745,11 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
                 {/* Primary Action Button — always visible, disabled for terminal statuses */}
                 {(() => {
-                    const isTerminal = ['cancelled', 'refunded', 'completed', 'shipped'].includes(status)
+                    const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const primaryDisabled = isLoading || isTerminal
                     return (
                         <button
-                            onClick={() => handleAction(status === 'ready_to_ship' ? 'shipped' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')}
+                            onClick={() => handleAction(status === 'shipped' ? 'completed' : status === 'ready_to_ship' ? 'shipped' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')}
                             disabled={primaryDisabled}
                             className={`flex items-center justify-center transition-opacity font-bold ${primaryDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-90'}`}
                             style={{
@@ -765,7 +771,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 }}
                             >
                                 {isLoading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
-                                {status === 'ready_to_ship' ? a.shipOrder : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
+                                {status === 'shipped' ? a.completeOrder : status === 'ready_to_ship' ? a.shipOrder : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
                             </span>
                         </button>
                     )
@@ -941,6 +947,14 @@ export function OrderDetailPanel({
                     <div className="z-20 md:static md:p-0 md:m-0 md:bg-transparent">
                         <ActionButtons order={order} onUpdate={() => { fetchOrder(); onUpdate?.(); }} />
                     </div>
+
+                    {/* BT Verification Block */}
+                    {(order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'pending_verification') || (order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'paid') ? (
+                        <ManualPaymentVerificationBlock
+                            order={order}
+                            onUpdate={() => { fetchOrder(); onUpdate?.(); }}
+                        />
+                    ) : null}
 
                     {/* Customer Information */}
                     <CustomerInformation order={order} />

@@ -211,6 +211,8 @@ export const Orders: CollectionConfig = {
             index: true,
             options: [
                 { label: 'Unpaid', value: 'unpaid' },
+                { label: 'Awaiting Payment', value: 'awaiting_payment' },
+                { label: 'Pending Verification', value: 'pending_verification' },
                 { label: 'Paid', value: 'paid' },
                 { label: 'Failed', value: 'failed' },
                 { label: 'Refunded', value: 'refunded' },
@@ -222,10 +224,11 @@ export const Orders: CollectionConfig = {
             type: 'select',
             options: [
                 { label: 'Cash on Delivery', value: 'cod' },
-                { label: 'QR Banking', value: 'qr_banking' },
+                { label: 'QR Banking (legacy)', value: 'qr_banking' },
+                { label: 'Bank Transfer', value: 'bank_transfer' },
                 { label: 'Credit Card', value: 'card' },
                 { label: 'FPX (Online Banking)', value: 'fpx' },
-                { label: 'Bank Transfer', value: 'bank' },
+                { label: 'Bank Transfer (old)', value: 'bank' },
                 { label: 'e-Wallet', value: 'ewallet' },
                 { label: 'Free (100% discount)', value: 'free' },
             ],
@@ -239,7 +242,65 @@ export const Orders: CollectionConfig = {
         {
             name: 'paymentReference',
             type: 'text',
-            admin: { description: 'External payment gateway reference ID' },
+            admin: { description: 'Bank Transfer reference code (BT-XXXXXX)' },
+        },
+        {
+            name: 'paymentExpiresAt',
+            type: 'date',
+            admin: { readOnly: true, description: 'BT order TTL — auto-cancel after this timestamp' },
+        },
+        {
+            name: 'paymentRejectionReason',
+            type: 'select',
+            options: [
+                { label: 'Ảnh mờ', value: 'image_blurry' },
+                { label: 'Sai số tiền', value: 'wrong_amount' },
+                { label: 'Trùng đơn', value: 'duplicate_order' },
+                { label: 'Khác', value: 'other' },
+            ],
+            admin: { description: 'Reason set when seller rejects payment proof' },
+        },
+        {
+            name: 'paymentRejectionDetail',
+            type: 'textarea',
+            admin: { description: 'Required if rejectionReason=other (≥10 chars)' },
+        },
+        {
+            name: 'paymentVerifiedAt',
+            type: 'date',
+            admin: { readOnly: true },
+        },
+        {
+            name: 'paymentVerifiedBy',
+            type: 'relationship',
+            relationTo: 'users',
+            admin: { readOnly: true },
+        },
+        {
+            name: 'magicLinkSecret',
+            type: 'text',
+            access: { read: () => false, update: () => false },
+            admin: { hidden: true },
+        },
+        {
+            name: 'verificationSource',
+            type: 'select',
+            defaultValue: 'manual',
+            options: [
+                { label: 'Manual', value: 'manual' },
+                { label: 'Auto (Open Banking)', value: 'auto' },
+            ],
+            admin: { readOnly: true },
+        },
+        {
+            name: 'autoVerifiedAt',
+            type: 'date',
+            admin: { readOnly: true, hidden: true }, // Wave 8+
+        },
+        {
+            name: 'bankTransactionId',
+            type: 'text',
+            admin: { readOnly: true, hidden: true }, // Wave 8+
         },
         {
             name: 'stripeSessionId',
