@@ -551,9 +551,11 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             <button className="ty-btn primary lg" onClick={() => clearAndNavigate(`/sites/${slug}/products`, isPaid)}>
                                 <ShoppingBag size={15} /> Continue Shopping
                             </button>
-                            <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.id}`, isPaid)}>
-                                <ReceiptText size={15} /> View My Orders
-                            </button>
+                            {(!isBT || isPaid) && (
+                                <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.id}`, isPaid)}>
+                                    <ReceiptText size={15} /> View My Orders
+                                </button>
+                            )}
                         </div>
                         <div className="summary-trust"><ShieldCheck size={11} /> Encrypted Checkout · Order Locked</div>
                     </div>
