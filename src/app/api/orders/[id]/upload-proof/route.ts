@@ -25,6 +25,11 @@ export async function POST(
         return NextResponse.json({ error: 'token and paymentProofImage are required' }, { status: 400 })
     }
 
+    const proofId = Number(paymentProofImage)
+    if (!Number.isInteger(proofId) || proofId <= 0) {
+        return NextResponse.json({ error: 'paymentProofImage must be a positive integer' }, { status: 400 })
+    }
+
     const payload = await getPayload({ config })
 
     const orderId = isNaN(Number(id)) ? id : Number(id)
@@ -75,7 +80,7 @@ export async function POST(
             collection: 'orders',
             id: order.id,
             data: {
-                paymentProofImage: paymentProofImage as number | string,
+                paymentProofImage: proofId,
                 paymentStatus: 'pending_verification',
                 paymentRejectionReason: null,
                 paymentRejectionDetail: null,

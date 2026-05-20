@@ -279,7 +279,8 @@ export const Orders: CollectionConfig = {
         {
             name: 'magicLinkSecret',
             type: 'text',
-            admin: { hidden: true }, // server-only — never exposed via Payload REST
+            access: { read: () => false, update: () => false },
+            admin: { hidden: true },
         },
         {
             name: 'verificationSource',

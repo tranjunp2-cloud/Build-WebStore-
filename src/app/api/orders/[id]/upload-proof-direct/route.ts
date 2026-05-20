@@ -98,6 +98,8 @@ export async function POST(
             overrideAccess: true,
         })
     } catch {
+        // Clean up orphaned media doc before returning error
+        payload.delete({ collection: 'media', id: mediaId, overrideAccess: true }).catch(() => {})
         return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
     }
 

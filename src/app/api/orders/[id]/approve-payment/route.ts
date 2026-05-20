@@ -38,6 +38,23 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
             )
         }
 
+        const now = new Date()
+        const newStatus = order.status === 'pending' ? 'confirmed' : order.status
+
+        const updated = await payload.update({
+            collection: 'orders',
+            id,
+            data: {
+                paymentStatus: 'paid',
+                paymentVerifiedAt: now.toISOString(),
+                paymentVerifiedBy: user.id as any,
+                verificationSource: 'manual',
+                status: newStatus as any,
+            },
+            user,
+            overrideAccess: false,
+        })
+
         // Decrement inventory per item — per-item try/catch, non-blocking
         const items = (order.items as any[]) ?? []
         for (const item of items) {
@@ -59,26 +76,9 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
                     })
                 }
             } catch (err) {
-                console.error(`[approve-payment] inventory decrement failed for item`, err)
+                payload.logger.error({ err }, '[approve-payment] inventory decrement failed for item')
             }
         }
-
-        const now = new Date()
-        const newStatus = order.status === 'pending' ? 'confirmed' : order.status
-
-        const updated = await payload.update({
-            collection: 'orders',
-            id,
-            data: {
-                paymentStatus: 'paid',
-                paymentVerifiedAt: now.toISOString(),
-                paymentVerifiedBy: user.id as any,
-                verificationSource: 'manual',
-                status: newStatus as any,
-            },
-            user,
-            overrideAccess: false,
-        })
 
         // Slug lives on the tenant, not the site — sites collection has no slug field
         const siteObj = typeof order.site === 'object' ? (order.site as any) : null
@@ -98,7 +98,7 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
             to: order.customerEmail as string,
             subject: emailPayload.subject,
             html: emailPayload.html,
-        }).catch(console.error)
+        }).catch((err) => payload.logger.error({ err }, '[approve-payment] sendEmail failed'))
 
         return NextResponse.json({ success: true, data: updated })
     } catch (error: any) {

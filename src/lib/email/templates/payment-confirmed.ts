@@ -14,6 +14,10 @@ export interface PaymentConfirmedData {
     orderPageUrl: string
 }
 
+function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+}
+
 function formatPrice(amount: number, currency: string): string {
     if (currency === 'MYR') return `MYR ${amount.toFixed(2)}`
     return `${currency} ${amount.toFixed(2)}`
@@ -39,7 +43,7 @@ export function paymentConfirmedEmail(
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${data.customerName},</p>
+                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${escapeHtml(data.customerName)},</p>
                 <p style="font-size: 14px; color: #666; margin: 0 0 24px;">
                     Great news! We have successfully verified your payment. Your order is now confirmed and being processed.
                 </p>
@@ -47,7 +51,7 @@ export function paymentConfirmedEmail(
                 <!-- Order Summary -->
                 <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; text-align: center; border: 1px solid #bbf7d0;">
                     <p style="font-size: 12px; text-transform: uppercase; color: #15803d; font-weight: 600; letter-spacing: 0.05em; margin: 0 0 4px;">Order Confirmed</p>
-                    <p style="font-size: 22px; font-weight: 700; margin: 0 0 8px; letter-spacing: 1px;">${data.orderNumber}</p>
+                    <p style="font-size: 22px; font-weight: 700; margin: 0 0 8px; letter-spacing: 1px;">${escapeHtml(data.orderNumber)}</p>
                     <p style="font-size: 14px; color: #666; margin: 0 0 4px;">Total Paid</p>
                     <p style="font-size: 20px; font-weight: 700; margin: 0; color: #16a34a;">${formatPrice(data.total, data.currency)}</p>
                 </div>

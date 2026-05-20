@@ -25,6 +25,10 @@ export interface BankTransferInstructionsData {
     merchantQrUrl?: string | null
 }
 
+function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+}
+
 function formatPrice(amount: number, currency: string): string {
     if (currency === 'MYR') return `MYR ${amount.toFixed(2)}`
     return `${currency} ${amount.toFixed(2)}`
@@ -57,9 +61,9 @@ export function bankTransferInstructionsEmail(
         <div style="margin-top: 24px; background: #f8fafc; border-radius: 8px; padding: 20px; border-left: 4px solid #0ea5e9;">
             <p style="font-size: 12px; text-transform: uppercase; color: #64748b; margin: 0 0 12px; font-weight: 600; letter-spacing: 0.05em;">Bank Transfer Details</p>
             <table style="width: 100%; border-collapse: collapse;">
-                ${data.bankName ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666; width: 140px;">Bank</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600;">${data.bankName}</td></tr>` : ''}
-                ${data.bankAccountNo ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666;">Account No.</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600; font-family: monospace;">${data.bankAccountNo}</td></tr>` : ''}
-                ${data.bankAccountHolder ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666;">Account Name</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600;">${data.bankAccountHolder}</td></tr>` : ''}
+                ${data.bankName ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666; width: 140px;">Bank</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600;">${escapeHtml(data.bankName)}</td></tr>` : ''}
+                ${data.bankAccountNo ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666;">Account No.</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600; font-family: monospace;">${escapeHtml(data.bankAccountNo)}</td></tr>` : ''}
+                ${data.bankAccountHolder ? `<tr><td style="padding: 6px 0; font-size: 13px; color: #666;">Account Name</td><td style="padding: 6px 0; font-size: 13px; font-weight: 600;">${escapeHtml(data.bankAccountHolder)}</td></tr>` : ''}
             </table>
         </div>`
         : ''
@@ -90,13 +94,13 @@ export function bankTransferInstructionsEmail(
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${data.customerName},</p>
+                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${escapeHtml(data.customerName)},</p>
                 <p style="font-size: 14px; color: #666; margin: 0 0 24px;">Thank you for your order. To confirm it, please complete the bank transfer using the details below and upload your payment receipt.</p>
 
                 <!-- Order Summary -->
                 <div style="background: #f0f9ff; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 20px;">
                     <p style="font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 4px;">Order Number</p>
-                    <p style="font-size: 22px; font-weight: 700; margin: 0 0 8px; letter-spacing: 1px;">${data.orderNumber}</p>
+                    <p style="font-size: 22px; font-weight: 700; margin: 0 0 8px; letter-spacing: 1px;">${escapeHtml(data.orderNumber)}</p>
                     <p style="font-size: 14px; color: #666; margin: 0 0 4px;">Total Amount</p>
                     <p style="font-size: 20px; font-weight: 700; margin: 0; color: #0ea5e9;">${formatPrice(data.total, data.currency)}</p>
                 </div>

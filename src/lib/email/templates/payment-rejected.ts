@@ -29,6 +29,10 @@ const REJECTION_REASON_MAP: Record<RejectionReason, string> = {
     other: '', // resolved dynamically
 }
 
+function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+}
+
 function formatDeadline(isoDate: string): string {
     try {
         return new Date(isoDate).toLocaleString('en-MY', {
@@ -74,15 +78,15 @@ export function paymentRejectedEmail(
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${data.customerName},</p>
+                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${escapeHtml(data.customerName)},</p>
                 <p style="font-size: 14px; color: #666; margin: 0 0 24px;">
-                    We were unable to verify your payment for order <strong>#${data.orderNumber}</strong>. Please see the reason below and re-upload a valid receipt.
+                    We were unable to verify your payment for order <strong>#${escapeHtml(data.orderNumber)}</strong>. Please see the reason below and re-upload a valid receipt.
                 </p>
 
                 <!-- Rejection Reason -->
                 <div style="background: #fff1f2; border-radius: 8px; padding: 20px; border-left: 4px solid #ef4444;">
                     <p style="font-size: 12px; text-transform: uppercase; color: #be123c; font-weight: 700; letter-spacing: 0.08em; margin: 0 0 8px;">Reason for Rejection</p>
-                    <p style="font-size: 14px; color: #881337; margin: 0; line-height: 1.6;">${reasonText}</p>
+                    <p style="font-size: 14px; color: #881337; margin: 0; line-height: 1.6;">${escapeHtml(reasonText)}</p>
                 </div>
 
                 <!-- New Deadline -->

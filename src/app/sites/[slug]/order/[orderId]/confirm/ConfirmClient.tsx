@@ -51,7 +51,10 @@ function formatPrice(price: number, currency: string) {
 }
 
 function maskEmail(email: string) {
-    const [user, domain] = email.split('@')
+    const atIdx = email.lastIndexOf('@')
+    if (atIdx < 0) return '**'
+    const user = email.slice(0, atIdx)
+    const domain = email.slice(atIdx + 1)
     return `${user.slice(0, 2)}**@${domain}`
 }
 
@@ -104,7 +107,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     }, [])
 
     const currency = order.currency || 'MYR'
-    const shippingFee = order.shippingFee ?? 10
+    const shippingFee = order.shippingFee ?? 0
     const isBT = order.paymentMethod === 'bank_transfer'
     const isCod = order.paymentMethod === 'cod'
     const isStripe = !isBT && !isCod
