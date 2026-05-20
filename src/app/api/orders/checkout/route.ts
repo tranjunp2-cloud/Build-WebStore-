@@ -264,7 +264,7 @@ export async function POST(request: Request) {
         }
 
         const confirmToken = generateConfirmToken(order.id, orderNumber)
-        return NextResponse.json({
+        const res = NextResponse.json({
             success: true,
             data: {
                 orderId: order.id,
@@ -272,10 +272,17 @@ export async function POST(request: Request) {
                 total,
                 currency,
                 paymentMethod,
-                confirmToken,
                 ...(redirectUrl ? { redirectUrl } : {}),
             },
         })
+        // HttpOnly cookie so the confirm page can verify access without exposing token in URL
+        res.cookies.set(`ct_${order.id}`, confirmToken, {
+            httpOnly: true,
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60, // 30 days
+            path: '/',
+        })
+        return res
     } catch (error: any) {
         console.error('[Order Checkout Error]', error)
         return NextResponse.json(

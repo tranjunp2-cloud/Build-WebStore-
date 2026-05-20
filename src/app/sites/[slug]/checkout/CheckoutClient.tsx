@@ -283,7 +283,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                         currency: data.data.currency, itemCount: items.length,
                     }})
                 }
-                router.push(`/sites/${slug}/order/${data.data.orderId}/confirm?token=${data.data.confirmToken}`)
+                router.push(`/sites/${slug}/order/${data.data.orderId}/confirm`)
             } else {
                 toast.error(data.error?.message || 'Failed to place order')
             }

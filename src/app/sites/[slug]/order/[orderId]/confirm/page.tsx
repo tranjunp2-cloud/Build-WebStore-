@@ -1,19 +1,17 @@
 import { notFound } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
-import { generateUploadToken, generateConfirmToken, verifyConfirmToken } from '@/lib/orders/upload-token'
+import { generateUploadToken, verifyConfirmToken } from '@/lib/orders/upload-token'
 import ConfirmClient, { type ConfirmOrder } from './ConfirmClient'
 
 export default async function OrderConfirmPage({
     params,
-    searchParams,
 }: {
     params: Promise<{ slug: string; orderId: string }>
-    searchParams: Promise<{ token?: string }>
 }) {
     const { slug, orderId: rawId } = await params
-    const { token } = await searchParams
     const payload = await getPayload({ config })
     const orderId = isNaN(Number(rawId)) ? rawId : Number(rawId)
 
@@ -106,7 +104,9 @@ export default async function OrderConfirmPage({
     } catch { }
     if (!order) notFound()
 
-    // Guard: require a valid confirm token to prevent unauthorised order viewing
+    // Guard: require a valid confirm token (HttpOnly cookie) to prevent unauthorised order viewing
+    const cookieStore = await cookies()
+    const token = cookieStore.get(`ct_${order.id}`)?.value
     if (!token || !verifyConfirmToken(token, order.id, order.orderNumber)) notFound()
 
     const uploadToken = generateUploadToken(order.id)
