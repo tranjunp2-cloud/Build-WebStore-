@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Julyhouse — Email Templates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F7FB;
+    --ink: #0F172A;
+    --body: #475569;
+    --muted: #94A3B8;
+    --line: #E2E8F0;
+    --card: #FFFFFF;
+    --accent: #14C2BB;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .brand-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2F6B2F 0%, #14C2BB 100%);
+  }
+  .brand-name {
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+  .brand-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .meta {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .meta strong { color: var(--ink); font-weight: 600; font-size: 13px; display: block; }
+
+  .hero {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 48px 24px 16px;
+  }
+  .hero h1 {
+    font-size: 32px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+    font-weight: 700;
+  }
+  .hero p {
+    font-size: 15px;
+    line-height: 24px;
+    color: var(--body);
+    margin: 0;
+    max-width: 720px;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--body);
+    font-weight: 500;
+  }
+  .chip .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .grid {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 24px 64px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  @media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 720px)  { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px -12px rgba(15,23,42,0.18), 0 4px 8px -4px rgba(15,23,42,0.06);
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .card-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #F1F5F9;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-title {
+    flex: 1;
+    min-width: 0;
+  }
+  .card-title h3 {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-title small {
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 16px;
+  }
+  .tag {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .tag.buyer  { background: #ECFDF5; color: #047857; }
+  .tag.seller { background: #EFF6FF; color: #1D4ED8; }
+
+  .frame-wrap {
+    position: relative;
+    background: #FFFFFF;
+    aspect-ratio: 3 / 4;
+    overflow: hidden;
+  }
+  .frame-wrap iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200%;
+    height: 200%;
+    border: 0;
+    transform: scale(0.5);
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid var(--line);
+    background: #FAFBFD;
+  }
+  .open-link {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .open-link:hover { color: var(--accent); }
+  .open-link svg { width: 14px; height: 14px; }
+  .filename {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+
+  /* ---------- Full preview modal ---------- */
+  .preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: stretch;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity .18s ease;
+  }
+  .preview-overlay.open {
+    display: flex;
+    opacity: 1;
+  }
+  .preview-shell {
+    position: relative;
+    margin: 24px;
+    flex: 1;
+    max-width: 1280px;
+    background: #FFFFFF;
+    border-radius: 18px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 40px 80px -20px rgba(15, 23, 42, 0.45);
+    transform: translateY(8px) scale(0.99);
+    transition: transform .22s cubic-bezier(.2,.7,.2,1);
+  }
+  .preview-overlay.open .preview-shell { transform: none; }
+
+  .preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    background: #FAFBFD;
+    flex-shrink: 0;
+  }
+  .preview-num {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: #F1F5F9;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .preview-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .preview-meta h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .preview-meta small {
+    font-size: 11.5px;
+    color: var(--muted);
+    font-family: 'SF Mono', Menlo, monospace;
+  }
+
+  .vp-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    background: #F1F5F9;
+    border-radius: 999px;
+    gap: 2px;
+  }
+  .vp-toggle button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--body);
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .15s, color .15s;
+  }
+  .vp-toggle button:hover { color: var(--ink); }
+  .vp-toggle button.active {
+    background: #FFFFFF;
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.04);
+  }
+  .vp-toggle svg { width: 14px; height: 14px; }
+
+  .preview-action {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: #FFFFFF;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .15s, border-color .15s;
+  }
+  .preview-action:hover { background: #F8FAFC; border-color: #CBD5E1; }
+  .preview-action svg { width: 13px; height: 13px; }
+
+  .preview-close {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--body);
+    transition: background .15s, color .15s;
+  }
+  .preview-close:hover { background: #F1F5F9; color: var(--ink); }
+  .preview-close svg { width: 18px; height: 18px; }
+
+  .preview-stage {
+    flex: 1;
+    overflow: auto;
+    background:
+      linear-gradient(#F5F7FB, #F5F7FB),
+      radial-gradient(circle, #E2E8F0 1px, transparent 1px);
+    background-blend-mode: normal;
+    background-color: #F5F7FB;
+    background-image: radial-gradient(circle, #E2E8F0 1px, transparent 1px);
+    background-size: 24px 24px;
+    padding: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .preview-device {
+    background: #FFFFFF;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 24px 48px -16px rgba(15, 23, 42, 0.22), 0 0 0 1px var(--line);
+    transition: width .25s cubic-bezier(.2,.7,.2,1);
+    width: 720px;
+  }
+  .preview-device.mobile { width: 390px; }
+  .preview-device iframe {
+    display: block;
+    width: 100%;
+    height: 75vh;
+    border: 0;
+    background: #FFFFFF;
+  }
+
+  .open-link.btn {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  @media (max-width: 720px) {
+    .preview-shell { margin: 12px; border-radius: 14px; }
+    .preview-stage { padding: 16px; }
+    .preview-device { width: 100% !important; }
+    .preview-meta small { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-dot"></div>
+        <div>
+          <div class="brand-name">Julyhouse — Email Templates</div>
+          <div class="brand-sub">Transactional &amp; lifecycle · Bahasa Melayu (MY)</div>
+        </div>
+      </div>
+      <div class="meta">
+        <strong>9 templates</strong>
+        Light mode · 600px responsive
+      </div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Transactional email system</h1>
+    <p>Nine responsive HTML email templates for the Julyhouse storefront — order lifecycle (success, cancelled, delivered, failed), contact form, and newsletter sign-up — with consistent typography, status semantics, and a single teal call-to-action.</p>
+    <div class="legend">
+      <span class="chip"><span class="swatch" style="background:#10B981"></span>Berjaya / Dihantar</span>
+      <span class="chip"><span class="swatch" style="background:#EF4444"></span>Dibatalkan / Gagal</span>
+      <span class="chip"><span class="swatch" style="background:#14C2BB"></span>Primary CTA</span>
+      <span class="chip"><span class="swatch" style="background:#0F172A"></span>Ink / Heading</span>
+      <span class="chip"><span class="swatch" style="background:#94A3B8"></span>Muted value</span>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <!-- Full preview modal -->
+  <div class="preview-overlay" id="previewOverlay" role="dialog" aria-modal="true" aria-labelledby="previewTitle" hidden>
+    <div class="preview-shell">
+      <div class="preview-bar">
+        <div class="preview-num" id="previewNum">01</div>
+        <div class="preview-meta">
+          <h3 id="previewTitle">Order Confirmation</h3>
+          <small id="previewFile">01-order-confirmation-buyer.html</small>
+        </div>
+        <div class="vp-toggle" role="tablist" aria-label="Viewport">
+          <button type="button" class="active" data-vp="desktop" aria-label="Desktop width">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8"/><path d="M12 18v4"/></svg>
+            Desktop
+          </button>
+          <button type="button" data-vp="mobile" aria-label="Mobile width">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+            Mobile
+          </button>
+        </div>
+        <a class="preview-action" id="previewOpenNew" href="#" target="_blank" rel="noopener">
+          Open in new tab
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+        </a>
+        <button type="button" class="preview-close" id="previewClose" aria-label="Close preview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="preview-stage">
+        <div class="preview-device" id="previewDevice">
+          <iframe id="previewFrame" src="" title="Email full preview"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const templates = [
+      { n: '01', file: '01-order-confirmation-buyer.html', title: 'Order Confirmation', sub: 'Pesanan berjaya · Buyer', role: 'buyer' },
+      { n: '02', file: '02-new-order-seller.html',         title: 'New Order Notification', sub: 'Pesanan baharu · Seller', role: 'seller' },
+      { n: '03', file: '03-order-cancelled-buyer.html',    title: 'Order Cancelled', sub: 'Dibatalkan · Buyer', role: 'buyer' },
+      { n: '04', file: '04-order-delivered-buyer.html',    title: 'Order Delivered', sub: 'Dihantar · Buyer', role: 'buyer' },
+      { n: '05', file: '05-order-failed-buyer.html',       title: 'Delivery Failed', sub: 'Gagal · Buyer', role: 'buyer' },
+      { n: '06', file: '06-contact-form-buyer.html',       title: 'Contact Form — Reply', sub: 'Borang hubungi · Buyer', role: 'buyer' },
+      { n: '07', file: '07-contact-form-seller.html',      title: 'Contact Form — Inbox', sub: 'Borang hubungi · Seller', role: 'seller' },
+      { n: '08', file: '08-newsletter-buyer.html',         title: 'Newsletter Confirmation', sub: 'Surat berita · Buyer', role: 'buyer' },
+      { n: '09', file: '09-newsletter-seller.html',        title: 'Newsletter — Inbox', sub: 'Surat berita · Seller', role: 'seller' },
+    ];
+    const grid = document.getElementById('grid');
+    grid.innerHTML = templates.map((t, i) => `
+      <article class="card">
+        <header class="card-header">
+          <div class="card-num">${t.n}</div>
+          <div class="card-title">
+            <h3>${t.title}</h3>
+            <small>${t.sub}</small>
+          </div>
+          <span class="tag ${t.role}">${t.role}</span>
+        </header>
+        <div class="frame-wrap">
+          <iframe src="${t.file}" loading="lazy" title="${t.title}"></iframe>
+        </div>
+        <footer class="card-footer">
+          <button type="button" class="open-link btn" data-preview="${i}">
+            Open full preview
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+          </button>
+          <span class="filename">${t.file}</span>
+        </footer>
+      </article>
+    `).join('');
+
+    // ---------- Full preview modal logic ----------
+    const overlay   = document.getElementById('previewOverlay');
+    const frame     = document.getElementById('previewFrame');
+    const device    = document.getElementById('previewDevice');
+    const titleEl   = document.getElementById('previewTitle');
+    const fileEl    = document.getElementById('previewFile');
+    const numEl     = document.getElementById('previewNum');
+    const openNew   = document.getElementById('previewOpenNew');
+    const closeBtn  = document.getElementById('previewClose');
+    const vpButtons = overlay.querySelectorAll('.vp-toggle button');
+
+    function openPreview(idx) {
+      const t = templates[idx];
+      if (!t) return;
+      titleEl.textContent = t.title;
+      fileEl.textContent  = t.file;
+      numEl.textContent   = t.n;
+      openNew.href        = t.file;
+      frame.src           = t.file;
+      overlay.hidden = false;
+      requestAnimationFrame(() => overlay.classList.add('open'));
+      document.body.style.overflow = 'hidden';
+    }
+    function closePreview() {
+      overlay.classList.remove('open');
+      document.body.style.overflow = '';
+      setTimeout(() => {
+        overlay.hidden = true;
+        frame.src = '';
+      }, 200);
+    }
+
+    grid.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-preview]');
+      if (!btn) return;
+      openPreview(parseInt(btn.dataset.preview, 10));
+    });
+    closeBtn.addEventListener('click', closePreview);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closePreview();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !overlay.hidden) closePreview();
+    });
+    vpButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        vpButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        device.classList.toggle('mobile', btn.dataset.vp === 'mobile');
+      });
+    });
+  </script>
+</body>
+</html>
