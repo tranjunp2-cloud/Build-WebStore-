@@ -17,6 +17,7 @@
  * Security:
  *   - No anonymous access (401 if unauthenticated).
  *   - Tenant restriction enforced server-side — ?tenantId only honoured for super-admin.
+ *   - ?tenantId validated as positive integer before use (no sql.raw of user input).
  *   - Cache-Control: private, no-store (PII data).
  *   - Formula-injection guard: cells starting with = + - @ are prefixed with '.
  */
@@ -25,7 +26,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import type { User } from 'payload'
-import { sql } from '@payloadcms/db-postgres'
+import { sql } from 'drizzle-orm'
 
 const EXPORT_ROW_CAP = 10_000
 
@@ -54,12 +55,18 @@ function toCsvLine(fields: unknown[]): string {
     return fields.map(csvField).join(',')
 }
 
+/** Sanitize a string for use in Content-Disposition filename. */
+function sanitizeFilenameSegment(s: string): string {
+    return s.replace(/[^A-Za-z0-9_-]/g, '-')
+}
+
 // ── Tenant resolution ────────────────────────────────────────────────────────
 
 interface TenantResolutionResult {
-    tenantIds: string[]
+    tenantIds: number[]
     /** String used for filename, e.g. "all" or a single tenant ID */
     tenantLabel: string
+    isSuperAdmin: boolean
 }
 
 function resolveTenantIds(
@@ -68,30 +75,39 @@ function resolveTenantIds(
 ): TenantResolutionResult {
     const isSuperAdmin = (user as { roles?: string[] }).roles?.includes('super-admin') ?? false
 
-    // Extract tenant IDs from user.tenants[]
-    const userTenantIds: string[] = (
+    // Extract tenant IDs from user.tenants[] as integers (schema: tenant_id integer)
+    const userTenantIds: number[] = (
         (user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> }).tenants ?? []
     ).map((t) => {
         const tenant = t.tenant
-        if (typeof tenant === 'object' && tenant != null) return String(tenant.id)
-        return String(tenant)
-    })
+        if (typeof tenant === 'object' && tenant != null) return Number(tenant.id)
+        return Number(tenant)
+    }).filter((id) => Number.isFinite(id) && id > 0)
 
     if (isSuperAdmin) {
         if (requestedTenantId) {
-            // Super-admin restricted to a specific tenant by query param
-            return { tenantIds: [requestedTenantId], tenantLabel: requestedTenantId }
+            // Validate: must be a positive integer string
+            if (!/^\d+$/.test(requestedTenantId)) {
+                // Return sentinel — caller will 400
+                return { tenantIds: [-1], tenantLabel: '', isSuperAdmin: true }
+            }
+            const id = parseInt(requestedTenantId, 10)
+            return { tenantIds: [id], tenantLabel: String(id), isSuperAdmin: true }
         }
         // Super-admin without filter — export all (empty array signals no WHERE clause)
-        return { tenantIds: [], tenantLabel: 'all' }
+        return { tenantIds: [], tenantLabel: 'all', isSuperAdmin: true }
     }
 
     // Tenant-owner: always scoped to their own tenants, ignore ?tenantId param
     return {
         tenantIds: userTenantIds,
-        tenantLabel: userTenantIds[0] ?? 'unknown',
+        tenantLabel: userTenantIds[0] != null ? String(userTenantIds[0]) : 'unknown',
+        isSuperAdmin: false,
     }
 }
+
+// ── Drizzle result shape (matches pg QueryResult) ────────────────────────────
+type DrizzleQueryResult<T> = { rows: T[] }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 
@@ -99,46 +115,66 @@ export async function GET(req: NextRequest) {
     // 1. Auth
     const user = await getCurrentUser(req)
     if (!user) {
-        return new Response('Unauthorized', { status: 401 })
+        return new Response('Unauthorized', {
+            status: 401,
+            headers: { 'Cache-Control': 'private, no-store' },
+        })
     }
 
     // 2. Tenant scoping
     const requestedTenantId = req.nextUrl.searchParams.get('tenantId')
-    const { tenantIds, tenantLabel } = resolveTenantIds(user, requestedTenantId)
+    const { tenantIds, tenantLabel, isSuperAdmin } = resolveTenantIds(user, requestedTenantId)
+
+    // Super-admin with invalid ?tenantId → 400 (sentinel is -1)
+    if (isSuperAdmin && tenantIds.length === 1 && tenantIds[0] === -1) {
+        return new Response('Bad Request: tenantId must be a positive integer', {
+            status: 400,
+            headers: { 'Cache-Control': 'private, no-store' },
+        })
+    }
 
     // Tenant-owner with no tenants → 403
-    const isSuperAdmin = (user as { roles?: string[] }).roles?.includes('super-admin') ?? false
     if (!isSuperAdmin && tenantIds.length === 0) {
-        return new Response('Forbidden', { status: 403 })
+        return new Response('Forbidden', {
+            status: 403,
+            headers: { 'Cache-Control': 'private, no-store' },
+        })
     }
 
     try {
         const payload = await getPayload({ config })
-        const db = payload.db as { drizzle: { execute: (q: unknown) => Promise<unknown[]> } }
+        const db = payload.db as {
+            drizzle: { execute: (q: unknown) => Promise<DrizzleQueryResult<unknown>> }
+        }
 
         // 3. Row count check (hard cap)
+        // Use Drizzle template-literal parameterization — integers bound safely, no sql.raw
         const countQuery = tenantIds.length > 0
-            ? sql`SELECT COUNT(*) AS cnt FROM customers WHERE tenant_id = ANY(ARRAY[${sql.raw(tenantIds.map((id) => `'${id}'`).join(','))}]::text[])`
+            ? sql`SELECT COUNT(*) AS cnt FROM customers WHERE tenant_id = ANY(${tenantIds}::integer[])`
             : sql`SELECT COUNT(*) AS cnt FROM customers`
 
-        const countResult = await db.drizzle.execute(countQuery) as Array<{ cnt: string | number }>
-        const total = Number(countResult[0]?.cnt ?? 0)
+        const countResult = (await db.drizzle.execute(countQuery)) as DrizzleQueryResult<{ cnt: string | number }>
+        const total = Number(countResult.rows[0]?.cnt ?? 0)
 
         if (total > EXPORT_ROW_CAP) {
             return Response.json(
                 { error: 'export_too_large', hint: 'Filter by date or rank' },
-                { status: 413 },
+                {
+                    status: 413,
+                    headers: { 'Cache-Control': 'private, no-store' },
+                },
             )
         }
 
-        // 4. Build filename
+        // 4. Build filename — sanitize tenantLabel to safe chars only
         const today = new Date()
         const dateSuffix = [
             today.getFullYear(),
             String(today.getMonth() + 1).padStart(2, '0'),
             String(today.getDate()).padStart(2, '0'),
         ].join('')
-        const filename = `customers-${tenantLabel}-${dateSuffix}.csv`
+        const safeLabel = sanitizeFilenameSegment(tenantLabel)
+        const filename = `customers-${safeLabel}-${dateSuffix}.csv`
 
         // 5. Stream CSV response
         const stream = new ReadableStream({
@@ -148,61 +184,68 @@ export async function GET(req: NextRequest) {
                 // Header row
                 controller.enqueue(enc.encode('email,name,phone,rank,createdAt,addressCount,orderCount\n'))
 
-                // Data query — subqueries for counts keep memory flat
-                const dataQuery = tenantIds.length > 0
-                    ? sql`
-                        SELECT
-                            c.email,
-                            c.name,
-                            c.phone,
-                            c.rank,
-                            c.created_at,
-                            (SELECT COUNT(*) FROM customers_addresses WHERE _parent_id = c.id::text) AS addr_count,
-                            (SELECT COUNT(*) FROM orders WHERE customer_id = c.id) AS order_count
-                        FROM customers c
-                        WHERE c.tenant_id = ANY(ARRAY[${sql.raw(tenantIds.map((id) => `'${id}'`).join(','))}]::text[])
-                        ORDER BY c.created_at DESC
-                    `
-                    : sql`
-                        SELECT
-                            c.email,
-                            c.name,
-                            c.phone,
-                            c.rank,
-                            c.created_at,
-                            (SELECT COUNT(*) FROM customers_addresses WHERE _parent_id = c.id::text) AS addr_count,
-                            (SELECT COUNT(*) FROM orders WHERE customer_id = c.id) AS order_count
-                        FROM customers c
-                        ORDER BY c.created_at DESC
-                    `
+                try {
+                    // Data query — subqueries for counts keep memory flat.
+                    // IDs are integers; no ::text casts, no sql.raw.
+                    const dataQuery = tenantIds.length > 0
+                        ? sql`
+                            SELECT
+                                c.email,
+                                c.name,
+                                c.phone,
+                                c.rank,
+                                c.created_at,
+                                (SELECT COUNT(*) FROM customers_addresses WHERE _parent_id = c.id) AS addr_count,
+                                (SELECT COUNT(*) FROM orders WHERE customer_id = c.id) AS order_count
+                            FROM customers c
+                            WHERE c.tenant_id = ANY(${tenantIds}::integer[])
+                            ORDER BY c.created_at DESC
+                        `
+                        : sql`
+                            SELECT
+                                c.email,
+                                c.name,
+                                c.phone,
+                                c.rank,
+                                c.created_at,
+                                (SELECT COUNT(*) FROM customers_addresses WHERE _parent_id = c.id) AS addr_count,
+                                (SELECT COUNT(*) FROM orders WHERE customer_id = c.id) AS order_count
+                            FROM customers c
+                            ORDER BY c.created_at DESC
+                        `
 
-                const rows = await db.drizzle.execute(dataQuery) as Array<{
-                    email: string
-                    name: string
-                    phone: string | null
-                    rank: string | null
-                    created_at: string | Date
-                    addr_count: string | number
-                    order_count: string | number
-                }>
+                    const dataResult = (await db.drizzle.execute(dataQuery)) as DrizzleQueryResult<{
+                        email: string
+                        name: string
+                        phone: string | null
+                        rank: string | null
+                        created_at: string | Date
+                        addr_count: string | number
+                        order_count: string | number
+                    }>
 
-                for (const row of rows) {
-                    const createdAt = row.created_at
-                        ? new Date(row.created_at as string).toISOString()
-                        : ''
-                    const line = toCsvLine([
-                        row.email,
-                        row.name,
-                        row.phone ?? '',
-                        row.rank ?? '',
-                        createdAt,
-                        Number(row.addr_count),
-                        Number(row.order_count),
-                    ])
-                    controller.enqueue(enc.encode(line + '\n'))
+                    for (const row of dataResult.rows) {
+                        const createdAt = row.created_at
+                            ? new Date(row.created_at as string).toISOString()
+                            : ''
+                        const line = toCsvLine([
+                            row.email,
+                            row.name,
+                            row.phone ?? '',
+                            row.rank ?? '',
+                            createdAt,
+                            Number(row.addr_count),
+                            Number(row.order_count),
+                        ])
+                        controller.enqueue(enc.encode(line + '\n'))
+                    }
+
+                    controller.close()
+                } catch (streamErr) {
+                    console.error('[GET /api/v1/customers/export] stream error', streamErr)
+                    // Signal stream failure — client sees network error, not silent truncation
+                    controller.error(streamErr)
                 }
-
-                controller.close()
             },
         })
 
@@ -216,6 +259,9 @@ export async function GET(req: NextRequest) {
         })
     } catch (err) {
         console.error('[GET /api/v1/customers/export] error', err)
-        return new Response('Internal server error', { status: 500 })
+        return new Response('Internal server error', {
+            status: 500,
+            headers: { 'Cache-Control': 'private, no-store' },
+        })
     }
 }

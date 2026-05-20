@@ -30,10 +30,6 @@ function formatDate(val: string | Date | null | undefined): string {
     return d.toLocaleDateString('en-MY', { year: 'numeric', month: 'short', day: '2-digit' })
 }
 
-function escapeHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
 const STATUS_COLOURS: Record<string, string> = {
     pending: '#b45309',
     processing: '#1d4ed8',
@@ -66,7 +62,7 @@ function Badge({ value, colours }: { value: string; colours: Record<string, stri
                 textTransform: 'capitalize',
             }}
         >
-            {escapeHtml(value)}
+            {value}
         </span>
     )
 }
@@ -89,9 +85,24 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
     try {
         const payload = await getPayload({ config })
 
-        const where: Where = {
-            customer: { equals: id },
-        }
+        // Fetch the parent customer to read its tenant — used for defence-in-depth scoping
+        // (payload.find without req defaults to overrideAccess:true, so add explicit tenant
+        // filter to prevent leaking orders if customer.id ever points across tenants)
+        const customerResult = await payload.find({
+            collection: 'customers',
+            where: { id: { equals: id } },
+            limit: 1,
+            depth: 0,
+        })
+        const customer = customerResult.docs[0] as { id: string | number; tenant?: string | number | { id: string | number } } | undefined
+
+        const tenantId = customer?.tenant != null
+            ? (typeof customer.tenant === 'object' ? customer.tenant.id : customer.tenant)
+            : undefined
+
+        const where: Where = tenantId != null
+            ? { and: [{ customer: { equals: id } }, { tenant: { equals: tenantId } }] }
+            : { customer: { equals: id } }
 
         orders = await payload.find({
             collection: 'orders',
@@ -132,13 +143,7 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
                 <>
                     {/* Table */}
                     <div style={{ overflowX: 'auto' }}>
-                        <table
-                            style={{
-                                width: '100%',
-                                borderCollapse: 'collapse',
-                                fontSize: '13px',
-                            }}
-                        >
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                             <thead>
                                 <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
                                     {['Order #', 'Status', 'Total', 'Payment', 'Date', ''].map((h) => (
@@ -168,10 +173,7 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
                                         createdAt?: string
                                     }
                                     return (
-                                        <tr
-                                            key={String(o.id)}
-                                            style={{ borderBottom: '1px solid #f3f4f6' }}
-                                        >
+                                        <tr key={String(o.id)} style={{ borderBottom: '1px solid #f3f4f6' }}>
                                             <td style={{ padding: '8px 12px', fontWeight: 500 }}>
                                                 {o.orderNumber ?? String(o.id)}
                                             </td>
@@ -212,21 +214,13 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
                     {totalPages > 1 && (
                         <div style={{ marginTop: '16px', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px' }}>
                             {hasPrev && (
-                                <a
-                                    href={`?page=${page - 1}`}
-                                    style={{ color: '#2563eb', textDecoration: 'none' }}
-                                >
+                                <a href={`?page=${page - 1}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
                                     ← Previous
                                 </a>
                             )}
-                            <span style={{ color: '#6b7280' }}>
-                                Page {page} of {totalPages}
-                            </span>
+                            <span style={{ color: '#6b7280' }}>Page {page} of {totalPages}</span>
                             {hasNext && (
-                                <a
-                                    href={`?page=${page + 1}`}
-                                    style={{ color: '#2563eb', textDecoration: 'none' }}
-                                >
+                                <a href={`?page=${page + 1}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
                                     Next →
                                 </a>
                             )}
