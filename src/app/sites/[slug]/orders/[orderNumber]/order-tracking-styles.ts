@@ -126,11 +126,11 @@ export const OT_CSS = `
 .ot-tr-copy:hover{background:var(--tl1);}
 .ot-tr-copy.copied{background:var(--tl);color:#fff;border-color:var(--tl);}
 .ot-tr-copy svg{width:12px;height:12px;}
-.ot-eta-card{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;background:linear-gradient(135deg,var(--tl5) 0%,#fff 100%);border:1px solid var(--tl2);border-radius:12px;}
-.ot-eta-icon{width:44px;height:44px;border-radius:10px;background:#fff;border:1px solid var(--tl2);display:grid;place-items:center;color:var(--tl);flex-shrink:0;}
-.ot-eta-icon svg{width:20px;height:20px;}
+.ot-eta-card{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;background:var(--card);border:1px solid var(--bd);border-left:3px solid var(--tl);border-radius:12px;}
+.ot-eta-icon{width:40px;height:40px;border-radius:10px;background:var(--tl5);border:1px solid var(--tl2);display:grid;place-items:center;color:var(--tl);flex-shrink:0;}
+.ot-eta-icon svg{width:18px;height:18px;}
 .ot-eta-lbl{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tl7);display:block;margin-bottom:1px;}
-.ot-eta-date{font-family:var(--hf);font-size:17px;font-weight:800;color:var(--f1);letter-spacing:-.01em;line-height:1.15;}
+.ot-eta-date{font-family:var(--hf);font-size:16px;font-weight:800;color:var(--f1);letter-spacing:-.01em;line-height:1.15;}
 .ot-eta-window{font-size:11.5px;color:var(--f3);margin-top:1px;}
 /* Mini map */
 .ot-mini-map{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--bd);align-self:stretch;background:radial-gradient(ellipse at 20% 30%,#dcefe4 0%,transparent 55%),radial-gradient(ellipse at 78% 72%,#ecf6f0 0%,transparent 60%),repeating-linear-gradient(45deg,#f5f7f9 0 12px,#eef1f4 12px 24px);display:flex;flex-direction:column;cursor:pointer;transition:transform 200ms ease,box-shadow 200ms ease;}
