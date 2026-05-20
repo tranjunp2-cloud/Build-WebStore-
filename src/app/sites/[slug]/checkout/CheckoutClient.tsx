@@ -689,7 +689,7 @@ const CK_CSS = `
 .ck-row{display:grid;gap:14px;margin-top:14px;}
 .ck-row.c2{grid-template-columns:1fr 1fr;}
 .ck-row.c3{grid-template-columns:1fr 1fr 1fr;}
-.ck-row.c2>*,.ck-row.c3>*{display:flex;flex-direction:column;}
+.ck-row.c2>*,.ck-row.c3>*{display:flex;flex-direction:column;margin-top:0;}
 .ck-row.c2>* .ck-iw,.ck-row.c3>* .ck-iw{margin-top:auto;}
 /* Error */
 .ck-err{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;font-size:13px;color:#dc2626;display:flex;align-items:center;gap:10px;}
