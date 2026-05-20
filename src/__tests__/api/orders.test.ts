@@ -79,7 +79,8 @@ describe('POST /api/orders/create', () => {
             body: JSON.stringify({
                 siteId: 'invalid-site',
                 items: [{ productId: 'prod-1', quantity: 1 }],
-                customer: { name: 'John Doe', email: 'john@example.com' }
+                customer: { name: 'John Doe', email: 'john@example.com' },
+                paymentMethod: 'cod',
             })
         })
 
@@ -97,7 +98,8 @@ describe('POST /api/orders/create', () => {
             body: JSON.stringify({
                 siteId: 'site-123',
                 items: [{ productId: 'prod-1', quantity: 2 }],
-                customer: { name: 'John Doe', email: 'john@example.com' }
+                customer: { name: 'John Doe', email: 'john@example.com' },
+                paymentMethod: 'cod',
             })
         })
 
