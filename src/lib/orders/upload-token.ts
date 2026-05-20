@@ -36,3 +36,21 @@ export function verifyUploadToken(token: string, orderId: string | number): bool
         return false
     }
 }
+
+/** Generate a permanent (no-TTL) token for the confirm page, tied to order ID + orderNumber. */
+export function generateConfirmToken(orderId: string | number, orderNumber: string): string {
+    return createHmac('sha256', secret())
+        .update(`confirm:${orderId}:${orderNumber}`)
+        .digest('hex')
+}
+
+/** Returns true if the confirm page token is valid for this order. */
+export function verifyConfirmToken(token: string, orderId: string | number, orderNumber: string): boolean {
+    if (!token || token.length !== 64) return false
+    const expected = generateConfirmToken(orderId, orderNumber)
+    try {
+        return timingSafeEqual(Buffer.from(token, 'hex'), Buffer.from(expected, 'hex'))
+    } catch {
+        return false
+    }
+}

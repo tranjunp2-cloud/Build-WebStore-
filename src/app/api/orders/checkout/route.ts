@@ -7,6 +7,7 @@ import { orderCreateSchema } from '@/lib/validations/orders'
 import { getShippingRate } from '@/lib/shipping'
 import { generatePaymentReference } from '@/lib/payment/reference'
 import { signOrderToken } from '@/lib/auth/order-token'
+import { generateConfirmToken } from '@/lib/orders/upload-token'
 import { bankTransferInstructionsEmail } from '@/lib/email/templates/bank-transfer-instructions'
 
 export const maxDuration = 60
@@ -262,6 +263,7 @@ export async function POST(request: Request) {
             })).catch((err: unknown) => console.error('[Email BT instructions]', err))
         }
 
+        const confirmToken = generateConfirmToken(order.id, orderNumber)
         return NextResponse.json({
             success: true,
             data: {
@@ -270,6 +272,7 @@ export async function POST(request: Request) {
                 total,
                 currency,
                 paymentMethod,
+                confirmToken,
                 ...(redirectUrl ? { redirectUrl } : {}),
             },
         })
