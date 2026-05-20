@@ -29,28 +29,28 @@ describe('[TC-CUST-26..27] CustomerStatusBadge', () => {
         const { container } = withI18n(<CustomerStatusBadge status="contacted" />)
         expect(screen.getByText('Contacted')).toBeTruthy()
         const span = container.querySelector('span')!
-        expect(span.className).toContain('text-teal')
+        expect(span.className).toContain('text-teal-400')
     })
 
     it('[TC-CUST-26c] renders "Ignored" label with gray color', () => {
         const { container } = withI18n(<CustomerStatusBadge status="ignored" />)
         expect(screen.getByText('Ignored')).toBeTruthy()
         const span = container.querySelector('span')!
-        expect(span.className).toContain('text-zinc')
+        expect(span.className).toContain('text-zinc-400')
     })
 
     it('[TC-CUST-26d] renders "Read" label with indigo color', () => {
         const { container } = withI18n(<CustomerStatusBadge status="read" />)
         expect(screen.getByText('Read')).toBeTruthy()
         const span = container.querySelector('span')!
-        expect(span.className).toContain('text-indigo')
+        expect(span.className).toContain('text-indigo-400')
     })
 
     it('[TC-CUST-27] renders "Subscribed" label with violet color', () => {
         const { container } = withI18n(<CustomerStatusBadge status="subscribed" />)
         expect(screen.getByText('Subscribed')).toBeTruthy()
         const span = container.querySelector('span')!
-        expect(span.className).toContain('text-violet')
+        expect(span.className).toContain('text-violet-400')
     })
 })
 
@@ -59,13 +59,13 @@ describe('[TC-CUST-28..29] CustomerSourceBadge', () => {
         const { container } = withI18n(<CustomerSourceBadge source="contact-form" />)
         expect(screen.getByText('Contact Forms')).toBeTruthy()
         const span = container.querySelector('span')!
-        expect(span.className).toContain('text-blue')
+        expect(span.className).toContain('text-blue-400')
     })
 
     it('[TC-CUST-29] renders "Newsletter Subscriptions" label with indigo color', () => {
         const { container } = withI18n(<CustomerSourceBadge source="newsletter" />)
         expect(screen.getByText('Newsletter Subscriptions')).toBeTruthy()
         const span = container.querySelector('span')!
-        expect(span.className).toContain('text-violet')
+        expect(span.className).toContain('text-violet-400')
     })
 })
