@@ -114,9 +114,9 @@ export function OrdersClientLayout() {
             <div
                 className={`fixed z-50 overflow-y-auto transition-transform duration-300 shadow-2xl right-0 w-full top-0 h-[100dvh] md:w-[488px] md:top-[80px] md:h-[calc(100vh-80px)] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
                 style={{
-                    background: 'rgba(11, 17, 32, 0.95)',
-                    borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: 'var(--dash-surface)',
+                    borderLeft: '1px solid var(--dash-border)',
+                    borderTop: '1px solid var(--dash-border)',
                     backdropFilter: 'blur(20px)',
                 }}
             >

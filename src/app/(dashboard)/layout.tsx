@@ -10,6 +10,8 @@ import { NotificationProvider } from '@/providers/NotificationProvider'
 import { ToastContainer } from '@/components/notifications/ToastContainer'
 import { PushOptInPrompt } from '@/components/notifications/PushOptInPrompt'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { ThemeProvider } from '@/providers/theme-provider'
+import { cookies } from 'next/headers'
 
 export default async function DashboardLayout({
     children,
@@ -48,26 +50,32 @@ export default async function DashboardLayout({
     const currentUserRole = currentTenantInfo?.role || 'viewer'
     const isSuperAdmin = Boolean(typedUser?.roles?.includes('super-admin'))
 
+    const cookieStore = await cookies()
+    const themeCookie = cookieStore.get('theme')?.value
+    const initialTheme = themeCookie === 'light' ? 'light' : 'dark'
+
     return (
         <AppShell>
-            <I18nProvider defaultLocale="en">
-                <TooltipProvider delayDuration={300}>
-                    <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
-                        {children}
-                    </CMSLayoutClient>
-                    {typedUser && (
-                        <>
-                            <NotificationProvider />
-                            <ToastContainer />
-                            <PushOptInPrompt />
-                        </>
-                    )}
-                    {/* Only evaluate and render if the user hasn't seen the wizard yet */}
-                    {!typedUser?.has_seen_ai_wizard && (
-                        <AIDiscoveryWizard userId={typedUser?.id} />
-                    )}
-                </TooltipProvider>
-            </I18nProvider>
+            <ThemeProvider initialTheme={initialTheme}>
+                <I18nProvider defaultLocale="en">
+                    <TooltipProvider delayDuration={300}>
+                        <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
+                            {children}
+                        </CMSLayoutClient>
+                        {typedUser && (
+                            <>
+                                <NotificationProvider />
+                                <ToastContainer />
+                                <PushOptInPrompt />
+                            </>
+                        )}
+                        {/* Only evaluate and render if the user hasn't seen the wizard yet */}
+                        {!typedUser?.has_seen_ai_wizard && (
+                            <AIDiscoveryWizard userId={typedUser?.id} />
+                        )}
+                    </TooltipProvider>
+                </I18nProvider>
+            </ThemeProvider>
         </AppShell>
     )
 }
