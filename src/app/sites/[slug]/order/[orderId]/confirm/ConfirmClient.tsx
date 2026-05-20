@@ -1,6 +1,7 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
     Clock, Mail, Calendar, ShoppingBag, ReceiptText,
@@ -65,6 +66,13 @@ const CopyIcon = () => (
 )
 
 export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken }: Props) {
+    const router = useRouter()
+
+    const clearAndNavigate = useCallback(async (href: string) => {
+        await fetch(`/api/orders/${order.id}/clear-confirm-token`, { method: 'DELETE' }).catch(() => {})
+        router.push(href)
+    }, [order.id, router])
+
     const [uploadStatus, setUploadStatus] = useState<UploadStatus>(
         order.paymentStatus === 'pending_verification' || order.paymentStatus === 'paid' ? 'success' : 'empty'
     )
@@ -538,12 +546,12 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             {addrLine && <div className="ty-meta-row"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
                         </div>
                         <div className="ty-cta-row">
-                            <Link href={`/sites/${slug}/products`} className="ty-btn primary lg">
+                            <button className="ty-btn primary lg" onClick={() => clearAndNavigate(`/sites/${slug}/products`)}>
                                 <ShoppingBag size={15} /> Continue Shopping
-                            </Link>
-                            <Link href={`/sites/${slug}/orders/${order.id}`} className="ty-btn outline lg">
+                            </button>
+                            <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.id}`)}>
                                 <ReceiptText size={15} /> View My Orders
-                            </Link>
+                            </button>
                         </div>
                         <div className="summary-trust"><ShieldCheck size={11} /> Encrypted Checkout · Order Locked</div>
                     </div>
