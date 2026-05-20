@@ -391,6 +391,10 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                     <RotateCcw size={13} /> Upload a different file
                                 </button>
                             </div>
+                            <div className="ty-email-note">
+                                <Mail size={14} />
+                                <span>A copy of your order details and a re-upload link has also been sent to <strong>{maskedEmail}</strong>.</span>
+                            </div>
                         </div>
                     )}
 
