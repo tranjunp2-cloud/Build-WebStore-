@@ -47,7 +47,6 @@ export type SupportedAddSectionType =
     | 'custom-html'
     | 'products-featured'
     // v2.0 industry blocks
-    | 'menu-display'
     | 'booking-widget'
     | 'class-schedule'
     | 'review-cards'
@@ -94,8 +93,7 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['accordion', [/\baccordion\b/i, /\bcollapsible\b/i, /\bexpandable\b/i]],
     // ['step-process', [/\bstep\b/i, /\bprocess\b/i, /\bhow\s*it\s*works\b/i, /\btimeline\b/i]], // feat/fix-broken-block-variants: temporarily hidden
     ['portfolio-grid', [/\bportfolio\b/i, /\bproject\b/i, /\bshowcase\b/i, /\bwork\b/i]],
-    ['menu-display', [/\bmenu-display\b/i, /\bmenu\s+display\b/i]],
-    ['menu-food', [/\bmenu\b/i, /\bfood\b/i, /\brestaurant\b/i, /\bdish\b/i]],
+    ['menu-food', [/\bmenu-food\b/i, /\bmenu\s+food\b/i, /\bfood\s+menu\b/i, /\bmenu\b/i, /\bfood\b/i, /\brestaurant\b/i, /\bdish\b/i]],
     ['service-cards', [/\bservice\b/i, /\boffering\b/i]],
     ['carousel', [/\bcarousel\b/i, /\bslider\b/i, /\bslideshow\b/i]],
     ['hero', [/\bhero\b/i, /\bbanner\b/i, /\blanding\b/i]],
@@ -161,7 +159,6 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'custom-html': 'custom HTML',
     'products-featured': 'featured products',
     // v2.0 industry blocks
-    'menu-display': 'menu display',
     'booking-widget': 'booking widget',
     'class-schedule': 'class schedule',
     'review-cards': 'review cards',
@@ -531,21 +528,21 @@ export function createAddSectionBlock({
             return {
                 blockType: 'menu-food',
                 variant: 'classic',
-                headline: 'Our Menu',
+                headline: `${brandName} Menu`,
                 categories: [
                     {
                         name: 'Main Course',
                         items: [
-                            { name: 'Nasi Lemak Special', description: 'Fragrant rice with sambal, egg, and chicken', price: 12.90, currency: 'RM', tag: 'Popular' },
-                            { name: 'Mee Goreng', description: 'Stir-fried noodles with prawns and vegetables', price: 10.90, currency: 'RM' },
-                            { name: 'Roti Canai', description: 'Flaky flatbread with curry dipping sauce', price: 5.90, currency: 'RM' },
+                            { name: 'Nasi Lemak Special', description: 'Fragrant rice with sambal, egg, and chicken', price: 'RM 12.90', tag: 'Popular' },
+                            { name: 'Mee Goreng', description: 'Stir-fried noodles with prawns and vegetables', price: 'RM 10.90' },
+                            { name: 'Roti Canai', description: 'Flaky flatbread with curry dipping sauce', price: 'RM 5.90' },
                         ],
                     },
                     {
                         name: 'Beverages',
                         items: [
-                            { name: 'Teh Tarik', description: 'Pulled milk tea', price: 3.50, currency: 'RM', tag: 'Best Seller' },
-                            { name: 'Kopi O', description: 'Traditional black coffee', price: 2.90, currency: 'RM' },
+                            { name: 'Teh Tarik', description: 'Pulled milk tea', price: 'RM 3.50', tag: 'Best Seller' },
+                            { name: 'Kopi O', description: 'Traditional black coffee', price: 'RM 2.90' },
                         ],
                     },
                 ],
@@ -697,31 +694,7 @@ export function createAddSectionBlock({
                 subheadline: 'Hand-picked selections just for you.',
             }
 
-        case 'menu-display':
-            return {
-                blockType: 'menu-display',
-                variant: 'tabs',
-                headline: `${brandName} Menu`,
-                subheadline: 'Explore our selection',
-                currency: 'RM',
-                showDietaryIcons: true,
-                categories: [
-                    {
-                        name: 'Main Course',
-                        items: [
-                            { name: 'Signature Dish', description: 'Our most popular dish.', price: 25.00, dietaryTags: [] },
-                            { name: "Chef's Special", description: 'A seasonal favourite.', price: 30.00, dietaryTags: [] },
-                        ],
-                    },
-                    {
-                        name: 'Drinks',
-                        items: [
-                            { name: 'Fresh Juice', price: 8.00, dietaryTags: ['vegan'] },
-                            { name: 'Coffee', price: 6.00, dietaryTags: [] },
-                        ],
-                    },
-                ],
-            }
+        // menu-display removed — GH-1024: use menu-food instead
 
         case 'booking-widget':
             return {

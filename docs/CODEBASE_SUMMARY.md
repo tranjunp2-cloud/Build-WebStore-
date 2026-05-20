@@ -78,6 +78,7 @@ Adding a new collection requires: Payload config + migration in `scripts/db-setu
 - **Test harness** (`scripts/test-harness/`) — E2E page-gen regression harness with Playwright visual diff.
 - **Template drift validator** (`src/lib/ai/template-drift-validator.ts`) — scans TS presets + DB templates against live block registry; CI gate + post-deploy preflight. Paired with `block-schema-version.ts` hash stamped on seed.
 - **Templates health dashboard** (`src/app/(dashboard)/templates-health/`) — super-admin page surfacing per-template drift badges + re-seed/re-harness buttons.
+- **Block CRUD (SettingsPanel)** (`src/components/editor/SettingsPanel.tsx`) — F05 editor settings panel with nested array manipulation for menu blocks (menu-display, menu-food). Exports helpers: `updateNestedItem()`, `addNestedItem()`, `removeNestedItem()` for two-level nesting (categories → items). Handles dietary tag validation, isPopular/isNew flags, RichText fields. See `docs/architecture/F08-products-crud.md` Phase 03 (GH-1024).
 
 ## Notable patterns
 

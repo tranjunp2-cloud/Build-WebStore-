@@ -342,6 +342,19 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
 
     /* ── Carousel ────────────────────────────────────────────────────────────── */
     const renderCarousel = () => {
+        // ≤4 items: snap-mandatory left-aligns sparse items; use centered grid instead
+        if (displayProducts.length <= 4) {
+            const n = displayProducts.length
+            const sparseGrid = n === 1 ? 'grid-cols-1' : n === 2 ? 'grid-cols-1 sm:grid-cols-2' : n === 3 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 lg:grid-cols-4'
+            return (
+                <div className={`grid ${sparseGrid} gap-6 max-w-5xl mx-auto`}>
+                    {displayProducts.map((product, i) => (
+                        <ProductCard key={i} product={product} />
+                    ))}
+                </div>
+            )
+        }
+
         const scroll = (dir: 'left' | 'right') => {
             if (!scrollRef.current) return
             scrollRef.current.scrollBy({ left: dir === 'left' ? -280 : 280, behavior: 'smooth' })
@@ -358,12 +371,10 @@ export function ProductQuickViewBlock({ block, site }: BlockProps<ProductQuickVi
                         </div>
                     ))}
                 </div>
-                {displayProducts.length > 4 && (
-                    <div className="flex justify-center gap-3 mt-6">
-                        <CarouselArrow direction="left" onClick={() => scroll('left')} label="Previous products" />
-                        <CarouselArrow direction="right" onClick={() => scroll('right')} label="Next products" />
-                    </div>
-                )}
+                <div className="flex justify-center gap-3 mt-6">
+                    <CarouselArrow direction="left" onClick={() => scroll('left')} label="Previous products" />
+                    <CarouselArrow direction="right" onClick={() => scroll('right')} label="Next products" />
+                </div>
             </div>
         )
     }

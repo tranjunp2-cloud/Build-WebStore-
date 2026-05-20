@@ -120,12 +120,15 @@ export const restaurantContent: CategoryContent = {
   ],
   industryBlocks: [
     {
-      blockType: 'menu-display',
-      variant: 'grid',
+      blockType: 'menu-food',
+      variant: 'classic',
       title: 'Our Menu',
-      categories: ['Nasi & Rice', 'Roti & Bread', 'Curries', 'Beverages'],
-      showPrices: true,
-      currency: 'RM',
+      items: [
+        { name: 'Nasi Lemak', description: 'Fragrant coconut rice with sambal tumis, ikan bilis, and egg', price: 'RM 12', tag: 'Signature' },
+        { name: 'Roti Canai', description: 'Hand-stretched flatbread served with dhal and curry', price: 'RM 3' },
+        { name: 'Curry Chicken', description: 'Slow-cooked chicken in aromatic coconut curry', price: 'RM 6' },
+        { name: 'Teh Tarik', description: 'Pulled milk tea, frothy and perfectly sweet', price: 'RM 4' },
+      ],
     },
     {
       blockType: 'booking-widget',

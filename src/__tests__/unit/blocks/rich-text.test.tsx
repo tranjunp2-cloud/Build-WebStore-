@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { RichText } from '@/blocks/shared/RichText'
-import { decodeHtmlEntities } from '@/lib/utils/rich-text-render'
+import { decodeHtmlEntities, sanitizeInlineHtml } from '@/lib/utils/rich-text-render'
 
 describe('[TC-F05-richtext] RichText component', () => {
     it('TC-F05-rt-01: renders plain text without wrapper when as=span', () => {
@@ -74,6 +74,34 @@ describe('[TC-F05-richtext] RichText component', () => {
         const b = container.querySelector('b')
         expect(b).not.toBeNull()
         expect(b!.getAttribute('onclick')).toBeNull()
+    })
+})
+
+describe('[TC-F05-rt-link] sanitizeInlineHtml — link rel enforcement', () => {
+    it('TC-F05-rt-09: _blank link without rel gets noopener noreferrer injected', () => {
+        const result = sanitizeInlineHtml('<a href="https://example.com" target="_blank">Link</a>')
+        expect(result).toContain('rel="noopener noreferrer"')
+    })
+
+    it('TC-F05-rt-10: _blank link with nofollow rel gets noopener noreferrer appended', () => {
+        const result = sanitizeInlineHtml('<a href="https://example.com" target="_blank" rel="nofollow">Link</a>')
+        expect(result).toContain('noopener')
+        expect(result).toContain('noreferrer')
+        expect(result).toContain('nofollow')
+    })
+
+    it('TC-F05-rt-11: disallowed rel values (stylesheet, prefetch) are stripped', () => {
+        const result = sanitizeInlineHtml('<a href="https://example.com" rel="stylesheet prefetch">Link</a>')
+        expect(result).not.toContain('stylesheet')
+        expect(result).not.toContain('prefetch')
+        // rel attribute removed entirely when no safe tokens remain and not _blank
+        expect(result).not.toContain('rel=')
+    })
+
+    it('TC-F05-rt-12: non-blank link with valid rel passes through unchanged', () => {
+        const result = sanitizeInlineHtml('<a href="https://example.com" rel="nofollow">Link</a>')
+        expect(result).toContain('rel="nofollow"')
+        expect(result).not.toContain('noopener')
     })
 })
 

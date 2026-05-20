@@ -117,6 +117,46 @@ describe('PreviewScripts', () => {
         removeEventListenerSpy.mockRestore()
     })
 
+    // TC-F05-06-09: contentEditable must not activate on table-scroll wrapper divs
+    it('should not set contenteditable on a div that directly wraps a <table> (overflow-x-auto fix)', () => {
+        // Arrange — feature-comparison table variant DOM structure
+        document.body.innerHTML = `
+            <div data-block-index="0" data-block-type="feature-comparison">
+                <section>
+                    <div class="container">
+                        <div class="overflow-x-auto" id="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th id="th-cell"><span>Feature</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td id="td-cell">
+                                            <span id="td-span" class="inline-flex">
+                                                <svg><path d="M5 10l3.5 3.5L15 7"/></svg>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        `
+        render(<PreviewScripts />)
+        const tableWrapper = document.getElementById('table-wrapper')!
+
+        // Act — click on the table-cell padding area (target = td, walk-up reaches div.overflow-x-auto)
+        const tdCell = document.getElementById('td-cell')!
+        tdCell.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+
+        // Assert — the overflow-x-auto div must NOT become contenteditable
+        expect(tableWrapper.getAttribute('contenteditable')).toBeNull()
+    })
+
     describe('replaceDropHintCSS', () => {
         it('should replace drop hint text in CSS', () => {
             const css = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`

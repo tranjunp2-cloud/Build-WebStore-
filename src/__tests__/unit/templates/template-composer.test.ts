@@ -43,7 +43,7 @@ describe('[TC-S3-010] composeTemplate — starter tier', () => {
     const homePage = template.pages[0]!
 
     // Assert — composer was enriched in 8598e64 to emit signature blocks
-    // (menu-display, booking-widget) for richer starters; upper bound removed.
+    // (menu-food, booking-widget) for richer starters; upper bound removed. GH-1024: menu-display hidden.
     expect(homePage.layout.length).toBeGreaterThanOrEqual(5)
   })
 
