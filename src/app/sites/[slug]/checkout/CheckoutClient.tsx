@@ -89,6 +89,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const router = useRouter()
+    const [mounted, setMounted] = useState(false)
     const [isPlacing, setIsPlacing] = useState(false)
     const [showOverlay, setShowOverlay] = useState(false)
     const [overlayTakingLong, setOverlayTakingLong] = useState(false)
@@ -99,6 +100,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
+
+    useEffect(() => { setMounted(true) }, [])
 
     useEffect(() => {
         fetch('/api/geo/states')
@@ -269,6 +272,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const handlePlaceOrder = async () => {
         if (!canPlaceOrder) return
         setIsPlacing(true)
+        let navigatedToConfirm = false
         // Show overlay after 300ms if API still running (avoids flash on fast responses)
         overlayTimerRef.current = setTimeout(() => {
             setShowOverlay(true)
@@ -293,7 +297,6 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             const data = await res.json()
 
             if (res.ok && data.success) {
-                clearCart()
                 if (siteId) {
                     trackEvent({ siteId, event: 'purchase', isOwner, metadata: {
                         orderNumber: data.data.orderNumber, total: data.data.total,
@@ -302,6 +305,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                 }
                 const confirmUrl = `/sites/${slug}/order/${data.data.orderId}/confirm`
                 dismissOverlay()
+                // Keep isPlacing=true via flag so empty-cart check doesn't trigger before unmount
+                navigatedToConfirm = true
+                clearCart()
                 if ('startViewTransition' in document) {
                     document.startViewTransition(() => { router.push(confirmUrl) })
                 } else {
@@ -315,11 +321,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             dismissOverlay()
             toast.error(err instanceof Error ? err.message : ck.networkError)
         } finally {
-            setIsPlacing(false)
+            if (!navigatedToConfirm) setIsPlacing(false)
         }
     }
 
-    if (items.length === 0 && !isPlacing) {
+    if (mounted && items.length === 0 && !isPlacing) {
         return (
             <div className="ck-empty">
                 <ShoppingBag size={48} />
