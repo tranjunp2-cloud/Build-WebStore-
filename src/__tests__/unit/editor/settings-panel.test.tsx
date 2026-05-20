@@ -241,3 +241,119 @@ describe('SettingsPanel', () => {
         expect(screen.queryByLabelText('Primary color picker')).not.toBeInTheDocument()
     })
 })
+
+// ── GH-1024 Phase 02: SettingsPanel CRUD — feature-comparison ───────────
+
+describe('SettingsPanel CRUD — feature-comparison [TC-F08-CRUD-FEATCMP]', () => {
+    it('[TC-F08-CRUD-FEATCMP-ADD-PRODUCT-SYNC] adding a product extends all features values arrays', () => {
+        // Arrange
+        const fcBlock = {
+            blockType: 'feature-comparison',
+            products: [{ name: 'Basic', highlighted: false }],
+            features: [{ name: 'Storage', values: [true] }],
+        }
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={fcBlock} /></I18nProvider>)
+
+        // Act — stepper increment button adds a product
+        fireEvent.click(screen.getByLabelText('Increase product count'))
+
+        // Assert: new product appended, each feature gains a false value column
+        expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {
+            products: [{ name: 'Basic', highlighted: false }, { name: 'New Product', highlighted: false }],
+            features: [{ name: 'Storage', values: [true, false] }],
+        })
+    })
+
+    it('[TC-F08-CRUD-FEATCMP-REMOVE-PRODUCT-SYNC] removing a product trims all features values arrays', () => {
+        // Arrange
+        const fcBlock = {
+            blockType: 'feature-comparison',
+            products: [{ name: 'Basic', highlighted: false }, { name: 'Pro', highlighted: true }],
+            features: [{ name: 'Storage', values: [true, false] }],
+        }
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={fcBlock} /></I18nProvider>)
+
+        // Act — stepper decrement removes the last product
+        fireEvent.click(screen.getByLabelText('Decrease product count'))
+
+        // Assert: last product (Pro) removed, last feature value trimmed
+        expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {
+            products: [{ name: 'Basic', highlighted: false }],
+            features: [{ name: 'Storage', values: [true] }],
+        })
+    })
+})
+
+// ── GH-1024 Phase 03: SettingsPanel CRUD — menu-food ────────────────────
+
+describe('SettingsPanel CRUD — menu-food [TC-F08-CRUD-MENUFOOD]', () => {
+    const mfItem = { name: 'Burger', description: 'Juicy', price: '15.00', currency: 'RM', tag: 'Popular', image: null }
+    const mfCat = { name: 'Burgers', items: [mfItem] }
+    const menuFoodBlock = { blockType: 'menu-food', categories: [mfCat] }
+
+    it('[TC-F08-CRUD-MENUFOOD-CAT-ADD] clicking Add Category appends default category', () => {
+        // Arrange
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={menuFoodBlock} /></I18nProvider>)
+
+        // Act
+        fireEvent.click(screen.getByText('+ Add Category'))
+
+        // Assert
+        expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {
+            categories: [mfCat, { name: 'New Category', items: [] }],
+        })
+    })
+
+    it('[TC-F08-CRUD-MENUFOOD-CAT-REMOVE] clicking remove on category removes it', () => {
+        // Arrange — no items so only one ✕ (the category remove)
+        const emptyCatBlock = { blockType: 'menu-food', categories: [{ name: 'Burgers', items: [] }] }
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={emptyCatBlock} /></I18nProvider>)
+
+        // Act
+        fireEvent.click(screen.getByText('✕'))
+
+        // Assert
+        expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, { categories: [] })
+    })
+
+    it('[TC-F08-CRUD-MENUFOOD-ITEM-ADD] clicking Add Item appends default menu item inside category', () => {
+        // Arrange
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={menuFoodBlock} /></I18nProvider>)
+
+        // Act
+        fireEvent.click(screen.getByText('+ Add Item'))
+
+        // Assert
+        expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {
+            categories: [{ ...mfCat, items: [mfItem, { name: 'New Item', description: '', price: '', currency: 'RM', tag: '', image: null }] }],
+        })
+    })
+
+    it('[TC-F08-CRUD-MENUFOOD-ITEM-EDIT] onBlur on item name updates nested item via onBlockUpdate', () => {
+        // Arrange
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={menuFoodBlock} /></I18nProvider>)
+        const input = screen.getByDisplayValue('Burger')
+
+        // Act
+        fireEvent.blur(input, { target: { value: 'Double Burger' } })
+
+        // Assert
+        expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {
+            categories: [{ ...mfCat, items: [{ ...mfItem, name: 'Double Burger' }] }],
+        })
+    })
+
+    it('[TC-F08-CRUD-MENUFOOD-ITEM-REMOVE] clicking remove on item removes it from category', () => {
+        // Arrange — category ✕ first, item ✕ second
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={menuFoodBlock} /></I18nProvider>)
+
+        // Act — second ✕ is the item remove button
+        const removeBtns = screen.getAllByText('✕')
+        fireEvent.click(removeBtns[1])
+
+        // Assert: item removed, category remains with empty items
+        expect(defaultProps.onBlockUpdate).toHaveBeenCalledWith(0, {
+            categories: [{ ...mfCat, items: [] }],
+        })
+    })
+})

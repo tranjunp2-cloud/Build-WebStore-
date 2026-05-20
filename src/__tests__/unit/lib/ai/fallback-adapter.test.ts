@@ -83,7 +83,7 @@ describe('composeFallbackResult — behaviors', () => {
     })
 
     it('restaurant fallback emits at least one restaurant-appropriate block', () => {
-        const ACCEPTABLE = new Set(['hero', 'features', 'testimonials', 'faq', 'cta', 'stats', 'team', 'pricing', 'menu-display'])
+        const ACCEPTABLE = new Set(['hero', 'features', 'testimonials', 'faq', 'cta', 'stats', 'team', 'pricing', 'menu-food'])
         const blockTypes = new Set<string>()
         for (let seed = 0; seed < 4; seed++) {
             const result = composeFallbackResult('restaurant', seed, 'en')
@@ -106,7 +106,7 @@ describe('composeFallbackResult — behaviors', () => {
         // review-cards drops on all gen paths (media pipeline required).
         // Note: before-after, booking-widget re-enabled via plan 260422-1900-block-aivisible-audit-fix.
         // Note: gallery + portfolio-grid re-enabled via plan 260414-1400 Unsplash pipeline.
-        // Note: menu-display re-enabled via GH-960 (#961 cart/checkout shipped).
+        // Note: menu-display re-hidden via GH-1024 — use menu-food for restaurants.
         const UNSUPPORTED = new Set([
             'review-cards',
         ])

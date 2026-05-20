@@ -71,6 +71,9 @@ export const TEMP_HIDDEN_BLOCK_TYPES = new Set([
   'doctor-profile',   // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
   'gallery-masonry',  // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
   'before-after',     // re-hidden 260508 — not supported by harness (PR #836 accidentally re-enabled)
+  'property-card',    // GH-1024 — hidden; use features/gallery
+  'menu-display',     // GH-1024 — hidden; use menu-food
+  'pricing-table',    // GH-1024 — hidden; use pricing
 ])
 
 function simpleHash(str: string): number {
@@ -897,38 +900,34 @@ function buildNewsletter(biz: BusinessSample): Record<string, unknown> {
 
 // ── Industry block builders ─────────────────────────────────────────────────
 
-function buildMenuDisplay(content: CategoryContent): Record<string, unknown> {
-  const industryBlock = content.industryBlocks.find((b) => b.blockType === 'menu-display')
+// GH-1024: menu-display hidden — use menu-food (schema: price: string, tag?: string, no dietaryTags).
+function buildMenuFood(content: CategoryContent): Record<string, unknown> {
+  const industryBlock = content.industryBlocks.find((b) => b.blockType === 'menu-food')
   return {
-    blockType: 'menu-display',
-    variant: 'tabs',
+    blockType: 'menu-food',
+    variant: 'classic',
     headline: (industryBlock?.title as string) ?? 'Our Menu',
-    currency: (industryBlock?.currency as string) ?? 'RM',
-    showDietaryIcons: true,
     categories: [
       {
         name: 'Nasi & Rice',
-        description: 'Our signature rice dishes',
         items: [
-          { name: 'Nasi Lemak Special', description: 'Coconut rice with sambal, egg, and fried chicken', price: 12, dietaryTags: ['halal'], isPopular: true },
-          { name: 'Nasi Goreng Kampung', description: 'Village-style fried rice with anchovies', price: 10, dietaryTags: ['halal', 'spicy'] },
-          { name: 'Chicken Rice', description: 'Hainanese-style steamed chicken with fragrant rice', price: 11, dietaryTags: ['halal'] },
+          { name: 'Nasi Lemak Special', description: 'Coconut rice with sambal, egg, and fried chicken', price: 'RM 12', tag: 'halal' },
+          { name: 'Nasi Goreng Kampung', description: 'Village-style fried rice with anchovies', price: 'RM 10', tag: 'spicy' },
+          { name: 'Chicken Rice', description: 'Hainanese-style steamed chicken with fragrant rice', price: 'RM 11', tag: 'halal' },
         ],
       },
       {
         name: 'Roti & Bread',
-        description: 'Freshly prepared flatbreads',
         items: [
-          { name: 'Roti Canai', description: 'Crispy flatbread with dhal curry', price: 3, dietaryTags: ['halal', 'vegetarian'] },
-          { name: 'Roti Telur', description: 'Flatbread stuffed with egg', price: 4, dietaryTags: ['halal'] },
+          { name: 'Roti Canai', description: 'Crispy flatbread with dhal curry', price: 'RM 3', tag: 'vegetarian' },
+          { name: 'Roti Telur', description: 'Flatbread stuffed with egg', price: 'RM 4', tag: 'halal' },
         ],
       },
       {
         name: 'Beverages',
-        description: 'Hot and cold drinks',
         items: [
-          { name: 'Teh Tarik', description: 'Pulled milk tea', price: 3.5, dietaryTags: ['halal', 'vegetarian'] },
-          { name: 'Kopi O', description: 'Traditional black coffee', price: 3, dietaryTags: ['halal', 'vegetarian'] },
+          { name: 'Teh Tarik', description: 'Pulled milk tea', price: 'RM 3.50', tag: 'vegetarian' },
+          { name: 'Kopi O', description: 'Traditional black coffee', price: 'RM 3', tag: 'vegetarian' },
         ],
       },
     ],
@@ -1298,8 +1297,8 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
   // Guard: temporarily hidden block types — return null so callers skip them cleanly
   if (TEMP_HIDDEN_BLOCK_TYPES.has(blockType)) return null
   switch (blockType) {
-    case 'menu-display':
-      return buildMenuDisplay(content)
+    case 'menu-food':
+      return buildMenuFood(content)
     case 'booking-widget':
       return buildBookingWidget(content, category)
     case 'class-schedule':
@@ -1796,8 +1795,8 @@ function buildBlockFromSpec(
     case 'client-logos':
       return { ...buildClientLogos(category, compositionSeed ?? 0), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     // Industry-specific blocks
-    case 'menu-display':
-      return buildMenuDisplay(content)
+    case 'menu-food':
+      return buildMenuFood(content)
     case 'booking-widget':
       return buildBookingWidget(content, category)
     case 'class-schedule':
