@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/keep-alive",
       "schedule": "*/4 * * * *"
+    },
+    {
+      "path": "/api/cron/payment-expiry",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

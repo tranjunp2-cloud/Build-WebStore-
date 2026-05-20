@@ -22,14 +22,14 @@ export function CustomerAvatar({ name, email, source, size = 40 }: Props) {
     return (
         <div
             className="flex items-center justify-center shrink-0 rounded-[8px]"
-            style={{ width: size, height: size, background: '#2f3445' }}
+            style={{ width: size, height: size, background: 'var(--dash-secondary-bg)' }}
         >
             {source === 'newsletter' ? (
-                <Mail style={{ width: Math.round(size * 0.53), height: Math.round(size * 0.53) }} className="text-[#adc6ff]" />
+                <Mail style={{ width: Math.round(size * 0.53), height: Math.round(size * 0.53), color: 'var(--dash-accent)' }} />
             ) : (
                 <span
                     className="font-extrabold select-none"
-                    style={{ fontSize: 16, color: '#adc6ff', fontFamily: 'Manrope, sans-serif' }}
+                    style={{ fontSize: 16, color: 'var(--dash-accent)', fontFamily: 'Manrope, sans-serif' }}
                 >
                     {getInitials(name, email)}
                 </span>

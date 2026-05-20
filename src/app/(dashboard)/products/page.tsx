@@ -521,7 +521,7 @@ export default function ProductsPage() {
                             </button>
                             {isDropdownOpen && (
                                 <div className="absolute top-[calc(100%+8px)] left-0 w-[189px] z-20">
-                                    <div className="absolute left-[32px] -top-[6px] w-0 h-0" style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid #1F2937' }} />
+                                    <div className="absolute left-[32px] -top-[6px] w-0 h-0" style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid var(--dash-secondary-bg)' }} />
                                     <div className="bg-[#1F2937] rounded-[2px] shadow-[0_8px_24px_rgba(25,32,56,0.1)] flex flex-col py-2">
                                         {SORT_OPTIONS.map((option) => (
                                             <button key={option} onClick={() => { setSortBy(option); setIsDropdownOpen(false) }}
@@ -621,7 +621,7 @@ export default function ProductsPage() {
                                                             <circle cx="10" cy="10" r="5" fill="#2DD4BF" />
                                                         </>
                                                     ) : (
-                                                        <circle cx="10" cy="10" r="9" fill="transparent" stroke="#374151" strokeWidth="2" className="group-hover:stroke-[#2DD4BF]/50 transition-colors" />
+                                                        <circle cx="10" cy="10" r="9" fill="transparent" stroke="var(--dash-border)" strokeWidth="2" className="group-hover:stroke-[#2DD4BF]/50 transition-colors" />
                                                     )}
                                                 </svg>
                                                 <span className={cn("text-[14px] font-medium leading-[20px] whitespace-nowrap", saleStatus === status ? "text-[#F8FAFC]" : "text-[#F8FAFC]/80")}>{status === 'All Products' ? t.dashboard.products.list.allProducts : status === 'On Sale' ? t.dashboard.products.list.onSale : t.dashboard.products.list.regularPrice}</span>
@@ -640,7 +640,7 @@ export default function ProductsPage() {
                                     <div
                                         onClick={(e) => { e.preventDefault(); setShowLowStock(!showLowStock); }}
                                         className={cn("rounded-[16px] h-[50px] flex items-center justify-between px-[17px] transition-colors cursor-pointer", showLowStock ? "bg-[#FF8904]/10" : "bg-[#0B1120]")}
-                                        style={{ border: showLowStock ? '1px solid rgba(255, 137, 4, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)' }}
+                                        style={{ border: showLowStock ? '1px solid rgba(255, 137, 4, 0.3)' : '1px solid var(--dash-border)' }}
                                     >
                                         <div className="flex items-center gap-[8px]">
                                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -788,7 +788,7 @@ export default function ProductsPage() {
                                                         product.status === 'active' ? "border-transparent" : "bg-[#1E293B]"
                                                     )}
                                                     style={{
-                                                        border: product.status === 'active' ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
+                                                        border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
                                                         background: product.status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #3989F3 7%, #378FEF 14%, #3596EC 21%, #339CE9 29%, #32A2E5 36%, #30A8E1 43%, #2FAEDE 50%, #2EB3DA 57%, #2DB9D6 64%, #2DBFD1 71%, #2CC4CD 79%, #2CC9C9 86%, #2DCFC4 93%, #2DD4BF 100%)" : undefined,
                                                         boxShadow: product.status === 'active' ? "0px 0px 12px 0px rgba(59, 130, 246, 0.4)" : undefined
                                                     }}
@@ -902,8 +902,8 @@ export default function ProductsPage() {
                                                     onClick={(e) => handleUpdateStatus(product, e)}
                                                     className="w-[42px] h-[22px] rounded-full p-[2px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden mb-[2px]"
                                                     style={{
-                                                        border: product.status === 'active' ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
-                                                        background: product.status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)" : "#1E293B",
+                                                        border: product.status === 'active' ? 'none' : '1px solid var(--dash-border)',
+                                                        background: product.status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)" : "var(--dash-secondary-bg)",
                                                         boxShadow: product.status === 'active' ? "0px 0px 10px 0px rgba(59, 130, 246, 0.35)" : undefined
                                                     }}
                                                 >

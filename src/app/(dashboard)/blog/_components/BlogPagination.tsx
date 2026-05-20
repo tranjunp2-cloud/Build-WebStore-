@@ -22,7 +22,7 @@ function ChevronLeft() {
         >
             <path
                 d="M10 4L6 8L10 12"
-                stroke="#FAFAFA"
+                stroke="currentColor"
                 strokeWidth="1"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -43,7 +43,7 @@ function ChevronRight() {
         >
             <path
                 d="M6 4L10 8L6 12"
-                stroke="#FAFAFA"
+                stroke="currentColor"
                 strokeWidth="1"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -61,9 +61,9 @@ function EllipsisIcon() {
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
         >
-            <circle cx="3.33" cy="8" r="1" fill="#FAFAFA" />
-            <circle cx="8" cy="8" r="1" fill="#FAFAFA" />
-            <circle cx="12.67" cy="8" r="1" fill="#FAFAFA" />
+            <circle cx="3.33" cy="8" r="1" fill="currentColor" />
+            <circle cx="8" cy="8" r="1" fill="currentColor" />
+            <circle cx="12.67" cy="8" r="1" fill="currentColor" />
         </svg>
     )
 }
@@ -76,7 +76,7 @@ function PageText({ children }: { children: React.ReactNode }) {
                 fontWeight: 500,
                 fontSize: 14,
                 lineHeight: '1.4285714285714286em',
-                color: '#FAFAFA',
+                color: 'var(--dash-text)',
                 display: 'block',
             }}
         >
@@ -141,8 +141,8 @@ export function BlogPagination({
                         height: 36,
                         padding: 10,
                         ...(currentPage === page ? {
-                            background: '#0B1120',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            background: 'var(--dash-bg)',
+                            border: '1px solid var(--dash-border)',
                             boxShadow: '0px 1px 2px 0px rgba(0, 0, 0, 0.1)',
                         } : {}),
                     }}
