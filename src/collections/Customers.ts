@@ -6,6 +6,28 @@ export const Customers: CollectionConfig = {
         useAsTitle: 'email',
         description: 'Shop customers (buyers). Auto-created from orders; addresses + rank editable.',
         defaultColumns: ['email', 'name', 'rank', 'phone', 'createdAt'],
+        // Payload 3.79 admin.listSearchableFields — enables search by name in list view
+        // (email is already covered by useAsTitle)
+        listSearchableFields: ['email', 'name'],
+        components: {
+            views: {
+                edit: {
+                    // Payload 3.79 custom view tab API:
+                    //   admin.components.views.edit.{key}.Component  = view component path
+                    //   admin.components.views.edit.{key}.path       = URL segment
+                    //   admin.components.views.edit.{key}.tab        = tab label + href
+                    // Chosen path: spec custom Tab (not Fallback A/B) — Payload 3.79 supports this natively.
+                    ordersTab: {
+                        Component: '@/components/admin/customers-orders-tab',
+                        path: '/orders',
+                        tab: {
+                            label: 'Orders',
+                            href: '/orders',
+                        },
+                    },
+                },
+            },
+        },
     },
     access: {
         // Authenticated users can create customers
