@@ -12,10 +12,10 @@ export default async function OrderTrackingPage({
     params,
     searchParams,
 }: {
-    params: Promise<{ slug: string; id: string }>
+    params: Promise<{ slug: string; orderNumber: string }>
     searchParams: Promise<{ token?: string }>
 }) {
-    const [{ slug, id }, sp] = await Promise.all([params, searchParams])
+    const [{ slug, orderNumber }, sp] = await Promise.all([params, searchParams])
     const token = sp.token ?? ''
     const payload = await getPayload({ config })
 
@@ -39,12 +39,11 @@ export default async function OrderTrackingPage({
     const site = siteResult.docs[0] as any
     if (!site) notFound()
 
-    const orderId = isNaN(Number(id)) ? id : Number(id)
     let order: any = null
     try {
         const result = await payload.find({
             collection: 'orders',
-            where: { id: { equals: orderId }, site: { equals: site.id } },
+            where: { orderNumber: { equals: orderNumber }, site: { equals: site.id } },
             limit: 1,
             overrideAccess: true,
             depth: 1,

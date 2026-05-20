@@ -554,7 +554,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                                 <ShoppingBag size={15} /> Continue Shopping
                             </button>
                             {(!isBT || isPaid) && (
-                                <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.id}`, isOrderSuccess)}>
+                                <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.orderNumber}`, isOrderSuccess)}>
                                     <ReceiptText size={15} /> View My Orders
                                 </button>
                             )}

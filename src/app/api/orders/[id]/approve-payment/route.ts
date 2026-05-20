@@ -84,7 +84,7 @@ export const PATCH = withAuth<RouteContext>(async (user, _request, ctx) => {
         const siteObj = typeof order.site === 'object' ? (order.site as any) : null
         const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
         const siteSlug = tenantObj?.slug ?? ''
-        const orderPageUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/sites/${siteSlug}/orders/${id}`
+        const orderPageUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/sites/${siteSlug}/orders/${order.orderNumber}`
 
         const emailPayload = paymentConfirmedEmail({
             orderNumber: order.orderNumber as string,

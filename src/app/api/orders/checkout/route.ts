@@ -243,8 +243,8 @@ export async function POST(request: Request) {
             const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
             const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
             const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
-            redirectUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.id}?token=${token}`
-            const plainUploadUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.id}`
+            redirectUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}?token=${token}`
+            const plainUploadUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
 
             const pcConfig = (site as any).paymentConfig
             payload.sendEmail(bankTransferInstructionsEmail({
