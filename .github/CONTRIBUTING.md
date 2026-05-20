@@ -4,14 +4,105 @@
 
 ---
 
+## 0. End-to-End Flow (Tổng quan)
+
+Toàn bộ luồng từ Story → Code → Deploy → QA:
+
+```
+┌─ STORY ──────────────────────────────────────────────────────────────┐
+│ PM viết docs/stories/F*.md → push staging                           │
+│     ↓ story-sync.yml                                                │
+│ Auto-create GitHub Issue (labels: user-story, wave, priority)       │
+│     ↓ UIUX + BA review → label "status:ready"                      │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ CODE ───────────────────────────────────────────────────────────────┐
+│ Dev pick issue → tạo branch: feat/FXX-YY-mô-tả                     │
+│     ↓ code + commit (conventional, lowercase, ≤72 chars)            │
+│     ↓ /ship (hoặc manual push + PR)                                 │
+│         ├─ merge staging → branch                                   │
+│         ├─ run tests + check coverage                               │
+│         ├─ pre-landing review                                       │
+│         ├─ commit + push                                            │
+│         └─ create PR → staging (auto-link issue #N)                 │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ PR AUTOMATION ──────────────────────────────────────────────────────┐
+│ pr-lifecycle.yml:                                                    │
+│     ├─ Auto-label: size (S/M/L/XL), type, area                     │
+│     ├─ Smart issue linking (story ID from title/branch)             │
+│     └─ Board → Code Review column                                   │
+│ ci.yml:                                                              │
+│     ├─ Lint → Typecheck → Test → Build                              │
+│     ├─ Quality Metrics comment (coverage, bundle, failing tests)    │
+│     └─ Docker build check                                           │
+│ codex-review.yml:                                                    │
+│     └─ AI Code Review (P1/P2 comments)                              │
+│ CODEOWNERS:                                                          │
+│     └─ Auto-request reviewer (FE/BE/Infra/Docs)                    │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ REVIEW + MERGE ─────────────────────────────────────────────────────┐
+│ Reviewer approve + CI pass → label "ready-to-merge"                 │
+│     ↓ Dev/PM merge PR                                               │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ DEPLOY + HEALTH CHECK ─────────────────────────────────────────────┐
+│ Push staging → ci.yml → sync secrets → deploy DigitalOcean          │
+│     ↓ staging-health.yml (auto-trigger)                             │
+│         ├─ HTTP health, DB check, env vars                          │
+│         └─ Lark notify result                                       │
+│     ↓ smart-notify → Lark CI/CD group                               │
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ QA TESTING ─────────────────────────────────────────────────────────┐
+│ issue-lifecycle.yml:                                                 │
+│     PR merged → linked issues auto-label "qa:pending"               │
+│     Board → QA Testing column                                       │
+│     ↓ QC tests on staging                                           │
+│         ├─ Pass → QC close issue → Done ✅                          │
+│         └─ Fail → label "qa:failed" → bug report → dev fix → PR mới│
+└──────────────────────────────────────────────────────────────────────┘
+      ↓
+┌─ RELEASE ────────────────────────────────────────────────────────────┐
+│ All QA pass → PM create PR: staging → main                          │
+│     ↓ CI pass → merge → deploy production                           │
+│     ↓ release-changelog.yml → auto-generate changelog               │
+│     ↓ Lark notify: production deployed                              │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Lark Notification Channels
+
+| Channel | Nhận thông báo khi |
+|---------|-------------------|
+| **[PrimeWeb - V2] CI/CD** | Deploy, CI fail, health check |
+| **[Prime Web v2] Task - Report** | PR opened/merged, issue updates |
+| **[ECH MY] Squad Team** | Sprint rituals (start, standup, review) |
+
+### Stale Detection (Tự động)
+
+| Đối tượng | Điều kiện | Hành động |
+|-----------|-----------|-----------|
+| PR chưa review | >4h | Lark reminder 2x/ngày |
+| PR không hoạt động | >5 ngày | Label "stale" |
+| Issue assigned, không update | >3 ngày | Lark reminder |
+| Issue chưa assign | >24h | Alert PM |
+
+---
+
 ## 1. Git Rules
 
 ### Branch Naming
+
+Mỗi branch = **1 User Story hoặc 1 task nhỏ**. KHÔNG tạo branch cha cho cả Feature.
+
 ```
-feature/F01-ai-builder     # Feature mới (FXX = feature code, bot dùng để auto-link issue)
-feat/F07-template-gallery  # Cũng OK — bot nhận FXX từ tên branch
-fix/F01-login-redirect     # Bug fix
-chore/deps-upgrade         # Cleanup, CI, docs (bot skip check issue)
+feat/F01-01-generate-site     # US-F01-01: 1 story = 1 branch = 1 PR
+feat/F01-02-store-setup       # US-F01-02: story tiếp theo
+feat/F08-03-bulk-create       # US-F08-03: Products bulk create
+fix/F01-builder-crash         # Bug fix cho F01
+chore/deps-upgrade            # Cleanup, CI, docs (bot skip check issue)
 ```
 
 ### Commit Convention
@@ -63,12 +154,16 @@ Backlog → Review (UIUX+BA) → In Progress → Code Review → QA Testing → 
               └── review:rejected
 ```
 
-### Branch Flow
+### Branch Flow — Merge thẳng staging
 ```
-feat/F05-editor ─→ PR vào staging ─→ review ─→ merge ─→ QA Testing ─→ QC close → Done
-                                                           ↓
-                                              main (release only)
+feat/F01-01-generate-site ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+feat/F01-02-store-setup   ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+feat/F08-01-product-crud  ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+                                                                              ↓
+                                              Tất cả pass → PR staging → main (release v1.0)
 ```
+
+**KHÔNG dùng feature branch cha.** Mỗi US merge thẳng staging → QA test ngay → feedback nhanh.
 
 ---
 
@@ -94,10 +189,11 @@ feat/F05-editor ─→ PR vào staging ─→ review ─→ merge ─→ QA Test
 
 ### Dev
 1. Pick issues ở **In Progress** (đã có label `status:ready`)
-2. Tạo branch: `feature/F01-mô-tả` → code → commit → push
-3. Tạo PR vào staging: title có `[US-F01-03]` → bot auto-link
-4. Đợi review + CI pass → merge khi có label `ready-to-merge`
-5. Nếu QC gắn `qa:failed` → check comment QC → fix → tạo PR mới
+2. Tạo branch từ staging: `feat/F01-01-generate-site` (1 US = 1 branch)
+3. Code → commit → push
+4. Tạo PR vào **staging**: title `feat(F01): [US-F01-01] generate site` → bot auto-link
+5. CI pass + reviewer approve → merge → staging auto-deploy
+6. Nếu QC gắn `qa:failed` → check comment QC → tạo branch fix mới → PR mới vào staging
 
 ### QC (Quality Control)
 1. Check issues ở **QA Testing** (có label `qa:pending`)

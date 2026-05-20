@@ -1,169 +1,109 @@
+import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import { Suspense } from 'react'
+import { OverviewSkeleton, AnalyticsSkeleton, SEOSkeleton } from '@/components/dashboard/DashboardSkeleton'
+import { OverviewView } from '@/components/dashboard/views/OverviewView'
+import { AnalyticsView } from '@/components/dashboard/views/AnalyticsView'
+import { SEOView } from '@/components/dashboard/views/SEOView'
+import { DashboardTabs } from '@/components/dashboard/DashboardTabs'
+import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
+import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
+import { DashboardTabContent, TabPanel } from '@/components/dashboard/DashboardTabContent'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { startOfDay, subDays } from 'date-fns'
+import { getCurrentTenantId } from '@/lib/auth'
 
-// Force dynamic — requires auth context + getPayload() at runtime
+export async function generateMetadata(): Promise<Metadata> {
+    const cookieStore = await cookies()
+    const locale = cookieStore.get('prefer_lang')?.value ?? 'en'
+    const isMs = locale === 'ms'
+    return {
+        title: isMs ? 'Papan Pemuka | PrimeWeb' : 'Dashboard | PrimeWeb',
+        description: isMs
+            ? 'Pantau prestasi kedai anda dan urus perniagaan dalam talian.'
+            : 'Monitor your store performance and manage your online business.',
+    }
+}
+
 export const dynamic = 'force-dynamic'
-
-import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
-import type { PlatformUser } from '@/types/user'
-import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
-import { DashboardStats } from '@/components/dashboard/DashboardStats'
-import { DashboardActionList } from '@/components/dashboard/DashboardActionList'
-import { SEOHealthWidget } from '@/components/dashboard/SEOHealthWidget'
-import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
-import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
-import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
-import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
-import { DashboardSiteGrid } from '@/components/dashboard/DashboardSiteGrid'
-import { AISmartInsights } from '@/components/dashboard/AISmartInsights'
-
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-export default async function DashboardPage({ searchParams }: Props) {
-    const user = await getCurrentUser()
-    const tenantId = await getCurrentTenantId()
-    const payload = await getPayload({ config })
-    
-    // Using Next.js 15 asynchronous searchParams
+export default async function DashboardRoot({ searchParams }: Props) {
     const resolvedParams = await searchParams
-    const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
+    const rawTab = typeof resolvedParams.tab === 'string' ? resolvedParams.tab : 'overview'
 
-    const typedUser = user as PlatformUser | null
-    const userName = typedUser?.firstName || typedUser?.email?.split('@')[0] || 'User'
-
-    let totalSites = 0
-    let recentSites: any[] = []
-    if (tenantId) {
-        const sitesResult = await payload.find({ 
-            collection: 'sites', 
-            where: { tenant: { equals: tenantId } }, 
-            sort: '-updatedAt',
-            limit: 6 
-        })
-        totalSites = sitesResult.totalDocs
-        recentSites = sitesResult.docs
-    }
-
-    if (totalSites === 0) {
-        return (
-            <div className="space-y-8">
-                <DashboardGreeting userName={userName} />
-                <DashboardEmptyState />
-            </div>
-        )
-    }
-
-    const now = new Date()
-    let startDate = subDays(startOfDay(now), 7)
-    let daysDiff = 7
-    if (period === 'today') {
-        startDate = startOfDay(now)
-        daysDiff = 1
-    }
-    if (period === '30d') {
-        startDate = subDays(startOfDay(now), 30)
-        daysDiff = 30
-    }
-
-    const prevStartDate = subDays(startDate, daysDiff)
-
-    let views = 0
-    let prevViews = 0
-    let leads = 0
-    let engagement = 0
-    let revenue = 0
-    let pendingOrdersCount = 0
-    let pendingOrders: any[] = []
+    // We fetch preferences here so we can pass it down to modal safely
     let dashboardPreferences: string[] | undefined = undefined
-
+    let hasUsableSites = false
+    const tenantId = await getCurrentTenantId()
     if (tenantId) {
-        const tenantResult: any = await payload.findByID({ collection: 'tenants', id: tenantId })
-        dashboardPreferences = tenantResult?.settings?.dashboardPreferences
+        const payload = await getPayload({ config })
+        const tenantResult = await payload.findByID({ collection: 'tenants', id: tenantId })
+        dashboardPreferences = (tenantResult as { settings?: { dashboardPreferences?: string[] } })?.settings?.dashboardPreferences
 
-        const [viewsRes, prevViewsRes, leadsRes, engagementRes, ordersRes, pendingOrdersRes] = await Promise.all([
-            payload.count({ 
-                collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'pageview' } }
-            }),
-            payload.count({ 
-                collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevStartDate.toISOString(), less_than: startDate.toISOString() }, event: { equals: 'pageview' } }
-            }),
-            payload.count({ 
-                collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'click' } }
-            }),
-            payload.count({ 
-                collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { in: ['add_to_cart', 'checkout'] } }
-            }),
-            payload.find({ 
-                collection: 'orders', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, status: { in: ['paid', 'completed'] } }, 
-                limit: 2000 
-            }),
-            payload.find({ 
-                collection: 'orders', 
-                where: { tenant: { equals: tenantId }, status: { equals: 'pending' } }, 
-                sort: '-createdAt', 
-                limit: 5 
-            })
-        ])
-
-        views = viewsRes.totalDocs
-        prevViews = prevViewsRes.totalDocs
-        leads = leadsRes.totalDocs
-        engagement = engagementRes.totalDocs
-
-        ordersRes.docs.forEach((doc: any) => {
-            if (doc.total) revenue += doc.total
+        const usableSiteCount = await payload.count({
+            collection: 'sites',
+            where: {
+                and: [
+                    { tenant: { equals: tenantId } },
+                    {
+                        or: [
+                            { generationStatus: { equals: 'completed' } },
+                            { generationStatus: { equals: 'none' } },
+                            { generationStatus: { equals: null } },
+                            { generationStatus: { exists: false } },
+                        ],
+                    },
+                ],
+            },
         })
-
-        pendingOrdersCount = pendingOrdersRes.totalDocs
-        pendingOrders = pendingOrdersRes.docs
+        hasUsableSites = usableSiteCount.totalDocs > 0
     }
+
+    // Force overview tab when no usable sites — prevents empty analytics/seo views via direct URL
+    const tab = hasUsableSites ? rawTab : 'overview'
 
     return (
-        <Suspense fallback={<DashboardSkeleton />}>
-            <div className="space-y-8">
-                {/* Header: Greeting + Period Selector */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <DashboardGreeting userName={userName} />
-                    <div className="flex items-center gap-4">
-                        <PeriodSelector />
-                        <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+        <div className="space-y-6">
+            <DashboardTabContent defaultTab={tab}>
+                {/* Universal Page Header / Toolbar — hidden when no usable sites */}
+                {hasUsableSites && (
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <DashboardTabs />
+
+                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            <PeriodSelector />
+                            <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                        </div>
                     </div>
-                </div>
+                )}
 
-                {/* AI Insights & Alerts */}
-                <AISmartInsights views={views} prevViews={prevViews} />
-
-                {/* Stats Cards */}
-                <DashboardStats 
-                    views={views}
-                    leads={leads}
-                    engagement={engagement}
-                    revenue={revenue}
-                    pendingOrdersCount={pendingOrdersCount}
-                    currency="MYR"
-                    preferences={dashboardPreferences}
-                />
-
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <DashboardActionList pendingOrders={pendingOrders} />
-                    <SEOHealthWidget score={68} />
-                </div>
-
-                {/* Recent Sites */}
-                <div className="mt-8">
-                    <DashboardSiteGrid sites={recentSites} />
-                </div>
-            </div>
-        </Suspense>
+                {/* Render all tabs — TabPanel hides inactive via CSS for instant switching.
+                   Note: PeriodSelector still uses router.push() which re-renders all tabs.
+                   This is an accepted tradeoff — period changes are rare (1-2x/session)
+                   while tab switches are frequent and must be instant. */}
+                <TabPanel tabId="overview">
+                    <Suspense fallback={<OverviewSkeleton />}>
+                        <OverviewView searchParams={searchParams} />
+                    </Suspense>
+                </TabPanel>
+                {hasUsableSites && (
+                    <>
+                        <TabPanel tabId="analytics">
+                            <Suspense fallback={<AnalyticsSkeleton />}>
+                                <AnalyticsView searchParams={searchParams} />
+                            </Suspense>
+                        </TabPanel>
+                        <TabPanel tabId="seo">
+                            <Suspense fallback={<SEOSkeleton />}>
+                                <SEOView />
+                            </Suspense>
+                        </TabPanel>
+                    </>
+                )}
+            </DashboardTabContent>
+        </div>
     )
 }

@@ -32,12 +32,12 @@ export const POST = withAuth(async (_user, request) => {
             )
         }
 
-        // Get all published pages for this site
+        // Get all pages for this site (exclude noIndex pages)
         const pagesResult = await payload.find({
             collection: 'pages',
             where: {
                 site: { equals: siteId },
-                _status: { equals: 'published' }
+                'seo.noIndex': { not_equals: true },
             },
             limit: 200,
             depth: 0,
@@ -77,7 +77,7 @@ ${urls}
     } catch (error: any) {
         console.error('[SEO Sitemap Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Sitemap generation failed' } },
             { status: 500 }
         )
     }

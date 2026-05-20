@@ -1,0 +1,363 @@
+import { describe, it, expect, beforeEach, vi, Mock } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
+import { useEditorStore } from '@/store/editorStore'
+import { I18nProvider } from '@/i18n'
+import { Toaster, toast } from 'sonner'
+import '@testing-library/jest-dom'
+
+// Mock fetch
+global.fetch = vi.fn()
+
+// Mock sonner
+vi.mock('sonner', () => {
+    const toast = vi.fn() as any
+    toast.success = vi.fn()
+    toast.error = vi.fn()
+    return {
+        toast,
+        Toaster: () => null,
+    }
+})
+
+describe('PageManagerPanel', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        useEditorStore.getState().reset()
+        useEditorStore.getState().init('site-123', [], {}, 'Test Site')
+        useEditorStore.getState().setPages([
+            {
+                id: 'page-1',
+                title: 'Trang chủ',
+                slug: 'home',
+                status: 'published',
+                isHomepage: true,
+                isVisible: true,
+                updatedAt: new Date().toISOString(),
+            },
+            {
+                id: 'page-2',
+                title: 'About Us',
+                slug: 'about',
+                status: 'draft',
+                isVisible: true,
+                updatedAt: new Date().toISOString(),
+            },
+        ])
+    })
+
+    const TestWrapper = () => (
+        <I18nProvider defaultLocale="en">
+            <PageManagerPanel
+                siteId="site-123"
+                currentPageId="page-1"
+                onPageSelected={vi.fn()}
+            />
+        </I18nProvider>
+    )
+
+    it('TC-F05.06: Initializes Page Grid properly', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+
+        // Assert
+        expect(screen.getByText('Trang chủ')).toBeInTheDocument() // page title from store data
+        expect(screen.getByText('About Us')).toBeInTheDocument()
+        // Check badges — current page shows "Editing", others show status
+        expect(screen.getByText('Editing')).toBeInTheDocument() // Page 1 (current)
+        expect(screen.getByText('Draft')).toBeInTheDocument() // Page 2
+    })
+
+    // TC-F05-02-14: GH-864 panel header + micro-copy + no search
+    it('TC-F05-02-14a: panel title reads "Page Library" (renamed from Page Manager)', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+        // Assert — title must reflect rename
+        expect(screen.getByText('Page Library')).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-14b: micro-copy description is visible below the title', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+        // Assert — micro-copy from i18n key pageManagerPanel.description
+        expect(screen.getByText(/internal editing/)).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-14c: search input is NOT present (removed per GH-864)', () => {
+        // Arrange & Act
+        render(<TestWrapper />)
+        // Assert — search input must be gone
+        expect(screen.queryByPlaceholderText(/[Ss]earch/)).not.toBeInTheDocument()
+    })
+
+    it('TC-F05-02-14d: multiple published pages on published site all show Live badge', () => {
+        // Arrange — two published pages; menu membership is irrelevant to badge logic
+        useEditorStore.getState().setPages([
+            { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
+            { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-99"
+                    siteStatus="published"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+        // Assert — all published pages show Live when site is published
+        const liveBadges = screen.getAllByText('Live')
+        expect(liveBadges.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('TC-F05-02-14e: published page on published site shows Live badge regardless of menu', () => {
+        // Arrange — page-2 published, site published; menu membership is irrelevant to status
+        useEditorStore.getState().setPages([
+            { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-99"
+                    siteStatus="published"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+        // Assert — page.status=published + siteStatus=published → Live (menu state does not affect badge)
+        expect(screen.getByText('Live')).toBeInTheDocument()
+        expect(screen.queryByText('Draft')).not.toBeInTheDocument()
+    })
+
+    it('TC-F05-02-15d: published page on unpublished site shows Draft badge', () => {
+        // Arrange — page published but site not yet published
+        useEditorStore.getState().setPages([
+            { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-99"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+        // Assert — site not published → Draft even if page.status is published
+        expect(screen.getByText('Draft')).toBeInTheDocument()
+        expect(screen.queryByText('Live')).not.toBeInTheDocument()
+    })
+
+    it('TC-F05.07: Adds a new page and syncs state', async () => {
+        // Arrange
+        const mockResponse = {
+            ok: true,
+            json: async () => ({
+                page: {
+                    id: 'page-3',
+                    title: 'Khuyến mãi',
+                    slug: 'khuyen-mai',
+                    status: 'draft',
+                    isVisible: true,
+                    updatedAt: new Date().toISOString()
+                }
+            })
+        }
+        ;(global.fetch as any).mockResolvedValueOnce(mockResponse)
+
+        render(<TestWrapper />)
+
+        // Act
+        fireEvent.click(screen.getByText('Add New Page'))
+        
+        const input = screen.getByPlaceholderText('Page name (e.g. Promotions)')
+        fireEvent.change(input, { target: { value: 'Khuyến mãi' } })
+        
+        const form = input.closest('form')!
+        fireEvent.submit(form)
+
+        // Assert
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith('/api/sites/site-123/pages', expect.objectContaining({
+                method: 'POST',
+                body: expect.stringContaining('khuyen-mai')
+            }))
+        })
+        expect(useEditorStore.getState().pages).toHaveLength(3)
+        expect(useEditorStore.getState().pages[2].slug).toBe('khuyen-mai')
+    })
+
+    it('TC-F05.08: Catch Slug conflict error during creation (Mocking UI fallback)', async () => {
+        // Arrange: mock 409 conflict
+        const mockResponse = {
+            ok: false,
+            status: 409,
+            text: async () => 'Page slug already exists in this site',
+        }
+        ;(global.fetch as any).mockResolvedValueOnce(mockResponse)
+
+        render(<TestWrapper />)
+
+        // Act
+        fireEvent.click(screen.getByText('Add New Page'))
+        const input = screen.getByPlaceholderText('Page name (e.g. Promotions)')
+        fireEvent.change(input, { target: { value: 'Duplicate Slug' } })
+        const form = input.closest('form')!
+        fireEvent.submit(form)
+
+        // Assert
+        await waitFor(() => {
+            expect(toast.error).toHaveBeenCalledWith('Page slug already exists in this site')
+        })
+        expect(useEditorStore.getState().pages).toHaveLength(2) // No new page added
+    })
+
+    it('TC-F05.09: Soft deletes a page, updates store, and triggers Toast Undo', async () => {
+        // Arrange
+        const mockResponse = { ok: true }
+        ;(global.fetch as any).mockResolvedValueOnce(mockResponse)
+        
+        render(<TestWrapper />)
+
+        // Act: Open delete confirmation for "About Us" (page-2)
+        // Note: Target by Title to find correct buttons
+        const aboutUsContainer = screen.getByText('About Us').closest('div[class*="rounded-xl"]')!
+        const deleteButton = aboutUsContainer.querySelector('button[title="Delete page"]')!
+        fireEvent.click(deleteButton)
+
+        // Wait for modal and confirm
+        // Modal has a delete button with Trash2 icon — find by the modal container
+        const modal = screen.getByText('Delete this page?').closest('div[class*="max-w"]')!
+        const confirmDeleteButton = modal.querySelectorAll('button')[1] // second button is confirm
+        fireEvent.click(confirmDeleteButton)
+
+        // Assert API Request
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith('/api/sites/site-123/pages/page-2', expect.objectContaining({
+                method: 'PATCH',
+                body: expect.stringContaining('deletedAt')
+            }))
+        })
+
+        // Assert toast called with undo
+        expect(toast).toHaveBeenCalledWith('Page deleted. Undo?', expect.objectContaining({
+            action: expect.objectContaining({ label: 'Undo' })
+        }))
+
+        // Assert UI hides it - About us is gone from store view
+        expect(useEditorStore.getState().pages.find(p => p.id === 'page-2')?.deletedAt).toBeTruthy()
+    })
+
+    it('TC-F05-02-15e: published page with isVisible=false on live site shows Live badge + Hidden sublabel', () => {
+        // Arrange — page published + visible:false; site published
+        useEditorStore.getState().setPages([
+            { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
+            { id: 'page-2', title: 'Secret', slug: 'secret', status: 'published', isVisible: false, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-1"
+                    siteStatus="published"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+
+        // Assert — Live badge present AND Hidden sublabel (amber badge) next to it.
+        // Note: pm.hidden ("Hidden") also appears as the toggle button text, so use getAllByText.
+        expect(screen.getByText('Live')).toBeInTheDocument()
+        const hiddenElements = screen.getAllByText('Hidden')
+        // At least 2: the amber sublabel badge + the visibility toggle button text
+        expect(hiddenElements.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('TC-F05-02-15f: published page not in nav menu on live site shows Live badge + No Link sublabel', () => {
+        // Arrange — page published + visible; site published; header has no links to page-2
+        useEditorStore.getState().setPages([
+            { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
+            { id: 'page-2', title: 'Unlisted', slug: 'unlisted', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+        // headerBlock with links only pointing to Home (slug-based, actual data format)
+        useEditorStore.getState().init(
+            'site-123',
+            [],
+            {},
+            'Test Site',
+            { blockType: 'navigation', links: [{ label: 'Home', url: '/' }] },
+        )
+        useEditorStore.getState().setPages([
+            { id: 'page-1', title: 'Home', slug: 'home', status: 'published', isHomepage: true, isVisible: true, updatedAt: new Date().toISOString() },
+            { id: 'page-2', title: 'Unlisted', slug: 'unlisted', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-1"
+                    siteStatus="published"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+
+        // Assert — Live badge present AND No Link sublabel for page-2
+        const liveCount = screen.getAllByText('Live').length
+        expect(liveCount).toBeGreaterThanOrEqual(1)
+        expect(screen.getByText('No Link')).toBeInTheDocument()
+    })
+
+    it('TC-F05-02-15g: published page on unpublished site shows Draft badge with site-specific tooltip', () => {
+        // Arrange — page published but site not published
+        useEditorStore.getState().setPages([
+            { id: 'page-2', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: new Date().toISOString() },
+        ])
+
+        render(
+            <I18nProvider defaultLocale="en">
+                <PageManagerPanel
+                    siteId="site-123"
+                    currentPageId="page-99"
+                    siteStatus="draft"
+                    onPageSelected={vi.fn()}
+                />
+            </I18nProvider>,
+        )
+
+        // Assert — shows Draft (not Live) since site is unpublished
+        expect(screen.getByText('Draft')).toBeInTheDocument()
+        expect(screen.queryByText('Live')).not.toBeInTheDocument()
+    })
+
+    it('TC-F05.10: Toggling Visibility flag (Hide Page)', async () => {
+        // Arrange
+        const mockResponse = { ok: true }
+        ;(global.fetch as any).mockResolvedValueOnce(mockResponse)
+        
+        render(<TestWrapper />)
+
+        // Act: Find eye button for 'About Us'
+        const aboutUsContainer = screen.getByText('About Us').closest('div[class*="rounded-xl"]')!
+        const hideButton = aboutUsContainer.querySelector('button[title="Hide page"]')!
+        
+        fireEvent.click(hideButton)
+
+        // Assert
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenCalledWith('/api/sites/site-123/pages/page-2', expect.objectContaining({
+                method: 'PATCH',
+                body: JSON.stringify({ isVisible: false })
+            }))
+        })
+
+        expect(useEditorStore.getState().pages.find(p => p.id === 'page-2')?.isVisible).toBe(false)
+    })
+})

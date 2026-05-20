@@ -6,7 +6,14 @@ import React from 'react'
 vi.mock('@/i18n', () => ({
     useI18n: () => ({
         locale: 'en',
+        setLocale: vi.fn(),
         toggleLocale: vi.fn(),
+        t: {
+            cms: { profile: 'Profile', logout: 'Logout' },
+            dashboard: { overview: { greeting: 'Good' } },
+        },
+        tp: vi.fn(),
+        ti: vi.fn(),
     }),
     I18nProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -25,6 +32,15 @@ vi.mock('next/link', () => ({
 
 vi.mock('@/components/dashboard/NotificationBell', () => ({
     NotificationBell: () => <div data-testid="notification-bell">Bell</div>,
+}))
+
+vi.mock('@/app/(dashboard)/actions', () => ({
+    logoutAction: vi.fn(() => Promise.resolve({ success: true })),
+}))
+
+vi.mock('@/providers/theme-provider', () => ({
+    useTheme: () => ({ theme: 'dark', toggle: vi.fn() }),
+    ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 // ── Imports ─────────────────────────────────────────────────────────────
@@ -65,29 +81,38 @@ describe('F18 CMS Core Layout', () => {
         it('[TC-F18.01] Renders Desktop sidebar and links correctly', () => {
             render(<DashboardSidebar {...defaultProps} />)
             expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0)
-            expect(screen.getAllByText('Products').length).toBeGreaterThan(0)
-            
+            // v1.0: Products/Orders removed — verify "My Website" and Settings group present
+            expect(screen.getAllByText('My Website').length).toBeGreaterThan(0)
+            expect(screen.getAllByRole('button', { name: /Settings/i }).length).toBeGreaterThan(0)
+
             // Check hrefs
             const dashboardLinks = screen.getAllByRole('link', { name: /Dashboard/i })
             expect(dashboardLinks[0]).toHaveAttribute('href', '/dashboard')
         })
 
-        it('[TC-F18.21] Expands My Webstore to reveal Editor and Blog', () => {
+        it('[TC-F18.21] Expands My Website to reveal Editor and Blog', () => {
             render(<DashboardSidebar {...defaultProps} />)
-            
-            const webstoreBtn = screen.getAllByRole('button', { name: /My Webstore/i })[0]
-            expect(webstoreBtn).toHaveAttribute('aria-expanded', 'false')
-            
-            fireEvent.click(webstoreBtn)
-            expect(webstoreBtn).toHaveAttribute('aria-expanded', 'true')
-            
+
+            const websiteBtn = screen.getAllByRole('button', { name: /My Website/i })[0]
+            expect(websiteBtn).toHaveAttribute('aria-expanded', 'false')
+
+            fireEvent.click(websiteBtn)
+            expect(websiteBtn).toHaveAttribute('aria-expanded', 'true')
+
             expect(screen.getAllByText('Editor').length).toBeGreaterThan(0)
             expect(screen.getAllByText('Blog').length).toBeGreaterThan(0)
         })
 
         it('[TC-F18.10] Toggles Language (MY/EN)', () => {
             const toggleLocaleMock = vi.fn()
-            vi.spyOn(i18n, 'useI18n').mockReturnValue({ locale: 'en', toggleLocale: toggleLocaleMock, t: {} as any })
+            vi.spyOn(i18n, 'useI18n').mockReturnValue({ 
+                locale: 'en', 
+                setLocale: vi.fn(), 
+                toggleLocale: toggleLocaleMock, 
+                t: { cms: { profile: 'Profile', logout: 'Logout' }, dashboard: { overview: { greeting: 'Good' } } } as any,
+                tp: vi.fn(),
+                ti: vi.fn()
+            })
             
             render(<DashboardSidebar {...defaultProps} />)
             
@@ -165,7 +190,7 @@ describe('F18 CMS Core Layout', () => {
             // Click Logout
             fireEvent.click(screen.getByText('Logout'))
             
-            expect(global.fetch).toHaveBeenCalledWith('/api/users/logout', expect.any(Object))
+            expect(global.fetch).toHaveBeenCalledWith('/api/auth/logout', expect.any(Object))
             
             await waitFor(() => {
                 expect(window.location.href).toBe('/login')

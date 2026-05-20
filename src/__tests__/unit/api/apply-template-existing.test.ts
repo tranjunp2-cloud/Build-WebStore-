@@ -1,0 +1,952 @@
+/**
+ * Unit Tests — POST /api/ai/apply-template
+ *
+ * Coverage:
+ *   TC-F07.039 — Apply template to existing site (smart mapping)
+ *   TC-F07.016 — Unauthorized access blocked (401/403)
+ *   TC-F07.023 — New site creation from template (backward compat)
+ *   TC-F07.022 — Rate limit protection (429)
+ *   TC-F07.050 — GH-731: service-cards empty titles coerced before payload.update on apply-template
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest } from 'next/server'
+
+// ── Mocks — MUST be declared before any imports that trigger module resolution ──
+
+// Bypass withAuth HOC — inject authenticated user directly
+let mockUser: Record<string, unknown> = {
+    id: 'user-42',
+    email: 'owner@example.com',
+    tenants: [{ tenant: { id: 'tenant-99' }, role: 'owner', status: 'active' }],
+}
+
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => handler(mockUser, req, ctx)
+    }),
+    getCurrentUser: vi.fn().mockImplementation(() => Promise.resolve(mockUser)),
+}))
+
+// Rate limiter — controlled per test via mockRateLimitAllowed flag
+let mockRateLimitAllowed = true
+
+vi.mock('@/lib/rateLimit', () => ({
+    checkRateLimit: vi.fn().mockImplementation(() => ({
+        allowed: mockRateLimitAllowed,
+        remaining: mockRateLimitAllowed ? 19 : 0,
+        resetAt: Date.now() + 3_600_000,
+    })),
+}))
+
+// Payload CMS — controlled via shared mock state below
+vi.mock('@payload-config', () => ({ default: {} }))
+
+vi.mock('payload', () => ({
+    getPayload: vi.fn().mockImplementation(async () => mockPayloadInstance),
+}))
+
+// ── Shared mock state ────────────────────────────────────────────────────────
+
+const DEFAULT_TEMPLATE = {
+    id: 'tpl-modern',
+    name: 'Modern Business',
+    category: 'business',
+    usageCount: 5,
+    defaultTheme: {
+        primaryColor: '#6366f1',
+        secondaryColor: '#d946ef',
+        fontHeading: 'Outfit',
+        fontBody: 'Inter',
+        colorMode: 'dark',
+    },
+    defaultBlocks: [
+        { blockType: 'hero', headline: 'Welcome' },
+        { blockType: 'features', items: [] },
+    ],
+}
+
+const DEFAULT_TENANT = { id: 'tenant-99', name: 'Acme Store' }
+
+const DEFAULT_SITE = {
+    id: 101,
+    name: 'My Site',
+    tenant: { id: 'tenant-99' }, // object form (populated relationship)
+    status: 'published',
+}
+
+const DEFAULT_HOMEPAGE = {
+    id: 201,
+    slug: 'home',
+    isHomepage: true,
+    layout: [
+        { blockType: 'hero', variant: 'centered', headline: 'Old Hero' },
+        { blockType: 'footer', logoText: 'Old Footer' },
+    ],
+}
+
+// Mutable references — reset in beforeEach, overridden in specific tests
+let mockTemplate: Record<string, unknown> | null = { ...DEFAULT_TEMPLATE }
+let mockTenant: Record<string, unknown> | null = { ...DEFAULT_TENANT }
+let mockSite: Record<string, unknown> | null = { ...DEFAULT_SITE }
+let mockHomepage: Record<string, unknown> | null = { ...DEFAULT_HOMEPAGE }
+let mockCreatedSite = { id: 999, name: DEFAULT_TEMPLATE.name }
+
+const mockTransaction = {
+    commitTransaction: vi.fn().mockResolvedValue(undefined),
+    rollbackTransaction: vi.fn().mockResolvedValue(undefined),
+}
+
+const mockPayloadInstance = {
+    findByID: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+        if (collection === 'templates') return mockTemplate
+        if (collection === 'sites') return mockSite
+        if (collection === 'pages') return mockHomepage
+        return null
+    }),
+    find: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+        if (collection === 'tenants') return { docs: mockTenant ? [mockTenant] : [] }
+        return { docs: [] }
+    }),
+    create: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
+        if (collection === 'sites') return mockCreatedSite
+        return { id: 1000 + Math.random() }
+    }),
+    update: vi.fn().mockResolvedValue({}),
+    delete: vi.fn().mockResolvedValue({}),
+    db: {
+        beginTransaction: vi.fn().mockResolvedValue(mockTransaction),
+        drizzle: {
+            // Simulates: SELECT id FROM pages WHERE site_id = ? AND deleted_at IS NULL LIMIT 100
+            execute: vi.fn().mockImplementation(async () => ({
+                rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [],
+            })),
+        },
+    },
+}
+
+// ── Route handler — imported AFTER all mocks ─────────────────────────────────
+
+import { POST } from '@/app/api/ai/apply-template/route'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function makeRequest(body: Record<string, unknown>) {
+    return new NextRequest('http://localhost:3000/api/ai/apply-template', {
+        method: 'POST',
+        body: JSON.stringify(body),
+    })
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('POST /api/ai/apply-template', () => {
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+
+        // Reset all control flags and mock state to known defaults
+        mockRateLimitAllowed = true
+        mockUser = {
+            id: 'user-42',
+            email: 'owner@example.com',
+            tenants: [{ tenant: { id: 'tenant-99' }, role: 'owner', status: 'active' }],
+        }
+        mockTemplate = { ...DEFAULT_TEMPLATE }
+        mockTenant = { ...DEFAULT_TENANT }
+        mockSite = { ...DEFAULT_SITE }
+        mockHomepage = { ...DEFAULT_HOMEPAGE }
+        mockCreatedSite = { id: 999, name: DEFAULT_TEMPLATE.name }
+
+        // Re-wire mock implementations after clearAllMocks resets them
+        mockPayloadInstance.findByID.mockImplementation(async ({ collection }: { collection: string }) => {
+            if (collection === 'templates') return mockTemplate
+            if (collection === 'sites') return mockSite
+            if (collection === 'pages') return mockHomepage
+            return null
+        })
+        mockPayloadInstance.find.mockImplementation(async ({ collection }: { collection: string }) => {
+            if (collection === 'tenants') return { docs: mockTenant ? [mockTenant] : [] }
+            return { docs: [] }
+        })
+        mockPayloadInstance.create.mockImplementation(async ({ collection }: { collection: string }) => {
+            if (collection === 'sites') return mockCreatedSite
+            return { id: 1000 }
+        })
+        mockPayloadInstance.update.mockResolvedValue({})
+        mockPayloadInstance.delete.mockResolvedValue({})
+        mockPayloadInstance.db.drizzle.execute.mockImplementation(async () => ({
+            rows: mockHomepage ? [{ id: (mockHomepage as Record<string, unknown>).id }] : [],
+        }))
+    })
+
+    // ── TC-F07.022: Rate limiting ─────────────────────────────────────────────
+
+    // ── TC-F07.022: Rate limit exceeded → 429 ──────────────────────────────
+    describe('[TC-F07.022] Rate limit protection', () => {
+
+        it('returns 429 when user has exceeded 20 calls per hour', async () => {
+            // Arrange
+            mockRateLimitAllowed = false
+            const req = makeRequest({ templateId: 'tpl-modern' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(429)
+            expect(body.error).toMatch(/rate limit/i)
+            expect(mockPayloadInstance.create).not.toHaveBeenCalled()
+            expect(mockPayloadInstance.update).not.toHaveBeenCalled()
+        })
+    })
+
+    // ── Validation errors ─────────────────────────────────────────────────────
+
+    describe('Input validation', () => {
+
+        it('returns 400 with VALIDATION_ERROR when templateId is missing', async () => {
+            // Arrange
+            const req = makeRequest({ siteId: '101' }) // templateId absent
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(400)
+            expect(body.error.code).toBe('VALIDATION_ERROR')
+            expect(body.error.details.fieldErrors).toHaveProperty('templateId')
+        })
+
+        it('returns 400 with VALIDATION_ERROR when body is empty JSON object', async () => {
+            // Arrange
+            const req = makeRequest({})
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(400)
+            expect(body.error.code).toBe('VALIDATION_ERROR')
+        })
+    })
+
+    // ── TC-F07.023: Backward compat — create new site ─────────────────────────
+
+    describe('[TC-F07.023] New site creation from template (no siteId)', () => {
+
+        it('returns 200 with success:true and no "applied" field when siteId is omitted', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(body.success).toBe(true)
+            expect(body.siteId).toBe(999)
+            expect(body.siteName).toBe('Modern Business')
+            expect(body.templateName).toBe('Modern Business')
+            expect(body.applied).toBeUndefined() // backward compat: no applied field
+        })
+
+        it('creates site with template theme, homepage, and 404 page', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern' })
+
+            // Act
+            await POST(req)
+
+            // Assert — site created with template theme
+            const siteCreateCall = mockPayloadInstance.create.mock.calls.find(
+                (c: any[]) => c[0].collection === 'sites'
+            )
+            expect(siteCreateCall).toBeDefined()
+            expect(siteCreateCall[0].data.theme).toEqual(DEFAULT_TEMPLATE.defaultTheme)
+            expect(siteCreateCall[0].data.status).toBe('draft')
+
+            // Two pages created: home + 404
+            const pageCreateCalls = mockPayloadInstance.create.mock.calls.filter(
+                (c: any[]) => c[0].collection === 'pages'
+            )
+            expect(pageCreateCalls).toHaveLength(2)
+
+            const slugs = pageCreateCalls.map((c: any[]) => c[0].data.slug)
+            expect(slugs).toContain('home')
+            expect(slugs).toContain('404')
+        })
+
+        it('increments template usageCount by 1 when creating new site', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern' })
+
+            // Act
+            await POST(req)
+
+            // Assert
+            const templateUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'templates'
+            )
+            expect(templateUpdateCall).toBeDefined()
+            expect(templateUpdateCall[0].data.usageCount).toBe(6) // 5 + 1
+        })
+
+        it('returns 404 when templateId does not match any template', async () => {
+            // Arrange
+            mockTemplate = null
+            const req = makeRequest({ templateId: 'tpl-does-not-exist' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(404)
+            expect(body.error).toMatch(/template not found/i)
+        })
+
+        it('auto-creates tenant when user has no associated tenant', async () => {
+            // Arrange — user.tenants is empty (no tenant assigned)
+            mockUser = { id: 'user-42', email: 'owner@example.com', tenants: [] }
+            const req = makeRequest({ templateId: 'tpl-modern' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert — should succeed by auto-creating tenant (same as generate-site)
+            expect(res.status).toBe(200)
+            expect(body.success).toBe(true)
+        })
+
+        it('uses default theme values when template has no defaultTheme', async () => {
+            // Arrange
+            mockTemplate = { ...DEFAULT_TEMPLATE, defaultTheme: undefined }
+            const req = makeRequest({ templateId: 'tpl-modern' })
+
+            // Act
+            await POST(req)
+
+            // Assert — falls back to hardcoded default theme
+            const siteCreateCall = mockPayloadInstance.create.mock.calls.find(
+                (c: any[]) => c[0].collection === 'sites'
+            )
+            expect(siteCreateCall[0].data.theme).toMatchObject({
+                primaryColor: '#0ea5e9',
+                fontHeading: 'Outfit',
+                fontBody: 'Inter',
+                colorMode: 'dark',
+            })
+        })
+
+        it('handles template with array category by taking the first element as siteType', async () => {
+            // Arrange
+            mockTemplate = { ...DEFAULT_TEMPLATE, category: ['restaurant', 'food'] }
+            const req = makeRequest({ templateId: 'tpl-modern' })
+
+            // Act
+            await POST(req)
+
+            // Assert
+            const siteCreateCall = mockPayloadInstance.create.mock.calls.find(
+                (c: any[]) => c[0].collection === 'sites'
+            )
+            expect(siteCreateCall[0].data.siteType).toBe('restaurant')
+        })
+    })
+
+    // ── TC-F07.039: Apply template to existing site ───────────────────────────
+
+    describe('[TC-F07.039] Apply template to existing site (siteId provided)', () => {
+
+        it('returns 200 with applied:true when siteId is valid and owned by user', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(body.success).toBe(true)
+            expect(body.applied).toBe(true)
+            expect(body.siteId).toBe(101)
+            expect(body.siteName).toBe('My Site')
+            expect(body.templateName).toBe('Modern Business')
+        })
+
+        it('updates site theme with template defaultTheme', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — sites.update called with the template theme
+            const siteUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [{ collection: string; data?: { theme?: unknown }; id?: number | string }]) => c[0].collection === 'sites' && c[0].data?.theme
+            )
+            expect(siteUpdateCall).toBeDefined()
+            expect(siteUpdateCall[0].id).toBe(101)
+            expect(siteUpdateCall[0].data.theme).toEqual(DEFAULT_TEMPLATE.defaultTheme)
+        })
+
+        it('updates existing homepage layout via smart mapping (not delete+create)', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — page UPDATED in-place (smart mapping), NOT deleted+created
+            expect(mockPayloadInstance.delete).not.toHaveBeenCalledWith(
+                expect.objectContaining({ collection: 'pages' })
+            )
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            expect(layout.length).toBeGreaterThan(0)
+            expect(layout[0].blockType).toBe('hero')
+        })
+
+        it('skips homepage layout update when site has no homepage', async () => {
+            // Arrange
+            mockHomepage = null
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            const res = await POST(req)
+
+            // Assert — pages.update should NOT be called, but site update must still happen
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages'
+            )
+            expect(pageUpdateCall).toBeUndefined()
+            expect(res.status).toBe(200)
+        })
+
+        it('increments template usageCount by 1 when applying to existing site', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert
+            const templateUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'templates'
+            )
+            expect(templateUpdateCall).toBeDefined()
+            expect(templateUpdateCall[0].data.usageCount).toBe(6) // 5 + 1
+        })
+
+        it('updates existing pages in-place when applying template (smart mapping)', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — pages are UPDATED, not created anew
+            const pageUpdateCalls = mockPayloadInstance.update.mock.calls.filter(
+                (c: any[]) => c[0].collection === 'pages'
+            )
+            expect(pageUpdateCalls.length).toBeGreaterThanOrEqual(1)
+        })
+
+        it('finds all existing pages by site ID for deletion', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — route now uses drizzle.execute (raw SQL) to fetch page IDs
+            // instead of payload.find, bypassing the aggregate-SQL bug (GH-767).
+            expect(mockPayloadInstance.db.drizzle.execute).toHaveBeenCalled()
+            // payload.findByID must be called for the fetched page IDs
+            const pageFindByIDCall = mockPayloadInstance.findByID.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageFindByIDCall).toBeDefined()
+        })
+    })
+
+    // ── TC-F07.016: Authorization / tenant ownership ──────────────────────────
+
+    describe('[TC-F07.016] Authorization and tenant ownership', () => {
+
+        it('returns 403 when site belongs to a different tenant', async () => {
+            // Arrange — site tenant does NOT match user's tenant
+            mockSite = { ...DEFAULT_SITE, tenant: { id: 'tenant-DIFFERENT' } }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(403)
+            expect(body.error).toMatch(/unauthorized/i)
+        })
+
+        it('returns 403 when site.tenant is a scalar ID not matching user tenant', async () => {
+            // Arrange — tenant stored as plain ID string (non-populated relationship)
+            mockSite = { ...DEFAULT_SITE, tenant: 'tenant-DIFFERENT' }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(403)
+            expect(body.error).toMatch(/unauthorized/i)
+        })
+
+        it('accepts ownership when site.tenant is a scalar ID matching user tenant', async () => {
+            // Arrange — tenant stored as plain ID (non-populated)
+            mockSite = { ...DEFAULT_SITE, tenant: 'tenant-99' }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(200)
+            expect(body.applied).toBe(true)
+        })
+
+        it('returns 404 when siteId does not match any site in database', async () => {
+            // Arrange
+            mockSite = null
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '999' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(res.status).toBe(404)
+            expect(body.error).toMatch(/site not found/i)
+        })
+    })
+
+    // ── Edge cases ────────────────────────────────────────────────────────────
+
+    describe('Edge cases', () => {
+
+        it('keeps existing layout when template has no defaultBlocks (re-skin path)', async () => {
+            // Arrange — template has no blocks → templateBlocksClean is empty
+            // → smart mapping skipped → re-skin path keeps existing blocks
+            mockTemplate = { ...DEFAULT_TEMPLATE, defaultBlocks: undefined }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — page UPDATED (re-skin), existing layout preserved
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            expect(layout.length).toBeGreaterThan(0)
+        })
+
+        it('passes siteId as Number when calling payload.findByID and payload.update for sites', async () => {
+            // Arrange — siteId is a string in the request body
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — route must coerce to Number before DB calls
+            const sitesFindCall = mockPayloadInstance.findByID.mock.calls.find(
+                (c: any[]) => c[0].collection === 'sites'
+            )
+            expect(typeof sitesFindCall[0].id).toBe('number')
+            expect(sitesFindCall[0].id).toBe(101)
+
+            const sitesUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'sites'
+            )
+            expect(typeof sitesUpdateCall[0].id).toBe('number')
+        })
+
+        it('returns siteId as a Number in the response body (not a string)', async () => {
+            // Arrange
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert
+            expect(typeof body.siteId).toBe('number')
+            expect(body.siteId).toBe(101)
+        })
+
+        // ── TC-F07.040: null defaultBlocks ────────────────────────────────────
+
+        it('TC-F07.040: apply template with null defaultBlocks keeps existing layout (re-skin)', async () => {
+            // Arrange — template.defaultBlocks is null → templateBlocksClean = []
+            // → re-skin path preserves existing blocks
+            mockTemplate = { ...DEFAULT_TEMPLATE, defaultBlocks: null }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — page updated with existing layout preserved (re-skin)
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            expect(layout.length).toBeGreaterThan(0)
+        })
+
+        // ── TC-F07.041: null defaultTheme ─────────────────────────────────────
+
+        it('TC-F07.041: apply template with null defaultTheme uses fallback theme defaults', async () => {
+            // Arrange — template.defaultTheme is explicitly null
+            mockTemplate = { ...DEFAULT_TEMPLATE, defaultTheme: null }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — site theme must contain hardcoded fallback values
+            const siteUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [{ collection: string; data?: { theme?: unknown }; id?: number | string }]) => c[0].collection === 'sites' && c[0].data?.theme
+            )
+            expect(siteUpdateCall).toBeDefined()
+            expect(siteUpdateCall[0].data.theme).toMatchObject({
+                primaryColor: '#0ea5e9',
+                fontHeading: 'Outfit',
+                fontBody: 'Inter',
+                colorMode: 'dark',
+            })
+        })
+
+        // ── TC-F07.044–046: contact formFields sanitization ────────────────────
+
+        it('TC-F07.044: valid contact formFields are preserved during template apply', async () => {
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    {
+                        blockType: 'contact', headline: 'Contact Us',
+                        formFields: [
+                            { fieldName: 'name', fieldType: 'text', label: 'Name', required: true },
+                            { fieldName: 'email', fieldType: 'email', label: 'Email', required: true },
+                        ],
+                    },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            await POST(req)
+
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')
+            expect(contactBlock).toBeDefined()
+            const formFields = contactBlock!.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(2)
+            expect(formFields[0].fieldName).toBe('name')
+        })
+
+        it('TC-F07.045: invalid formFields items are filtered out (missing/wrong type)', async () => {
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    {
+                        blockType: 'contact', headline: 'Contact',
+                        formFields: [
+                            { fieldName: 'name', fieldType: 'text', label: 'Name' },          // valid
+                            { fieldName: '', fieldType: 'text', label: 'Empty name' },          // invalid: empty fieldName
+                            { fieldName: 123, fieldType: 'text', label: 'Number name' },        // invalid: non-string
+                            { fieldName: 'x', fieldType: 'bogus', label: 'Bad type' },          // invalid: unknown fieldType
+                            { fieldName: 'msg', fieldType: 'textarea', label: '' },             // invalid: empty label
+                            { fieldName: '   ', fieldType: 'text', label: 'Whitespace' },       // invalid: whitespace-only
+                        ],
+                    },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            await POST(req)
+
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')!
+            const formFields = contactBlock.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(1) // only 'name' survives
+            expect(formFields[0].fieldName).toBe('name')
+        })
+
+        it('TC-F07.046: all-invalid formFields falls back to default 3 fields', async () => {
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    {
+                        blockType: 'contact', headline: 'Contact',
+                        formFields: [
+                            { fieldName: null, fieldType: null, label: null },
+                            { bad: 'data' },
+                        ],
+                    },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            await POST(req)
+
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const contactBlock = layout.find(b => b.blockType === 'contact')!
+            const formFields = contactBlock.formFields as Record<string, unknown>[]
+            expect(formFields).toHaveLength(3)
+            expect(formFields.map(f => f.fieldName)).toEqual(['name', 'email', 'message'])
+        })
+
+        // ── TC-F07.047: google-maps dropped — temporarily disabled per GH-820 ──
+
+        it('TC-F07.047: google-maps block is dropped (embedUrl cannot be auto-generated, GH-820)', async () => {
+            mockHomepage = {
+                ...DEFAULT_HOMEPAGE,
+                layout: [
+                    { blockType: 'google-maps', headline: 'Find Us', embedUrl: '', address: '123 Street' },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            await POST(req)
+
+            type PageUpdateArg = { collection: string; id?: number | string; data: { layout?: Record<string, unknown>[] } }
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: [PageUpdateArg]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            const layout = pageUpdateCall![0].data.layout as Record<string, unknown>[]
+            const mapsBlock = layout.find(b => b.blockType === 'google-maps')
+            expect(mapsBlock).toBeUndefined()
+        })
+
+        // ── TC-F07.048: usageCount failure doesn't crash apply ────────────────
+
+        it('TC-F07.048: template usageCount update failure does not fail the apply', async () => {
+            // Save original implementation to restore after test
+            const originalImpl = mockPayloadInstance.update.getMockImplementation()
+
+            // Make template update throw on usageCount (but not on other updates)
+            mockPayloadInstance.update.mockImplementation(async (args: Record<string, unknown>) => {
+                if (args.collection === 'templates') {
+                    throw new Error('Category validation failed')
+                }
+                return {}
+            })
+
+            try {
+                const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+                const res = await POST(req)
+                const body = await res.json()
+
+                // Apply should still succeed despite usageCount failure
+                expect(res.status).toBe(200)
+                expect(body.applied).toBe(true)
+            } finally {
+                // Restore original mock to avoid polluting subsequent tests
+                if (originalImpl) {
+                    mockPayloadInstance.update.mockImplementation(originalImpl)
+                } else {
+                    mockPayloadInstance.update.mockResolvedValue({})
+                }
+            }
+        })
+
+        // ── TC-F07.042: siteId as empty string ────────────────────────────────
+
+        it('TC-F07.042: siteId as empty string "" is treated as falsy, creates new site', async () => {
+            // Arrange — schema transforms "" to "" but route checks if (siteId) which is falsy
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert — went through new-site creation path, not apply-to-existing
+            expect(res.status).toBe(200)
+            expect(body.applied).toBeUndefined()
+            expect(body.siteId).toBe(999) // mockCreatedSite.id
+            const siteCreateCall = mockPayloadInstance.create.mock.calls.find(
+                (c: any[]) => c[0].collection === 'sites'
+            )
+            expect(siteCreateCall).toBeDefined()
+        })
+
+        // ── TC-F07.043: templateId as number ──────────────────────────────────
+
+        it('TC-F07.043: templateId as number is coerced to string by schema and works correctly', async () => {
+            // Arrange — schema: z.union([z.string().min(1), z.number()]).transform(String)
+            const req = makeRequest({ templateId: 42, siteId: '101' })
+
+            // Act
+            const res = await POST(req)
+            const body = await res.json()
+
+            // Assert — schema coerces 42 → "42", route calls findByID with "42"
+            expect(res.status).toBe(200)
+            expect(body.applied).toBe(true)
+            const templateFindCall = mockPayloadInstance.findByID.mock.calls.find(
+                (c: any[]) => c[0].collection === 'templates'
+            )
+            expect(templateFindCall).toBeDefined()
+            expect(typeof templateFindCall[0].id).toBe('string')
+            expect(templateFindCall[0].id).toBe('42')
+        })
+
+        // ── TC-F07.050: GH-731 service-cards empty titles coerced on apply ─────
+        it('TC-F07.050: service-cards with empty titles in existing layout are coerced before payload.update', async () => {
+            // Arrange — homepage has a service-cards block with empty service titles
+            // (simulates data written to DB before the AI gen sanitization fix)
+            mockHomepage = {
+                id: 201,
+                slug: 'home',
+                isHomepage: true,
+                layout: [
+                    { blockType: 'hero', variant: 'centered', headline: 'Hero' },
+                    {
+                        blockType: 'service-cards',
+                        variant: 'grid',
+                        headline: 'Our Services',
+                        services: [
+                            { title: '', description: 'desc 1', icon: '🛠️' },
+                            { title: null, description: 'desc 2', icon: '⭐' },
+                            { description: 'desc 3', icon: '🔧' },
+                            { title: 'Valid Title', description: 'desc 4', icon: '✅' },
+                        ],
+                    },
+                    { blockType: 'footer', logoText: 'Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — payload.update for the page was called with coerced titles
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            const scBlock = layout.find(b => b.blockType === 'service-cards')
+            expect(scBlock).toBeDefined()
+            const services = scBlock!.services as Record<string, unknown>[]
+            // empty/null/missing titles must be coerced to 'Service'
+            expect(services[0].title).toBe('Service')
+            expect(services[1].title).toBe('Service')
+            expect(services[2].title).toBe('Service')
+            // valid title must be preserved
+            expect(services[3].title).toBe('Valid Title')
+        })
+
+        // ── TC-F07.049: multi-page template dedup ─────────────────────────────
+        // Bug repro: templatePages.flatMap across all pages concatenated nav+footer
+        // from every template page into the homepage Smart Mapping source, creating
+        // duplicate nav/footer blocks on the user's homepage layout.
+        it('TC-F07.049: multi-page template applies homepage-only blocks, no nav/footer duplication', async () => {
+            // Arrange — Professional-style template with 3 pages, each carrying nav+footer
+            mockTemplate = {
+                ...DEFAULT_TEMPLATE,
+                templatePages: [
+                    {
+                        title: 'Home',
+                        slug: 'home',
+                        isHomepage: true,
+                        layout: [
+                            { blockType: 'navigation', links: [] },
+                            { blockType: 'hero', variant: 'centered', headline: 'Tpl Hero' },
+                            { blockType: 'features', items: [] },
+                            { blockType: 'footer', logoText: 'Tpl Footer' },
+                        ],
+                    },
+                    {
+                        title: 'About',
+                        slug: 'about',
+                        isHomepage: false,
+                        layout: [
+                            { blockType: 'navigation', links: [] },
+                            { blockType: 'team', members: [] },
+                            { blockType: 'footer', logoText: 'Tpl Footer' },
+                        ],
+                    },
+                    {
+                        title: 'Contact',
+                        slug: 'contact',
+                        isHomepage: false,
+                        layout: [
+                            { blockType: 'navigation', links: [] },
+                            { blockType: 'contact', formFields: [] },
+                            { blockType: 'footer', logoText: 'Tpl Footer' },
+                        ],
+                    },
+                ],
+            }
+            // User homepage has 1 nav + 1 hero + 1 footer
+            mockHomepage = {
+                id: 201,
+                slug: 'home',
+                isHomepage: true,
+                layout: [
+                    { blockType: 'navigation', links: [{ label: 'User Link', url: '/' }] },
+                    { blockType: 'hero', variant: 'split', headline: 'User Hero' },
+                    { blockType: 'footer', logoText: 'User Footer' },
+                ],
+            }
+            const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
+
+            // Act
+            await POST(req)
+
+            // Assert — user homepage updated with exactly 1 nav + 1 footer (no dupes)
+            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+                (c: any[]) => c[0].collection === 'pages' && c[0].id === 201
+            )
+            expect(pageUpdateCall).toBeDefined()
+            const layout = pageUpdateCall[0].data.layout as Record<string, unknown>[]
+            const navCount = layout.filter(b => b.blockType === 'navigation').length
+            const footerCount = layout.filter(b => b.blockType === 'footer').length
+            expect(navCount).toBe(1)
+            expect(footerCount).toBe(1)
+            // User's footer content must be preserved (Smart Mapping intent)
+            const footer = layout.find(b => b.blockType === 'footer')
+            expect(footer?.logoText).toBe('User Footer')
+        })
+    })
+})

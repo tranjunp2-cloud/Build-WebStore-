@@ -1,87 +1,89 @@
-# Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F18 - CMS Core Layout & Navigation
-> **Phiên bản:** 3.0 (29-Case Final - Zero Bug Tolerance) | **Cập nhật:** 2026-03-20 | **Thực hiện:** QA Team (Antigravity QC)
+# Tài Liệu Kiểm Thử: F18 - CMS Core Layout & Navigation
+> **Phiên bản:** 3.1 | **Cập nhật:** 2026-04-06 | **Thực hiện:** QA Team
 > **Nguồn Tham chiếu:** PRD (`F18-cms-layout.md`), User Stories (3 US chính)
-> **Kỹ năng ứng dụng (.agent):** UI/UX Boundary Check, Mobile Touch Validation, i18n Localization Testing, Performance SLA Metrics.
+> **Kỹ năng ứng dụng:** Kiểm tra giao diện người dùng, Tối ưu hóa trải nghiệm trên thiết bị di động, Đa ngôn ngữ (Localization Testing).
 
 ---
 
-## 1. Mục Tiêu (Objective)
-Tài liệu Test Case này xây dựng lưới kiểm thử bao phủ toàn diện 100% logic giao diện cốt lõi của **CMS Layout (F18)**. Bao gồm 3 phân hệ chính: Top Header cố định, Side Menu linh hoạt theo kích thước màn hình, và Main Content Area có khả năng scroll độc lập.
+## 1. Mục Tiêu Kiểm Thử (Objective)
+Tài liệu cung cấp danh sách kiểm thử bao phủ 100% logic giao diện cốt lõi của **CMS Layout (F18)**. Hệ thống bao gồm 3 phân hệ chính: Top Header (Thanh tiêu đề cố định), Side Menu (Thanh điều hướng linh hoạt thu gọn) và Main Content Area (Khu vực nội dung có khả năng cuộn độc lập).
 
-Bộ test đặc biệt nhấn mạnh vào **trải nghiệm Mobile (Hamburger Drawer)** và tính năng **Đa ngôn ngữ (BM/EN)** qua Avatar Dropdown nhằm phục vụ sát sao đối tượng SME/Dropshipper tại thị trường Malaysia.
+Trọng tâm là kiểm tra tính năng trên thiết bị di động (Nút Menu Hamburger), tính năng thay đổi đa ngôn ngữ (Tiếng Anh / Bahasa Melayu) và các điểm dễ bị vỡ bố cục khi văn bản quá dài.
 
 ---
 
-## 2. Test Environment (Môi trường Kiểm thử)
-| Biến (Variable) | Yêu cầu (Requirements) |
+## 2. Thông Tin Môi Trường (Test Environment)
+
+| Thông số | Yêu cầu kiểm thử |
 |---|---|
-| Môi trường (Env) | Staging / Pre-Production |
-| Browsers | Chrome (v110+), Safari iOS, Firefox |
-| Devices (Responsive) | Desktop (1920x1080), Tablet iPad (768px), Mobile (iPhone 14 Pro 375px) |
-| Test Data & SLA | Mạng chậm (Fast 3G), Touch padding 44px, Điểm Lighthouse Mobile > 90 |
+| Môi trường | Staging / Pre-Production |
+| Trình duyệt | Chrome (v110+), Safari iOS, Firefox |
+| Chi tiết thiết bị | Desktop (1920x1080), Tablet iPad (768px), Mobile (iPhone 14 Pro 375px) |
 
 ---
 
-## 3. Unified Test Cases (Traceability Matrix)
+## 3. Danh Sách Kịch Bản Kiểm Thử Chi Tiết
 
-| ID | Tham chiếu | LOẠI | TIÊU ĐỀ (Scenario) | CÁC BƯỚC THỰC HIỆN & DỮ LIỆU (Steps & Test Data) | KẾT QUẢ MONG ĐỢI GHERKIN & DB CHECKS (Expected) | MỨC ĐỘ | AUTO |
-|:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **[US-F18-01: CMS Global Sidebar Navigation] - Trình Đơn Bên Trái** |
-| **TC-F18.01** | `AC-1` | `UI` | **[Positive]** Giao diện Sidebar mặc định trên Desktop | **1.** Đăng nhập CMS trên Desktop (Màn >1024px). | **THEN** Sidebar mở rộng (Expanded).<br>Các item hiển thị đủ Icon + Text (Ví dụ: 📦 Products). Active state tô sáng nền. | Blocker | [x] |
-| **TC-F18.02** | `AC-2` | `Mobile`| **[Positive]** Thu gọn Sidebar & Nút Hamburger Mobile | **1.** Chuyển sang View Mobile (375px).<br>**2.** Nhìn góc trái Header. | Sidebar tự động ẩn. Chỉ còn Nút Hamburger `☰` trên Top Header. Khung content tràn 100% width. | Blocker | [ ] |
-| **TC-F18.03** | `AC-2` | `Interact`| **[Positive]** Cử chỉ Kéo mở Slide-in Drawer Mobile | **1.** Ở View Mobile, click nút Hamburger `☰`. | **WHEN** Click **THEN** Sidebar trượt mượt mà từ trái sang, phủ lấp có Overlay mờ, z-index cao hơn Content. | High | [ ] |
-| **TC-F18.04** | `UX`   | `Layout`| **[Negative]** Click Outside Đóng Drawer Mobile | **1.** Mở Sidebar Drawer trên Mobile.<br>**2.** Click chuột/Chạm ngón tay ra vùng Overlay xám bên ngoài. | Hook ClickOutside bắt được sự kiện. Drawer tự động slide-out đóng lại mượt mà, trả lại không gian Main Content. | High | [ ] |
-| **TC-F18.23** | `AC-4` | `Interact`| **[Positive]** Vuốt (Swipe Left) để đóng Drawer Mobile | **1.** Mở Sidebar Drawer trên thiết bị cảm ứng.<br>**2.** Vuốt nhanh tay từ vùng phải sang trái. | **THEN** Drawer bắt event Swipe và nương theo lực vuốt để trượt đóng lại dứt khoát. | High | [ ] |
-| **TC-F18.24** | `AC-4` | `Route` | **[Positive]** Đóng Drawer tự động khi click Leaf Link | **1.** Mở Drawer trên Mobile.<br>**2.** Click vào link "Products". | **THEN** Nền tải nội dung Products.<br>**AND** Drawer tự động đóng lại để trả không gian cho user xem ruột nhanh nhất. | High | [ ] |
-| **TC-F18.05** | `AC-3` | `Logic` | **[Positive]** Điều hướng Help Center Nút Cuối | **1.** Cuộn xuống cuối cùng Sidebar.<br>**2.** Click "Help Center". | Route chuyển hướng nội bộ CMS sang `/help` (Module F20). Active state nhảy sang Help Center, Main Content tải màn hỗ trợ. | Medium | [ ] |
-| **TC-F18.06** | `UX`   | `Access`| **[Positive]** Kích thước vùng chạm (Touch Area 44px) | **1.** Dùng devtools soi padding/margin các nút trong Sidebar trên Mobile. | Element có clickable area tối thiểu `44x44px` (Fat-finger friendly) chống việc bấm nhầm trên màn hình nhỏ. | Medium | [ ] |
-| **TC-F18.21** | `UI`   | `Menu`  | **[Positive]** Mở rộng Sub-menu Accordion | **1.** Click vào mục "My Webstore" (có icon mũi tên). | **THEN** Menu con xổ xuống (Slide down) hiển thị "Editor" và "Blog". Mũi tên đổi hướng xoay góc. | High | [ ] |
-| **TC-F18.22** | `UI`   | `Inte`  | **[Positive]** Badge Đếm Số Lượng Trên Sidebar | **1.** Nhìn vào menu "Orders". Cấp API có 5 đơn chờ. | Cạnh chữ "Orders" hiển thị cục Badge nổi màu Xanh lục mang số `5`. | Medium | [ ] |
-| **[US-F18-02: CMS Global Top Header] - Thanh Công Cụ Trên Cùng** |
-| **TC-F18.07** | `AC-1` | `Func` | **[Positive]** Chức năng Quay Về Trang Chủ (Logo Routing) | **1.** Đang đứng ở trang `/products/123`.<br>**2.** Click Logo PrimeWeb ở Header. | Trình duyệt gọi Route nhảy tuột về trang `/dashboard`. Component React không reload toàn trang, đổi ruột cực nhanh. | High | [x] |
-| **TC-F18.08** | `AC-2` | `Integrate`| **[Positive]** Hiển thị Bell Notification & Red Badge | **1.** Inject data Notification chưa đọc.<br>**2.** Kiểm tra góc phải Header. | Icon Bell rung chuông, gắn Badge Đỏ (Eg: `3`). Khi Click vào, thả xuống Dropdown thông báo F16 (Z-index cao nhất). | High | [ ] |
-| **TC-F18.09** | `AC-4` | `UI` | **[Positive]** Dropdown Menu của Avatar User | **1.** Click vào hình Avatar User góc phải Header. | Xổ xuống Menu nổi chứa 2 item chính: `Profile` và Nút `Logout` màu đỏ (Không chứa phần đổi ngôn ngữ). | Blocker | [ ] |
-| **TC-F18.10** | `BR-03`| `i18n` | **[Positive]** Toggle Đổi Ngôn Ngữ Nơi Đáy Sidebar (MY/EN) | **1.** Cuộn xuống đáy Sidebar (trên nút Logout).<br>**2.** Bấm chuyển đổi nút Switch (MY / EN) sang `EN`. | **THEN** Giao diện Sidebar/Header Reload ngôn ngữ tương ứng.<br>State lưu chặt, Highlight màu Xanh/Trắng cho nút Active. | Blocker | [x] |
-| **TC-F18.11** | `UX`   | `SLA`  | **[Negative]** Chặn Click Xuyên Lủng Layer Dropdown | **1.** Mở Avatar Dropdown thả dọc xuống.<br>**2.** Bên dưới Background có dòng chữ Title của Main Content. Thử click đè lên chữ. | Overlay trong suốt che cú click, Menu Popover tự động đóng khép lại, không kích hoạt Link lầm cọc dưới nền. | High | [ ] |
-| **[US-F18-03: Main Content Area Display] - Không Gian Nội Dung Chính** |
-| **TC-F18.12** | `AC-1` | `Layout`| **[Positive]** Bố cục Độc Lập Scrolling (Independent Scroll) | **1.** Mở trang Products có 100 sản phẩm.<br>**2.** Cuộn thanh Scroll dọc xuống giữa trang. | **EXPECTED** Sidebar TRÁI và Header TRÊN vẫn Đứng Im (Fixed/Sticky). Chỉ có thẻ `<main>` bị lăn cuộn. | Blocker | [x] |
-| **TC-F18.13** | `UX`   | `Route` | **[Positive]** Khôi phục Vị Trí Cuộn (Reset Scroll Top) | **1.** Kéo xuống cuối trang màn Products.<br>**2.** Click sang menu Orders. | Tại màn Orders mới load, Trục Scroll Bar Tự Động Rút Lên Đỉnh Y=0. Không bị kẹt ở đáy. | High | [ ] |
-| **TC-F18.14** | `AC-3` | `State` | **[Positive]** Trạng thái Rỗng (Empty State) & Layout Vững Chắc | **1.** Xóa sạch DB để trang `/blog` rỗng không.<br>**2.** F5 Web. | Lòng Main Content sinh component Empty (Vector ảnh, "Chưa có bài viết nào"). Không làm phình to hay bóp xéo tỷ lệ Header/Sidebar. Layout vững như thạch. | Medium | [ ] |
-| **TC-F18.15** | `SLA`  | `Perf` | **[Negative]** Render Performance Ngưỡng Dưới 1 giây | **1.** Reload trang F5 toàn khung CMS Layout. | Lớp Vỏ CMS (Shell) App Shell bật lên ngay lập tức dưới 100ms. Tiến trình Fetch Data Modules chạy Async không Block Màn Header. | Medium | [x] |
-| **TC-F18.25** | `AC-4` | `UI`   | **[Positive]** Kích hoạt Global Loading Transition Bar | **1.** Click mở một module nặng.<br>**2.** Quan sát thanh Top Header lập tức. | Xuất hiện thanh progress loading bar `2px` trôi ngang mép dưới Header. Load xong đạt 100% tự động biến mất. | High | [ ] |
-| **[MISSING ACs PHÁT HIỆN TỪ PRD - CẬP NHẬT BỞI AI QC AGENT]** |
-| **TC-F18.16** | `QC-AI`| `Tablet` | **[Boundary]** Chế độ Mini-Sidebar (Collapsed Mode) trên Tablet | **1.** Kéo Window size xuống mức mốc `768px - 1024px`. | **THEN** Sidebar KHÔNG ẩn mất (như Mobile) cũng KHÔNG mở rộng (như Desktop) mà co thành cột hẹp (Width 60px) chỉ hiện Icon. Tooltip bật ra khi Hover. | Blocker | [ ] |
-| **TC-F18.17** | `i18n` | `Layout` | **[Boundary]** Vỡ Khung Do Độ Dài Ký Tự Bahasa Melayu Khi Đổi Ngôn Ngữ | **1.** Switch Language qua Mã Lai.<br>**2.** Chờ Sidebar text re-render. | Chữ tiếng Mã Lai thường dài hơn 30-40% so với tiếng Anh. **EXPECTED:** Element tự động thu gọt `Text Overflow: Ellipsis...` không đội Width của Sidebar để Main Content bị lép. | High | [ ] |
-| **TC-F18.18** | `Sec`  | `Header` | **[Negative]** XSS Injection vào Vùng Cảnh Báo Avatar Name | **1.** Cho User tên là dài có bọc `<script>alert('idor')</script>`. | **EXPECTED** Khung Avatar Header Ráp Hàm Sanitize Html Cắt Mã Nóng Độc Quyền, Chỉ Hiện Nguyên Bản Chữ PlainText. Thắt Nút Sập DOM CMS. | Blocker | [x] |
-| **TC-F18.19** | `Perf` | `Load`   | **[Negative]** Giới hạn Bơm Nhồi DOM (Sidebar React Rerender Load Testing) | **1.** Run Script k6 bắn Click liên thanh vào 5 Sidebar Menu Items (200 clicks/min). | Khung Giao Diện Được Sử Dụng `React.memo` Và Không Bị Bào Lấy RAM, Khóa Bug Lỏng State Gây Unmount Component Con Layout Áp Đảo Trình Duyệt. Trả mượt Web Vitals. | High | [ ] |
-| **TC-F18.20** | `UX`   | `A11y`   | **[Positive]** Phóng To Giao Diện Lên Cỡ Đại (Zoom 200%) | **1.** Nhấn `Ctrl +` zoom 200%. Tắt Thu Phóng. | Dính Khớp Cấp Khống UI Accessbility Màn WCAG Lõi: Không Vỡ Tràn Header Box, Cột Chữ Sidebar Chữ Mèo Co Túm Nhưng Quả Nút Kế Đăng Xuất Vẫn Hiện Dễ Thấy. | Medium | [ ] |
-| **[DEEP BUGS & ARCHITECTURE - BỔ SUNG AUDIT CUỐI]** |
-| **TC-F18.26** | `Sec`  | `RBAC`   | **[Negative]** Ẩn Menu Cứng Dựa Vào Phân Quyền Giả (Role Override) | **1.** Đăng nhập tài khoản Staff thấp (Không có quyền Store Config).<br>**2.** F12 sửa config ráng gọi API. | **EXPECTED** Sidebar NGAY TỪ ĐẦU KHÔNG THỀ render ra chữ "Store Config". UI Auth-Guard chặn đứng, nếu gõ thẳng URL ra màn 403 thay vì sập Layout. | Blocker | [x] |
-| **TC-F18.27** | `Logic`| `Router` | **[Boundary]** Mất Dấu Đồng Bộ Active State Khi Dùng Browser Back/Forward | **1.** Đang ở "Products". Box sáng màu rực.<br>**2.** Nhấn Back của Trình Duyệt lùi về "Dashboard". | URL đổi về `/dashboard` VÀ CÙNG LÚC State sáng đèn Sidebar nhảy tương ứng về Dashboard. Không bị bug "URL 1 đằng, Active Box 1 nẻo". | High | [ ] |
-| **TC-F18.28** | `UI`   | `Layout` | **[Boundary]** Vỡ Khung Avatar Dropdown Bằng Email Cực Dài | **1.** Đổi Email thành chuỗi 100 character: `nguyenthidieulam.marketing.manager.primeweb@domain.com.my`.<br>**2.** Bật Avatar Menu. | Chiều rộng khay Dropdown không bị kéo căng đứt nắp. Email dài tự động bị cắt bằng hàm CSS `text-overflow: ellipsis` (hiển thị... ở cuối). | Medium | [ ] |
-| **TC-F18.29** | `UX`   | `Net`    | **[Negative]** Treo Progress Bar Khi Đứt Mạng / Timeout Giữa Chừng | **1.** Click Menu sang "Orders".<br>**2.** Tắt Network (Chrome Offline) ngay khi Bar Loading chạy được nửa. | **EXPECTED** Progress loading bar (TC-F18.25) KHÔNG BỊ kẹt mãi ở 90%. Trả Toast Error "Network Timeout" và thanh trượt đỏ lên / ẩn đi gỡ kẹt UI cho User rẽ sang module khác. | High | [ ] |
+### Nhóm 1: Trình Đơn Điều Hướng Bên Trái (Global Sidebar Navigation)
+
+| ID | Ref | Loại | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ |
+|:---|:---|:---|:---|:---|:---:|
+| **TC-F18.01** | `AC-1` | `UI` | 1. Đăng nhập hệ thống bằng máy tính Desktop.<br>2. Quan sát thanh Sidebar bên trái. | - Sidebar mặc định hiển thị toàn bộ chiều rộng.<br>- Các chức năng hiển thị đầy đủ Biểu tượng và Chữ.<br>- Chức năng đang chọn được tô sáng bằng màu nền. | Blocker |
+| **TC-F18.02** | `AC-2` | `Mobile` | 1. Truy cập hệ thống bằng điện thoại di động (Mobile).<br>2. Kiểm tra thanh Sidebar. | - Sidebar tự động bị ẩn.<br>- Header phía trên xuất hiện nút Menu Hamburger (☰).<br>- Nội dung chiếm 100% màn hình. | Blocker |
+| **TC-F18.03** | `AC-2` | `Mobile` | 1. Trên thiết bị di động, nhấn nút Menu Hamburger (☰). | - Màn hình trượt Sidebar từ trái sang phải.<br>- Màn hình nền xuất hiện lớp phủ màu tối (Overlay) nhằm làm nổi bật Sidebar. | High |
+| **TC-F18.04** | `UX` | `UX` | 1. Mở Sidebar trên Mobile.<br>2. Click chạm vào màn hình lớp phủ tối bên ngoài Sidebar. | - Lớp phủ bắt sự kiện click.<br>- Sidebar tự động trượt lùi về đóng lại. | High |
+| **TC-F18.05** | `AC-4` | `UX` | 1. Mở Sidebar trên Mobile.<br>2. Vuốt màn hình từ phía bên phải sang phía bên trái. | - Nhận diện thành công cử chỉ vuốt.<br>- Sidebar tự động trượt đóng lại. | High |
+| **TC-F18.06** | `AC-4` | `UX` | 1. Mở Sidebar trên Mobile.<br>2. Nhấn chọn một đường dẫn chức năng bất kỳ (ví dụ: "Products"). | - Ứng dụng điều hướng sang màn hình Products.<br>- Sidebar tự động đóng lại để người dùng xem thông tin. | High |
+| **TC-F18.07** | `AC-3` | `Logic` | 1. Cuộn Sidebar xuống mục cuối cùng.<br>2. Nhấn chọn chức năng "Help Support". | - Trình duyệt tự mở sang tab ẩn mới với đường link gọi API WhatsApp.<br>- Trang làm việc hiện tại của CMS không bị tải lại hoặc mất nội dung. | Medium |
+| **TC-F18.08** | `UX` | `UX` | 1. Dùng DevTools (F12) để xác minh kích thước nút bấm trên Mobile. | - Bất kỳ khu vực nút bấm nào cũng đạt diện tích chạm (Touch Area) tối thiểu chuẩn là `44x44px`. | Medium |
+| **TC-F18.09** | `UI` | `Menu` | 1. Nhấp chọn một danh sách mẹ có biểu tượng mũi tên xổ xuống. | - Khối danh sách (Accordion) mở trượt xuống dưới liệt kê các chức năng con.<br>- Biểu tượng mũi tên xoay đảo ngược chiều. | High |
+| **TC-F18.10** | `UI` | `State`| 1. Hệ thống có 5 đơn hàng chưa duyệt.<br>2. Quan sát menu chức năng "Orders" trên Sidebar. | - Bên cạnh văn bản "Orders" hiển thị cảnh báo vòng tròn (Badge) có số `5` với màu sắc nổi bật (thường là màu đỏ/xanh lá). | Medium |
+
+### Nhóm 2: Thanh Công Cụ Phía Trên (Global Top Header)
+
+| ID | Ref | Loại | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ |
+|:---|:---|:---|:---|:---|:---:|
+| **TC-F18.11** | `AC-1` | `Func` | 1. Quản trị viên đang làm việc ở bất kì đường dẫn nào.<br>2. Nhấn Logo hệ thống trên Top Header. | - Trình duyệt điều hướng quay về trang `/dashboard`.<br>- Không tải lại toàn trang HTTP, Component ứng dụng hiển thị rất nhanh. | High |
+| **TC-F18.12** | `AC-2` | `Func` | 1. Khi có bản tin báo lỗi hoặc thông báo mới được gửi đến tài khoản. | - Biểu tượng cái Chuông xuất hiện huy hiệu số (Badge đỏ).<br>- Nhấn vào chuông sẽ thả dọc khay danh sách thông báo nổi lên trên cùng (Z-index lớn nhất). | High |
+| **TC-F18.13** | `AC-4` | `UI` | 1. Bấm chuột tương tác lên Icon Hình Ảnh Cá Nhân (Avatar) góc phải tiêu đề. | - Danh sách tùy chọn trượt ra bao gồm: Profile cá nhân, Settings và nút Logout. | High |
+| **TC-F18.14** | `i18n` | `Local`| 1. Tại Sidebar dưới cùng, nhấn vào nút Chuyển đổi ngôn ngữ Tùy chọn (EN -> BM Bahasa Melayu). | - Tất cả văn bản toàn hệ thống lập tức thay đổi đồng bộ theo tiếng Mã Lai.<br>- Không làm mới nguyên trang (Refresh webpage), nhằm tránh xoá những dữ liệu đang biên tập trên Form CMS. | Blocker |
+| **TC-F18.15** | `Limit`| `Limit`| 1. Mở danh sách chức năng từ Icon Avatar.<br>2. Lớp UI ứng dụng bên dưới bảng có chứa văn bản. Nhấn đè thử chuột vào văn bản xuyên qua bảng Menu. | - Bảng Avatar đóng lại.<br>- Không thể nhấp chuột xuyên lớp (Z-index Overlay) dẫn tới nhấn nhầm các tính năng bên dưới giao diện. | High |
+
+### Nhóm 3: Khu Vực Nội Dung Chính (Main Content Area Display)
+
+| ID | Ref | Loại | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ |
+|:---|:---|:---|:---|:---|:---:|
+| **TC-F18.16** | `AC-1` | `Layout`| 1. Liệt kê bảng hàng hóa chứa hơn 100 sản phẩm.<br>2. Cuộn thao tác chuột dọc qua danh sách. | - Chỉ phần dữ liệu Main Content bị cuộn trượt đi.<br>- Cấu kiện Header phía trên và Sidebar bên trái đứng nguyên vị trí đóng đinh (Fixed Layout). | Blocker |
+| **TC-F18.17** | `Route`| `Route`| 1. Lăn cuộn thanh Scroll của chuột tới vị trí đáy của trang Products.<br>2. Click nút chuyển sang chức năng "Orders". | - Giao diện Orders tải thành công.<br>- Trục thanh cuộn (Scroll Position) tự động hoàn trả lên đỉnh điểm đầu Y=0 của trang Order. Không bị giữ kẹt ở phía đáy giống trang màn trước. | High |
+| **TC-F18.18** | `AC-3` | `State`| 1. Kiểm tra hệ thống tại màn hình không có bất kỳ bộ cơ sở dữ liệu nào.<br>2. Refesh trang. | - Giao diện thả vào khung rỗng màn hình thông báo Empty State: "Chưa có thông tin".<br>- Khung không bị thu nhỏ hoặc bóp méo, đảm bảo tính vững chãi cho Box Main Container. | Medium |
+| **TC-F18.19** | `Perf` | `Perf` | 1. Nhấn nút F5 nhằm đánh giá độ tải của giao diện App Shell hệ thống. | - Giao diện rào bao gồm Top Header và Sidebar bật dựng hiển thị ngay dưới 150 mili-giây.<br>- Dữ liệu gọi qua API Content chạy ở dạng nền (Async) đảm bảo không gây treo giật màn hình. | High |
+| **TC-F18.20** | `AC-4` | `UI` | 1. Bấm lệnh mở một phân hệ nặng tải chậm từ Menu. | - Sát đường mép dưới của Top Header xuất hiện một thanh Loading Progress quét dải màu chạy tiến trình qua.<br>- Khi màn hình gọi API hoàn tất, thanh tiến trình tự biến dạng mất đi. | High |
+
+### Nhóm 4: Trường Hợp Cận Biên, Bẻ Khung Và Bảo Mật Chuyên Sâu (Edge Cases)
+
+| ID | Ref | Loại | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ |
+|:---|:---|:---|:---|:---|:---:|
+| **TC-F18.21** | `Tablet`| `Layout`| 1. Thay đổi kích thước trình độ phân giải cửa sổ rơi về dải 768px (Màn Ipad). | - Sidebar chuyển vào trạng thái Collapse Mode (Thu gọn), cột co hẹp để lại không gian vừa đủ đặt Icons. Ẩn văn bản.<br>- Rê chuột (Hover) icon làm bung ra Text Tooltip kế bên minh họa. | Blocker |
+| **TC-F18.22** | `i18n` | `Layout`| 1. Chọn ngôn ngữ BM (Bahasa Mã Lai). | - Ngôn ngữ BM thường dài. Nếu chữ quá dài không vừa cột Sidebar, phải tự động cắt đứt bằng CSS sinh ra chuỗi 3 chấm "..." (Ellipsis). Không cơi nới độ rộng Sidebar gây bẹp màn Main Layout chính. | High |
+| **TC-F18.23** | `Sec` | `Sec` | 1. Can thiệp Database nhằm đổi Tên Thành Viên (User Profile) bao bọc mã độc HTML (VD: `<script>alert('bad')</script>`).<br>2. Xem Avatar Header. | - Quá trình chuyển đổi nội dung văn bản thuần (Encode/Escape). Hệ mã độc không chạy sinh Lệnh Alert Box ở trình duyệt. Bảo đảm tránh kỹ thuật XSS lỗ hổng CMS Component. | Blocker |
+| **TC-F18.24** | `Perf` | `Load` | 1. Lặp thao tác Nhấp chuyển đổi các Tabs Sidebar liên tục khoảng trên 150 nhấp/phút bằng Script hoặc Ngón Tay. | - React phân giải Framework không tạo hiện tượng Unmount Menu quá nhiều.<br>- Ứng dụng điều hướng êm tốc độ phản hồi tốt. Hệ thống không bị treo hoặc rớt cạn Memory RAM gây gián đoạn trình duyệt. | High |
+| **TC-F18.25** | `A11y` | `A11y` | 1. Phóng hiển thị Window Thu phóng Accessibility qua góc 200%. | - Thành phần Menu, Header Logo phân chia rõ ràng tương ứng. Nút Đăng Xuất và Thông Số Cơ bản không bị chồng lên lệch hoặc lún giấu mất không thể Click được. | Medium |
+| **TC-F18.26** | `Sec` | `RBAC` | 1. Truy cập bằng Account Staff (không có quyền cài đặt quản trị Settings F15).<br>2. Nạp Trình Gõ URL cưỡng ép mở Route CMS Settings. | - Sidebar Menu sẽ thu ẩn dòng Settings hoàn toàn.<br>- CMS xuất thẳng tín hiệu Access Denied (Code Lỗi HTTP 403 Ẩn Chỉnh) ra View Content thay vì sụp giao diện Page lỗi. | Blocker |
+| **TC-F18.27** | `Logic`| `Route`| 1. Di chuyển bằng Menu: Vào trang Products.<br>2. Bấm nhấn phím Nút BACK (Quay Lại Lịch Sử) của ứng dụng Browser Browser. | - Khi URL thanh địa chỉ lùi trở về Dashboard, Cửa Sáng Highlight tô đánh dấu bên Sidebar cũng tự động nhảy bám màu sáng về Mục Dashboard hoàn toàn chính xác theo State Quản. | High |
+| **TC-F18.28** | `UI` | `Layout`| 1. Khai báo Email quản trị cực dài dằng dặc trên 50 kí hiệu ký tự. Nhấp Avatar Cấp Panel Trải Dropdown Menu Cá Nhân Phía Top Header. | - Hộp Dropdown không bị kéo dãn bục giới hạn Box Layout Frame.<br>- Những phần chữ thuộc Email bị dài quá viền được tự định nghĩa thu gọn 3 chấm (Ellipsis) đúng mức, an toàn Responsive Container Component Box Không vỡ móp xô lệ CSS lưới tổng thể diện. | Medium |
+| **TC-F18.29** | `Net` | `Net` | 1. Trong thời gian màn hình Mới đang chạy quá trình thanh Progress Bar Load API Route, ngắt hoàn toàn Internet (Timeout Code Lỗi Quá 30s Cắt Đứt). | - Giao diện thanh vệt tiến trình Progress Load Bar sẽ ngưng không đứng chờ mãi mốc 90%.<br>- Hệ điều hướng báo hiển thị Lỗi Network Toast Error nhằm yêu cầu Thử Lại. Hoàn tất cất Thanh Progress Load cho Phép Mở Đi Lại Quãng Route Không Cản Trở Vỡ Ngưng Trình Ứng Dụng Load Chậm Gãy Tab. | High |
 
 ---
 
-## 4. Hành trình Trải nghiệm End-to-End Thực Tế (E2E UAT Flow)
-_Đánh giá hệ thống dựa trên thói quen điều hướng của tập Người Kinh Doanh (SME/Dropshipper)._
+## 4. Hành trình Trải nghiệm End-to-End (E2E UAT Flow)
 
-| Mã UAT | Bài toán Kinh tế (User Persona) | Hành trình thao tác (E2E Steps) | Nút thắt cần Verify (Critical Checkpoints) |
-|---|---|---|---|
-| **UAT-01** | **Chủ SME Truyền Thống (Desktop user)**<br>Thường xuyên thao tác quản trị trên Laptop. Có nhu cầu đọc Báo cáo, xem Đơn, tạo Sản phẩm luân phiên liên tục. | 1. Ngồi Dashboard xem biểu đồ (Main cuộn).<br>2. Liếc mắt thấy Chuông rung Đỏ.<br>3. Mở Chuông xem Đơn Hàng mới.<br>4. Lập tức click Sidebar qua kho `Orders` xử lý. | - Scroll main document mượt mà, Sidebar đứng im không bị rung.<br>- Click Sidebar qua tab mới phải chớp nháy dưới 500ms (Client-side routing). Trạng thái Menu đổi màu Active đúng chỗ. |
-| **UAT-02** | **KOC/Dropshipper (Mobile User)**<br>Di chuyển liên tục, check luồng chạy đơn bằng Điện thoại màn hình dọc 375px. Thích ngôn ngữ Tiếng Anh. | 1. Mở web bằng iPhone Safari.<br>2. Màn hình đập vào mặt là Content. Header có ☰.<br>3. Chạm ☰ vuốt khay Menu ra.<br>4. Chạm Avatar đổi ngôn ngữ, vuốt xuống đáy click `Help Center`. | - Drawer Menu Sidebar trượt mượt mà (Không bị lag CSS frame).<br>- Padding Touch Area trên Avatar và Link Menu > 44px vuông chuẩn mập ngón tay không bấm trượt.<br>- Đổi EN/BM không bị reflow bóp méo khung Flexbox. |
+* **Kịch bản UAT Desktop:** Quản trị viên theo dõi dữ liệu trên giao diện màn hình lớn. Khi cuộn xem biểu đồ thống kê, thanh Menu Trái (Sidebar) và Màn Trên (Header) vẫn giữ cố định vũng chức. Khi click Menu chuyển tác vụ, ứng dụng đổi màn hình React tức thì dưới 500ms mà không Reload Flash toàn phiên làm việc.
+* **Kịch bản UAT Mobile:** Nhân viên kiểm tra nhanh hàng hóa qua iPhone Safari. Giao diện Sidebar gọn ẩn nhường chỗ hoàn toàn cho thông số Data Center Grid. Nút chọn Burger Mở Trượt Mềm (Hamburger Drawer Animation Drawer Sidebar Layout 100% Khung Kín Phóng Smooth Phản Chạm). Có thể nháy chọn vào Đa Ngôn Ngữ chuyển tiếng Mã Lai linh hoạt. Mật độ Icon đạt khoảng chuẩn bấm 44px phù hợp chạm. 
 
----
+## 5. Tiêu chí Đánh giá Quality Gates
 
-## 5. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates)
-
-| Nhóm Kiểm thử (Criteria) | Trạng Thái (Status) | Ghi chú (Notes & Rules .Agent Trích Chọn) |
-|---|---|---|
-| **1. UI/UX Coverage** | [ ] Đã chạy 0/9 TC | Focus kỹ Form Grid, Z-Index Drawer Mobile, Widget Tablet, Touch Target >44px. Cấp `A11y` Zoom UI. |
-| **2. Logic Routing** | [ ] Đã chạy 0/3 TC | Logo Redirect, Side Menu Active Highlight state không kẹt màu. |
-| **3. Integration API** | [ ] Đã chạy 0/2 TC | Chuỗi Component Avatar + Data F16 Component Bell Dropdown Lấy Thông Chống Đứt Socket. |
-| **4. Performance SLA** | [ ] Not Run | CMS App Shell Chạy Lighthouse Cắm Mốc Chắc Chắn 90 Điểm, Lỗi CLS <= 0.1 (`performance-test-engineer` k6 Stress) |
-| **5. E2E UAT Approval** | [ ] Not Run | Kéo Auto Test Đánh Playwright Flow UAT-02 Mobile Drawer Đổ Ra Xác Định Xanh Toàn Tuyến Mạch (`bdd-cucumber-expert` Gherkin) |
-| **6. Security Gate** | [ ] Not Run | Dò quét XSS Profile Input, Lỗi Avatar Header Ràng Khuôn Code. (`qc-ai-engineer` CISA Rules) |
-
-> **Khuyến Nghị Release:** Đây là Root Layout ốp toàn bộ Site. Các Bug P0 liên quan đến z-index đè Form Module bên trong Content Area (Ex: Z-index Drawer Sidebar Mobile phải bọc cẩn thận). Bắt buộc Pass 100% case Cảm Ứng Smartphone trước khi Merge Nhánh Dưới. Trang Shell Không Cho Phép Đứt CLS Dịch Layer Hình.
+| Nhóm Đánh Giá | Ghi chú |
+|---|---|
+| **1. UI/UX Focus Touch Area** | Test chuẩn Mobile iPhone Safari: Z-Index Overlay Drawer, Khả năng vuốt mượt, Touch Target tối thiểu đạt 44px ở các nút Click quan trọng. |
+| **2. Client-Side Routing logic** | Cố định Sidebar Highlight Menu tương ứng chính xác đối với Browser Back or Forward History Buttons mà không bị sai màu Highlight State React. |
+| **3. Perf App Shell Metric Load** | Chạm chuẩn Framework SLA 150ms Shell Loader Core. CLS = 0 không nảy chuyển lệch DOM Content Components quá mốc Delay Limit Gây Gãy UX Client Request Web Tĩnh. |

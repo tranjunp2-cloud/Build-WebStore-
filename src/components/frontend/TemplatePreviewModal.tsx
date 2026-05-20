@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Monitor, Smartphone, Loader2, Sparkles, X } from 'lucide-react'
+import { Monitor, Smartphone, Loader2, Sparkles, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import type { Template } from './TemplateCard'
@@ -28,39 +28,45 @@ export function TemplatePreviewModal({
             if (e.key === 'Escape') onClose()
         }
         document.addEventListener('keydown', handler)
-        return () => document.removeEventListener('keydown', handler)
+        document.body.style.overflow = 'hidden'
+        return () => {
+            document.removeEventListener('keydown', handler)
+            document.body.style.overflow = ''
+        }
     }, [onClose])
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center animate-in fade-in duration-200"
+            onClick={onClose}
+        >
             {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-black/85 backdrop-blur-md" />
 
             {/* Modal */}
             <div
-                className="relative w-[95vw] h-[85vh] sm:h-[92vh] rounded-2xl border border-white/10 bg-[#0B1120] overflow-hidden flex flex-col"
+                className="relative w-[96vw] h-[90vh] rounded-2xl border border-white/[0.08] bg-[#0a0a14] overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-bottom-2 duration-300"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Top bar */}
-                <div className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-white/10 bg-[#0B1120]/95 backdrop-blur-md shrink-0">
-                    <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-white/[0.06] bg-[#0a0a14]/90 backdrop-blur-xl shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
                         <div
-                            className="h-4 w-4 rounded-full border border-white/10"
+                            className="h-3.5 w-3.5 rounded-full ring-1 ring-white/10 shrink-0"
                             style={{ backgroundColor: template.defaultTheme?.primaryColor || '#3B82F6' }}
                         />
-                        <div>
-                            <h3 className="text-sm font-semibold text-white">{template.name}</h3>
-                            <p className="text-[10px] text-gray-500">{template.description}</p>
+                        <div className="min-w-0">
+                            <h3 className="text-sm font-semibold text-white truncate">{template.name}</h3>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                         {/* View mode toggle */}
-                        <div className="hidden sm:flex items-center gap-1 rounded-lg bg-white/5 p-0.5">
+                        <div className="hidden sm:flex items-center gap-0.5 rounded-xl bg-white/[0.04] p-1 border border-white/[0.06]">
                             <button
                                 onClick={() => setViewMode('desktop')}
                                 className={cn(
-                                    'rounded-md p-1.5 transition-colors',
-                                    viewMode === 'desktop' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'
+                                    'rounded-lg p-1.5 transition-all',
+                                    viewMode === 'desktop' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-600 hover:text-gray-300'
                                 )}
                             >
                                 <Monitor className="h-3.5 w-3.5" />
@@ -68,8 +74,8 @@ export function TemplatePreviewModal({
                             <button
                                 onClick={() => setViewMode('mobile')}
                                 className={cn(
-                                    'rounded-md p-1.5 transition-colors',
-                                    viewMode === 'mobile' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'
+                                    'rounded-lg p-1.5 transition-all',
+                                    viewMode === 'mobile' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-600 hover:text-gray-300'
                                 )}
                             >
                                 <Smartphone className="h-3.5 w-3.5" />
@@ -79,7 +85,7 @@ export function TemplatePreviewModal({
                         <button
                             onClick={() => onUse(template.id)}
                             disabled={isApplying}
-                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:brightness-110 transition-all disabled:opacity-50"
                         >
                             {isApplying ? (
                                 <>
@@ -95,7 +101,7 @@ export function TemplatePreviewModal({
                         <button
                             onClick={onClose}
                             aria-label="Close preview"
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors ml-2"
+                            className="rounded-xl p-2 text-gray-500 hover:bg-white/5 hover:text-white transition-all"
                         >
                             <X className="h-4 w-4" />
                         </button>
@@ -103,21 +109,23 @@ export function TemplatePreviewModal({
                 </div>
 
                 {/* Preview iframe */}
-                <div className="flex-1 flex items-center justify-center bg-[#09090b] overflow-hidden p-2 sm:p-4">
+                <div className="flex-1 flex items-center justify-center bg-[#06060a] overflow-hidden p-3 sm:p-5">
                     <div
                         className={cn(
-                            'relative h-full rounded-xl overflow-hidden border border-white/5 transition-all duration-500 bg-[#09090b]',
-                            viewMode === 'desktop' ? 'w-full' : 'w-[min(370px,100%)] h-[min(800px,100%)]'
+                            'relative h-full rounded-xl overflow-hidden border border-white/[0.04] transition-all duration-500 bg-[#08080c]',
+                            viewMode === 'desktop' ? 'w-full' : 'w-[min(375px,100%)]'
                         )}
                     >
                         {!iframeLoaded && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-[#09090b] z-10">
-                                <Loader2 className="h-8 w-8 animate-spin text-white/30" />
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#08080c] z-10 gap-3">
+                                <Loader2 className="h-6 w-6 animate-spin text-blue-500/40" />
+                                <span className="text-[10px] text-gray-700 font-medium uppercase tracking-[0.15em]">Loading preview</span>
                             </div>
                         )}
                         <iframe
                             src={`/api/templates/preview?id=${template.id}`}
-                            className={cn("w-full h-full border-0 transition-opacity duration-300", iframeLoaded ? "opacity-100" : "opacity-0")}
+                            sandbox="allow-scripts allow-same-origin"
+                            className={cn("w-full h-full border-0 transition-opacity duration-500", iframeLoaded ? "opacity-100" : "opacity-0")}
                             title={`Preview: ${template.name}`}
                             onLoad={() => setIframeLoaded(true)}
                         />

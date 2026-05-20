@@ -1,5 +1,7 @@
 # Architecture: SEO Dashboard (F11)
 
+> **Lưu ý:** File này mang tên F11 nhưng nội dung thuộc về F03 SEO Dashboard. F11 PRD thực tế là Undo/Redo (`docs/prd/F11-undo-redo.md`). Sẽ đổi tên khi refactor docs.
+
 > **Version:** 1.0 | **PRD:** [F11-seo-dashboard.md](../prd/F11-seo-dashboard.md)  
 > **Tech:** Next.js 15 + Payload CMS 3 + OpenAI
 
@@ -44,6 +46,13 @@ interface SEOScore {
   content: number       // 35% weight
   technical: number     // 25% weight
 }
+
+// Trọng số theo plan SEO Sprint 1:
+// - Meta Tags: 40% (title exists, title length, desc exists, desc length)
+// - Content:   35% (H1/hero, word count ≥300, alt text coverage, contact section)
+// - Technical: 25% (OG image, noIndex check, slug SEO-friendly, Google verification)
+//
+// overall = meta * 0.4 + content * 0.35 + technical * 0.25
 
 // Meta Tags scoring (40%)
 // - Each page has title (≤60 chars): +10 per page
@@ -118,3 +127,10 @@ SEODashboard
 | OpenAI API failure | Toast error, keep manual edit option |
 | Score calculation error | Show "Unable to calculate" with retry |
 | Sitemap generation fail | Toast + manual retry |
+
+## 6.1 Business Rules
+
+| Rule | Mô tả |
+|------|-------|
+| BR-06 | Khi AI sinh meta: trường trống → tự điền. Trường đã có nội dung thủ công → đề xuất chỉnh sửa, hiển thị so sánh bản cũ vs bản mới, chỉ ghi đè khi người dùng đồng ý |
+| Keyword-aware | AI Generate sử dụng `trackedKeywords` từ site settings để kết hợp từ khoá mục tiêu vào meta tự nhiên |

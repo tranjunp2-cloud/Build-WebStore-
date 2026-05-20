@@ -1,64 +1,157 @@
 /**
  * Editor Store (Zustand)
  * Manages editor state with undo/redo history and auto-save.
- * Features: F-06 (Undo/Redo) + F-07 (Auto-Save & Draft)
+ * Features: F-11 (Undo/Redo) + F-07 (Auto-Save & Draft)
  */
 
 import { create } from 'zustand'
+import { COMMERCE_BLOCK_TYPES } from '@/lib/site-renderer/detect-commerce-presence'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-type BlockData = { blockType: string;[key: string]: any }
+export type BlockData = { blockType: string;[key: string]: unknown }
+
+export type UndoActionSource = 'ai_chat' | 'inline_edit' | 'manual' | 'theme_change'
+
+export type GlobalBlockKey = 'cartWidget' | 'whatsappButton' | 'socialWidget'
+
+export type GlobalBlocksState = {
+    cartWidget: BlockData | null
+    whatsappButton: BlockData | null
+    socialWidget: BlockData | null
+} | null
+
+export const BLOCK_TYPE_TO_KEY: Record<string, GlobalBlockKey> = {
+    'cartWidget': 'cartWidget',
+    'whatsapp-button': 'whatsappButton',
+    'socialWidget': 'socialWidget',
+}
 
 type EditorSnapshot = {
+    id: string
     blocks: BlockData[]
-    theme: any
+    theme: ThemeState
+    headerBlock: BlockData | null
+    footerBlock: BlockData | null
+    globalBlocks: GlobalBlocksState
     timestamp: number
+    label?: string           // "Changed hero title"
+    source?: UndoActionSource
+}
+
+export type PageData = {
+    id: string
+    title: string
+    slug: string
+    status: 'published' | 'draft'
+    isHomepage?: boolean
+    isVisible: boolean
+    seoTitle?: string | null
+    seoDescription?: string | null
+    error?: string | null
+    deletedAt?: string | null
+    updatedAt: string
+    blockCount?: number
 }
 
 type EditorState = {
     // Data
     siteId: string | null
     blocks: BlockData[]
-    theme: any
+    theme: ThemeState
     siteName: string
 
-    // History (F-06)
+    // Global Header/Footer (F-05-07)
+    headerBlock: BlockData | null
+    footerBlock: BlockData | null
+    globalBlocks: GlobalBlocksState
+
+    // Pages (F-05-02)
+    pages: PageData[]
+    currentPageId: string | null
+
+    // History (F-06 / F-11)
     history: EditorSnapshot[]
     historyIndex: number
     maxHistory: number
 
+    // AI streaming guard (F-11)
+    isAIStreaming: boolean
+
+    // Inline editing guard — true while user is editing text directly in iframe.
+    // Auto-save is suspended during this window to prevent stale-block saves.
+    isInlineEditing: boolean
+
     // Save status (F-07)
     hasUnsavedChanges: boolean
+    hasUnpublishedChanges: boolean
     lastSavedAt: number | null
     isSaving: boolean
+    pendingManualSave: boolean
+    saveStatus: 'idle' | 'saving' | 'saved' | 'error'
+    autoSaveTimer: NodeJS.Timeout | null
     autoSaveEnabled: boolean
     autoSaveIntervalMs: number
 }
 
+type ThemeState = Record<string, string | number | boolean | null | unknown>
+type BlockPatch = Record<string, unknown>
+
 type EditorActions = {
     // Init
-    init: (siteId: string, blocks: BlockData[], theme: any, siteName: string) => void
+    init: (siteId: string, blocks: BlockData[], theme: ThemeState, siteName: string, headerBlock?: BlockData | null, footerBlock?: BlockData | null, globalBlocks?: GlobalBlocksState) => void
+
+    // Pages (F-05-02)
+    setPages: (pages: PageData[]) => void
+    setCurrentPageId: (pageId: string) => void
+    addPageToState: (page: PageData) => void
+    updatePageInState: (id: string, data: Partial<PageData>) => void
+    removePageFromState: (id: string) => void
 
     // Block operations (push to history)
-    updateBlock: (index: number, changes: Record<string, any>) => void
-    addBlock: (afterIndex: number, block: BlockData) => void
-    deleteBlock: (index: number) => void
+    updateBlock: (index: number, changes: BlockPatch, label?: string) => void
+    addBlock: (afterIndex: number, block: BlockData, label?: string) => void
+    deleteBlock: (index: number, label?: string) => void
     duplicateBlock: (index: number) => void
     reorderBlocks: (fromIndex: number, toIndex: number) => void
 
     // Theme
-    updateTheme: (changes: Record<string, any>) => void
+    updateTheme: (changes: ThemeState, label?: string) => void
+    updateSiteName: (name: string) => void
 
-    // Undo/Redo (F-06)
+    // Header/Footer (F-05-07)
+    updateHeaderBlock: (changes: BlockPatch) => void
+    updateFooterBlock: (changes: BlockPatch) => void
+
+    // AI Batch (F-11) — push ALL AI changes as a single undoable action
+    pushBatch: (blocks: BlockData[], theme: ThemeState, label: string) => void
+
+    // Undo/Redo (F-06 / F-11)
     undo: () => void
     redo: () => void
     canUndo: () => boolean
     canRedo: () => boolean
+    undoLabel: () => string | undefined
+    redoLabel: () => string | undefined
+
+    // AI streaming state (F-11)
+    setIsAIStreaming: (streaming: boolean) => void
+
+    // Inline editing guard
+    setIsInlineEditing: (editing: boolean) => void
 
     // Save (F-07)
+    handleContentChange: () => void
+    performSave: (isManual?: boolean) => Promise<boolean>
     markSaved: () => void
+    markPublished: () => void
     setIsSaving: (saving: boolean) => void
+    setAutoSaveEnabled: (val: boolean) => void
+
+    // Global Blocks (F-09/F-10)
+    updateGlobalBlock: (type: GlobalBlockKey, patch: BlockPatch) => void
+    deleteGlobalBlock: (type: GlobalBlockKey) => void
+    flipBlockVariant: (blockType: string, newVariant: 'inline' | 'floating', sourceIndex?: number) => void
 
     // Reset
     reset: () => void
@@ -66,12 +159,56 @@ type EditorActions = {
 
 const MAX_HISTORY = 50
 
-function createSnapshot(blocks: BlockData[], theme: any): EditorSnapshot {
+function createSnapshot(
+    blocks: BlockData[],
+    theme: ThemeState,
+    headerBlock: BlockData | null = null,
+    footerBlock: BlockData | null = null,
+    label?: string,
+    source?: UndoActionSource,
+    globalBlocks: GlobalBlocksState = null,
+): EditorSnapshot {
     return {
+        id: crypto.randomUUID(),
         blocks: JSON.parse(JSON.stringify(blocks)),
         theme: JSON.parse(JSON.stringify(theme)),
+        headerBlock: headerBlock ? JSON.parse(JSON.stringify(headerBlock)) : null,
+        footerBlock: footerBlock ? JSON.parse(JSON.stringify(footerBlock)) : null,
+        globalBlocks: globalBlocks ? JSON.parse(JSON.stringify(globalBlocks)) : null,
         timestamp: Date.now(),
+        label,
+        source,
     }
+}
+
+function pushSnapshot(
+    history: EditorSnapshot[],
+    historyIndex: number,
+    maxHistory: number,
+    snapshot: EditorSnapshot,
+) {
+    // Slice off any redo branch (branch cut-off rule BR-01)
+    const newHistory = history.slice(0, historyIndex + 1)
+    if (newHistory.length >= maxHistory) newHistory.shift()
+    newHistory.push(snapshot)
+    return newHistory
+}
+
+function syncSystemBlockInLayout(
+    blocks: BlockData[],
+    blockType: 'navigation' | 'footer',
+    changes: BlockPatch,
+) {
+    let updated = false
+    const nextBlocks = blocks.map((block) => {
+        if (!updated && block.blockType === blockType) {
+            updated = true
+            return { ...block, ...changes }
+        }
+        return block
+    })
+
+    return updated ? nextBlocks : blocks
 }
 
 export const useEditorStore = create<EditorState & EditorActions>((set, get) => ({
@@ -80,176 +217,510 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     blocks: [],
     theme: {},
     siteName: '',
+    headerBlock: null,
+    footerBlock: null,
+    globalBlocks: null,
+    pages: [],
+    currentPageId: null,
     history: [],
     historyIndex: -1,
     maxHistory: MAX_HISTORY,
+    isAIStreaming: false,
+    isInlineEditing: false,
     hasUnsavedChanges: false,
+    hasUnpublishedChanges: false,
     lastSavedAt: null,
     isSaving: false,
+    pendingManualSave: false,
     autoSaveEnabled: true,
-    autoSaveIntervalMs: 30000, // 30s
+    autoSaveIntervalMs: 3000,
+    saveStatus: 'idle',
+    autoSaveTimer: null,
 
-    init: (siteId, blocks, theme, siteName) => {
-        const snapshot = createSnapshot(blocks, theme)
+    init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null, globalBlocks = null) => {
+        // Clear any pending auto-save timer from previous page to prevent cross-page save
+        const { autoSaveTimer } = get()
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+
+        const fallbackHeader = blocks.find(b => b.blockType === 'navigation')
+        const fallbackFooter = blocks.find(b => b.blockType === 'footer')
+
+        const effectiveHeader = headerBlock || (fallbackHeader ? JSON.parse(JSON.stringify(fallbackHeader)) : { blockType: 'navigation', links: [] })
+        const effectiveFooter = footerBlock || (fallbackFooter ? JSON.parse(JSON.stringify(fallbackFooter)) : { blockType: 'footer' })
+
+        // Keep blocks as-is (including nav/footer) for preview iframe index consistency
+        const snapshot = createSnapshot(blocks, theme, effectiveHeader, effectiveFooter, 'Initial state', 'manual', globalBlocks)
         set({
-            siteId, blocks, theme, siteName,
+            siteId,
+            blocks,
+            theme,
+            siteName,
+            headerBlock: effectiveHeader,
+            footerBlock: effectiveFooter,
+            globalBlocks,
             history: [snapshot],
             historyIndex: 0,
             hasUnsavedChanges: false,
+            hasUnpublishedChanges: false,
+            lastSavedAt: null,
+            autoSaveTimer: null,
+            isSaving: false,
+            saveStatus: 'idle',
+            isAIStreaming: false,
         })
     },
+
+    // ── Pages Operations ──────────────────────────────────────────────────
+
+    setPages: (pages) => set({ pages }),
+    setCurrentPageId: (currentPageId) => set({ currentPageId }),
+    addPageToState: (page) => set((state) => ({ pages: [...state.pages, page] })),
+    updatePageInState: (id, data) => set((state) => ({
+        pages: state.pages.map((p) => p.id === id ? { ...p, ...data } : p)
+    })),
+    removePageFromState: (id) => set((state) => ({
+        pages: state.pages.filter((p) => p.id !== id)
+    })),
 
     // ── Block Operations ─────────────────────────────────────────────────
 
-    updateBlock: (index, changes) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+    updateBlock: (index, changes, label) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
         const newBlocks = [...blocks]
         newBlocks[index] = { ...newBlocks[index], ...changes }
 
-        const snapshot = createSnapshot(newBlocks, theme)
-        const newHistory = history.slice(0, historyIndex + 1)
-        if (newHistory.length >= maxHistory) newHistory.shift()
-        newHistory.push(snapshot)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Edited ${newBlocks[index].blockType}`, 'inline_edit', globalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
-    addBlock: (afterIndex, block) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+    addBlock: (afterIndex, block, label) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        // Footer must always be last — clamp insert position to just before it
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        const safeAfterIndex = footerIdx >= 0 ? Math.min(afterIndex, footerIdx - 1) : afterIndex
         const newBlocks = [...blocks]
-        newBlocks.splice(afterIndex + 1, 0, block)
+        newBlocks.splice(safeAfterIndex + 1, 0, block)
 
-        const snapshot = createSnapshot(newBlocks, theme)
-        const newHistory = history.slice(0, historyIndex + 1)
-        if (newHistory.length >= maxHistory) newHistory.shift()
-        newHistory.push(snapshot)
+        // Auto-restore cart when a commerce block is added, unless cart is already active.
+        // globalBlocks === null: fresh site (never configured) — restore.
+        // globalBlocks.cartWidget === null: user explicitly deleted — restore.
+        // globalBlocks.cartWidget = {...}: already configured — no restore needed.
+        const cartAlreadyActive = globalBlocks !== null && globalBlocks.cartWidget != null
+        const needsCartRestore = COMMERCE_BLOCK_TYPES.has(block.blockType) && !cartAlreadyActive
+        const effectiveGlobalBlocks: GlobalBlocksState = needsCartRestore
+            ? {
+                  cartWidget: { blockType: 'cartWidget', variant: 'floating' } as BlockData,
+                  whatsappButton: globalBlocks?.whatsappButton ?? null,
+                  socialWidget: globalBlocks?.socialWidget ?? null,
+              }
+            : globalBlocks
+
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual', effectiveGlobalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
             blocks: newBlocks,
+            globalBlocks: effectiveGlobalBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
-    deleteBlock: (index) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+    deleteBlock: (index, label) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const blockType = blocks[index]?.blockType ?? 'block'
         const newBlocks = blocks.filter((_, i) => i !== index)
 
-        const snapshot = createSnapshot(newBlocks, theme)
-        const newHistory = history.slice(0, historyIndex + 1)
-        if (newHistory.length >= maxHistory) newHistory.shift()
-        newHistory.push(snapshot)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Deleted ${blockType}`, 'manual', globalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     duplicateBlock: (index) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        if (index === footerIdx) return // never duplicate footer
         const blockCopy = JSON.parse(JSON.stringify(blocks[index]))
+        const insertAt = footerIdx >= 0 ? Math.min(index + 1, footerIdx) : index + 1
         const newBlocks = [...blocks]
-        newBlocks.splice(index + 1, 0, blockCopy)
+        newBlocks.splice(insertAt, 0, blockCopy)
 
-        const snapshot = createSnapshot(newBlocks, theme)
-        const newHistory = history.slice(0, historyIndex + 1)
-        if (newHistory.length >= maxHistory) newHistory.shift()
-        newHistory.push(snapshot)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Duplicated ${blocks[index]?.blockType}`, 'manual', globalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     reorderBlocks: (fromIndex, toIndex) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        // Footer must always be last — block any move that violates this
+        const footerIdx = blocks.findIndex(b => b.blockType === 'footer')
+        if (footerIdx >= 0) {
+            if (fromIndex === footerIdx) return // footer itself cannot move
+            if (toIndex >= footerIdx) return // nothing can land after footer
+        }
         const newBlocks = [...blocks]
         const [moved] = newBlocks.splice(fromIndex, 1)
         newBlocks.splice(toIndex, 0, moved)
 
-        const snapshot = createSnapshot(newBlocks, theme)
-        const newHistory = history.slice(0, historyIndex + 1)
-        if (newHistory.length >= maxHistory) newHistory.shift()
-        newHistory.push(snapshot)
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Moved ${moved?.blockType}`, 'manual', globalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     // ── Theme ────────────────────────────────────────────────────────────
 
-    updateTheme: (changes) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+    updateTheme: (changes, label) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
         const newTheme = { ...theme, ...changes }
 
-        const snapshot = createSnapshot(blocks, newTheme)
-        const newHistory = history.slice(0, historyIndex + 1)
-        if (newHistory.length >= maxHistory) newHistory.shift()
-        newHistory.push(snapshot)
+        const snapshot = createSnapshot(blocks, newTheme, headerBlock, footerBlock, label ?? 'Updated theme', 'theme_change', globalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
             theme: newTheme,
             history: newHistory,
             historyIndex: newHistory.length - 1,
+        })
+        get().handleContentChange()
+    },
+
+    updateSiteName: (name: string) => {
+        set({ siteName: name })
+    },
+
+    // ── AI Batch (F-11) ─────────────────────────────────────────────────
+    // Groups an entire AI response into EXACTLY 1 undoable action (BR-02)
+
+    pushBatch: (blocks, theme, label) => {
+        const { headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        // Enforce footer-last invariant on AI-generated blocks — dedupe and sort
+        const footerBlocks = blocks.filter(b => b.blockType === 'footer')
+        const nonFooter = blocks.filter(b => b.blockType !== 'footer')
+        const sanitized = footerBlocks.length > 0 ? [...nonFooter, footerBlocks[0]] : nonFooter
+        const snapshot = createSnapshot(sanitized, theme, headerBlock, footerBlock, label, 'ai_chat', globalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
+
+        set({
+            blocks: JSON.parse(JSON.stringify(sanitized)),
+            theme: JSON.parse(JSON.stringify(theme)),
+            history: newHistory,
+            historyIndex: newHistory.length - 1,
             hasUnsavedChanges: true,
         })
     },
 
-    // ── Undo/Redo (F-06) ────────────────────────────────────────────────
+    // ── Undo/Redo (F-11) ────────────────────────────────────────────────
 
     undo: () => {
-        const { historyIndex, history } = get()
-        if (historyIndex <= 0) return
+        const { historyIndex, history, isAIStreaming } = get()
+        if (isAIStreaming || historyIndex <= 0) return
         const newIndex = historyIndex - 1
         const snapshot = history[newIndex]
+
         set({
             blocks: JSON.parse(JSON.stringify(snapshot.blocks)),
             theme: JSON.parse(JSON.stringify(snapshot.theme)),
+            headerBlock: snapshot.headerBlock ? JSON.parse(JSON.stringify(snapshot.headerBlock)) : null,
+            footerBlock: snapshot.footerBlock ? JSON.parse(JSON.stringify(snapshot.footerBlock)) : null,
+            globalBlocks: snapshot.globalBlocks ? JSON.parse(JSON.stringify(snapshot.globalBlocks)) : null,
             historyIndex: newIndex,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     redo: () => {
-        const { historyIndex, history } = get()
-        if (historyIndex >= history.length - 1) return
+        const { historyIndex, history, isAIStreaming } = get()
+        if (isAIStreaming || historyIndex >= history.length - 1) return
         const newIndex = historyIndex + 1
         const snapshot = history[newIndex]
+
         set({
             blocks: JSON.parse(JSON.stringify(snapshot.blocks)),
             theme: JSON.parse(JSON.stringify(snapshot.theme)),
+            headerBlock: snapshot.headerBlock ? JSON.parse(JSON.stringify(snapshot.headerBlock)) : null,
+            footerBlock: snapshot.footerBlock ? JSON.parse(JSON.stringify(snapshot.footerBlock)) : null,
+            globalBlocks: snapshot.globalBlocks ? JSON.parse(JSON.stringify(snapshot.globalBlocks)) : null,
             historyIndex: newIndex,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
-    canUndo: () => get().historyIndex > 0,
-    canRedo: () => get().historyIndex < get().history.length - 1,
+    canUndo: () => {
+        const { historyIndex, isAIStreaming } = get()
+        return !isAIStreaming && historyIndex > 0
+    },
+    canRedo: () => {
+        const { historyIndex, history, isAIStreaming } = get()
+        return !isAIStreaming && historyIndex < history.length - 1
+    },
+
+    undoLabel: () => {
+        const { historyIndex, history } = get()
+        if (historyIndex <= 0) return undefined
+        return history[historyIndex]?.label
+    },
+
+    redoLabel: () => {
+        const { historyIndex, history } = get()
+        if (historyIndex >= history.length - 1) return undefined
+        return history[historyIndex + 1]?.label
+    },
+
+    // ── AI Streaming Guard (F-11) ────────────────────────────────────────
+
+    setIsAIStreaming: (streaming) => set({ isAIStreaming: streaming }),
+
+    // ── Inline Editing Guard ─────────────────────────────────────────────
+
+    setIsInlineEditing: (editing) => set({ isInlineEditing: editing }),
 
     // ── Save (F-07) ─────────────────────────────────────────────────────
+    handleContentChange: () => {
+        const { autoSaveTimer, siteId, isInlineEditing, autoSaveEnabled } = get()
+        if (!siteId) return
 
-    markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now() }),
+        // Always mark dirty — auto-save disabled only suspends scheduling, not tracking
+        set({ hasUnsavedChanges: true, saveStatus: 'idle' })
+
+        // Suspend scheduling while auto-save is disabled (e.g. template applied) or
+        // inline editing is active (TEXT_EDITING_STOPPED pipeline handles that case)
+        if (!autoSaveEnabled || isInlineEditing) return
+
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+
+        const timer = setTimeout(() => {
+            get().performSave()
+        }, 3000) // 3s debounce
+
+        set({ autoSaveTimer: timer })
+    },
+
+    performSave: async (isManual = false) => {
+        const { siteId, autoSaveTimer, isSaving } = get()
+        if (!siteId) return false
+
+        // If a save is already in-flight, mark as pending and return.
+        // The in-flight save's success path reads this flag and fires a retry immediately
+        // after it completes — deterministic, no magic timeout.
+        if (isManual && isSaving) {
+            set({ pendingManualSave: true })
+            return false
+        }
+
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+        set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
+
+        const RETRY_DELAYS = [5000, 10000, 20000]
+
+        const attemptSave = async (retryCount = 0): Promise<boolean> => {
+            // Re-read all state each attempt to prevent stale closure after page switch
+            const { blocks, theme, headerBlock, footerBlock, globalBlocks, currentPageId: pageIdNow } = get()
+            try {
+                const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
+                if (pageIdNow) {
+                    saveUrl.searchParams.set('pageId', pageIdNow)
+                }
+                // Only send globalBlocks when non-null — omitting keeps the DB value unchanged
+                // for legacy sites that have never set globalBlocks (prevents accidental wipe).
+                const body: Record<string, unknown> = { blocks, theme, headerBlock, footerBlock, isDraft: true }
+                if (globalBlocks !== null) body.globalBlocks = globalBlocks
+                const res = await fetch(saveUrl.toString(), {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(body),
+                })
+
+                if (res.ok) {
+                    const hasPending = get().pendingManualSave
+                    set({
+                        hasUnsavedChanges: false,
+                        hasUnpublishedChanges: true,
+                        saveStatus: 'saved',
+                        lastSavedAt: Date.now(),
+                        isSaving: false,
+                        pendingManualSave: false,
+                    })
+                    // Fire the queued manual save immediately now that the slot is free.
+                    // Uses latest store blocks — no stale-closure risk.
+                    if (hasPending) void get().performSave(true)
+                    return true
+                } else {
+                    if (res.status === 401) {
+                        set({ saveStatus: 'error', isSaving: false, pendingManualSave: false })
+                        return false
+                    }
+                    throw new Error('Save failed')
+                }
+            } catch (err) {
+                set({ saveStatus: 'error', isSaving: false })
+                if (retryCount < RETRY_DELAYS.length) {
+                    const timer = setTimeout(() => {
+                        set({ isSaving: true, saveStatus: 'saving' })
+                        attemptSave(retryCount + 1)
+                    }, RETRY_DELAYS[retryCount])
+                    set({ autoSaveTimer: timer })
+                } else {
+                    set({ pendingManualSave: false })
+                }
+                return false
+            }
+        }
+
+        return await attemptSave(0)
+    },
+
+    markSaved: () => set({ hasUnsavedChanges: false, hasUnpublishedChanges: true, lastSavedAt: Date.now(), saveStatus: 'saved' }),
+    markPublished: () => set({ hasUnpublishedChanges: false }),
     setIsSaving: (saving) => set({ isSaving: saving }),
+    setAutoSaveEnabled: (val) => set({ autoSaveEnabled: val }),
 
-    reset: () => set({
-        siteId: null, blocks: [], theme: {}, siteName: '',
-        history: [], historyIndex: -1,
-        hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
-    }),
+    // ── Header/Footer (F-05-07) ──────────────────────────────────────────
+
+    updateHeaderBlock: (changes) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const newHeader = headerBlock ? { ...headerBlock, ...changes } : { blockType: 'navigation', ...changes }
+        const newBlocks = syncSystemBlockInLayout(blocks, 'navigation', changes)
+
+        const snapshot = createSnapshot(newBlocks, theme, newHeader, footerBlock, 'Updated Header', 'inline_edit', globalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
+
+        set({
+            blocks: newBlocks,
+            headerBlock: newHeader,
+            history: newHistory,
+            historyIndex: newHistory.length - 1,
+        })
+        get().handleContentChange()
+    },
+
+    updateFooterBlock: (changes) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const newFooter = footerBlock ? { ...footerBlock, ...changes } : { blockType: 'footer', ...changes }
+        const newBlocks = syncSystemBlockInLayout(blocks, 'footer', changes)
+
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, newFooter, 'Updated Footer', 'inline_edit', globalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
+
+        set({
+            blocks: newBlocks,
+            footerBlock: newFooter,
+            history: newHistory,
+            historyIndex: newHistory.length - 1,
+        })
+        get().handleContentChange()
+    },
+
+    // ── Global Blocks (F-09/F-10) ────────────────────────────────────────
+
+    updateGlobalBlock: (type, patch) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const existing = globalBlocks?.[type] ?? null
+        const newEntry = existing ? { ...existing, ...patch } : { blockType: type === 'whatsappButton' ? 'whatsapp-button' : type, ...patch }
+        const newGlobalBlocks: NonNullable<GlobalBlocksState> = {
+            cartWidget: globalBlocks?.cartWidget ?? null,
+            whatsappButton: globalBlocks?.whatsappButton ?? null,
+            socialWidget: globalBlocks?.socialWidget ?? null,
+            [type]: newEntry,
+        }
+
+        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, `Updated ${type}`, 'inline_edit', newGlobalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
+
+        set({ globalBlocks: newGlobalBlocks, history: newHistory, historyIndex: newHistory.length - 1 })
+        get().handleContentChange()
+    },
+
+    deleteGlobalBlock: (type) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const newGlobalBlocks: NonNullable<GlobalBlocksState> = {
+            cartWidget: globalBlocks?.cartWidget ?? null,
+            whatsappButton: globalBlocks?.whatsappButton ?? null,
+            socialWidget: globalBlocks?.socialWidget ?? null,
+            [type]: null,
+        }
+
+        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, `Deleted ${type}`, 'manual', newGlobalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
+
+        set({ globalBlocks: newGlobalBlocks, history: newHistory, historyIndex: newHistory.length - 1 })
+        get().handleContentChange()
+    },
+
+    flipBlockVariant: (blockType, newVariant, sourceIndex) => {
+        const { blocks, theme, headerBlock, footerBlock, globalBlocks, history, historyIndex, maxHistory } = get()
+        const key = BLOCK_TYPE_TO_KEY[blockType]
+        if (!key) return
+
+        let newBlocks = [...blocks]
+        let newGlobalBlocks: GlobalBlocksState = {
+            cartWidget: globalBlocks?.cartWidget ?? null,
+            whatsappButton: globalBlocks?.whatsappButton ?? null,
+            socialWidget: globalBlocks?.socialWidget ?? null,
+        }
+
+        if (newVariant === 'floating') {
+            // inline → floating: remove from page layout, promote to globalBlocks
+            const idx = sourceIndex ?? newBlocks.findIndex(b => b.blockType === blockType && b.variant === 'inline')
+            if (idx < 0) return
+            const [removed] = newBlocks.splice(idx, 1)
+            newGlobalBlocks = { ...newGlobalBlocks, [key]: { ...removed, variant: 'floating' } }
+        } else {
+            // floating → inline: remove from globalBlocks, push to page layout
+            const entry = globalBlocks?.[key]
+            if (!entry) return
+            newGlobalBlocks = { ...newGlobalBlocks, [key]: null }
+            newBlocks = [...newBlocks, { ...entry, blockType, variant: 'inline' }]
+        }
+
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Switched ${blockType} to ${newVariant}`, 'manual', newGlobalBlocks)
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
+
+        set({ blocks: newBlocks, globalBlocks: newGlobalBlocks, history: newHistory, historyIndex: newHistory.length - 1 })
+        get().handleContentChange()
+    },
+
+    reset: () => {
+        // Cancel any pending auto-save/retry timer before clearing state — prevents
+        // stale cross-site writes when the user navigates to a different site.
+        const { autoSaveTimer } = get()
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+        set({
+            siteId: null, blocks: [], theme: {}, siteName: '',
+            headerBlock: null, footerBlock: null, globalBlocks: null,
+            pages: [], currentPageId: null,
+            history: [], historyIndex: -1,
+            isAIStreaming: false,
+            isInlineEditing: false,
+            hasUnsavedChanges: false, lastSavedAt: null, isSaving: false, pendingManualSave: false,
+            autoSaveEnabled: true, autoSaveIntervalMs: 3000,
+            saveStatus: 'idle', autoSaveTimer: null,
+        })
+    },
 }))

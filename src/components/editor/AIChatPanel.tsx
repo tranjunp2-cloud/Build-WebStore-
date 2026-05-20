@@ -1,232 +1,509 @@
 'use client'
 
-import React, { memo, useState, useEffect, useRef } from 'react'
-import {
-    Sparkles, LayoutGrid, Send, GripVertical,
-    PanelLeftClose, PanelLeftOpen, Plus
-} from 'lucide-react'
+
+import React, { memo, useEffect, useRef, useState } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
+import { RotateCcw, Send, Sparkles, X, WandSparkles } from 'lucide-react'
+import { AddSectionPromptChips } from './AddSectionPromptChips'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { blockRegistry } from '@/blocks/registry'
-import type { BlockData, AIAction, ThemeData } from '@/types/editor'
+import type { AIAction, BlockData, ThemeData } from '@/types/editor'
+import { useI18n } from '@/i18n'
 
-// ─── Types ──────────────────────────────────────────────────────────────
-type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
-
-function getBlockInfo(blockType: string) {
-    const meta = blockRegistry.getBlockMeta(blockType)
-    return { label: meta?.name || blockType, icon: meta?.icon || '🧩', variants: meta?.variants || [] }
+/** Strip all HTML tags from content — defense-in-depth against XSS in AI responses */
+function sanitizeContent(content: string): string {
+    return DOMPurify.sanitize(content, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
 }
 
-// ─── Props ──────────────────────────────────────────────────────────────
+type ChatMessage = {
+    id: string
+    role: 'user' | 'assistant'
+    content: string
+    createdAt?: string
+    undoable?: boolean
+    isStreaming?: boolean
+}
+
 interface AIChatPanelProps {
-    isOpen: boolean
-    onToggle: () => void
+    siteId?: string
     blocks: BlockData[]
-    onBlockSelect: (idx: number) => void
-    selectedBlock: number
-    onAIAction: (action: AIAction) => void
+    selectedBlock: number | null
+    onAIAction: (action: AIAction) => Promise<void> | void
+    onUndoLastAction: () => void
     siteName: string
     theme: ThemeData | undefined
+    currentPageSlug?: string
+    currentPageTitle?: string
+    externalActivity?: {
+        id: string
+        content: string
+    } | null
+    blockContext?: { blockIndex: number; blockType: string } | null
+    onBlockContextDismiss?: () => void
+    compact?: boolean
 }
 
-// ─── Component ──────────────────────────────────────────────────────────
+function formatChatTime(date = new Date()) {
+    return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+    })
+}
+
 function AIChatPanelInner({
-    isOpen, onToggle, blocks, onBlockSelect, selectedBlock,
-    onAIAction, siteName, theme,
+    siteId,
+    blocks,
+    selectedBlock,
+    onAIAction,
+    onUndoLastAction,
+    siteName,
+    theme,
+    currentPageSlug,
+    currentPageTitle,
+    externalActivity,
+    blockContext,
+    onBlockContextDismiss,
+    compact = false,
 }: AIChatPanelProps) {
-    const [tab, setTab] = useState<'chat' | 'blocks'>('blocks')
+
+    const { t } = useI18n()
+    const ac = t.editor.aiChat
+
+    // BUG-F05-13: Persist chat history per site in localStorage
+    const chatStorageKey = siteId ? `editor-chat-${siteId}` : null
+
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
-    const [messages, setMessages] = useState<ChatMessage[]>([
-        { id: 'welcome', role: 'assistant', content: 'I can help you edit your website. For example:\n• "Change primary colour to green"\n• "Rewrite the About section shorter"\n• "Add a FAQ section"\n• "Change heading font to Playfair Display"' },
-    ])
-    const [showAddBlock, setShowAddBlock] = useState(false)
+    // MIN-5: SSR-safe initial state — deterministic welcome without createdAt.
+    // Cache + timestamp hydrate in the useEffect below after mount.
+    const [messages, setMessages] = useState<ChatMessage[]>([{
+        id: 'welcome',
+        role: 'assistant',
+        content: ac.welcomeMessage,
+    }])
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    // Skip the save effect's first run per chatStorageKey.
+    // Root cause: effects run in declaration order within the same render cycle.
+    // Hydration effect (1st) calls setMessages — state hasn't updated yet when
+    // save effect (2nd) runs, so save would write stale [welcome] to localStorage.
+    const skipNextSaveRef = useRef(true)
+
+    // MIN-5: hydrate from localStorage after mount to avoid SSR/CSR divergence.
+    useEffect(() => {
+        skipNextSaveRef.current = true // block save for this render cycle
+        if (chatStorageKey) {
+            const saved = localStorage.getItem(chatStorageKey)
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved) as ChatMessage[]
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setMessages(parsed)
+                        return
+                    }
+                } catch (err) {
+                    if (process.env.NODE_ENV === 'development') console.error('[AIChatPanel] invalid cache', err)
+                    localStorage.removeItem(chatStorageKey)
+                }
+            }
+        }
+        setMessages(prev =>
+            prev.length === 1 && prev[0].id === 'welcome' && !prev[0].createdAt
+                ? [{ ...prev[0], createdAt: formatChatTime() }]
+                : prev,
+        )
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chatStorageKey])
+
+    // BUG-F05-13: Save messages to localStorage on change
+    useEffect(() => {
+        if (typeof window === 'undefined' || !chatStorageKey) return
+        if (skipNextSaveRef.current) {
+            skipNextSaveRef.current = false
+            return
+        }
+        // Strip incomplete streaming messages — they render broken on next load
+        const toSave = messages.filter(m => !m.isStreaming)
+        localStorage.setItem(chatStorageKey, JSON.stringify(toSave))
+    }, [messages, chatStorageKey])
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
-    const handleSendChat = async () => {
-        if (!input.trim() || isProcessing) return
-        const userMsg = input.trim()
-        setInput('')
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: userMsg }])
-        setIsProcessing(true)
+    useEffect(() => {
+        if (!externalActivity) return
 
-        try {
-            const currentBlock = blocks[selectedBlock] || null
-            const res = await fetch('/api/ai/edit-block', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    instruction: userMsg,
-                    block: currentBlock,
-                    blockIndex: selectedBlock,
-                    allBlocks: blocks,
-                    theme,
-                    siteName,
-                }),
-                credentials: 'include',
-            })
+        setMessages(prev => {
+            if (prev.some(message => message.id === externalActivity.id)) {
+                return prev
+            }
 
-            const data = await res.json()
+            return [
+                ...prev,
+                {
+                    id: externalActivity.id,
+                    role: 'assistant',
+                    content: externalActivity.content,
+                    createdAt: formatChatTime(),
+                    undoable: true,
+                },
+            ]
+        })
+    }, [externalActivity])
 
-            if (!res.ok) {
-                setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ ${data.error || 'Failed'}` }])
+    const updateAssistantMessage = (messageId: string, next: Partial<ChatMessage>) => {
+        setMessages(prev =>
+            prev.map(message => (message.id === messageId
+                ? { ...message, ...next, content: next.content ? sanitizeContent(next.content) : message.content }
+                : message)),
+        )
+    }
+
+    const handleAIError = (messageId: string, message: string) => {
+        updateAssistantMessage(messageId, {
+            content: `❌ ${sanitizeContent(message)}`,
+            isStreaming: false,
+            undoable: false,
+        })
+    }
+
+    const readSSEStream = async (response: Response, messageId: string) => {
+        if (!response.body) {
+            throw new Error('Empty stream body')
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        const flushChunk = async (chunk: string) => {
+            const rawEvent = chunk.trim()
+            if (!rawEvent) return
+
+            let eventName = 'message'
+            const dataLines: string[] = []
+
+            for (const line of rawEvent.split('\n')) {
+                if (line.startsWith('event:')) {
+                    eventName = line.slice(6).trim()
+                    continue
+                }
+
+                if (line.startsWith('data:')) {
+                    dataLines.push(line.slice(5).trim())
+                }
+            }
+
+            if (dataLines.length === 0) return
+
+            const payload = JSON.parse(dataLines.join('\n'))
+
+            if (eventName === 'status') {
+                updateAssistantMessage(messageId, { content: payload.message || ac.drafting })
                 return
             }
 
-            // Apply the AI action
-            onAIAction(data as AIAction)
+            if (eventName === 'action') {
+                const actionType = payload?.result?.action ?? payload?.action
+                if (actionType === 'none') {
+                    updateAssistantMessage(messageId, {
+                        content: payload.result?.message || payload.message || ac.outOfScope,
+                        isStreaming: false,
+                        undoable: false,
+                    })
+                    return
+                }
+                await onAIAction(payload as AIAction)
+                return
+            }
 
-            const actionDesc = data.action === 'update_block' ? '✅ Block updated'
-                : data.action === 'update_theme' ? '🎨 Theme updated'
-                    : data.action === 'add_block' ? '➕ New block added'
-                        : data.action === 'delete_block' ? '🗑️ Block deleted'
-                            : '✅ Done'
+            if (eventName === 'done') {
+                updateAssistantMessage(messageId, {
+                    content: payload.message || ac.appliedChanges,
+                    isStreaming: false,
+                    undoable: true,
+                })
+                return
+            }
 
-            setMessages(prev => [...prev, {
-                id: (Date.now() + 1).toString(), role: 'assistant',
-                content: `${actionDesc}\n${data.message || ''}`,
-            }])
+            if (eventName === 'error') {
+                handleAIError(messageId, payload.error || ac.editFailed)
+            }
+        }
+
+        while (true) {
+            const { done, value } = await reader.read()
+            buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+
+            const chunks = buffer.split('\n\n')
+            buffer = chunks.pop() || ''
+
+            for (const chunk of chunks) {
+                await flushChunk(chunk)
+            }
+
+            if (done) {
+                if (buffer.trim()) {
+                    await flushChunk(buffer)
+                }
+                break
+            }
+        }
+    }
+
+    const handleSendChat = async () => {
+        if (!input.trim() || isProcessing) return
+
+        const blockLabel = blockContext ? blockContext.blockType.replace(/-/g, ' ') : null
+        const userMsg = blockLabel
+            ? `[${blockLabel}] ${input.trim()}`
+            : input.trim()
+        const assistantMessageId = `${Date.now()}-assistant`
+
+        setInput('')
+        onBlockContextDismiss?.()
+        setMessages(prev => [
+            ...prev,
+            { id: Date.now().toString(), role: 'user', content: userMsg, createdAt: formatChatTime() },
+            {
+                id: assistantMessageId,
+                role: 'assistant',
+                content: ac.drafting,
+                createdAt: formatChatTime(),
+                isStreaming: true,
+            },
+        ])
+        setIsProcessing(true)
+
+        try {
+            const currentBlock = selectedBlock !== null ? (blocks[selectedBlock] || null) : null
+
+            // Spec §1.3: send last 10 chat messages as context
+            const recentMessages = messages
+                .filter(m => !m.isStreaming)
+                .slice(-10)
+                .map(m => ({ role: m.role, content: m.content }))
+
+            const res = await fetch('/api/ai/edit-block?stream=true', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    instruction: userMsg,
+                    block: currentBlock,
+                    blockIndex: selectedBlock ?? undefined,
+                    allBlocks: blocks,
+                    theme,
+                    siteName,
+                    currentPageSlug: currentPageSlug || 'home',
+                    currentPageTitle: currentPageTitle || '',
+                    chatHistory: recentMessages,
+                }),
+            })
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                handleAIError(assistantMessageId, data.error || ac.failedToEdit)
+                return
+            }
+
+            const isStream = res.headers.get('content-type')?.includes('text/event-stream')
+
+            if (isStream) {
+                await readSSEStream(res, assistantMessageId)
+                return
+            }
+
+            const data = await res.json()
+            const resultAction = data?.result?.action ?? data?.action
+            if (resultAction === 'none') {
+                // Out-of-scope request — show message only, no changes applied
+                updateAssistantMessage(assistantMessageId, {
+                    content: data.result?.message || data.description || ac.outOfScope,
+                    isStreaming: false,
+                    undoable: false,
+                })
+            } else {
+                await onAIAction(data as AIAction)
+                updateAssistantMessage(assistantMessageId, {
+                    content: data.message || data.description || ac.appliedChanges,
+                    isStreaming: false,
+                    undoable: true,
+                })
+            }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Unknown error'
-            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ Error: ${message}` }])
+            handleAIError(assistantMessageId, message)
         } finally {
             setIsProcessing(false)
         }
     }
 
-    if (!isOpen) {
-        return (
-            <button onClick={onToggle}
-                aria-label="Open editor panel"
-                className="fixed left-0 top-14 z-30 rounded-r-lg bg-[#1E293B] p-2 text-gray-400 hover:text-white transition-colors border border-l-0 border-white/10"
-                title="Open Panel">
-                <PanelLeftOpen className="h-4 w-4" />
-            </button>
-        )
-    }
-
-    const allBlockTypes = blockRegistry.getAllMeta()
-
     return (
-        <div className="flex h-full w-[380px] shrink-0 flex-col border-r border-white/10 bg-[#0B1120]">
-            {/* Panel header with tabs */}
-            <div className="flex h-12 items-center justify-between border-b border-white/10 px-3">
-                <div className="flex gap-1" role="tablist" aria-label="Editor panel tabs">
-                    <button onClick={() => setTab('blocks')} role="tab" aria-selected={tab === 'blocks'}
-                        className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                            tab === 'blocks' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300')}>
-                        <LayoutGrid className="h-3 w-3" /> Blocks
-                    </button>
-                    <button onClick={() => setTab('chat')} role="tab" aria-selected={tab === 'chat'}
-                        className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                            tab === 'chat' ? 'bg-purple-500/10 text-purple-400' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300')}>
-                        <Sparkles className="h-3 w-3" /> AI Chat
-                    </button>
-                </div>
-                <button onClick={onToggle} aria-label="Close editor panel" className="rounded-lg p-1 text-gray-500 hover:bg-white/5 hover:text-white transition-colors">
-                    <PanelLeftClose className="h-4 w-4" />
-                </button>
-            </div>
+        <div className="flex h-full flex-col bg-[#0F172A]">
+            <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
+                <div
+                    className={cn(
+                        'flex-1 overflow-y-auto',
+                        compact ? 'px-4 pb-5 pt-6' : 'px-4 pb-4 pt-6',
+                    )}
+                    role="log"
+                    aria-label="AI chat messages"
+                >
+                    <div className="space-y-3">
+                        {messages.map(msg => {
+                            if (msg.role === 'user') {
+                                return (
+                                    <div key={msg.id} className="flex justify-end">
+                                        <div className="w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] px-4 py-3 text-white shadow-lg shadow-blue-500/10">
+                                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
+                                            {msg.createdAt ? (
+                                                <p className="mt-1.5 text-right text-[10px] text-white/50">{msg.createdAt}</p>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                )
+                            }
 
-            {tab === 'blocks' ? (
-                <div className="flex-1 overflow-y-auto p-3 space-y-1" role="tabpanel">
-                    <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs text-gray-500">{blocks.length} blocks</p>
-                        <button onClick={() => setShowAddBlock(!showAddBlock)}
-                            className="flex items-center gap-1 rounded-lg bg-blue-500/10 px-2 py-1 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">
-                            <Plus className="h-3 w-3" /> Add
+                            if (msg.isStreaming) {
+                                return (
+                                    <div key={msg.id} className="flex">
+                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] px-4 py-3">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex gap-1">
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:0ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:150ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:300ms]" />
+                                                </div>
+                                                <span className="text-[13px] leading-relaxed text-slate-300">{msg.content || ac.thinking}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            }
+
+                            if (msg.undoable) {
+                                return (
+                                    <div key={msg.id} className="flex">
+                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] px-4 py-3 text-[#F8FAFC]">
+                                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
+                                            <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={onUndoLastAction}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#2DD4BF] transition-all hover:bg-[#2DD4BF]/10 hover:text-[#5EEAD4]"
+                                                >
+                                                    <RotateCcw className="h-3 w-3" />
+                                                    {ac.undo}
+                                                </button>
+                                                {msg.createdAt ? (
+                                                    <span className="text-[10px] text-white/40">{msg.createdAt}</span>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            }
+
+                            return (
+                                <div key={msg.id} className="flex">
+                                    <div className={cn(
+                                        'rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] text-[#F8FAFC]',
+                                        compact ? 'max-w-[85%] px-4 py-3' : 'max-w-[85%] px-4 py-3',
+                                    )}>
+                                        <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
+                                        {msg.createdAt ? (
+                                            <p className="mt-1.5 text-[10px] text-white/40">{msg.createdAt}</p>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            )
+                        })}
+
+                        <div ref={messagesEndRef} />
+                    </div>
+                </div>
+
+                <div className={cn('border-t border-white/[0.06] bg-[#0B1120]/80 backdrop-blur-sm', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-3')}>
+                    <div className={cn('mb-2.5 flex gap-1.5', compact ? 'overflow-x-auto pb-1 scrollbar-none' : 'flex-wrap')}>
+                        <button
+                            type="button"
+                            onClick={() => setInput('Change web color to mint green')}
+                            className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-300 transition-all hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-white"
+                        >
+                            {ac.changeColorPrompt}
+                        </button>
+                        <AddSectionPromptChips
+                            compact={compact}
+                            desktopMinimal={!compact}
+                            desktopLabelOverride={ac.addSectionPrompt}
+                            onPromptSelect={prompt => setInput(prompt)}
+                        />
+                    </div>
+
+                    <div className={cn(
+                        'group relative rounded-xl border border-white/[0.08] bg-[#1E293B]/80 pl-4 pr-12 py-3 transition-all focus-within:border-cyan-400/40 focus-within:bg-[#1E293B] focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]',
+                        compact && 'px-4 py-3',
+                        blockContext && 'pt-2',
+                    )}>
+                        {blockContext && (
+                            <div className="mb-2 flex items-center gap-1.5">
+                                <span className="flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300 border border-amber-500/20">
+                                    <Sparkles className="h-3 w-3" />
+                                    {blockContext.blockType.replace(/-/g, ' ')}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={onBlockContextDismiss}
+                                    className="rounded p-0.5 text-slate-500 hover:text-slate-300 transition-colors"
+                                    title="Remove context"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </div>
+                        )}
+                        <textarea
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    void handleSendChat()
+                                }
+                            }}
+                            placeholder={ac.inputPlaceholder}
+                            aria-label="Chat message"
+                            rows={1}
+                            className="w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[13px] leading-relaxed text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                            style={{ minHeight: '24px', maxHeight: '120px' }}
+                            disabled={isProcessing}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => void handleSendChat()}
+                            disabled={!input.trim() || isProcessing}
+                            className={cn(
+                                'absolute bottom-2.5 right-3 inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all',
+                                input.trim() && !isProcessing
+                                    ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
+                                    : 'bg-white/[0.06] text-slate-500',
+                                isProcessing && 'cursor-not-allowed',
+                            )}
+                        >
+                            <Send className="h-3.5 w-3.5" />
                         </button>
                     </div>
 
-                    {/* Add Block Picker */}
-                    {showAddBlock && (
-                        <div className="mb-3 rounded-lg border border-blue-500/20 bg-blue-500/5 p-2 space-y-1 max-h-40 overflow-y-auto">
-                            {allBlockTypes.map(meta => (
-                                <button key={meta.type}
-                                    onClick={() => {
-                                        onAIAction({ action: 'add_block', afterIndex: selectedBlock, block: { blockType: meta.type, variant: meta.variants[0] } })
-                                        setShowAddBlock(false)
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 transition-colors">
-                                    <span>{meta.icon}</span> {meta.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {blocks.map((block, i) => {
-                        const info = getBlockInfo(block.blockType)
-                        return (
-                            <button key={i} onClick={() => onBlockSelect(i)}
-                                aria-current={selectedBlock === i ? 'true' : undefined}
-                                className={cn('flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
-                                    selectedBlock === i ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'text-gray-300 hover:bg-white/5 border border-transparent')}>
-                                <GripVertical className="h-3 w-3 text-gray-600" />
-                                <span className="mr-1">{info.icon}</span>
-                                <span className="font-medium">{info.label}</span>
-                                {block.variant ? <span className="ml-auto text-[10px] text-gray-600">{String(block.variant)}</span> : null}
-                            </button>
-                        )
-                    })}
-                </div>
-            ) : (
-                <div role="tabpanel" className="flex flex-1 flex-col">
-                    {/* AI Chat Messages */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-3" role="log" aria-label="AI chat messages">
-                        {messages.map(msg => (
-                            <div key={msg.id} className={cn('flex gap-2', msg.role === 'user' ? 'flex-row-reverse' : '')}>
-                                {msg.role === 'assistant' && (
-                                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
-                                        <Sparkles className="h-3 w-3 text-white" />
-                                    </div>
-                                )}
-                                <div className={cn('max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed',
-                                    msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-[#1E293B] text-gray-300 rounded-bl-sm border border-white/5')}>
-                                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                                </div>
-                            </div>
-                        ))}
-                        {isProcessing && (
-                            <div className="flex gap-2" role="status" aria-label="AI is thinking">
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
-                                    <Sparkles className="h-3 w-3 text-white" />
-                                </div>
-                                <div className="rounded-xl rounded-bl-sm border border-white/5 bg-[#1E293B] px-3 py-2">
-                                    <div className="flex gap-1">
-                                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-500" style={{ animationDelay: '0ms' }} />
-                                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-500" style={{ animationDelay: '150ms' }} />
-                                        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-500" style={{ animationDelay: '300ms' }} />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* AI Chat Input */}
-                    <div className="border-t border-white/10 p-3">
-                        <div className="flex items-center gap-2 rounded-lg bg-[#1E293B] pr-2 border border-white/10 focus-within:border-purple-500/50 transition-colors">
-                            <input value={input}
-                                onChange={e => setInput(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat() } }}
-                                placeholder="Ask AI to make changes..."
-                                aria-label="Chat message"
-                                className="flex-1 bg-transparent px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none"
-                                disabled={isProcessing}
-                            />
-                            <button onClick={handleSendChat} disabled={!input.trim() || isProcessing}
-                                aria-label="Send message"
-                                className="rounded-md bg-purple-600 p-1.5 text-white disabled:opacity-30 hover:bg-purple-500 transition-colors">
-                                <Send className="h-3.5 w-3.5" />
-                            </button>
-                        </div>
+                    <div className="mt-2 flex items-center justify-between px-0.5">
+                        <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                            <kbd className="rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Enter</kbd>
+                            <span>{ac.send}</span>
+                            <kbd className="ml-1 rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Shift+Enter</kbd>
+                            <span>{ac.newLine}</span>
+                        </p>
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     )
 }

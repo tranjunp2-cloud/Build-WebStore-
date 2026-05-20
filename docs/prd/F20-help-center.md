@@ -88,6 +88,7 @@ SO THAT I can quickly learn how to use the system and troubleshoot issues indepe
 | FR-03 | Mỗi module phải có trang hướng dẫn riêng kèm text và screenshots | US-F20-03 | P1 | |
 | FR-04 | User có thể click vào screenshot để phóng to (Lightbox) | US-F20-03 | P2 | Tăng trải nghiệm nhìn |
 | FR-05 | **[Mobile]** Khung Lightbox cho phép Pinch-to-zoom và double-tap zoom trên mobile. | US-F20-04 | P2 | Tối ưu đọc text nhỏ |
+| FR-06 | **[Mobile]** Sidebar navigation chuyển thành sticky top dropdown hoặc horizontal scrollable tab-bar khi màn hình ≤ 768px. | US-F20-04 | P2 | Bảo toàn không gian đọc dọc |
 
 ---
 
@@ -122,12 +123,15 @@ Step 2: User selects a tab / menu item:
 
 > **[Global CMS Constraint]** Render bên trong Main Content Area của F18 CMS Layout.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Help Center Main Screen
 - **Mô tả:** Màn hình chính chứa Table of Contents (hoặc Sidebar phụ) và nội dung chính.
 - **Components chính:**
   - Sidebar phụ (hoặc Tabs): Guideline, Q&A, Modules (Products, Orders, v.v.).
   - Main Area: Nội dung dạng văn bản giàu định dạng (Rich text), Headings, Lists.
-- **Wireframe:**
+- **Design / Wireframe:**
   ```text
   +-----------------------------------------------------------+
   | [H1] Help Center / Hướng dẫn sử dụng                        |
@@ -147,7 +151,7 @@ Step 2: User selects a tab / menu item:
 - **Components chính:**
   - Content Text: Các text hướng dẫn từng bước.
   - Image blocks: Screenshot chèn giữa các text.
-- **Wireframe:**
+- **Design / Wireframe:**
   ```text
   +-----------------------------------------------------------+
   | [H2] Hướng dẫn sử dụng module: Products                     |
@@ -166,32 +170,11 @@ Step 2: User selects a tab / menu item:
 
 ### 10.4. Mobile View (Pinch-to-zoom Lightbox)
 - **Mô tả:** Do screenshot trên mobile khá bé và khó đọc text, Lightbox mở ra phải chiếm full-screen và cho phép user chụm 2 ngón tay lại để Zoom chữ (Pinch-to-zoom) để đọc detail dễ dàng. Sidebar navigation chuyển thành sticky top dropdown.
-- **Wireframe:**
-```text
-┌─ Mobile Help Center ──────────┐
-│ [☰]      [ Module: Orders ▼ ] │
-│ ───────────────────────────── │
-│ Bước 1: Vào mục Orders...     │
-│ ┌───────────────────────────┐ │
-│ │ (Thumbnail Image)         │ │
-│ │ 👆 Nhấp để phóng to        │ │
-│ └───────────────────────────┘ │
-└───────────────────────────────┘
-
-┌─ Lightbox Zoom ───────────────┐
-│                           [X] │
-│                               │
-│       ┌─────────┐             │
-│   ↔️  │(zoomed) │  ↔️        │
-│ Pinch │         │  to         │
-│  <=>  │  Image  │  <=>        │
-│  Zoom │         │ Zoom        │
-│       └─────────┘             │
-│                               │
-└───────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - 📐 [F20 Help Center Design & Wireframe Report](../design/F20-help-center-design.md)
 
 ---
+
 
 ## 11. Acceptance Criteria
 
@@ -233,6 +216,24 @@ GIVEN the user is viewing module instructions
 WHEN  they click on a screenshot
 THEN  the screenshot should expand in a lightbox/modal for better visibility
   AND they can close it to return to the text
+```
+
+### AC-5: Pinch-to-Zoom Support
+> 📌 Source: [US-F20-04](../stories/F20-help-center-stories.md) — AC-1: Pinch-to-Zoom Support
+
+```gherkin
+GIVEN the user opens a screenshot in the Lightbox on a mobile device
+WHEN  they use the pinch gesture (two fingers spreading) or double-tap
+THEN  the image zooms in smoothly without exiting the lightbox
+```
+
+### AC-6: Mobile-Friendly Navigation
+> 📌 Source: [US-F20-04](../stories/F20-help-center-stories.md) — AC-2: Mobile-Friendly Navigation
+
+```gherkin
+GIVEN the user is reading a module guide on mobile
+WHEN  they view the page
+THEN  the left Sidebar navigation shifts to a sticky top dropdown or horizontal scrollable tab-bar to preserve vertical reading space
 ```
 
 ---

@@ -1,8 +1,9 @@
 # PRD: Orders Management (F10)
-> **Version:** 2.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
-> **Priority:** P0 | **Sprint:** Wave 5 | **Size:** M
+> **Version:** 2.2 | **Updated:** 2026-05-15 | **Agent:** `project-planner`
+> **Priority:** P0 | **Sprint:** Wave 6 (v2.2 manual payment verification) · Wave 5 (v2.1 base)
 > **Depends on:** F09 Storefront Commerce ✅, Payload CMS Orders collection ✅
 > **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — §6 WhatsApp
+> **Decisions Log:** [PD-018](../decisions/decisions-log.md#pd-018--manual-payment-bank-transfer-verification-flow) · Issue [#1004](https://github.com/primeproduction/ech-prime-web-v2/issues/1004)
 
 ---
 
@@ -22,6 +23,8 @@
 | US-F10-03 | Order Cancellation & Inventory Restock | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Ready |
 | US-F10-04 | Order List Advanced Sorting & Filtering | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Ready |
 | US-F10-05 | Mobile Web UX — Order Management on the Go | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Ready |
+| US-F10-06 | Seller verifies Manual Payment proof (Approve / Reject) | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Draft (v2.2) |
+| US-F10-07 | Buyer uploads payment proof post-order via Magic Link | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Draft (v2.2) |
 
 ---
 
@@ -41,7 +44,29 @@ When customers place orders through the storefront, site owners need a dashboard
 
 ## 3. Solution Overview
 
-Dashboard `/orders`: stats bar (by status), table với order list (có search, filter, sort), order detail drawer với status timeline. Hỗ trợ 2 luồng đơn hàng: (1) Manual Flow (COD, QR Banking) cho phép merchant tự chỉnh status; (2) Automated Flow (Stripe) tự chuyển status thông qua API. Tích hợp tính năng Refund, Cancel logic (có lý do & restock), và Bulk Confirm.
+Dashboard `/orders`: stats bar (by status), table với order list (có search, filter, sort), order detail drawer với status timeline. Hỗ trợ 2 luồng đơn hàng: (1) Manual Flow (COD, Bank Transfer) cho phép merchant tự chỉnh status; (2) Automated Flow (Stripe) tự chuyển status thông qua API. Tích hợp tính năng Refund, Cancel logic (có lý do & restock), và Bulk Confirm.
+
+### 3.1 Bank Transfer 3-step async verification (v2.2 — PD-018)
+
+PRD v2.1 cho phép Bank Transfer auto-mark `Paid` khi buyer upload proof → tạo lỗ hổng đơn ảo (ảnh đen / meme / hóa đơn cũ vẫn pass). v2.2 đổi thành **3-step async** với verification gate:
+
+```
+Step 1: Buyer Place Order (không cần upload proof)
+        → Order tạo với paymentStatus = awaiting_payment
+        → Stock reservation 24h
+        → Email gửi magic link upload (JWT signed, TTL 24h)
+        ↓
+Step 2: Buyer mở magic link → upload proof
+        → paymentStatus = pending_verification
+        ↓
+Step 3: Seller xem proof trên CMS
+        → Approve → paymentStatus = paid → orderStatus = confirmed
+        → Reject (kèm reason) → paymentStatus = awaiting_payment (re-open upload)
+        ↓
+Timeout (24h) không upload hoặc không verify → auto-cancel + restock
+```
+
+COD giữ nguyên logic — không cần upload proof (physical handover).
 
 ---
 
@@ -49,18 +74,27 @@ Dashboard `/orders`: stats bar (by status), table với order list (có search, 
 
 ### In Scope
 - Giao diện List view: Search, Sort, Filter linh hoạt (US-F10-04)
-- 2 luồng trạng thái đơn hàng: Manual (COD, QR Banking) (US-F10-01, US-F10-02)
+- 2 luồng trạng thái đơn hàng: Manual (COD, Bank Transfer) (US-F10-01, US-F10-02)
+- Quản lý **Order Status** (Pending, Confirmed, Ready to Ship, Shipped, Completed, Cancelled) tách biệt với **Payment Status** (Unpaid, Awaiting Payment, Pending Verification, Paid, Cancelled, Refunded).
 - Order detail trực quan với status timeline, cho phép đổi status trên list/detail (US-F10-01)
-- Các Status: Pending, Confirmed, Ready to Ship, Shipped, Completed, Cancelled, Refunded (US-F10-01)
 - Cancel order: Quy định phải có Cancel reason, auto-restock ngoại trừ product bị xoá (US-F10-03)
 - Hỗ trợ Refund thủ công khi đơn đang Shipped hoặc Completed (US-F10-01)
 - Bulk status update: Thao tác Confirm đồng loạt nhiều đơn Pending (US-F10-01)
+- **[v2.2] Bank Transfer 3-step async verification:** Awaiting Payment → Pending Verification → Paid/Cancelled (US-F10-06, US-F10-07)
+- **[v2.2] Seller verification UI:** Awaiting Verification filter chip, large proof preview, Approve/Reject với reason picker (US-F10-06)
+- **[v2.2] Buyer post-order upload via Magic Link:** JWT signed token TTL 24h, gửi qua email confirmation (US-F10-07)
+- **[v2.2] Stock reservation TTL 24h** với auto-cancel + restock job (US-F10-07)
+- **[v2.2] Auto-generated 6-char Reference Code** đính kèm mỗi Bank Transfer order
 
 ### Out of Scope
 - WhatsApp Business API (P1 — Wave 7+)
 - Đồng bộ webhook tự động từ 3rd Party Logistics API (Phase sau)
-- Payment gateway integration (Stripe) (Phase sau - Tạm ẩn)
-- Xác nhận thanh toán qua open banking API (Phase sau)
+- Stripe Card / FPX (F13 owns — Wave 6)
+- Bulk Approve cho `pending_verification` orders (defer — D-14, revisit sau seller dashboard ship)
+
+### Roadmap Wave 8+ (decided D-13 — 2026-05-15)
+
+- **Auto-verify via Open Banking API**: Match `paymentReference` với bank transaction history → auto-set `paymentStatus = paid` + `verificationSource = auto` + lưu `bankTransactionId`. Schema Wave 6 **đã pre-build** 3 fields dự phòng (`autoVerifiedAt`, `bankTransactionId`, `verificationSource`) — backward-compat zero migration sau khi Open Banking integration ship.
 
 ---
 
@@ -94,14 +128,27 @@ SO THAT tôi quản lý fulfilment hiệu quả
 | FR-03 | Bulk Action: Chọn nhiều đơn "Pending" -> Update thành "Confirmed" | US-F10-01 | P0 | Áp dụng cho manual flow |
 | FR-04 | New order notification: in-app toast + email to merchant trong < 60s | US-F10-01 | P0 | |
 | FR-05 | Order detail: customer info, items, subtotal, SST, shipping, total, payment proof (đối với QR Banking) | US-F10-01 | P0 | Cho phép đổi status ở list/drawer |
-| FR-06 | Status workflow: Pending → Confirmed → Ready to Ship → Shipped → Completed / Cancelled / Refunded | US-F10-01 | P0 | |
+| FR-06 | Order Status workflow: Pending → Confirmed → Ready to Ship → Shipped → Completed / Cancelled | US-F10-01 | P0 | Tách biệt với Payment Status |
 | FR-07 | Status update → customer notification email auto-sent (áp dụng Confirm, Shipped, Cancelled) | US-F10-01 | P1 | |
 | FR-08 | Cancel order: Yêu cầu nhập Cancel Reason & inventory auto-restock | US-F10-03 | P0 | Bỏ qua restock nếu product bị xoá |
-| FR-09 | Refund: Chuyển order sang Refund thủ công khi ở trạng thái hợp lệ (Shipped, Completed) | US-F10-01 | P0 | |
-| FR-10 | Customer payment flow: COD, QR Banking (Manual). Stripe tạm ẩn. | US-F10-02 | P0 | |
-| FR-11 | QR Payment Checkout: Hiển thị hình QR mã hoá, bắt buộc upload ảnh biên lai (<2MB, JPG/PNG) | US-F10-02 | P0 | Nút continue bị block nếu chưa upload |
+| FR-09 | Refund: Chuyển order sang Refund thủ công khi ở trạng thái hợp lệ (Shipped, Completed), tự cập nhật Payment Status -> Refunded | US-F10-01 | P0 | |
+| FR-10 | Customer payment flow: COD, Bank Transfer (Manual). Stripe Card + FPX qua F13. | US-F10-02 | P0 | |
+| ~~FR-11~~ | ~~QR Payment Checkout: Bắt buộc upload ảnh biên lai (<2MB). Trạng thái thanh toán (Payment Status) khởi tạo mặc định là `Paid`.~~ | ~~US-F10-02~~ | ~~P0~~ | **DEPRECATED v2.2 — replaced by FR-14 → FR-22.** Auto-Paid pattern tạo lỗ hổng fake orders. |
+| FR-11.1 | Payment Status Sync: Khi đơn hàng được `Cancelled`, `Payment Status` cập nhật thành `Cancelled`. Khi đơn hàng thực hiện thao tác hoàn tiền, `Payment Status` thành `Refunded`. | US-F10-01 | P0 | Đồng bộ state. |
+| FR-11.2 | Payment Status Data: Hệ thống hỗ trợ tách bạch Order Status và 6 Payment Statuses: `Unpaid` (COD chưa giao), `Awaiting Payment` (BT chưa upload proof), `Pending Verification` (BT đã upload, chờ seller), `Paid`, `Cancelled`, `Refunded`. | US-F10-01, US-F10-06 | P0 | **[v2.2]** Enum mở rộng. COD = `Unpaid`. BT lifecycle: `Awaiting Payment` → `Pending Verification` → `Paid` hoặc `Cancelled`. |
 | FR-12 | **[Mobile]** Danh sách đơn hàng trên viewport < 768px chuyển đổi từ Bảng (Table) sang dạng Thẻ Card dọc (Stacked Cards). | US-F10-05 | P1 | UX chống cuộn ngang |
 | FR-13 | **[Mobile]** Chi tiết đơn hàng mở thành dạng Fullscreen thay vì Drawer, với các nút Action (Update Status, Cancel) sticky ở mép dưới màn hình. | US-F10-05 | P1 | Thumb-friendly |
+| **FR-14** | **Bank Transfer Place Order:** Buyer chọn Bank Transfer + bấm Place Order **KHÔNG cần upload proof tại checkout** → order tạo với `paymentStatus = awaiting_payment`, `paymentExpiresAt = now + 24h`, auto-generated 6-char `paymentReference` (e.g. `BT-A3K9P2`). | US-F10-02, US-F10-07 | P0 | **[v2.2 D-04 D-08 D-11]** Drop fast-path upload-at-checkout. |
+| **FR-15** | **Magic Link Email:** Sau Place Order, hệ thống gửi email confirmation kèm magic link `/sites/[slug]/orders/[id]?token=<JWT>` (signed JWT, expiry = `paymentExpiresAt`). Email content cho cả Bank Transfer + COD đồng nhất template. | US-F10-07 | P0 | **[v2.2 D-01 D-07 D-09 D-10]** Fire-and-forget pattern. |
+| **FR-16** | **Post-Order Upload Page:** Magic link mở persistent route hiển thị: order summary, QR/STK merchant, **6-char Reference Code instruction** ("Vui lòng nhập `BT-XXXXXX` vào ghi chú khi chuyển khoản"), Upload Receipt button. | US-F10-07 | P0 | **[v2.2 D-01 D-08 D-10]** Route bookmark được + sharable. |
+| **FR-17** | **Upload Proof → Pending Verification:** Khi buyer upload proof thành công (file ≤2MB, JPG/PNG/PDF) → `paymentStatus = pending_verification`. **KHÔNG auto-mark Paid** (đảo BR-Payment-01 cũ). | US-F10-07 | P0 | **[v2.2 D-11]** Verification gate. |
+| **FR-18** | **Re-upload Behavior:** Buyer được phép replace proof khi `paymentStatus IN (awaiting_payment, pending_verification)`. Khi seller Reject, status quay về `awaiting_payment` → buyer có thể re-upload (kháng cáo). | US-F10-07 | P0 | **[v2.2 D-03]** Tránh deadlock UX. |
+| **FR-19** | **Seller Verify Drawer:** Order detail Bank Transfer hiển thị: large proof preview (click → full-screen modal), `paymentReference` rõ ràng để seller đối soát app bank, 2 nút **Approve** + **Reject**. | US-F10-06 | P0 | **[v2.2]** Replace Image Viewer cũ. |
+| **FR-20** | **Approve Flow:** Seller bấm Approve → `paymentStatus = paid`, `paymentVerifiedAt = now`, `paymentVerifiedBy = currentUserId`. Order Status auto-promote `pending` → `confirmed`. Trigger email "Payment Confirmed". | US-F10-06 | P0 | **[v2.2]** |
+| **FR-21** | **Reject Flow:** Seller bấm Reject → modal yêu cầu chọn **reason** từ enum: `Ảnh mờ`, `Sai số tiền`, `Trùng đơn`, `Khác (kèm freetext bắt buộc ≥10 chars)`. Sau submit → `paymentRejectionReason` + `paymentRejectionDetail` lưu, status về `awaiting_payment`, gửi email "Payment Rejected — please re-upload" kèm magic link mới. | US-F10-06 | P0 | **[v2.2 D-05]** Single-select enum + Khác freetext. |
+| **FR-22** | **Stock Reservation TTL + Auto-Cancel:** Bank Transfer order **reserve stock** (KHÔNG decrement immediate). Background job quét order có `paymentStatus IN (awaiting_payment, pending_verification)` AND `paymentExpiresAt < now` → auto-cancel + restock + gửi email "Order expired". | US-F10-07 | P0 | **[v2.2 D-02]** TTL 24h. Job tần suất ≤ 15 phút. |
+| **FR-23** | **Awaiting Verification Filter Chip:** Orders Dashboard hiển thị quick-filter chip "Awaiting Verification" (count badge) bên cạnh Status Stats Bar. Click → list lọc orders có `paymentStatus = pending_verification`. | US-F10-06 | P0 | **[v2.2]** Seller daily workflow. |
+| ~~**FR-24**~~ | ~~Anti-Fraud Warning Copy~~ | ~~US-F10-07~~ | ~~P0~~ | **[v2.2 D-06 DROPPED 2026-05-15]** PM chốt bỏ — trust signal đến từ reference code + verification gate. |
 
 ---
 
@@ -109,26 +156,78 @@ SO THAT tôi quản lý fulfilment hiệu quả
 
 - **BR-01:** Valid status base transitions: Pending→Confirmed→Ready to Ship→Shipped→Completed.
 - **BR-Cancel-01:** Bắt buộc nhập **Lý do huỷ** (Cancel Reason) khi thực hiện Cancel order.
-- **BR-Cancel-02:** Với đơn thanh toán kiểu Manual (COD/QR), chỉ cho phép Cancel khi ở trạng thái `Pending` hoặc `Confirmed`.
-- **BR-Refund-01:** Chỉ cho phép chuyển sang `Refunded` (thủ công) khi đơn đang ở trạng thái `Shipped` (Đang vận chuyển) hoặc `Completed` (Hoàn thành đơn hàng).
-- **BR-Restock-01:** Khi trạng thái chuyển sang `Cancelled`, hệ thống tự động cộng lại tồn kho. Bỏ qua nếu sản phẩm đã bị xoá khỏi hệ thống.
+- **BR-Cancel-02:** Với đơn thanh toán kiểu Manual (COD/Bank Transfer), chỉ cho phép Cancel khi ở trạng thái `Pending` hoặc `Confirmed`. Khi được chuyển sang `Cancelled` thì `Payment Status` cũng tự động được đồng bộ về `Cancelled`.
+- **BR-Refund-01:** Chỉ cho phép thực hiện Refund (thủ công) khi đơn đang ở trạng thái `Shipped` (Đang vận chuyển) hoặc `Completed` (Hoàn thành đơn hàng). Lúc này Order Status sẽ tự fallback về Cancelled và `Payment Status` là `Refunded`.
+- **BR-Restock-01:** Khi trạng thái Order chuyển sang `Cancelled`, hệ thống tự động cộng lại tồn kho. Bỏ qua logic này nếu sản phẩm đã bị xoá khỏi database.
+- ~~**BR-Payment-01 (QR Banking):** Mặc định khi khách đặt hàng và upload thành công biên lai (Payment Proof), hệ thống tự động mark `Payment Status` của họ là `Paid`.~~ **[DEPRECATED v2.2 — replaced by BR-Payment-03 → BR-Payment-08.]** Pattern auto-Paid tạo lỗ hổng fake orders. PD-018 chốt verification gate.
+- **BR-Payment-02 (COD):** Khi khách chọn COD, Payment Status khởi tạo bằng `Unpaid`. Admin vẫn tiến hành chuyển trạng thái Order theo luồng giao vận bình thường. Khi Admin update Order Status thành `Completed`, hệ thống **tự động cập nhật** Payment Status thành `Paid`. **(COD parity confirmed D-12 — không thay đổi.)**
+- **BR-Payment-03 (Bank Transfer Lifecycle):** Bank Transfer order lifecycle `paymentStatus`: `awaiting_payment` (post-Place-Order, chưa upload) → `pending_verification` (đã upload proof, chờ seller) → `paid` (Approved) hoặc `cancelled` (Rejected / TTL expired). KHÔNG có path nào auto-promote sang `paid` mà thiếu seller Approve.
+- **BR-Payment-04 (Stock Reservation TTL):** Bank Transfer order **reserve stock** ngay khi Place Order (không decrement). TTL = 24h tính từ `createdAt`. Background job auto-cancel + restock orders quá hạn. Tần suất job ≤ 15 phút để đảm bảo SLA.
+- **BR-Payment-05 (Magic Link Expiry):** JWT magic link expiry = `paymentExpiresAt`. Buyer mở link sau expiry → page hiển thị "Order expired" + CTA tạo đơn mới. Seller có thể issue magic link mới khi Reject (resets `paymentExpiresAt` thêm 24h từ thời điểm Reject).
+- **BR-Payment-06 (Re-upload Allowed):** Buyer được phép replace proof khi `paymentStatus IN (awaiting_payment, pending_verification)`. Sau Reject, status revert `awaiting_payment` → re-upload mở lại. KHÔNG cho phép upload sau khi Approve hoặc Cancel.
+- **BR-Payment-07 (Reject Reason Mandatory):** Seller Reject **bắt buộc** chọn reason. Enum: `Ảnh mờ` | `Sai số tiền` | `Trùng đơn` | `Khác`. Khi chọn `Khác` → field freetext bắt buộc ≥10 chars. Lưu vào `paymentRejectionReason` + `paymentRejectionDetail`.
+- **BR-Payment-08 (Reference Code Generation):** Mỗi Bank Transfer order tạo auto `paymentReference` format `BT-XXXXXX` (6 chars alphanumeric uppercase, exclude ambiguous `0/O/I/1`). Unique per tenant. Buyer instruction yêu cầu nhập code này vào ghi chú chuyển khoản.
 - **BR-06:** Order scope theo tenant — không cross-tenant.
-- **BR-07:** Inventory reservation released nếu API payment fail sau 30 phút.
+- **BR-07:** Inventory reservation released nếu API payment fail sau 30 phút **(Stripe automated flow only — Bank Transfer dùng BR-Payment-04 TTL 24h)**.
 
 ---
 
 ## 9. User Flow
 
+### 9.1 COD Flow (unchanged from v2.1)
+
 ```
-New order placed (Storefront) → Order created 'pending'
+New COD order placed (Storefront) → Order created 'pending', paymentStatus=unpaid
   → Merchant notification (toast + email)
   → Customer confirmation email
   ↓
 /orders
   Order appears in list
   Click → detail drawer
-  Change status: Pending → Confirmed
+  Change status: Pending → Confirmed → ... → Completed
   → Customer notification (email / WhatsApp P1)
+  → On Completed: paymentStatus auto-set 'paid' (BR-Payment-02)
+```
+
+### 9.2 Bank Transfer 3-step async flow (v2.2 — PD-018)
+
+```
+[STEP 1] Storefront Checkout
+  Buyer chọn Bank Transfer + Place Order
+    → Order tạo: orderStatus='pending', paymentStatus='awaiting_payment'
+    → Stock reservation (KHÔNG decrement) + paymentExpiresAt = now + 24h
+    → Auto-generate paymentReference = "BT-XXXXXX"
+    → Send email confirmation kèm magic link (JWT signed, TTL 24h)
+    → Buyer redirect → /sites/[slug]/orders/[id]?token=<JWT>
+                                                          ↓
+[STEP 2] Post-Order Upload page (persistent route)
+  Buyer xem QR/STK merchant + reference code instruction + Upload Receipt button
+    → Buyer upload proof (≤2MB, JPG/PNG/PDF)
+    → paymentStatus → 'pending_verification'
+    → Notify seller (toast + email)
+                                                          ↓
+[STEP 3] Seller verifies on Orders Dashboard
+  Click "Awaiting Verification" filter chip → list
+  Open order detail → large proof preview
+  Đối soát số tiền + paymentReference với app bank
+    │
+    ├─ Approve → paymentStatus='paid', paymentVerifiedAt=now
+    │           → orderStatus auto-promote 'pending' → 'confirmed'
+    │           → Email buyer "Payment Confirmed"
+    │           → Stock commit (decrement)
+    │
+    └─ Reject (modal chọn reason)
+                → paymentRejectionReason + paymentRejectionDetail saved
+                → paymentStatus revert 'awaiting_payment'
+                → Email buyer "Payment Rejected: <reason>" + new magic link
+                → Buyer có thể re-upload (kháng cáo)
+
+[TIMEOUT] Background job (≤15min cadence)
+  WHERE paymentStatus IN ('awaiting_payment','pending_verification')
+    AND paymentExpiresAt < NOW()
+  → orderStatus='cancelled', paymentStatus='cancelled'
+  → Stock restock
+  → Email buyer "Order Expired"
 ```
 
 ---
@@ -139,93 +238,72 @@ New order placed (Storefront) → Order created 'pending'
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Orders Dashboard / List)
 - **Mô tả:** Trung tâm quản lý toàn bộ đơn hàng của nhà bán.
 - **Components chính:**
   - Status Stats Bar: Thanh ngang (Hoặc Widget KPIs) trên cùng tóm tắt số liệu đơn theo trạng thái (vd: Pending: 3, Confirmed: 5, Shipped: 12).
+  - **[v2.2]** Quick Filter Chip **"Awaiting Verification"** (count badge) — preset filter `paymentStatus=pending_verification`. Vị trí: ngay cạnh Status Stats Bar, distinct color (orange/amber) để seller nhận diện workload.
   - Search & Filter Bar: Tìm theo Mã Đơn/KH; Lọc theo Ngày/Tháng; Khối thao tác Bulk Action "Confirm x Orders".
-  - Data Table: Cột Mã Đơn (Clickable), Tên Khách, Tổng tiền (RM), Status Badge (đổi màu theo state), Loại thanh toán, Thời gian.
-- **Wireframe:**
-```text
-┌─ /orders ────────────────────────────────────────────────┐
-│  Orders                                                  │
-│  Pending: 3  │ Confirmed: 5  │ Shipped: 12               │
-│  [All ▼] [Date Range] [🔍 Search]                        │
-│                                                          │
-│  Order#     │ Customer │ Total  │ Status                 │
-│  ORD-A1B2C3 │ Aisha    │ RM156  │ 🟡 Pending             │
-│  ORD-D4E5F6 │ Kumar    │ RM89   │ 🟢 Confirmed            │
-│  ORD-G7H8I9 │ Wei Lin  │ RM245  │ 📦 Shipped             │
-│                                                          │
-│ Mobile: cards, detail = full page                        │
-└──────────────────────────────────────────────────────────┘
-```
+  - Data Table: Cột Mã Đơn (Clickable), Tên Khách, Tổng tiền (RM), Status Badge (đổi màu theo state — `awaiting_payment`=gray, `pending_verification`=amber, `paid`=green), **[v2.2]** Payment Reference (BT-XXXXXX), Loại thanh toán, Thời gian.
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Chi tiết (Order Detail / Info Drawer)
 - **Mô tả:** Màn hình chi tiết của 1 đơn hàng cụ thể, thường được thiết kế dưới dạng Flyout Sidebar trượt từ phải ra (hoặc Page riêng độc lập).
 - **Components chính:**
   - Status Timeline (Progress Flow): Biểu đồ các mốc trạng thái từ Pending -> Confirmed -> Shipped... để user theo dõi tiến trình.
   - Nút thao tác Status Actions: [Mark as Shipped], [Cancel Order], [Refund].
+  - **[v2.2] Manual Payment Verification Block (chỉ hiện cho Bank Transfer khi `paymentStatus=pending_verification`):**
+    - Reference code prominently displayed: `BT-XXXXXX` (font mono, large, copyable)
+    - Large proof preview (clickable → full-screen modal)
+    - Amount expected vs (placeholder cho phép seller note actual amount nếu khác)
+    - Buyer info quick view (name + phone — để liên hệ nếu cần)
+    - 2 primary buttons: **[Approve]** (green) + **[Reject]** (red — opens Reject Modal)
   - Customer Block: Tên, SDT, Địa chỉ giao hàng, Địa chỉ email.
-  - Payment Detail: Loại hình (COD/QR), Nếu là QR thì hiển thị ảnh receipt do khách upload kèm nút [Mở To Ảnh].
+  - Payment Detail: Loại hình (COD/Bank Transfer). Nếu Bank Transfer + đã verify → hiển thị `paymentVerifiedAt` + `paymentVerifiedBy` (audit trail).
   - Line Items list: Danh sách các SKU khách đặt mua kèm Cân nặng, Giá tiền. Summary khối tính tổng: Subtotal, Shipping fee, SST 6%, Grand Total.
-- **Wireframe (Order Detail Drawer):**
-```text
-┌─ Order Detail: ORD-A1B2C3 ──────────[X]┐
-│  🟢 Confirmed  |  May 15, 2026 14:30   │
-│                                        │
-│  ┌─ STATUS TIMELINE ─────────────────┐ │
-│  │ (✓) Pending -> (✓) Confirmed      │ │
-│  │     -> ( ) Shipped -> ( ) Done    │ │
-│  └───────────────────────────────────┘ │
-│  [ Mark as Shipped ]  [ Cancel Order ] │
-│                                        │
-│  ┌─ CUSTOMER ────────────────────────┐ │
-│  │ Aisha Binti Omar | 012-345-6789   │ │
-│  │ aisha@email.com                   │ │
-│  │ 123 Jalan Ampang, Kuala Lumpur    │ │
-│  └───────────────────────────────────┘ │
-│  ┌─ ITEMS (2) ───────────────────────┐ │
-│  │ Baju Kurung (Đỏ, M) x1    RM 89   │ │
-│  │ Head Scarf (Đen) x2       RM 40   │ │
-│  └───────────────────────────────────┘ │
-│  Subtotal: RM 129 | Ship: RM 8 | SST: RM 7 │
-│  TOTAL: RM 144.00 (Paid via QR)        │
-└────────────────────────────────────────┘
-```
+- **Design / Wireframe (Order Detail Drawer):**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Order Cards & Full-page Detail)
 - **Mô tả:** Thay vì bảng Data Table khó xem trên mobile, danh sách đơn hàng biến thành các Blocks. Tương tác vuốt (Swipe) thẻ để thực hiện thao tác nhanh. Khi click vào chi tiết, Drawer chuyển thành một màn hình dọc toàn phần (Full-page modal) thay vì Sidebar móp méo bên phải.
-- **Wireframe:**
-```text
-┌─ 📱 Mobile Orders ──────────────────────────┐
-│ [≡] Orders                                  │
-│ ─────────────────────────────────────────── │
-│  Pending: 3  │ Conf: 5  │ Ship: 12          │
-│                                             │
-│ [ 🔍 Mã đơn / Tên khách... ]                │
-│ ─────────────────────────────────────────── │
-│ ┌─ ORD-A1B2C3 ─────────[ 🟡 Pending ]─┐     │
-│ │ Khách: Aisha Binti Omar             │     │
-│ │ Ngày: 15/05/26        Giá: RM 144   │     │
-│ │                                     │     │
-│ │ [ Hủy Đơn ]          [ Xác nhận ✔ ] │     │
-│ └─────────────────────────────────────┘     │
-│                                             │
-│ ┌─ ORD-D4E5F6 ─────────[ 🟢 Confirmed]─┐     │
-│ │ Khách: Kumar                        │     │
-│ │ Ngày: 14/05/26        Giá: RM 89    │     │
-│ └─────────────────────────────────────┘     │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
-### 10.4. Các trạng thái UI (UI States) & Modals
+### 10.4. **[v2.2] Storefront — Post-Order Upload Page** (`/sites/[slug]/orders/[id]?token=...`)
+- **Mô tả:** Persistent route cho buyer upload proof sau Place Order. Magic link từ email → page này.
+- **States:**
+  - **`awaiting_payment` (default):**
+    - Headline: "Order Received! Awaiting Payment"
+    - Subtext: "Đơn hàng `<orderNumber>` đã được tạo. Vui lòng chuyển khoản và upload bằng chứng để chúng tôi xác nhận."
+    - Order summary block: order#, total, expiry timer ("Còn lại 23h 45m")
+    - **Payment Instructions Block:**
+      - Merchant QR image (DuitNow) — large
+      - Bank account details (tên ngân hàng, STK, tên TK)
+      - **Reference Code** `BT-XXXXXX` (highlighted, copy button)
+      - Instruction copy: "Vui lòng nhập `BT-XXXXXX` vào ghi chú khi chuyển khoản để chúng tôi đối soát nhanh hơn."
+    - Upload Receipt button (large CTA) + drag-drop zone
+    - **Anti-fraud warning** (FR-24): "Cố ý gửi bằng chứng giả mạo có thể dẫn đến việc hủy đơn hoặc khóa quyền mua hàng vĩnh viễn."
+  - **`pending_verification`:** Headline "Awaiting Seller Verification" + "Seller sẽ xác minh trong 1–12 giờ". Cho phép re-upload (replace).
+  - **`paid`:** Headline "Payment Confirmed ✓" + CTA "Continue Shopping" / "Track Order".
+  - **`cancelled` (Rejected hoặc TTL expired):** Headline "Order Cancelled" + lý do (nếu Rejected) + CTA tạo đơn mới.
+  - **Token invalid / expired:** Error page + CTA contact support hoặc tạo đơn mới.
+
+### 10.5. **[v2.2] Modals**
+- **Reject Payment Modal:** Single-select radio reason (`Ảnh mờ` | `Sai số tiền` | `Trùng đơn` | `Khác`). Khi chọn `Khác` → textarea bắt buộc ≥10 chars. Submit → confirmation toast.
+- **Full-Screen Proof Viewer:** Click proof preview → full-screen image với zoom/rotate. ESC để đóng.
+
+### 10.6. Các trạng thái UI (UI States) & Modals (legacy)
 - **Empty State:** Hình xe giao hàng lủi thủi + "Bạn chưa có đơn hàng nào. Hãy chia sẻ link store!".
 - **Loading State:** Bảng Table Skeleton lines loading. Nút Update Status show Spinner.
 - **Error State / Edge Cases:** Toast đỏ báo lỗi không thể update status.
-- **Modals:** Modal Cancel Order buộc nhập Text Reason. Modal Image Viewer (khi click vào ảnh receipt QR Payment Proof).
+- **Modals:** Modal Cancel Order buộc nhập Text Reason. Modal Image Viewer (legacy — v2.2 dùng Full-Screen Proof Viewer ở §10.5).
 
 ---
+
 
 ## 11. Acceptance Criteria
 
@@ -236,7 +314,7 @@ New order placed (Storefront) → Order created 'pending'
 
 ```gherkin
 GIVEN a new order is placed on my storefront
-WHEN  the payment is confirmed (QR/COD)
+WHEN  the order is created (COD = paymentStatus 'unpaid', Bank Transfer = 'awaiting_payment')
 THEN  the order appears in my Orders dashboard within 60 seconds
   AND I receive a notification (in-app toast + email to merchant)
 ```
@@ -262,15 +340,85 @@ THEN  the system prompts me to enter a "Cancel Reason"
   AND the reserved inventory is restored (unless the original product is deleted)
 ```
 
-### AC-4: Checkout with QR Banking (Proof Upload)
-> 📌 Source: [US-F10-02](../stories/F10-orders-stories.md) — AC-4
+### AC-4: Checkout with Bank Transfer (3-step async — v2.2)
+> 📌 Source: [US-F10-02](../stories/F10-orders-stories.md) — AC-3 (v2.2 rewrite)
 
 ```gherkin
 GIVEN I am at the checkout page
-WHEN  I select "QR Banking" as my payment method
-THEN  the system displays the Merchant's QR Code image
-  AND the "Proceed/Confirm Order" button is disabled until I upload a Payment Proof Image
-  AND if I upload an image > 2MB or invalid format, an error is shown
+WHEN  I select "Bank Transfer" as my payment method and click Place Order
+THEN  the order is created with paymentStatus = 'awaiting_payment'
+  AND paymentReference is auto-generated (format BT-XXXXXX)
+  AND paymentExpiresAt = createdAt + 24h
+  AND stock is reserved (NOT decremented)
+  AND I receive an email with magic link to the Post-Order Upload page
+  AND I am redirected to /sites/[slug]/orders/[id]?token=<JWT>
+  AND the upload page shows QR/STK + reference code instruction + Upload Receipt button
+  AND no upload happens at checkout (FR-14 D-04)
+```
+
+### AC-5: Buyer uploads payment proof (post-order)
+> 📌 Source: [US-F10-07](../stories/F10-orders-stories.md) — AC-1 (v2.2)
+
+```gherkin
+GIVEN I open the magic link from order confirmation email
+  AND the order is in paymentStatus 'awaiting_payment' AND paymentExpiresAt is in the future
+WHEN  I upload a proof image (≤2MB, JPG/PNG/PDF)
+THEN  paymentStatus transitions to 'pending_verification'
+  AND seller receives notification (toast + email)
+  AND I see "Awaiting Seller Verification" headline
+  AND I CAN re-upload (replace) before seller decision (FR-18 D-03)
+```
+
+### AC-6: Seller approves Bank Transfer payment
+> 📌 Source: [US-F10-06](../stories/F10-orders-stories.md) — AC-1 (v2.2)
+
+```gherkin
+GIVEN I am viewing a Bank Transfer order with paymentStatus 'pending_verification'
+WHEN  I click "Approve" in the Manual Payment Verification Block
+THEN  paymentStatus transitions to 'paid'
+  AND paymentVerifiedAt = now, paymentVerifiedBy = currentUserId
+  AND orderStatus auto-promotes 'pending' → 'confirmed'
+  AND stock is committed (decrement)
+  AND buyer receives "Payment Confirmed" email
+```
+
+### AC-7: Seller rejects Bank Transfer payment with reason
+> 📌 Source: [US-F10-06](../stories/F10-orders-stories.md) — AC-2 (v2.2)
+
+```gherkin
+GIVEN I am viewing a Bank Transfer order with paymentStatus 'pending_verification'
+WHEN  I click "Reject"
+THEN  a modal asks me to select a reason from enum [Ảnh mờ, Sai số tiền, Trùng đơn, Khác]
+  AND if I select "Khác", a freetext field is required (≥10 chars)
+  AND upon submit, paymentRejectionReason + paymentRejectionDetail are saved
+  AND paymentStatus reverts to 'awaiting_payment'
+  AND paymentExpiresAt extends by 24h from rejection moment
+  AND buyer receives "Payment Rejected: <reason>" email with new magic link
+  AND buyer can re-upload (kháng cáo)
+```
+
+### AC-8: Auto-cancel on TTL expiry
+> 📌 Source: [US-F10-07](../stories/F10-orders-stories.md) — AC-3 (v2.2)
+
+```gherkin
+GIVEN a Bank Transfer order with paymentStatus IN ('awaiting_payment','pending_verification')
+  AND paymentExpiresAt < now
+WHEN  the background job runs (cadence ≤15 minutes)
+THEN  orderStatus is set to 'cancelled'
+  AND paymentStatus is set to 'cancelled'
+  AND reserved stock is restored
+  AND buyer receives "Order Expired" email
+```
+
+### AC-9: Magic link expiry / invalid token
+> 📌 Source: [US-F10-07](../stories/F10-orders-stories.md) — AC-4 (v2.2)
+
+```gherkin
+GIVEN I have a magic link with an expired or tampered JWT token
+WHEN  I open the link
+THEN  the upload page shows "Order expired" or "Invalid link" error
+  AND CTA to contact seller or create a new order is displayed
+  AND NO upload action is possible
 ```
 
 ---
@@ -291,15 +439,49 @@ THEN  the system displays the Merchant's QR Code image
 
 | Component | File | Description |
 |-----------|------|-------------|
-| `OrdersPage` | `app/(dashboard)/orders/page.tsx` | List + stats |
-| `OrderDetailDrawer` | `components/dashboard/OrderDetailDrawer.tsx` | Detail + status |
+| `OrdersPage` | `app/(dashboard)/orders/page.tsx` | List + stats + **[v2.2] Awaiting Verification filter chip** |
+| `OrderDetailDrawer` | `components/dashboard/OrderDetailDrawer.tsx` | Detail + status + **[v2.2] ManualPaymentVerificationBlock** |
 | `StatusTimeline` | `components/dashboard/StatusTimeline.tsx` | Progress steps |
+| **[v2.2]** `ManualPaymentVerificationBlock` | `components/dashboard/ManualPaymentVerificationBlock.tsx` | Approve/Reject buttons + large proof preview + reference code display |
+| **[v2.2]** `RejectPaymentModal` | `components/dashboard/RejectPaymentModal.tsx` | Reason picker (enum + Khác freetext) |
+| **[v2.2]** `PostOrderUploadPage` | `app/sites/[slug]/orders/[id]/page.tsx` | Persistent route — buyer upload flow |
+| **[v2.2]** `magicLinkVerify` | `lib/auth/order-token.ts` | JWT sign/verify cho magic link |
+| **[v2.2]** `paymentExpiryJob` | `lib/jobs/payment-expiry.ts` | Background cron auto-cancel + restock |
 
-### 13.2 API Endpoints
+### 13.2 Data Models & Structure
+Order Collection (Payload CMS) cần lưu rõ các Fields:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `orderStatus` | enum | `pending` \| `confirmed` \| `ready_to_ship` \| `shipped` \| `completed` \| `cancelled` |
+| `paymentMethod` | enum | `cod` \| `bank_transfer` (v2.2 rename khỏi `qr_banking`) — `card` \| `fpx` qua F13 |
+| `paymentStatus` | enum | **[v2.2 D-11]** `unpaid` \| `awaiting_payment` \| `pending_verification` \| `paid` \| `cancelled` \| `refunded` |
+| `paymentReference` | varchar(10) | **[v2.2 D-08]** Auto `BT-XXXXXX` (6 chars alphanum exclude `0/O/I/1`). Unique per tenant. |
+| `paymentExpiresAt` | timestamp | **[v2.2 D-02]** `createdAt + 24h` cho Bank Transfer. Background job dùng để cancel. |
+| `paymentProofImage` | upload → media | Already exists (v2.1). v2.2 cho phép replace khi `paymentStatus IN (awaiting_payment, pending_verification)`. |
+| `paymentRejectionReason` | enum | **[v2.2 D-05]** `null` \| `image_blurry` \| `wrong_amount` \| `duplicate_order` \| `other` |
+| `paymentRejectionDetail` | text | **[v2.2]** Freetext ≥10 chars nếu `paymentRejectionReason='other'`. |
+| `paymentVerifiedAt` | timestamp | **[v2.2]** Set khi seller Approve hoặc auto-verify match. |
+| `paymentVerifiedBy` | relation → users | **[v2.2]** Audit trail. NULL khi `verificationSource = auto`. |
+| `magicLinkSecret` | varchar | **[v2.2]** Per-order JWT signing salt. Rotated khi Reject (invalidate old link). |
+| **`verificationSource`** | enum | **[v2.2 D-13]** `manual` (default) \| `auto`. Phân biệt seller manual verify vs Open Banking auto-match. Wave 6 chỉ `manual`. |
+| **`autoVerifiedAt`** | timestamp | **[v2.2 D-13]** Pre-build cho Wave 8+. Set khi Open Banking API match reference code. NULL ở Wave 6. |
+| **`bankTransactionId`** | varchar | **[v2.2 D-13]** Pre-build cho Wave 8+. External bank transaction reference từ Open Banking API. NULL ở Wave 6. |
+| `paymentDetails` | group/json | Legacy field — thumbnail URL + transaction notes. |
+
+### 13.3 **[v2.2]** Schema migration plan (separate issue post-PRD-merge)
+
+- **Migration 1**: enum extension `paymentStatus` add `awaiting_payment`, `pending_verification`
+- **Migration 2**: add columns `paymentReference`, `paymentExpiresAt`, `paymentRejectionReason`, `paymentRejectionDetail`, `paymentVerifiedAt`, `paymentVerifiedBy`, `magicLinkSecret`
+- **Migration 3**: enum rename `paymentMethod` từ `qr_banking` → `bank_transfer` + data backfill
+- **Migration 4** (D-13 Wave 8+ pre-build): add columns `verificationSource` (enum default `manual`), `autoVerifiedAt`, `bankTransactionId`
+- All migrations follow `.claude/rules/database-schema.md` — `ALTER TABLE ... IF NOT EXISTS`, no `DROP TABLE`
+
+### 13.3 API Endpoints
 
 ```
 GET /api/orders?where[site][equals]={id}  → list (tenant-scoped)
-PATCH /api/orders/:id                      → update status
+PATCH /api/orders/:id                      → update status (order_status hoặc payment_status)
 POST /api/orders/:id/cancel                → cancel + inventory restore
 ```
 

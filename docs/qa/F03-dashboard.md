@@ -1,119 +1,160 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F03 - Dashboard Suite
-> **Phiên bản:** 5.0 (Omni-Channel Quality & Agent-Driven) | **Cập nhật:** 2026-03-20 | **Thực hiện:** QA Team
+> **Phiên bản:** 5.0 (Omni-Channel Quality & Agent-Driven) | **Cập nhật:** 2026-04-06 | **Thực hiện:** QA Team
 > **Tài liệu tham chiếu PRD:** [F03-dashboard.md](../prd/F03-dashboard.md) | **Tài liệu tham chiếu User Stories:** [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md)
 
 ---
 
 ## 1. Mục Tiêu (Objective)
-Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lượng toàn diện cho tính năng Bảng điều khiển Tổng Quan (Dashboard Suite - F03). Bộ kiểm thử bao gồm **62 kịch bản chi tiết**, được phân bổ khắt khe theo từng User Story (Không gộp chung).
 
-Đặc biệt thiết kế và triển khai áp dụng 100% các kỹ năng từ hệ sinh thái tác nhân (AI QA Agents): **BDD Cucumber, K6 Performance, Locator Healer, Test Data Generator, CI/CD Runner, Security Check**.
+Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lượng toàn diện cho tính năng **Bảng điều khiển Tổng Quan (Dashboard Suite - F03)**. Bộ kiểm thử bao gồm **57 kịch bản chi tiết**, được phân bổ theo từng User Story.
+
+Áp dụng 100% các kỹ năng từ hệ sinh thái AI QA Agents: **BDD Cucumber, K6 Performance, Locator Healer, Test Data Generator, CI/CD Runner, Security Check**.
 
 ---
 
 ## 2. Test Environment (Môi trường Kiểm thử)
+
 | Biến (Variable) | Yêu cầu (Requirements) |
 |---|---|
 | Môi trường (Env) | Staging / Pre-Production |
 | Browsers | Chrome (v110+), Firefox (v105+), Safari (macOS), iOS WebKit |
 | OS / Desktop | Windows 11, macOS |
 | Devices (Responsive) | Desktop (1920x1080), Tablet (768px), Mobile (iPhone 14 Pro 375px) |
-| Network | 4G (Fast/Slow), WiFi, Throttling giả lập Request API đứt quãng (Offline Simulator) |
-| Test Data | Database Mock tự động giả lập 100,000+ Record Đơn hàng, Mốc Tín hiệu Traffic 5 năm |
+| Network | 4G (Fast/Slow), WiFi, Throttling, Offline Simulator |
+| Test Data | Database Mock tự động giả lập 100,000+ records đơn hàng, traffic 5 năm |
 
 ---
 
 ## 3. Unified Test Cases (Traceability Matrix)
 
-| ID | Tham chiếu | LOẠI | TIÊU ĐỀ | CÁC BƯỚC THỰC HIỆN | KẾT QUẢ MONG ĐỢI | MỨC ĐỘ | AUTO |
+### US-01: Dashboard Overview & Personalization
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **[US-01: Dashboard — Overview & Personalization]** *(Bao gồm Trải nghiệm, Hiệu năng, Bảo mật Lõi)* |
-| **TC-F03.01** | `US-01/AC-4`| `UX/UI`     | **[Empty State]** Kích hoạt trạng thái Giao diện Rỗng | 1. Đăng nhập User chưa cấu hình Site.<br>2. Vào `/dashboard`. | Khung hiển thị `[Icon] + "Tạo Website đầu tiên"`. Nút CTA điều hướng chính xác về `/onboarding`. | High | [x] |
-| **TC-F03.02** | `US-01/AC-1`| `Func`      | **[Happy Path]** Hiển thị 4 Thẻ Thống Kê mặc định | 1. Bằng TK có Date, truy cập `/dashboard`. | Render đúng 4 Metric Card: Traffic, Leads, Engagement, Revenue/Orders (F10 Load). | Blocker| [x] |
-| **TC-F03.03** | `US-01/AC-1`| `Integrate` | **[F10 Intergration]** Lấy danh sách Pending Orders | 1. Kiểm tra list `Action Required`. | Hiển thị 3-5 Đơn hàng MỚI NHẤT trạng thái Pending từ CMS F10. | High | [x] |
-| **TC-F03.04** | `US-01/AC-1`| `Integrate` | **[F10 Redirect]** Đường dẫn liên thông Đơn hàng | 1. Bấm vào 1 Item "Order #001" trên list. | Trình duyệt chuyển Route `/dashboard/orders/:id`, giữ nguyên Session. | High | [x] |
-| **TC-F03.05** | `US-01/AC-1`| `Math`      | **[Metric Math]** Công thức Đếm Tổng Lượt Chọn | 1. Kiểm tra số hiển thị thẻ Revenue. | Tính `%` và `$ Doanh Thu` chỉ đếm Đơn `[Paid]`/`[Completed]`. Lọc bỏ ngoại trừ `[Cancelled]`/`[Refunded]`. | Blocker| [x] |
-| **TC-F03.06** | `US-01/AC-1`| `Math`      | **[Metric Math]** Unique Visitors vs Total | 1. Tải thẻ Traffic. | Đếm đúng cấu trúc Unique Visitor theo Session ID thay vì đếm dồn số lần Hit Web. | Blocker| [ ] |
-| **TC-F03.07** | `US-01/AC-2`| `Func/UX`   | **[Filter]** Tương tác Lọc thời gian 7d/30d | 1. Chọn Dropdown khoảng thời gian `30 days`. | 4 Thẻ Stat Card update Data (Biểu đồ Tịnh Tiến) lập tức, KHÔNG TẢI LẠI TRANG (No Reload). | High | [x] |
-| **TC-F03.08** | `US-01/AC-2`| `Storage`   | **[Session]** Persistent State (Lưu Trạng Thái) | 1. Chỉnh Filter sang `30d`. F5 lại Page. | Hệ thống nhớ tuỳ chọn lưu trong Storage. Phục hồi View `30d`. Dữ liệu ăn khớp. | Medium | [x] |
-| **TC-F03.09** | `US-01/AC-2`| `Boundary`  | **[Data Load]** Mock K6 Perf 100,000 Records | 1. Chèn Database Khổng Lồ, Filter Max Date `[All Time]`. | React Table/Charts ko bị Crash Heap. Pagination API Data Streaming ngầm. SLA Response `< 2 giây`. | Blocker| [x] |
-| **TC-F03.10** | `US-01/AC-2`| `Boundary`  | **[Rage Click]** Ngăn thao tác bấm lặp API Spam | 1. Nhấp liên tục vào List Filter (10 lần/1s). | Debouncer Component khóa luồng Request dư. Chỉ gọi Request Cập nhật Ở lần Click cuối cùng. | High | [x] |
-| **TC-F03.11** | `US-01/AC-3`| `Func/UI`   | **[Customize]** Ẩn/Hiện Card Bối Cảnh Cá Nhân | 1. Bấm `[Tùy chỉnh Dashboard]`. Bỏ tick views. | Layout Card lấp đầy khoảng trống (Responsive). Backend lưu Patch Configurations. | High | [ ] |
-| **TC-F03.12** | `US-01/AC-3`| `Desktop`   | **[DND Mouse]** Drag & Drop PC Browser | 1. Chuột bôi tay Cầm Component, Vượt Box A sang B. | Layout chuyển Cạnh Smoothly. Update State Array Index. | High | [x] |
-| **TC-F03.13** | `US-01/AC-3`| `Mobile`    | **[DND Touch]** Drag & Drop Cảm Ứng (iPhone) | 1. Màn iPhone 375px, Giữ Long-press thả Panel A sang B. | Ko Lỗi Conflict Kéo Window Cuộn Trang của Trình Duyệt. Block Tách Điểm Di Động Rõ Ràng. | Blocker| [ ] |
-| **TC-F03.14** | `US-01/AC-3`| `Edge`      | **[Sync Tab]** Xử lý Multi-Tabs Conflict | 1. Đổi Config Card ở Tab 1. Xem xét Tab 2. | Không sập System. Request POST Ghi đè State Dữ Liệu Version mới nhất. | Medium | [ ] |
-| **TC-F03.15** | `NFR/Perf`  | `Perf/UI`   | **[UX Load]** Xài Skeleton Shimmer Tải Trước | 1. Fast Load Component `DashboardPage`. | Khung Component lên hình `[Skeleton]` Nhấp Nháy Màu Khói. Không Hiển Thị Vòng Xoay (No Spinner Layout). | Medium | [x] |
-| **TC-F03.16** | `NFR/Sec`   | `Security`  | **[Auth Redirect]** Xác thực Session Access 401 | 1. Clear LocalStorage, Request Call URL. | Redirection KICK người dùng ra trang `/login`. API Trả trạng thái Từ Chối HTTP `401 Unauthorized`. | Blocker| [x] |
-| **TC-F03.17** | `NFR/Sec`   | `Access`    | **[Tenant Rules]** Cô Lập Dữ Liệu Tách Biệt Site | 1. Đổi Tham Số Token Fetch TenantID Của Khách Hàng Khác. | Bắt dính JWT Mã Access Khác Biệt. HTTP `403 Forbidden` Server API Limit Chống Penetration. | Blocker| [x] |
-| **TC-F03.18** | `NFR/Mobile`| `UI/Layout` | **[Responsive]** Breakpoint Mobile Width 375px | 1. Thu hẹp Window 375px. | Thẻ Card chia Grid `2x2`, Sidebar Trái `[Hidden]` Thay Bằng Hamburger Menu Top Header. Chữ không Tràn. | Blocker| [x] |
-| **[US-02: Analytics Details]** *(Bao gồm Math Validation & Analytics Format)* |
-| **TC-F03.19** | `US-02/AC-1`| `Func`      | **[Chart View]** Biểu đồ Bar Chart Render Chuẩn | 1. Vào `/dashboard/analytics`. Load Canvas. | Biểu đồ Nạp Trục X/Y Phân Chia Ngày Khắc. Scaling Dynamic Mức Khỏa Không Chen Lấn Layout X. | High | [x] |
-| **TC-F03.20** | `US-02/AC-1`| `Touch`     | **[Tooltip]** Mồi Dữ Liệu Trạm Cảm Ứng Point | 1. Màn Hình Cảm ứng (Tablet), Gõ Tap Lên Đầu Cột Dữ liệu. | Tooltip Box nhảy số thông minh Không Phụ thuộc Kích Click Hover Của Chuột Cơ. Box Không Tràn Khung Viewport. | High | [ ] |
-| **TC-F03.21** | `US-02/AC-1`| `Render`    | **[Safari Bug]** Apple Webkit CSS Display Check | 1. Load Bar Chart Bằng MacOS Safari Browser. | Tránh Tình Trạng Nhòe Nét Canvas / HTML Grid Sập Flex Layout (Lỗi Truyền thống Browser Engine). | Medium | [ ] |
-| **TC-F03.22** | `US-02/AC-1`| `Boundary`  | **[Data Limits]** List Top Pages / Product Giới hạn | 1. DB Push Hơn 50 Row Traffic Khác nhau. | Component `[Top Pages/Products/Blogs]` Limit render Khống max 10 dòng Row. Tối ưu Client DOM Nhẹ Nhàng. | High | [x] |
-| **TC-F03.23** | `US-02/AC-1`| `Math`      | **[Delta +]** Tính Tỷ Lệ Grow Dương | 1. Giả Bước Trước 1500, Kì Này 2000. | In Cụm Chữ Số: `+33.3%` Tông Xanh Có Mũi Tên Hướng Lên. | Blocker| [x] |
-| **TC-F03.24** | `US-02/AC-1`| `Math`      | **[Delta -]** Tính Tỷ Lệ Grow Suy Giảm Âm | 1. Giả Bước Trước 300, Kỳ Này 200. | Thiết Lập Text: `-33.3%` Tông Đỏ Có Mũi Tên Dốc Xuống. | Blocker| [x] |
-| **TC-F03.25** | `US-02/AC-1`| `Math Zero` | **[Fail-safe Formula]** Công Thức Bị Chia Zero | 1. Data Analytics Báo Tháng Cũ Bằng 0, Mới là 500 views. | Component Loại Bỏ Output Toán Học JS Lỗi (Infinity/NaN). Xử lý HardCode Ký tự `N/A` hoặc `+100% Growth`. | Blocker| [x] |
-| **TC-F03.26** | `US-02/AC-2`| `UX`        | **[Empty Logic]** Mốc Dữ Liệu Thời Gian Tạm Trống | 1. Lọt DB Kỳ Date Select Trống Records. | Empty State Thay Cốt Canvas Chart Báo "Chưa Có Tham Chiếu Thông Số Trong Kỳ Này". Giá trị 4 Card Báo Neutral 0. | High | [x] |
-| **TC-F03.27** | `US-02/AC-3`| `Failover`  | **[API Crash]** Mạng Lưới Phục Hồi Load Timeout | 1. DevTools Block Request `/api/analytics/`. | Cắt Gẫy Hiệu Ứng DOM Treo Nát Trang bằng React Error Boundary. Hiện Ra Nút Button Lệnh `[Thử Lại Data]`. | Blocker| [x] |
-| **TC-F03.28** | `BR-02/Sec` | `Privacy`   | **[Data Crypto]** Băm Thông Số Mạng Thu Thập User | 1. Lướt Log Backend Service Tích Vào Hành vi. | Kiểm đếm Địa chỉ IPv4/v6 Đã Được Mã Hóa Cứng `SHA-256 Hashing`. Không Phát hiện Bóc Tách Plain Text Lưu Dấu Dữ liệu Nhạy Cảm User End-Web. | Blocker| [x] |
-| **[US-03: SEO Dashboard Overview]** |
-| **TC-F03.29** | `US-03/AC-1`| `Func/UI`   | **[Score Board]** Định Hình Widget Nhóm Base Cấp Độ | 1. View `/dashboard/seo`. | Có Vòng Nhẫn Ranh Hiện Score /100. Tách Liệt Kê Các Khoản: Lỗi Code Tech, Meta Tag Rác, Layout Chữ Bài. | Blocker| [x] |
-| **TC-F03.30** | `US-03/AC-2`| `Func`      | **[Sitemap]** Trình Push XML Map Generator File | 1. Đánh Action `Generate Sitemap`. | Tệp Sitemap Sinh Trong Local Directory Tĩnh Máy Chủ Rả Route XML. Lên Toast Inform UI Xanh Lá Trong `< 2s`. | High | [x] |
-| **TC-F03.31** | `US-03/AC-3`| `Failover`  | **[Timeout]** API Auto Scan Tắc Nghẽn Service Gốc | 1. Làm Giảm Băng Thông Kênh Máy Quét Crawler. | Widget Hiện Báo Bực `[Timeout Lỗi Cấu Trúc Đọc HTML]`. Cung Cấp Phá Vây Nút `Retry Scan` Khẩn. | High | [x] |
-| **[US-04: Auto SEO Meta Generation]** *(Intergration F05/Localize)* |
-| **TC-F03.32** | `US-04/AC-1`| `Intergrate`| **[First Publish]** Hooking Editor Auto Sinh SEO | 1. Trong F05 Web Editor: Sinh Thử 1 Page Trắng Không Đánh Chữ Setting SEO Meta. Click Lệnh Publish Công Khai. | Backend Route Chạy Trình Duyệt Ngầm Cấu trúc LLM Bot AI Ráp Nghĩa. Page Output Mới Thành Phẩm Tồn Tại Header Chuyên Có Hẳn SEO Text Cứu Trang. | Blocker| [x] |
-| **TC-F03.33** | `US-04/AC-1`| `Format`    | **[Title Rule Homepage]** Template Title Trang Chủ | 1. Publish Page Gắn Flag Trang Chính Home. | Gen Định Dạng Code Tuân Thủ Text Base: `{Tên Shop} | {Category Ngành} Online Malaysia`. | High | [x] |
-| **TC-F03.34** | `US-04/AC-1`| `Format`    | **[Title Rule Product]** Template Title Cho SP Nhóm | 1. Publish Single Page Đơn Sản Phẩm Bán Hàng. | Title Render Khung Chữ Form Chuẩn SEO E-Com: `{Tên Hàng Hóa} | {Tên Shop} | Buy Online Malaysia`. | High | [x] |
-| **TC-F03.35** | `BR-05 / F21`| `Locale`    | **[Format Locale]** Target Thị Trường Malaysia MS | 1. System Config `locale=ms`. Publish Sinh Keyword. | Text Thay Vì Tiếng Anh Tự Dò Hệ Số `Online Malaysia` Dịch Quá Ngữ Nghĩa Về Formal Bahasa Melayu Mã Lai. | Blocker| [ ] |
-| **TC-F03.36** | `US-04/AC-1`| `Boundary`  | **[Trim Length]** Cắt Gọn Kí Tự Chống Mù Kích Thước | 1. Prompt Ép Gen > 100 Từ. | Data Bịt Mức `Max: 60 Chars Title` Và Khống `Max: 160 Description`. Bypass Hàm String Truncate. | High | [x] |
-| **TC-F03.37** | `US-04/AC-1`| `Schema`    | **[JSON-LD Inject]** Đúc Lệnh Bot Crawler Spider Code | 1. Inspect Document HTML Header Website Đã Public. | Block Cấu Trúc Thẻ `<script type="application/ld+json">` Chứa Khung Rich Snippet Schema Bắn Rành Mạch Product Chờ Crawler Đọc. | High | [x] |
-| **TC-F03.38** | `US-04/AC-2`| `Queue`     | **[Background Job]** Background Retry Delay API Nước | 1. Ngắt Connection ChatGPT 504. Dấn Publish. | Luồng Web UI Không Căng Chờ Response. UI Trả Về Toast "Thành Công Web". Còn Trình Gen SEO Thì Cố Khép Gửi RabbitMQ Job Nền Cố Tái Sinh Lại Khi Mạng Thở Đều. | Blocker| [x] |
-| **[US-05: AI SEO Fix All Issues - 🚀 Vũ Khí Hạt Nhân]** |
-| **TC-F03.39** | `QA/Auto`   | `Locator`   | **[Data-TestID]** Bắt Hook Gắn Điểm Node Chuẩn BDD | 1. Inspect F12 Code Phím `[AI Fix All]`. | Phím Node Gắn Tag `data-testid="btn-ai-fix-all"` Phục Vụ Quy Trình Automation Chạy Locator Vững Bước Bằng Playwright Framework. | High | [x] |
-| **TC-F03.40** | `US-05/AC-1`| `UX`        | **[Propose Mode]** Xem Trước Output Hành Trình Dịch | 1. Click Lệnh Fix Tổng Lỗi. | Modal Gọi Đọc Trình Bày List Before - After Kèm Tich Box Chọn Dòng Cần Đồng Ý Change Hay Ngó Lơ Cố Giữ Gốc Văn Khách Tự Đặt. | Blocker| [x] |
-| **TC-F03.41** | `US-05/AC-1`| `Perf/SLA`  | **[SSE 15s Load]** Cày Kéo Tải Mảng Dữ Liệu Socket | 1. Request Dãy Bự 20 Lỗi Meta Code Bèo Nhèo. | API Load Data Dạng Connection Keep-Alive Server-Sent Events. Output Response Text Sạch Về Từng Chunks Chốt Limit `< 15s`. | Blocker| [x] |
-| **TC-F03.42** | `NFR/UX`    | `Button`    | **[State Disable]** Khóa Kép Ngăn Tự Bấm Lệnh Nhiều Lần | 1. Tác Nghiệp Bấm Nút Sửa Data Khi SSE Đang Kéo. | Nút Nẩy Bật State `Disabled="true"` Mức Chờ (Loading Icon). Chống Spam Click Bắn Request Xóa Quota API Bot Nước Ngoài Đau Túi. | High | [x] |
-| **TC-F03.43** | `US-05/AC-2`| `Failover`  | **[Timeout UI]** Mạng Giật Lác Lỗi API Giữa Chừng SSE | 1. Gây Sụp Gián Đoạn Request Trả Khuya > 15 Giây. | Hiện Thị Alert "Sự Cố Render Đứt Quãng, Yêu Cầu Gửi Khác". Chặn Data Khung Preview Chạy Vòng Quay Vô Hình Hại PC Khách. | Blocker| [x] |
-| **TC-F03.44** | `US-05/AC-2`| `SQL/DB`    | **[Mệnh Lệnh Rollback DB]** Gỡ Bỏ Dữ Liệu Kẹt Cửa Nửa Vời | 1. Mạng API Tỉnh Nhịp Kẹp Gãy Transaction Insert (Sụp TC-43). | Ràng Hệ Query Code Nền Hủy Khương Lệnh ACID. Thu Nạp Về Rộng 0 Thay Đổi Chữ HTML Nào Tránh Lưu Nhập Nhằng Lỗi Nửa Này Cắm Lỗi Kia Nơi Database Web Content. | Blocker| [x] |
-| **TC-F03.45** | `US-05/AC-1`| `Func`      | **[Batch Undo]** Sức Chứa Nền Ctrl+Z Lấp Biển HTML Kém | 1. Nhấn Approve Đồng ý Quẹt Toàn Lỗi Mới Chữa Xong, Nhận Định Result Cự Kỳ Ngớ Ngẩn Bèn Bấm Nút Hoàn Tác Batch. | Toàn Cấu Hình Text Bảng Sửa Dối Lập Tức Hoàn Gọi Lại State Trữ Tạm Gốc Lõi Session Cũ (Ctrl+Z Tác Dụng Cho 1 Click). Khách Yên Lòng Nới Sai Mà Không Sợ Quên Gốc Content Text Lịch Sử Cũ Lâu Năm. | Blocker| [x] |
-| **[US-06: Basic SEO Keyword Tracker & Cross-Locale UI]** |
-| **TC-F03.46** | `US-06/AC-1`| `UI`        | **[Keywords Adding]** Thêm Chip Từ Khóa Kích Hoạt Nguồn | 1. Nhập Input `Bánh Bao`, Ấn Bàn Phím Enter. | Tách Rộng Khung Bảng Lên Chip 1 Khối Nhãn Cây Keyword Nguồn Dây Rốn Theo Dõi. | High | [x] |
-| **TC-F03.47** | `US-06/AC-1`| `Boundary`  | **[Lock Target 5 Limit]** Giam Kho Đếm Kịch Mức 5 Max | 1. Force Gửi Array POST API Chứa Tham Mảng 6 Cây Từ Khóa Mới Lạ. | BE Chặn Đầu Ngắt Luồng Lưu. Lên Validation Error Text Cấm Dội Database "Không Cầm Giới Quá 5". Nút Gõ Input Disable Form Câm Lặng Tránh Khách Tiêm Vô Tội Vạ. | High | [x] |
-| **TC-F03.48** | `US-06/AC-2`| `View`      | **[Ranking SERP]** Gọi Trình So Hàm Bậc Bảng Hạng Google | 1. Quét Nhìn Trực Diện Layout Ô Keyword Tồn. | In Cột Chữ Thông Báo Rõ Ràng Mức Vị Trí Domain Trên Google Index (Ví Dụ Hạng: #12 Trực Quan Dễ Đọc). | High | [x] |
-| **TC-F03.49** | `US-06/AC-2`| `UX`        | **[Trend Arrows]** Biểu Đồ Nhãn Dán Phán Hướng Mũi Tên | 1. Dò Đánh Giá List API Backend Soi Cũ/Mới Lên Rank. | Map Chuẩn Ký Hiệu CSS Trend Vector Trắng Nhỏ Kéo Lên Trên 🔺 (Grow Rank) / Trịch Sụp Đáy Mũi Kẹp 🔻 Down Rank Và Phẳng Nước Ngang ➖ Unchanged Khác Rất Rõ Nhìn Hiểu Tranh Báo. | Medium | [ ] |
-| **TC-F03.50** | `US-06/AC-3`| `Worker`    | **[Background Job]** Node Nhặt Data Crawler Đêm (Cron Tasks) | 1. Log Soát Trạm Thức Đồng Hồ Gốc Database `00:00AM`. | Service Backend Kích API Thủng Hoặc Vét Scrape Quét Top URL Từng Keyword Trong List. Khách Lỗ Ngủ Sáng Dậy Mở Admin Là Thấy Báo Cáo Rớt Thăng Vị Trí Vừa Render Dưới Giường Ra. | Blocker| [x] |
-| **TC-F03.51** | `BR-05 / F21`| `Integrate` | **[Malaysia Targeting]** Bóp Goolgle Search .com.my Code | 1. Locale Khai Mở Gốc Báo User Của Indo/Malay Mã `Ms`. | Scrape Móc Đầu Host Tham Số Tìm Kiếm API Search Ưu Tiên URL Dốc Thường Google.com.my Để Kết Quả List Rank Trả Về Khớp Nhu Cầu Local Chữ Thay Vì Query Tìm Khống Global Mù Câm US Mẽo Lạc Quẻ Search Tiếng Malay Đuối Top. | High | [x] |
-| **TC-F03.52** | `Sec/SQLi`  | `Security`  | **[Sanitization]** Diệt Khuẩn Mũi Text Inject DB Crawler SQLi | 1. Insert Kí tự Rác, Móc Ngặc Single Quoted SQL Văng Chặn Từ Khóa Target Đầu Hộp Form Input Cố Tình Hack Sạch Table Rỗng DB Core (VD: ``;DROP TABLE Keywords;--`). | Input Validation Thẳng Tay Sanitize Kẹp Đóng Ngoặc Giữ Payload Dưới Phép Text Clean JSON API String. Không Thực Thi Execute Rác DB Quét Lỗ Nước Rò Hacker Độc. | Blocker| [x] |
-| **[Integration: F21 Localization (BM/EN) - Toàn Bộ Dashboard UI]** |
-| **TC-F03.53** | `F21/UI`    | `State`     | **[No-Reload Switch]** Lật React State Đổi Ngữ Header | 1. Chọn Dropdown Ngôn Ngữ Top Admin Nhảy Sang (Bahasa Melayu BM). | Tên Trục Biểu Đồ Đếm, Card Box Thuộc Widget Và Nhãn Labels Tức Khắc Nhảy Gõ Chuyển Đổi Sang Text Dịch Ráp Không Quay Tròn Nạp Chờ Cánh Browser Kẹp Lại Window Location `(SPA Smoothness)`. | High | [x] |
-| **TC-F03.54** | `F21/Data`  | `Data Form` | **[Protect Dynamic User Payload]** Giữ Định Tuyến Dòng Form Ngôn Ngữ Gốc Do User Tự Viết Khống Dịch Nhầm | 1. Thao Tác Chuyển Thẻ Interface Mã Lai, Quan Nhìn Vào Box Dải Nhánh Top List Blogs. | Code Text Title Của "Bài Viết Lợn Cưới Áo Mới Bán Hàng" Do Khách Nhập (User Generator Values Data Gốc) Bảo Mật Ròng Không Sứt Trôi Dịch Máy Về Tiếng Anh (Chỉ Dịch Nhãn Khung Component Viền Không Vọc Ruột Content Lỗ Thông Text Động Nháp Data User Cây Bảng Table Tự Mọc Lên Cấm Fix Thâm Đổi Lạ Sang Anh Dịch Trật Bản Gốc). | Blocker| [x] |
-| **TC-F03.55** | `F21/UI`    | `Format`    | **[Currency Format RM]** Số Toán Học Tiền Tệ Định Mức Vùng | 1. Card Order / Revenue Dashboard. | Auto Regex Dòng Cột Numeric Code Nhét Tiền Lẻ Mã Bảng Phân Tách Ngàn Phảy Giữa, Gắn Mác Bằng Text Tĩnh Code: `RM 200,342.11` Phủ Lõi Rành Cho Form Nhóm Thị Trường Mã Lai Thay Vì Tiếng Chuẩn Default API Cầm Là Kí Quỳ Trí $ (Dollar Mỹ Dè). | Medium | [ ] |
-| **TC-F03.56** | `F21/UI`    | `Format`    | **[Date Format]** Trục Tooltip Timeline Chart Cáp Dịch Locale | 1. Hover Hoặc Dùng Tay Tap Trạm Cột Biểu Đồ Data Chart Dashboard Bar Báo Cáo Lịch. | Đuôi Format Khung Cửa Trình View Đổi Từ Dốc Mỹ `<MM/DD/YYYY>` Biến Ngược Lại Đổi Thay Form `DD/MM/YYYY` Cây Mã Lai Quê Địa Chọn, Khớp Tôn Chỉ Thời Gian Format Local Tán. | High | [ ] |
-| **TC-F03.57** | `F05/Flow`  | `E2E/UAT`   | **[End-to-End Hành Động]** Khách Thấy Pending Đơn Liền Lập Hành Vi Lăn Kho F10 Approval Chạy Lùi View F03 Overview Cần Rớt Đơn Đã Nhận Trống Danh Sách Cần Yêu Cầu Gấp Gọi Trống Sót Task Pending Chậm Chễ Kịp Giao. | 1. Login. F03 Overview Báo Chờ Duyệt Lệnh Order 002. Tap Đi Tới F10 Lấy View Duyệt Accepted Cọc Xong. Lùi Route Trả Gót Window Phím Quay Admin CMS View Đầu F03 List Lệnh Khởi Lược Ban. | Danh Sách To-Do Lệnh Yêu Cầu Bắt Phụ Hàng Của Khách Giảm Nét Component Reload Array, Loại Rớt Item `#002`, Data Card Mức Doanh Số Tổng Dội Tiền Thêm (Metric Math Triggered Live Sync Ràng Xuyên Khoản Cũ Đơn Vọng App Cửa). Hệ Hoạt Động Không Crash Tách Rời Block Kẻ Lắp Lại DB Data Cache Query Bị Khựng Lác Trễ Cập Cấu Trúc Khối. | Blocker| [x] |
+| **TC-F03.01** | `US-01/AC-4` | `UX/UI` | **[Empty State]** Hiển thị giao diện rỗng khi chưa cấu hình site | 1. Đăng nhập tài khoản chưa tạo Site.<br>2. Truy cập `/dashboard`. | - Hiển thị icon + nút CTA "Tạo Website đầu tiên".<br>- Nút điều hướng đúng về `/onboarding`. | High | [x] |
+| **TC-F03.02** | `US-01/AC-1` | `Func` | **[Happy Path]** Hiển thị 4 thẻ thống kê mặc định | 1. Đăng nhập tài khoản có dữ liệu.<br>2. Truy cập `/dashboard`. | - Render đúng 4 Metric Card: Traffic, Leads, Engagement, Revenue/Orders. | Blocker | [x] |
+| **TC-F03.03** | `US-01/AC-1` | `Integrate` | **[F10 Integration]** Lấy danh sách Pending Orders | 1. Vào section "Action Required" trên Dashboard. | - Hiển thị 3–5 đơn hàng mới nhất có trạng thái Pending từ CMS F10. | High | [x] |
+| **TC-F03.04** | `US-01/AC-1` | `Integrate` | **[F10 Redirect]** Điều hướng liên thông đến chi tiết đơn hàng | 1. Nhấn vào 1 item "Order #001" trong danh sách Pending. | - Trình duyệt chuyển sang `/dashboard/orders/:id`.<br>- Session được giữ nguyên. | High | [x] |
+| **TC-F03.05** | `US-01/AC-1` | `Math` | **[Metric Math]** Công thức tính tổng doanh thu | 1. Kiểm tra số liệu hiển thị trên thẻ Revenue. | - Chỉ tính đơn hàng trạng thái `[Paid]`/`[Completed]`.<br>- Loại bỏ đơn `[Cancelled]`/`[Refunded]`. | Blocker | [x] |
+| **TC-F03.06** | `US-01/AC-1` | `Math` | **[Metric Math]** Tính Unique Visitors chính xác | 1. Tải thẻ Traffic trên Dashboard. | - Đếm đúng theo Session ID (Unique Visitor).<br>- Không đếm tổng số lần hit trang. | Blocker | [ ] |
+| **TC-F03.07** | `US-01/AC-2` | `Func/UX` | **[Filter]** Lọc dữ liệu theo khoảng thời gian | 1. Nhấn mở menu bộ lọc thời gian.<br>2. Lần lượt chọn các tùy chọn: 7d, 14d, 30d, 90d. | - 4 thẻ Stat Card cập nhật dữ liệu ngay lập tức.<br>- Không reload lại trang. | High | [x] |
+| **TC-F03.08** | `US-01/AC-2` | `Storage` | **[Session]** Ghi nhớ trạng thái bộ lọc sau khi F5 | 1. Chỉnh filter sang `30d`.<br>2. Nhấn F5 reload trang. | - Trang phục hồi về filter `30d`.<br>- Dữ liệu hiển thị khớp với lựa chọn đã lưu. | Medium | [x] |
+| **TC-F03.09** | `US-01/AC-2` | `Boundary` | **[Data Load]** Thử nghiệm tải 100,000 records | 1. Chèn dữ liệu khổng lồ vào DB.<br>2. Chọn filter `All Time`. | - Trang không bị crash hay treo.<br>- Dữ liệu được stream/phân trang.<br>- Response SLA < 2 giây. | Blocker | [x] |
+| **TC-F03.10** | `US-01/AC-2` | `Boundary` | **[Rage Click]** Chặn spam click vào bộ lọc | 1. Nhấp liên tục vào nút Filter 10 lần trong 1 giây. | - Debouncer chỉ gọi 1 API request (lần click cuối).<br>- Không spam API. | High | [x] |
+| **TC-F03.11** | `US-01/AC-3` | `Func/UI` | **[Customize]** Lưu/Hủy tùy chỉnh layout card | 1. Nhấn "Tùy chỉnh Dashboard".<br>2. Bỏ tick một số card, nhấn **Cancel**.<br>3. Thử lại, kéo thả và nhấn **Save Changes**. | - Nhấn Cancel: layout không thay đổi.<br>- Nhấn Save Changes: layout cập nhật ngay lập tức. | High | [ ] |
+| **TC-F03.12** | `US-01/AC-3` | `Desktop` | **[DND Mouse]** Drag & Drop trên PC | 1. Dùng chuột kéo một Card từ vị trí A sang B. | - Card di chuyển mượt mà.<br>- State thứ tự mảng được cập nhật đúng. | High | [x] |
+| **TC-F03.13** | `US-01/AC-3` | `Mobile` | **[DND Touch]** Drag & Drop cảm ứng (iPhone) | 1. Trên iPhone 375px, giữ long-press một card và kéo sang vị trí khác. | - Không conflict với hành động cuộn trang.<br>- Card di chuyển đến đúng vị trí mong muốn. | Blocker | [ ] |
+| **TC-F03.14** | `US-01/AC-3` | `Edge` | **[Sync Tab]** Xử lý thay đổi cấu hình đồng thời trên nhiều tab | 1. Đổi cấu hình card ở Tab 1.<br>2. Quan sát Tab 2 cùng đăng nhập. | - Hệ thống không crash.<br>- Ghi nhận phiên bản mới nhất khi có xung đột. | Medium | [ ] |
+| **TC-F03.15** | `NFR/Perf` | `Perf/UI` | **[UX Load]** Skeleton shimmer khi tải trang | 1. Tải nhanh trang `/dashboard`. | - Hiển thị khung skeleton nhấp nháy trong khi chờ dữ liệu.<br>- Không hiển thị spinner (vòng tròn xoay). | Medium | [x] |
+| **TC-F03.16** | `NFR/Sec` | `Security` | **[Auth Redirect]** Redirect về Login khi hết session | 1. Xóa LocalStorage/cookie.<br>2. Gửi request vào URL bất kỳ của Dashboard. | - Redirect về `/login`.<br>- API trả về `HTTP 401 Unauthorized`. | Blocker | [x] |
+| **TC-F03.17** | `NFR/Sec` | `Access` | **[Tenant Rules]** Cô lập dữ liệu giữa các Tenant | 1. Sửa tham số TenantID trong request để trỏ sang tenant khác.<br>2. Gửi request. | - Server từ chối với `HTTP 403 Forbidden`.<br>- Không trả về dữ liệu của tenant khác. | Blocker | [x] |
+| **TC-F03.18** | `NFR/Mobile` | `UI/Layout` | **[Responsive]** Breakpoint Mobile 375px | 1. Thu hẹp viewport xuống 375px. | - Thẻ Card hiển thị dạng grid 2x2.<br>- Sidebar ẩn, thay bằng hamburger menu trên header.<br>- Không có text bị tràn ra ngoài. | Blocker | [x] |
 
 ---
 
-## 4. Hành trình Trải nghiệm End-to-End (E2E UAT Flow)
-_Kết hợp góc độ Business Analytics, QA Load Perfomance & Hệ Khái Trải Nghiệm Mượt mà từ Khách Hàng Chóp Rễ SME Business Malaysia._
+### US-02: Analytics Details
 
-**Hành trình Use Case Cốt Lõi (Omni-Flow F02 -> F03 -> F04/F05 -> F10):**
-1. **Login State Security (F02->F03):** SME Log Code Trải Nghiệm Đẩy Chấm 401 Kick (TC-F03.16). Đăng nhập Trúng Chuyển Tức Thời Ngắm Layout Command Screen Dashboard Lóa Chờ Khóa Tải Bằng Component API Shimmer `SLA < 2s` Chống Spinner Khó Luông Mắt (TC-F03.15, TC-F03.09 Data Lớn Phễu 100K Mốc).
-2. **Khảo sát Thông Minh (No Data Limit Break):** SME Chủ Kho xem 4 Mật Khấu Trình Tiền Bạc + Lead, Nhích Dropdown Data 30d Chóp. Bảng Card Gọi Nhảy Hook Code Live Fetch Ngành Delta Xanh/Đỏ Khứ (+/-% - Zero Div) Vùng Logic Không Reload Cản F5 (TC-F03.07, TC-F03.25). Túng Tooltip Xem Trệt Điểm Bar Chart Cẩm Vượt Bằng Lướt Tap Cảm Ứng IPad Screen Báo Biểu Safari Mac Chống Glitches Code HTML5 Vỡ Form DOM Tràng Vị Trí Trái Màn (TC-F03.20, TC-F03.21).
-3. **Cross Module Trút Đơn Mảnh Ghép Store (F10->F03):** Check Pending Cần Bấm Click Hành Động Tự Nảy Window Quản Lệnh Bán F10 Xử Xong Tóm Bấm Lùi Trang Dashboard Biến Khỏi List Việc Móc Thâm Đồng Doanh Số Gross Revenue Xịn Xác Thu Mảnh Chống Mất Tràng Order Dữ DB (TC-F03.04, TC-F03.57 - Đỉnh Mốc).
-4. **Trình Ghi AI Tự Sinh Sinh SEO Cứu Rank Track (F05->F03):** Mở Hộp Thùng SEO Đáy Ring Đỏ Gọi Cứu Gọi Hạch AI Bấm Nút Quét Streaming Phục Hồi Load Timeout Sập Tự Lăn Tải RollBack SQL Batch Báo Hoàn Tác Cứu Data Khách Hoảng Hồi (TC-F03.44, TC-F03.45). Add Chip Tracker Key Limit Bound Mức Max 5 Core Kêu Scrape Mã Lai `locale=ms` Cron Chạc Lệnh Chạy Check Google.com.my Rõ Rank (TC-F03.47, TC-F03.51). Lệnh Chỉnh Mượt Mã Đa NN Language Format Số / Tiền RM F21 Đổi Thẳng Toàn Bộ Form Dashboard Không Tải Reset Máy Client Web Mất Hứng Load Form Hoàn Hảo Code. (TC-F03.55).
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F03.19** | `US-02/AC-1` | `Func` | **[Chart View]** Bar Chart render chuẩn | 1. Vào `/dashboard/analytics`.<br>2. Chờ biểu đồ tải xong. | - Biểu đồ hiển thị trục X/Y với dữ liệu theo ngày.<br>- Không chèn lấn layout. | High | [x] |
+| **TC-F03.20** | `US-02/AC-1` | `Touch` | **[Tooltip]** Tooltip dữ liệu trên cảm ứng | 1. Dùng màn hình Tablet, tap vào đầu cột dữ liệu trên biểu đồ. | - Tooltip hiển thị đúng số liệu.<br>- Không phụ thuộc vào hover chuột.<br>- Tooltip không tràn ra khỏi viewport. | High | [ ] |
+| **TC-F03.21** | `US-02/AC-1` | `Render` | **[Safari Bug]** Kiểm tra CSS render trên Safari | 1. Tải trang Analytics bằng macOS Safari. | - Biểu đồ không bị nhòe.<br>- Layout không bị vỡ Flex/Grid. | Medium | [ ] |
+| **TC-F03.22** | `US-02/AC-1` | `Boundary` | **[Data Limits]** Giới hạn Top Pages/Products hiển thị | 1. Đẩy hơn 50 rows traffic vào DB.<br>2. Xem component Top Pages/Products/Blogs. | - Chỉ hiển thị tối đa 10 dòng.<br>- DOM nhẹ, không render quá mức. | High | [x] |
+| **TC-F03.23** | `US-02/AC-1` | `Math` | **[Delta +]** Tính tỷ lệ tăng trưởng dương | 1. Cấu hình dữ liệu: kỳ trước = 1500, kỳ này = 2000. | - Hiển thị `+33.3%` màu xanh lá với mũi tên lên. | Blocker | [x] |
+| **TC-F03.24** | `US-02/AC-1` | `Math` | **[Delta -]** Tính tỷ lệ suy giảm âm | 1. Cấu hình dữ liệu: kỳ trước = 300, kỳ này = 200. | - Hiển thị `-33.3%` màu đỏ với mũi tên xuống. | Blocker | [x] |
+| **TC-F03.25** | `US-02/AC-1` | `Math Zero` | **[Fail-safe Formula]** Xử lý chia cho 0 | 1. Cấu hình dữ liệu: kỳ trước = 0, kỳ này = 500. | - Không hiển thị `Infinity` hoặc `NaN`.<br>- Hiển thị `N/A` hoặc `+100% Growth`. | Blocker | [x] |
+| **TC-F03.26** | `US-02/AC-2` | `UX` | **[Empty Logic]** Khoảng thời gian không có dữ liệu | 1. Chọn bộ lọc thời gian không có record trong DB. | - Thay biểu đồ bằng thông báo "Chưa có dữ liệu trong kỳ này".<br>- 4 thẻ Card hiển thị giá trị 0. | High | [x] |
+| **TC-F03.27** | `US-02/AC-3` | `Failover` | **[API Crash]** Xử lý timeout khi API analytics lỗi | 1. Dùng DevTools block request `/api/analytics/`. | - Không treo toàn bộ trang.<br>- Hiển thị thông báo lỗi và nút "Thử Lại". | Blocker | [x] |
+| **TC-F03.28** | `BR-02/Sec` | `Privacy` | **[Data Crypto]** Mã hóa IP người dùng trong log | 1. Kiểm tra log backend khi có user thao tác. | - Địa chỉ IP được mã hóa SHA-256.<br>- Không lưu plaintext IP trong DB. | Blocker | [x] |
 
 ---
 
-## 5. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates)
+### US-03: SEO Dashboard Overview
 
-| Nhóm Kiểm thử (Criteria) | Trạng Thái | Ghi chú Trọng Tâm & Ứng Dụng Chuyên Gia Agent QC (AI Tools Mapping) |
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F03.29** | `US-03/AC-1` | `Func/UI` | **[Score Board]** Widget điểm SEO tổng quan | 1. Truy cập `/dashboard/seo`. | - Hiển thị vòng tròn điểm SEO /100.<br>- Liệt kê các nhóm: Lỗi kỹ thuật, Meta Tags thiếu, Nội dung kém. | Blocker | [x] |
+| **TC-F03.30** | `US-03/AC-2` | `Func` | **[Sitemap]** Tạo Sitemap XML tự động | 1. Nhấn **Generate Sitemap**. | - File Sitemap được tạo trong thư mục static route của server.<br>- Toast thông báo xanh lá xuất hiện trong < 2 giây. | High | [x] |
+| **TC-F03.31** | `US-03/AC-3` | `Failover` | **[Timeout]** Xử lý khi Auto Scan bị timeout | 1. Giảm băng thông kênh crawer.<br>2. Kích hoạt quét SEO tự động. | - Widget hiển thị thông báo lỗi timeout.<br>- Hiện nút **Retry Scan**. | High | [x] |
+
+---
+
+### US-04: Auto SEO Meta Generation (Integration F05/Localize)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F03.32** | `US-04/AC-1` | `Integrate` | **[First Publish]** Tự động sinh SEO khi publish trang trắng | 1. Trong F05 Editor, tạo trang mới không điền SEO Meta.<br>2. Nhấn **Publish**. | - Backend tự động sinh SEO title/description bằng AI.<br>- Trang output có meta tags đầy đủ trong `<head>`. | Blocker | [x] |
+| **TC-F03.33** | `US-04/AC-1` | `Format` | **[Title Rule Homepage]** Format title cho trang chủ | 1. Publish trang có gắn flag là trang chủ (Homepage). | - Title theo format: `{Tên Shop} \| {Ngành} Online Malaysia`. | High | [x] |
+| **TC-F03.34** | `US-04/AC-1` | `Format` | **[Title Rule Product]** Format title cho trang sản phẩm | 1. Publish trang sản phẩm đơn lẻ. | - Title theo format: `{Tên Sản Phẩm} \| {Tên Shop} \| Buy Online Malaysia`. | High | [x] |
+| **TC-F03.35** | `BR-05/F21` | `Locale` | **[Format Locale]** Target thị trường Malaysia (Bahasa Melayu) | 1. Cấu hình `locale=ms`.<br>2. Publish trang và kiểm tra meta sinh ra. | - Nội dung SEO được sinh bằng Bahasa Melayu thay vì tiếng Anh. | Blocker | [ ] |
+| **TC-F03.36** | `US-04/AC-1` | `Boundary` | **[Trim Length]** Cắt gọn title/description vượt giới hạn | 1. Tạo nội dung khiến AI sinh title > 100 ký tự. | - Title bị cắt tại tối đa 60 ký tự.<br>- Description bị cắt tại tối đa 160 ký tự. | High | [x] |
+| **TC-F03.37** | `US-04/AC-1` | `Schema` | **[JSON-LD Inject]** Kiểm tra structured data trong HTML | 1. Inspect HTML `<head>` của trang đã publish. | - Có thẻ `<script type="application/ld+json">` chứa schema sản phẩm đúng chuẩn. | High | [x] |
+| **TC-F03.38** | `US-04/AC-2` | `Queue` | **[Background Job]** Sinh SEO nền khi API gián đoạn | 1. Ngắt kết nối tới OpenAI (giả lập 504).<br>2. Nhấn Publish trang. | - UI không bị treo chờ response.<br>- Hiển thị toast "Publish thành công".<br>- Job SEO được đưa vào queue và retry khi mạng phục hồi. | Blocker | [x] |
+
+---
+
+### US-05: AI SEO Fix All Issues
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F03.39** | `QA/Auto` | `Locator` | **[Data-TestID]** Nút AI Fix All có testid chuẩn | 1. Inspect F12 phần tử nút **AI Fix All**. | - Phần tử có attribute `data-testid="btn-ai-fix-all"`. | High | [x] |
+| **TC-F03.40** | `US-05/AC-1` | `UX` | **[Propose Mode]** Xem trước thay đổi trước khi áp dụng | 1. Nhấn nút **AI Fix All**. | - Modal hiển thị danh sách Before/After từng lỗi.<br>- Có checkbox để chọn từng dòng muốn áp dụng hoặc bỏ qua. | Blocker | [x] |
+| **TC-F03.41** | `US-05/AC-1` | `Perf/SLA` | **[SSE 15s Load]** Stream dữ liệu qua SSE < 15 giây | 1. Kích hoạt AI Fix với 20 lỗi meta cần sửa. | - API trả dữ liệu dạng Server-Sent Events (SSE).<br>- Toàn bộ kết quả nhận về trong < 15 giây. | Blocker | [x] |
+| **TC-F03.41b** | `US-05/AC-1` | `UI/State` | **[Tracking Checklist]** Hiển thị tiến độ SSE theo từng hạng mục | 1. Quan sát UI trong khi SSE đang nhận dữ liệu. | - Thanh progress tăng dần.<br>- Từng hạng mục (Tối ưu ảnh, Sinh tiêu đề...) có dấu tick xanh xuất hiện tuần tự theo dữ liệu trả về. | High | [ ] |
+| **TC-F03.42** | `NFR/UX` | `Button` | **[State Disable]** Khóa nút khi SSE đang chạy | 1. Nhấn nút sửa dữ liệu trong khi SSE đang kéo. | - Nút chuyển sang Disabled với loading icon.<br>- Không thể gửi thêm request. | High | [x] |
+| **TC-F03.43** | `US-05/AC-2` | `Failover` | **[Timeout UI]** Xử lý SSE bị gián đoạn quá 15 giây | 1. Giả lập mạng bị đứt giữa chừng, SSE không nhận response > 15 giây. | - Hiển thị alert "Sự cố kết nối, vui lòng thử lại".<br>- Không treo UI hay vòng lặp vô hạn. | Blocker | [x] |
+| **TC-F03.44** | `US-05/AC-2` | `SQL/DB` | **[Rollback DB]** Hoàn tác transaction khi insert thất bại | 1. Gây sự cố ngắt kết nối giữa chừng khi transaction đang insert (từ TC-F03.43). | - Hệ thống rollback toàn bộ transaction.<br>- Không có dữ liệu dở dang hoặc lỗi nửa vời trong DB. | Blocker | [x] |
+| **TC-F03.45** | `US-05/AC-1` | `Func` | **[Batch Undo]** Hoàn tác toàn bộ thay đổi AI bằng 1 click | 1. Approve toàn bộ thay đổi AI.<br>2. Nhận thấy kết quả sai, nhấn nút **Hoàn Tác**. | - Toàn bộ nội dung khôi phục về trạng thái trước khi AI sửa.<br>- Hoạt động như Ctrl+Z cho 1 batch. | Blocker | [x] |
+
+---
+
+### US-06: Basic SEO Keyword Tracker & Cross-Locale UI
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F03.46** | `US-06/AC-1` | `UI` | **[Keywords Adding]** Thêm từ khóa theo dõi | 1. Nhập từ khóa `Bánh Bao` vào ô input.<br>2. Nhấn Enter. | - Từ khóa xuất hiện dạng chip/tag trong bảng theo dõi. | High | [x] |
+| **TC-F03.47** | `US-06/AC-1` | `Boundary` | **[Lock Target 5 Limit]** Giới hạn tối đa 5 từ khóa | 1. Gửi API POST với mảng chứa 6 từ khóa mới. | - API từ chối, trả về validation error "Không thể thêm quá 5 từ khóa".<br>- Ô input bị disable. | High | [x] |
+| **TC-F03.48** | `US-06/AC-2` | `View` | **[Ranking SERP]** Hiển thị thứ hạng Google của từng từ khóa | 1. Quan sát bảng danh sách từ khóa đang theo dõi. | - Cột thứ hạng hiển thị rõ ràng vị trí trên Google (vd: #12). | High | [x] |
+| **TC-F03.49** | `US-06/AC-2` | `UX` | **[Trend Arrows]** Mũi tên xu hướng thứ hạng | 1. Xem danh sách từ khóa sau khi có dữ liệu cũ/mới. | - Tăng hạng: mũi tên lên 🔺 (xanh).<br>- Giảm hạng: mũi tên xuống 🔻 (đỏ).<br>- Không đổi: dấu ➖. | Medium | [ ] |
+| **TC-F03.50** | `US-06/AC-3` | `Worker` | **[Background Job]** Cron job crawl thứ hạng ban đêm | 1. Kiểm tra log backend lúc 00:00 AM. | - Service tự động crawl thứ hạng Google cho từng từ khóa.<br>- Dữ liệu mới nhất hiển thị khi admin mở Dashboard sáng hôm sau. | Blocker | [x] |
+| **TC-F03.51** | `BR-05/F21` | `Integrate` | **[Malaysia Targeting]** Crawl thứ hạng từ Google.com.my | 1. Cài đặt locale người dùng là `ms` (Malaysia/Indonesia). | - Hệ thống crawl thứ hạng từ Google.com.my thay vì Google.com.<br>- Kết quả phản ánh đúng thị trường địa phương. | High | [x] |
+| **TC-F03.52** | `Sec/SQLi` | `Security` | **[Sanitization]** Chặn SQL Injection qua ô nhập từ khóa | 1. Nhập chuỗi tấn công vào ô từ khóa: `` `; DROP TABLE Keywords; --` ``.<br>2. Submit. | - Input được sanitize, không thực thi lệnh SQL.<br>- Dữ liệu DB không bị ảnh hưởng. | Blocker | [x] |
+
+---
+
+### Integration: F21 Localization (BM/EN) — Dashboard UI
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F03.53** | `F21/UI` | `State` | **[No-Reload Switch]** Chuyển ngôn ngữ không reload trang | 1. Chọn ngôn ngữ **Bahasa Melayu** trong dropdown trên header. | - Nhãn biểu đồ, tên card, labels chuyển sang BM ngay lập tức.<br>- Trang không reload (SPA behavior). | High | [x] |
+| **TC-F03.54** | `F21/Data` | `Data Form` | **[Protect Dynamic User Payload]** Không dịch nội dung người dùng tự nhập | 1. Chuyển sang giao diện Bahasa Melayu.<br>2. Quan sát tiêu đề bài viết trong danh sách. | - Tiêu đề bài viết do người dùng nhập giữ nguyên gốc, không bị dịch tự động.<br>- Chỉ nhãn UI (tên column, button...) mới được dịch. | Blocker | [x] |
+| **TC-F03.55** | `F21/UI` | `Format` | **[Currency Format RM]** Định dạng tiền theo chuẩn Malaysia | 1. Quan sát thẻ Order/Revenue trên Dashboard. | - Số tiền hiển thị định dạng `RM 200,342.11` thay vì `$`. | Medium | [ ] |
+| **TC-F03.56** | `F21/UI` | `Format` | **[Date Format]** Định dạng ngày trên biểu đồ theo locale | 1. Hover hoặc tap vào cột dữ liệu trên biểu đồ. | - Ngày hiển thị theo format `DD/MM/YYYY` (Malaysia) thay vì `MM/DD/YYYY` (Mỹ). | High | [ ] |
+| **TC-F03.57** | `F05/Flow` | `E2E/UAT` | **[End-to-End]** Duyệt đơn hàng và dashboard cập nhật real-time | 1. Đăng nhập, Dashboard F03 hiển thị đơn hàng #002 đang chờ duyệt.<br>2. Vào F10, duyệt đơn hàng #002.<br>3. Quay lại F03 Dashboard. | - Danh sách "Action Required" không còn đơn #002.<br>- Metric doanh thu được cộng thêm giá trị đơn #002.<br>- Không crash, dữ liệu sync đúng. | Blocker | [x] |
+
+---
+
+## 4. Hành Trình E2E UAT Flow
+
+| Bước | Hành Động | Kết Quả Mong Đợi |
+|:---:|:---|:---|
+| 1 | User chưa đăng nhập truy cập Dashboard. | Redirect về `/login` (TC-F03.16). |
+| 2 | Đăng nhập thành công, Dashboard tải dữ liệu lớn. | Skeleton shimmer hiển thị, sau đó 4 thẻ metric render < 2s (TC-F03.09, 15). |
+| 3 | Chuyển filter từ 7d → 30d, reload lại trang. | Dữ liệu cập nhật ngay, filter được ghi nhớ sau F5 (TC-F03.07, 08). |
+| 4 | Vào Analytics, tap biểu đồ trên Tablet. | Tooltip đúng số liệu, không phụ thuộc hover chuột (TC-F03.20). |
+| 5 | Nhấn AI Fix All → nhận SSE → approve → undo. | Toàn bộ luồng hoạt động, rollback thành công (TC-F03.40–45). |
+
+---
+
+## 5. Tiêu Chí Đánh Giá Chất Lượng Phát Hành (Quality Gates)
+
+| Nhóm Kiểm Thử | Trạng Thái | Ghi Chú |
 |---|---|---|
-| **1. UI/UX & Responsive Touch** | [ ] 0/15 | Ứng Dụng Tool `ui-debug-agent` Kéo Check Layout Safari Grid Vỡ Flex. Đảm Bảo Khớp Tablet Touch Tooltip Ko Gọi Trúng Hàm Click Mouse Đẩy Component Bấn Loạn. |
-| **2. BDD/Math Logic Validation** | [ ] 0/14 | Tool Sinh Phân Rã Math Delta `% Grow`, Bắt Phép Zero Division Math Lỗ Thẳng Code Mạch React Khi Nền Cũ = 0. Tịch Thu `test_data_generator` Kí Quota Form Order Status Thừa Thiếu Tính Cũ Cancel Cấn Sai Toán. |
-| **3. Non-Functional Perf & Load** | [ ] 0/8 | Load Perf Lắp Khúc Data Nhảy 100K Views Quét SQL Code Dội K6 `performance-test-engineer` Giữ Vững Tải `SLA 2 Second Request` Đánh Nát Băng Tải Mạng Throttling Phá Test Lệnh Queue RabbitMQ Nằm Background Khúc Gọi SEO AI Thủng Timeout Hoặc OpenAI 504 Crash Quá Mức Độ Request Giây `Rate Limit`. |
-| **4. Integration & Security Flow** | [ ] 0/11 | Kỹ Năng Địch Hashing `SHA-256 IP User Tracking` Kẹp Luồng Trút `Tenant Data Isolation` Ngừa Mã Bug Rò API Xuyên Không Đấu Tố Hacker Nhảy Lâu Răng Database Kẹp Cổng `qc-ai-engineer`. |
-| **5. Cross-Language Base (F21)** | [ ] 0/6 | Tool Phá Tĩnh Vọt Ngôn Trải Bằng Lệnh `locator_healer_agent` Sinh Automation Bóp Lỗi Khóa Bảng Biểu Format Date Nhảy Sai Date Mỹ Thay Dùng Mã Lai Hoặc Sập List Sản Phẩm User Chừa Mềm Trống Vi Cẩm Dịch Dòng Đổi Thành Chữ Tự Động Sai Nội Dung Mặc Cảm Gốc. |
-| **6. Automation Auto Pipeline** | [ ] Không Cấp | Yêu Cầu Code Commit File Pipeline Đứng Kịch Bản BDD Bọc Thân Dưới CI/CD GitHub Action Mảng Khống File Automation Tải `ci-cd-test-runner` Đẩy Gọt Dọt Pass 100% Sạch Bụi Khung Test Script Không Flaky Lủng (Nhờ Check Code Tại File `flaky_test_analyzer`). |
+| **1. UI/UX & Responsive Touch** | [ ] 0/15 | Kiểm tra layout Safari, Tablet tooltip, mobile breakpoint. |
+| **2. BDD/Math Logic Validation** | [ ] 0/14 | Kiểm tra Delta %, chia cho 0, filter trạng thái đơn hàng. |
+| **3. Non-Functional Perf & Load** | [ ] 0/8 | K6 load 100K records, SSE < 15s, SLA < 2s, RabbitMQ retry. |
+| **4. Integration & Security Flow** | [ ] 0/11 | SHA-256 IP hashing, Tenant isolation, SQL injection sanitize. |
+| **5. Cross-Language (F21)** | [ ] 0/6 | Chuyển ngôn ngữ mượt, format RM, date DD/MM/YYYY, không dịch nội dung gốc. |
+| **6. Automation Pipeline** | [ ] Chưa cấu hình | CI/CD GitHub Actions, BDD Cucumber, không flaky test. |
 
-> **Khuyến Nghị Release:** Mã Lỗi Đặc Công Của Màn F03 Lâu Rất Mỏng (Hầu Hết Math Ẩn Sai Do Division Zero, Lấn Quán Lỗi API Do Timeout SSE, Data Dàn 100K Lủng Tràn Memory Tải Khúc Component Table JS). Bắn Automation Chạy Data Load Nhét Cốt Sắp Pass Tuyệt Trí Đáy Không Lọt Khung UI Lác Kí Release Q1 Production Safe Hoàn Đảo.
+> **Khuyến Nghị Release:** Các lỗi tiềm ẩn chính của F03 là: Division by Zero trong Math, timeout SSE do OpenAI chậm, và tràn memory khi tải 100K records. Cần chạy automation load test trước khi release Production.

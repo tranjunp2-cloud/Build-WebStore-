@@ -5,7 +5,8 @@ import type { CollectionConfig } from 'payload'
  * Exported for reuse in API route validation.
  */
 export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
-    pending: ['confirmed', 'cancelled'],
+    pending: ['new', 'confirmed', 'cancelled'],  // 'new' = Stripe webhook success target
+    new: ['confirmed', 'cancelled'],
     confirmed: ['ready_to_ship', 'cancelled'],
     ready_to_ship: ['shipped'],
     shipped: ['completed', 'refunded'],
@@ -21,6 +22,48 @@ export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
 
 export const Orders: CollectionConfig = {
     slug: 'orders',
+    hooks: {
+        beforeChange: [
+            async ({ data, originalDoc }) => {
+                // COD: seller marks completed → auto paymentStatus=paid
+                if (
+                    data.status === 'completed' &&
+                    originalDoc?.status !== 'completed' &&
+                    originalDoc?.paymentMethod === 'cod'
+                ) {
+                    data.paymentStatus = 'paid'
+                }
+                // Any method cancelled → paymentStatus=cancelled (if still unpaid)
+                if (data.status === 'cancelled' && originalDoc?.status !== 'cancelled') {
+                    if (!data.paymentStatus || data.paymentStatus === 'unpaid') {
+                        data.paymentStatus = 'cancelled'
+                    }
+                }
+                return data
+            },
+        ],
+        afterChange: [
+            async ({ doc, operation, req }) => {
+                if (operation !== 'create') return doc
+                // Skip Stripe orders — they're notified via webhook after payment confirms
+                if (doc.stripeSessionId) return doc
+                // Fire-and-forget: notify tenant owners of new order (COD/QR Banking)
+                import('@/lib/notifications/notify-tenant-owners')
+                    .then(({ notifyTenantOwners }) => {
+                        const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                        return notifyTenantOwners(req.payload, tenantId, {
+                            type: 'ORDER_NEW',
+                            title: `New Order #${doc.orderNumber} - ${doc.currency || 'MYR'} ${(doc.total ?? 0).toFixed(2)}`,
+                            message: `Order placed by ${doc.customerName}`,
+                            actionUrl: '/orders',
+                            metadata: { orderNumber: doc.orderNumber, currency: doc.currency || 'MYR', total: (doc.total ?? 0).toFixed(2), customerName: doc.customerName },
+                        })
+                    })
+                    .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))
+                return doc
+            },
+        ],
+    },
     admin: {
         useAsTitle: 'orderNumber',
         description: 'Customer orders from the storefront.',
@@ -33,6 +76,7 @@ export const Orders: CollectionConfig = {
             const tenantIds = req.user.tenants?.map((t: any) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         update: ({ req }) => {
@@ -41,6 +85,7 @@ export const Orders: CollectionConfig = {
             const tenantIds = req.user.tenants?.map((t: any) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         delete: () => false, // Orders should not be deleted
@@ -145,6 +190,7 @@ export const Orders: CollectionConfig = {
             index: true,
             options: [
                 { label: 'Pending', value: 'pending' },
+                { label: 'New', value: 'new' },          // Stripe webhook success target (Architecture §2.1)
                 { label: 'Confirmed', value: 'confirmed' },
                 { label: 'Ready to Ship', value: 'ready_to_ship' },
                 { label: 'Shipped', value: 'shipped' },
@@ -159,14 +205,32 @@ export const Orders: CollectionConfig = {
         },
         // --- Payment ---
         {
+            name: 'paymentStatus',
+            type: 'select',
+            defaultValue: 'unpaid',
+            index: true,
+            options: [
+                { label: 'Unpaid', value: 'unpaid' },
+                { label: 'Awaiting Payment', value: 'awaiting_payment' },
+                { label: 'Pending Verification', value: 'pending_verification' },
+                { label: 'Paid', value: 'paid' },
+                { label: 'Failed', value: 'failed' },
+                { label: 'Refunded', value: 'refunded' },
+                { label: 'Cancelled', value: 'cancelled' },
+            ],
+        },
+        {
             name: 'paymentMethod',
             type: 'select',
             options: [
                 { label: 'Cash on Delivery', value: 'cod' },
-                { label: 'QR Banking', value: 'qr_banking' },
+                { label: 'QR Banking (legacy)', value: 'qr_banking' },
+                { label: 'Bank Transfer', value: 'bank_transfer' },
                 { label: 'Credit Card', value: 'card' },
-                { label: 'Bank Transfer', value: 'bank' },
+                { label: 'FPX (Online Banking)', value: 'fpx' },
+                { label: 'Bank Transfer (old)', value: 'bank' },
                 { label: 'e-Wallet', value: 'ewallet' },
+                { label: 'Free (100% discount)', value: 'free' },
             ],
         },
         {
@@ -178,7 +242,65 @@ export const Orders: CollectionConfig = {
         {
             name: 'paymentReference',
             type: 'text',
-            admin: { description: 'External payment gateway reference ID' },
+            admin: { description: 'Bank Transfer reference code (BT-XXXXXX)' },
+        },
+        {
+            name: 'paymentExpiresAt',
+            type: 'date',
+            admin: { readOnly: true, description: 'BT order TTL — auto-cancel after this timestamp' },
+        },
+        {
+            name: 'paymentRejectionReason',
+            type: 'select',
+            options: [
+                { label: 'Ảnh mờ', value: 'image_blurry' },
+                { label: 'Sai số tiền', value: 'wrong_amount' },
+                { label: 'Trùng đơn', value: 'duplicate_order' },
+                { label: 'Khác', value: 'other' },
+            ],
+            admin: { description: 'Reason set when seller rejects payment proof' },
+        },
+        {
+            name: 'paymentRejectionDetail',
+            type: 'textarea',
+            admin: { description: 'Required if rejectionReason=other (≥10 chars)' },
+        },
+        {
+            name: 'paymentVerifiedAt',
+            type: 'date',
+            admin: { readOnly: true },
+        },
+        {
+            name: 'paymentVerifiedBy',
+            type: 'relationship',
+            relationTo: 'users',
+            admin: { readOnly: true },
+        },
+        {
+            name: 'magicLinkSecret',
+            type: 'text',
+            access: { read: () => false, update: () => false },
+            admin: { hidden: true },
+        },
+        {
+            name: 'verificationSource',
+            type: 'select',
+            defaultValue: 'manual',
+            options: [
+                { label: 'Manual', value: 'manual' },
+                { label: 'Auto (Open Banking)', value: 'auto' },
+            ],
+            admin: { readOnly: true },
+        },
+        {
+            name: 'autoVerifiedAt',
+            type: 'date',
+            admin: { readOnly: true, hidden: true }, // Wave 8+
+        },
+        {
+            name: 'bankTransactionId',
+            type: 'text',
+            admin: { readOnly: true, hidden: true }, // Wave 8+
         },
         {
             name: 'stripeSessionId',
@@ -192,6 +314,12 @@ export const Orders: CollectionConfig = {
             type: 'text',
             index: true,
             admin: { readOnly: true, description: 'Stripe PaymentIntent ID' },
+        },
+        {
+            name: 'stripeChargeId',
+            type: 'text',
+            index: true,
+            admin: { readOnly: true, description: 'Stripe Charge ID (from payment_intent.latest_charge)' },
         },
         // --- Customer ---
         {

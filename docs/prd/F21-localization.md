@@ -99,52 +99,25 @@ Tính năng **F21 Localization** cho phép người dùng thay đổi ngôn ng�
 
 > **Tối ưu UX/UI:** Đưa Localization ra vùng tương tác chính.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 8.1. Màn hình Auth (F02) - Cập nhật
 Nút Language Switcher dạng Text Toggle gọn nhẹ hoặc Select Box tuỳ design.
-```text
-┌────────────────────────────────────────────────────────────┐
-│ [Logo PrimeWeb]                                    EN | BM │
-│                                                            │
-│                  ┌─────────────────────┐                   │
-│                  │ Login to your store │                   │
-...
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 8.2. Màn hình CMS Layout (F18) - Cập nhật
 Đưa Language Switcher ra ngoài Avatar dropdown, đặt trực tiếp lên Header để dễ nhìn nhất.
-```text
-┌─ CMS Layout ──────────────────────────────────────────────┐
-│ ┌─ Top Header ───────────────────────────────────────────┐ │
-│ │ [☰] [Logo PrimeWeb]        [🌐 EN/BM ▼] [🔔 3] [Avatar] │ │
-│ └────────────────────────────────────────────────────────┘ │
-...
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 *(Dropdown của ngôn ngữ hiển thị dạng cờ hoặc text: 🇲🇾 Bahasa Melayu | 🇬🇧 English)*
 
 ### 8.3. Mobile View (Language Switcher Hamburger)
 - **Mô tả:** Không gian Header mobile là giới hạn, do đó nút 🌐 EN/BM được nhét vào bên trong Hamburger menu drawer hoặc Avatar profile list để giao diện Header không bị vỡ.
-- **Wireframe:**
-```text
-┌─ Mobile CMS ──────────────────┐
-│ [☰] [Logo]             [🔔] │ 
-│ ─────────────────────────── │
-│ ...                         │
-└───────────────────────────────┘
-
-[ Hamburger Drawer opened ]
-┌─ ☰ Navigation ──────────────┐
-│  👤 Aisha Store             │
-│ ─────────────────────────── │
-│  🌐 Preferred Language:      │
-│  [ (•) EN  |  ( ) BM ]      │
-│ ─────────────────────────── │
-│  📊 Dashboard               │
-│  📦 Products                │
-│  🛒 Orders                  │
-└─────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ---
+
 
 ## 9. Acceptance Criteria
 

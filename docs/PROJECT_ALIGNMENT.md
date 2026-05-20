@@ -15,9 +15,11 @@ Nếu 1 task không trực tiếp hoặc gián tiếp hỗ trợ mục tiêu →
 
 ---
 
-## Timeline — April 2026 Launch (Webstore V2 Focus)
+## Timeline — Phase 1: Webstore Builder 2.0 (March 2026 Crash Schedule)
 
-> **Cập nhật:** Tập trung cao độ vào nhóm USP (AI Builder, Editor) và hoàn thiện Webstore V2 trong tháng 4. Tính năng Auth và các module nâng cao lùi sang Phase 2.
+> **Cập nhật Phase 1:** Lịch trình được rút ngắn tối đa (Crash Schedule) để kịp ra mắt vào cuối tháng 3/2026. Nhóm Foundation (Sprint 0) giữ nguyên đến 25/03. Toàn bộ các nhóm tính năng còn lại được gộp vào **Sprint 1 duy nhất**, chạy song song với cường độ cao từ 26/03 đến 31/03.
+> 
+> ⚠️ **Phạm vi (Scope Out):** Các tính năng **F13 (Payment), F14 (Shipping), F15 (Admin)** tạm thời **KHÔNG** làm trong Phase 1. Các tính năng ít ưu tiên (F17, F03, F07, F16) cũng đưa vào diện nguy cơ lùi sang Phase 2.
 
 ```text
 Tuần 1-2 (Mar 12-25)    Sprint 0: Foundation
@@ -26,26 +28,11 @@ Tuần 1-2 (Mar 12-25)    Sprint 0: Foundation
                          ├── Test infra ready
                          └── Designer Figma
 
-Tuần 3-4 (Mar 26-Apr 8)  Sprint 1: Core USP (AI Builder & Editor)
-                         ├── F01 AI Web Builder (polish)
-                         ├── F05 AI Editor (rebuild & text SEO)
-                         ├── F18 CMS Layout & Navigation
-                         ├── F02 Auth web                    
-                         └── F06 Onboarding
-
-Tuần 5-6 (Apr 9-22)      Sprint 2: Webstore V2 (Commerce Setup)
-                         ├── F19 Store Config & Domains
-                         ├── F08 Products & Publishing
-                         ├── F09 Storefront Commerce UI
-                         └── F10 Orders & Checkout
-
-Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
-                         ├── F17 Blog Management + AI Writing
-                         ├── F03 Dashboard & SEO Tracker
-                         ├── F07 Template Gallery
-                         ├── F16 Notification Center
-                         ├── Bug fixes & Testings
-                         └── 🚀 M1 Launch (SME Web Builder & Webstore v2)
+Tuần 3-4 (Mar 26-31)     Sprint 1: Webstore Builder 2.0 (M1 Launch)
+                         ├── (Mar 26-28) F01, F05, F11, F12, F18, F02, F06: Core USP, Nhóm CMS & Auth
+                         ├── (Mar 29-30) F19, F08, F09, F10, F21, F20: Nhóm Webstore Commerce & Checkout
+                         └── (Mar 31) Stabilization, Bug fixes & 🚀 Launch! (F17, F03, F07, F16 best-effort)
+```
 
 ---
 

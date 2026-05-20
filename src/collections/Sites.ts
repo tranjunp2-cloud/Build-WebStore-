@@ -13,27 +13,30 @@ export const Sites: CollectionConfig = {
         read: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         // Users can update their own tenant's sites
         update: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         // Users can delete their own tenant's sites
         delete: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
     },
@@ -66,6 +69,22 @@ export const Sites: CollectionConfig = {
                 { label: 'Draft', value: 'draft' },
                 { label: 'Published', value: 'published' },
                 { label: 'Archived', value: 'archived' },
+            ],
+        },
+        {
+            name: 'generationStatus',
+            type: 'select',
+            defaultValue: 'none',
+            admin: {
+                position: 'sidebar',
+                readOnly: true,
+                description: 'Tracks AI site generation state (system-managed)',
+            },
+            options: [
+                { label: 'None', value: 'none' },
+                { label: 'Generating', value: 'generating' },
+                { label: 'Completed', value: 'completed' },
+                { label: 'Failed', value: 'failed' },
             ],
         },
         {
@@ -163,6 +182,43 @@ export const Sites: CollectionConfig = {
                         { label: 'Dark', value: 'dark' },
                     ],
                 },
+                {
+                    name: 'accentColor',
+                    type: 'text',
+                },
+                {
+                    name: 'surfaceColor',
+                    type: 'text',
+                },
+                {
+                    name: 'textColor',
+                    type: 'text',
+                },
+                {
+                    name: 'mutedColor',
+                    type: 'text',
+                },
+                {
+                    name: 'spacingPreset',
+                    type: 'select',
+                    defaultValue: 'default',
+                    options: [
+                        { label: 'Compact', value: 'compact' },
+                        { label: 'Default', value: 'default' },
+                        { label: 'Relaxed', value: 'relaxed' },
+                    ],
+                },
+                {
+                    name: 'shadowPreset',
+                    type: 'select',
+                    defaultValue: 'subtle',
+                    options: [
+                        { label: 'None', value: 'none' },
+                        { label: 'Subtle', value: 'subtle' },
+                        { label: 'Medium', value: 'medium' },
+                        { label: 'Dramatic', value: 'dramatic' },
+                    ],
+                },
             ],
         },
         {
@@ -194,6 +250,12 @@ export const Sites: CollectionConfig = {
                     type: 'text',
                 },
                 {
+                    name: 'autoMetaEnabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Automatically generate SEO meta tags when publishing pages/products' },
+                },
+                {
                     name: 'trackedKeywords',
                     type: 'array',
                     maxRows: 5,
@@ -217,6 +279,23 @@ export const Sites: CollectionConfig = {
                 { name: 'linkedin', type: 'text' },
                 { name: 'youtube', type: 'text' },
                 { name: 'tiktok', type: 'text' },
+            ],
+        },
+        {
+            name: 'branding',
+            type: 'group',
+            fields: [
+                { name: 'logo', type: 'text' },
+                { name: 'favicon', type: 'text' },
+            ],
+        },
+        {
+            name: 'contactInfo',
+            type: 'group',
+            fields: [
+                { name: 'phone', type: 'text' },
+                { name: 'email', type: 'text' },
+                { name: 'address', type: 'textarea' },
             ],
         },
         {
@@ -254,6 +333,12 @@ export const Sites: CollectionConfig = {
             admin: { description: 'Shipping rates for Malaysia regions' },
             fields: [
                 {
+                    name: 'enabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Enable shipping calculation. If off, shipping fee = 0' },
+                },
+                {
                     name: 'westRate',
                     type: 'number',
                     defaultValue: 800,
@@ -271,6 +356,90 @@ export const Sites: CollectionConfig = {
                     admin: { description: 'Free shipping above X sen (null = no free shipping)' },
                 },
             ],
+        },
+        {
+            name: 'paymentConfig',
+            type: 'group',
+            label: 'Payment Configuration',
+            fields: [
+                {
+                    name: 'merchantQrCode',
+                    type: 'upload',
+                    relationTo: 'media',
+                    label: 'Merchant QR Code',
+                    admin: { description: 'QR code image for QR Banking payments. Shown to customer at checkout.' },
+                },
+                {
+                    name: 'enableCod',
+                    type: 'checkbox',
+                    label: 'Enable Cash on Delivery',
+                    defaultValue: true,
+                },
+                {
+                    name: 'enableQrBanking',
+                    type: 'checkbox',
+                    label: 'Enable QR Banking',
+                    defaultValue: true,
+                },
+                {
+                    name: 'bankName',
+                    type: 'text',
+                    label: 'Bank Name',
+                    admin: { description: 'e.g. Maybank, CIMB, Public Bank' },
+                },
+                {
+                    name: 'bankAccountNo',
+                    type: 'text',
+                    label: 'Account Number',
+                },
+                {
+                    name: 'bankAccountHolder',
+                    type: 'text',
+                    label: 'Account Holder Name',
+                },
+                {
+                    name: 'cardEnabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Allow Credit/Debit Card via Stripe (layer-2 guard)' },
+                },
+                {
+                    name: 'fpxEnabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Allow FPX (Online Banking) via Stripe — Malaysia only (layer-2 guard)' },
+                },
+            ],
+        },
+        {
+            name: 'headerBlock',
+            type: 'json',
+            admin: { description: 'Global header/navigation block — published/live version' },
+        },
+        {
+            name: 'pendingHeaderBlock',
+            type: 'json',
+            admin: { description: 'Draft header block — promoted to headerBlock on publish. null = no pending changes.' },
+        },
+        {
+            name: 'footerBlock',
+            type: 'json',
+            admin: { description: 'Global footer block — published/live version' },
+        },
+        {
+            name: 'pendingFooterBlock',
+            type: 'json',
+            admin: { description: 'Draft footer block — promoted to footerBlock on publish. null = no pending changes.' },
+        },
+        {
+            name: 'globalBlocks',
+            type: 'json',
+            admin: { description: 'Global floating widgets (cart, whatsapp, social) — published/live version' },
+        },
+        {
+            name: 'pendingGlobalBlocks',
+            type: 'json',
+            admin: { description: 'Draft global floating widgets — copied to globalBlocks on publish. null = no pending changes.' },
         },
     ],
     timestamps: true,

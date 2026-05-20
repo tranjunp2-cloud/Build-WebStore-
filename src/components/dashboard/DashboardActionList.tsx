@@ -1,57 +1,73 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Clock, AlertCircle } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNowStrict } from 'date-fns'
 import { useI18n } from '@/i18n'
+import { ArrowRight } from 'lucide-react'
 
-export function DashboardActionList({ pendingOrders }: { pendingOrders: any[] }) {
-    const { t, locale } = useI18n()
+export interface PendingOrder {
+    id: string | number
+    orderNumber?: string
+    customerName?: string
+    createdAt: string | Date
+    currency?: string
+    total?: number
+    items?: Array<{ quantity?: number }>
+}
+
+export function DashboardActionList({ pendingOrders }: { pendingOrders: PendingOrder[] }) {
+    const { t } = useI18n()
 
     return (
-        <div className="flex flex-col rounded-xl border border-white/10 bg-[#1E293B] shadow-sm">
-            <div className="flex items-center justify-between border-b border-white/5 px-6 py-5">
-                <div className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-amber-500" />
-                    <h3 className="font-bold text-white">{t.dashboard.overview.actions.title}</h3>
-                </div>
-                <Link href="/orders?status=pending" className="text-sm font-medium text-blue-400 hover:text-blue-300">
-                    {t.dashboard.overview.actions.viewAll} <ArrowRight className="inline h-4 w-4" />
-                </Link>
+        <div className="rounded-[16px] border border-white/10 bg-[#1E293B] flex flex-col p-6 h-full min-h-[400px]">
+            <div className="flex items-center justify-between mb-[40px]">
+                <h2 className="text-[18px] font-semibold text-[#F8FAFC] tracking-tight leading-[1.55]">
+                    {t.dashboard.overview.actions.title}
+                </h2>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
                 {pendingOrders.length === 0 ? (
-                    <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                    <div className="flex h-full items-center justify-center text-sm text-[#9CA3AF]">
                         {t.dashboard.overview.actions.empty}
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {pendingOrders.map((order) => (
-                            <div key={order.id} className="flex items-center justify-between rounded-lg border border-white/5 bg-[#0F172A] p-4 transition-colors hover:bg-white/[0.02]">
-                                <div className="flex flex-col gap-1">
-                                    <span className="font-semibold text-white">{order.orderNumber}</span>
-                                    <span className="text-sm text-gray-400">
-                                        {order.customerName} • {order.currency} {order.total.toLocaleString()}
-                                    </span>
+                    pendingOrders.map((order) => {
+                        const totalItems = order.items?.reduce((sum: number, item: { quantity?: number }) => sum + (item.quantity || 1), 0) || 0
+                        const orderNum = order.orderNumber?.startsWith('#') || order.orderNumber?.startsWith('Order') 
+                            ? order.orderNumber 
+                            : `Order #${order.orderNumber}`
+                        const currencySymbol = order.currency === 'MYR' ? 'RM' : (order.currency || 'RM')
+
+                        return (
+                            <Link 
+                                href={`/orders/${order.id}`}
+                                key={order.id} 
+                                className="flex items-center justify-between py-3 px-4 rounded-lg border border-[#1F2937] hover:border-[#3B82F6] hover:bg-white/5 cursor-pointer transition-colors duration-200 group no-underline"
+                            >
+                                <div className="flex flex-col gap-[2px] max-w-[60%] shrink-0 overflow-hidden">
+                                    <div className="text-[13px] font-semibold text-white leading-[1.69] truncate">
+                                        {orderNum} — {order.customerName}
+                                    </div>
+                                    <div className="text-[12px] text-[#9CA3AF] leading-[1.83] truncate">
+                                        {t.dashboard.overview.pendingLabel} · {totalItems} {t.dashboard.overview.itemsLabel} · {formatDistanceToNowStrict(new Date(order.createdAt), { addSuffix: true })}
+                                    </div>
                                 </div>
                                 
-                                <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-1.5 text-xs text-amber-400">
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
-                                    </div>
-                                    <Link 
-                                        href={`/orders/${order.id}`}
-                                        className="rounded bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/20"
-                                    >
-                                        {t.dashboard.overview.actions.fulfill}
-                                    </Link>
+                                <div className="text-[14px] font-bold text-[#F59E0B] leading-[1.57]">
+                                    {currencySymbol} {order.total?.toLocaleString() || '0'}
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                                <ArrowRight className="w-[18px] h-[18px] text-[#9CA3AF] group-hover:translate-x-1 group-hover:text-blue-500 transition-all duration-200" strokeWidth={1.5} />
+                            </Link>
+                        )
+                    })
                 )}
+            </div>
+
+            <div className="mt-4">
+                <Link href="/orders?status=pending" className="inline-flex items-center gap-1 py-2 text-[13px] font-semibold text-[#3B82F6] hover:underline transition-all no-underline group">
+                    {t.dashboard.overview.actions.viewAll} <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-all" />
+                </Link>
             </div>
         </div>
     )

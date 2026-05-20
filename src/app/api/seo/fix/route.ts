@@ -21,7 +21,7 @@ export const POST = withAuth(async (user, request) => {
         const payload = await getPayload({ config })
 
         // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -155,7 +155,7 @@ export const POST = withAuth(async (user, request) => {
     } catch (error: any) {
         console.error('[SEO Fix Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'SEO fix failed' } },
             { status: 500 }
         )
     }

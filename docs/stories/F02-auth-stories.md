@@ -6,59 +6,58 @@
 ---
 
 
-## US-F02-01: Register & Welcome 
+## US-F02-01: SSO Integration & Auto-provisioning
 
 **Wave 1** | **P0** | **M** | **Status:** Ready
 
 ### Story
 
-```
-As a   chủ doanh nghiệp SME mới tìm hiểu PrimeWeb
-I want đăng ký tài khoản Owner với thông tin doanh nghiệp chi tiết
-So that hệ thống ngầm khởi tạo dữ liệu của riêng tôi và cho phép tôi tự động bắt đầu hành trình tạo website
+```text
+As a   chủ doanh nghiệp SME (Owner)
+I want tài khoản của tôi được tạo tự động thông qua giao thức tiếp nhận Payload từ cổng SSO (Legacy)
+So that tôi không phải mất công đăng ký lại một form thủ công dư thừa trên Webstore 2.0
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — Đăng Ký Owner Thành Công
+#### AC-1: SSO Payload Sync Provisioning (Happy Path)
 
 ```gherkin
-GIVEN user truy cập /register
-WHEN  điền hợp lệ các trường bắt buộc (First Name, Last Name, Company Name, BRN Number, Email, Password)
-  AND (Tùy chọn) điền Số điện thoại (chọn mã VN/MY), Address, TM Customer
-  AND click "Create account"
-THEN  hệ thống tạo tài khoản với role 'owner'
-  AND tự động tạo ngầm 1 Tenant (Khái niệm Workspace không hiển thị ra UI cho user)
-  AND tự động set auth cookie (lưu phiên đăng nhập) VÀ redirect thẳng vào /onboarding
-  AND gửi 1 Welcome Email (có Banner hình ảnh + Nút Login) vào hòm thư
-  AND hiển thị toast.success (thông báo xanh) "Account created! 🎉"
+GIVEN hệ thống SSO (TM Legacy) có khách hàng Owner vừa khởi tạo xong
+WHEN  SSO gọi Webhook/API `POST /api/users/sso/provision` truyền xuống Payload JSON
+  AND payload chứa đủ 6 trường Identity bắt buộc: `company_name, email, customer_id_number, service_id, first_name, last_name, pack_code`
+  AND các trường gửi sang đều là Unique (Chưa từng tồn tại trong DB Webstore)
+  AND `service_id` KHÔNG phải là chuỗi `"NA"` hoặc chuỗi rỗng
+THEN  hệ thống Webstore tự động sinh 1 Account với role 'owner'
+  AND tự động sinh 1 Tenant (Workspace) liên kết
+  AND trả về HTTP 201 Created chờ Owner qua đăng nhập
 ```
 
-#### AC-2: Validation — Form & Phone Khác Khu Vực
+#### AC-2: Validation — Strict Service ID Constraint
 
 ```gherkin
-GIVEN user đang nhập nội dung Phone Number
-WHEN  chọn mã vùng +84 (VN) hoặc +60 (MY)
-THEN  định dạng số điện thoại sẽ bị force validation phù hợp với format quốc gia đó
-  AND các trường Password tự động trim space trước khi đánh giá dài 8 ký tự/đủ chữ hoa, số, đặc biệt.
+GIVEN hệ thống Webstore 2.0 phân tích Payload từ SSO
+WHEN  trường `service_id` bị thiếu, là chuỗi rỗng `""`, hoặc mang giá trị `"NA"`
+THEN  hệ thống từ chối khởi tạo (Reject)
+  AND trả về HTTP 400 Bad Request kèm message lỗi "service_id is required and cannot be NA"
 ```
 
-#### AC-3: Validation — Global Email Uniqueness (Trùng Email Toàn Hệ Thống)
+#### AC-3: Validation — Global Unique Identity Check
 
 ```gherkin
-GIVEN email đã tồn tại trong collections (ở bất kỳ role nào: Owner cũ, Staff, Admin)
-WHEN  nhập email đó vào register form và submit
-THEN  inline error (lỗi hiển thị ngay dưới ô text) "This email is already registered in our system"
-  AND KHÔNG submit form
+GIVEN hệ thống Webstore 2.0 phân tích Payload từ SSO
+WHEN  bất kỳ trường nào trong `email`, `customer_id_number`, hay `service_id` đã bị trùng lặp trong Database (có người dùng trước)
+THEN  hệ thống từ chối khởi tạo (Reject)
+  AND trả về HTTP 409 Conflict ngăn chặn ghi đè dữ liệu
 ```
 
-#### AC-4: Staff Invitation (Staff Không Được Tự Đăng Ký)
+#### AC-4: Staff Invitation Rule (Ngăn chặn tạo ngoài)
 
 ```gherkin
-GIVEN một nhân viên (Staff) tự truy cập /register
-WHEN  cố gắng tạo account
-THEN  Staff không thể tự sinh ra cấu trúc dữ liệu doanh nghiệp mới
-  AND (Ghi chú kiến trúc) Staff chỉ được cấp tài khoản thông qua luồng Owner gửi chức năng Invite từ trong Payload CMS Dashboard. Khi đó Staff sẽ nhận Welcome Email tương tự Owner.
+GIVEN user có hành vi cố tình gọi API tạo tài khoản Staff (hoặc dùng đường link ẩn /register)
+WHEN  cố gắng tạo account Staff (Nhân viên)
+THEN  hệ thống chặn bỏ (403 Forbidden hoặc 404 Not Found)
+  AND Staff chỉ có thể được sinh ra thông qua lời mời (Invite) trực tiếp từ CMS nội bộ của Owner.
 ```
 
 
@@ -115,7 +114,27 @@ THEN  hiện alert banner "Incorrect email or password"
   AND password field cleared
 ```
 
+#### AC-2a: Error — Workspace bị khóa tạm thời (inactivated)
 
+```gherkin
+GIVEN user (Owner hoặc Staff) nhập đúng email + password
+  AND workspace mà user thuộc về đang ở trạng thái `suspended` (SSO inactivated)
+WHEN  hệ thống check workspace status sau khi xác thực mật khẩu
+THEN  KHÔNG gửi OTP, KHÔNG cấp session
+  AND hiển thị thông báo: "Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ nhà cung cấp dịch vụ."
+  AND KHÔNG redirect, giữ nguyên trang login
+```
+
+#### AC-2b: Error — Workspace đã bị xóa (terminated)
+
+```gherkin
+GIVEN user (Owner hoặc Staff) nhập đúng email + password
+  AND workspace mà user thuộc về đang ở trạng thái `terminated` (SSO terminated)
+WHEN  hệ thống check workspace status sau khi xác thực mật khẩu
+THEN  KHÔNG gửi OTP, KHÔNG cấp session
+  AND hiển thị thông báo: "Tài khoản của bạn đã bị xóa. Vui lòng liên hệ nhà cung cấp dịch vụ để tạo lại."
+  AND KHÔNG redirect, giữ nguyên trang login
+```
 
 #### AC-3: UI — Split Screen Layout & Brand Banner
 

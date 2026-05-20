@@ -1,10 +1,12 @@
 /**
- * Basic Keyword Rank Tracker Utility
- * 
- * Fetches Google SERP and parses HTML to find the approximate rank of a domain for a specific keyword.
- * Fallbacks to a random mock rank if Google blocks the automated request (often happens without proper proxies).
+ * Keyword Rank Tracker Utility
+ *
+ * SERP scraping with mock fallback
  */
 
+/**
+ * Fetches Google SERP and parses HTML to find approximate rank.
+ */
 export async function checkKeywordRank(domain: string, keyword: string): Promise<number | null> {
     try {
         // Clean domain (remove protocol and www.)

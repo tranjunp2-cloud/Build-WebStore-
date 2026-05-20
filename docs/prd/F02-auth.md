@@ -1,7 +1,7 @@
 # PRD: Auth Flow (F02)
-> **Version:** 2.2 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
+> **Version:** 2.3 | **Updated:** 2026-03-23 | **Agent:** `Antigravity Copilot`
 > **Priority:** P0 | **Sprint:** Wave 1 | **Size:** L
-> **Depends on:** Payload CMS Users & Tenants collections ✅
+> **Depends on:** Payload CMS Users & Tenants collections, External SSO System ✅
 > **Blocks:** Everything (Dashboard, Builder, Editor, Storefront)
 
 ---
@@ -10,70 +10,48 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
-
----
-
-## 0. Story Traceability
-
-| Story ID | Title | File | Status |
-|----------|-------|------|--------|
-| US-F02-01 | Register & Welcome | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
-| US-F02-02 | Login | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
-| US-F02-03 | Auth Guard | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
-| US-F02-04 | Logout | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
-| US-F02-05 | Forgot Password | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
-| US-F02-06 | Reset Password | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
-| US-F02-07 | Two-Factor Authentication (Email) | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
-| US-F02-08 | Mobile Web UX — Adaptive Auth Layout & Numeric Inputs | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
-
 ---
 
 ## 1. Problem Statement
 
-Hệ thống yêu cầu luồng xác thực (Auth Flow) hoàn chỉnh bao gồm đăng nhập trước (mặc định), đăng ký, khôi phục mật khẩu, và bảo vệ các route (Auth guard). Ngoài ra, tài khoản SME cần được phân quyền rõ ràng rành mạch và bảo mật thêm tính năng 2FA qua Email OTP.
+Hệ thống yêu cầu luồng xác thực (Auth Flow) tích hợp kết nối với hệ thống SSO Login bên ngoài. Các tài khoản Store Owner được quản lý đăng ký tại SSO; khi khởi tạo thành công sẽ tự động đồng bộ (payload sync) để Webstore 2.0 cấp phát tài khoản và Tenant (Workspace). Đồng thời Webstore vẫn duy trì cơ chế đăng nhập/quản lý mật khẩu nội bộ cho tài khoản nhân viên (Staff). Tầng bảo mật 2FA qua Email OTP là BẮT BUỘC áp dụng cho mọi tài khoản ngay lập tức khi đăng nhập.
 
 ---
 
 ## 2. Target User
 
-- Chủ doanh nghiệp SME mới lần đầu dùng (Persona A) - Nhập Form Đăng Ký (Owner).
-- Nhân viên quản trị hệ thống của Owner - Được mời tham gia (Staff).
-- Trình độ công nghệ (Tech): Thấp — Đòi hỏi giao diện người dùng (UX) thật đơn giản, lỗi báo rõ ràng, và tiện lợi hỗ trợ ngay ở trang đăng nhập.
+- **Owner (Quản trị viên Doanh nghiệp):** Đăng ký thông tin và xác thực đăng nhập thông qua hệ thống SSO. 
+- **Staff (Nhân viên quản trị hệ thống):** Được Owner mời (Invite), sử dụng luồng đăng nhập nội bộ (Native login) của Webstore 2.0.
 
 ---
 
 ## 3. Solution Overview
 
-Luồng xác thực tiêu chuẩn 6 tính năng: Login, Register, Forgot Password, Reset Password, Middleware Auth Guard, và Verify OTP (2FA). 
-Hệ thống ưu tiên điều hướng về màn hình Login (Đăng nhập) trước tiên trên giao diện Split-Screen hiện đại. 
-- **Roles:** Phân định quyền Owner và Staff. Owner tạo Workspace, Staff được Invite.
-- **Data store:** Payload CMS (JWT + Cookies).
-- **Mật khẩu:** Buộc tuân thủ quy tắc dài 8 ký tự, có đủ biểu thức, tự động cắt khoảng trống.
-- **Bảo mật:** 2 lớp bảo mật qua mã OTP Email.
+- **Đồng bộ hóa tài khoản (Account Provisioning):** Webstore 2.0 tiếp nhận payload đăng ký từ SSO để tự tạo Account ID và Tenant cho Owner dựa trên các thông số định danh thiết yếu (unique properties).
+- **Phân luồng Xác thực (Dual Auth Flows):** 
+  - Owner: Redirect đăng nhập & đổi mật khẩu thông qua hệ thống SSO.
+  - Staff: Đăng nhập & đối mật khẩu bằng form bảo mật nội bộ của Webstore 2.0.
+- **Bảo mật bắt buộc (Mandatory 2FA):** Bất kể nguồn đăng nhập (SSO cho Owner hay Native cho Staff), sau bước xác nhận tài khoản mật khẩu nền tảng (pre-auth), hệ thống tự động gửi 1 Email OTP. Người dùng phải nhập đúng OTP để truy cập Dashboard.
 
 ---
 
 ## 4. Scope
 
 ### 4.1. Kiến Trúc User Roles & Cấu Trúc Khách (RBAC)
-- **Owner**: Đăng ký từ trang `/register`, tự động sinh 1 Workspace duy nhất, quyền tạo site và thanh toán.
-- **Staff**: Nhân viên được Owner mời (Invite) qua Payload CMS. KHÔNG tự đăng ký ở trang ngoài. Cấp quyền vào CMS dựa trên Policy của Owner.
+- **Owner**: Tạo và quản lý chủ chốt bởi SSO. Tự động sinh 1 Workspace duy nhất từ lúc SSO báo sang.
+- **Staff**: Nhân viên được Owner mời qua Payload CMS. KHÔNG có quyền tự đăng ký. Sử dụng credential nội bộ Webstore 2.0.
 
 ### 4.2. In Scope
-- Ưu tiên hiển thị màn hình Login làm luồng gốc cho khách lặp lại (returning users).
-- Đăng nhập (Login) + Màn hình xác thực 2FA OTP qua Email (US-F02-02, US-F02-07).
-- Form Đăng ký (Register) cho Owner bao gồm các trường: Email, Password, First/Last Name, Company Name, BRN Number (Bắt buộc); Phone, Address, TM Customer (Tùy chọn) (US-F02-01).
-- Ràng buộc Hệ Thống Ẩn (Invisible Constraint): Mỗi Owner sinh ra **1 cấu trúc dữ liệu Namespace/Workspace gầm (ẩn)**. Người dùng không biết khái niệm Workspace trên giao diện.
-- Cấu hình Gửi Email Welcome (có Banner ảnh + Nút Đăng nhập) khi Owner đăng ký xong hoặc Staff vừa được Invite.
-- Auth guard chặn redirect các user chưa đăng nhập về `/login` (US-F02-03).
-- Đăng xuất (Logout) (US-F02-04).
-- Quên mật khẩu & Đặt lại mật khẩu (US-F02-05, US-F02-06).
-- Giao diện Split Screen kết hợp Brand Logo/Banner và nút Hỗ trợ (User Guideline).
+- Xây dựng API Webhook tiếp nhận Payload khởi tạo tài khoản từ SSO.
+- Xử lý Payload thông tin bắt buộc và Unique (Duy nhất): `company_name`, `email`, `customer_id_number`, `service_id`, `first_name`, `last_name`. Xử lý lưu trữ thuộc tính gói `pack_code`.
+- Tách luồng Login: Cho phép Staff nhập Email/ID, trong khi Owner sẽ có lối rẽ redirect xác thực bằng SSO.
+- Bắt buộc bắt mã 2FA bằng Email OTP cho TOÀN BỘ luồng đăng nhập thành công.
+- Reset / Quên mật khẩu: Điều hướng thẳng Owner sang trang reset của SSO. Tính năng Native Reset Password trên Webstore 2.0 chỉ áp dụng cho Staff.
+- Auth guard & auto-routing. Logout và hủy phiên hoàn toàn.
 
 ### 4.3. Out of Scope
-- Google SSO / Social Logins (Các Wave sau).
-- 2FA qua Authenticator App (Google Auth/Authy) (Các Wave sau).
-- Thiết lập Rate limit chặn spam đăng nhập liên tiếp (Phạm vi Server/Infra ở Wave kế).
+- Form Đăng ký (Register native) cho Owner tại giao diện Webstore 2.0 bị loại bỏ (tạm ẩn UI). Đầu vào Owner hoàn toàn lệ thuộc SSO (hệ thống dùng account admin lấy token và gọi API register ở Webstore 2.0 để khởi tạo).
+- Social Logins trực tiếp.
 
 ---
 
@@ -81,406 +59,153 @@ Hệ thống ưu tiên điều hướng về màn hình Login (Đăng nhập) tr
 
 | Metric | Target | Measured By |
 |--------|--------|-------------|
-| Register → Dashboard | < 10s | Timing |
-| Login → Dashboard | < 3s | Timing |
-| Forgot → email sent | < 5s | Resend logs |
-| Unprotected routes | 0 | Audit |
+| SSO Payload Sync processing | < 2s | API logs |
+| Login → 2FA Prompt | < 2s | Timing |
 
 ---
 
-## 6. User Story Summary
+## 6. Functional Requirements
 
-```
-AS A   chủ doanh nghiệp SME mới tìm hiểu PrimeWeb
-I WANT đăng ký tài khoản Owner với thông tin doanh nghiệp chi tiết
-SO THAT hệ thống ngầm khởi tạo không gian dữ liệu của riêng tôi và cho phép tôi tự động bắt đầu hành trình tạo website
-```
-> Source: [US-F02-01](../stories/F02-auth-stories.md#us-f02-01)
-
----
-
-## 7. Functional Requirements
-
-| FR-ID | Requirement | Story Ref | Priority | Notes |
-|-------|-------------|-----------|----------|-------|
-| FR-01 | Register: Form bắt buộc (Company, BRN, Head name, Email, Pass). Tùy chọn (Phone format VN/MY, Address) | US-F02-01 | P0 |
-| FR-02 | Register: Validate password ≥ 8 ký tự (Hoa, Số, Đặc biệt), tự động trim space trước khi submit | US-F02-01 | P0 |
-| FR-03 | Register: Quét Uniqueness email trùng trên toàn bộ hệ thống (Owner, Staff) | US-F02-01 | P0 | 409 response |
-| FR-04 | Register: Tạo Account + Auto-create 1 Tenant (Workspace) duy nhất cho Owner | US-F02-01 | P0 | After Hook |
-| FR-05 | Register: Gửi Email Welcome có hình ảnh banner + Nút đăng nhập lúc Reg/Invite | US-F02-01 | P0 | Resend
-| FR-06 | Register: Tự động Set Cookie và Redirect thẳng vào `/onboarding` | US-F02-01 | P0 |
-| FR-07 | Login: Màn hình Login hiện theo dạng Split-Screen, có Logo & Nút hướng dẫn User Guideline | US-F02-02 | P0 |
-| FR-08 | Login: Sau bước email/pass nhập đúng → Gọi màn OTP (nếu bật 2FA) | US-F02-07 | P0 |
-| FR-09 | Login: Gửi OTP 6 số, giới hạn hạn sử dụng 5 phút. Set auth cookie khi verify THÀNH CÔNG | US-F02-07 | P0 | Payload CMS
-| FR-10 | Login: alert banner + toast khi sai credentials | US-F02-02 | P0 | 401 response |
-| FR-11 | Auth Guard: Redirect ngay về `/login?redirect=[url]` nếu user chưa auth truy cập route bất kỳ, ưu tiên luồng Login | US-F02-03 | P0 |
-| FR-12 | Auth Guard: Phân luồng auto-routing: Owner (`/onboarding` nếu chưa có site, hoặc `/dashboard` nếu có site), Staff (`/admin` PayloadCMS) | US-F02-03 | P0 |
-| FR-13 | Logout: clear cookie + redirect `/login` | US-F02-04 | P0 |
-| FR-14 | Forgot pass: luôn hiện success state (không reveal email) | US-F02-05 | P0 | Security by design |
-| FR-15 | Reset pass: validate token, cập nhật password (tuân thủ trim và rule 8 chars) | US-F02-06 | P0 |
-| FR-16 | [Mobile] Màn hình Split Screen chuyển sang dạng cột dọc (Stack Width 100%), ẩn/thu nhỏ khối Brand Banner. | US-F02-08 | P0 | Tiết kiệm diện tích |
-| FR-17 | [Mobile] Màn hình OTP phải gọi đúng Numpad ảo (Bàn phím số) trên thiết bị di động bằng thuộc tính `inputmode="numeric"`. | US-F02-08 | P0 | Ergonomics |
+| FR-ID | Requirement | Priority | Notes |
+|-------|-------------|----------|-------|
+| FR-01 | SSO Sync: Cung cấp API endpoint nội bộ lấy thông tin từ hệ thống SSO tạo Owner liên kết (Webhook / Register API). Bảo mật: SSO dùng account admin để lấy token và gọi gọi qua API này. | P0 | Server API |
+| FR-02 | SSO Sync Validation: Payload gửi sang bắt buộc phải hợp lệ cho các trường sau và tất cả phải là UNIQUE trong DB: `company_name`, `email`, `customer_id_number`, `service_id`, `first_name`, `last_name`. | P0 | Reject 400 or 409 error |
+| FR-03 | SSO Target Sync: Payload bắt buộc gửi kèm mã gói đăng ký `pack_code` để phân loại gói doanh nghiệp trên CMS. | P0 |
+| FR-04 | Provisioning: Tự động khởi tạo Account Owner và 1 Tenant duy nhất gắn liền với thông tin SSO gửi sang. | P0 | After Hook |
+| FR-05 | Login Form Switch: Tuỳ biến trang `/login`. Staff có thể đăng nhập bằng tài khoản nội bộ. Owner sẽ cần dùng tùy chọn Auth với SSO. | P0 |
+| FR-06 | 2FA Mandatory: Ngay sau khi nhập mật khẩu đúng (Staff) HOẶC nhận Callback Auth thành công từ SSO (Owner), HỆ THỐNG GỬI NGAY 1 OTP 6 số qua Email. Yêu cầu nhập đúng để vào Dashboard. | P0 | Resend |
+| FR-07 | Reset Password Routing: Màn đổi mật khẩu. Chỉ duy nhất STAFF mới được làm mới mật khẩu tại trang đăng nhập Webstore 2.0. | P0 | Security Check |
+| FR-08 | Reset Password SSO Direct: Mọi yêu cầu đổi mật khẩu hoặc phát hiện tài khoản là Owner muốn đổi đều phải direct 100% sang link của trang web SSO login (ví dụ: `https://sso-dev.ech.primecommerce.asia/auth/forgot-password`). | P0 |
+| FR-09 | Auth Guard: Tự động Redirect về `/login` nếu truy cập tài nguyên bảo mật không phép. | P0 |
+| FR-10 | Logout: Xóa session và JWT nội bộ. Redirect về login. | P0 |
 
 ---
 
-## 8. Business Rules
+## 7. Business Rules
 
-- **BR-01 (Priority Routing):** Mặc định truy cập trang chủ `/` (hoặc nội bộ) không có session sẽ bị điều hướng thẳng vào `/login?redirect=[original_url]` thay vì `/register`.
-- **BR-02 (Role Routing):** Phân luồng đăng nhập: Owner vào khu vực `/onboarding` (nếu chưa có site) hoặc `/dashboard` (nếu đã có site). Staff bị đẩy về Payload CMS Workspace để làm việc.
-- **BR-03 (Invisible Workspace Limits):** Auto-create 1 Tenant duy nhất sau khi register (chạy ngầm ở Backend) — gán Role 'Owner'. Các account ko thể tạo ra Tenant số 2. Toàn bộ UI sẽ không bao giờ hiển thị từ khóa "Workspace" hay "Tenant" để tránh gây rối cho user.
-- **BR-04 (Staff Constraints):** Nhân viên (Staff) không được tự mở tài khoản ở `/register`. Staff Account chỉ sinh ra khi Owner dùng chức năng Invite.
-- **BR-05 (Data Format):** Validation tự động trim khoảng trắng (trailing space) cho Email và Password. Password đủ 8 ký tự, mix chữ hoa, chữ thường, số, đặc biệt.
-- **BR-06 (Security):** Tích hợp Email Verification code (OTP) sau user credential step lúc Login. Authentication Token chỉ set sau khi hoàn thành OTP nếu 2FA được bật.
-- **BR-07 (Security):** Luôn hiện success state cho forgot-password (không reveal email có tồn tại hay không). Mọi protected route phải check auth (0 exposed routes). Token reset password expire sau 24h.
-- **BR-08 (Localization Sync):** Sau khi xác thực thành công (Login / OTP verify), hệ thống phải đọc ngôn ngữ ưu tiên từ Database của user và ghi đè (override) lên giá trị LocalStorage của thiết bị truy cập để đồng bộ trải nghiệm cá nhân.
-
----
-
-## 9. User Flow
-
-```
-1. Unauthenticated Root Flow:
-   `/` → Hệ thống check session (None) → Redirect về `/login` theo mặc định.
-
-2. Register (Owner only): 
-   `/register` → Điền Form (Company, Header, BRN, Phone...) + Mật khẩu trim space 
-   → POST `/api/users` 
-   → Check Email Unique All Roles 
-   → Validation → Auto-create 1 Tenant 
-   → Gửi Welcome Email 
-   → Auto-login → Redirect `/onboarding`
-
-3. Login (Split-Screen Interface):
-   `/login` → Điền Form & trim space → POST `/api/users/login` 
-   ├── (Nếu bật 2FA) → Bypass Token → Gửi OTP qua Resend → Mở màn hình OTP → Nhập đúng OTP 6 số → Set Cookie
-   └── (Nếu không bật 2FA) → Set Cookie ngay
-       ├── Sync i18n ưu tiên: Đọc `prefer_lang` từ Database và override lại `prefer_lang` dưới LocalStorage
-       ├── (Nếu Role = Owner) → `/dashboard` (hoặc redirect `/onboarding`)
-       └── (Nếu Role = Staff) → Giao diện CMS Admin (Workspace)
-
-4. Auth Guard: access `/dashboard` → no session → `/login?redirect=/dashboard` → login → (route theo flow 3)
-
-5. Forgot Pass: `/forgot-password` → email → POST forgot-password → success state (always)
-
-6. Reset Pass: email link → `/reset-password?token=xxx` → new password → POST reset → `/login`
-```
+- **BR-01 (Single Source of Truth cho Owner):** Mọi tài khoản Owner đều trỏ về một gốc đăng ký tại SSO. Hệ thống Webstore lấy Payload làm chuẩn để sinh tài khoản tự động (Tên, Mã khách hàng, Service ID, Pack Code). Thông tin tài khoản cốt lõi của Owner khóa chéo không thể tự sửa ở Webstore.
+- **BR-02 (Mandatory 2FA):** Việc bảo mật OTP qua Email là BẮT BUỘC 100% người dùng, kích hoạt NGAY LẬP TỨC khi phiên truy cập bắt đầu.
+- **BR-03 (Reset Password Routing):** Owner phải và chỉ có thể đổi mật khẩu bên hệ thống SSO. Staff phải và chỉ có thể truy cập Đổi mật khẩu Native tại `/login`.
+- **BR-04 (Staff Constraints):** Không ai được tự đăng ký luồng Staff. Phải do hệ thống phân quyền/mời người vào Payload CMS.
+- **BR-05 (SSO Account Status):** SSO quản lý trạng thái tài khoản Owner gồm 3 trạng thái:
+  - **activated** — đang hoạt động, Owner + Staff đăng nhập bình thường.
+  - **inactivated** (deactivated) — bị khóa tạm thời. Workspace status = suspended. Owner + tất cả Staff thuộc workspace đó KHÔNG đăng nhập được. Có thể mở lại từ SSO.
+  - **terminated** (deactivated) — gói bị xóa vĩnh viễn. Workspace status = terminated. Owner + Staff KHÔNG đăng nhập được. Website bị unpublish. Dữ liệu giữ 90 ngày. Phải tạo lại tài khoản SSO mới.
+- **BR-06 (Login Block khi Workspace suspended/terminated):** Khi user (Owner hoặc Staff) cố đăng nhập mà workspace đang ở trạng thái `suspended` hoặc `terminated`, hệ thống PHẢI:
+  - Block đăng nhập (không gửi OTP, không cấp session).
+  - Hiển thị thông báo rõ ràng:
+    - suspended: "Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ nhà cung cấp dịch vụ."
+    - terminated: "Tài khoản của bạn đã bị xóa. Vui lòng liên hệ nhà cung cấp dịch vụ để tạo lại."
+- **BR-07 (Staff theo workspace):** Staff bị ảnh hưởng theo trạng thái workspace, không cần khóa từng Staff riêng. Khi workspace activated lại → Staff tự động truy cập được.
 
 ---
 
-## 10. Screen Layout
-
-> **[Global CMS Constraint]** Tính năng Auth là ngoại lệ - rendering full màn hình ngoài Layout CMS.
-
-> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
-
-### 10.1. Màn hình Login / Register gốc (Split-Screen Interface)
-- **Mô tả:** Màn hình chính phục vụ đăng nhập/đăng ký tài khoản cho Owner và redirect tương ứng định tuyến.
-- **Components chính:**
-  - Hero Image/Banner (Trái): [Visual image, slogan quảng cáo thương hiệu]
-  - Form Area (Phải): [Logo, Input Form: Email, Pass, v.v., Nút Submit Primary, Link Register/Forgot]
-- **Wireframe:**
-```text
-┌─ [Desktop] /login hay /register ────────────────────────────────────┐
-│  [BRAND IMAGE / BANNER LỚN BÊN TRÁI] │  [PrimeWeb Logo]             │
-│  (Hiệu ứng đồ họa, Slogan quảng cáo) │                              │
-│                                      │  [Glassmorphism Form]        │
-│                                      │  Email...                    │
-│                                      │  Password...                 │
-│                                      │  Forgot password?            │
-│                                      │  [Sign In (Primary CTA)]     │
-│                                      │  [Register (Secondary)]      │
-│                                      │                              │
-│                                      │ 🔗 [Hướng dẫn sử dụng Help]   │
-└─────────────────────────────────────────────────────────────────────┘
-
-**Wireframe Mobile (< 768px): Stacked Laytout**
-```text
-┌─ 📱 Mobile Browser ─────────────────┐
-│ [PrimeWeb Logo]                     │
-│ ─────────────────────────────────── │
-│          [Glassmorphism Form]       │
-│  Email address                      │
-│  [ _____________________________ ]  │
-│                                     │
-│  Password                           │
-│  [ _____________________________ ]  │
-│  Forgot password?                   │
-│                                     │
-│  [ Sign In (Primary CTA)         ]  │
-│  [ Register (Secondary CTA)      ]  │
-│                                     │
-│ ─────────────────────────────────── │
-│ 🔗 [Hướng dẫn sử dụng Help]         │
-└─────────────────────────────────────┘
-```
-
-### 10.2. Màn hình OTP / Khôi phục mật khẩu (2FA / Recovery Screen)
-- **Mô tả:** UI đơn giản tập trung vào Verify OTP hoặc nhập Email quên mk. Không chứa Banner trái phức tạp.
-- **Components chính:**
-  - OTP Input Form: [6 ô text fields cho OTP, đồng hồ Countdown 5 phút, Nút Resend]
-  - Forgot/Reset Form: [Trường nhập Email, Mật khẩu mới, Nút Xác nhận]
-- **Wireframe (OTP Verification):**
-```text
-┌─ 2FA Verification ──────────────────────────┐
-│                                             │
-│  🔒 Enter Security Code                     │
-│  We sent a 6-digit code to ow***@sme.com    │
-│                                             │
-│  [ ] [ ] [ ] - [ ] [ ] [ ]                  │
-│                                             │
-│  [ Verify Code ]                            │
-│                                             │
-│  Didn't receive it? Resend in 04:59         │
-└─────────────────────────────────────────────┘
-```
-
-- **Wireframe (Forgot Password):**
-```text
-┌─ Reset Password ────────────────────────────┐
-│                                             │
-│  🔑 Forgot your password?                   │
-│  Enter your email below to receive a link   │
-│                                             │
-│  Email address                              │
-│  [ you@company.com ]                        │
-│                                             │
-│  [ Send Reset Link ]                        │
-│                                             │
-│  ← Back to login                            │
-└─────────────────────────────────────────────┘
-```
-
-### 10.3. Các trạng thái UI (UI States) & Modals
-- **Loading State:** Thay text "Sign In" bằng dạng Button Spinner isLoading. Không chặn toàn trang.
-- **Error State / Edge Cases:** Inline field validation lỗi viền đỏ (sai format, pass ngắn). Alert banner báo tài khoản không tồn tại.
-- **Success State:** Sonner Toast xanh báo tạo Account, Forgot Pass link sent.
-
----
-
-## 11. Acceptance Criteria
-
-> Các AC dưới đây được migrate chuẩn hóa từ `F02-auth-stories.md`.
-
-### AC-1: Cấu trúc Form Đăng ký Owner và Welcome Email
-> 📌 Source: [US-F02-01](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user truy cập /register để đăng ký Owner
-WHEN  hoàn thành điền form bắt buộc (Tên cty, Tên người đứng đầu, BRN, Email, Pass)
-  AND (tùy chọn) SĐT mã format QG, Địa chỉ
-  AND không có bất kỳ email trùng nào trong DB toàn hệ thống
-THEN  tạo mới account + sinh ngầm 1 Tenant data duy nhất (Không hiển thị khái niệm Workspace ra màn hình)
-  AND tự động login chuyển vào /onboarding
-  AND gửi Email Welcome có chèn hình ảnh Banner và nút Login
-  AND hiển thị toast thành công
-```
-
-### AC-2: Mật khẩu chuẩn và Tự động Trim
-> 📌 Source: [US-F02-01](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user đang nhập mật khẩu
-WHEN  mật khẩu < 8 ký tự, hoặc thiếu (chữ hoa, số, ký tự đặc biệt)
-THEN  inline validation hiển thị lỗi "Password must be at least 8 char..."
-  AND Email và Pass khi submit tự động trim bỏ khoảng trắng thừa (trailing/leading space)
-```
-
-### AC-3: Luồng Staff Invitation
-> 📌 Source: [US-F02-01](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user đóng vai trò Staff (nhân viên)
-WHEN  cố tình truy cập trang /register ngoài frontend
-THEN  chặn không cho kết nối workspace
-  AND Staff chỉ có thể được tạo bằng cách Owner gửi thư mời từ Payload CMS (Nhận Welcome Email)
-```
-
-### AC-4: Split Screen UI và Support Guide Link
-> 📌 Source: [US-F02-02](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user truy cập /login
-THEN  màn hình hiển thị dạng Split Screen
-  AND nửa MÀN HÌNH chứa Brand Banner nổi bật
-  AND nửa FORMs chứa Kính trong suốt + Logo Brand + Nút Đăng nhập làm Primary CTA
-  AND có Link Hướng dẫn (User Guideline) để trợ giúp
-```
-
-### AC-5: Post-Login Phân luồng Role (Auto-Routing)
-> 📌 Source: [US-F02-02](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user (Owner hoặc Staff) đã đăng nhập thành công ở /login chung
-WHEN  chuẩn bị redirect
-THEN  nếu Role = 'owner' → redirect về AI Builder hoặc Dashboard
-  AND nếu Role = 'staff' → redirect thẳng vào giao diện Payload CMS Admin Panel (giới hạn theo quyền)
-```
-
-### AC-6: Auth Guard — Chặn Quyền
-> 📌 Source: [US-F02-03](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user chưa login (không có session)
-WHEN  truy cập trang chủ / hoặc /dashboard, /builder/*
-THEN  redirect mặc định → /login?redirect=[original_url]
-```
-
-### AC-7: Two-Factor Authentication (OTP Email)
-> 📌 Source: [US-F02-07](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user kích hoạt 2FA qua Email
-WHEN  nhập đúng email và password ở /login 
-THEN  điều hướng sang màn hình OTP Verification, gửi SMS 6 số qua mail hạn 5 phút
-  AND CHỈ set session cookie thực tế khi nhập mã OTP chuẩn xác
-```
-
-### AC-8: Forgot Password — Always Success Design
-> 📌 Source: [US-F02-05](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user vào /forgot-password
-WHEN  nhập email và click "Send reset link"
-THEN  LUÔN hiện success state (bảo vệ không reveal email của database)
-  AND gửi link khôi phục nếu email hợp lệ
-```
-
-### AC-9: Logout System
-> 📌 Source: [US-F02-04](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user đã login
-WHEN  click Logout (sidebar bottom)
-THEN  clear session cookie
-  AND redirect → /login
-```
-
-### AC-10: Reset Password Flow
-> 📌 Source: [US-F02-06](../stories/F02-auth-stories.md)
-
-```gherkin
-GIVEN user click link /reset-password?token=xxx
-WHEN  nhập new password + confirm password hợp lệ
-THEN  POST /api/users/reset-password { token, password }
-  AND thành công → toast.success
-  AND redirect → /login
-```
-
-### AC-11: Trải Nghiệm Nhập Liệu Mobile Auth
-> 📌 Source: [US-F02-08](../stories/F02-auth-stories.md)
-
-Khi truy cập màn hình `/login` hoặc `/register` trên view dưới 768px, Brand Banner bị loại bỏ hoặc thu nhỏ thành Top Header. Giao diện form lấy trọn 100% width. Tại trang nhập OTP (`/verify-otp`), việc chạm vào ô điền OTP sẽ kích hoạt bàn phím số (Numeric Numpad) thay vì bàn phím chữ QWERTY. Tự động focus sang ô OTP kế tiếp mà KHÔNG gây khựng / giật màn hình (scroll jumping).
-
----
-
-## 12. Non-Functional Requirements
-
-| Category | Requirement | Notes |
-|----------|-------------|-------|
-| **Security** | Không reveal email tồn tại trong forgot-password | Security by design |
-| **Security** | JWT cookie HttpOnly, Secure, SameSite=Strict | Payload CMS |
-| **Integrity** | Check uniqueness email ở cấp Database layer | Global scope |
-| **Performance** | Login → Dashboard < 3s | |
-| **Accessibility** | WCAG 2.1 AA, keyboard navigable forms | |
-| **Device support** | Mobile 375px, Tablet 768px, Desktop 1280px+ | Stack Column ở Mobile |
-
----
-
-## 13. Technical Architecture
-
-### 13.1 Components
-
-| Component | File | Description |
-|-----------|------|-------------|
-| `AuthLayout` | `app/(auth)/layout.tsx` | Màn hình Split Screen (Banner + Form Card), chứa UI Link guideline |
-| `LoginPage` | `app/(auth)/login/page.tsx` | Login form |
-| `OTPPage` | `app/(auth)/verify-otp/page.tsx` | Form nhập 6 số xác thực 2FA OTP |
-| `RegisterPage` | `app/(auth)/register/page.tsx` | Mở rộng form: Email, Pass, Name, Company, BRN, Phone... |
-| `ForgotPasswordPage` | `app/(auth)/forgot-password/page.tsx` | Email → reset link |
-| `ResetPasswordPage` | `app/(auth)/reset-password/page.tsx` | Token → new password |
-
-### 13.2 API Endpoints
+## 8. User Flow
 
 ```text
-POST /api/users                  → Register (201 Created) — Include BRN, Phone, etc.
-POST /api/users/login            → Login — Return 200 (OTP required) or 200 (Set-Cookie)
-POST /api/users/verify-otp       → Verify 6 digit OTP (Set-Cookie)
-POST /api/users/logout           → Logout (200 OK + Clear-Cookie)
-POST /api/users/forgot-password  → Send reset email (200 always)
-POST /api/users/reset-password   → Reset with token (200 OK / 400 Bad)
-Auth: Payload CMS built-in with custom Resend hooks.
+1. Owner Provisioning (SSO Webhook Flow):
+   SSO System (Create User) → Gọi POST Payload API sang Webstore 2.0 
+   → Webstore Validate đủ 6 trường unique + pack_code
+   → Tạo Account Owner & Tenant (status = 'active')
+   → (Optional) Gửi Welcome Email có nút "Tới Webstore"
+
+2. SSO Status Change (MỚI):
+   SSO gửi status change → Webstore API cập nhật:
+   - inactivated → tenants.status = 'suspended' → Owner + Staff bị block login
+   - terminated → tenants.status = 'terminated' → website unpublish + block login
+   - activated → tenants.status = 'active' → Owner + Staff đăng nhập được lại
+
+3. Đăng nhập (Login) + Mandatory 2FA:
+   - Truy cập `/login`.
+   - Hệ thống check workspace status TRƯỚC:
+     - Nếu workspace suspended → hiển thị "Tài khoản đang bị tạm khóa" → DỪNG
+     - Nếu workspace terminated → hiển thị "Tài khoản đã bị xóa" → DỪNG
+     - Nếu workspace active → tiếp tục luồng đăng nhập
+   - [Chạy Luồng Owner]: Bấm "Đăng nhập với SSO" → Hệ thống SSO Auth → Trả về Webstore (Callback) → Trigger Gửi OTP Email → [Màn hình Xác thực OTP] → Cấp Session Cookie (Dashboard).
+   - [Chạy Luồng Staff]: Điền Email/Pass nội bộ → Trigger Gửi OTP Email → [Màn hình Xác thực OTP] → Cấp Session Cookie (CMS Admin).
+
+4. Đổi Mật Khẩu (Forgot/Reset):
+   - Vào mục Quên mật khẩu.
+   - Owner → Điều hướng External sang domain hệ thống SSO /reset-password (URL mẫu: `https://sso-dev.ech.primecommerce.asia/auth/forgot-password`).
+   - Staff → Nhập email → Nhận link về email → Khôi phục tại Cổng Webstore 2.0.
 ```
 
 ---
 
-## 14. Dependencies
+## 9. API Contract (SSO Payload & Mapping)
 
-| Dependency | Status | Action Needed |
-|-----------|--------|---------------|
-| Payload CMS Users (Roles) | ✅ Thêm `Role`, `2FaConfig` field | |
-| Payload CMS Tenants data | ✅ Thêm Company, BRN, Phone | |
-| Resend email | ✅ Đã cấu hình | Tùy biến Welcome Email template dạng HTML Banner |
+Webstore 2.0 sẽ nhận cấu trúc Payload nguyên bản từ hệ thống SSO (TM Legacy) với các trường dữ liệu chi tiết. Để quá trình xử lý được gọn nhẹ, Webstore sẽ bóc tách các trường thiết yếu để khởi tạo tài khoản và đưa các thông tin còn lại vào bộ lưu trữ phụ (`meta_data`).
 
----
-
-## 15. API Contract
-
+### 9.1 Data Payload Example (từ SSO)
 ```json
-POST /api/users/register
-Request: { 
-  "email": "owner@sme.com", 
-  "password": "...", 
-  "firstName": "John", 
-  "lastName": "Doe",
-  "companyName": "SME LLC",
-  "brnNumber": "12345678",
-  "phone": "+84912345678",
-  "tmCustomer": true
-}
-Response: { "success": true, "user": {...}, "workspace": {...} }
+POST /api/v1/tm/users
+Content-Type: application/json
+Authorization: ********
 
-POST /api/users/login
-Request: { "email": "owner@sme.com", "password": "..." }
-Response: { "success": true, "requires2FA": true, "emailMasked": "ow***@sme.com" } 
-(Cookie Not Set yet)
+{
+    "company_name": "ECH Store 2026 v5",
+    "customer_id_type": 1,
+    "segment_group": "SME",
+    "segment_sub_group": 1,
+    "industry_code": 25,
+    "brn_format": 3,
+    "brn_type": 10,
+    "relationship_code": 1,
+    "contracting_party": 1,
+    "foreign_telco": 2,
+    "customer_id_number": "5320919-6794387",
+    "first_name": "ECH",
+    "last_name": "Store 2025",
+    "preferred_language": 1,
+    "telephone": "01234622081",
+    "email": "testduyne8@yopmail.com",
+    "address_type": 1,
+    "unit_number": "18",
+    "floor_number": "NA",
+    "building_name": "NA",
+    "street_type": 22,
+    "street_name": "INDUSTRI SEBERANG 1",
+    "section": "KAWASAN INDUSTRI SEBERANG TEMERLOH",
+    "post_code": "72000",
+    "city": "TEMERLOH",
+    "state": 6,
+    "country": 1,
+    "existing_tm_customer": 1,
+    "waiver": 2,
+    "commission_to_id": "NA",
+    "commission_to_name": "NA",
+    "pack_code": "STARTER",
+    "business_model": 1,
+    "training_plan": "",
+    "service_id": "NA",
+    "unifi_order_id": "PC-CV17SXDUSAAAA"
+}
 ```
+
+### 9.2 Data Mapping Rules (SSO → Webstore)
+
+| SSO Payload Field | Webstore Field (User/Tenant) | Ràng buộc | Mục đích sử dụng |
+|-------------------|------------------------------|-----------|------------------|
+| `email` | `users.email` | Bắt buộc (Unique) | Login ID, nhận thông báo 2FA |
+| `first_name` | `users.firstName` | Bắt buộc | Hiển thị lời chào nội bộ |
+| `last_name` | `users.lastName` | Bắt buộc | Hiển thị tài khoản |
+| `telephone` | `users.phone` | Tuỳ chọn | Chăm sóc khách hàng |
+| `preferred_language` | `users.prefer_lang` | Tuỳ chọn | Auto-switch ngôn ngữ (Ví dụ `1` = EN) |
+| `company_name` | `tenants.companyName` | Bắt buộc | Tên Workspace/Cửa hàng |
+| `customer_id_number`| `tenants.customerId` | Bắt buộc (Unique) | Đối soát (Reconciliation) dữ liệu Owner |
+| `service_id` | `tenants.serviceId` | Bắt buộc (Unique) | Định danh dịch vụ gói (Reject/Báo lỗi nếu nhận giá trị "NA" hoặc rỗng) |
+| `pack_code` | `tenants.packCode` | Bắt buộc | Phân loại gói doanh nghiệp (freemium/starter/standard/professional). Hiện tại tất cả gói giới hạn giống nhau — chưa có rate limits khác nhau. |
+| `unifi_order_id` | `tenants.orderId` | Tuỳ chọn | Lưu log tracking mã đơn hàng |
+| *(Các trường Địa chỉ)* | `tenants.address` (JSON) | Tuỳ chọn | Tham khảo cho Auto-fill Billing |
+
+> **Quy tắc Xử lý Dữ liệu thô (Raw Data Policy):** Các thuộc tính còn lại từ SSO (như `industry_code`, `segment_group`, `brn_type`...) sẽ KHÔNG được tạo cột riêng trong Database để tránh làm phình cấu trúc. Thay vào đó, toàn bộ cục JSON payload ban đầu sẽ được serialize lưu vào 1 trường dạng JSONB gọi là `meta_data` trong Collection `Tenants` của Payload CMS. Khi có nghiệp vụ Report/Analytics phát sinh sau này, hệ thống vẫn có thể query và truy xuất ra được.
 
 ---
 
-## 16. Open Questions
+## 10. Open Questions (Cần PO / Tech Lead confirm)
 
 | # | Question | Owner | Status |
 |---|----------|-------|--------|
-| 1 | Logic Invite Staff của Payload CMS sẽ xử lý UI trên Frontend như thế nào? Cần Custom View trong Payload Panel. | PO / Team | ⬜ Open |
-
----
-
-## 17. 9-Point Done Checklist
-
-- [x] Loading State — Button spinner during API calls
-- [x] Empty State — N/A (forms always visible)
-- [x] Error State — Alert banner + inline field errors + toast
-- [x] Form Validation — Zod schemas with phone number format validator and trimming
-- [x] Button States — Disabled + spinner during submit
-- [x] Toast Feedback — Success + error on all actions (sonner)
-- [x] Auth Redirect — 401 → /login?redirect=[url] 
-- [x] Mobile 375px — Responsive Stack column layout, 44px tap targets
-- [x] TypeScript Clean — tsc --noEmit pass
-
----
-
-## 18. Definition of Ready
-
-- [x] User Stories approved và linked ở Section 0 ✅
-- [x] AC ở Section 11 copy/merge logic gọn gàng từ story files ✅
-- [x] FR ở Section 7 map 1-1 với thiết kế Roles và UI ✅
-- [x] Schema CMS được note đầy đủ field BRN, Company... ✅
-
----
-
-## 19. Definition of Done
-
-- [ ] All FR items implemented và verified.
-- [ ] Welcome emails render đúng HTML Banner và trigger ngay sau khi Invite/Register.
-- [ ] 9-Point Checklist all pass.
-- [ ] Uniqueness checking pass unit test trên API.
+| 1 | Xác nhận phương thức bảo mật chứng thực API kết nối giữa SSO đẩy Data Payload và Webstore 2.0 (Dùng API Key, HMAC hay OAuth Bearer)?<br><br>**Decision:** Hiện tại hệ thống chỉ dùng account admin để lấy token và request qua API register ở Webstore 2.0 (vẫn có 1 api register ở Webstore 2.0 nhưng không có giao diện, UI tạm ẩn). | Tech Lead | ✅ Resolved |
+| 2 | Redirect đổi mật khẩu: Domain/URL SSO login cấp để Webstore chuyển hướng là gì?<br><br>**Decision:** URL server dev đang dùng là `https://sso-dev.ech.primecommerce.asia/auth/forgot-password`. | PO | ✅ Resolved |
+| 3 | Khi Owner login SSO thành công rồi, Webstore gửi lại thêm 1 OTP mail thì có rườm rà (UX) không, vì bản thân SSO cũng có thể chặn Auth 2 lớp rồi?<br><br>**Decision:** Đây là yêu cầu bắt buộc của đối tác, không thay đổi ở thời điểm hiện tại. | BA/PO | ✅ Resolved |

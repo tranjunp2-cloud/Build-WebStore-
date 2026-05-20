@@ -259,14 +259,38 @@ THEN  site chuyển về trạng thái Draft
   AND dashboard hiển thị site đang ở trạng thái "Draft"
 ```
 
-#### AC-3: Rate Limit — Free tier chỉ 1 lần generate
+#### AC-3: Rate Limit — Tất cả gói chỉ 1 lần generate
 
 ```gherkin
-GIVEN user thuộc Free tier đã từng generate 1 site trước đó
+GIVEN user (bất kỳ gói nào: freemium/starter/standard/professional) đã từng generate 1 site thành công trước đó
 WHEN  user cố gắng generate site thứ 2
-THEN  hệ thống hiển thị modal Upgrade Prompt
+THEN  builder UI ẩn hoặc disable nút "Tạo Website"
   AND KHÔNG gọi AI API
-  AND modal giải thích giới hạn và options nâng cấp
+  AND user chỉ có thể chỉnh sửa site đã tạo, không thể gen lại
+
+GIVEN user generate site nhưng GẶP LỖI (timeout, API fail)
+WHEN  user quay lại builder
+THEN  cho phép retry (không tính vào quota)
+  AND form giữ nguyên dữ liệu đã nhập
+```
+
+#### AC-4: Block — Workspace bị khóa/xóa (SSO Status)
+
+```gherkin
+GIVEN user truy cập /builder/new
+  AND workspace của user đang ở trạng thái `suspended` (SSO inactivated) hoặc `terminated`
+WHEN  trang builder tải
+THEN  KHÔNG hiển thị form tạo website
+  AND hiển thị thông báo toàn trang:
+      suspended: "Tài khoản của bạn đang bị tạm khóa. Vui lòng liên hệ nhà cung cấp dịch vụ."
+      terminated: "Tài khoản của bạn đã bị xóa. Vui lòng liên hệ nhà cung cấp dịch vụ."
+  AND nút "Liên hệ hỗ trợ" hoặc redirect về /login
+
+GIVEN user cố gọi API POST /api/ai/generate-site trực tiếp
+  AND workspace suspended hoặc terminated
+WHEN  API nhận request
+THEN  trả về 403 với message tương ứng
+  AND KHÔNG gọi AI API, KHÔNG tốn chi phí
 ```
 
 ### Definition of Done

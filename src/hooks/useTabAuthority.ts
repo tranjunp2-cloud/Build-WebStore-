@@ -1,0 +1,76 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+const CHANNEL_NAME = 'primeweb-editor-tab'
+
+type TabMessage = {
+    type: 'CLAIM_AUTHORITY' | 'YIELD_AUTHORITY'
+    siteId: string
+    tabId: string
+    createdAt: number
+}
+
+export function useTabAuthority(siteId: string) {
+    const tabIdRef = useRef(`tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`)
+    const createdAtRef = useRef(Date.now())
+    const [isMaster, setIsMaster] = useState(true)
+    const channelRef = useRef<BroadcastChannel | null>(null)
+
+    useEffect(() => {
+        if (typeof BroadcastChannel === 'undefined') return
+
+        const channel = new BroadcastChannel(CHANNEL_NAME)
+        channelRef.current = channel
+
+        // Claim authority on mount
+        channel.postMessage({
+            type: 'CLAIM_AUTHORITY',
+            siteId,
+            tabId: tabIdRef.current,
+            createdAt: createdAtRef.current,
+        } satisfies TabMessage)
+
+        const tabId = tabIdRef.current
+        const createdAt = createdAtRef.current
+
+        channel.onmessage = (e: MessageEvent<TabMessage>) => {
+            const msg = e.data
+            if (msg.siteId !== siteId) return
+
+            if (msg.type === 'CLAIM_AUTHORITY' && msg.tabId !== tabId) {
+                // Deterministic: newer tab (higher createdAt) wins
+                // Tie-break by tabId string compare
+                const theyWin = msg.createdAt > createdAt
+                    || (msg.createdAt === createdAt && msg.tabId > tabId)
+                if (theyWin) {
+                    setIsMaster(false)
+                }
+            }
+        }
+
+        return () => {
+            channel.postMessage({
+                type: 'YIELD_AUTHORITY',
+                siteId,
+                tabId,
+                createdAt,
+            } satisfies TabMessage)
+            channel.close()
+            channelRef.current = null
+        }
+    }, [siteId])
+
+    const reclaimAuthority = useCallback(() => {
+        createdAtRef.current = Date.now()
+        setIsMaster(true)
+        channelRef.current?.postMessage({
+            type: 'CLAIM_AUTHORITY',
+            siteId,
+            tabId: tabIdRef.current,
+            createdAt: createdAtRef.current,
+        } satisfies TabMessage)
+    }, [siteId])
+
+    return { isMaster, reclaimAuthority, tabId: tabIdRef.current }
+}

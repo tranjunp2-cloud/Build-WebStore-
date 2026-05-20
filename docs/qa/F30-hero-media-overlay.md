@@ -1,0 +1,25 @@
+# Test Cases: F30 Hero Media Overlay (Inline Edit)
+> **Version:** 1.0 | **Updated:** 2026-04-21 | **Status:** Active
+> **Source:** `src/blocks/hero/hero-media-overlay.tsx`, `src/components/site-renderer/BlockEditCallbackContext.tsx`
+
+---
+
+## Objective
+Verify that site owners can edit hero images and videos inline via the hover overlay, while non-owners see no UI change. Covers upload, video URL entry, error handling, and positionClass variants.
+
+---
+
+## Test Cases
+
+| ID | Type | Title | Steps | Expected | Level | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F30-HMO-001** | Unit | **[Positive]** Non-owner — passthrough renders children only | 1. Render `HeroMediaOverlay` with `isOwner=false`.<br>2. Inspect DOM output. | No wrapper div added. Children rendered as-is via fragment. No overlay buttons. | Blocker | [x] |
+| **TC-F30-HMO-002** | Unit | **[Positive]** Owner but no callback — passthrough | 1. Render with `isOwner=true`, `useBlockEditCallback()=null`.<br>2. Inspect DOM. | Same as TC-001. Fragment passthrough only. | Blocker | [x] |
+| **TC-F30-HMO-003** | Unit | **[Positive]** Owner + callback — overlay wrapper present | 1. Render with `isOwner=true`, `callback` set.<br>2. Inspect DOM. | Wrapper div contains `group/media-overlay`. Overlay div rendered (hidden by default). "Change Image" button present. | Blocker | [x] |
+| **TC-F30-HMO-004** | Unit | **[Positive]** positionClass default is `relative` | 1. Render owner+callback with no `positionClass` prop.<br>2. Check wrapper className. | Wrapper div has `relative` in className. | High | [x] |
+| **TC-F30-HMO-005** | Unit | **[Positive]** positionClass override sets `absolute inset-0` | 1. Render owner+callback with `positionClass="absolute inset-0"`.<br>2. Check wrapper className. | Wrapper has `absolute inset-0` instead of `relative`. | High | [x] |
+| **TC-F30-HMO-006** | Unit | **[Negative]** Invalid file type rejected | 1. Render in owner+callback mode.<br>2. Trigger file input change with a `.pdf` file.<br>3. Check toast calls. | `toast.error` called with "Only JPG, PNG, and WebP images are supported". `onFieldChange` NOT called. | Blocker | [x] |
+| **TC-F30-HMO-007** | Unit | **[Positive]** Valid image upload triggers onFieldChange | 1. Render in owner+callback mode.<br>2. Mock `compressImage` → returns same file, `uploadMediaAction` → `{ url: 'https://cdn/img.jpg' }`.<br>3. Trigger file input with valid JPEG.<br>4. Wait for async upload. | `onFieldChange('image.url', 'https://cdn/img.jpg')` called. `toast.success` called. Input value reset. | Blocker | [x] |
+| **TC-F30-HMO-008** | Unit | **[Positive]** showVideoButton=true renders video button | 1. Render with `showVideoButton=true`, `videoField="videoUrl"`.<br>2. Check rendered buttons. | "Change Video" button present alongside "Change Image". | High | [x] |
+| **TC-F30-HMO-009** | Unit | **[Positive]** VideoInputPopover URL tab submits URL | 1. Render with `showVideoButton=true`. Click "Change Video".<br>2. In popover URL tab, type URL and click Apply.<br>3. Check callback. | `onFieldChange('videoUrl', '<url>')` called. Popover dismissed. | High | [x] |
+| **TC-F30-HMO-010** | Integration | **[Positive]** SiteRenderer passes onBlockFieldChange to overlay | 1. Render `SiteRenderer` with `isEditor=true`, `isOwner=true`, `onBlockFieldChange` spy.<br>2. Hover hero image, click "Change Image", upload a valid image.<br>3. Check spy call. | `onBlockFieldChange(blockIndex, 'image.url', uploadedUrl)` called with correct block index. | High | [ ] |

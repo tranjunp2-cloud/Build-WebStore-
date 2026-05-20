@@ -1,10 +1,32 @@
 import type { CollectionConfig } from 'payload'
+import { isReservedSlug, validateSlugFormat } from '@/lib/utils/reserved-slugs'
 
 export const Tenants: CollectionConfig = {
     slug: 'tenants',
     admin: {
         useAsTitle: 'name',
         description: 'Each tenant is a customer who has a subscription and owns one or more websites.',
+    },
+    hooks: {
+        beforeChange: [
+            ({ data, operation }) => {
+                // F23: Validate slug format on create and update
+                if (data?.slug) {
+                    const slug = (data.slug as string).toLowerCase().trim()
+                    data.slug = slug
+
+                    const formatError = validateSlugFormat(slug)
+                    if (formatError) {
+                        throw new Error(`Invalid slug: ${formatError}`)
+                    }
+
+                    if (isReservedSlug(slug)) {
+                        throw new Error(`Invalid slug: "${slug}" is a reserved subdomain`)
+                    }
+                }
+                return data
+            },
+        ],
     },
     access: {
         read: ({ req }) => {
@@ -51,12 +73,44 @@ export const Tenants: CollectionConfig = {
             },
         },
         {
-            name: 'customDomain',
-            type: 'text',
-            unique: true,
+            name: 'previousSlugs',
+            type: 'array',
             admin: {
-                description: 'Custom domain (e.g. www.mybakery.com). Leave blank to use subdomain.',
+                description: 'Previous slugs for 301 redirect (30-day grace period)',
+                readOnly: true,
             },
+            fields: [
+                { name: 'slug', type: 'text', required: true },
+                { name: 'expiresAt', type: 'date', required: true },
+            ],
+        },
+        {
+            name: 'customDomains',
+            type: 'array',
+            admin: {
+                description: 'List of custom domains attached to this store',
+            },
+            fields: [
+                { name: 'domain', type: 'text', required: true, index: true },
+                { name: 'status', type: 'select', defaultValue: 'pending', options: [{ label: 'Pending', value: 'pending' }, { label: 'Active', value: 'active' }] },
+                { name: 'isPrimary', type: 'checkbox', defaultValue: false },
+                {
+                    name: 'vercelDomainId',
+                    type: 'text',
+                    admin: {
+                        description: 'Vercel project-domain handle. Auto-managed.',
+                        readOnly: true,
+                    },
+                },
+                {
+                    name: 'vercelVerification',
+                    type: 'json',
+                    admin: {
+                        description: 'Outstanding TXT challenges from Vercel verify. Auto-managed.',
+                        readOnly: true,
+                    },
+                },
+            ],
         },
         {
             name: 'plan',
@@ -70,6 +124,54 @@ export const Tenants: CollectionConfig = {
                 { label: 'Business', value: 'business' },
             ],
         },
+        // ── SSO Integration Fields ──
+        {
+            name: 'customerId',
+            type: 'text',
+            unique: true,
+            index: true,
+            admin: {
+                description: 'Customer ID Number synced from SSO (customer_id_number)',
+            },
+        },
+        {
+            name: 'serviceId',
+            type: 'text',
+            unique: true,
+            index: true,
+            admin: {
+                description: 'Service ID from SSO. Must not be "NA" or empty.',
+            },
+        },
+        {
+            name: 'packCode',
+            type: 'text',
+            admin: {
+                description: 'Pack code from SSO payload (e.g. STARTER, PRO)',
+            },
+        },
+        {
+            name: 'orderId',
+            type: 'text',
+            admin: {
+                description: 'Unifi Order ID from SSO (unifi_order_id)',
+            },
+        },
+        {
+            name: 'address',
+            type: 'json',
+            admin: {
+                description: 'Structured address data from SSO payload',
+            },
+        },
+        {
+            name: 'metaData',
+            type: 'json',
+            admin: {
+                description: 'Full raw SSO payload stored for future analytics',
+            },
+        },
+        // ────────────────────────────
         {
             name: 'stripeCustomerId',
             type: 'text',
@@ -140,9 +242,130 @@ export const Tenants: CollectionConfig = {
             ],
         },
         {
+            name: 'payments',
+            type: 'group',
+            fields: [
+                {
+                    name: 'payment_card',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Credit / Debit Card (via Stripe)',
+                    admin: {
+                        description:
+                            'Master toggle: accept Card via Stripe Checkout across all sites. Requires Stripe Connect onboarding complete. Each site can override via its paymentConfig.cardEnabled (layer-2 guard).',
+                    },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                // Block enabling if Stripe onboarding not complete (defense-in-depth)
+                                if (value && originalDoc?.stripeOnboardingComplete !== true) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'payment_fpx',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'FPX Online Banking (via Stripe)',
+                    admin: {
+                        description:
+                            'Master toggle: accept FPX Online Banking (Malaysia) across all sites. Requires Stripe Connect onboarding complete. Each site can override via its paymentConfig.fpxEnabled (layer-2 guard).',
+                    },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, originalDoc }) => {
+                                if (value && originalDoc?.stripeOnboardingComplete !== true) return false
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'payment_cod',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Cash on Delivery (COD)',
+                    admin: { description: 'Enable Cash on Delivery' },
+                },
+                {
+                    name: 'payment_qr',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Bank Transfer / QR Banking',
+                    admin: { description: 'Enable QR Banking / Bank Transfer' },
+                    hooks: {
+                        beforeChange: [
+                            ({ siblingData, value }) => {
+                                // Enforce rule: cannot enable QR without an image
+                                if (value && !siblingData.qr_image) {
+                                    return false
+                                }
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'qr_image',
+                    type: 'upload',
+                    relationTo: 'media',
+                    label: 'QR Code Image',
+                    admin: {
+                        description: 'Upload QR Code image (Max 2MB, JPG/PNG)',
+                    },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, siblingData }) => {
+                                // If image is removed, disable the qr toggle
+                                if (!value) {
+                                    siblingData.payment_qr = false
+                                }
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'bank_name',
+                    type: 'text',
+                    label: 'Bank Name',
+                    admin: {
+                        description: 'Shown to buyers as fallback if QR fails (e.g. Maybank Berhad)',
+                    },
+                },
+                {
+                    name: 'account_holder_name',
+                    type: 'text',
+                    label: 'Account Holder Name',
+                    admin: {
+                        description: 'Must match exactly the name on the bank account (shown to buyers for transfer reference)',
+                    },
+                },
+                {
+                    name: 'account_number',
+                    type: 'text',
+                    label: 'Account Number',
+                    admin: {
+                        description: 'Masked at checkout — only last 4 digits shown to buyers',
+                    },
+                },
+            ],
+        },
+        {
             name: 'onboardingCompleted',
             type: 'checkbox',
             defaultValue: false,
+        },
+        {
+            name: 'aiGenerationsCount',
+            type: 'number',
+            defaultValue: 0,
+            admin: {
+                description: 'Number of times this tenant has used the AI Site Builder',
+                readOnly: true,
+            },
         },
         {
             name: 'whatsappNumber',

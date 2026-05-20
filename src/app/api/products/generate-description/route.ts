@@ -15,7 +15,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
 export const POST = withAuth(async (user, request) => {
     try {
         // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -44,8 +44,9 @@ export const POST = withAuth(async (user, request) => {
                     role: 'system',
                     content: `You are a professional e-commerce copywriter for Malaysian businesses. Generate compelling product copy. Output JSON only:
 {
-  "description": "2-3 paragraph rich description (HTML with <p>, <strong>, <ul> tags allowed)",
-  "shortDescription": "One-liner for product cards (max 150 chars)",
+  "descriptionEN": "2-3 paragraph rich description in English",
+  "descriptionBM": "2-3 paragraph rich description in Bahasa Melayu",
+  "shortDescription": "One-liner for product cards in English (max 150 chars)",
   "seoTitle": "SEO meta title (max 60 chars)",
   "seoDescription": "SEO meta description (max 155 chars)"
 }`,
@@ -66,7 +67,7 @@ export const POST = withAuth(async (user, request) => {
     } catch (error: any) {
         console.error('[Product AI Description Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Description generation failed' } },
             { status: 500 }
         )
     }

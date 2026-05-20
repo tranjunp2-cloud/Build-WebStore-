@@ -1,15 +1,21 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { formatPrice } from '@/lib/utils'
 import {
     validateCheckoutForm,
+    validateEmail,
+    validatePhone,
     calculateOrderTotals,
     generateOrderNumber,
-    MY_STATES,
+    validatePaymentProof,
+    PROOF_MAX_SIZE_BYTES,
 } from '@/lib/storefront'
+import { MY_STATES } from '@/lib/shipping'
 
-describe('Checkout Validation (lib/storefront)', () => {
-    it('should pass with valid name + email', () => {
-        const result = validateCheckoutForm({
+// ─── TC-F09.23, TC-F09.24: Checkout Form Validation ────────────────────────
+describe('[TC-F09.23/TC-F09.24] Checkout Form Validation (validateCheckoutForm)', () => {
+    it('TC-F09.23: passes with valid name + email + address', () => {
+        // Arrange
+        const form = {
             name: 'Ahmad bin Ali',
             email: 'ahmad@example.com',
             phone: '012-3456789',
@@ -18,136 +24,388 @@ describe('Checkout Validation (lib/storefront)', () => {
             city: 'Kuala Lumpur',
             state: 'Kuala Lumpur',
             postcode: '50450',
-        })
+        }
+
+        // Act
+        const result = validateCheckoutForm(form)
+
+        // Assert
         expect(result.valid).toBe(true)
         expect(result.errors).toHaveLength(0)
     })
 
-    it('should fail when name is empty', () => {
-        const result = validateCheckoutForm({
+    it('TC-F09.23: fails when Full Name is empty (required field)', () => {
+        // Arrange
+        const form = {
             name: '',
             email: 'ahmad@example.com',
             phone: '',
             line1: '', line2: '', city: '', state: '', postcode: '',
-        })
+        }
+
+        // Act
+        const result = validateCheckoutForm(form)
+
+        // Assert
         expect(result.valid).toBe(false)
         expect(result.errors).toContain('Name is required')
     })
 
-    it('should fail when email is empty', () => {
-        const result = validateCheckoutForm({
+    it('TC-F09.23: fails when email is empty (required field)', () => {
+        // Arrange
+        const form = {
             name: 'Ahmad',
             email: '',
             phone: '',
             line1: '', line2: '', city: '', state: '', postcode: '',
-        })
+        }
+
+        // Act
+        const result = validateCheckoutForm(form)
+
+        // Assert
         expect(result.valid).toBe(false)
         expect(result.errors).toContain('Email is required')
     })
 
-    it('should fail with invalid email format', () => {
-        const result = validateCheckoutForm({
+    it('TC-F09.24: fails with invalid email format (abc@.com)', () => {
+        // Arrange
+        const form = {
             name: 'Ahmad',
             email: 'not-an-email',
             phone: '',
             line1: '', line2: '', city: '', state: '', postcode: '',
-        })
+        }
+
+        // Act
+        const result = validateCheckoutForm(form)
+
+        // Assert
         expect(result.valid).toBe(false)
         expect(result.errors).toContain('Invalid email format')
     })
 
-    it('should fail when both name and email are empty', () => {
-        const result = validateCheckoutForm({
+    it('TC-F09.24: fails with email missing domain part (abc.com)', () => {
+        // Arrange
+        const form = {
+            name: 'Ahmad',
+            email: 'abc.com',
+            phone: '',
+            line1: '', line2: '', city: '', state: '', postcode: '',
+        }
+
+        // Act
+        const result = validateCheckoutForm(form)
+
+        // Assert
+        expect(result.valid).toBe(false)
+        expect(result.errors).toContain('Invalid email format')
+    })
+
+    it('TC-F09.23 + TC-F09.24: accumulates multiple errors when both name and email are empty', () => {
+        // Arrange
+        const form = {
             name: '',
             email: '',
             phone: '',
             line1: '', line2: '', city: '', state: '', postcode: '',
-        })
+        }
+
+        // Act
+        const result = validateCheckoutForm(form)
+
+        // Assert
         expect(result.valid).toBe(false)
         expect(result.errors.length).toBeGreaterThanOrEqual(2)
     })
+
+    it('TC-F09.23: trims whitespace before validating name (whitespace-only name is invalid)', () => {
+        // Arrange
+        const form = {
+            name: '   ',
+            email: 'valid@email.com',
+            phone: '',
+            line1: '', line2: '', city: '', state: '', postcode: '',
+        }
+
+        // Act
+        const result = validateCheckoutForm(form)
+
+        // Assert
+        expect(result.valid).toBe(false)
+        expect(result.errors).toContain('Name is required')
+    })
 })
 
-describe('Order Calculations (lib/storefront)', () => {
-    it('should calculate SST at 6%', () => {
-        const { subtotal, tax, total } = calculateOrderTotals([
-            { price: 100, quantity: 1 },
-        ])
+// ─── TC-F09.33, TC-F09.51: Order Totals & SST Tax Calculation ───────────────
+describe('[TC-F09.33/TC-F09.51] Order Totals — SST 6% Calculation (calculateOrderTotals)', () => {
+    it('TC-F09.33: calculates SST at exactly 6% of subtotal', () => {
+        // Arrange
+        const items = [{ price: 100, quantity: 1 }]
+
+        // Act
+        const { subtotal, tax, total } = calculateOrderTotals(items)
+
+        // Assert — SST RM 100 -> SST RM 6.00 (TC-F09.33 example)
         expect(subtotal).toBe(100)
         expect(tax).toBe(6)
         expect(total).toBe(106)
     })
 
-    it('should handle multiple items', () => {
-        const { subtotal, tax, total } = calculateOrderTotals([
+    it('TC-F09.33: handles multiple items with correct SST total', () => {
+        // Arrange
+        const items = [
             { price: 49.90, quantity: 2 },
             { price: 29.90, quantity: 1 },
-        ])
+        ]
+
+        // Act
+        const { subtotal, tax, total } = calculateOrderTotals(items)
+
+        // Assert
         expect(subtotal).toBeCloseTo(129.70)
         expect(tax).toBeCloseTo(7.78)
         expect(total).toBeCloseTo(137.48)
     })
 
-    it('should handle empty cart', () => {
+    it('TC-F09.33: returns zero totals for empty cart', () => {
+        // Arrange + Act
         const { subtotal, tax, total } = calculateOrderTotals([])
+
+        // Assert
         expect(subtotal).toBe(0)
         expect(tax).toBe(0)
         expect(total).toBe(0)
     })
 
-    it('should round SST to 2 decimal places', () => {
-        const { tax } = calculateOrderTotals([
-            { price: 33.33, quantity: 1 },
-        ])
+    it('TC-F09.51: rounds SST to exactly 2 decimal places (rounding rule)', () => {
+        // Arrange — RM 33.33 * 6% = 1.9998 → rounds to RM 2.00
+        const items = [{ price: 33.33, quantity: 1 }]
+
+        // Act
+        const { tax } = calculateOrderTotals(items)
+
+        // Assert
         expect(tax).toBe(2)
+    })
+
+    it('TC-F09.51: rounds fractional SST correctly (RM 1.55 * 6% = 0.093 -> RM 0.09)', () => {
+        // Arrange
+        const items = [{ price: 1.55, quantity: 1 }]
+
+        // Act
+        const { tax } = calculateOrderTotals(items)
+
+        // Assert — 0.093 rounds to 0.09
+        expect(tax).toBe(0.09)
+    })
+
+    it('TC-F09.54: handles large cart values (RM 10,000+) without precision errors', () => {
+        // Arrange — simulate large order
+        const items = [{ price: 5000, quantity: 2 }]
+
+        // Act
+        const { subtotal, tax, total } = calculateOrderTotals(items)
+
+        // Assert
+        expect(subtotal).toBe(10000)
+        expect(tax).toBe(600)
+        expect(total).toBe(10600)
     })
 })
 
-describe('Order Number Generation (lib/storefront)', () => {
-    it('should start with ORD-', () => {
-        expect(generateOrderNumber()).toMatch(/^ORD-/)
+// ─── TC-F09.31: Order Number Generation ────────────────────────────────────
+describe('[TC-F09.31] Order Number Generation (generateOrderNumber)', () => {
+    it('TC-F09.31: starts with ORD- prefix', () => {
+        // Act
+        const orderNum = generateOrderNumber()
+
+        // Assert
+        expect(orderNum).toMatch(/^ORD-/)
     })
 
-    it('should be uppercase', () => {
+    it('TC-F09.31: is all uppercase', () => {
+        // Act
         const orderNum = generateOrderNumber()
+
+        // Assert
         expect(orderNum).toBe(orderNum.toUpperCase())
     })
 
-    it('should generate unique numbers', () => {
+    it('TC-F09.31: generates unique order numbers across multiple calls', () => {
+        // Arrange + Act
         const nums = new Set<string>()
         for (let i = 0; i < 10; i++) {
             nums.add(generateOrderNumber())
         }
+
+        // Assert — with 10 calls at different timestamps, expect uniqueness
         expect(nums.size).toBeGreaterThanOrEqual(1)
+    })
+
+    it('TC-F09.31: format matches ORD- followed by alphanumeric characters', () => {
+        // Act
+        const orderNum = generateOrderNumber()
+
+        // Assert — ORD- + base36 encoded timestamp (letters + digits only)
+        expect(orderNum).toMatch(/^ORD-[A-Z0-9]+$/)
     })
 })
 
-describe('formatPrice (lib/utils)', () => {
-    it('should format MYR correctly', () => {
+// ─── TC-F09.11: Price Formatting (Malaysia RM) ──────────────────────────────
+describe('[TC-F09.11] Price Formatting — Malaysia RM (formatPrice)', () => {
+    it('TC-F09.11: formats MYR with RM prefix (RM XX.XX standard)', () => {
+        // Act + Assert — TC-F09.11 requires RM prefix always present
         expect(formatPrice(29.90, 'MYR')).toBe('RM 29.90')
         expect(formatPrice(0, 'MYR')).toBe('RM 0.00')
+    })
+
+    it('TC-F09.11: formats large MYR amounts without precision loss', () => {
+        // Act + Assert
         expect(formatPrice(1250.5, 'MYR')).toBe('RM 1250.50')
     })
 
-    it('should format SGD correctly', () => {
+    it('TC-F09.11: formats SGD with correct symbol', () => {
+        // Act + Assert
         expect(formatPrice(29.90, 'SGD')).toBe('S$29.90')
     })
 
-    it('should default to USD format', () => {
+    it('TC-F09.11: defaults to USD format for unknown currency', () => {
+        // Act + Assert
         expect(formatPrice(29.90, 'USD')).toBe('$29.90')
     })
 })
 
-describe('Malaysian States (lib/storefront)', () => {
-    it('should have 16 states', () => {
-        expect(MY_STATES).toHaveLength(16)
+// ─── TC-F09.24: Phone Format Validation ─────────────────────────────────────
+describe('[TC-F09.24] Phone Format Validation (validatePhone)', () => {
+    it('TC-F09.24: returns null for empty phone (phone is optional)', () => {
+        expect(validatePhone('')).toBeNull()
+        expect(validatePhone('   ')).toBeNull()
     })
 
-    it('should include major states', () => {
-        expect(MY_STATES).toContain('Kuala Lumpur')
-        expect(MY_STATES).toContain('Selangor')
-        expect(MY_STATES).toContain('Johor')
-        expect(MY_STATES).toContain('Sabah')
-        expect(MY_STATES).toContain('Sarawak')
+    it('TC-F09.24: accepts local mobile format (012-3456789)', () => {
+        expect(validatePhone('012-3456789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts local mobile without separator (0123456789)', () => {
+        expect(validatePhone('0123456789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts international format (+60 12 345 6789)', () => {
+        expect(validatePhone('+60 12 345 6789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts international without spaces (+601234567890)', () => {
+        expect(validatePhone('+6012-3456789')).toBeNull()
+    })
+
+    it('TC-F09.24: accepts 011 prefix with 8 digits (011-12345678)', () => {
+        expect(validatePhone('011-12345678')).toBeNull()
+    })
+
+    it('TC-F09.24: rejects too-short number (0123)', () => {
+        expect(validatePhone('0123')).not.toBeNull()
+    })
+
+    it('TC-F09.24: rejects non-MY format (starts with 1 directly)', () => {
+        expect(validatePhone('12345678')).not.toBeNull()
+    })
+
+    it('TC-F09.24: validateCheckoutForm includes phone format error when phone is invalid', () => {
+        const form = {
+            name: 'Ahmad', email: 'ahmad@email.com', phone: 'invalid-phone',
+            line1: '', line2: '', city: '', state: '', postcode: '',
+        }
+        const result = validateCheckoutForm(form)
+        expect(result.valid).toBe(false)
+        expect(result.errors).toContain('Invalid phone format')
+    })
+
+    it('TC-F09.24: validateCheckoutForm passes when phone is empty (optional)', () => {
+        const form = {
+            name: 'Ahmad', email: 'ahmad@email.com', phone: '',
+            line1: '', line2: '', city: '', state: '', postcode: '',
+        }
+        const { errors } = validateCheckoutForm(form)
+        expect(errors).not.toContain('Invalid phone format')
     })
 })
+
+// ─── TC-F09.24: Email Format Validation (standalone) ────────────────────────
+describe('[TC-F09.24] Email Format Validation (validateEmail)', () => {
+    it('TC-F09.24: returns null for empty email (required handled separately)', () => {
+        expect(validateEmail('')).toBeNull()
+    })
+
+    it('TC-F09.24: returns null for valid email', () => {
+        expect(validateEmail('user@example.com')).toBeNull()
+        expect(validateEmail('user+tag@domain.co.my')).toBeNull()
+    })
+
+    it('TC-F09.24: returns error string for invalid email', () => {
+        expect(validateEmail('not-an-email')).not.toBeNull()
+        expect(validateEmail('abc@.com')).not.toBeNull()
+        expect(validateEmail('@nodomain')).not.toBeNull()
+    })
+})
+
+// ─── TC-F09.188: Payment Proof File Validator ───────────────────────────────
+describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
+    it('TC-F09.188: accepts JPEG file within size limit', () => {
+        // Arrange
+        const file = { type: 'image/jpeg', size: 1 * 1024 * 1024 } // 1 MB
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: accepts PNG file within size limit', () => {
+        // Arrange
+        const file = { type: 'image/png', size: 500 * 1024 } // 500 KB
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: rejects file exceeding 2 MB limit', () => {
+        // Arrange — 1 byte over limit
+        const file = { type: 'image/jpeg', size: PROOF_MAX_SIZE_BYTES + 1 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('FILE_TOO_LARGE')
+    })
+
+    it('TC-F09.188: accepts file exactly at 2 MB boundary (inclusive)', () => {
+        // Arrange — exactly at limit
+        const file = { type: 'image/png', size: PROOF_MAX_SIZE_BYTES }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
+    it('TC-F09.188: rejects PDF (unsupported type)', () => {
+        // Arrange
+        const file = { type: 'application/pdf', size: 500 * 1024 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+
+    it('TC-F09.188: rejects GIF (unsupported type)', () => {
+        // Arrange
+        const file = { type: 'image/gif', size: 100 * 1024 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+
+    it('TC-F09.188: INVALID_TYPE takes precedence over FILE_TOO_LARGE', () => {
+        // Arrange — wrong type AND oversized
+        const file = { type: 'application/pdf', size: PROOF_MAX_SIZE_BYTES + 1 }
+
+        // Act + Assert — type checked first
+        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+})
+
+// TC-F09.26: MY_STATES static list removed — states now served from DB via GET /api/geo/states

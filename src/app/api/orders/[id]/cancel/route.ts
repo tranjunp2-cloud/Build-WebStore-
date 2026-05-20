@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCancelSchema } from '@/lib/validations/orders'
+import { sendEmail } from '@/lib/email/send'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -24,9 +25,10 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const payload = await getPayload({ config })
 
         // Get current order
+        const orderId = isNaN(Number(id)) ? id : Number(id)
         const order = await payload.findByID({
             collection: 'orders',
-            id,
+            id: orderId,
             user,
             overrideAccess: false,
         })
@@ -60,7 +62,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         // Cancel the order
         const updated = await payload.update({
             collection: 'orders',
-            id,
+            id: orderId,
             data: {
                 status: 'cancelled',
                 cancelReason: reason,
@@ -74,11 +76,12 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const items = (order as any).items || []
 
         for (const item of items) {
-            const productId = typeof item.product === 'object' ? item.product?.id : item.product
-            if (!productId) {
+            const rawProductId = typeof item.product === 'object' ? item.product?.id : item.product
+            if (!rawProductId) {
                 restockResults.push({ productId: 'unknown', restocked: 0, skipped: true })
                 continue
             }
+            const productId = isNaN(Number(rawProductId)) ? rawProductId : Number(rawProductId)
 
             try {
                 const product = await payload.findByID({
@@ -89,18 +92,18 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
 
                 if (!product) {
                     // Product deleted — skip safely (per AC-2 of US-F10-03)
-                    restockResults.push({ productId, restocked: item.quantity, skipped: true })
+                    restockResults.push({ productId: String(productId), restocked: item.quantity, skipped: true })
                     continue
                 }
 
-                const currentStock = (product as any).stock || 0
+                const currentStock = (product as any).stock ?? 0
                 await payload.update({
                     collection: 'products',
                     id: productId,
                     data: { stock: currentStock + item.quantity } as any,
                 })
 
-                restockResults.push({ productId, restocked: item.quantity })
+                restockResults.push({ productId: String(productId), restocked: item.quantity })
             } catch (err) {
                 // If product was deleted between check and update, skip
                 console.warn(`[Restock] Failed for product ${productId}:`, err)
@@ -108,7 +111,24 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             }
         }
 
-        // TODO: Send cancellation email to customer
+        // Send cancellation email to customer
+        try {
+            const customerEmail = (updated as any).customerEmail
+            if (customerEmail) {
+                await sendEmail({
+                    to: customerEmail,
+                    subject: `[Order Cancelled] Your Order #${(updated as any).orderNumber || updated.id} has been cancelled`,
+                    html: `
+                        <p>Hi ${(updated as any).customerName || 'Customer'},</p>
+                        <p>Your order <strong>#${(updated as any).orderNumber || updated.id}</strong> has been cancelled by the store administrator.</p>
+                        <p><strong>Reason:</strong> ${reason}</p>
+                        <p>If you have any questions, please contact our support team.</p>
+                    `
+                })
+            }
+        } catch (emailErr) {
+            console.warn('[Order Cancel] Failed to send email:', emailErr)
+        }
 
         return NextResponse.json({
             success: true,
@@ -118,7 +138,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
     } catch (error: any) {
         console.error('[Order Cancel Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order cancellation failed' } },
             { status: 500 }
         )
     }

@@ -127,7 +127,7 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 | FR-24 | Widget Cart: Tích hợp nút giỏ hàng, mở xem giỏ, ấn Mua → sang Checkout | US-F05-11 | P0 | |
 | FR-25 | Logo Scaling & AI Favicon: Upload Logo → tự resize/adapt theo chuẩn (VD: max-height 60px). AI tự xử lý extract ra Favicon (file .ico/png nhỏ). | US-F05-07 | P1 | |
 | FR-26 | Global Settings Panel (Right Sidebar): Khi không focus block nào, hiển thị Cấu hình Toàn cục. Chứa mục Nhận diện (Tên cửa hàng, Logo), Liên hệ (SDT, Email, Trụ sở), Mạng xã hội, và Cấu hình SEO cơ bản (Title, Description). | US-F05-12 | P0 | Data bound |
-| FR-27 | Page-Level SEO & AI Content: Trong Page Manager hoặc Settings, cho phép tùy chỉnh Meta Title, Description, Slug cho từng trang. Bổ sung nút "✨ Tự động Tối ưu SEO" để AI đọc các text blocks trên canvas và tự sinh metadata phù hợp. | US-F05-13 | P1 | Content-aware AI |
+| FR-27 | Page-Level SEO & AI Content: Trong Page Manager hoặc Settings, cho phép tùy chỉnh Meta Title, Description, Slug cho từng trang. Bổ sung nút "✨ Tự động Tối ưu SEO" để AI đọc các text blocks trên canvas, kết hợp với trackedKeywords từ cài đặt site, và tự sinh metadata phù hợp chứa từ khoá mục tiêu một cách tự nhiên. | US-F05-13 | P1 | Content-aware AI + Keyword-aware. Nếu trường meta đã có nội dung thủ công → AI đề xuất bản chỉnh sửa, hiển thị so sánh, chỉ ghi đè khi người dùng đồng ý. |
 | FR-28 | Template Gallery Integration: Entry point để mở Template Gallery modal, hỗ trợ AI Search và Smart Swap. | US-F07-04 | P0 | Integrated with F07 |
 | FR-29 | **[Mobile]** Layout Editor trên mobile từ bỏ Split-Screen, thay bằng `Live Preview` làm background chiếm toàn màn hình, và `AI Chat` trở thành nút nổi (FAB) góc phải dưới màn hình. | US-F05-14 | P0 | Tiết kiệm diện tích |
 | FR-30 | **[Mobile]** Hủy tính năng Drag & Drop component blocks trên viewport mobile. Thay bằng nút `[+] Tap to Add` chèn thẳng vào đầu/cuối trang. | US-F05-14 | P0 | Tránh xung đột cuộn mượt |
@@ -144,7 +144,26 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 - **BR-05:** **[System Pages]** Bắt buộc vô hiệu hóa (Disable) tính năng Ẩn (Hide) và Xóa (Delete) đối với Trang Chủ (Homepage), kèm Tooltip giải thích.
 - **BR-06:** **[System Pages]** Trang 404 (Not Found) chỉ cấp quyền Edit nội dung, KHÔNG cho phép Ẩn, Xóa hoặc thay đổi URL Slug.
 - **BR-07:** **[Offline Fallback]** Tiến trình Auto-save nếu gặp lỗi Mạng (Network Failed) thì phải lưu payload vào LocalStorage (Offline queue), hiển thị trạng thái cảnh báo trên UI và chặn hành vi đóng Tab (window.onbeforeunload).
-- **BR-08:** **[Feature Fallback]** Mọi nút có chức năng "Checkout" hoặc "Thanh Toán" (trong Cart widget / Product block) chỉ hiển thị Toast Message: "Tính năng Checkout đang được phát triển". Không thực hiện trigger redirect gây lỗi 404.
+- **BR-08:** **[Editor Sandbox Protection]** Mọi nút có chức năng "Checkout" hoặc hướng người dùng ra khỏi trang hiện hành (external links, Cart checkout) sẽ bị chặn redirect (Prevent default) khi đang thao tác trong Editor để tránh làm gián đoạn phiên làm việc.
+
+### 8.1. Data Validation & System Limits
+
+Để đảm bảo an toàn hệ thống, tránh UI break và lãng phí token, Editor tuân thủ các quy tắc xác thực dữ liệu (Client-side & Server-side):
+
+| Form Area | Field | Validation Rules | Error / Warning Message |
+|-----------|-------|------------------|-------------------------|
+| **Page Manager** | Page Name | `Required`, `Max limit: 60 chars` | "Page name is required and cannot exceed 60 characters." |
+| | URL Slug | `Required`, `Unique` (trong cùng siteId), `Regex: /^[a-z0-9-]+$/` (Kebab-case) | "Invalid or duplicate URL slug." |
+| | Page Count | `Hard limit:` Tối đa 100 trang / 1 Website (bao gồm cả trang hiển thị và trang ẩn) | "You have reached the maximum limit of 100 pages." |
+| **Global Settings** | Store Name | `Required`, `Max limit: 100 chars` | "Store name is required." |
+| | Email | `Regex:` Định dạng Email hợp lệ | "Invalid email format." |
+| | Hotline | `Regex:` Số điện thoại hợp lệ (Chỉ số, +, khoảng trắng) | "Invalid phone number format." |
+| | Social Links | `Regex:` Bắt buộc bắt đầu bằng `http://` hoặc `https://` | "URL must start with http:// or https://" |
+| **SEO Settings** | Meta Title | `Soft limit:` Cảnh báo vàng khi > 60 chars | *(Warning)* "Title may be truncated on Google Search." |
+| | Meta Description| `Soft limit:` Cảnh báo vàng khi > 160 chars | *(Warning)* "Description may be truncated on Google Search." |
+| **Multimedia Content**| Image Upload | `Hard limit:` Tối đa 10MB/file. `Allow:` .jpg, .png, .webp, .svg, .gif | "File is too large or invalid format. Max 10MB allowed." |
+| **Header Menu** | Sub-Menu Depth | `Hard limit:` Menu lồng nhau tối đa 2 cấp (1 parent, 1 child) | "Only 1 level of nested submenu is supported." |
+| **AI Chat** | Prompt Input | `Hard limit:` Max 500 chars/request. `Rate limit:` 5 request/phút. | "Prompt exceeds 500 characters. Please shorten it." |
 
 ---
 
@@ -174,108 +193,18 @@ User action:
 
 > **[Global CMS Constraint]** Tính năng Editor là một ngoại lệ do cần không gian tối ưu cho live preview, màn hình này chiếm toàn bộ diện tích trình duyệt.
 
-> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+### 10.1. Nguồn Design Files
+Toàn bộ UI Component và Layout chi tiết cho Editor được định nghĩa chung trong các tài liệu thiết kế sau:
+- [F05 Base Wireframes](../design/F05-wireframe-lowfi.md)
+- [F05 AI Editor High-Fidelity Design](../design/F05-ai-editor-design.md)
 
-### 10.1. Màn hình chính (Split-Screen Editor)
+### 10.2. Màn hình chính (Split-Screen Editor)
 - **Mô tả:** Màn hình làm việc chính khi chỉnh sửa trang web.
 - **Components chính:**
   - Header Toolbar: Nút điều hướng Pages, Templates, Undo/Redo, Viewport Toggle, Publish.
   - Left Panel (Chat & Blocks): Tab quản lý library blocks và chat AI thao tác.
   - Center Panel (Live Preview): Iframe sandbox hiển thị nội dung website đang chỉnh sửa.
   - Right Panel (Contextual Settings): Global Settings hoặc Settings riêng của block đang click.
-- **Wireframe:**
-```text
-┌─ /editor/:siteId ──────────────────────────────────────────┐
-│ ┌─ Toolbar ────────────────────────────────────────────────────────────┐ │
-│ │ [Pages ▼] [Templates 🎨] [Undo] [Redo] [Màn hình 💻▼] [👁] [🚀 Publish] │ │
-│ └──────────────────────────────────────────────────────────────────────┘ │
-│ ┌────────────┐ ┌─────────────────────────┐ ┌──────────────┐│
-│ │ 🛠 BLOCKS / │ │  LIVE PREVIEW (iframe)  │ │ ⚙️ SETTINGS  ││
-│ │ 🤖 CHAT    │ │                         │ │ (Contextual) ││
-│ │ -----------│ │  [Global Header]        │ │--------------││
-│ │ ├ Navbar   │ │  [Hero] ← Click!        │ │ *If Hero:*   ││
-│ │ ├ Banner   │ │       ┌─────────────┐   │ │ - Background ││
-│ │ ├ Carousel │ │       │ ✨ Edit with│   │ │ - Colors     ││
-│ │ ├ Product  │ │       │    AI       │   │ │--------------││
-│ │ ├ Form     │ │       └─────────────┘   │ │ *If None:*   ││
-│ │ (Drag ⠿)   │ │  [Features] [About]     │ │ - Store Name ││
-│ │            │ │  [Global Footer]        │ │ - Phone/Email││
-│ │            │ │                         │ │ - Social URL ││
-│ │            │ │                         │ │ - SEO Data   ││
-│ └────────────┘ └─────────────────────────┘ └──────────────┘│
-└────────────────────────────────────────────────────────────┘
-
-**Wireframe Mobile (< 768px): Overlay Floating Chat & Bottom Sheet**
-```text
-┌─ 📱 Mobile Browser ─────────────────────────┐
-│ [≡] My Webstore          [👁] [🚀 Publish] │
-│ ─────────────────────────────────────────── │
-│                                             │
-│  [Hero Block]                               │
-│  Let us help you build...                   │
-│                                             │
-│  [Features Block]                           │
-│  ...                                        │
-│                                             │
-│                  ─────────────              │
-│                  [✨ AI Chat ] (FAB button) │
-│                  ─────────────              │
-└─────────────────────────────────────────────┘
-
-Khi Tap vào một Element (Ví dụ: Hero Text), Bottom Sheet mở lên:
-┌─ 📱 Mobile Browser ─────────────────────────┐
-│  Let us help you build... (Text being edite │
-│                                             │
-│ ╭─────────────────────────────────────────╮ │
-│ │ ⚙️ Text Options                  [X]    │ │
-│ │ ─────────────────────────────────────── │ │
-│ │  [✨ Edit with AI]                      │ │
-│ │  [ B ] [ I ] [ U ] [ H1 ▼ ] [ ≡ ]       │ │
-│ │  [ Khóa thay đổi ]                      │ │
-│ ╰─────────────────────────────────────────╯ │
-└─────────────────────────────────────────────┘
-```
-```
-
-### 10.2. Các màn hình phụ & Modals (Sub-screens & Modals)
-
-- **Wireframe (Page Manager Modal):**
-```text
-┌─ 📄 Page Manager ─────────────────────────[X]┐
-│                                              │
-│  [+ Thêm trang mới]                          │
-│                                              │
-│  Tên Trang          Trạng thái     Hành động │
-│  ------------------------------------------- │
-│  🏠 Homepage        [Published]    [Edit]    │
-│  ℹ️ About Us        [Draft]        [Edit][🗑]│
-│  🛍️ Products        [Published]    [Edit][🗑]│
-│  📞 Contact         [Published]    [Edit][🗑]│
-│                                              │
-└──────────────────────────────────────────────┘
-```
-
-- **Wireframe (Inline Edit & Context Settings):**
-```text
-[Trên Live Preview - Khi Hover/Click vào Text]
-
- ┌─────────────────────────────────┐
- │ B  I  U  [H1 ▼]  ≡  =  Ξ  [🔗]  │  (Floating Formatting Toolbar)
- └─────────────────────────────────┘
-  Let us help you build...
-                                    [✨ Edit with AI] (Nút góc phải của Block)
-
-[Right Sidebar - Cấu hình Component / Global]
-┌─ ⚙️ Settings ─────────────────────┐
-│ 📍 Global Settings                │
-│ --------------------------------- │
-│ Tên Website: [ PrimeWeb ]         │
-│ Logo: [ Upload Image 🖼️ ]         │
-│ Facebook URL: [ https://... ]     │
-│ SEO Meta Title:                   │
-│ [ _________________ ]  [✨ Auto ] │
-└───────────────────────────────────┘
-```
 
 ### 10.3. Các trạng thái UI (UI States)
 - **Loading State:** Thấy Skeleton frame cho preview khi mở Editor; typing indicator khi AI chat response.
@@ -283,6 +212,7 @@ Khi Tap vào một Element (Ví dụ: Hero Text), Bottom Sheet mở lên:
 - **Success State:** Toast màu xanh báo Apply thay đổi thành công, hiển thị nút "Undo" nổi bật.
 
 ---
+
 
 ## 11. Acceptance Criteria
 
@@ -368,10 +298,23 @@ THEN  trạng thái Saving (Icon góc trên) đổi màu đỏ báo lỗi
   AND dữ liệu tạm được queue vào bộ nhớ LocalStorage
   AND kích hoạt popup cảnh báo của trình duyệt nếu user nhấn nút Close Tab (window.onbeforeunload)
 
-GIVEN user đang trải nghiệm Widget Giỏ hàng (Cart)
-WHEN  bấm vào nút chức năng "Checkout / Mua hàng"
-THEN  hệ thống hiển thị Toast báo: "Tính năng thanh toán đang được phát triển cho bản sau"
-  AND ngăn chặn (Prevent default) mọi hành vi Redirect ra khỏi Editor gây lỗi 404
+GIVEN user click vào external link hoặc nút Checkout bên trong Editor Preview
+WHEN  bấm vào nút chức năng đó
+THEN  ngăn chặn hành vi Redirect (Prevent default) để tránh làm mất trạng thái phiên làm việc hiện tại
+  AND hệ thống hiển thị Toast báo: "Navigation is disabled inside the Editor."
+```
+
+### AC-8: AI SEO Generate sử dụng từ khoá mục tiêu
+
+> 📌 Source: Plan SEO Optimization Sprint 1 — Công việc 2
+
+```gherkin
+GIVEN người dùng đang ở Page-level SEO Settings
+  AND site đã có trackedKeywords (VD: "bakery KL", "bánh sinh nhật")
+WHEN  click nút "✨ Tự động Tối ưu SEO"
+THEN  AI phân tích text content trên trang VÀ kết hợp trackedKeywords
+  AND meta title/description sinh ra chứa từ khoá mục tiêu tự nhiên
+  AND hiển thị preview so sánh nếu trường đã có nội dung cũ
 ```
 
 ---
@@ -436,7 +379,7 @@ iframe → Parent: BLOCK_CLICKED, BLOCK_HOVERED (with rect position)
 - [ ] Loading State — Skeleton preview, typing indicator chat
 - [ ] Empty State — Welcome + suggestion prompts in chat
 - [ ] Error State — Toast + retry cho AI failures
-- [ ] Form Validation — N/A (chat input)
+- [ ] Form Validation — Áp dụng toàn bộ rules tại mục `8.1. Data Validation`.
 - [ ] Button States — Send disabled during streaming, Undo/Redo greyed khi empty
 - [ ] Toast Feedback — Success/Error cho all actions
 - [ ] Auth Redirect — 401 → /login

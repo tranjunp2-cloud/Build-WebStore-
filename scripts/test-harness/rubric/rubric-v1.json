@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "name": "wix-pro-v1",
+  "description": "Wix-professional quality rubric for ECH Prime template blueprints. 8 dimensions, 45 criteria, total weight 66.",
+  "thresholds": {
+    "pass": 7,
+    "warn": 5
+  },
+  "dimensions": [
+    {
+      "id": "visual-richness",
+      "name": "Visual Richness",
+      "weight": 10,
+      "description": "Visual variety — decorative blocks, imagery-heavy sections, variant diversity.",
+      "criteria": [
+        {
+          "id": "hero-variant-diverse",
+          "label": "Hero uses non-default variant",
+          "check": { "type": "enum", "blockType": "hero", "field": "variant", "in": ["split-left", "split-right", "fullscreen", "video", "magazine", "minimal", "cards-overlay", "gradient", "parallax", "slideshow", "split-video"] },
+          "passPoints": 2
+        },
+        {
+          "id": "gallery-present",
+          "label": "Gallery / portfolio block present",
+          "check": { "type": "presence", "blockType": "gallery,gallery-masonry,portfolio-grid" },
+          "passPoints": 2
+        },
+        {
+          "id": "stats-present",
+          "label": "Stats block present (numerical social proof)",
+          "check": { "type": "presence", "blockType": "stats" },
+          "passPoints": 2
+        },
+        {
+          "id": "logo-cloud-present",
+          "label": "Logo Cloud / Trust Bar present",
+          "check": { "type": "presence", "blockType": "client-logos,logo-cloud" },
+          "passPoints": 2
+        },
+        {
+          "id": "block-variety",
+          "label": "≥7 distinct block types on homepage",
+          "check": { "type": "custom", "evaluator": "distinctBlockTypes7" },
+          "passPoints": 2
+        }
+      ]
+    },
+    {
+      "id": "typography-hierarchy",
+      "name": "Typography Hierarchy",
+      "weight": 9,
+      "description": "Clear H1→H2→body hierarchy, theme font pairing, section labels.",
+      "criteria": [
+        {
+          "id": "hero-headline-present",
+          "label": "Hero has non-empty headline",
+          "check": { "type": "custom", "evaluator": "heroHasHeadline" },
+          "passPoints": 2
+        },
+        {
+          "id": "single-hero",
+          "label": "Exactly 1 hero block (single H1)",
+          "check": { "type": "custom", "evaluator": "singleHero" },
+          "passPoints": 2
+        },
+        {
+          "id": "theme-heading-font",
+          "label": "Theme specifies heading font",
+          "check": { "type": "custom", "evaluator": "themeHasHeadingFont" },
+          "passPoints": 1
+        },
+        {
+          "id": "theme-body-font",
+          "label": "Theme specifies body font",
+          "check": { "type": "custom", "evaluator": "themeHasBodyFont" },
+          "passPoints": 1
+        },
+        {
+          "id": "hero-subheadline",
+          "label": "Hero has subheadline",
+          "check": { "type": "custom", "evaluator": "heroHasSubheadline" },
+          "passPoints": 1
+        },
+        {
+          "id": "section-headlines-coverage",
+          "label": "≥70% content blocks have headline/sectionLabel",
+          "check": { "type": "custom", "evaluator": "sectionHeadlinesCoverage70" },
+          "passPoints": 2
+        }
+      ]
+    },
+    {
+      "id": "social-proof",
+      "name": "Social Proof & Trust",
+      "weight": 9,
+      "description": "Testimonials, logos, stats, trust badges presence + depth.",
+      "criteria": [
+        {
+          "id": "testimonials-present",
+          "label": "Testimonials block present",
+          "check": { "type": "presence", "blockType": "testimonials" },
+          "passPoints": 2
+        },
+        {
+          "id": "testimonials-count-3plus",
+          "label": "Testimonials ≥3 items",
+          "check": { "type": "count", "blockType": "testimonials", "field": "testimonials", "min": 3 },
+          "passPoints": 2
+        },
+        {
+          "id": "logos-count-4plus",
+          "label": "Logo cloud ≥4 logos",
+          "check": { "type": "count", "blockType": "client-logos,logo-cloud", "field": "logos", "min": 4 },
+          "passPoints": 2
+        },
+        {
+          "id": "stats-count-3plus",
+          "label": "Stats block ≥3 items",
+          "check": { "type": "count", "blockType": "stats", "field": "stats", "min": 3 },
+          "passPoints": 2
+        },
+        {
+          "id": "testimonial-avatar",
+          "label": "≥1 testimonial has avatar URL",
+          "check": { "type": "custom", "evaluator": "testimonialHasAvatar" },
+          "passPoints": 1
+        }
+      ]
+    },
+    {
+      "id": "micro-interactions",
+      "name": "Micro-Interactions",
+      "weight": 8,
+      "description": "Sticky nav, interactive forms, animation-ready theme, variant diversity (proxy for interactivity richness — live animations not measurable from static block data).",
+      "criteria": [
+        {
+          "id": "nav-variant-rich",
+          "label": "Nav uses non-basic variant",
+          "check": { "type": "enum", "blockType": "navigation", "field": "variant", "in": ["centered", "mega", "transparent", "sidebar", "floating"] },
+          "passPoints": 2
+        },
+        {
+          "id": "cta-block-present",
+          "label": "Standalone CTA block present",
+          "check": { "type": "presence", "blockType": "cta" },
+          "passPoints": 2
+        },
+        {
+          "id": "interactive-form",
+          "label": "Newsletter or contact form present",
+          "check": { "type": "presence", "blockType": "newsletter,contact" },
+          "passPoints": 2
+        },
+        {
+          "id": "block-variety-8plus",
+          "label": "≥8 distinct block types (interaction diversity proxy)",
+          "check": { "type": "custom", "evaluator": "distinctBlockTypes8" },
+          "passPoints": 2
+        }
+      ]
+    },
+    {
+      "id": "spacing-rhythm",
+      "name": "Spacing & Rhythm",
+      "weight": 8,
+      "description": "Block count within healthy range, no consecutive duplicates, theme spacing preset.",
+      "criteria": [
+        {
+          "id": "block-count-6-16",
+          "label": "Homepage has 6-16 blocks",
+          "check": { "type": "custom", "evaluator": "blockCount6To16" },
+          "passPoints": 3
+        },
+        {
+          "id": "no-consecutive-duplicates",
+          "label": "No 2 adjacent blocks of same type",
+          "check": { "type": "custom", "evaluator": "noConsecutiveDuplicates" },
+          "passPoints": 2
+        },
+        {
+          "id": "theme-spacing-preset",
+          "label": "Theme specifies spacingPreset",
+          "check": { "type": "custom", "evaluator": "themeHasSpacingPreset" },
+          "passPoints": 3
+        }
+      ]
+    },
+    {
+      "id": "conversion-path",
+      "name": "Conversion Path Clarity",
+      "weight": 8,
+      "description": "Multiple CTA placements (hero + mid + final), clear primary action, form lead capture.",
+      "criteria": [
+        {
+          "id": "hero-has-cta",
+          "label": "Hero has CTA button",
+          "check": { "type": "custom", "evaluator": "heroHasCta" },
+          "passPoints": 2
+        },
+        {
+          "id": "mid-cta-present",
+          "label": "Mid-page CTA block present",
+          "check": { "type": "presence", "blockType": "cta" },
+          "passPoints": 2
+        },
+        {
+          "id": "contact-present",
+          "label": "Contact block present (final conversion)",
+          "check": { "type": "presence", "blockType": "contact" },
+          "passPoints": 2
+        },
+        {
+          "id": "newsletter-present",
+          "label": "Newsletter lead capture present",
+          "check": { "type": "presence", "blockType": "newsletter" },
+          "passPoints": 1
+        },
+        {
+          "id": "nav-cta-present",
+          "label": "Nav has CTA button",
+          "check": { "type": "custom", "evaluator": "navHasCta" },
+          "passPoints": 1
+        }
+      ]
+    },
+    {
+      "id": "content-authenticity",
+      "name": "Content Authenticity",
+      "weight": 7,
+      "description": "No Lorem Ipsum, category-appropriate copy, substantial content depth.",
+      "criteria": [
+        {
+          "id": "no-lorem-ipsum",
+          "label": "No 'Lorem Ipsum' found anywhere",
+          "check": { "type": "custom", "evaluator": "noLoremIpsum" },
+          "passPoints": 2
+        },
+        {
+          "id": "hero-headline-substantial",
+          "label": "Hero headline ≥10 chars",
+          "check": { "type": "custom", "evaluator": "heroHeadlineSubstantial" },
+          "passPoints": 1
+        },
+        {
+          "id": "features-count-3plus",
+          "label": "Features block ≥3 items",
+          "check": { "type": "count", "blockType": "features", "field": "features", "min": 3 },
+          "passPoints": 2
+        },
+        {
+          "id": "faq-count-4plus",
+          "label": "FAQ ≥4 items",
+          "check": { "type": "count", "blockType": "faq", "field": "items", "min": 4 },
+          "passPoints": 2
+        }
+      ]
+    },
+    {
+      "id": "information-density",
+      "name": "Information Density",
+      "weight": 7,
+      "description": "Balanced block count vs page length, block type variety ensures visual rhythm.",
+      "criteria": [
+        {
+          "id": "block-count-min-7",
+          "label": "Homepage ≥7 blocks",
+          "check": { "type": "custom", "evaluator": "blockCountMin7" },
+          "passPoints": 2
+        },
+        {
+          "id": "block-count-max-16",
+          "label": "Homepage ≤16 blocks (not cluttered)",
+          "check": { "type": "custom", "evaluator": "blockCountMax16" },
+          "passPoints": 2
+        },
+        {
+          "id": "variety-half-unique",
+          "label": "Distinct block types ≥ total/2",
+          "check": { "type": "custom", "evaluator": "varietyHalfUnique" },
+          "passPoints": 3
+        }
+      ]
+    }
+  ]
+}

@@ -122,7 +122,7 @@ export default function HomePage() {
             <Link href="/login" className="hidden md:inline-flex text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-3 py-2 rounded-lg hover:bg-zinc-100/80">
               {t.common.signIn}
             </Link>
-            <Link href="/signup" className="hidden sm:inline-flex rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm px-5 py-2.5 transition-all shadow-md shadow-sky-500/20 hover:shadow-lg hover:shadow-sky-500/30">
+            <Link href="/login" className="hidden sm:inline-flex rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm px-5 py-2.5 transition-all shadow-md shadow-sky-500/20 hover:shadow-lg hover:shadow-sky-500/30">
               {t.common.getStartedFree}
             </Link>
             {/* Mobile hamburger */}
@@ -159,7 +159,7 @@ export default function HomePage() {
                   {t.common.signIn}
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/login"
                   onClick={() => setMobileMenuOpen(false)}
                   className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm px-5 py-3 text-center transition-all"
                 >
@@ -201,7 +201,7 @@ export default function HomePage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <Link
-                  href="/signup"
+                  href="/login"
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-8 py-4 text-lg shadow-lg shadow-sky-500/20 transition-all"
                 >
                   {t.common.startBuilding}
@@ -448,10 +448,10 @@ export default function HomePage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <Link href="/signup" className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-6 py-3 text-sm transition-colors">
+                  <Link href="/login" className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-6 py-3 text-sm transition-colors">
                     Xem chi tiết
                   </Link>
-                  <Link href="/signup" className="text-sky-600 font-medium text-sm hover:text-sky-700 inline-flex items-center gap-1">
+                  <Link href="/login" className="text-sky-600 font-medium text-sm hover:text-sky-700 inline-flex items-center gap-1">
                     Dùng thử miễn phí →
                   </Link>
                 </div>
@@ -735,7 +735,7 @@ export default function HomePage() {
                 {t.cta.subtitle}
               </p>
               <Link
-                href="/signup"
+                href="/login"
                 className="inline-flex items-center gap-2 rounded-xl bg-white text-sky-600 font-semibold px-8 py-4 border-2 border-white hover:bg-sky-50 hover:border-sky-50 transition-colors"
               >
                 {t.cta.button}
@@ -805,7 +805,7 @@ export default function HomePage() {
                 {t.common.signIn}
               </Link>
               <Link
-                href="/signup"
+                href="/login"
                 className="text-sky-600 hover:text-sky-700 font-medium transition-colors"
               >
                 {t.common.getStartedFree}

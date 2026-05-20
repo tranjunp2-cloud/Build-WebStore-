@@ -8,44 +8,71 @@
 
 ### 1. Git workflow (branch strategy)
 
-Áp dụng **GitHub Flow** với **staging bắt buộc** (team chỉ vào staging trước; main chỉ qua hotfix hoặc release):
+Áp dụng **GitHub Flow** với **staging bắt buộc** — mỗi PR merge thẳng vào staging, QA test trên staging, release qua PR staging → main.
 
 ```
 main          ← production (protected). Chỉ nhận PR từ staging (release) hoặc hotfix/*
-staging       ← pre-production. Nhận PR từ feature/*, fix/*. Deploy staging khi push.
-feature/*     ← tính năng mới (tạo từ main hoặc staging). PR vào staging only.
-fix/*         ← sửa bug. PR vào staging only.
-hotfix/*      ← sửa gấp production. Tạo từ main → PR vào main. Sau đó merge main → staging.
+staging       ← pre-production. Nhận PR từ feature/*, fix/*. Deploy + QA trên staging.
+feature/*     ← tính năng mới. Tạo từ staging → PR vào staging.
+feat/*        ← alias cho feature/*
+fix/*         ← sửa bug. PR vào staging.
+hotfix/*      ← sửa gấp production. Tạo từ main → PR vào main → merge main → staging.
 chore/*       ← deps, config, refactor (không đổi logic)
 docs/*        ← chỉ tài liệu
 ```
 
-- **main**: chỉ cập nhật qua (1) PR **staging → main** (khi release) hoặc (2) PR **hotfix/* → main**. Không merge feature/fix trực tiếp vào main.
-- **staging**: nhánh team merge hàng ngày. Feature/fix → PR vào **staging** → QA/demo → khi ổn định mới tạo PR staging → main.
-- **feature/fix**: luôn tạo PR với **base = staging** (không PR vào main).
-- **hotfix**: ngoại lệ — PR vào main, merge xong nên merge main vào staging để đồng bộ.
+#### Luồng chính: Feature → staging → main
 
-Chi tiết luồng deploy: [.github/DEPLOY.md](.github/DEPLOY.md). Đánh giá triển khai CI/CD (so workflow + analysis): [.github/CICD_IMPLEMENTATION_ASSESSMENT.md](.github/CICD_IMPLEMENTATION_ASSESSMENT.md).
+```
+staging (base)
+  ├── feat/F01-01-generate-site    → PR → merge staging → QA test
+  ├── feat/F01-02-store-setup      → PR → merge staging → QA test
+  ├── feat/F08-01-product-crud     → PR → merge staging → QA test
+  ├── fix/F01-builder-crash        → PR → merge staging → QA test
+  └── ... tất cả PRs merge thẳng staging ...
+  → Khi tất cả features pass QA → PR staging → main (release v1.0)
+```
 
-**Không dùng:** GitFlow (develop/release) trừ khi cần hỗ trợ nhiều phiên bản production.
+#### Quy tắc
+
+- **KHÔNG dùng feature branch cha** (ví dụ `feat/F01-ai-builder` rồi merge US nhỏ vào đó). Mỗi US/task = 1 PR merge thẳng staging.
+- **main**: chỉ cập nhật qua (1) PR **staging → main** (release) hoặc (2) PR **hotfix/* → main**.
+- **staging**: nhánh team merge hàng ngày. Mỗi PR merged → auto deploy staging → QA test ngay.
+- **hotfix**: ngoại lệ — PR vào main, merge xong merge main → staging để đồng bộ.
+- **Mỗi PR nên nhỏ** (1 US hoặc 1 task) — dễ review, dễ revert nếu lỗi.
+
+#### Tại sao không dùng feature branch cha?
+
+| | Feature branch cha | Merge thẳng staging |
+|--|---|---|
+| Conflict risk | 🔴 Cao (branch sống lâu) | ✅ Thấp |
+| QA effort | Test 2 lần (feature + staging) | ✅ Test 1 lần |
+| Deploy cost | Cần preview app ($) | ✅ Dùng staging có sẵn |
+| AI code speed | Branch lỗi thời nhanh | ✅ Luôn mới nhất |
+| Rollback | Revert cả feature branch | ✅ Revert từng PR |
+
+Chi tiết luồng deploy: [.github/DEPLOY.md](.github/DEPLOY.md).
 
 ---
 
 ### 2. Branch naming
 
-**Chuẩn:** `type/FXX-mô-tả-ngắn`
-- `FXX` = Feature code (F01, F02, ...) — **quan trọng** để bot auto-link PR → Issue.
+**Chuẩn:** `type/FXX-YY-mô-tả-ngắn`
+- `FXX` = Feature code (F01, F02, ...) — bot auto-link PR → Issue.
+- `YY` = User Story number (01, 02, ...) — map đúng US trong PRD.
 - Chữ thường, từ cách nhau bằng dấu gạch ngang `-`.
-- Không dấu cách, ký tự đặc biệt (trừ `-`).
 
-| Type     | Ví dụ |
-|----------|--------|
-| feature  | `feature/F01-ai-builder` |
-| feat     | `feat/F07-template-gallery` |
-| fix      | `fix/F01-login-redirect` |
-| hotfix   | `hotfix/F13-payment-timeout` |
-| chore    | `chore/deps-upgrade-nextjs` |
-| docs     | `docs/api-spec-auth` |
+| Type     | Ví dụ | Giải thích |
+|----------|--------|------------|
+| feat     | `feat/F01-01-generate-site` | US-F01-01: Generate site |
+| feat     | `feat/F01-02-store-setup` | US-F01-02: Store setup form |
+| feat     | `feat/F08-03-bulk-create` | US-F08-03: Bulk create products |
+| fix      | `fix/F01-builder-crash` | Fix bug trong F01 |
+| hotfix   | `hotfix/F13-payment-timeout` | Fix gấp production |
+| chore    | `chore/deps-upgrade-nextjs` | Upgrade dependencies |
+| docs     | `docs/api-spec-auth` | Chỉ docs |
+
+**Mỗi branch = 1 US hoặc 1 task nhỏ.** Không tạo branch cha cho cả Feature.
 
 **CI/CD:** Pipeline trigger theo prefix (`feature/*` → test + build, `main` → deploy production).
 **Bot:** Branch có `FXX` → bot tự tìm issues matching để auto-link (xem §4.3).
@@ -156,22 +183,24 @@ Closes #123         ← SAI: issue tự close khi merge, skip QA
 
 #### 4.4 Issue Lifecycle — Quy trình chi tiết từ tạo đến Done
 
-> **6 trạng thái trên Board.** Bot tự chuyển status theo automation. Team chỉ cần thao tác đúng role.
+> **7 trạng thái trên Board.** Bot tự chuyển status theo automation. Team chỉ cần thao tác đúng role.
 
 **Tổng quan flow:**
 
 ```
 📋 Backlog → 🔍 Review → 🔨 In Progress → 👀 Code Review → 🧪 QA Testing → ✅ Done
-      ↑          │                ↑                                │
-      │          │                │                                │
-      └── rejected               └──────── qa:failed ─────────────┘
+      ↑                                          ↑                │
+      │                                          │                │
+      └── rejected               🔄 Re-Open ←── qa:failed ───────┘
+                                 (dev fix → PR → merge → QA Testing lại)
 ```
 
 | Status | Ai | Trigger | Hành động |
 |--------|-----|---------|-----------|
 | **📋 Backlog** | PM | Issue mới tạo (auto) | PM viết story → Bot tạo issue → PM assign UIUX+BA |
 | **🔍 Review** | UIUX + BA | PM assign (thủ công) | UIUX design, BA verify AC. Approve → `status:ready` |
-| **🔨 In Progress** | Dev | Label `status:ready` / QA fail trả về (auto) | Dev tạo branch, code theo AC + design |
+| **🔨 In Progress** | Dev | Label `status:ready` (auto) | Dev tạo branch, code theo AC + design |
+| **🔄 Re-Open** | Dev | QA fail → `qa:failed` label (auto) | Dev fix bug, tạo PR mới |
 | **👀 Code Review** | Reviewer | PR opened + linked issue (auto) | Review code → approve hoặc request changes |
 | **🧪 QA Testing** | QC | PR merged to staging (auto) | QC test trên staging theo AC |
 | **✅ Done** | QC | QC close issue (thủ công) | Milestone % tăng |
@@ -221,21 +250,21 @@ CI chạy: Lint → Typecheck → Test → Build
 ```
 PR merged → staging auto-deploy
   ↓
-Bot tự: gắn label `qa:pending` + chuyển board "QA Testing"
+Bot tự: gắn `qa:pending` + XÓA `qa:failed`/`qa:passed` cũ + board "QA Testing"
   ↓
 🔔 Lark thông báo QC: "🧪 QA Ready — Issue #98 chờ test"
   ↓
 QC mở Issue #98 → đọc AC → test trên staging
   ↓
-  ├── ✅ Pass → QC close issue → Done ✅ (milestone % tăng)
+  ├── ✅ Pass → QC gắn `qa:passed` → bot xóa `qa:pending`+`qa:failed` → board "Done"
   │
-  └── ❌ Fail → QC gắn label `qa:failed` + comment mô tả bug
+  └── ❌ Fail → QC gắn `qa:failed` → bot xóa `qa:pending`+`qa:passed` → board "Re-Open"
         ↓
-      Bot tự: tạo bug report template + chuyển board "In Progress" + assign dev
+      Bot tự: tạo bug report template + assign dev
         ↓
       🔔 Lark thông báo Dev: "🔴 QA Failed — #98 — @dev fix"
         ↓
-      Dev fix → tạo PR mới → merge → lại vào QA Testing → loop
+      Dev fix → tạo PR mới → merge → bot reset labels → QA Testing → loop
 ```
 
 ---
@@ -330,7 +359,7 @@ PM chỉnh spec → assign lại UIUX+BA → review lại
 | PR approved + CI pass | Gắn `approved` + `ready-to-merge` | pr-lifecycle.yml |
 | PR merged | Status → QA Testing, label `qa:pending`, **Lark → QC** | pr-lifecycle.yml |
 | PR merged → staging | Auto-deploy staging | ci.yml |
-| Label `qa:failed` | Status → In Progress, assign dev, bug template, **Lark → Dev** | issue-lifecycle.yml |
+| Label `qa:failed` | Status → **Re-Open**, assign dev, bug template, **Lark → Dev** | issue-lifecycle.yml |
 | Issue closed | Status → Done | issue-lifecycle.yml |
 
 ---
@@ -573,6 +602,201 @@ Issue tự chuyển **QA Testing**. QC test trên staging → pass thì close is
 | Hook không chạy (commit vẫn qua) | Chạy `npm run prepare`; kiểm tra `.husky/commit-msg` có quyền execute (`chmod +x`). |
 | Push bị từ chối (branch protected) | Không push trực tiếp lên `main`. Tạo branch → PR → merge. |
 | CI fail trên PR | Xem tab Checks, sửa lint/typecheck/test theo báo lỗi, commit lại và push. |
+
+---
+
+## §6 Testing Pipeline
+
+### CI/CD Flow — từ PR tới QC
+
+```
+PR created
+  → CI: Lint → Typecheck → Unit Test → Build
+  → Reviewer approve → Merge staging
+  → Deploy staging (DO App Platform)
+  → Smoke Test (30s): health check + page loads
+  → E2E Tests (3-5 min): Java Playwright tự động
+  → QC Manual UAT: UX/visual check
+  → Pass → Done / Fail → Re-Open
+```
+
+### Board Status (7 cột)
+
+| Status | Ai làm | Trigger |
+|--------|--------|---------|
+| 📋 Backlog | PM | Issue tạo mới |
+| 🔍 Review | UIUX + BA | PM chuyển |
+| 🔨 In Progress | Dev | Dev assign |
+| 👀 Code Review | Reviewer | Dev tạo PR |
+| 🧪 QA Testing | QC | PR merged (bot tự chuyển) |
+| 🔄 Re-Open | Dev | QC gắn `qa:failed` (bot tự chuyển) |
+| ✅ Done | — | QC close issue |
+
+### QA Flow chi tiết
+
+```
+PR merged → Bot gắn qa:pending + chuyển "QA Testing"
+  → Lark notify QC: "🧪 Issue #N chờ test"
+
+QC test trên staging:
+  ├── ✅ Pass → QC gắn qa:passed → close issue → Done
+  └── ❌ Fail → QC gắn qa:failed
+       → Bot chuyển "Re-Open" + tạo bug template
+       → Lark notify Dev: "🔴 QA Failed — @dev fix"
+       → Dev fix → PR mới → merge → lại "QA Testing" (loop)
+```
+
+### Lark Notifications
+
+| Event | Ai nhận | Nội dung |
+|-------|---------|----------|
+| PR merged | QC | 🧪 QA Ready — Issue #N chờ test |
+| qa:failed | Dev | 🔴 QA Failed — @dev fix #N |
+| Smoke fail | Team | 🔴 Staging down after deploy |
+| E2E pass | QC | ✅ E2E passed — bắt đầu UAT |
+| E2E fail | Dev | ❌ E2E failed — xem report |
+
+---
+
+## §7 Monitoring & Logs
+
+### Betterstack — Logs realtime cho staging
+
+Team dev xem logs staging **không cần** truy cập DigitalOcean. Dùng Betterstack:
+
+| Công cụ | Link | Mục đích |
+|---------|------|----------|
+| **Live tail** | [telemetry.betterstack.com](https://telemetry.betterstack.com/team/t518152/tail) | Xem logs realtime |
+| **Uptime monitor** | [uptime.betterstack.com](https://uptime.betterstack.com) | Check staging up/down |
+
+**Cách dùng Live tail:**
+1. Mở link Live tail ở trên (cần được invite — hỏi PM/DevOps)
+2. Chọn source: `ech-prime-web-v2-staging`
+3. Search: gõ keyword (VD: `Error`, `500`, `ECONNREFUSED`)
+4. Filter: click vào log line → filter theo field
+
+**Khi nào dùng:**
+- Deploy staging xong → QC/Dev vào test → thấy lỗi → mở Live tail search error
+- Staging down → check Uptime monitor → xem alert
+- Debug API 500 → search endpoint path trong Live tail
+
+**Invite team:**
+PM/DevOps invite qua Betterstack → Settings → Team → Invite (dùng email công ty).
+
+---
+
+## §7 Testing Pipeline (Best Practice)
+
+### Testing Pyramid
+
+```
+         ╱╲
+        ╱  ╲        Manual UAT (QC)
+       ╱ QC ╲       → UX, visual, edge cases
+      ╱──────╲
+     ╱  E2E   ╲     E2E Tests (Java Playwright)
+    ╱──────────╲    → Critical user flows trên staging
+   ╱Integration ╲   Integration Tests (API routes)
+  ╱──────────────╲  → Test API endpoints (mock DB)
+ ╱   Unit Tests   ╲ Unit Tests (Vitest)
+╱──────────────────╲→ Logic, utils, components
+```
+
+### CI Pipeline — Full flow
+
+```
+PR created
+  ↓
+CI Gate (TRƯỚC merge):
+  ├── Lint (ESLint)
+  ├── Typecheck (tsc --noEmit)
+  ├── Unit + Integration Tests (Vitest, coverage ≥ 40%)
+  └── Build check (Next.js build)
+  ↓ (all pass + reviewer approve)
+Merge → Deploy staging (DigitalOcean)
+  ↓
+Smoke Test (30s):
+  ├── /api/health?deep=1 → DB connected? Memory OK?
+  ├── / → HTTP 200?
+  ├── /login → HTTP 200?
+  └── /register → HTTP 200?
+  ↓ (pass)
+E2E Tests (3-5 min — Java Playwright):
+  ├── Login → create site → products CRUD → orders
+  └── Parse results → upload report artifact
+  ↓
+Lark Notifications:
+  ├── 🔴 Smoke fail → "Staging may be down" (Dev + DevOps)
+  ├── ❌ E2E fail → "X/Y tests failed" (Dev)
+  └── ✅ E2E pass → "QC bắt đầu UAT" (QC)
+```
+
+### Lark notifications mỗi stage
+
+| Event | Ai nhận | Message |
+|-------|---------|---------|
+| CI fail (PR) | Dev | "❌ CI failed — lint/test/build" |
+| Deploy staging success | Team | "🚀 Staging deployed — commit abc" |
+| Smoke test fail | Dev + DevOps | "🔴 Staging down after deploy" |
+| E2E tests pass | QC | "✅ E2E passed — QC bắt đầu UAT" |
+| E2E tests fail | Dev | "❌ E2E 12/15 failed — fix trước QC test" |
+| QA failed (manual) | Dev | "🔴 QA Failed — #98 — @dev fix" |
+| Issue closed (QA pass) | PM | Board → Done, milestone % tăng |
+
+---
+
+## §8 Database Schema & Migration Rules
+
+### Payload CMS Column Naming Convention
+
+Payload 3.14 Drizzle ORM dùng **2 convention khác nhau** tùy field type:
+
+| Payload Field Type | Table Pattern | id | order | parent_id | Extra |
+|---|---|---|---|---|---|
+| `type: 'array'` | `{collection}_{field}` | **varchar** (UUID) | **_order** (underscore) | **_parent_id** (underscore) | **_uuid** varchar |
+| `type: 'select' + hasMany` | `{collection}_{field}` | **serial** (int) | **order** (NO underscore) | **parent_id** (NO underscore) | value varchar |
+| `type: 'group'` | same table | — | — | — | `{group}_{field}` prefix |
+| `type: 'relationship'` | same table | — | — | — | `{field}_id` integer |
+
+### Khi thay đổi collection (thêm/sửa/xóa field)
+
+1. Thêm migration vào `scripts/db-setup.js` MIGRATIONS array
+2. **Tuân theo naming convention** ở bảng trên — CI sẽ chặn nếu sai
+3. Dùng `CREATE TABLE IF NOT EXISTS` — **KHÔNG dùng DROP TABLE**
+4. Array table id phải là `varchar` (UUID) — **KHÔNG dùng serial**
+5. Test local trước PR: `node scripts/check-migrations.js origin/staging`
+
+### Ví dụ đúng
+
+```javascript
+// Array field: type 'array' → underscore prefix, varchar id
+{
+  name: 'users_tenants.create_table',
+  sql: `CREATE TABLE IF NOT EXISTS users_tenants (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+    tenant_id integer, role varchar DEFAULT 'viewer');`,
+},
+
+// Select hasMany: type 'select' + hasMany → NO underscore, serial id
+// (Payload tự tạo qua pushDevSchema — thường không cần manual migration)
+
+// Simple column addition:
+{
+  name: 'tenants.whatsapp_number',
+  sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_number varchar;`,
+},
+```
+
+### CI Enforcement
+
+`scripts/check-migrations.js` chạy trên mọi PR → chặn merge nếu:
+- ❌ Collection thêm field mới nhưng thiếu migration
+- ❌ Array table dùng `serial` id thay vì `varchar`
+- ❌ Array table dùng `parent_id` thay vì `_parent_id`
+- ❌ Có `DROP TABLE` trong migrations
 
 ---
 

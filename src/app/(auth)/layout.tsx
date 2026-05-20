@@ -1,61 +1,82 @@
 import Link from 'next/link'
+import Image from 'next/image'
+import { cookies } from 'next/headers'
 import { AppShell } from '@/components/AppShell'
 import { AuthToaster } from './AuthToaster'
+import { I18nProvider, Locale } from '@/i18n'
 
-export default function AuthLayout({
+export default async function AuthLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
+    const cookieStore = await cookies()
+    const cookieValue = cookieStore.get('prefer_lang')?.value
+    const localeCookie = (cookieValue === 'en' || cookieValue === 'ms') ? (cookieValue as Locale) : 'en'
+
     return (
         <AppShell>
-            <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0A0E1A] px-4 py-8">
-                {/* Animated gradient orbs */}
-                <div className="pointer-events-none fixed inset-0 overflow-hidden">
-                    <div className="absolute -left-20 -top-20 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-blue-600/20 to-cyan-500/10 blur-[120px]" />
-                    <div className="absolute -bottom-20 -right-20 h-[400px] w-[400px] rounded-full bg-gradient-to-br from-violet-600/15 to-fuchsia-500/10 blur-[120px]" />
-                    <div className="absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-teal-500/10 to-emerald-500/5 blur-[100px]" />
-                </div>
+            <I18nProvider defaultLocale={localeCookie}>
+                <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0A0E1A] px-4 py-8">
 
-                {/* Grid pattern overlay */}
-                <div
-                    className="pointer-events-none fixed inset-0 opacity-[0.03]"
-                    style={{
-                        backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-                        backgroundSize: '60px 60px',
-                    }}
-                />
-
-                <div className="relative z-10 w-full max-w-[90vw] sm:max-w-[420px]">
-                    {/* Logo */}
-                    <div className="mb-8 text-center">
-                        <Link href="/" className="group inline-flex items-center gap-2.5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-blue-500/25 transition-transform group-hover:scale-105">
-                                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                                    <polyline points="2 17 12 22 22 17" />
-                                    <polyline points="2 12 12 17 22 12" />
-                                </svg>
-                            </div>
-                            <span className="text-2xl font-bold tracking-tight text-white">
-                                Prime<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Web</span>
-                            </span>
-                        </Link>
+                    {/* Animated gradient orbs */}
+                    <div className="pointer-events-none fixed inset-0 overflow-hidden">
+                        <div className="absolute -left-20 -top-20 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-blue-600/20 to-cyan-500/10 blur-[120px]" />
+                        <div className="absolute -bottom-20 -right-20 h-[400px] w-[400px] rounded-full bg-gradient-to-br from-violet-600/15 to-fuchsia-500/10 blur-[120px]" />
+                        <div className="absolute left-1/2 top-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-teal-500/10 to-emerald-500/5 blur-[100px]" />
                     </div>
 
-                    {/* Glassmorphism card */}
-                    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 sm:p-8 shadow-2xl shadow-black/20 backdrop-blur-xl">
-                        {children}
+                    {/* Grid pattern overlay */}
+                    <div
+                        className="pointer-events-none fixed inset-0 opacity-[0.03]"
+                        style={{
+                            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+                            backgroundSize: '60px 60px',
+                        }}
+                    />
+
+                    <div className="relative z-10 w-full max-w-[90vw] sm:max-w-[448px] flex flex-col items-start flex-1" style={{ gap: 28 }}>
+                        {/* Logo — Figma: 48×48 rounded-2xl with glow + "PrimeWeb" Inter Bold 24 */}
+                        <div className="flex justify-center w-full">
+                            <Link href="/" className="group inline-flex items-center gap-3" style={{ textDecoration: 'none' }}>
+                                <Image
+                                    src="/icons/auth/logo-primeweb.png"
+                                    alt="PrimeWeb Logo"
+                                    width={48}
+                                    height={48}
+                                    className="transition-transform group-hover:scale-105"
+                                    style={{
+                                        filter: 'drop-shadow(0px 0px 12px rgba(59, 130, 246, 0.5)) drop-shadow(0px 0px 20px rgba(45, 212, 191, 0.25))',
+                                    }}
+                                    priority
+                                />
+                                <span style={{ color: '#F8FAFC', fontFamily: 'Inter, sans-serif', fontSize: 24, fontWeight: 700, lineHeight: '32px', textDecoration: 'none' }}>
+                                    Prime<span style={{ color: '#00B6CD' }}>Web</span>
+                                </span>
+                            </Link>
+                        </div>
+
+                        {/* Glassmorphism card — Figma: bg rgba(30,41,59,0.6), border rgba(59,130,246,0.15), r-16, p-33, shadow */}
+                        <div
+                            className="w-full rounded-2xl p-6 sm:p-[33px] backdrop-blur-xl"
+                            style={{
+                                background: 'rgba(30, 41, 59, 0.6)',
+                                border: '1px solid rgba(59, 130, 246, 0.15)',
+                                boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
+                            }}
+                        >
+                            {children}
+                        </div>
+
+                        {/* Footer — Figma: Inter 400 12px, #94A3B8, center */}
+                        <p className="w-full m-0 text-center text-xs text-[#94A3B8]" style={{ fontFamily: 'Inter, sans-serif', lineHeight: '1.33' }}>
+                            © 2026 PrimeWeb. AI-powered website builder for Malaysian SMEs.
+                        </p>
                     </div>
 
-                    {/* Footer */}
-                    <p className="mt-6 text-center text-xs text-gray-500">
-                        © 2026 PrimeWeb. AI-powered website builder for Malaysian SMEs.
-                    </p>
+                    <AuthToaster />
                 </div>
-
-                <AuthToaster />
-            </div>
+            </I18nProvider>
         </AppShell>
     )
 }

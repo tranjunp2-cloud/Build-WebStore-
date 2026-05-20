@@ -223,6 +223,7 @@ jobs:
             core.setOutput('linked_issues', linkedIssues.join(', ') || 'none');
 
       - name: Notify Lark (PR Opened)
+        if: false # Disabled — duplicate with prime-bot
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
@@ -294,7 +295,7 @@ jobs:
             });
 
       - name: Notify Lark (Approved)
-        if: github.event.review.state == 'approved'
+        if: false # Disabled — duplicate with prime-bot
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
@@ -311,8 +312,29 @@ jobs:
             🎉 **Ready to merge!**
           buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
 
-      - name: Notify Lark (Changes Requested)
+      - name: Remove approved labels on changes requested
         if: github.event.review.state == 'changes_requested'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = context.payload.pull_request.number;
+            for (const label of ['approved', 'ready-to-merge']) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+                console.log(`Removed ${label} from PR #${prNumber}`);
+              } catch (e) {
+                if (e.status !== 404) console.warn(`Failed to remove ${label} from PR #${prNumber}: ${e.message}`);
+              }
+            }
+
+      - name: Notify Lark (Changes Requested)
+        if: false # Disabled — duplicate with prime-bot
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
@@ -388,6 +410,20 @@ jobs:
                   labels: ['qa:pending'],
                 });
 
+                // Remove stale QA labels from previous test cycle
+                for (const oldLabel of ['qa:failed', 'qa:passed']) {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner, repo,
+                      issue_number: issueNumber,
+                      name: oldLabel,
+                    });
+                    console.log(`Removed ${oldLabel} from #${issueNumber}`);
+                  } catch (e) {
+                    if (e.status !== 404) console.warn(`Failed to remove ${oldLabel} from #${issueNumber}: ${e.message}`);
+                  }
+                }
+
                 // Comment on issue
                 await github.rest.issues.createComment({
                   owner, repo,
@@ -418,8 +454,8 @@ jobs:
               return;
             }
 
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -438,9 +474,9 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner, repo, number: projectNumber,
+                org: owner, number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project: ${e.message}`);
               return;
@@ -495,7 +531,7 @@ jobs:
             }
 
       - name: Notify Lark (QA Ready)
-        if: steps.qa_issues.outputs.issues != ''
+        if: false # Disabled — duplicate with prime-bot
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
@@ -516,7 +552,7 @@ jobs:
           buttons: '[{"text":"📋 QA Board","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Aqa%3Apending","type":"primary"},{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"default"}]'
 
       - name: Notify Lark (Merged — no issues)
-        if: steps.qa_issues.outputs.issues == ''
+        if: false # Disabled — duplicate with prime-bot
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
@@ -600,7 +636,7 @@ jobs:
             core.setOutput('count', needsReview.length + stale.length);
 
       - name: Notify Lark (Stale PRs)
-        if: steps.stale.outputs.has_issues == 'true'
+        if: false # Disabled — duplicate with prime-bot
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}

@@ -4,6 +4,7 @@ export type PlatformUser = {
     email: string
     firstName?: string
     lastName?: string
+    phone?: string
     roles?: ('super-admin' | 'tenant-owner' | 'editor' | 'viewer')[]
     tenants?: Array<{
         tenant: string | { id: string; name?: string; slug?: string }
@@ -13,4 +14,6 @@ export type PlatformUser = {
     lastLoginAt?: string
     createdAt: string
     updatedAt: string
+    has_seen_ai_wizard?: boolean
+    prefer_lang?: 'en' | 'ms'
 }

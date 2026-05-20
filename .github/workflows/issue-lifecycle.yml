@@ -22,7 +22,7 @@ jobs:
     name: 'Board: Auto-manage'
     if: >-
       github.event_name == 'issues' &&
-      (github.event.action == 'opened' || github.event.action == 'assigned' || github.event.action == 'closed')
+      (github.event.action == 'opened' || github.event.action == 'assigned' || github.event.action == 'closed' || github.event.action == 'reopened')
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -41,9 +41,9 @@ jobs:
             const issue = context.payload.issue;
             const action = context.payload.action;
 
-            // Get project ID via GraphQL
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            // Get project ID via GraphQL (org-level project)
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -62,11 +62,10 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                org: context.repo.owner,
                 number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project #${projectNumber}: ${e.message}`);
               return;
@@ -84,6 +83,7 @@ jobs:
             if (action === 'opened') targetStatus = 'Backlog';
             else if (action === 'assigned') targetStatus = 'In Progress';
             else if (action === 'closed') targetStatus = 'Done';
+            else if (action === 'reopened') targetStatus = 'Re-Open';
 
             const statusOption = statusField.options.find(o => o.name === targetStatus);
             if (!statusOption) {
@@ -127,7 +127,7 @@ jobs:
   # ──────────────────────────────────────
   # Label-based transitions
   # status:ready → In Progress (UIUX+BA approved)
-  # qa:failed → In Progress (QC trả về dev)
+  # qa:failed → Re-Open (QC trả về dev)
   # review:rejected → Backlog (trả về PM)
   # qa:passed → remove qa:pending
   # ──────────────────────────────────────
@@ -139,9 +139,6 @@ jobs:
       issues: write
       repository-projects: write
     steps:
-      - name: Checkout (for composite action)
-        uses: actions/checkout@v4
-
       - name: Handle label-based status changes
         uses: actions/github-script@v7
         with:
@@ -154,48 +151,46 @@ jobs:
             // Define label → status mapping
             const labelMap = {
               'status:ready': 'In Progress',
-              'qa:failed': 'In Progress',
+              'qa:failed': 'Re-Open',
+              'qa:passed': 'Done',
               'review:rejected': 'Backlog',
             };
 
             const targetStatus = labelMap[label];
 
-            // ── Handle qa:passed: remove qa:pending label ──
-            if (label === 'qa:passed') {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner, repo,
-                  issue_number: issue.number,
-                  name: 'qa:pending',
-                });
-                console.log(`Removed qa:pending from #${issue.number}`);
-              } catch (e) {
-                console.log(`Could not remove qa:pending: ${e.message}`);
+            // ── Helper: remove labels safely (ignore 404, log real errors) ──
+            async function removeLabels(labels) {
+              for (const name of labels) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo,
+                    issue_number: issue.number,
+                    name,
+                  });
+                  console.log(`Removed ${name} from #${issue.number}`);
+                } catch (e) {
+                  if (e.status === 404) {
+                    console.log(`Label ${name} not present on #${issue.number}, skipping`);
+                  } else {
+                    console.warn(`Failed to remove ${name} from #${issue.number}: ${e.message}`);
+                  }
+                }
               }
+            }
 
+            // ── Handle qa:passed: remove conflicting labels + comment ──
+            if (label === 'qa:passed') {
+              await removeLabels(['qa:pending', 'qa:failed']);
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
                 body: `✅ **QA Passed!** Issue sẵn sàng close → Done.`,
               });
-              return;
             }
 
-            if (!targetStatus) {
-              console.log(`Label "${label}" has no status mapping, skipping`);
-              return;
-            }
-
-            // ── Handle qa:failed: re-assign dev + auto bug report template ──
+            // ── Handle qa:failed: remove conflicting labels + bug report ──
             if (label === 'qa:failed') {
-              // Remove qa:pending if present
-              try {
-                await github.rest.issues.removeLabel({
-                  owner, repo,
-                  issue_number: issue.number,
-                  name: 'qa:pending',
-                });
-              } catch (e) { /* label might not exist */ }
+              await removeLabels(['qa:pending', 'qa:passed']);
 
               // Find linked PRs for context
               const timeline = await github.rest.issues.listEventsForTimeline({
@@ -279,8 +274,9 @@ jobs:
               console.log(`Issue #${issue.number} → QA Failed → bug report template posted`);
             }
 
-            // ── Handle review:rejected: notify PM ──
+            // ── Handle review:rejected: notify PM + clean status:ready ──
             if (label === 'review:rejected') {
+              await removeLabels(['status:ready']);
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
@@ -291,6 +287,7 @@ jobs:
 
             // ── Handle status:ready: UIUX+BA approved ──
             if (label === 'status:ready') {
+              await removeLabels(['review:rejected']);
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
@@ -306,8 +303,8 @@ jobs:
               return;
             }
 
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -326,9 +323,9 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner, repo, number: projectNumber,
+                org: owner, number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project: ${e.message}`);
               return;
@@ -380,6 +377,12 @@ jobs:
           # Get all assignees for the notification
           ASSIGNEES=$(echo '${{ toJSON(github.event.issue.assignees) }}' | jq -r '.[].login' 2>/dev/null | tr '\n' ', ' | sed 's/,$//' || echo 'unassigned')
           echo "assignees=${ASSIGNEES:-unassigned}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout (for lark-notify composite action)
+        if: github.event.label.name == 'qa:failed'
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_BOT_TOKEN || github.token }}
 
       - name: Notify Lark (QA Failed → Dev fix)
         if: github.event.label.name == 'qa:failed'
@@ -441,9 +444,9 @@ jobs:
 
             console.log(`Found linked issues: ${linkedIssues.join(', ')}`);
 
-            // Get project and Status field
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            // Get project and Status field (org-level project)
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -462,11 +465,10 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                org: context.repo.owner,
                 number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project #${projectNumber}: ${e.message}`);
               return;
@@ -540,8 +542,10 @@ jobs:
       issues: write
       contents: read
     steps:
-      - name: Checkout (for composite action)
+      - name: Checkout (for lark-notify composite action)
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_BOT_TOKEN || github.token }}
 
       - name: Find stale and unassigned issues
         uses: actions/github-script@v7
@@ -621,3 +625,26 @@ jobs:
           meta-right-value: "${{ steps.stale.outputs.count }} items"
           content: ${{ steps.stale.outputs.content }}
           buttons: '[{"text":"📋 View Issues","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Auser-story","type":"primary"}]'
+
+  # ──────────────────────────────────────
+  # AI Estimate: auto-estimate effort + set dates when size label added
+  # ──────────────────────────────────────
+  ai-estimate:
+    name: 'AI: Estimate effort'
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'labeled' &&
+      startsWith(github.event.label.name, 'size:')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      repository-projects: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Estimate and set dates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+        run: node .github/scripts/estimate-issue.js

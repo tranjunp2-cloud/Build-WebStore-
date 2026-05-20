@@ -1,0 +1,63 @@
+import { z } from 'zod'
+import { BaseBlockSchema } from '../types'
+
+export type MenuItemImage = { id?: number; url?: string; alt?: string }
+
+export type MenuItem = {
+    name: string
+    description?: string
+    price: string
+    currency?: string
+    tag?: string
+    image?: MenuItemImage | number | string | null
+}
+
+export type MenuCategory = {
+    name: string
+    items: MenuItem[]
+}
+
+export type MenuFoodConfig = {
+    blockType: 'menu-food'
+    variant?: 'classic' | 'cards' | 'minimal'
+    headline: string
+    categories: MenuCategory[]
+}
+
+export const MenuFoodConfigSchema = BaseBlockSchema.extend({
+    blockType: z.literal('menu-food'),
+    variant: z.enum(['classic', 'cards', 'minimal']).default('classic'),
+    headline: z.string(),
+    categories: z.array(z.object({
+        name: z.string(),
+        items: z.array(z.object({
+            name: z.string(),
+            description: z.string().optional(),
+            price: z.string(),
+            currency: z.string().default('RM'),
+            tag: z.string().optional(),
+            image: z.union([
+                z.object({ id: z.number().optional(), url: z.string().optional(), alt: z.string().optional() }),
+                z.number(),
+                z.string(),
+                z.null(),
+            ]).optional(),
+        })).default([]),
+    })).default([]),
+})
+
+export const menuFoodMeta = {
+    type: 'menu-food' as const,
+    name: 'Food Menu',
+    description: 'Restaurant menu with categories, prices and tags',
+    icon: '🍽️',
+    variants: ['classic', 'cards', 'minimal'],
+    defaultVariant: 'classic',
+    editableFields: ['headline', 'categories'],
+    quickActions: ['Add category', 'Add item', 'Change prices'],
+    aiVisible: true,
+    category: 'store' as const,
+}
+
+/** Canonical configSchema export for block-schema-registry.ts introspection */
+export const configSchema = MenuFoodConfigSchema

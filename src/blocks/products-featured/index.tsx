@@ -1,116 +1,253 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import type { BlockProps } from '../types'
 import type { ProductsFeaturedConfig } from './config'
 import { GradientBlob, SectionLabel } from '../shared/decorative'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
+import { Heading, Body, Caption } from '../shared/Typography'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
+import { getGalleryImages } from '@/lib/images/industry-images'
+import { handleCartClick } from '@/lib/storefront/editor-intercept'
 
-const MOCK_FEATURED = [
-    {
-        id: 1,
-        name: 'The Obsidian Chronograph',
-        price: '$1,250',
-        description: 'Engineered for precision. Crafted for elegance. The Obsidian Chronograph features a matte black titanium case, sapphire crystal, and our proprietary automatic movement. Water-resistant up to 200m.',
-        image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1000&q=80',
-        tags: ['Limited Edition', 'Titanium'],
-    },
-    {
-        id: 2,
-        name: 'Acoustic Excellence Headphones',
-        price: '$450',
-        description: 'Immerse yourself in pure studio sound with active noise cancellation and 40-hour battery life.',
-        image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1000&q=80',
-        tags: ['New Release', 'Audio'],
-    }
-]
+const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
+const CART_ENABLED = true
 
-export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeaturedConfig>) {
+interface FeaturedProduct {
+    id: string
+    slug: string
+    name: string
+    price: string
+    description: string
+    image: string | null
+    tags: string[]
+}
+
+function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
+    return (
+        <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
+            {children}
+        </SectionWrapper>
+    )
+}
+
+export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<ProductsFeaturedConfig>) {
     const { headline = 'Featured Collection', subheadline, variant = 'hero-product' } = block
-    const pc = theme.primaryColor
+    const category = typeof site?.siteType === 'string' ? site.siteType : 'business'
 
-    const product = MOCK_FEATURED[0] // For hero-product we just show the first one
-    const products = MOCK_FEATURED // For carousel we'd show all
+    const [products, setProducts] = useState<FeaturedProduct[]>([])
+    const [loading, setLoading] = useState(true)
+    const scrollRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const siteId = site?.id ? String(site.id) : null
+        if (!siteId) {
+            setLoading(false)
+            return
+        }
+
+        const controller = new AbortController()
+        // carousel shows multiple products; hero needs only 2
+        const limit = variant === 'carousel' ? 6 : 2
+        fetch(`/api/storefront/products?site=${siteId}&limit=${limit}&sort=-createdAt`, { signal: controller.signal })
+            .then(res => res.ok ? res.json() : Promise.reject(res))
+            .then(json => {
+                const docs = json.docs || []
+                const mapped: FeaturedProduct[] = docs.map((doc: Record<string, unknown>) => {
+                    const images = doc.images as Array<{ image?: { url?: string } }> | undefined
+                    const currencyCode = typeof doc.currency === 'string' ? doc.currency : 'MYR'
+                    const currency = CURRENCY_DISPLAY[currencyCode] ?? currencyCode
+                    const price = typeof doc.price === 'number' ? doc.price : parseFloat(String(doc.price)) || 0
+                    return {
+                        id: String(doc.id),
+                        slug: String(doc.slug || ''),
+                        name: String(doc.name || ''),
+                        price: `${currency} ${price.toFixed(2)}`,
+                        description: String(doc.shortDescription || ''),
+                        image: images?.[0]?.image?.url ?? null,
+                        tags: [],
+                    }
+                })
+                setProducts(mapped)
+            })
+            .catch(err => {
+                if (err.name !== 'AbortError') console.error('[ProductsFeaturedBlock] Failed to fetch products:', err)
+            })
+            .finally(() => setLoading(false))
+
+        return () => controller.abort()
+    }, [site, variant])
+
+    if (loading) {
+        return (
+            <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent">
+                <div className="flex items-center justify-center py-16">
+                    <div className="animate-spin w-8 h-8 rounded-full border-2 border-current border-t-transparent opacity-40" />
+                </div>
+            </SectionWrapper>
+        )
+    }
+
+    // Fallback: carousel needs more items than hero-product
+    const fallbackCount = variant === 'carousel' ? 6 : 2
+    const fallbackImages = getGalleryImages(category, fallbackCount)
+    const displayProducts: FeaturedProduct[] = products.length > 0
+        ? products.map((p, i) => ({
+            ...p,
+            image: p.image ?? fallbackImages[i] ?? fallbackImages[0] ?? null,
+        }))
+        : variant === 'carousel'
+            ? fallbackImages.map((img, i) => ({
+                id: `fallback-${i}`,
+                slug: '',
+                name: headline,
+                price: '',
+                description: subheadline || '',
+                image: img ?? null,
+                tags: [],
+            }))
+            : [
+                {
+                    id: 'fallback-1',
+                    slug: '',
+                    name: headline,
+                    price: '',
+                    description: subheadline || '',
+                    image: fallbackImages[0] ?? null,
+                    tags: [],
+                },
+            ]
+
+    const product = displayProducts[0]!
+    const siteRec = site as Record<string, unknown>
+    const siteBasePath = typeof siteRec?.siteBasePath === 'string'
+        ? (siteRec.siteBasePath as string)
+        : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
+
+    const scrollCarousel = (dir: 'prev' | 'next') => {
+        const el = scrollRef.current
+        if (!el) return
+        const itemWidth = (el.firstElementChild as HTMLElement)?.offsetWidth ?? 500
+        el.scrollBy({ left: dir === 'next' ? itemWidth + 24 : -(itemWidth + 24), behavior: 'smooth' })
+    }
 
     if (variant === 'carousel') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={pc} className="top-1/4 right-0" size={600} opacity={0.05} />
-                <div className="container mx-auto px-6 relative z-10">
-                    <div className="text-center max-w-2xl mx-auto mb-16">
-                        {block.sectionLabel && <SectionLabel color={pc}>{block.sectionLabel}</SectionLabel>}
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>
-                        {subheadline && <p className="opacity-60 text-lg">{subheadline}</p>}
-                    </div>
-                    
-                    <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 hide-scrollbar">
-                        {products.map((p) => (
-                            <div key={p.id} className="snap-center w-[85vw] sm:w-[500px] flex-shrink-0 relative rounded-3xl overflow-hidden group">
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
+            <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
+                <GradientBlob color={CSS_VARS.primary} className="top-1/4 right-0" size={600} opacity={0.05} />
+                <div className="text-center max-w-2xl mx-auto mb-16">
+                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
+                    {subheadline && <RichText text={subheadline} as="p" className="opacity-60 text-lg" />}
+                </div>
+
+                <div ref={scrollRef} className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 no-scrollbar">
+                    {displayProducts.map((p) => (
+                        <div key={p.id} className="snap-center w-[85vw] sm:w-[500px] flex-shrink-0 relative rounded-3xl overflow-hidden group">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
+                            {p.image ? (
                                 <img src={p.image} alt={p.name} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
-                                <div className="absolute bottom-0 left-0 p-8 z-20 w-full text-white">
-                                    <h3 className="text-2xl font-heading mb-2">{p.name}</h3>
-                                    <p className="text-xl font-medium" style={{ color: pc }}>{p.price}</p>
-                                </div>
+                            ) : (
+                                <div className="w-full h-[500px] bg-black/5 flex items-center justify-center text-6xl opacity-20">🛍️</div>
+                            )}
+                            <div className="absolute bottom-0 left-0 p-8 z-20 w-full text-white">
+                                <Heading level={3} className="mb-2">{p.name}</Heading>
+                                {p.price && <Body size="lg" className="font-medium" style={{ color: 'var(--brand-primary)' }}>{p.price}</Body>}
                             </div>
+                        </div>
+                    ))}
+                </div>
+                {displayProducts.length > 1 && (
+                    <div className="flex justify-center gap-3 mt-4">
+                        {(['prev', 'next'] as const).map((dir) => (
+                            <button
+                                key={dir}
+                                type="button"
+                                onClick={() => scrollCarousel(dir)}
+                                className={`rounded-full flex items-center justify-center transition-opacity hover:opacity-80 ${TOUCH_TARGET.min} min-w-[44px]`}
+                                style={{ background: `rgba(var(--brand-primary-rgb), 0.12)`, color: 'var(--brand-primary)' }}
+                                aria-label={dir === 'prev' ? 'Previous products' : 'Next products'}
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d={dir === 'prev' ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'} />
+                                </svg>
+                            </button>
                         ))}
                     </div>
-                </div>
-            </section>
+                )}
+            </SectionWrapper>
         )
     }
 
     // Default: hero-product split view
     return (
-        <section className="py-24 relative overflow-hidden">
-            <div className="container mx-auto px-6 relative z-10">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                    {/* Left: Huge Product Image */}
-                    <div className="relative group">
-                        <GradientBlob color={pc} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.15} />
-                        <div className="relative z-10 rounded-2xl overflow-hidden animate-float" style={{ animationDuration: '6s' }}>
-                            <img 
-                                src={product.image} 
-                                alt={product.name} 
-                                className="w-full h-auto object-cover transform scale-110 drop-shadow-2xl mix-blend-multiply dark:mix-blend-normal" 
+        <ProductsFeaturedSection>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                {/* Left: Huge Product Image */}
+                <div className="relative group">
+                    <GradientBlob color={CSS_VARS.primary} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.15} />
+                    <div className="relative z-10 rounded-2xl overflow-hidden animate-float" style={{ animationDuration: '6s' }}>
+                        {product.image ? (
+                            <img
+                                src={product.image}
+                                alt={product.name}
+                                className="w-full h-auto object-cover transform scale-110 drop-shadow-2xl mix-blend-multiply dark:mix-blend-normal"
                             />
-                        </div>
+                        ) : (
+                            <div className="w-full aspect-square bg-black/5 flex items-center justify-center text-8xl opacity-20">🛍️</div>
+                        )}
                     </div>
+                </div>
 
-                    {/* Right: Info */}
-                    <div className="flex flex-col justify-center">
-                        {block.sectionLabel && <SectionLabel color={pc}>{block.sectionLabel}</SectionLabel>}
-                        
+                {/* Right: Info */}
+                <div className="flex flex-col justify-center">
+                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+
+                    {product.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-6">
                             {product.tags.map((tag) => (
-                                <span key={tag} className="px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase" 
-                                    style={{ backgroundColor: `${pc}15`, color: pc, border: `1px solid ${pc}30` }}>
+                                <Caption key={tag} className="px-3 py-1 rounded-full font-semibold tracking-wider uppercase"
+                                    style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)', border: `1px solid rgba(var(--brand-primary-rgb), 0.188)` }}>
                                     {tag}
-                                </span>
+                                </Caption>
                             ))}
                         </div>
+                    )}
 
-                        <h2 className="text-5xl lg:text-7xl font-bold font-heading mb-6 leading-tight">{product.name}</h2>
-                        
-                        <p className="text-4xl font-heading mb-6" style={{ color: pc }}>{product.price}</p>
-                        
-                        <p className="text-lg opacity-70 leading-relaxed mb-10 max-w-lg">
+                    <RichText text={product.name} as="h2" className="text-5xl lg:text-7xl font-bold font-heading mb-6 leading-tight" />
+
+                    <RichText text={product.price} as="p" className="text-4xl font-heading mb-6" style={{ color: 'var(--brand-primary)' }} />
+
+                    {product.description && (
+                        <Body size="lg" className="opacity-70 mb-10 max-w-lg">
                             {product.description}
-                        </p>
+                        </Body>
+                    )}
 
-                        <div className="flex flex-col sm:flex-row gap-4">
-                            <button 
-                                className="px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105"
-                                style={{ backgroundColor: pc, color: theme.colorMode === 'dark' ? '#000' : '#fff' }}
-                            >
-                                Add to Cart
-                            </button>
-                            <button 
-                                className="px-8 py-4 rounded-full font-bold text-lg transition-colors"
-                                style={{ border: `2px solid ${pc}50`, color: theme.colorMode === 'dark' ? '#fff' : '#000' }}
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        {CART_ENABLED && (
+                        <button
+                            type="button"
+                            className={`px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 ${TOUCH_TARGET.min}`}
+                            style={{ backgroundColor: 'var(--brand-primary)', color: theme.colorMode === 'dark' ? '#000' : '#fff' }}
+                            onClick={handleCartClick}
+                        >
+                            Add to Cart
+                        </button>
+                        )}
+                        {product.slug && (
+                            <Link
+                                href={`${siteBasePath}/products/${product.slug}`}
+                                className={`px-8 py-4 rounded-full font-bold text-lg transition-colors inline-block text-center ${TOUCH_TARGET.min}`}
+                                style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`, color: theme.colorMode === 'dark' ? '#fff' : '#000' }}
                             >
                                 View Details
-                            </button>
-                        </div>
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>
@@ -125,6 +262,6 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
                     animation: float ease-in-out infinite;
                 }
             `}</style>
-        </section>
+        </ProductsFeaturedSection>
     )
 }

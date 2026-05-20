@@ -1,8 +1,9 @@
 # PRD: Storefront Commerce (F09)
-> **Version:** 2.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
-> **Priority:** P0 🌟 | **Sprint:** Wave 5 | **Size:** XL
+> **Version:** 2.2 | **Updated:** 2026-05-15 | **Agent:** `project-planner`
+> **Priority:** P0 🌟 | **Sprint:** Wave 6 (v2.2 Bank Transfer confirmation variant) · Wave 5 (v2.1 base)
 > **Depends on:** F08 Products CRUD ✅, F10 Orders ✅ | **Blocks:** F13 Payment Gateway, F14 Shipping
 > **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — §6 Trust Signals, §4 Payment
+> **Decisions Log:** [PD-018](../decisions/decisions-log.md#pd-018--manual-payment-bank-transfer-verification-flow) · Issue [#1004](https://github.com/primeproduction/ech-prime-web-v2/issues/1004)
 
 ---
 
@@ -53,8 +54,8 @@ Public storefront pages dưới `/sites/[slug]/`: products listing, product deta
 - Phân trang (Pagination) tối đa 10 sản phẩm/trang ở danh sách sản phẩm (US-F09-01)
 - Product detail (PDP) với Ảnh Gallery, Variant Selector (2-tier), Bảng Attributes, Rich Text Description và JSON-LD schema (US-F09-01)
 - Cart drawer slide-in + localStorage persistence (US-F09-02)
-- Guest checkout đủ thông tin Shipping: name/email/phone/address line 1/city/state/postcode + Payment Method (COD, QR) (US-F09-03)
-- Bắt buộc Upload proof image (<2MB) nếu Payment Method là QR Banking (US-F09-03)
+- Guest checkout đủ thông tin Shipping: name/email/phone/address line 1/city/state/postcode + Payment Method (COD, Bank Transfer) (US-F09-03)
+- **[v2.2]** Bank Transfer: KHÔNG bắt buộc upload tại checkout (D-04 PD-018). Proof upload chuyển sang Post-Order page via magic link.
 - SST 6% calculation + Malaysian state dropdown (US-F09-03)
 - Shipping by state: West MY = RM 8, East MY = RM 15 (US-F09-03)
 - Order confirmation page (US-F09-04)
@@ -100,14 +101,17 @@ SO THAT tôi mua hàng và seller nhận được đơn
 | FR-03 | Product detail: image gallery, stock status, JSON-LD schema | US-F09-01 | P0 | |
 | FR-04 | Add to Cart → cart drawer slides in từ phải | US-F09-02 | P0 | |
 | FR-05 | Cart quantity controls (+/-), subtotal realtime, localStorage persist | US-F09-02 | P0 | |
-| FR-06 | Checkout form details: name*, email*, phone*, address line 1*, line 2, city*, state (MY)*, postcode*, Payment Method (COD, QR) | US-F09-03 | P0 | Stripe tạm ẩn |
-| FR-06.1 | Bắt buộc khách hàng upload receipt ảnh (<2MB, JPG/PNG) nếu chọn QR Banking | US-F09-03 | P0 | |
+| FR-06 | Checkout form details: name*, email*, phone*, address line 1*, line 2, city*, state (MY)*, postcode*, Payment Method (COD, Bank Transfer). Stripe Card/FPX qua F13. | US-F09-03 | P0 | |
+| ~~FR-06.1~~ | ~~Bắt buộc khách hàng upload receipt ảnh (<2MB, JPG/PNG) nếu chọn QR Banking~~ | ~~US-F09-03~~ | ~~P0~~ | **DEPRECATED v2.2 (D-04)** — upload moved post-order via magic link. F10 FR-14 → FR-16 handle. |
+| **FR-06.2** | **[v2.2]** Storefront checkout Bank Transfer option visibility tuân thủ tenant settings (`payment_bank_transfer` toggle ON + bank details complete). Nếu OFF → ẩn radio Bank Transfer. | US-F09-03 | P0 | Fix audit gap G-01 |
 | FR-07 | Guest checkout — không cần auth | US-F09-03 | P0 | |
 | FR-08 | SST 6% auto-calculated on subtotal | US-F09-03 | P0 | MY market |
 | FR-09 | Shipping: West MY = RM 8, East MY (Sabah/Sarawak) = RM 15 | US-F09-03 | P0 | MY market |
 | FR-10 | Place Order → order created, order number ORD-XXXXXXXX | US-F09-03 | P0 | |
 | FR-11 | Cart preserved nếu payment fail | US-F09-03 | P0 | |
-| FR-12 | Confirmation page: order number, items, total | US-F09-04 | P0 | |
+| FR-12 | Confirmation page: order number, items, total. Persistent route `/sites/[slug]/orders/[id]?token=...` (v2.2 — bookmark-able + share-able). | US-F09-04 | P0 | |
+| **FR-12.1** | **[v2.2] Confirmation page COD variant:** Headline "Order Received!" + delivery expectations + tracking placeholder. | US-F09-04 | P0 | D-09 unified template |
+| **FR-12.2** | **[v2.2] Confirmation page Bank Transfer variant** = Post-Order Upload page (F10 FR-16): Headline "Order Received! Awaiting Payment" + expiry timer + QR/STK + reference code + Upload Receipt button + anti-fraud warning. Đồng nhất route + token-based auth. | US-F09-04 | P0 | D-04 D-10 |
 | FR-13 | WhatsApp floating button (nếu store owner set phone) | US-F09-01 | P1 | MY market |
 | FR-14 | Trust signals footer: Halal badge, SSM number, payment icons | US-F09-01 | P1 | MY market |
 | FR-15 | **[Mobile]** PDP hỗ trợ Sticky Bottom Bar cho nút Add to Cart. | US-F09-05 | P1 | Conversion Booster |
@@ -153,6 +157,9 @@ Add to Cart → cart drawer slide in
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (PLP: Product List Page - Shop Page)
 - **Mô tả:** Màn hình khách hàng lướt xem danh sách sản phẩm.
 - **Components chính:**
@@ -161,31 +168,8 @@ Add to Cart → cart drawer slide in
   - Top Bar: Text "Hiển thị X kết quả", Nút Sort By Dropdown (Mới nhất, Giá tăng/giảm), Nút Grid/List view toggle.
   - Product Grid: Danh sách card sản phẩm (Ảnh, Tên, Giá, Badge Sale). Cấu trúc 3-col Desktop, 1-col Mobile.
   - Bottom Pagination: Phân trang `< [1] [2] [3] >`.
-- **Wireframe:**
-```text
-┌─ /sites/[slug]/shop/category/[category-slug] ──────────┐
-│ [Crumbs: Home > Fashion > Men > Shirts]                │
-│                                                        │
-│ ┌────────────────┐ ┌─────────────────────────────────┐ │
-│ │ CATEGORIES     │ │ [Sort by ▼] [View: ⊞ / ☰]       │ │
-│ │ ├ Fashion      │ │ ┌──────┐ ┌──────┐ ┌──────┐      │ │
-│ │ │ ├ Men        │ │ │ 📦   │ │ 📷   │ │ 📷   │      │ │
-│ │ │ │ └ Shirts   │ │ │ Nam  │ │ Nu   │ │ Polo │      │ │
-│ │ │ └ Women      │ │ │ RM29 │ │ RM49 │ │ RM19 │      │ │
-│ │ ├ F&B          │ │ └──────┘ └──────┘ └──────┘      │ │
-│ │ └ Beauty       │ │                                 │ │
-│ │                │ │ ┌──────┐ ┌──────┐ ┌──────┐      │ │
-│ │ FILTERS        │ │ │ 📦   │ │ 📷   │ │ 📷   │      │ │
-│ │ ├ Trắng [x]    │ │ │ Tee  │ │ Pant │ │ Hat  │      │ │
-│ │ ├ Size L [x]   │ │ │ RM39 │ │ RM89 │ │ RM59 │      │ │
-│ │ └ Price (RM)   │ │ └──────┘ └──────┘ └──────┘      │ │
-│ │   [0 - 50 ]    │ │                                 │ │
-│ └────────────────┘ │ <  [1]  [2]  [3]  >             │ │
-│                    │ (Tối đa 10 sản phẩm/trang)      │ │
-│                    └─────────────────────────────────┘ │
-│ Mobile: 1-col stack, Filter in Bottom Sheet            │
-└────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Chi tiết (PDP: Product Detail Page)
 - **Mô tả:** Xem chi tiết 1 sản phẩm cụ thể để bỏ vào giỏ hàng.
@@ -193,77 +177,13 @@ Add to Cart → cart drawer slide in
   - Gallery (Left): Ảnh vuông lớn, thumbnail strip bên dưới.
   - Thông tin (Right): Tên SP, Đánh giá, Giá (giá gạch ngang nếu sale), Các khối chọn Biến thể (Tier 1, Tier 2), Số lượng điều chỉnh (+/-), Nút siêu to "🛒 THÊM VÀO GIỎ / ADD TO CART".
   - Mô tả & Attributes (Bottom): Khối tab chuyển đổi Rich Text giới thiệu và Bảng thông số chi tiết (Key-Value attributes).
-- **Wireframe:**
-```text
-┌─ /sites/[slug]/product/[friendly-slug] ────────────────┐
-│ [Crumbs: Home > Fashion > Men > Shirts > Polo Black]   │
-│                                                        │
-│ ┌─────────────────┐ ┌────────────────────────────────┐ │
-│ │   [ MAIN IMG ]  │ │ Polo Black Nhập Khẩu           │ │
-│ │                 │ │ ⭐⭐⭐⭐⭐ 5.0 (20 Reviews)      │ │
-│ │                 │ │ RM 120.00                      │ │
-│ │                 │ │                                │ │
-│ │   [T1] [T2] [T3]│ │ Màu Sắc (Tier 1):              │ │
-│ │   (Gallery)     │ │ [ Đỏ ] [ Xanh (Out of stock)]  │ │
-│ │                 │ │ Kích cỡ (Tier 2):              │ │
-│ │                 │ │ [ S ] [ M ] [ L ]              │ │
-│ │                 │ │                                │ │
-│ │                 │ │ [-] 1 [+]   [ THÊM VÀO GIỎ ]   │ │
-│ └─────────────────┘ └────────────────────────────────┘ │
-│ ────────────────────────────────────────────────────── │
-│ ┌────────────────────────┐ ┌─────────────────────────┐ │
-│ │ MÔ TẢ SẢN PHẨM         │ │ THÔNG TIN CHI TIẾT      │ │
-│ │ Áo thun làm từ chất    │ │ ├ Thương hiệu: XYZ      │ │
-│ │ liệu cotton lụa...     │ │ ├ Xuất xứ: Vietnam      │ │
-│ │ [✨ AI Rich Text]     │ │ ├ Chất liệu: Cotton 100%│ │
-│ │                        │ │ (Hiển thị Attributes)   │ │
-│ └────────────────────────┘ └─────────────────────────┘ │
-└────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Storefront PLP / PDP & Cart)
 - **Mô tả:** Trải nghiệm mua sắm trên điện thoại của khách hàng, lưới 1 cột, Filter giấu vào Bottom Sheet, Giỏ hàng hiển thị toàn màn hình (Full Screen Drawer).
-- **Wireframe:**
-```text
-┌─ 📱 Mobile Shop (PLP) ──────────────────────┐
-│ [☰] Store Logo                 [🛒 2] │
-│ ─────────────────────────────────────────── │
-│ < Home / Fashion / Men                      │
-│                                             │
-│ [ 🔍 Search ]  [ ⧨ Sort ]  [ ⚙ Filters ]   │
-│ ─────────────────────────────────────────── │
-│ ┌────────────────────────┐                  │
-│ │ [ MAIN IMAGE ]         │                  │
-│ │ Polo Black Nhập Khẩu   │                  │
-│ │ RM 120.00              │                  │
-│ └────────────────────────┘                  │
-│ ┌────────────────────────┐                  │
-│ │ [ MAIN IMAGE ]         │                  │
-│ │ Áo Thun Basic Trắng    │                  │
-│ │ RM 89.00               │                  │
-│ └────────────────────────┘                  │
-│                                             │
-│                [ Load More ]                │
-└─────────────────────────────────────────────┘
-
-┌─ 📱 Mobile Cart Drawer ─────────────────────┐
-│ TÚI HÀNG (2)                           [✕] │
-│ ─────────────────────────────────────────── │
-│ ┌───┐ Polo Black               [ 🗑 ]     │
-│ │ 🖼️ │ Size L, Trắng                      │
-│ └───┘ [-] 1 [+]                  RM 120     │
-│                                             │
-│ ┌───┐ Cà Phê Hạt               [ 🗑 ]     │
-│ │ 🖼️ │ 500g                               │
-│ └───┘ [-] 2 [+]                  RM  60     │
-│ ─────────────────────────────────────────── │
-│ Chú ý: Miễn phí vận chuyển cho đơn > RM 150!│
-│ ─────────────────────────────────────────── │
-│ Tổng cộng:                           RM 180 │
-│                                             │
-│ [ THÀNH TOÁN AN TOÀN ]                      │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Empty State:** PLP (Shop) hiện icon túi giấy rỗng text "Không tìm thấy sản phẩm nào". Drawer Cart hiển thị text "Giỏ hàng trống, hãy mua sắm".
@@ -273,48 +193,14 @@ Add to Cart → cart drawer slide in
   - Cart Drawer: Slide từ phải (Right Screen Edge) đè lên nội dung, hỗ trợ +/- số lượng và Checkout button.
 
 ### 10.4. Màn hình Checkout & Cart Drawer
-- **Wireframe (Cart Drawer):**
-```text
-[Bên phải màn hình trượt ra]
-┌─ TÚI HÀNG (2) ────────[✕]┐
-│                          │
-│ ┌───┐ Polo Black Nhập  🗑│
-│ │ 🖼️ │ Size L, Trắng     │
-│ └───┘ [-] 1 [+]   RM 120 │
-│                          │
-│ ┌───┐ Cà Phê Hạt Nguyên🗑│
-│ │ 🖼️ │ 500g              │
-│ └───┘ [-] 2 [+]   RM  60 │
-│                          │
-│ ──────────────────────── │
-│ Tổng cộng:        RM 180 │
-│                          │
-│ [ THÀNH TOÁN ]           │
-└──────────────────────────┘
-```
+- **Design / Wireframe (Cart Drawer):**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
-- **Wireframe (Guest Checkout):**
-```text
-┌─ Checkout ───────────────────────────────────────────┐
-│ ┌─ THÔNG TIN GIAO HÀNG (Guest) ────────────────────┐ │
-│ │ Họ Tên: [_________________]  SĐT: [___________]  │ │
-│ │ Email:  [_________________]                      │ │
-│ │                                                  │ │
-│ │ Tỉnh/Bang: [ Selangor ▼ ]    Mã Bưu: [ 40000 ]   │ │
-│ │ Địa chỉ:   [_____________________________]       │ │
-│ └──────────────────────────────────────────────────┘ │
-│ ┌─ PHƯƠNG THỨC THANH TOÁN ─────────────────────────┐ │
-│ │ ( ) COD - Thanh toán khi nhận hàng               │ │
-│ │ (•) QR Banking                                   │ │
-│ │     [ 🖼 Upload Receipt (Bắt buộc) ]             │ │
-│ └──────────────────────────────────────────────────┘ │
-│ ──────────────────────────────────────────────────   │
-│ Tạm tính: RM 180.00 | Shipping: RM 8 | SST 6%: RM 10 │
-│ TỔNG CỘNG: RM 198.80           [ PLACE ORDER ]       │
-└──────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe (Guest Checkout):**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ---
+
 
 ## 11. Acceptance Criteria
 

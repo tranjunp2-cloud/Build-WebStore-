@@ -212,10 +212,12 @@ describe('otpVerificationEmail', () => {
         expect(result.html).toContain('lang="ms"')
     })
 
-    it('renders OTP code with spacing for readability (TC-F02.23)', () => {
+    it('renders OTP code with letter-spacing in the OTP span element (TC-F02.23)', () => {
         const result = otpVerificationEmail(baseData)
-        // OTP "377528" should be formatted as "3  7  7  5  2  8"
-        expect(result.html).toContain('3  7  7  5  2  8')
+        // Assert both OTP code and letter-spacing are within the SAME <span> element
+        expect(result.html).toMatch(
+            /<span[^>]*letter-spacing:\s*12px[^>]*>377528<\/span>/
+        )
     })
 
     it('includes security notice with amber styling', () => {
@@ -233,7 +235,9 @@ describe('otpVerificationEmail', () => {
 
     it('renders different OTP codes correctly', () => {
         const result = otpVerificationEmail({ ...baseData, otpCode: '000000' })
-        expect(result.html).toContain('0  0  0  0  0  0')
+        expect(result.html).toMatch(
+            /<span[^>]*letter-spacing:\s*12px[^>]*>000000<\/span>/
+        )
     })
 })
 

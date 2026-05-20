@@ -8,10 +8,9 @@ import { checkKeywordRank } from '@/lib/seo/rank-tracker'
 export async function GET(request: Request) {
     try {
         const authHeader = request.headers.get('authorization')
-        const VERCEL_CRON_SECRET = process.env.CRON_SECRET || 'dev-cron-secret'
-        
-        // Basic security check for cron endpoints
-        if (authHeader !== `Bearer ${VERCEL_CRON_SECRET}` && process.env.NODE_ENV === 'production') {
+        const CRON_SECRET = process.env.CRON_SECRET
+
+        if (process.env.NODE_ENV === 'production' && (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`)) {
             return new NextResponse('Unauthorized', { status: 401 })
         }
 
@@ -76,6 +75,6 @@ export async function GET(request: Request) {
         })
     } catch (error: any) {
         console.error('[SEO Cron Error]', error)
-        return NextResponse.json({ success: false, error: { message: error.message } }, { status: 500 })
+        return NextResponse.json({ success: false, error: { message: 'Keyword cron failed' } }, { status: 500 })
     }
 }

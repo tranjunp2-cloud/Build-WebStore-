@@ -1,0 +1,288 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { AIAction, BlockData } from '@/types/editor'
+import { useI18n } from '@/i18n'
+import { listAllBlocks } from '@/lib/admin/block-registry-reader'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useEditorStore, BLOCK_TYPE_TO_KEY } from '@/store/editorStore'
+
+// ── Category display config (i18n labels + icons, Malay) ──────────────────────
+
+const CATEGORY_DISPLAY: Record<string, { icon: string; label: string }> = {
+    basics:   { icon: '📦', label: 'Asas' },
+    content:  { icon: '📄', label: 'Kandungan' },
+    media:    { icon: '🖼️', label: 'Media' },
+    store:    { icon: '💼', label: 'Perniagaan' },
+    commerce: { icon: '🛒', label: 'Perdagangan' },
+    form:     { icon: '📝', label: 'Borang & Hubungi' },
+    widgets:  { icon: '🔧', label: 'Widget' },
+    layout:   { icon: '📐', label: 'Susun Atur' },
+}
+
+// Canonical display order — matches editor UX taxonomy
+const CATEGORY_ORDER = ['basics', 'content', 'media', 'store', 'commerce', 'form', 'widgets', 'layout'] as const
+
+// ── Icon overrides (slug → icon) ─────────────────────────────────────────────
+// Provides a curated icon experience for known blocks, overrides meta.icon
+
+const BLOCK_ICON_OVERRIDES: Record<string, string> = {
+    'custom-html': '🧱',
+    hero: '🎯',
+    gallery: '🖼️',
+    cta: '🔘',
+    socialWidget: '💬',
+    pricing: '💰',
+    'pricing-table': '📊',
+    'gallery-masonry': '🧱',
+    'whatsapp-button': '💬',
+    'google-maps': '📍',
+    'social-proof': '⭐',
+    'countdown-timer': '⏰',
+    'before-after': '🔄',
+    'feature-comparison': '📋',
+    'download-cta': '📥',
+    'video-background': '🎬',
+    breadcrumb: '🔗',
+    divider: '➖',
+    'announcement-bar': '📢',
+    'client-logos': '🏢',
+    accordion: '📂',
+    'step-process': '🔢',
+    'portfolio-grid': '💼',
+    'menu-food': '🍽️',
+    'service-cards': '🛠️',
+    carousel: '🎠',
+}
+
+interface BlockLibraryPanelProps {
+    blocks: BlockData[]
+    selectedBlock: number | null
+    onBlockSelect: (index: number) => void
+    onAIAction: (action: AIAction) => Promise<void> | void
+    onEditGlobalBlock?: (blockType: string) => void
+}
+
+export function BlockLibraryPanel({
+    blocks,
+    selectedBlock,
+    onAIAction,
+    onEditGlobalBlock,
+}: BlockLibraryPanelProps) {
+    const { t } = useI18n()
+    const bl = t.editor.blockLibrary
+    const categoryLabels = bl.categories as Record<string, string>
+    const blockTranslations = bl.blocks as Record<string, { name: string; description: string; scopeTooltip?: string }>
+    const [query, setQuery] = useState('')
+    const [expandedCategory, setExpandedCategory] = useState<string>('basics')
+
+    // Build visible categories from registry on every render cycle.
+    // listAllBlocks() is module-level cached (process lifetime), so this is O(n) array work only.
+    const allRegistryBlocks = listAllBlocks()
+    const visibleBlocks = allRegistryBlocks
+        .filter(b => b.aiVisible !== false)
+        .filter(b => !b.isSystem)
+        .filter(b => b.category !== 'archive')
+
+    // Group by category
+    const registryByCategory = new Map<string, typeof visibleBlocks>()
+    for (const b of visibleBlocks) {
+        const arr = registryByCategory.get(b.category) ?? []
+        arr.push(b)
+        registryByCategory.set(b.category, arr)
+    }
+
+    // Build ordered category list (only categories that have blocks)
+    const baseCategories = CATEGORY_ORDER
+        .filter(cat => registryByCategory.has(cat))
+        .map(cat => ({
+            id: cat,
+            icon: CATEGORY_DISPLAY[cat]?.icon ?? '📦',
+            // i18n label: prefer translated string from i18n system, fall back to Malay hardcode
+            label: categoryLabels[cat] || CATEGORY_DISPLAY[cat]?.label || cat,
+            blocks: registryByCategory.get(cat)!,
+        }))
+
+    const categories = useMemo(() => {
+        const keyword = query.trim().toLowerCase()
+
+        return baseCategories.map(category => {
+            const items = category.blocks.map(b => ({
+                type: b.slug,
+                name: blockTranslations?.[b.slug]?.name || b.name,
+                description: blockTranslations?.[b.slug]?.description || b.description,
+                icon: BLOCK_ICON_OVERRIDES[b.slug] || b.icon || '🧩',
+                defaultVariant: b.defaultVariant || b.variants?.[0] || 'default',
+                scope: b.scope ?? 'page',
+                scopeTooltip: blockTranslations?.[b.slug]?.scopeTooltip ?? b.scopeTooltip,
+            })).filter(item => {
+                if (!keyword) return true
+                return (
+                    item.name.toLowerCase().includes(keyword)
+                    || item.description.toLowerCase().includes(keyword)
+                    || item.type.toLowerCase().includes(keyword)
+                )
+            })
+
+            return {
+                ...category,
+                items,
+                totalCount: category.blocks.length,
+            }
+        }).filter(category => category.items.length > 0 || !query.trim())
+    }, [query, baseCategories, blockTranslations])
+
+    const globalBlocks = useEditorStore(state => state.globalBlocks)
+    const updateGlobalBlock = useEditorStore(state => state.updateGlobalBlock)
+
+    const handleAddBlock = (blockType: string, variant: string) => {
+        const key = BLOCK_TYPE_TO_KEY[blockType]
+        if (variant === 'floating' && key) {
+            // Floating global block → goes into site.globalBlocks, not page.layout
+            updateGlobalBlock(key, { blockType, variant: 'floating' })
+            return
+        }
+        const afterIndex = selectedBlock ?? (blocks.length - 1)
+        void onAIAction({
+            action: 'add_block',
+            afterIndex,
+            block: { blockType, variant },
+        })
+    }
+
+    return (
+        <TooltipProvider delayDuration={200}>
+        <div className="flex h-full flex-col bg-[#0F172A]">
+            <div className="border-b border-white/[0.06] px-4 py-3">
+                <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                    <input
+                        type="text"
+                        value={query}
+                        onChange={event => setQuery(event.target.value)}
+                        placeholder={bl.searchPlaceholder}
+                        className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] pl-9 pr-4 text-[13px] text-white placeholder:text-slate-500 outline-none transition-all focus:border-cyan-400/40 focus:bg-[#1E293B] focus:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]"
+                    />
+                </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                <div className="space-y-1">
+                    {categories.map(category => {
+                        const isExpanded = category.id === expandedCategory
+
+                        return (
+                            <section key={category.id}>
+                                <button
+                                    type="button"
+                                    onClick={() => setExpandedCategory(prev => (prev === category.id ? prev : category.id))}
+                                    className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-white/[0.04]"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm leading-none">{category.icon}</span>
+                                        <span className="text-[13px] font-medium text-slate-200">{category.label}</span>
+                                        <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{category.totalCount}</span>
+                                    </div>
+                                    {isExpanded ? (
+                                        <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+                                    ) : (
+                                        <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
+                                    )}
+                                </button>
+
+                                {isExpanded ? (
+                                    <div className="mt-1 space-y-1 pb-2">
+                                        {category.items.map(item => {
+                                            const globalKey = BLOCK_TYPE_TO_KEY[item.type]
+                                            const isAlreadyGlobal = item.scope === 'global' && item.defaultVariant === 'floating'
+                                                && !!globalKey && !!globalBlocks?.[globalKey]
+                                            return (
+                                            <Tooltip key={item.type} open={isAlreadyGlobal ? undefined : false}>
+                                            <TooltipTrigger asChild>
+                                            <button
+                                                type="button"
+                                                draggable={!isAlreadyGlobal}
+                                                onDragStart={(e) => {
+                                                    if (isAlreadyGlobal) { e.preventDefault(); return }
+                                                    const blockData = { blockType: item.type, variant: item.defaultVariant }
+                                                    e.dataTransfer.setData('application/json', JSON.stringify(blockData))
+                                                    e.dataTransfer.effectAllowed = 'copy'
+                                                }}
+                                                onClick={() => {
+                                                    if (isAlreadyGlobal) { onEditGlobalBlock?.(item.type) }
+                                                    else handleAddBlock(item.type, item.defaultVariant)
+                                                }}
+                                                className={cn(
+                                                    "group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all",
+                                                    isAlreadyGlobal
+                                                        ? "opacity-60 hover:border-white/[0.08] hover:bg-white/[0.06] cursor-pointer"
+                                                        : "hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]",
+                                                )}
+                                            >
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15 text-lg">
+                                                    {item.icon}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <p className="truncate text-[13px] font-medium text-slate-200">{item.name}</p>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                {item.scope === 'global' ? (
+                                                                    <span
+                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
+                                                                        style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}
+                                                                    >
+                                                                        🌐 {bl.globalScopeLabel}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span
+                                                                        className="shrink-0 cursor-default rounded px-1.5 py-0.5 text-[9px] font-semibold leading-none"
+                                                                        style={{ background: 'rgba(148,163,184,0.10)', color: '#94a3b8' }}
+                                                                    >
+                                                                        📄 {bl.pageScopeLabel}
+                                                                    </span>
+                                                                )}
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="right">
+                                                                {item.scope === 'global'
+                                                                    ? (item.scopeTooltip ?? bl.globalScopeTooltipDefault)
+                                                                    : (item.scopeTooltip ?? bl.pageScopeTooltipDefault)}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </div>
+                                                    <p className="truncate text-[11px] text-slate-500">{item.description}</p>
+                                                </div>
+                                                {!isAlreadyGlobal && (
+                                                    <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
+                                                        {bl.dragHint}
+                                                    </span>
+                                                )}
+                                            </button>
+                                            </TooltipTrigger>
+                                            {isAlreadyGlobal && (
+                                                <TooltipContent side="right">
+                                                    {bl.alreadyAddedHint ?? 'Already added — click to edit settings'}
+                                                </TooltipContent>
+                                            )}
+                                            </Tooltip>
+                                            )
+                                        })}
+                                    </div>
+                                ) : null}
+                            </section>
+                        )
+                    })}
+                </div>
+            </div>
+
+            <div className="border-t border-white/[0.06] bg-[#0B1120]/60 px-4 py-3">
+                <p className="text-center text-[11px] text-slate-500">
+                    {bl.footerHint}
+                </p>
+            </div>
+        </div>
+        </TooltipProvider>
+    )
+}

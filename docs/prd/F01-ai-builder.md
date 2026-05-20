@@ -116,7 +116,7 @@ SO THAT AI tạo đầy đủ website phù hợp và chính xác
 | FR-12 | User can regenerate any AI image | US-F01-03 | P1 | |
 | FR-13 | One-click publish to {slug}.primeweb.app in < 30s | US-F01-04 | P0 | |
 | FR-14 | Unpublish: site returns 404 | US-F01-04 | P0 | |
-| FR-15 | Rate limit: Free tier = 1 generation total | US-F01-01 | P0 | Ref: SPEC §7.3 |
+| FR-15 | Rate limit: Tất cả gói chỉ được generate 1 site duy nhất. Lỗi → cho retry, không tính quota. Thành công → ẩn builder. | US-F01-01 | P0 | Áp dụng mọi gói (freemium/starter/standard/professional). Chưa có rate limits khác nhau giữa các gói. |
 | FR-16 | Site content generated in user's input language (BM / VI / EN) | US-F01-06 | P0 | Fallback to EN if language unsupported |
 | FR-17 | Generated site must include 4 pages: Homepage, About, Products, Contact | US-F01-01 | P0 | Nav menu links to all 4 |
 | FR-18 | Layout selected based on business category parsed from input | US-F01-01 | P0 | Color, font, block order per category |
@@ -142,6 +142,12 @@ SO THAT AI tạo đầy đủ website phù hợp và chính xác
 - **BR-07 (Quota Protection):** Nếu quá trình generate thất bại do server/API (timeout), User KHÔNG bị trừ credit/quota 
 - **BR-08 (Language Detection):** Hệ thống tự động nhận diện ngôn ngữ từ form input để tạo content phù hợp
 - **BR-09 (Data Retention):** Các site ở trạng thái Draft sẽ bị cronjob (Payload CMS) xóa sau 30 ngày để dọn rác DB
+- **BR-10 (SSO Status Block):** Nếu workspace đang ở trạng thái `suspended` (inactivated) hoặc `terminated`:
+  - KHÔNG cho phép generate site mới (block trước khi gọi AI API).
+  - KHÔNG cho phép publish website.
+  - KHÔNG cho phép truy cập editor.
+  - Hiển thị thông báo: "Tài khoản của bạn đang bị tạm khóa/đã bị xóa. Vui lòng liên hệ nhà cung cấp dịch vụ."
+- **BR-11 (Terminated → Auto Unpublish):** Khi workspace chuyển sang trạng thái `terminated`, hệ thống tự động unpublish tất cả website của workspace đó. URL `{slug}.primeweb.app` trả về 404.
 
 ---
 
@@ -149,6 +155,11 @@ SO THAT AI tạo đầy đủ website phù hợp và chính xác
 
 ```text
 /builder/new (đã xác thực - authenticated)
+  ↓
+Hệ thống check workspace status:
+  ├── suspended → hiển thị "Tài khoản đang bị tạm khóa" → DỪNG
+  ├── terminated → hiển thị "Tài khoản đã bị xóa" → DỪNG
+  └── active → tiếp tục
   ↓
 User điền thông tin vào Form (Tên doanh nghiệp, Lĩnh vực, Mô tả, Dịch vụ)
   ↓
@@ -174,45 +185,17 @@ User click "Tạo Website"
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Builder Screen)
 - **Mô tả:** Màn hình chính cho phép user nhập form để AI generate website và xem live preview.
 - **Components chính:**
   - Form Panel (Left): [Các trường input Tên DN, Lĩnh vực, Mô tả, Dịch vụ, Nút Generate]
   - Live Preview (Right): [Hiển thị website được generate block-by-block dạng iframe, thao tác drag-and-drop]
-- **Wireframe:**
-```text
-┌─ /builder/new ─────────────────────────────────────────┐
-│  ┌──────────────┐          ┌──────────────────────┐    │
-│  │  FORM PANEL  │          │    LIVE PREVIEW       │    │
-│  │  (380px)     │          │    (remaining width)  │    │
-│  │ [Tên DN]     │          │  [skeleton loading]   │    │
-│  │ [Lĩnh vực]   │  ──→     │  Nav → Hero → About   │    │
-│  │ [Mô tả]      │          │  → Contact → Footer   │    │
-│  │ [Dịch vụ]    │          │                       │    │
-│  │ [Generate]   │          │                       │    │
-│  │              │          │  Draft badge          │    │
-│  │              │          │                       │    │
-│  └──────────────┘          └──────────────────────┘    │
-└─────────────────────────────────────────────────────────┘
-
-**Wireframe Mobile (< 768px): Vertical Form & Immersive Preview**
-```text
-┌─ 📱 Mobile Browser ─────────┐  ┌─ 📱 Immersive Preview ──────┐
-│ [≡] Builder                 │  │           [Hero]            │
-│ ─────────────────────────── │  │          PrimeWeb           │
-│ Tên Doanh Nghiệp:           │  │                             │
-│ [ _______________________ ] │  │         [Features]          │
-│ Ngành nghề / Lĩnh vực:      │  │       - Feature 1           │
-│ [F&B] [Retail] [Beauty] ▾ │  │       - Feature 2           │
-│ Mô tả ngắn:                 │  │                             │
-│ [                         ] │  │                             │
-│ [ _______________________ ] │  │      ╭────────────────╮     │
-│                             │  │      │ ⏳ Đang tạo...  │     │
-│ ─────────────────────────── │  │      ╰────────────────╯     │
-│        [✨ Tạo Website]      │  │                             │
-└─────────────────────────────┘  └─────────────────────────────┘
-  (Nút bấm Sticky dưới cùng)      (Chỉ hiện Live Site + Progress)
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]text
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Các trạng thái UI (UI States) & Modals
 - **Empty State:** Form sạch sẽ với placeholder rõ ràng. Banner preview trống.
@@ -222,37 +205,14 @@ User click "Tạo Website"
 
 **Wireframe Mobile Reorder Mode (< 768px):**
 ```text
-┌─ 📱 Mobile Browser ─────────┐
-│ [X Đóng] Sắp xếp bố cục     │
-│ ─────────────────────────── │
-│  [ Header (Cố định)     ] 🔒│
-│                             │
-│  [ Hero Banner          ] ≡ │
-│                             │
-│  [ About Us             ] ≡ │  ← Kéo thả thẻ (Card List) thay 
-│                             │     vì kéo cả khối Iframe to    
-│  [ Products & Services  ] ≡ │
-│                             │
-│  [ Footer (Cố định)     ] 🔒│
-│ ─────────────────────────── │
-│        [✓ Hoàn tất]         │
-└─────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 **Wireframe Success Modal:**
 ```text
-┌─────────────────────────────────┐
-│ ✨ Website Generated!           │
-│                                 │
-│ Your website is now live at:    │
-│ 🌐 my-bakery.primeweb.app [Copy]│
-│                                 │
-│ [ Go to Admin Dashboard ]       │
-│ [ Edit in Advanced Mode ]       │
-└─────────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ---
+
 
 ## 11. Acceptance Criteria
 
@@ -316,7 +276,7 @@ POST /api/ai/generate-site → text/event-stream (SSE)
 Request: { businessName: string, industry: string, description: string, services: string, siteId: string }
 Response: SSE stream (step | block_complete | theme_set | seo_generated | error | done)
 Auth: Bearer JWT (required)
-Rate Limit: Free=1 total, Starter=5/mo, Pro=20/mo, Business=unlimited
+Rate Limit: Tất cả gói = 1 lần duy nhất (thành công → ẩn builder, lỗi → cho retry). Chưa có rate limits khác nhau giữa các gói.
 ```
 
 ---
@@ -325,9 +285,9 @@ Rate Limit: Free=1 total, Starter=5/mo, Pro=20/mo, Business=unlimited
 
 | # | Question | Owner | Status |
 |---|----------|-------|--------|
-| 1 | Rate limit Free tier (1 generation total) có thể gây friction cho user demo/test — có cần sandbox mode không? | PO | ⬜ Open |
+| 1 | Tất cả gói chỉ gen 1 lần — có cần sandbox mode cho demo/test không? | PO | ⬜ Open |
 | 2 | AI image generation (DALL-E) cost per call có được track riêng theo tenant không? | Tech Lead | ⬜ Open |
-| 3 | Sau khi generate xong, user có thể re-generate toàn bộ site (xóa cũ, tạo lại) hay chỉ edit từng section? | BA | ⬜ Open |
+| 3 | ~~Sau khi generate xong, user có thể re-generate toàn bộ site?~~ | BA | ✅ Resolved — Không. Tất cả gói chỉ gen 1 lần. Lỗi → retry. Thành công → chỉ edit, không gen lại. |
 | 4 | Mobile preview toggle ([📝 Form] [👁 Preview]) — Preview có cần hiển thị realtime update hay chỉ show kết quả cuối? | Design | ⬜ Open |
 
 ---
@@ -354,7 +314,7 @@ Rate Limit: Free=1 total, Starter=5/mo, Pro=20/mo, Business=unlimited
 - [ ] FR ở Section 7 có đầy đủ Story Ref
 - [ ] Architecture diagrams updated to match Form Panel (`docs/architecture/F01-ai-builder.md`)
 - [ ] API contract defined (SSE streaming endpoint)
-- [ ] Rate limit tiers confirmed với Business
+- [x] Rate limit: đã chốt tất cả gói chỉ gen 1 lần. Chưa có rate limits khác nhau giữa các gói (freemium/starter/standard/professional).
 - [ ] AI image fallback strategy confirmed với Dev
 
 ---

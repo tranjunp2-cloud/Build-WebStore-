@@ -25,6 +25,8 @@ interface PageAnalysis {
     slug: string
     score: number
     issues: SEOIssue[]
+    currentMetaTitle?: string
+    currentMetaDescription?: string
 }
 
 function analysePage(page: any, siteSEO: any): PageAnalysis {
@@ -95,6 +97,8 @@ function analysePage(page: any, siteSEO: any): PageAnalysis {
         slug: page.slug || '/',
         score,
         issues,
+        currentMetaTitle: metaTitle || undefined,
+        currentMetaDescription: metaDesc || undefined,
     }
 }
 
@@ -164,7 +168,7 @@ export const POST = withAuth(async (_user, request) => {
     } catch (error: any) {
         console.error('[SEO Analyze Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'SEO analysis failed' } },
             { status: 500 }
         )
     }

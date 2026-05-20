@@ -1,0 +1,86 @@
+name: "✨ Feature Request"
+description: "Yeu cau tinh nang moi hoac cai tien tinh nang hien tai"
+labels: ["enhancement"]
+body:
+  - type: input
+    id: story-id
+    attributes:
+      label: "Story ID (neu co)"
+      description: "US-FXX-YY hoac link PRD"
+      placeholder: "US-F01-03"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Muc do uu tien"
+      options:
+        - P0 — Blocker (can cho release)
+        - P1 — High (sprint hien tai)
+        - P2 — Medium (sprint sau)
+        - P3 — Low (backlog)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Mo ta tinh nang"
+      description: "User muon gi? Tai sao can?"
+      placeholder: |
+        AS A [user role]
+        I WANT TO [action]
+        SO THAT [benefit]
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: "Acceptance Criteria"
+      description: "Dieu kien de tinh nang duoc chap nhan"
+      placeholder: |
+        - [ ] AC-01: ...
+        - [ ] AC-02: ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: design
+    attributes:
+      label: "Design / Wireframe"
+      description: "Screenshot, Figma link, hoac mo ta UI"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: "Pham vi"
+      options:
+        - Frontend only
+        - Backend only
+        - Full-stack
+        - Database change
+        - CI/CD
+    validations:
+      required: true
+
+  - type: input
+    id: start-date
+    attributes:
+      label: "Start Date"
+      description: "Ngay bat dau (YYYY-MM-DD)"
+      placeholder: "2026-04-09"
+    validations:
+      required: false
+
+  - type: input
+    id: end-date
+    attributes:
+      label: "End Date"
+      description: "Ngay ket thuc / Deadline (YYYY-MM-DD)"
+      placeholder: "2026-04-16"
+    validations:
+      required: false

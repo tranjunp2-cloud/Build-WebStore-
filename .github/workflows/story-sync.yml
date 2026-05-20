@@ -8,6 +8,10 @@ on:
       - 'docs/stories/**'
   workflow_dispatch: # Manual trigger for initial sync
 
+concurrency:
+  group: story-sync
+  cancel-in-progress: false
+
 jobs:
   sync-stories:
     name: 'Sync: Stories → Issues'
@@ -202,16 +206,13 @@ jobs:
               if (story.size) labels.push(`size:${story.size}`);
               if (story.featureId) labels.push(`feature:${story.featureId}`);
 
-              // Search for existing issue
-              const { data: searchResults } = await github.rest.issues.listForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: 'all',
-                labels: 'user-story',
-                per_page: 100,
+              // Search for existing issue using Search API (reliable across ALL issues)
+              const { data: searchResults } = await github.rest.search.issuesAndPullRequests({
+                q: `repo:${context.repo.owner}/${context.repo.repo} is:issue in:title "${titlePrefix}"`,
+                per_page: 5,
               });
 
-              const existing = searchResults.find(i => i.title.startsWith(titlePrefix));
+              const existing = searchResults.items.find(i => i.title.startsWith(titlePrefix));
 
               if (existing) {
                 // Update existing issue

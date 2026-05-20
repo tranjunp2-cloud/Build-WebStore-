@@ -18,6 +18,7 @@ export function OrderStatusBadge({
     const o = t.dashboard.orders
     const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending
     const loading = isUpdating === true || isUpdating === order.id
+    const [isOpen, setIsOpen] = useState(false)
 
     // Status key mapping for i18n
     const statusKeyMap: Record<string, keyof typeof o.status> = {
@@ -57,8 +58,6 @@ export function OrderStatusBadge({
             </span>
         )
     }
-
-    const [isOpen, setIsOpen] = useState(false)
 
     return (
         <div className="relative inline-block text-left">

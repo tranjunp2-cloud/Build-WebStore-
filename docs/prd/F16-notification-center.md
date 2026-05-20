@@ -27,7 +27,7 @@
 | US-F16-02 | Xem danh sách thông báo (Notification Dropdown) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 | US-F16-03 | Chuyển hướng khi click thông báo (Actionable Links) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 | US-F16-04 | Đánh dấu "Đã đọc" (Mark all as read) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
-| US-F16-05 | Nhận nhận thông báo từ Ban Quản Trị Hệ Thống (Global Broadcasts) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
+| US-F16-05 | Nhận thông báo từ Ban Quản Trị Hệ Thống (Global Broadcasts) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 | US-F16-06 | Hiển thị Live Popup góc dưới chuông thông báo (In-app Toast/Popup) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 | US-F16-07 | Nhận thông báo qua Trình duyêt Desktop (Browser Push Notifications) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 | US-F16-08 | Mobile Web UX — Touch-friendly Notification Hub | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
@@ -150,12 +150,15 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình Dropdown / Drawer (Danh sách thông báo)
 - **Mô tả:** Màn hình popup list khi click vào biểu tượng chuông.
 - **Components chính:**
   - Header: Tiêu đề "Notifications" và nút "Mark all as read".
   - List View: Danh sách các item thông báo (Title, Nội dung ngắn, Icon tròn, Timestamp). Item chưa đọc có chấm xanh hoặc in đậm.
-- **Wireframe:**
+- **Design / Wireframe:**
 ```text
 [Header Navigation]
   Logo    |   Search                          |   [🔔 (3)]   UserAvatar
@@ -190,36 +193,15 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
                                                            (Live Popup Corner)
 ```
   - Native Push Notification:
-```text
-┌──────────────────────────────────────────────┐
-│ 🔔 [PrimeWeb] - System                       │
-│ 📦 Đơn hàng mới: ORD-1025                   │
-│ Khách hàng Aisha vừa đặt Baju Kurung.       │
-└──────────────────────────────────────────────┘
-```
+  - [Thiết kế & Wireframe chi tiết xem tại `docs/design/F16-notification-center-design.md`](../design/F16-notification-center-design.md)
 
 ### 10.3. Mobile View (Full-screen Drawer / Bottom Sheet)
 - **Mô tả:** Trên mobile (<768px), Dropdown list không đủ chỗ hiển thị. Giao diện trở thành một cửa sổ trượt từ dưới lên (Bottom Sheet) hoặc Full-screen phủ hết toàn màn hình đễ dễ bấm ngón tay.
-- **Wireframe:**
-```text
-┌─ Mobile Screen ───────────────┐
-│ Notifications           [ X ] │
-│ ───────────────────────────── │
-│                  [Mark Read]  │
-│                               │
-│ [🔵] 📦 New Order #1024       │
-│      RM 150.00 • 2 mins ago   │
-│ ───────────────────────────── │
-│ [🔵] 📢 System Maintenance    │
-│      Downtime at 2AM • 1 hr   │
-│ ───────────────────────────── │
-│ [ ]  📦 New Order #1023       │
-│      RM 80.00 • 5 hours ago   │
-│                               │
-└───────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Thiết kế & Wireframe chi tiết xem tại `docs/design/F16-notification-center-design.md`](../design/F16-notification-center-design.md)
 
 ---
+
 
 ## 11. Acceptance Criteria
 
@@ -318,6 +300,54 @@ THEN  một Native Push Notification của hệ điều hành Desktop xuất hi�
   AND khi User click vào thông báo đó, trình duyệt tự động focus về tab Antigravity và di chuyển đến trang nội dung tương ứng (VD: trang Chi tiết Order).
 ```
 
+### AC-10: Thông tin hiển thị của mỗi Item
+> 📌 Source: [US-F16-02](../stories/F16-notification-center-stories.md) — AC-2
+
+```gherkin
+GIVEN hiển thị list thông báo
+WHEN  User nhìn vào một notification item
+THEN  phải thấy các thông tin: Icon phân loại (Ví dụ: Giỏ hàng cho Order, Loa cho System), Tiêu đề, Nội dung tóm tắt, Thời gian (Ví dụ: 5 mins ago, 2 hours ago).
+```
+
+### AC-11: Thông báo không có liên kết điều hướng
+> 📌 Source: [US-F16-03](../stories/F16-notification-center-stories.md) — AC-2
+
+```gherkin
+GIVEN User nhìn thấy thông báo dạng "System Maintenance" (không có link cụ thể)
+WHEN  User click vào thông báo
+THEN  thông báo chuyển thành "Đã đọc"
+  AND dropdown được đóng lại (hoặc giữ nguyên tuỳ UX) nhưng không redirect đi đâu
+```
+
+### AC-12: Tích hợp với F15 Admin Broadcast
+> 📌 Source: [US-F16-05](../stories/F16-notification-center-stories.md) — AC-1
+
+```gherkin
+GIVEN Admin hệ thống đẩy 1 thông báo Global "Bảo trì lúc 2h sáng" (F16)
+WHEN  Owner đang hoạt động trên hệ thống
+THEN  họ sẽ nhận được 1 thông báo vào Notification Center (kèm unread count +1)
+  AND thông báo có tag/icon riêng biệt (System/Announcement)
+```
+
+### AC-13: Full-Screen or Bottom Sheet Hub
+> 📌 Source: [US-F16-08](../stories/F16-notification-center-stories.md) — AC-1
+
+```gherkin
+GIVEN a user is on a mobile device (< 768px)
+WHEN  they tap the Notification Bell icon
+THEN  instead of a floating dropdown, a Full-Screen Drawer or Bottom Sheet opens up
+  AND the notification items are rendered with large touch targets (≥ 44px height)
+```
+
+### AC-14: Prominent "Mark All as Read"
+> 📌 Source: [US-F16-08](../stories/F16-notification-center-stories.md) — AC-2
+
+```gherkin
+GIVEN the mobile notification drawer is open
+WHEN  the user wants to clear their notifications
+THEN  the "Mark all as read" button is prominently displayed at the top or bottom sticky bar, making it easy to tap with one thumb
+```
+
 ---
 
 ## 12. Non-Functional Requirements
@@ -414,7 +444,7 @@ Response: { success: true }
 - [x] AC ở Section 11 đã được copy từ story file
 - [x] FR ở Section 7 có đầy đủ Story Ref
 - [x] Architecture doc exists (`docs/architecture/F16-notification-center.md`)
-- [ ] API contract defined
+- [x] API contract defined
 - [ ] Dependencies confirmed
 - [ ] Business Rules confirmed với PO
 - [ ] Open Questions resolved

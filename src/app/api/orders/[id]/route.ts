@@ -5,6 +5,14 @@ import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderStatusUpdateSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
+import { orderStatusEmail } from '@/lib/email/templates/order-status'
+
+// Map order workflow statuses to email template statuses
+const STATUS_EMAIL_MAP: Record<string, 'processing' | 'shipped' | 'cancelled'> = {
+    confirmed: 'processing',
+    shipped: 'shipped',
+    cancelled: 'cancelled',
+}
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -55,18 +63,20 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             )
         }
 
-        // Build update data
-        const updateData: any = { status: newStatus }
-        if (trackingNumber) updateData.trackingNumber = trackingNumber
-        if (notes) updateData.notes = notes
-
-        // If shipping, require tracking number
-        if (newStatus === 'shipped' && !trackingNumber && !order.trackingNumber) {
+        // Tracking number required when transitioning to shipped
+        if (newStatus === 'shipped' && !trackingNumber) {
             return NextResponse.json(
                 { success: false, error: { code: 'VALIDATION_ERROR', message: 'Tracking number is required when shipping' } },
                 { status: 422 }
             )
         }
+
+        // Build update data
+        const updateData: any = { status: newStatus }
+        if (trackingNumber) updateData.trackingNumber = trackingNumber
+        if (notes) updateData.notes = notes
+
+
 
         const updated = await payload.update({
             collection: 'orders',
@@ -76,17 +86,36 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             overrideAccess: false,
         })
 
-        // TODO: Send email notification based on status change
-        // (confirmed → confirmation email, shipped → shipped email, cancelled → cancellation email)
+        // Fire-and-forget status update email to customer
+        const emailStatus = STATUS_EMAIL_MAP[newStatus]
+        if (emailStatus && order.customerEmail) {
+            const emailPayload = orderStatusEmail({
+                customerName: order.customerName as string,
+                orderNumber: order.orderNumber as string,
+                status: emailStatus,
+                trackingNumber: trackingNumber ?? (order.trackingNumber as string | undefined),
+            })
+            payload.sendEmail({
+                to: order.customerEmail as string,
+                subject: emailPayload.subject,
+                html: emailPayload.html,
+            }).catch((err) => payload.logger.error({ err, orderId: id, status: newStatus }, '[order-update] sendEmail failed'))
+        }
 
         return NextResponse.json({
             success: true,
             data: updated,
         })
     } catch (error: any) {
+        if (error?.status === 404 || error?.name === 'NotFound') {
+            return NextResponse.json(
+                { success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } },
+                { status: 404 }
+            )
+        }
         console.error('[Order Update Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order operation failed' } },
             { status: 500 }
         )
     }
@@ -119,9 +148,15 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
 
         return NextResponse.json({ success: true, data: order })
     } catch (error: any) {
+        if (error?.status === 404 || error?.name === 'NotFound') {
+            return NextResponse.json(
+                { success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } },
+                { status: 404 }
+            )
+        }
         console.error('[Order Detail Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order operation failed' } },
             { status: 500 }
         )
     }

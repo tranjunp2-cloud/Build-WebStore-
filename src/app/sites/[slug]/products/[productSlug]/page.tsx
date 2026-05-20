@@ -1,10 +1,20 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { AddToCartButton } from '@/components/storefront/AddToCartButton'
+import { ProductVariantSelector } from '@/components/storefront/ProductVariantSelector'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
+import { TrackingManager } from '@/components/site-renderer/TrackingManager'
+import { getCurrentUser } from '@/lib/auth'
+import type { TenantMembership } from '@/lib/normalize-tenants'
+import { getServerI18n } from '@/i18n/server'
+import { SiteLayoutShell } from '@/components/site-renderer/SiteLayoutShell'
+import { getSiteBasePath } from '@/lib/site-base-path'
+import type { NavPage, SiteRendererProps } from '@/components/site-renderer/SiteRenderer'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -13,7 +23,7 @@ type Props = {
     params: Promise<{ slug: string; productSlug: string }>
 }
 
-async function getProductData(slug: string, productSlug: string) {
+const getProductData = cache(async function getProductData(slug: string, productSlug: string) {
     const payload = await getPayload({ config })
 
     const tenantsResult = await payload.find({
@@ -52,8 +62,21 @@ async function getProductData(slug: string, productSlug: string) {
     const product = productsResult.docs[0]
     if (!product) return null
 
-    return { tenant, site, product }
-}
+    // Fetch nav pages for SiteLayoutShell header/footer URL rewriting
+    const pagesResult = await payload.find({
+        collection: 'pages',
+        where: {
+            and: [
+                { site: { equals: site.id } },
+                { deletedAt: { exists: false } },
+            ],
+        },
+        limit: 100,
+        sort: 'createdAt',
+    })
+
+    return { tenant, site, product, pages: pagesResult.docs }
+})
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, productSlug } = await params
@@ -65,13 +88,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = (product as any).seo?.description || (product as any).shortDescription || `Buy ${product.name} from ${site.name}`
     const ogImage = (product as any).images?.[0]?.image?.url
 
+    // BUG-F05-020: Resolve canonical URL for product pages
+    const reqHeaders = await headers()
+    const tenantHostname = reqHeaders.get('x-tenant-hostname')
+    const tenantSlug = reqHeaders.get('x-tenant-slug')
+    const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+
+    let baseUrl: string
+    if (tenantHostname) {
+        baseUrl = `https://${tenantHostname}`
+    } else if (tenantSlug) {
+        baseUrl = `https://${tenantSlug}.${PLATFORM_DOMAIN}`
+    } else if (slug !== 'custom') {
+        baseUrl = `https://${slug}.${PLATFORM_DOMAIN}`
+    } else {
+        baseUrl = ''
+    }
+    const canonical = baseUrl ? `${baseUrl}/products/${productSlug}` : undefined
+
     return {
         title,
         description,
+        alternates: canonical ? { canonical } : undefined,
         openGraph: {
             title,
             description,
             type: 'website',
+            ...(canonical ? { url: canonical } : {}),
             ...(ogImage && { images: [{ url: ogImage }] }),
         },
     }
@@ -89,14 +132,52 @@ export default async function ProductDetailPage({ params }: Props) {
 
     if (!data) notFound()
 
-    const { site, product } = data
-    const p = product as any
-    const primaryColor = (site.theme as any)?.primaryColor || '#0ea5e9'
+    const { t } = await getServerI18n()
+    const { tenant, site, product, pages } = data
+
+    interface ProductView {
+        id: string | number
+        slug: string
+        name: string
+        price: number
+        compareAtPrice?: number
+        currency?: string
+        inventory: number
+        sku?: string
+        shortDescription?: string
+        category?: { id: string; name: string; breadcrumbs?: string }
+        attributes?: Array<{ key: string; value: string }>
+        images?: Array<{ image?: { url: string }; alt?: string }>
+        seo?: { title?: string; description?: string }
+        // Variants (US-F08-02)
+        hasVariants?: boolean
+        variants?: Array<{
+            name: string
+            price: number
+            compareAtPrice?: number | null
+            stock: number
+        }>
+    }
+
+    const p = product as ProductView
+    const primaryColor = (site.theme as { primaryColor?: string } | undefined)?.primaryColor || '#0ea5e9'
+
+    const user = await getCurrentUser()
+    const isOwner = !!user && (user.tenants?.map((t: TenantMembership) =>
+        typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+    ) ?? []).includes(String(tenant.id))
+
     const images = p.images || []
     const hasDiscount = p.compareAtPrice && p.compareAtPrice > p.price
-    const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice) * 100) : 0
+    const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice!) * 100) : 0
+    const attributes = p.attributes || []
 
-    // JSON-LD Product schema
+    const additionalProperty = attributes.map((attr: any) => ({
+        '@type': 'PropertyValue',
+        name: attr.key,
+        value: attr.value,
+    }))
+
     const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'Product',
@@ -110,151 +191,180 @@ export default async function ProductDetailPage({ params }: Props) {
             priceCurrency: p.currency || 'MYR',
             availability: p.inventory > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
         },
+        ...(additionalProperty.length > 0 && { additionalProperty }),
     }
 
+    const base = await getSiteBasePath(slug)
+    const siteWithContext = { ...site, tenantSlug: slug, siteBasePath: base }
+
     return (
-        <>
+        <SiteLayoutShell
+            site={siteWithContext as SiteRendererProps['site']}
+            pages={pages as unknown as NavPage[]}
+            isOwner={isOwner}
+        >
+            <TrackingManager siteId={String(site.id)} isOwner={isOwner} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+            <style>{`
+                .pd-breadcrumb { padding: 16px 32px; }
+                .pd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; padding: 0 32px 64px; max-width: 1200px; margin: 0 auto; }
+                @media (max-width: 768px) {
+                    .pd-breadcrumb { padding: 12px 16px; }
+                    .pd-grid { grid-template-columns: 1fr; gap: 24px; padding: 0 16px 48px; }
+                }
+            `}</style>
 
-            <div style={{ fontFamily: `${(site.theme as any)?.fontBody || 'Inter'}, sans-serif` }}>
-                {/* Nav */}
-                <nav style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '16px 32px', borderBottom: '1px solid #eee',
-                }}>
-                    <Link href={`/sites/${slug}`} style={{
-                        fontSize: '20px', fontWeight: 700, textDecoration: 'none', color: '#111',
-                        fontFamily: `${(site.theme as any)?.fontHeading || 'Outfit'}, sans-serif`,
+            {/* Breadcrumb */}
+            <div className="pd-breadcrumb" style={{ fontSize: '13px', color: 'var(--text-muted, #999)', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                <Link href={`${base}/products`} style={{ color: primaryColor, textDecoration: 'none' }}>Products</Link>
+                <span style={{ margin: '0 4px' }}>/</span>
+                {p.category && typeof p.category === 'object' && p.category.breadcrumbs && (
+                    <>
+                        {p.category.breadcrumbs.split(' > ').map((crumb: string, i: number) => (
+                            <span key={i} style={{ display: 'flex', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>{crumb}</span>
+                                <span style={{ margin: '0 8px' }}>/</span>
+                            </span>
+                        ))}
+                    </>
+                )}
+                <span style={{ color: 'var(--text)', fontWeight: 500 }}>{p.name}</span>
+            </div>
+
+            {/* Product Detail */}
+            <div className="pd-grid">
+                {/* Images */}
+                <div>
+                    <div style={{
+                        borderRadius: '16px', overflow: 'hidden', background: 'var(--surface, #f8f8f8)',
+                        aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                        {site.name}
-                    </Link>
-                    <div style={{ display: 'flex', gap: '24px', fontSize: '14px' }}>
-                        <Link href={`/sites/${slug}`} style={{ color: '#666', textDecoration: 'none' }}>Home</Link>
-                        <Link href={`/sites/${slug}/products`} style={{ color: '#666', textDecoration: 'none' }}>Products</Link>
+                        {images[0]?.image?.url ? (
+                            <img src={images[0].image.url} alt={images[0].alt || p.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            <span style={{ fontSize: '80px', opacity: 0.15 }}>📦</span>
+                        )}
                     </div>
-                </nav>
 
-                {/* Breadcrumb */}
-                <div style={{ padding: '16px 32px', fontSize: '13px', color: '#999', maxWidth: '1200px', margin: '0 auto' }}>
-                    <Link href={`/sites/${slug}/products`} style={{ color: primaryColor, textDecoration: 'none' }}>Products</Link>
-                    <span style={{ margin: '0 8px' }}>/</span>
-                    <span>{p.name}</span>
+                    {images.length > 1 && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                            {images.slice(0, 5).map((img: any, i: number) => (
+                                <div key={i} style={{
+                                    width: '64px', height: '64px', borderRadius: '8px', overflow: 'hidden',
+                                    border: i === 0 ? `2px solid ${primaryColor}` : '1px solid rgba(var(--brand-primary-rgb), 0.125)',
+                                }}>
+                                    {img.image?.url && (
+                                        <img src={img.image.url} alt={img.alt || `${p.name} ${i + 1}`}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                {/* Product Detail */}
-                <div style={{
-                    display: 'grid', gridTemplateColumns: '1fr 1fr',
-                    gap: '48px', padding: '0 32px 64px', maxWidth: '1200px', margin: '0 auto',
-                }}>
-                    {/* Images */}
-                    <div>
-                        <div style={{
-                            borderRadius: '16px', overflow: 'hidden', background: '#f8f8f8',
-                            aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                            {images[0]?.image?.url ? (
-                                <img src={images[0].image.url} alt={images[0].alt || p.name}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                                <span style={{ fontSize: '80px', opacity: 0.15 }}>📦</span>
-                            )}
-                        </div>
+                {/* Product Info */}
+                <div>
+                    {p.category && typeof p.category === 'object' && (
+                        <p style={{ fontSize: '13px', color: primaryColor, fontWeight: 600, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {p.category.name}
+                        </p>
+                    )}
 
-                        {/* Thumbnail row */}
-                        {images.length > 1 && (
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                                {images.slice(0, 5).map((img: any, i: number) => (
-                                    <div key={i} style={{
-                                        width: '64px', height: '64px', borderRadius: '8px', overflow: 'hidden',
-                                        border: i === 0 ? `2px solid ${primaryColor}` : '1px solid #eee',
-                                    }}>
-                                        {img.image?.url && (
-                                            <img src={img.image.url} alt={img.alt || `${p.name} ${i + 1}`}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        )}
+                    <h1 style={{ fontSize: '32px', fontWeight: 700, margin: '0 0 16px', color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>
+                        {p.name}
+                    </h1>
+
+                    {/* Price + Variants/Stock — US-F08-02: selector owns price display for variant products */}
+                    {p.hasVariants && p.variants && p.variants.length > 0 ? (
+                        <ProductVariantSelector
+                            variants={p.variants}
+                            currency={p.currency || 'MYR'}
+                            primaryColor={primaryColor}
+                            basePrice={p.price}
+                            baseCompareAtPrice={p.compareAtPrice ?? null}
+                        />
+                    ) : (
+                        <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                                <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text)' }}>
+                                    {formatPrice(p.price, p.currency || 'MYR')}
+                                </span>
+                                {hasDiscount && (
+                                    <>
+                                        <span style={{ fontSize: '18px', color: 'var(--text-muted, #999)', textDecoration: 'line-through' }}>
+                                            {formatPrice(p.compareAtPrice!, p.currency || 'MYR')}
+                                        </span>
+                                        <span style={{ background: '#fef2f2', color: '#ef4444', fontSize: '13px', fontWeight: 600, padding: '4px 10px', borderRadius: '20px' }}>
+                                            -{discountPercent}%
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                            <p style={{
+                                fontSize: '13px', marginBottom: '24px',
+                                color: p.inventory > 10 ? '#22c55e' : p.inventory > 0 ? '#f59e0b' : '#ef4444',
+                            }}>
+                                {p.inventory > 10 ? '✓ In Stock' : p.inventory > 0 ? `⚠ Only ${p.inventory} left` : '✕ Out of Stock'}
+                            </p>
+                        </>
+                    )}
+
+                    <AddToCartButton
+                        product={{
+                            id: String(p.id),
+                            slug: p.slug,
+                            name: p.name,
+                            price: p.price,
+                            compareAtPrice: p.compareAtPrice,
+                            currency: p.currency || 'MYR',
+                            imageUrl: images[0]?.image?.url,
+                            inventory: p.inventory ?? 0,
+                        }}
+                        primaryColor={primaryColor}
+                        siteSlug={slug}
+                        siteId={String(site.id)}
+                    />
+
+                    {/* Specifications */}
+                    {attributes.length > 0 && (
+                        <div style={{ marginTop: '32px' }}>
+                            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '12px' }}>{t.storefront.products.specifications}</h3>
+                            <div style={{
+                                display: 'grid', gridTemplateColumns: '1fr', gap: '1px',
+                                background: 'rgba(var(--brand-primary-rgb), 0.125)', border: '1px solid rgba(var(--brand-primary-rgb), 0.125)', borderRadius: '8px', overflow: 'hidden',
+                            }}>
+                                {attributes.map((attr: any, idx: number) => (
+                                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', background: 'var(--background)', fontSize: '14px' }}>
+                                        <div style={{ padding: '12px 16px', background: 'rgba(var(--brand-primary-rgb), 0.03)', color: 'var(--text-muted)', fontWeight: 500 }}>
+                                            {attr.key}
+                                        </div>
+                                        <div style={{ padding: '12px 16px', color: 'var(--text)' }}>
+                                            {attr.value}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
-                        )}
-                    </div>
-
-                    {/* Product Info */}
-                    <div>
-                        {p.category && (
-                            <p style={{ fontSize: '13px', color: primaryColor, fontWeight: 500, marginBottom: '8px' }}>
-                                {p.category}
-                            </p>
-                        )}
-
-                        <h1 style={{
-                            fontSize: '32px', fontWeight: 700, margin: '0 0 16px', color: '#111',
-                            fontFamily: `${(site.theme as any)?.fontHeading || 'Outfit'}, sans-serif`,
-                        }}>
-                            {p.name}
-                        </h1>
-
-                        {/* Price */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                            <span style={{ fontSize: '28px', fontWeight: 700, color: '#111' }}>
-                                {formatPrice(p.price, p.currency || 'MYR')}
-                            </span>
-                            {hasDiscount && (
-                                <>
-                                    <span style={{ fontSize: '18px', color: '#999', textDecoration: 'line-through' }}>
-                                        {formatPrice(p.compareAtPrice, p.currency || 'MYR')}
-                                    </span>
-                                    <span style={{
-                                        background: '#fef2f2', color: '#ef4444', fontSize: '13px',
-                                        fontWeight: 600, padding: '4px 10px', borderRadius: '20px',
-                                    }}>
-                                        -{discountPercent}%
-                                    </span>
-                                </>
-                            )}
                         </div>
+                    )}
 
-                        {/* Stock */}
-                        <p style={{
-                            fontSize: '13px', marginBottom: '24px',
-                            color: p.inventory > 10 ? '#22c55e' : p.inventory > 0 ? '#f59e0b' : '#ef4444',
-                        }}>
-                            {p.inventory > 10 ? '✓ In Stock' : p.inventory > 0 ? `⚠ Only ${p.inventory} left` : '✕ Out of Stock'}
-                        </p>
+                    {/* Description */}
+                    {p.shortDescription && (
+                        <div style={{ borderTop: '1px solid rgba(var(--brand-primary-rgb), 0.125)', paddingTop: '24px' }}>
+                            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' }}>{t.storefront.products.description}</h3>
+                            <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.7 }}>{p.shortDescription}</p>
+                        </div>
+                    )}
 
-                        {/* Add to Cart */}
-                        <AddToCartButton
-                            product={{
-                                id: String(p.id),
-                                slug: p.slug,
-                                name: p.name,
-                                price: p.price,
-                                compareAtPrice: p.compareAtPrice,
-                                currency: p.currency || 'MYR',
-                                imageUrl: images[0]?.image?.url,
-                                inventory: p.inventory ?? 0,
-                            }}
-                            primaryColor={primaryColor}
-                            siteSlug={slug}
-                        />
-
-                        {/* Description */}
-                        {p.shortDescription && (
-                            <div style={{ borderTop: '1px solid #eee', paddingTop: '24px' }}>
-                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '8px' }}>Description</h3>
-                                <p style={{ fontSize: '14px', color: '#666', lineHeight: 1.7 }}>{p.shortDescription}</p>
-                            </div>
-                        )}
-
-                        {/* SKU */}
-                        {p.sku && (
-                            <p style={{ fontSize: '12px', color: '#bbb', marginTop: '24px' }}>SKU: {p.sku}</p>
-                        )}
-                    </div>
+                    {/* SKU */}
+                    {p.sku && (
+                        <p style={{ fontSize: '12px', opacity: 0.5, marginTop: '24px' }}>{t.storefront.products.sku} {p.sku}</p>
+                    )}
                 </div>
             </div>
 
-            {/* Cart Drawer */}
-            <CartDrawer siteSlug={slug} />
-        </>
+            <CartDrawer siteSlug={slug} siteId={String(site.id)} />
+        </SiteLayoutShell>
     )
 }

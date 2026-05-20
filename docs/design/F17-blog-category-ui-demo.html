@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog & Category UI Demo - PrimeWeb</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0F172A; /* slate-900 */
+            color: #F8FAFC; /* slate-50 */
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        
+        /* Layout */
+        .sidebar { background-color: #0B1120; border-right: 1px solid #1E293B; }
+        .topbar { border-bottom: 1px solid #1E293B; background-color: #0F172A; }
+        .content-area { background-color: #0F172A; }
+        
+        /* Components */
+        .card { background-color: #1E293B; border: 1px solid #334155; border-radius: 0.75rem; }
+        .input-bg { background-color: #0B1120; border: 1px solid #334155; color: #F8FAFC; outline: none; transition: all 0.2s; }
+        .input-bg:focus { border-color: #3B82F6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        
+        .btn-primary { background-color: #3B82F6; color: white; transition: background-color 0.2s; font-weight: 500; }
+        .btn-primary:hover { background-color: #2563EB; }
+        .btn-secondary { background-color: #1E293B; border: 1px solid #334155; color: #F8FAFC; transition: background-color 0.2s; font-weight: 500; }
+        .btn-secondary:hover { background-color: #334155; }
+        .btn-danger { background-color: #EF4444; color: white; transition: background-color 0.2s; }
+        .btn-danger:hover { background-color: #DC2626; }
+        .btn-ghost { background: transparent; color: #94A3B8; transition: color 0.2s; }
+        .btn-ghost:hover { color: #F8FAFC; }
+
+        /* Modal */
+        .glass-overlay { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); }
+        .modal-content { background-color: #1E293B; border: 1px solid #334155; border-radius: 0.75rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3); }
+
+        /* Badges */
+        .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+        .status-badge-published { color: #10B981; border: 1px solid #065F46; background: rgba(16, 185, 129, 0.1); }
+        .status-badge-draft { color: #64748B; border: 1px solid #334155; background: rgba(100, 116, 139, 0.1); }
+
+        .cat-ecommerce { color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.1); }
+        .cat-marketing { color: #A855F7; border: 1px solid rgba(168, 85, 247, 0.3); background: rgba(168, 85, 247, 0.1); }
+        .cat-analytics { color: #14B8A6; border: 1px solid rgba(20, 184, 166, 0.3); background: rgba(20, 184, 166, 0.1); }
+        .cat-business { color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.1); }
+        .cat-default { color: #94A3B8; border: 1px solid #334155; background: rgba(148, 163, 184, 0.1); }
+
+        /* Custom Checkbox */
+        .custom-checkbox { width: 1.125rem; height: 1.125rem; background-color: #0F172A; border: 1px solid #475569; border-radius: 0.25rem; cursor: pointer; appearance: none; position: relative; }
+        .custom-checkbox:checked { background-color: #3B82F6; border-color: #3B82F6; }
+        .custom-checkbox:checked::after { content: '\f00c'; font-family: 'Font Awesome 6 Free'; font-weight: 900; color: white; font-size: 10px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+        /* Tables & Lists */
+        .table-row { border-bottom: 1px solid #1E293B; transition: background-color 0.2s; }
+        .table-row:hover { background-color: #1a2235; }
+        .category-item { border-bottom: 1px solid #334155; transition: background-color 0.2s; }
+        .category-item:hover { background-color: #2a374a; }
+        .category-item:last-child { border-bottom: none; }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-sm">
+
+    <!-- Sidebar -->
+    <aside class="sidebar w-64 flex flex-col justify-between h-full flex-shrink-0 relative z-10 transition-transform duration-300">
+        <div>
+            <!-- Logo -->
+            <div class="h-16 flex items-center px-6 border-b border-slate-800">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg">
+                        <i class="fa-solid fa-cube text-white"></i>
+                    </div>
+                    <span class="text-xl font-bold tracking-tight text-white">PrimeWeb</span>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="p-4 space-y-1">
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+                    <i class="fa-solid fa-border-all w-5"></i> Dashboard
+                </a>
+                
+                <div>
+                    <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors group">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-store w-5"></i> My Webstore
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-xs transition-transform group-hover:text-white"></i>
+                    </a>
+                    
+                    <div class="mt-1 ml-4 pl-4 border-l border-slate-700 space-y-1">
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800">Editor</a>
+                        <a href="#" class="flex items-center gap-3 px-3 py-2 text-blue-400 bg-blue-900/20 rounded-lg font-medium relative">
+                            <div class="absolute w-1.5 h-1.5 rounded-full bg-blue-400 -left-[1.1rem]"></div>
+                            Blog
+                        </a>
+                    </div>
+                </div>
+
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+                    <i class="fa-solid fa-box-open w-5"></i> Products
+                </a>
+                
+                <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-cart-shopping w-5"></i> Orders
+                    </div>
+                    <span class="bg-cyan-500 text-slate-900 text-xs font-bold px-1.5 py-0.5 rounded-full">5</span>
+                </a>
+
+                <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-gear w-5"></i> Store Config
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+                    <i class="fa-regular fa-circle-question w-5"></i> Help Center
+                </a>
+            </nav>
+        </div>
+
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center justify-between mb-4 bg-slate-800 rounded-full p-1">
+                <button class="flex-1 py-1 text-center text-xs text-slate-400 hover:text-white rounded-full transition-colors">MY</button>
+                <button class="flex-1 py-1 text-center text-xs bg-cyan-400 text-slate-900 font-bold rounded-full shadow-sm">EN</button>
+            </div>
+            <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
+                <i class="fa-solid fa-arrow-right-from-bracket w-5"></i> Logout
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full relative">
+        
+        <!-- Topbar -->
+        <header class="topbar h-16 flex items-center justify-end px-8 flex-shrink-0 z-10">
+            <div class="flex items-center gap-6 text-slate-400">
+                <button class="hover:text-white relative">
+                    <i class="fa-regular fa-bell text-lg"></i>
+                    <span class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900"></span>
+                </button>
+                <button class="hover:text-white">
+                    <i class="fa-regular fa-sun text-lg"></i>
+                </button>
+                <div class="flex items-center gap-3 cursor-pointer group">
+                    <img src="https://ui-avatars.com/api/?name=Admin+User&background=334155&color=fff" alt="User" class="w-8 h-8 rounded-full border border-slate-600 group-hover:border-slate-400 transition-colors">
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="flex-1 overflow-y-auto p-8">
+            <div class="max-w-7xl mx-auto">
+                
+                <!-- Page Header -->
+                <div class="flex items-start justify-between mb-8">
+                    <div>
+                        <h1 class="text-2xl font-bold text-white mb-1">Blogs</h1>
+                        <p class="text-slate-400 font-medium">Manage your blog posts and content</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="openCategoryModal()" class="btn-secondary px-4 py-2 rounded-lg flex items-center gap-2">
+                            Category
+                        </button>
+                        <button class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg shadow-blue-500/20">
+                            <i class="fa-solid fa-plus font-bold"></i> Create Post
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters Bar -->
+                <div class="flex gap-4 mb-6">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                        <input type="text" placeholder="Search by title..." class="input-bg w-full pl-10 pr-4 py-2.5 rounded-lg">
+                    </div>
+                    <select class="input-bg px-4 py-2.5 rounded-lg w-48 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:12px_12px] cursor-pointer">
+                        <option>All Status</option>
+                        <option>Published</option>
+                        <option>Draft</option>
+                    </select>
+                    <select class="input-bg px-4 py-2.5 rounded-lg w-48 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:12px_12px] cursor-pointer">
+                        <option>All Categories</option>
+                        <option>E-Commerce</option>
+                        <option>Marketing</option>
+                        <option>Analytics</option>
+                        <option>Business</option>
+                    </select>
+                    <select class="input-bg px-4 py-2.5 rounded-lg w-48 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:12px_12px] cursor-pointer">
+                        <option>Newest</option>
+                        <option>Oldest</option>
+                    </select>
+                </div>
+
+                <!-- Data Table -->
+                <div class="card overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-800/50 text-xs font-bold tracking-wider text-slate-400 uppercase border-b border-slate-700">
+                                <th class="py-4 px-6 w-12"><input type="checkbox" class="custom-checkbox"></th>
+                                <th class="py-4 px-4 w-24 text-center">Thumbnail</th>
+                                <th class="py-4 px-4">Title</th>
+                                <th class="py-4 px-4 hidden sm:table-cell">Category</th>
+                                <th class="py-4 px-4 hidden sm:table-cell">Status</th>
+                                <th class="py-4 px-4 hidden md:table-cell">Author</th>
+                                <th class="py-4 px-4 hidden md:table-cell">Date</th>
+                                <th class="py-4 px-6 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="blog-table-body">
+                            <!-- Rows rendered by JS to sync with categories dynamically if needed, but we can hardcode initial state -->
+                            <tr class="table-row">
+                                <td class="py-4 px-6"><input type="checkbox" class="custom-checkbox"></td>
+                                <td class="py-4 px-4 text-center">
+                                    <div class="w-12 h-8 rounded bg-slate-700 mx-auto overflow-hidden">
+                                        <img src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=100&h=60&fit=crop" class="w-full h-full object-cover" alt="Thumb">
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 font-medium text-white">10 Tips for Building a Successful Online Store</td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge cat-ecommerce" id="b-cat-1">E-Commerce</span></td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge status-badge-published">Published</span></td>
+                                <td class="py-4 px-4 text-slate-300 hidden md:table-cell">Ahmad Razak</td>
+                                <td class="py-4 px-4 text-slate-400 hidden md:table-cell">Mar 20, 2024</td>
+                                <td class="py-4 px-6 text-right">
+                                    <button class="btn-ghost px-2" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+                                    <button class="btn-ghost px-2 hover:text-red-400" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="table-row">
+                                <td class="py-4 px-6"><input type="checkbox" class="custom-checkbox"></td>
+                                <td class="py-4 px-4 text-center">
+                                    <div class="w-12 h-8 rounded bg-slate-700 mx-auto overflow-hidden">
+                                        <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=100&h=60&fit=crop" class="w-full h-full object-cover" alt="Thumb">
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 font-medium text-white">How to Optimize Your Product Listings</td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge cat-marketing" id="b-cat-2">Marketing</span></td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge status-badge-published">Published</span></td>
+                                <td class="py-4 px-4 text-slate-300 hidden md:table-cell">Sarah Lee</td>
+                                <td class="py-4 px-4 text-slate-400 hidden md:table-cell">Mar 19, 2024</td>
+                                <td class="py-4 px-6 text-right">
+                                    <button class="btn-ghost px-2" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+                                    <button class="btn-ghost px-2 hover:text-red-400" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="table-row">
+                                <td class="py-4 px-6"><input type="checkbox" class="custom-checkbox"></td>
+                                <td class="py-4 px-4 text-center">
+                                    <div class="w-12 h-8 rounded bg-slate-700 mx-auto overflow-hidden">
+                                        <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=100&h=60&fit=crop" class="w-full h-full object-cover" alt="Thumb">
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 font-medium text-white">Understanding Customer Behavior Analytics</td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge cat-analytics" id="b-cat-3">Analytics</span></td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge status-badge-draft">Draft</span></td>
+                                <td class="py-4 px-4 text-slate-300 hidden md:table-cell">Chen Wei</td>
+                                <td class="py-4 px-4 text-slate-400 hidden md:table-cell">Mar 18, 2024</td>
+                                <td class="py-4 px-6 text-right">
+                                    <button class="btn-ghost px-2" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+                                    <button class="btn-ghost px-2 hover:text-red-400" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="table-row">
+                                <td class="py-4 px-6"><input type="checkbox" class="custom-checkbox"></td>
+                                <td class="py-4 px-4 text-center">
+                                    <div class="w-12 h-8 rounded bg-slate-700 mx-auto overflow-hidden">
+                                        <div class="w-full h-full bg-slate-800 flex items-center justify-center text-red-500 font-bold text-lg border border-slate-700">N</div>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 font-medium text-white">Social Media Marketing Strategies for 2024</td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge cat-marketing" id="b-cat-4">Marketing</span></td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge status-badge-published">Published</span></td>
+                                <td class="py-4 px-4 text-slate-300 hidden md:table-cell">Fatimah Ahmad</td>
+                                <td class="py-4 px-4 text-slate-400 hidden md:table-cell">Mar 17, 2024</td>
+                                <td class="py-4 px-6 text-right">
+                                    <button class="btn-ghost px-2" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+                                    <button class="btn-ghost px-2 hover:text-red-400" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
+                                </td>
+                            </tr>
+                            <tr class="table-row border-b-transparent">
+                                <td class="py-4 px-6"><input type="checkbox" class="custom-checkbox"></td>
+                                <td class="py-4 px-4 text-center">
+                                    <div class="w-12 h-8 rounded bg-slate-700 mx-auto overflow-hidden">
+                                        <img src="https://images.unsplash.com/photo-1556761175-5973dc0f32d7?w=100&h=60&fit=crop" class="w-full h-full object-cover" alt="Thumb">
+                                    </div>
+                                </td>
+                                <td class="py-4 px-4 font-medium text-white">Building Trust with Your Customers</td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge cat-business" id="b-cat-5">Business</span></td>
+                                <td class="py-4 px-4 hidden sm:table-cell"><span class="badge status-badge-draft">Draft</span></td>
+                                <td class="py-4 px-4 text-slate-300 hidden md:table-cell">David Tan</td>
+                                <td class="py-4 px-4 text-slate-400 hidden md:table-cell">Mar 16, 2024</td>
+                                <td class="py-4 px-6 text-right">
+                                    <button class="btn-ghost px-2" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+                                    <button class="btn-ghost px-2 hover:text-red-400" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Category Modal (Hidden by default) -->
+    <div id="categoryModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 glass-overlay" onclick="closeCategoryModal()"></div>
+        
+        <!-- Modal wrapper -->
+        <div class="modal-content relative z-10 w-full max-w-lg animate-slide-in flex flex-col max-h-[90vh]">
+            <!-- Header -->
+            <div class="px-6 py-4 flex items-center justify-between border-b border-slate-700">
+                <h2 class="text-lg font-bold text-white">Manage Categories</h2>
+                <button onclick="closeCategoryModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <!-- Body: Category List -->
+            <div class="p-6 overflow-y-auto flex-1">
+                
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wide">Existing Categories</h3>
+                    <span id="cat-count" class="text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded-md">4 items</span>
+                </div>
+
+                <div id="category-list" class="border border-slate-700 rounded-lg overflow-hidden mb-6">
+                    <!-- Javascript will render categories here -->
+                </div>
+
+                <!-- Add New Category -->
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-3 flex items-center gap-2 cursor-pointer" onclick="toggleAddForm()">
+                        <i id="add-icon" class="fa-solid fa-plus text-blue-400"></i> Add New Category
+                    </h3>
+                    
+                    <div id="add-form" class="bg-slate-800/50 p-4 rounded-lg border border-slate-700 hidden">
+                        <label class="block text-xs text-slate-400 mb-1">Category Name</label>
+                        <div class="flex gap-3">
+                            <input type="text" id="new-cat-input" class="input-bg flex-1 px-3 py-2 rounded-md focus:outline-none" placeholder="e.g. Tips & Tricks">
+                            <button onclick="addNewCategory()" class="btn-primary px-4 py-2 rounded-md whitespace-nowrap">Save</button>
+                        </div>
+                        <p id="add-error" class="text-red-400 text-xs mt-2 hidden">Category name is required.</p>
+                    </div>
+                </div>
+
+            </div>
+            
+            <!-- Footer -->
+            <div class="px-6 py-4 border-t border-slate-700 bg-slate-800/30 rounded-b-xl flex justify-end">
+                <button onclick="closeCategoryModal()" class="btn-secondary px-5 py-2 rounded-lg">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts for Interaction -->
+    <script>
+        // Initial Category Data
+        let categories = [
+            { id: 1, name: 'E-Commerce', code: 'cat-ecommerce', blogsAssigned: 1 },
+            { id: 2, name: 'Marketing', code: 'cat-marketing', blogsAssigned: 2 },
+            { id: 3, name: 'Analytics', code: 'cat-analytics', blogsAssigned: 1 },
+            { id: 4, name: 'Business', code: 'cat-business', blogsAssigned: 1 }
+        ];
+
+        let editingId = null;
+
+        const modal = document.getElementById('categoryModal');
+        const catListEl = document.getElementById('category-list');
+        const catCountEl = document.getElementById('cat-count');
+        const addForm = document.getElementById('add-form');
+        const addIcon = document.getElementById('add-icon');
+        const newCatInput = document.getElementById('new-cat-input');
+        const addError = document.getElementById('add-error');
+
+        // Main Modal Controls
+        function openCategoryModal() {
+            renderCategories();
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // reset add form
+            addForm.classList.add('hidden');
+            addIcon.classList.replace('fa-minus', 'fa-plus');
+            newCatInput.value = '';
+            addError.classList.add('hidden');
+        }
+
+        function closeCategoryModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            editingId = null;
+        }
+
+        // Render List
+        function renderCategories() {
+            catCountEl.textContent = `${categories.length} item${categories.length !== 1 ? 's' : ''}`;
+            
+            if (categories.length === 0) {
+                catListEl.innerHTML = `
+                    <div class="p-6 text-center text-slate-500">
+                        <i class="fa-solid fa-folder-open text-3xl mb-3 opacty-50"></i>
+                        <p>No categories found.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            categories.forEach(cat => {
+                const isEditing = editingId === cat.id;
+
+                if (isEditing) {
+                    html += `
+                        <div class="category-item p-3 flex items-center justify-between bg-slate-800">
+                            <div class="flex-1 mr-3 flex flex-col">
+                                <input type="text" id="edit-input-${cat.id}" class="input-bg px-3 py-1.5 rounded-md text-sm w-full" value="${cat.name}" autofocus>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="saveEdit(${cat.id})" class="text-green-400 hover:text-green-300 p-2 rounded-md hover:bg-slate-700 transition-colors" title="Save">
+                                    <i class="fa-solid fa-check"></i>
+                                </button>
+                                <button onclick="cancelEdit()" class="text-slate-400 hover:text-white p-2 rounded-md hover:bg-slate-700 transition-colors" title="Cancel">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="category-item p-3 flex items-center justify-between group">
+                            <div class="flex items-center gap-3">
+                                <span class="badge ${cat.code}">${cat.name}</span>
+                            </div>
+                            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="startEdit(${cat.id})" class="text-slate-400 hover:text-blue-400 p-2 rounded-md hover:bg-slate-700 transition-colors" title="Edit">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <button onclick="deleteCategory(${cat.id})" class="text-slate-400 hover:text-red-400 p-2 rounded-md hover:bg-slate-700 transition-colors" title="Delete">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            catListEl.innerHTML = html;
+        }
+
+        // Add
+        function toggleAddForm() {
+            const isHidden = addForm.classList.contains('hidden');
+            if (isHidden) {
+                addForm.classList.remove('hidden');
+                addIcon.classList.replace('fa-plus', 'fa-minus');
+                setTimeout(() => newCatInput.focus(), 50);
+            } else {
+                addForm.classList.add('hidden');
+                addIcon.classList.replace('fa-minus', 'fa-plus');
+                addError.classList.add('hidden');
+            }
+        }
+
+        function addNewCategory() {
+            const val = newCatInput.value.trim();
+            if (!val) {
+                addError.classList.remove('hidden');
+                newCatInput.classList.add('border-red-500');
+                return;
+            }
+            
+            // Success
+            addError.classList.add('hidden');
+            newCatInput.classList.remove('border-red-500');
+            
+            const newId = Date.now();
+            categories.push({
+                id: newId,
+                name: val,
+                code: 'cat-default', // Fallback color for new items
+                blogsAssigned: 0
+            });
+            
+            newCatInput.value = '';
+            toggleAddForm(); // hide form
+            renderCategories();
+            showToast('Category created successfully!');
+        }
+
+        // Edit
+        function startEdit(id) {
+            editingId = id;
+            renderCategories();
+        }
+
+        function cancelEdit() {
+            editingId = null;
+            renderCategories();
+        }
+
+        function saveEdit(id) {
+            const inputEl = document.getElementById(`edit-input-${id}`);
+            const val = inputEl.value.trim();
+            if (!val) {
+                inputEl.classList.add('border-red-500');
+                return;
+            }
+            
+            const idx = categories.findIndex(c => c.id === id);
+            if (idx > -1) {
+                const oldName = categories[idx].name;
+                categories[idx].name = val;
+                
+                // Sync table visually
+                document.querySelectorAll('.badge').forEach(badge => {
+                    if (badge.textContent === oldName && !badge.classList.contains('status-badge-published') && !badge.classList.contains('status-badge-draft')) {
+                        badge.textContent = val;
+                    }
+                });
+
+                showToast('Category updated!');
+            }
+            
+            editingId = null;
+            renderCategories();
+        }
+
+        // Delete
+        function deleteCategory(id) {
+            const idx = categories.findIndex(c => c.id === id);
+            if (idx > -1) {
+                if (confirm(`Are you sure you want to delete the category "${categories[idx].name}"?\nBlogs using this category will become Uncategorized.`)) {
+                    categories.splice(idx, 1);
+                    renderCategories();
+                    showToast('Category deleted', 'error');
+                }
+            }
+        }
+
+        // enter key support in inputs
+        newCatInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') addNewCategory();
+        });
+        
+        // delegated events for edit save on enter
+        catListEl.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.id.startsWith('edit-input-')) {
+                const id = parseInt(e.target.id.split('-')[2]);
+                saveEdit(id);
+            }
+        });
+
+        // Simple Toast
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium animate-slide-in z-[60] flex items-center gap-3 ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> ${message}`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(100%)';
+                toast.style.transition = 'all 0.3s ease-in-out';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+    </script>
+</body>
+</html>

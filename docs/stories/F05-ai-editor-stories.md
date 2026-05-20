@@ -2,7 +2,6 @@
 
 > **Feature:** F05 — AI Editor (Split Screen)
 > **Wave:** 3 | **Priority:** P0 🌟 | **Ref PRD:** [F05-ai-editor.md](../prd/F05-ai-editor.md)
-> *Lưu ý: UX/UI Mobile Web Responsive/Adaptive được tách tại [F05-mobile-responsive-ai-editor-stories.md](./F05-mobile-responsive-ai-editor-stories.md).*
 
 ---
 
@@ -615,12 +614,64 @@ THEN  hiển thị các form fields: URL Slug, Meta Title, Meta Description
 GIVEN user đang ở Page-level SEO Settings
 WHEN  click nút "✨ Tự động Tối ưu SEO"
 THEN  AI sẽ phân tích toàn bộ text content hiện có trên trang
+  AND kết hợp trackedKeywords từ cài đặt site để từ khoá mục tiêu xuất hiện tự nhiên trong meta
   AND tự động điền Meta Title và Meta Description tối ưu
   AND URL Slug tự động đồng bộ theo Title (nếu page chưa publish)
+  AND nếu trường meta đã có nội dung thủ công → hiển thị so sánh bản cũ vs bản mới, chỉ ghi đè khi người dùng đồng ý
 ```
 
 ### Definition of Done
 - [ ] 9-Point Checklist pass.
 - [ ] Dữ liệu SEO lưu thành công vào Database field của riêng page đó (`pages.metaTitle`, `pages.metaDescription`).
+- [ ] AI Generate sử dụng trackedKeywords từ site settings khi sinh meta.
+- [ ] Nếu meta đã có nội dung → hiển thị so sánh, chỉ ghi đè khi đồng ý.
+
+---
+
+## US-F05-14: Mobile Web UX — Adaptive Editor Interface
+
+**Wave 3** | **P0** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   store owner on mobile
+I want to edit my website with an optimized mobile interface
+So that I can effectively build and tweak my store using my phone without the cluttered split-screen layout
+```
+
+### Acceptance Criteria
+
+#### AC-1: Live Preview Fullscreen & FAB Chat
+```gherkin
+GIVEN user truy cập Editor qua điện thoại di động
+WHEN  tải trang
+THEN  giao diện Split-Screen bị vô hiệu hóa
+  AND phần Live Preview của website chiếm 100% tỷ lệ khung hình
+  AND nút mở AI Chat xuất hiện dưới dạng Floating Action Button (FAB) ở góc phải dưới
+```
+
+#### AC-2: Tap-to-Add Component (No Drag & Drop)
+```gherkin
+GIVEN user đang ở chế độ xem Mobile Editor
+WHEN  mở thư viện Component (Component Library)
+THEN  tính năng kéo thả (Drag & Drop) bị tắt
+WHEN  chạm (Tap) vào một Block bất kỳ trong thư viện
+THEN  Block đó tự động được Insert (chèn) xuống dưới cùng của giao diện
+  AND màn hình tự động cuộn (scroll) tới vị trí block vừa được thêm
+```
+
+#### AC-3: Bottom Sheet Formatting & Commands
+```gherkin
+GIVEN user đang xem Preview trên mobile
+WHEN  chạm (Tap) vào một element muốn Edit (text, ảnh)
+THEN  công cụ Formatting (Rich text) và AI command hiện lên dưới dạng Bottom Sheet (vuốt từ dưới lên)
+  AND không sử dụng floating popup như giao diện Desktop để đảm bảo công thái học
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass cho Mobile layout.
+- [ ] Không có trigger scroll gãy nát khi mở Bottom Sheet.
+- [ ] Các tính năng Undo/Redo/Auto-save hoạt động mượt không block UI.
 
 

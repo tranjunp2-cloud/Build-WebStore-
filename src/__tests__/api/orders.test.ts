@@ -35,6 +35,7 @@ vi.mock('payload', () => {
                     slug: 'test-store',
                     stripeAccountId: 'acct_test_merchant',
                     stripeOnboardingComplete: true,
+                    payments: { payment_card: true, payment_fpx: true },
                 }
             }
             if (collection === 'products' && id === 'prod-1') {
@@ -50,14 +51,14 @@ vi.mock('payload', () => {
             return data
         })
     }
-    
+
     return {
         getPayload: vi.fn().mockResolvedValue(mockPayload)
     }
 })
 
 describe('POST /api/orders/create', () => {
-    
+
     it('returns 400 validation error when required fields are missing', async () => {
         // Thiếu customer email và items
         const req = new NextRequest('http://localhost:3000/api/orders/create', {
@@ -72,7 +73,7 @@ describe('POST /api/orders/create', () => {
         expect(json.success).toBe(false)
         expect(json.error.code).toBe('VALIDATION_ERROR')
     })
-    
+
     it('returns 404 if siteId does not exist in DB', async () => {
         const req = new NextRequest('http://localhost:3000/api/orders/create', {
             method: 'POST',
@@ -109,7 +110,7 @@ describe('POST /api/orders/create', () => {
         // 2 items * 100 price = 200 subtotal
         // Tax 6% = 12
         // Total = 212
-        
+
         expect(response.status).toBe(200)
         expect(json.success).toBe(true)
         expect(json.data.orderId).toBe('order-999')
