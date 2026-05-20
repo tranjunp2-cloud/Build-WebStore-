@@ -246,13 +246,23 @@ export async function PATCH(
                         for (const field of ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']) {
                             if (typeof block[field] === 'number') delete block[field]
                         }
-                        for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos']) {
+                        for (const arrayField of ['images', 'projects', 'members', 'testimonials', 'logos', 'properties', 'doctors', 'events', 'posts', 'caseStudies']) {
                             const arr = block[arrayField]
                             if (!Array.isArray(arr)) continue
                             for (const item of arr as Record<string, unknown>[]) {
                                 if (item && typeof item === 'object') {
                                     for (const f of ['image', 'logo', 'avatar']) {
                                         if (typeof item[f] === 'number') delete item[f]
+                                    }
+                                }
+                            }
+                        }
+                        // menu-food: clean nested categories[].items[].image numeric Payload IDs
+                        if (block.blockType === 'menu-food' && Array.isArray(block.categories)) {
+                            for (const cat of block.categories as Record<string, unknown>[]) {
+                                if (cat && Array.isArray(cat.items)) {
+                                    for (const item of cat.items as Record<string, unknown>[]) {
+                                        if (item && typeof item.image === 'number') delete item.image
                                     }
                                 }
                             }

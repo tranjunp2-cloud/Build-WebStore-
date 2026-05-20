@@ -1,13 +1,15 @@
 import { z } from 'zod'
 import { BaseBlockSchema } from '../types'
 
+export type MenuItemImage = { id?: number; url?: string; alt?: string }
+
 export type MenuItem = {
     name: string
     description?: string
     price: string
     currency?: string
     tag?: string
-    imageUrl?: string
+    image?: MenuItemImage | number | string | null
 }
 
 export type MenuCategory = {
@@ -34,7 +36,12 @@ export const MenuFoodConfigSchema = BaseBlockSchema.extend({
             price: z.string(),
             currency: z.string().default('RM'),
             tag: z.string().optional(),
-            imageUrl: z.string().optional(),
+            image: z.union([
+                z.object({ id: z.number().optional(), url: z.string().optional(), alt: z.string().optional() }),
+                z.number(),
+                z.string(),
+                z.null(),
+            ]).optional(),
         })).default([]),
     })).default([]),
 })

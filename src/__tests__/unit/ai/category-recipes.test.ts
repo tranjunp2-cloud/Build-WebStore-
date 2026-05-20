@@ -174,7 +174,7 @@ describe('isSupportedBlockId', () => {
   it('returns true for registered block types', () => {
     expect(isSupportedBlockId('hero')).toBe(true)
     expect(isSupportedBlockId('features')).toBe(true)
-    expect(isSupportedBlockId('property-card')).toBe(true)
+    expect(isSupportedBlockId('property-card')).toBe(false) // GH-1024 — hidden
   })
 
   it('returns false for unknown block types', () => {

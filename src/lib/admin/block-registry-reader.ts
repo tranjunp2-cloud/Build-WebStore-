@@ -90,6 +90,9 @@ const EDITOR_HIDDEN_BLOCKS = new Set([
     // feat/fix-broken-block-variants: temporarily hidden — re-enable by removing from this set
     'step-process',
     'booking-widget',
+    'property-card',  // GH-1024 — hidden until redesigned
+    'menu-display',   // GH-1024 — hidden; use menu-food
+    'pricing-table',  // GH-1024 — hidden; use pricing
 ])
 
 // ── Module-level cache (process lifetime) ────────────────────────────────────

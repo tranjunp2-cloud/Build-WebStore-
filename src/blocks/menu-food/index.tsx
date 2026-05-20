@@ -7,11 +7,20 @@ import type { MenuFoodConfig, MenuItem } from './config'
 import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { plainText } from '@/lib/utils/rich-text-render'
 import { Heading, Body, Caption } from '../shared/Typography'
 import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '../shared/SectionWrapper'
 
 void _CSS_VARS
+
+function getItemImageUrl(image: MenuItem['image']): string | null {
+    if (!image) return null
+    if (typeof image === 'string') return image || null
+    if (typeof image === 'number') return null
+    if (typeof image === 'object' && image.url) return image.url
+    return null
+}
 
 export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfig>) {
     void _theme
@@ -32,10 +41,10 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
         <div key={i} className="flex items-start gap-4 py-4">
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                    <Heading level={4} className="text-base">{item.name}</Heading>
+                    <Heading level={4} className="text-base"><RichText text={item.name} as="span" /></Heading>
                     {item.tag && <TagBadge tag={item.tag} />}
                 </div>
-                {item.description && <Body size="small" className="opacity-50 mb-2">{item.description}</Body>}
+                {item.description && <Body size="small" className="opacity-50 mb-2"><RichText text={item.description} as="span" /></Body>}
             </div>
             <div className="flex items-center gap-1 shrink-0">
                 <span
@@ -55,17 +64,20 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
             className="rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg"
             style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
         >
-            {item.imageUrl && (
-                <div className="relative aspect-[16/10] overflow-hidden">
-                    <Image src={item.imageUrl} alt={item.name} fill className="object-cover" />
-                </div>
-            )}
+            {(() => {
+                const url = getItemImageUrl(item.image)
+                return url ? (
+                    <div className="relative aspect-[16/10] overflow-hidden">
+                        <Image src={url} alt={plainText(item.name)} fill className="object-cover" />
+                    </div>
+                ) : null
+            })()}
             <div className="p-5">
                 <div className="flex items-center justify-between gap-2 mb-2">
-                    <Heading level={4} className="text-base">{item.name}</Heading>
+                    <Heading level={4} className="text-base"><RichText text={item.name} as="span" /></Heading>
                     {item.tag && <TagBadge tag={item.tag} />}
                 </div>
-                {item.description && <Body size="small" className="opacity-50 mb-3">{item.description}</Body>}
+                {item.description && <Body size="small" className="opacity-50 mb-3"><RichText text={item.description} as="span" /></Body>}
                 <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
                     {item.currency || 'RM'} {item.price}
                 </p>
@@ -116,7 +128,7 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
                                 }
                                 aria-current={activeTab === i}
                             >
-                                {cat.name}
+                                {plainText(cat.name)}
                             </button>
                         ))}
                     </div>
@@ -127,7 +139,7 @@ export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfi
                         {/* Category name (when single category) */}
                         {categories.length === 1 && (
                             <Heading level={3} className="mb-8 text-center" style={{ color: 'var(--brand-primary)' }}>
-                                {activeCategory.name}
+                                {plainText(activeCategory.name)}
                             </Heading>
                         )}
 

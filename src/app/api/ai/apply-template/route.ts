@@ -17,6 +17,7 @@ import { mergeUserContent } from '@/lib/ai/merge-user-content'
 import { resolveSiteType } from '@/lib/ai/site-type'
 import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
+import { BLOCKS_TEMP_HIDDEN } from '@/lib/ai/unsupported-blocks'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
  *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
@@ -375,8 +376,11 @@ export const POST = withAuth(async (user, req) => {
 
                     // Strip system fields — Payload rejects 'id' in layout block data
                     // GH-820: also drop google-maps — embedUrl cannot be auto-generated
+                    // GH-1024: strip temp-hidden blocks (menu-display, property-card, pricing-table)
+                    //   so DB-seeded templates don't smuggle them back into user pages
                     const cleanLayout = (stripSystemFields(newLayout) as Record<string, unknown>[])
                         .filter(b => b.blockType !== 'google-maps')
+                        .filter(b => !BLOCKS_TEMP_HIDDEN.has(b.blockType as string))
 
                     // Normalize required fields: coerces service-cards titles, upload fields,
                     // contact email, footer variant aliases, etc. Covers data from currentBlocks
@@ -485,7 +489,8 @@ export const POST = withAuth(async (user, req) => {
             title: p.title,
             slug: p.slug,
             isHomepage: p.isHomepage,
-            layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []),
+            layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || [])
+                .filter(b => !BLOCKS_TEMP_HIDDEN.has(b.blockType as string)), // GH-1024
         }))
         injectNavLinks(pagesToCreate)
 

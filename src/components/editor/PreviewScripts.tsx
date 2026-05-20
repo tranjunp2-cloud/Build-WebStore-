@@ -332,6 +332,9 @@ export function PreviewScripts() {
             if (!target.hasAttribute('data-text-editable') && !!target.parentElement?.closest('[data-no-text-edit]')) return
             // Skip image-placeholder elements — clicking them triggers image-replace, not text-edit
             if (target.getAttribute('data-image-index') !== null) return
+            // Skip table-scroll wrapper divs (overflow-x-auto containing a <table>)
+            // Setting contenteditable on such a div breaks the table layout
+            if (Array.from(target.children).some(c => c.tagName === 'TABLE')) return
             // Don't edit elements with many block-level children (sections, not text)
             const blockChildren = Array.from(target.children).filter(c =>
                 ['DIV', 'SECTION', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL'].includes(c.tagName)

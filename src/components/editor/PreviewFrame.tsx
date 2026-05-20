@@ -1266,7 +1266,7 @@ function PreviewFrameInner({
                 <div
                     ref={setScrollContainerElement}
                     className={cn(
-                        'flex h-full items-start overflow-auto border border-white/10 bg-[#0F172A]',
+                        'flex h-full items-stretch overflow-auto border border-white/10 bg-[#0F172A]',
                         isExpanded
                             ? cn('rounded-none', isMobile && 'justify-center')
                             : 'justify-center rounded-[28px] p-4',
@@ -1274,7 +1274,7 @@ function PreviewFrameInner({
                 >
                     <div
                         ref={setCanvasElement}
-                        className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
+                        className="relative overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
                         style={{
                             width: isMobile ? 'min(390px, 100%)' : '100%',
                             maxWidth: isMobile ? 390 : isExpanded ? undefined : 1280,

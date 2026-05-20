@@ -16,7 +16,7 @@ describe('generateBlocks — output structure [TC-F01.08]', () => {
     })
 
     it('returns 6-12 blocks (dynamic pool + industry blocks)', () => {
-        // Restaurant gets industry blocks (menu-display + review-cards) prepended before generic middle blocks.
+        // Restaurant gets industry blocks (menu-food + review-cards) prepended before generic middle blocks.
         // booking-widget temporarily hidden (feat/fix-broken-block-variants).
         // Range: nav + hero + 0-2 industry + 3-4 middle + contact + footer = 6-11
         expect(result.blocks.length).toBeGreaterThanOrEqual(6)
@@ -235,16 +235,17 @@ describe('generateBlocks — Payload field name compliance', () => {
 // ─── Industry-aware fallback: category-specific blocks ──────────────────
 describe('generateBlocks — industry-aware block selection', () => {
     // feat/fix-broken-block-variants: booking-widget temporarily hidden — test updated to match
-    it('restaurant fallback includes menu-display', () => {
+    it('restaurant fallback includes menu-food', () => {
         const result = generateBlocks('Create a website for "Ben Ben" restaurant', 12345)
         const blockTypes = result.blocks.map(b => b.blockType)
-        expect(blockTypes).toContain('menu-display')
+        expect(blockTypes).toContain('menu-food')
         expect(blockTypes).not.toContain('booking-widget') // temporarily hidden
+        expect(blockTypes).not.toContain('menu-display') // GH-1024 — hidden
     })
 
-    it('restaurant menu-display has non-empty categories with items', () => {
+    it('restaurant menu-food has non-empty categories with items', () => {
         const result = generateBlocks('Create a website for a restaurant', 12345)
-        const menu = result.blocks.find(b => b.blockType === 'menu-display') as Record<string, unknown> | undefined
+        const menu = result.blocks.find(b => b.blockType === 'menu-food') as Record<string, unknown> | undefined
         expect(menu).toBeDefined()
         const categories = menu!.categories as Array<{ items: unknown[] }>
         expect(Array.isArray(categories)).toBe(true)
