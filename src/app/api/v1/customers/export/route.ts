@@ -25,8 +25,14 @@ import type { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
-import type { User } from 'payload'
 import { sql } from 'drizzle-orm'
+
+// Structural type matching what resolveTenantIds reads from a user record —
+// matches getCurrentUser's inferred return without forcing a Payload `User` cast.
+type AuthUserShape = {
+    roles?: string[]
+    tenants?: Array<{ tenant: string | number | { id: string | number } }>
+}
 
 const EXPORT_ROW_CAP = 10_000
 
@@ -70,15 +76,13 @@ interface TenantResolutionResult {
 }
 
 function resolveTenantIds(
-    user: User,
+    user: AuthUserShape,
     requestedTenantId: string | null,
 ): TenantResolutionResult {
-    const isSuperAdmin = (user as { roles?: string[] }).roles?.includes('super-admin') ?? false
+    const isSuperAdmin = user.roles?.includes('super-admin') ?? false
 
     // Extract tenant IDs from user.tenants[] as integers (schema: tenant_id integer)
-    const userTenantIds: number[] = (
-        (user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> }).tenants ?? []
-    ).map((t) => {
+    const userTenantIds: number[] = (user.tenants ?? []).map((t) => {
         const tenant = t.tenant
         if (typeof tenant === 'object' && tenant != null) return Number(tenant.id)
         return Number(tenant)
@@ -123,7 +127,10 @@ export async function GET(req: NextRequest) {
 
     // 2. Tenant scoping
     const requestedTenantId = req.nextUrl.searchParams.get('tenantId')
-    const { tenantIds, tenantLabel, isSuperAdmin } = resolveTenantIds(user, requestedTenantId)
+    const { tenantIds, tenantLabel, isSuperAdmin } = resolveTenantIds(
+        user as AuthUserShape,
+        requestedTenantId,
+    )
 
     // Super-admin with invalid ?tenantId → 400 (sentinel is -1)
     if (isSuperAdmin && tenantIds.length === 1 && tenantIds[0] === -1) {

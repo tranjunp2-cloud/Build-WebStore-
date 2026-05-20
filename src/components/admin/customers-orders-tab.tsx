@@ -24,6 +24,23 @@ interface CustomersOrdersTabProps {
 
 const PAGE_SIZE = 25
 
+// Structural type for the orders fetch result — avoids referencing the runtime
+// `payload` symbol at type-level (it's declared inside the try block).
+type OrderRow = {
+    id: string | number
+    orderNumber?: string
+    status?: string
+    total?: number
+    currency?: string
+    paymentStatus?: string
+    createdAt?: string
+}
+type OrdersPage = {
+    docs: OrderRow[]
+    totalDocs: number
+    totalPages: number
+}
+
 function formatDate(val: string | Date | null | undefined): string {
     if (!val) return '—'
     const d = new Date(val as string)
@@ -79,7 +96,7 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
     const rawPage = searchParams?.page
     const page = typeof rawPage === 'string' ? Math.max(1, parseInt(rawPage, 10) || 1) : 1
 
-    let orders: Awaited<ReturnType<typeof payload.find<'orders'>>> | null = null
+    let orders: OrdersPage | null = null
     let fetchError: string | null = null
 
     try {
@@ -104,7 +121,7 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
             ? { and: [{ customer: { equals: id } }, { tenant: { equals: tenantId } }] }
             : { customer: { equals: id } }
 
-        orders = await payload.find({
+        const ordersResult = await payload.find({
             collection: 'orders',
             where,
             sort: '-createdAt',
@@ -112,6 +129,11 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
             page,
             depth: 0,
         })
+        orders = {
+            docs: ordersResult.docs as OrderRow[],
+            totalDocs: ordersResult.totalDocs,
+            totalPages: ordersResult.totalPages,
+        }
     } catch (err) {
         console.error('[CustomersOrdersTab] fetch error', err)
         fetchError = err instanceof Error ? err.message : 'Unknown error fetching orders'
@@ -162,16 +184,7 @@ export default async function CustomersOrdersTab({ id, searchParams }: Customers
                                 </tr>
                             </thead>
                             <tbody>
-                                {docs.map((order) => {
-                                    const o = order as {
-                                        id: string | number
-                                        orderNumber?: string
-                                        status?: string
-                                        total?: number
-                                        currency?: string
-                                        paymentStatus?: string
-                                        createdAt?: string
-                                    }
+                                {docs.map((o: OrderRow) => {
                                     return (
                                         <tr key={String(o.id)} style={{ borderBottom: '1px solid #f3f4f6' }}>
                                             <td style={{ padding: '8px 12px', fontWeight: 500 }}>
