@@ -109,6 +109,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const isCod = order.paymentMethod === 'cod'
     const isStripe = !isBT && !isCod
     const isPaid = order.paymentStatus === 'paid'
+    // Order is "done" from the confirm page POV: BT approved, Stripe charged, or COD placed
+    const isOrderSuccess = isPaid || isCod || isStripe
     const isSubmitted = isBT && uploadStatus === 'success' && !isPaid
     const addr = order.shippingAddress
     const addrLine = [addr?.city, addr?.state, addr?.postcode].filter(Boolean).join(', ')
@@ -548,11 +550,11 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             {addrLine && <div className="ty-meta-row"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
                         </div>
                         <div className="ty-cta-row">
-                            <button className="ty-btn primary lg" onClick={() => clearAndNavigate(`/sites/${slug}/products`, isPaid)}>
+                            <button className="ty-btn primary lg" onClick={() => clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)}>
                                 <ShoppingBag size={15} /> Continue Shopping
                             </button>
                             {(!isBT || isPaid) && (
-                                <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.id}`, isPaid)}>
+                                <button className="ty-btn outline lg" onClick={() => clearAndNavigate(`/sites/${slug}/orders/${order.id}`, isOrderSuccess)}>
                                     <ReceiptText size={15} /> View My Orders
                                 </button>
                             )}
