@@ -12,8 +12,8 @@
 
 - Date: 2026-05-20
 - Priority: P0 (blocker — must run before any other phase)
-- Implementation status: pending
-- Review status: pending
+- Implementation status: completed
+- Review status: completed
 - Description: Rename the pending `customers` virtual collection in plan 260429 to `audience` so this plan can claim `customers` for the shop customer entity. Plan 260429 is NOT yet merged — no DB migration ran for slug `customers` — so this is a textual rename across plan/phase markdown files + a placeholder note. No code touched.
 
 ## Key insights
@@ -96,12 +96,12 @@ No schema, no DB, no Payload registration affected.
 
 ## Todo
 
-- [ ] Audit grep matches in plan 260429
-- [ ] `git mv` phase-02 file
-- [ ] Search-replace 8 token classes (slug, table, rel col, list view, etc.)
-- [ ] Update plan 260429 "Open questions §1"
-- [ ] Add 2026-05-20 note in plan 260429
-- [ ] Final grep verification (zero `customers` matches)
+- [x] Audit grep matches in plan 260429
+- [x] `git mv` phase-02 file
+- [x] Search-replace 8 token classes (slug, table, rel col, list view, etc.)
+- [x] Update plan 260429 "Open questions §1"
+- [x] Add 2026-05-20 note in plan 260429
+- [x] Final grep verification (zero `customers` matches)
 
 ## Success criteria
 

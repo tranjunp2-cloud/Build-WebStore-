@@ -11,8 +11,9 @@
 
 - Date: 2026-05-20
 - Priority: P0 (Customers without Orders linkage is half-feature)
-- Implementation status: pending
-- Review status: pending
+- Implementation status: completed
+- Review status: completed (score: 9.96/10)
+- Commit: 40e13ccf
 - Description: Add nullable `customer` relationship to Orders. Extend Orders `beforeChange` hook to upsert-and-link Customer by `(tenant_id, lower(trim(email)))`. Preserve denormalized snapshot fields (`customerEmail`, `customerName`, `customerPhone`, `shippingAddress`) untouched for historical orders. Outline orphan-backfill script (DO NOT run, DO NOT add to db-setup).
 
 ## Key insights
@@ -226,16 +227,16 @@ POST /api/orders { customerEmail: 'Foo@Bar.com ', customerName: 'Foo', tenant: T
 
 ## Todo
 
-- [ ] Phase 02 merged on staging
-- [ ] Create `auto-link-customer.ts` helper
-- [ ] Create `sync-customer-snapshot.ts` helper
-- [ ] Wire hooks + field into `Orders.ts`
-- [ ] Add 2 migration entries to `db-setup.js` (column + index)
-- [ ] `check-migrations.js` exit 0
-- [ ] `npm run build` green
-- [ ] Smoke: idempotent customer (3 orders → 1 customer)
-- [ ] Smoke: empty email → no link, no error
-- [ ] Outline backfill script in this doc (no file)
+- [x] Phase 02 merged on staging
+- [x] Create `auto-link-customer.ts` helper
+- [x] Create `sync-customer-snapshot.ts` helper
+- [x] Wire hooks + field into `Orders.ts`
+- [x] Add 2 migration entries to `db-setup.js` (column + index)
+- [x] `check-migrations.js` exit 0
+- [x] `npm run build` green
+- [x] Smoke: idempotent customer (3 orders → 1 customer)
+- [x] Smoke: empty email → no link, no error
+- [x] Outline backfill script in this doc (no file)
 
 ## Success criteria
 

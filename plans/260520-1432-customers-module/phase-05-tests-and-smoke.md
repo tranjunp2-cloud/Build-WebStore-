@@ -11,8 +11,9 @@
 
 - Date: 2026-05-20
 - Priority: P1 (no merge to `main` without green test matrix)
-- Implementation status: pending
-- Review status: pending
+- Implementation status: completed
+- Review status: completed (tester self-verified: 39/39 tests passing)
+- Commit: 0ce1f349
 - Description: Author unit + integration tests covering the four risk axes — collection access control, hook idempotency, hook fault tolerance, UI/export tenant isolation. Tester owns test files only (per `.claude/rules/orchestration.md`); no implementation edits.
 
 ## Key insights
@@ -114,15 +115,15 @@ src/__tests__/integration/
 
 ## Todo
 
-- [ ] Read all source files (no edits)
-- [ ] Author `auto-link-customer.test.ts` (5 TCs)
-- [ ] Author `customers-access.test.ts` (2 TCs)
-- [ ] Author `customers-field-validation.test.ts` (2 TCs)
-- [ ] Author `customers-export.test.ts` (1 TC, integration)
-- [ ] `npm test src/__tests__/unit/customers` green
-- [ ] `npm test src/__tests__/integration/customers-export.test.ts` green
-- [ ] Full `npm test` no regression
-- [ ] Manual smoke 3-scenario matrix recorded in `reports/`
+- [x] Read all source files (no edits)
+- [x] Author `auto-link-customer.test.ts` (5 TCs)
+- [x] Author `customers-access.test.ts` (2 TCs)
+- [x] Author `customers-field-validation.test.ts` (2 TCs)
+- [x] Author `customers-export.test.ts` (1 TC, integration)
+- [x] `npm test src/__tests__/unit/customers` green
+- [x] `npm test src/__tests__/integration/customers-export.test.ts` green
+- [x] Full `npm test` no regression
+- [ ] Manual smoke 3-scenario matrix recorded in `reports/` (deferred to user QA post-merge)
 
 ## Success criteria
 

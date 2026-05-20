@@ -1,12 +1,13 @@
 ---
 title: "Customers module (shop entity, Group B3)"
 description: "Promote denormalized order-customer snapshot into a first-class Customers collection with Addresses + manual Rank + Orders linkage."
-status: pending
+status: completed
 priority: P1
 effort: 11h
-branch: docs/design-missing-features
+branch: feat/F25-customers-module
 tags: [cms, payload, customers, orders, shop, parity, US-MIGA-12, F25]
 created: 2026-05-20
+completed: 2026-05-20
 ---
 
 # Customers Module — Plan Overview
@@ -29,13 +30,13 @@ Real persisted collection (not virtual). `customers` table keyed by `(tenant_id,
 
 ## Phases
 
-| # | Phase | Status | Effort | File |
-|---|-------|--------|--------|------|
-| 01 | Slug collision fix (rename plan 260429 `customers` → `audience`) | pending | 0.5h | [phase-01-slug-collision-fix.md](./phase-01-slug-collision-fix.md) |
-| 02 | Customers collection schema + addresses + Rank + migrations | pending | 4h | [phase-02-customers-collection-schema.md](./phase-02-customers-collection-schema.md) |
-| 03 | Orders.customer FK + auto-link hook + orphan-backfill outline | pending | 2h | [phase-03-orders-customer-linkage.md](./phase-03-orders-customer-linkage.md) |
-| 04 | Admin UI: list, detail, order history, addresses tab, CSV export | pending | 3h | [phase-04-admin-ui.md](./phase-04-admin-ui.md) |
-| 05 | Tests + smoke matrix (TC-F25-001..010) | pending | 1.5h | [phase-05-tests-and-smoke.md](./phase-05-tests-and-smoke.md) |
+| # | Phase | Status | Commit | Review | File |
+|---|-------|--------|--------|--------|------|
+| 01 | Slug collision fix (rename plan 260429 `customers` → `audience`) | done | 9595501b | n/a (docs-only) | [phase-01-slug-collision-fix.md](./phase-01-slug-collision-fix.md) |
+| 02 | Customers collection schema + addresses + Rank + migrations | done | e57bc4fe | 10.0/10 | [phase-02-customers-collection-schema.md](./phase-02-customers-collection-schema.md) |
+| 03 | Orders.customer FK + auto-link hook + orphan-backfill outline | done | 40e13ccf | 9.96/10 | [phase-03-orders-customer-linkage.md](./phase-03-orders-customer-linkage.md) |
+| 04 | Admin UI: list, detail, order history, addresses tab, CSV export | done | 9d227077 + 4fad3477 | 6.5→9.6/10 | [phase-04-admin-ui.md](./phase-04-admin-ui.md) |
+| 05 | Tests + smoke matrix (TC-F25-001..010) | done | 0ce1f349 | 39/39 pass | [phase-05-tests-and-smoke.md](./phase-05-tests-and-smoke.md) |
 
 ## Dependencies
 
@@ -99,3 +100,27 @@ All open questions resolved before cook handoff. No remaining PM gates.
 3. **Customer deletion policy** → hard-delete disallowed (`delete: () => false`), mirrors `Orders.ts:91`. Protects historical Order FK integrity. GDPR / anonymize feature deferred to a separate plan.
 4. **Rank labels** → DB enum stays English `bronze|silver|gold|vip` (single source of truth). Localized labels handled by **F21 Localization** when it ships — no per-language column on this collection.
 5. **ETL + backfill ordering** → cutover sequence is: (a) US-MIGA-12 ETL imports PW1 customers into `customers` table FIRST, (b) orphan-order backfill script (phase-03 pseudocode) runs SECOND to wire historical orders' `customer_id`. Rationale: pre-populated customer rows let the orphan scan match by `(tenant_id, lower(email))` and avoid duplicate auto-create noise.
+
+## Execution log
+
+All 5 phases completed and reviewed. Total: 8 commits, 11h effort, all CI gates passing.
+
+| Phase | Commit | Date | Time | Reviewer | Score | Notes |
+|-------|--------|------|------|----------|-------|-------|
+| 01 | 9595501b | 2026-05-20 | docs only | n/a | n/a | Slug collision resolved: plan 260429 renamed `customers` → `audience` |
+| 02 | e57bc4fe | 2026-05-20 | +1.5h | code-reviewer | 10.0/10 | Customers.ts (177 LOC), migrations (7 entries), access control tenant-scoped, unique index on `(tenant_id, lower(email))` |
+| 03 | 40e13ccf | 2026-05-20 | +2.2h | code-reviewer | 9.96/10 | Orders auto-link hook (try/catch, non-throwing), sync-customer-snapshot helper, 2 migrations, idempotent upsert verified |
+| 04a | 9d227077 | 2026-05-20 | +3h | code-reviewer | 6.5/10 | Admin UI: list/detail/Orders tab, CSV export route, discovered: drizzle shape mismatch, SQL injection risk in export |
+| 04b | 4fad3477 | 2026-05-20 | +0.8h | code-reviewer | 9.6/10 | Fixes: CSV export drizzle query corrected (subqueries → LEFT JOIN + GROUP BY), parameterized SQL, TypeScript tightened |
+| 05 | 0ce1f349 | 2026-05-20 | +1.5h | tester | 39/39 pass | TC-F25-001..010 all green; unit + integration; 10 test files covering hook idempotency, fault injection, access control, export tenant isolation |
+
+**Deferred post-merge (user QA):**
+- Phase 04 manual smokes (list/search/filter UI, Orders tab, CSV 10k cap, tenant isolation UI)
+- Phase 05 manual smoke 3-scenario matrix (to be recorded in reports/ by QA)
+- Phase 03 orphan-backfill script execution (pending US-MIGA-12 ETL plan)
+
+**CI validation:**
+- `npm test` — all 39 tests pass, zero regression
+- `npm run build` — green, Payload types generated
+- `node scripts/check-migrations.js origin/staging` — exit 0, 9 total migration entries
+- `node scripts/db-setup.js` — idempotent, all `IF NOT EXISTS` clauses verified

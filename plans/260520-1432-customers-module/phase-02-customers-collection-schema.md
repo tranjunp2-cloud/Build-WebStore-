@@ -11,8 +11,9 @@
 
 - Date: 2026-05-20
 - Priority: P0 (foundation for phases 03/04/05)
-- Implementation status: pending
-- Review status: pending
+- Implementation status: completed
+- Review status: completed (score: 10.0/10)
+- Commit: e57bc4fe
 - Description: Create a real persisted `customers` collection with tenant scoping, multi-address book (Payload `array` field), and manual `rank` select tag. Add all `scripts/db-setup.js` migrations (collection table + addresses sub-table + rels ALTERs + unique index). Register in `src/payload.config.ts`. No code touching Orders or UI — pure collection + schema work.
 
 ## Key insights
@@ -219,14 +220,14 @@ Admin user → POST /api/customers
 
 ## Todo
 
-- [ ] Phase 01 complete (slug freed)
-- [ ] Author `src/collections/Customers.ts` ≤200 LOC
-- [ ] Add 7 migration entries to `scripts/db-setup.js`
-- [ ] Add `'customers'` to `COLLECTION_SLUGS[]`
-- [ ] Register in `src/payload.config.ts`
-- [ ] `node scripts/check-migrations.js origin/staging` → exit 0
-- [ ] `npm run build` → green
-- [ ] Manual smoke: create customer; duplicate rejected; tenant scoping verified
+- [x] Phase 01 complete (slug freed)
+- [x] Author `src/collections/Customers.ts` ≤200 LOC
+- [x] Add 7 migration entries to `scripts/db-setup.js`
+- [x] Add `'customers'` to `COLLECTION_SLUGS[]`
+- [x] Register in `src/payload.config.ts`
+- [x] `node scripts/check-migrations.js origin/staging` → exit 0
+- [x] `npm run build` → green
+- [x] Manual smoke: create customer; duplicate rejected; tenant scoping verified
 
 ## Success criteria
 
