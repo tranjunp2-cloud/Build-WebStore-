@@ -65,6 +65,7 @@ export const TY_CSS = `
 .ty-step-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;flex-shrink:0;}
 .ty-step-pill.pending{background:#fff4dc;border:1px solid #f1d693;color:#8a5c0a;}
 .ty-step-pill.done{background:var(--tl5);border:1px solid var(--tl2);color:var(--tl7);}
+.ty-step-pill.done.verified{background:var(--tl);border-color:var(--tl);color:#fff;}
 .ty-step-pill.blue{background:#e6f0ff;border:1px solid #c4daff;color:#1e40af;}
 /* Unified (stripe/cod) block */
 .ty-bank-block.ty-unified{padding:20px 22px;}
@@ -235,6 +236,7 @@ export const TY_CSS = `
 .ty-success-state{display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--tl5);border:1px solid var(--tl2);border-radius:12px;animation:tyFadeIn 320ms cubic-bezier(.22,1,.36,1);}
 @keyframes tyFadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 .ty-success-icon{width:40px;height:40px;border-radius:999px;background:var(--tl);color:#fff;display:grid;place-items:center;flex-shrink:0;box-shadow:0 4px 12px -4px rgba(14,117,86,.40);}
+.ty-success-icon.verified{background:var(--tl);box-shadow:0 4px 16px -4px rgba(14,117,86,.50);}
 .ty-success-text{flex:1;min-width:0;}
 .ty-success-title{font-size:14px;font-weight:800;color:var(--tl7);margin:0 0 2px;}
 .ty-success-sub{font-size:12.5px;color:var(--f3);margin:0;line-height:1.45;}

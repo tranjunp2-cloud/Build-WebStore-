@@ -66,7 +66,7 @@ const CopyIcon = () => (
 
 export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken }: Props) {
     const [uploadStatus, setUploadStatus] = useState<UploadStatus>(
-        order.paymentStatus === 'pending_verification' ? 'success' : 'empty'
+        order.paymentStatus === 'pending_verification' || order.paymentStatus === 'paid' ? 'success' : 'empty'
     )
     const [uploadFile, setUploadFile] = useState<File | null>(null)
     const [dragging, setDragging] = useState(false)
@@ -98,41 +98,50 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const isBT = order.paymentMethod === 'bank_transfer'
     const isCod = order.paymentMethod === 'cod'
     const isStripe = !isBT && !isCod
-    const isSubmitted = isBT && uploadStatus === 'success'
+    const isPaid = order.paymentStatus === 'paid'
+    const isSubmitted = isBT && uploadStatus === 'success' && !isPaid
     const addr = order.shippingAddress
     const addrLine = [addr?.city, addr?.state, addr?.postcode].filter(Boolean).join(', ')
     const placed = new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
     const maskedEmail = maskEmail(order.customerEmail)
     const ccySymbol = currency === 'MYR' ? 'RM' : currency === 'SGD' ? 'S$' : '$'
 
-    const heroCheckClass = isSubmitted ? 'info' : isBT ? 'warning' : ''
-    const heroClass = isSubmitted ? ' submitted' : isBT ? ' pending' : ''
-    const heroTitle = isSubmitted
-        ? 'The order has been placed — Awaiting seller confirmation.'
-        : isBT ? 'Order placed — Awaiting payment' : 'Order Successfully Placed!'
-    const heroSub = isSubmitted
-        ? "Thanks! We've received your receipt. The seller will verify your transfer against bank records and confirm your order shortly — you'll get an email update."
-        : isBT
-            ? 'Please complete your bank transfer and upload the receipt below to avoid order cancellation.'
-            : isCod
-                ? 'Your order is reserved. Our team will verify your address by phone, then dispatch it for cash-on-delivery.'
-                : 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
-    const badgeLabel = isSubmitted ? 'Awaiting seller confirmation' : isBT ? 'Awaiting Payment' : isCod ? 'Cash on Delivery' : 'Paid'
-    const badgeTone = isSubmitted ? 'blue' : isBT ? 'amber' : isCod ? 'blue' : 'teal'
-    const badgeIcon = isSubmitted ? <Hourglass size={11} /> : isBT ? <Clock size={11} /> : isCod ? <Banknote size={11} /> : <Check size={11} />
-    const heroIcon = isSubmitted
-        ? <Hourglass size={36} strokeWidth={2} />
-        : isBT ? <Clock size={36} strokeWidth={2.5} /> : <Check size={36} strokeWidth={3} />
+    const heroCheckClass = isPaid ? '' : isSubmitted ? 'info' : isBT ? 'warning' : ''
+    const heroClass = isPaid ? '' : isSubmitted ? ' submitted' : isBT ? ' pending' : ''
+    const heroTitle = isPaid
+        ? 'Order Confirmed — Payment Verified!'
+        : isSubmitted
+            ? 'The order has been placed — Awaiting seller confirmation.'
+            : isBT ? 'Order placed — Awaiting payment' : 'Order Successfully Placed!'
+    const heroSub = isPaid
+        ? 'Your payment has been verified by the seller. Your order is now being prepared for shipment.'
+        : isSubmitted
+            ? "Thanks! We've received your receipt. The seller will verify your transfer against bank records and confirm your order shortly — you'll get an email update."
+            : isBT
+                ? 'Please complete your bank transfer and upload the receipt below to avoid order cancellation.'
+                : isCod
+                    ? 'Your order is reserved. Our team will verify your address by phone, then dispatch it for cash-on-delivery.'
+                    : 'Your payment was processed successfully. Sit tight — we are getting your order ready for shipment.'
+    const badgeLabel = isPaid ? 'Payment Verified' : isSubmitted ? 'Awaiting seller confirmation' : isBT ? 'Awaiting Payment' : isCod ? 'Cash on Delivery' : 'Paid'
+    const badgeTone = isPaid ? 'teal' : isSubmitted ? 'blue' : isBT ? 'amber' : isCod ? 'blue' : 'teal'
+    const badgeIcon = isPaid ? <Check size={11} /> : isSubmitted ? <Hourglass size={11} /> : isBT ? <Clock size={11} /> : isCod ? <Banknote size={11} /> : <Check size={11} />
+    const heroIcon = isPaid
+        ? <Check size={36} strokeWidth={3} />
+        : isSubmitted
+            ? <Hourglass size={36} strokeWidth={2} />
+            : isBT ? <Clock size={36} strokeWidth={2.5} /> : <Check size={36} strokeWidth={3} />
 
-    const sumStatus = isSubmitted
-        ? { tone: 'blue', s1: 'Awaiting seller confirmation', s2: 'Seller will verify your transfer shortly.' }
-        : isBT
-            ? { tone: 'amber', s1: 'Action Required — Upload Receipt', s2: "We can't ship until your transfer is verified." }
-            : isCod
-                ? { tone: 'blue', s1: 'Pending phone verification', s2: "We'll call to confirm your address." }
-                : { tone: 'teal', s1: 'Payment received · Processing', s2: 'Warehouse is preparing your parcel.' }
+    const sumStatus = isPaid
+        ? { tone: 'teal', s1: 'Payment verified · Order confirmed', s2: 'Warehouse is preparing your parcel.' }
+        : isSubmitted
+            ? { tone: 'blue', s1: 'Awaiting seller confirmation', s2: 'Seller will verify your transfer shortly.' }
+            : isBT
+                ? { tone: 'amber', s1: 'Action Required — Upload Receipt', s2: "We can't ship until your transfer is verified." }
+                : isCod
+                    ? { tone: 'blue', s1: 'Pending phone verification', s2: "We'll call to confirm your address." }
+                    : { tone: 'teal', s1: 'Payment received · Processing', s2: 'Warehouse is preparing your parcel.' }
 
-    const shipsText = isCod ? 'After phone verification' : isBT ? 'Within 24 h after verification' : 'Within 24 h'
+    const shipsText = isCod ? 'After phone verification' : isBT && !isPaid ? 'Within 24 h after verification' : 'Within 24 h'
 
     const validateFile = (f: File): boolean => {
         if (!ACCEPTED_MIME.includes(f.type)) {
@@ -371,30 +380,44 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         </div>
                     )}
 
-                    {/* ── Bank Transfer: Upload success state ── */}
+                    {/* ── Bank Transfer: Upload success / payment verified state ── */}
                     {isBT && uploadStatus === 'success' && (
                         <div className="ty-upload-block">
                             <div className="ty-block-head ty-block-head-compact">
                                 <span className="ty-block-num">02</span>
-                                <div className="ty-block-titles"><h3>Upload Payment Receipt</h3></div>
-                                <span className="ty-step-pill done"><Check size={11} /> Submitted</span>
+                                <div className="ty-block-titles">
+                                    <h3>Upload Payment Receipt</h3>
+                                </div>
+                                <span className={`ty-step-pill done${isPaid ? ' verified' : ''}`}>
+                                    <Check size={11} /> {isPaid ? 'Verified' : 'Submitted'}
+                                </span>
                             </div>
                             <div className="ty-success-state">
-                                <div className="ty-success-icon"><Check size={20} strokeWidth={3} /></div>
+                                <div className={`ty-success-icon${isPaid ? ' verified' : ''}`}><Check size={20} strokeWidth={3} /></div>
                                 <div className="ty-success-text">
-                                    <p className="ty-success-title">File uploaded successfully</p>
-                                    <p className="ty-success-sub">We&apos;ll verify within 1–2 business hours and email you a confirmation.</p>
+                                    <p className="ty-success-title">
+                                        {isPaid ? 'Payment verified by seller' : 'File uploaded successfully'}
+                                    </p>
+                                    <p className="ty-success-sub">
+                                        {isPaid
+                                            ? 'Your transfer has been confirmed. Your order is now being prepared for shipment.'
+                                            : "We'll verify within 1–2 business hours and email you a confirmation."}
+                                    </p>
                                 </div>
                             </div>
-                            <div className="ty-upload-actions">
-                                <button className="ty-btn ghost" onClick={resetUpload}>
-                                    <RotateCcw size={13} /> Upload a different file
-                                </button>
-                            </div>
-                            <div className="ty-email-note">
-                                <Mail size={14} />
-                                <span>A copy of your order details and a re-upload link has also been sent to <strong>{maskedEmail}</strong>.</span>
-                            </div>
+                            {!isPaid && (
+                                <>
+                                    <div className="ty-upload-actions">
+                                        <button className="ty-btn ghost" onClick={resetUpload}>
+                                            <RotateCcw size={13} /> Upload a different file
+                                        </button>
+                                    </div>
+                                    <div className="ty-email-note">
+                                        <Mail size={14} />
+                                        <span>A copy of your order details and a re-upload link has also been sent to <strong>{maskedEmail}</strong>.</span>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
 
