@@ -73,28 +73,6 @@
   --dash-secondary-bg: #1F2937;
 }
 
-/* ── Theme Transition via @property (AC-2/3 #779) ───────────────────────── */
-/* Register dash-* tokens as typed <color> properties so the browser can
-   interpolate between light/dark values when .dark class toggles.
-   No JS tricks needed — transition fires automatically on :root. */
-@property --dash-bg         { syntax: '<color>'; initial-value: #F8FAFC; inherits: true; }
-@property --dash-surface    { syntax: '<color>'; initial-value: #FFFFFF; inherits: true; }
-@property --dash-surface-hover { syntax: '<color>'; initial-value: #F1F5F9; inherits: true; }
-@property --dash-text       { syntax: '<color>'; initial-value: #0F172A; inherits: true; }
-@property --dash-text-muted { syntax: '<color>'; initial-value: #64748B; inherits: true; }
-@property --dash-border     { syntax: '<color>'; initial-value: #E2E8F0; inherits: true; }
-@property --dash-secondary-bg { syntax: '<color>'; initial-value: #F1F5F9; inherits: true; }
-
-:root {
-  transition:
-    --dash-bg 150ms ease,
-    --dash-surface 150ms ease,
-    --dash-surface-hover 150ms ease,
-    --dash-text 150ms ease,
-    --dash-text-muted 150ms ease,
-    --dash-border 150ms ease,
-    --dash-secondary-bg 150ms ease;
-}
 
 /* ── Dashboard Shell — Legacy Color Overrides ────────────────────────────── */
 /* Remaps hardcoded Tailwind dark utilities to dash-* semantic tokens.
