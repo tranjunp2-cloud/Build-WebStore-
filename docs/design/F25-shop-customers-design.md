@@ -4,7 +4,8 @@
 > **Feature Code:** F25
 > **Version:** 1.0 — Initial PW2-side build (ETL deferred to US-MIGA-12)
 > **Updated:** 2026-05-20
-> **Figma Design:** TBD (this doc is the source of truth until Figma added)
+> **Claude Design (interactive):** [F25 Shop Customers prototype](https://claude.ai/design/p/019dd7e0-9ebb-7240-9a01-c5a1a8aa733b?file=customers-f25%2FF25%20Shop%20Customers.html&present=1)
+> **Figma Design:** TBD
 > **Decisions:** [Plan 260520-1432-customers-module](../../plans/260520-1432-customers-module/plan.md) · [PRD F25](../prd/F25-shop-customers.md) · Issue [#1043](https://github.com/primeproduction/ech-prime-web-v2/issues/1043) · PR [#1042](https://github.com/primeproduction/ech-prime-web-v2/pull/1042)
 
 Tài liệu này cung cấp bản vẽ Wireframe + spec UI cho module Shop Customers (F25), tổ chức dữ liệu khách hàng mua hàng thành entity bậc một. Tất cả giao diện sống bên trong **Payload Admin** và tuân thủ **F18 CMS Global Layout** (Sidebar trái + Topbar giữ nguyên).
