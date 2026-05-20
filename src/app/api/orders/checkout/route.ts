@@ -240,6 +240,7 @@ export async function POST(request: Request) {
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
         const dashboardOrderUrl = `${baseUrl}/orders`
+        const siteLocale = (site as any).locale ?? 'ms'
 
         // COD: confirmation to buyer + new-order notification to seller(s)
         if (paymentMethod === 'cod') {
@@ -265,6 +266,7 @@ export async function POST(request: Request) {
                 orderPageUrl,
                 currency,
                 buyerNote: (order as any).notes ?? null,
+                locale: siteLocale,
             })
             payload.sendEmail({ to: customer.email, subject: codEmail.subject, html: codEmail.html })
                 .catch((err: unknown) => console.error('[Email COD confirmation]', err))
@@ -318,6 +320,7 @@ export async function POST(request: Request) {
                 bankAccountNo: pcConfig?.bankAccountNo ?? null,
                 bankAccountHolder: pcConfig?.bankAccountHolder ?? null,
                 merchantQrUrl: pcConfig?.merchantQrCode?.url ?? null,
+                locale: siteLocale,
             })
             payload.sendEmail({ to: customer.email, subject: btEmail.subject, html: btEmail.html })
                 .catch((err: unknown) => console.error('[Email BT instructions]', err))

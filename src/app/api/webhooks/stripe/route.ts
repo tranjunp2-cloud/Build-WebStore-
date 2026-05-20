@@ -208,6 +208,7 @@ async function handleCheckoutCompleted(
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.orderNumber}`
         const dashboardOrderUrl = `${baseUrl}/orders`
+        const siteLocale = typeof (order as any).site === 'object' ? ((order as any).site?.locale ?? 'ms') : 'ms'
 
         // Buyer: order confirmation
         try {
@@ -233,6 +234,7 @@ async function handleCheckoutCompleted(
                 orderPageUrl,
                 currency: order.currency || 'MYR',
                 buyerNote: (order as any).notes ?? null,
+                locale: siteLocale,
             })
 
             await sendEmail({

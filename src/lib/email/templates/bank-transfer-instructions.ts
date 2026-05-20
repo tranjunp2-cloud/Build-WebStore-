@@ -42,7 +42,7 @@ export interface BankTransferInstructionsData {
     currency: string
     buyerNote?: string | null
     orderDate: string
-    /** BT-XXXXXX format — buyer must enter in transfer notes */
+    /** BT-XXXXXX format — stored in DB; email now shows orderNumber as reference instead */
     paymentReference: string
     /** Signed JWT URL for post-order upload page */
     magicLinkUrl: string
@@ -291,7 +291,7 @@ export function bankTransferInstructionsEmail(
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#FEFCE8;border:2px solid #EAB308;border-radius:10px;text-align:center;">
           <tr><td style="padding:20px 24px;">
             <div style="font-size:12px;text-transform:uppercase;color:#92400E;font-weight:700;letter-spacing:0.08em;margin-bottom:10px;">${tBT.referenceHeading}</div>
-            <div style="font-size:26px;font-weight:800;font-family:'Courier New',Courier,monospace;letter-spacing:3px;color:#78350F;margin-bottom:10px;">${esc(data.paymentReference)}</div>
+            <div style="font-size:26px;font-weight:800;font-family:'Courier New',Courier,monospace;letter-spacing:3px;color:#78350F;margin-bottom:10px;">${esc(data.orderNumber)}</div>
             <div style="font-size:13px;color:#92400E;">${tBT.referenceInstruction}</div>
           </td></tr>
         </table>
