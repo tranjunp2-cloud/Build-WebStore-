@@ -406,11 +406,15 @@ export async function generateSiteWithAI(
                 // copy gets replaced with curated MY content when AI hits the
                 // generic blacklist. Safe on sub-pages because no block is
                 // injected; missing blocks stay missing.
-                if (postSwapEnabled && detectedCategory) {
+                // Always run postAISwapStep when enabled — normalization (contact labels,
+                // client-logos headline, features headline, testimonials subheadline) must
+                // run even when GPT omits the category field (detectedCategory undefined).
+                // Pass 'business' as fallback so hydrateBiz always has a valid pack.
+                if (postSwapEnabled) {
                     const swapResult = postAISwapStep(
                         pageBlocks as Record<string, unknown>[],
                         enforcerBizOverride,
-                        detectedCategory,
+                        detectedCategory ?? 'business',
                         themeMood,
                         themeSeed,
                         blockLang,
@@ -521,11 +525,11 @@ export async function generateSiteWithAI(
             validBlocks = validateBlocks(rawBlocks)
 
             // Plan 260415 Phase 04 — post-AI swap on single-page path too.
-            if (postSwapEnabled && detectedCategory) {
+            if (postSwapEnabled) {
                 const swapResult = postAISwapStep(
                     validBlocks as Record<string, unknown>[],
                     enforcerBizOverride,
-                    detectedCategory,
+                    detectedCategory ?? 'business',
                     themeMood,
                     themeSeed,
                     blockLang,
