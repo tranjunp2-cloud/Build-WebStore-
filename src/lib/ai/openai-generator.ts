@@ -57,6 +57,47 @@ export type SSEEvent = {
     data: Record<string, unknown>
 }
 
+// Vietnamese-exclusive diacritical marks — not present in Malay, English, French, Spanish, or Portuguese.
+// Characters like é/à/â shared with Romance languages are excluded intentionally.
+const VI_DIACRITICS_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/
+
+// Malay function words and common nouns — reliable indicators of Malay input.
+// Includes both grammar words (high precision, low recall) and common business
+// nouns (kedai, makanan, etc.) to catch short noun-only inputs from SMB operators.
+const MALAY_WORDS = new Set([
+    // grammar/function words
+    'dan', 'atau', 'untuk', 'yang', 'dengan', 'tidak', 'kami', 'anda',
+    'kepada', 'dari', 'juga', 'dalam', 'akan', 'boleh', 'sudah', 'adalah',
+    'keperluan', 'perkhidmatan', 'menyediakan', 'menggunakan', 'ialah',
+    // common business/noun words distinctive to Malay
+    'kedai', 'makanan', 'perniagaan', 'jualan', 'pelanggan', 'warung',
+    'restoran', 'butik', 'klinik', 'syarikat', 'tempatan', 'harga',
+    'murah', 'berkualiti', 'jenama', 'produk', 'terbaik', 'segar',
+])
+
+/**
+ * Detect language from user's business info input text.
+ * Used to route 'auto' language requests: if input is Malay or Vietnamese,
+ * skip template-first (English-only templates) and use AI-first instead.
+ */
+function guessLanguageFromInput(info: BusinessInfoInput): 'ms' | 'vi' | 'en' {
+    const text = [info.businessName, info.shortDescription, info.products, info.industry]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+    // Vietnamese-exclusive diacritical marks — not shared with Romance languages
+    if (VI_DIACRITICS_RE.test(text)) return 'vi'
+
+    // Count distinct Malay words (not repetitions) to avoid false positives from
+    // a single repeated word. Require 2+ distinct matches.
+    const tokens = new Set(text.split(/\W+/).filter(Boolean))
+    const malayMatches = [...tokens].filter(t => MALAY_WORDS.has(t)).length
+    if (malayMatches >= 2) return 'ms'
+
+    return 'en'
+}
+
 /**
  * Generate a complete website using OpenAI GPT-4o with streaming.
  * Falls back to rule-based generation if API key missing or AI fails.
@@ -122,7 +163,11 @@ export async function generateSiteWithAI(
     const genMode = process.env.GEN_MODE?.trim() || 'template-first'
     const hasCustomInput = Boolean(extraInstructions?.trim()) || Boolean(referencePrompt?.trim())
 
-    if (genMode === 'template-first' && !hasCustomInput) {
+    // Template-first uses hardcoded English templates — only hero/SEO are GPT-personalized.
+    // Skip it for explicit non-English languages and for 'auto' when user's input text
+    // is detected as Malay/Vietnamese so AI-first generates fully localized content.
+    const detectedLang = language === 'auto' ? guessLanguageFromInput(businessInfo) : language
+    if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en') {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
         const templateResult = await generateTemplateFirst(
@@ -184,7 +229,7 @@ export async function generateSiteWithAI(
         }
         const userPromptText = buildUserPrompt(businessInfo, {
             extraInstructions: sanitizedExtra,
-            language,
+            language: detectedLang,
             referencePrompt: sanitizedRef,
             mood: themeMood,
             recipe: layoutRecipe,
@@ -312,8 +357,9 @@ export async function generateSiteWithAI(
         const detectedCategory = typeof parsed.category === 'string' ? parsed.category : undefined
 
         // Normalize pipeline language for content-rules lookups.
-        // normalizeLang handles 'auto' → 'en' internally.
-        const contentLang: ContentLang = normalizeLang(language)
+        // Use detectedLang (never 'auto') so Malay/Vietnamese sites get the
+        // correct char limits and placeholder copy, not English fallback.
+        const contentLang: ContentLang = normalizeLang(detectedLang)
 
         // Helper: validate and sanitize an array of raw blocks.
         // Unsupported block drop list lives in ./unsupported-blocks for reuse

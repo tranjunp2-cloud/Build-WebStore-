@@ -3,6 +3,7 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { GripVertical, ChevronUp, ChevronDown, Copy, Sparkles, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface BlockActionBarProps {
     blockIndex: number
@@ -16,6 +17,8 @@ interface BlockActionBarProps {
     onDuplicate: () => void
     onAIEdit: () => void
     onDelete: () => void
+    deleteDisabled?: boolean
+    deleteDisabledTitle?: string
     onDragStart?: (event: ReactPointerEvent<HTMLButtonElement>) => void
     position: { top: number; left: number; width: number }
 }
@@ -37,6 +40,8 @@ export function BlockActionBar({
     onDuplicate,
     onAIEdit,
     onDelete,
+    deleteDisabled,
+    deleteDisabledTitle,
     onDragStart,
     position,
 }: BlockActionBarProps) {
@@ -107,14 +112,27 @@ export function BlockActionBar({
 
             <div className="h-5 w-px bg-white/10" />
 
-            <button
-                type="button"
-                className={cn(ACTION_BTN, 'hover:bg-red-500/15')}
-                onClick={onDelete}
-                title={`Delete ${blockName}`}
-            >
-                <Trash2 className="h-3.5 w-3.5 text-red-400" />
-            </button>
+            <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                            <button
+                                type="button"
+                                className={cn(ACTION_BTN, !deleteDisabled && 'hover:bg-red-500/15')}
+                                onClick={deleteDisabled ? undefined : onDelete}
+                                disabled={deleteDisabled}
+                            >
+                                <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                            </button>
+                        </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                        {deleteDisabled
+                            ? (deleteDisabledTitle ?? `Delete ${blockName}`)
+                            : `Delete ${blockName}`}
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </div>
     )
 }

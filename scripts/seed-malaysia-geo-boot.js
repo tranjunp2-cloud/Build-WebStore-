@@ -21,39 +21,44 @@ async function seedMalaysiaGeo(pool) {
   const dataPath = path.join(__dirname, 'data', 'malaysia-geo.json');
   const { states, districts } = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
 
+  // Flatten postcodes before acquiring client (CPU only, no I/O)
+  const allPostcodes = [];
+  const allDistrictIds = [];
+  for (const d of districts) {
+    for (const pc of d.postcodes) {
+      allPostcodes.push(String(pc));
+      allDistrictIds.push(d.id);
+    }
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    for (const s of states) {
-      await client.query(
-        `INSERT INTO malaysia_states (id, name, state_code, zone)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (id) DO NOTHING`,
-        [s.id, s.name, s.state_code, s.zone],
-      );
-    }
+    // 3,855 individual queries → 3 batch UNNEST queries
+    await client.query(
+      `INSERT INTO malaysia_states (id, name, state_code, zone)
+       SELECT * FROM UNNEST($1::int[], $2::varchar[], $3::varchar[], $4::varchar[])
+       ON CONFLICT (id) DO NOTHING`,
+      [states.map(s => s.id), states.map(s => s.name), states.map(s => s.state_code), states.map(s => s.zone)],
+    );
 
-    for (const d of districts) {
-      await client.query(
-        `INSERT INTO malaysia_districts (id, state_id, name)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (id) DO NOTHING`,
-        [d.id, d.state_id, d.name],
-      );
-      for (const pc of d.postcodes) {
-        await client.query(
-          `INSERT INTO malaysia_postcodes (postcode, district_id)
-           VALUES ($1, $2)
-           ON CONFLICT (postcode) DO NOTHING`,
-          [pc, d.id],
-        );
-      }
-    }
+    await client.query(
+      `INSERT INTO malaysia_districts (id, state_id, name)
+       SELECT * FROM UNNEST($1::int[], $2::int[], $3::varchar[])
+       ON CONFLICT (id) DO NOTHING`,
+      [districts.map(d => d.id), districts.map(d => d.state_id), districts.map(d => d.name)],
+    );
+
+    await client.query(
+      `INSERT INTO malaysia_postcodes (postcode, district_id)
+       SELECT * FROM UNNEST($1::varchar[], $2::int[])
+       ON CONFLICT (postcode) DO NOTHING`,
+      [allPostcodes, allDistrictIds],
+    );
 
     await client.query('COMMIT');
-    const totalPc = districts.reduce((s, d) => s + d.postcodes.length, 0);
-    return { action: 'seeded', states: states.length, districts: districts.length, postcodes: totalPc };
+    return { action: 'seeded', states: states.length, districts: districts.length, postcodes: allPostcodes.length };
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

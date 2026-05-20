@@ -515,7 +515,8 @@ export function PreviewScripts() {
                 const blockIndex = parseInt(clickedBlock.getAttribute('data-block-index') || '-1', 10)
                 const blockType = clickedBlock.getAttribute('data-block-type')
                 const isGlobal = ['navigation', 'footer', 'breadcrumb'].includes(blockType || '')
-                if (blockIndex >= 0 || isGlobal) {
+                // blockIndex < 0 covers all floating global blocks (cartWidget=-1, whatsapp-button=-2, socialWidget=-3)
+                if (blockIndex >= 0 || isGlobal || blockIndex < 0) {
                     const rect = clickedBlock.getBoundingClientRect()
                     const firstChild = (clickedBlock as HTMLElement).firstElementChild as HTMLElement | null
                     const contentTop = firstChild ? firstChild.getBoundingClientRect().top : rect.top

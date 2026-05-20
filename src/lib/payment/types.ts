@@ -8,6 +8,8 @@
 
 // ── Checkout ─────────────────────────────────────────────────────────
 
+export type StripePaymentMethod = 'card' | 'fpx'
+
 export interface CheckoutParams {
     orderId: string
     items: Array<{
@@ -25,6 +27,12 @@ export interface CheckoutParams {
     stripeAccountId: string
     /** Platform fee percentage (default: 3%) */
     applicationFeePercent?: number
+    /** Override fee in cents — when set, applicationFeePercent is ignored.
+     *  Use when items includes non-product line items (shipping, tax) to charge fee on product subtotal only. */
+    applicationFeeAmountCents?: number
+    /** Stripe payment methods enabled for this checkout. MUST be non-empty.
+     *  Built by backend from tenant.payment_card/fpx filtered by site.paymentConfig. */
+    paymentMethodTypes: StripePaymentMethod[]
 }
 
 export interface CheckoutResult {
@@ -39,6 +47,7 @@ export type PaymentEventType =
     | 'payment_failed'
     | 'subscription_updated'
     | 'account_updated'
+    | 'account_deauthorized'
     | 'refund_completed'
 
 export interface PaymentWebhookEvent {

@@ -1,22 +1,24 @@
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
-import {
-    createConnectedAccount,
-    createAccountLink,
-} from '@/lib/payment/stripe'
+// import { getStripeOAuthUrl } from '@/lib/payment/stripe' // STRIPE_CONNECT_DISABLED
 
 /**
  * POST /api/stripe/connect/onboard
  *
- * Initiates Stripe Connect onboarding for a merchant.
- * Creates a Standard connected account and returns the onboarding URL.
+ * STRIPE_CONNECT_DISABLED — OAuth Connect flow temporarily disabled.
+ * Uncomment the implementation below and re-enable getStripeOAuthUrl import to restore.
  *
- * Auth: Required (tenant owner)
- * Body: { tenantId }
- * Returns: { accountId, onboardingUrl }
+ * Original flow: returns Stripe OAuth authorize URL so seller can connect
+ * an existing Stripe account. Auth: Required (tenant owner). Body: { tenantId }.
  */
+export const POST = withAuth(async (_user, _request) => {
+    return NextResponse.json(
+        { success: false, error: { code: 'DISABLED', message: 'Stripe Connect is temporarily disabled' } },
+        { status: 503 },
+    )
+})
+
+/* STRIPE_CONNECT_DISABLED — original implementation preserved below
 export const POST = withAuth(async (user, request) => {
     try {
         const body = await request.json()
@@ -29,76 +31,22 @@ export const POST = withAuth(async (user, request) => {
             )
         }
 
-        // Verify user owns this tenant
+        // Verify user owns this tenant (normalize to string — Payload returns integer IDs)
         const userTenantIds = ((user as any).tenants || []).map((t: any) =>
-            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+            String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
         )
-        if (!userTenantIds.includes(tenantId)) {
+        if (!userTenantIds.includes(String(tenantId))) {
             return NextResponse.json(
                 { success: false, error: { code: 'FORBIDDEN', message: 'You do not own this tenant' } },
                 { status: 403 },
             )
         }
 
-        const payload = await getPayload({ config })
-
-        const tenant = await payload.findByID({ collection: 'tenants', id: tenantId })
-        if (!tenant) {
-            return NextResponse.json(
-                { success: false, error: { code: 'NOT_FOUND', message: 'Tenant not found' } },
-                { status: 404 },
-            )
-        }
-
-        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
-
-        // Check if already has a Stripe account
-        if ((tenant as any).stripeAccountId) {
-            // Already has account — just create a new onboarding link (for retry/refresh)
-            const accountLinkUrl = await createAccountLink(
-                (tenant as any).stripeAccountId,
-                `${baseUrl}/settings?stripe=refresh`,
-                `${baseUrl}/settings?stripe=complete`,
-            )
-
-            return NextResponse.json({
-                success: true,
-                data: {
-                    accountId: (tenant as any).stripeAccountId,
-                    onboardingUrl: accountLinkUrl,
-                },
-            })
-        }
-
-        // Create new connected account
-        const accountId = await createConnectedAccount(
-            user.email || '',
-            (tenant as any).name || 'Merchant',
-        )
-
-        // Save to tenant
-        await payload.update({
-            collection: 'tenants',
-            id: tenantId,
-            data: {
-                stripeAccountId: accountId,
-                stripeOnboardingComplete: false,
-            } as any,
-        })
-
-        // Create onboarding link
-        const accountLinkUrl = await createAccountLink(
-            accountId,
-            `${baseUrl}/settings?stripe=refresh`,
-            `${baseUrl}/settings?stripe=complete`,
-        )
+        const oauthUrl = getStripeOAuthUrl(String(tenantId))
 
         return NextResponse.json({
             success: true,
-            data: {
-                accountId,
-                onboardingUrl: accountLinkUrl,
-            },
+            data: { oauthUrl },
         })
     } catch (error: any) {
         console.error('[Stripe Connect Onboard Error]', error)
@@ -108,3 +56,4 @@ export const POST = withAuth(async (user, request) => {
         )
     }
 })
+*/

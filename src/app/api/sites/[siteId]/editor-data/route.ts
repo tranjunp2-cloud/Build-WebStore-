@@ -118,8 +118,17 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 socialLinks: site.socialLinks || {},
                 branding: site.branding || {},
                 seo: site.seo || {},
-                headerBlock: site.headerBlock || null,
-                footerBlock: site.footerBlock || null,
+                // Editor loads pending draft when available (null = no pending changes, fall back to live).
+                // Explicit null check avoids treating `{}` as "no pending" (falsy-OR would shadow live data).
+                headerBlock: site.pendingHeaderBlock != null
+                    ? (site.pendingHeaderBlock as typeof site.headerBlock)
+                    : site.headerBlock ?? null,
+                footerBlock: site.pendingFooterBlock != null
+                    ? (site.pendingFooterBlock as typeof site.footerBlock)
+                    : site.footerBlock ?? null,
+                globalBlocks: site.pendingGlobalBlocks != null
+                    ? (site.pendingGlobalBlocks as typeof site.globalBlocks)
+                    : site.globalBlocks ?? null,
                 shippingConfig: site.shippingConfig || {},
                 publishedAt: site.publishedAt || null,
                 tenantSlug: (typeof site.tenant === 'object' && site.tenant !== null)

@@ -55,6 +55,8 @@ export const navigationMeta = {
     quickActions: ['Add link', 'Change logo', 'Toggle CTA'],
     category: 'nav' as const,
     isSystem: true,
+    scope: 'global' as const,
+    scopeTooltip: 'Thanh điều hướng tự động cho toàn bộ site. Cấu hình 1 lần trong cài đặt site.',
 }
 
 /** Canonical configSchema export for block-schema-registry.ts introspection */

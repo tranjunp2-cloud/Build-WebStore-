@@ -90,6 +90,9 @@ export function PreviewSiteRenderer({ site, page: initialPage, pages: initialPag
             } else if (e.data?.type === 'UPDATE_PAGES') {
                 const { pages: updatedPages } = e.data
                 if (Array.isArray(updatedPages)) setPages(updatedPages as NavPage[])
+            } else if (e.data?.type === 'UPDATE_GLOBAL_BLOCKS') {
+                const { globalBlocks } = e.data
+                setSiteState(prev => ({ ...prev, globalBlocks: globalBlocks ?? null }))
             }
         }
         window.addEventListener('message', onMessage)

@@ -35,6 +35,7 @@ vi.mock('payload', () => {
                     slug: 'test-store',
                     stripeAccountId: 'acct_test_merchant',
                     stripeOnboardingComplete: true,
+                    payments: { payment_card: true, payment_fpx: true },
                 }
             }
             if (collection === 'products' && id === 'prod-1') {

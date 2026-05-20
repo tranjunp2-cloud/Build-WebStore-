@@ -35,27 +35,50 @@ export function getStripeClient(): Stripe {
 
 // ── Connect Account Management ───────────────────────────────────────
 
-/**
- * Create a Standard connected account for a merchant.
- * Standard accounts: Stripe handles onboarding UI, merchant manages their own dashboard.
- */
-export async function createConnectedAccount(
-    email: string,
-    businessName: string,
-): Promise<string> {
-    const stripe = getStripeClient()
+/* STRIPE_CONNECT_DISABLED — OAuth Connect flow temporarily disabled
+ * Uncomment to re-enable seller OAuth Connect (requires STRIPE_CLIENT_ID env var).
+ *
+export function getStripeOAuthUrl(tenantId: string): string {
+    const clientId = process.env.STRIPE_CLIENT_ID
+    if (!clientId) throw new Error('STRIPE_CLIENT_ID is not set')
 
-    const account = await stripe.accounts.create({
-        type: 'standard',
-        email,
-        country: 'MY', // Malaysia
-        business_profile: {
-            name: businessName,
-        },
+    const params = new URLSearchParams({
+        client_id: clientId,
+        response_type: 'code',
+        scope: 'read_write',
+        state: tenantId,
     })
 
-    return account.id
+    return `https://connect.stripe.com/oauth/authorize?${params.toString()}`
 }
+
+export async function exchangeOAuthCode(
+    code: string,
+): Promise<{ stripeUserId: string }> {
+    const stripe = getStripeClient()
+    const response = await stripe.oauth.token({
+        grant_type: 'authorization_code',
+        code,
+    })
+
+    if (!response.stripe_user_id) {
+        throw new Error('Stripe OAuth response missing stripe_user_id')
+    }
+
+    return { stripeUserId: response.stripe_user_id }
+}
+
+export async function deauthorizeStripeAccount(accountId: string): Promise<void> {
+    const stripe = getStripeClient()
+    const clientId = process.env.STRIPE_CLIENT_ID
+    if (!clientId) throw new Error('STRIPE_CLIENT_ID is not set')
+
+    await stripe.oauth.deauthorize({
+        client_id: clientId,
+        stripe_user_id: accountId,
+    })
+}
+*/
 
 /**
  * Create an Account Link for Stripe-hosted onboarding.
@@ -109,18 +132,26 @@ export async function createStripeCheckoutSession(
 ): Promise<CheckoutResult> {
     const stripe = getStripeClient()
 
-    const feePercent = params.applicationFeePercent ?? 3
+    if (!params.paymentMethodTypes || params.paymentMethodTypes.length === 0) {
+        throw new Error('paymentMethodTypes must contain at least one method')
+    }
+
     const totalAmount = params.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
     )
-    const applicationFeeAmount = Math.round(totalAmount * (feePercent / 100))
+    // Use explicit cents override if provided, else compute from percent (default 3%).
+    // Route passes applicationFeeAmountCents=0 for US→MY cross-border (Stripe restriction).
+    const applicationFeeAmount =
+        params.applicationFeeAmountCents !== undefined
+            ? params.applicationFeeAmountCents
+            : Math.round(totalAmount * (params.applicationFeePercent ?? 3) / 100)
 
     const session = await stripe.checkout.sessions.create(
         {
             mode: 'payment',
             currency: params.currency.toLowerCase(),
-            payment_method_types: ['card', 'fpx'],
+            payment_method_types: params.paymentMethodTypes,
             line_items: params.items.map((item) => ({
                 price_data: {
                     currency: params.currency.toLowerCase(),
@@ -173,12 +204,14 @@ export function verifyStripeWebhook(
     const stripe = getStripeClient()
 
     const secret = isConnectWebhook
-        ? process.env.STRIPE_CONNECT_WEBHOOK_SECRET
+        ? (process.env.STRIPE_CONNECT_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET)
         : process.env.STRIPE_WEBHOOK_SECRET
 
     if (!secret) {
         throw new Error(
-            `${isConnectWebhook ? 'STRIPE_CONNECT_WEBHOOK_SECRET' : 'STRIPE_WEBHOOK_SECRET'} is not set`,
+            isConnectWebhook
+                ? 'STRIPE_CONNECT_WEBHOOK_SECRET (or STRIPE_WEBHOOK_SECRET fallback) is not set'
+                : 'STRIPE_WEBHOOK_SECRET is not set',
         )
     }
 
@@ -189,21 +222,23 @@ export function verifyStripeWebhook(
 
 /**
  * Normalize a Stripe event into our unified PaymentWebhookEvent format.
+ * Returns null for event types we don't handle — caller should return 200 to prevent retries.
  */
 export function normalizeStripeEvent(
     event: Stripe.Event,
-): PaymentWebhookEvent {
+): PaymentWebhookEvent | null {
     const typeMap: Record<string, PaymentEventType> = {
         'checkout.session.completed': 'payment_success',
         'payment_intent.payment_failed': 'payment_failed',
         'customer.subscription.updated': 'subscription_updated',
         'account.updated': 'account_updated',
+        'account.application.deauthorized': 'account_deauthorized',
     }
 
     const normalizedType = typeMap[event.type]
 
     if (!normalizedType) {
-        throw new Error(`Unhandled Stripe event type: ${event.type}`)
+        return null
     }
 
     return {
