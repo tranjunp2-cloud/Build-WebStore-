@@ -202,7 +202,7 @@ export const OT_CSS = `
 .ot-addr-tag{display:inline-flex;align-items:center;gap:5px;margin-top:8px;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--tl5);border:1px solid var(--tl2);color:var(--tl7);align-self:flex-start;}
 .ot-addr-tag svg{width:11px;height:11px;}
 /* Support card */
-.ot-support{background:linear-gradient(135deg,var(--tl5),#fff);border:1px solid var(--tl2);border-radius:var(--rc);padding:18px 20px;display:flex;flex-direction:column;gap:12px;}
+.ot-support{background:var(--card);border:1px solid var(--bd);border-left:3px solid var(--tl);border-radius:var(--rc);padding:18px 20px;display:flex;flex-direction:column;gap:12px;}
 .ot-support-head{display:flex;align-items:center;gap:12px;}
 .ot-support-icon{width:40px;height:40px;border-radius:12px;background:var(--tl);color:#fff;display:grid;place-items:center;flex-shrink:0;box-shadow:0 6px 14px -6px rgba(14,117,86,.45);}
 .ot-support-icon svg{width:19px;height:19px;}
