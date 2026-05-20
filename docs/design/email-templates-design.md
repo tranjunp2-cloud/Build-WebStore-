@@ -236,7 +236,7 @@ paymentTimeoutCancelledBuyerEmail({
 
 ### Design reference
 
-_[Cần design mới — chưa có HTML trong bundle. Đề xuất Claude Design tạo thêm hoặc adapt từ `05-order-failed-buyer.html` (cùng amber tone)]_
+[`./email-templates/10-order-auto-cancelled-buyer.html`](./email-templates/10-order-auto-cancelled-buyer.html)
 
 ### Notes
 
