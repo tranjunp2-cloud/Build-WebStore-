@@ -15,6 +15,12 @@ vi.mock('@/lib/auth/order-token', () => ({
 vi.mock('@/lib/email/templates/bank-transfer-instructions', () => ({
     bankTransferInstructionsEmail: vi.fn(() => ({ subject: 'test', html: '<p>test</p>' })),
 }))
+vi.mock('@/lib/orders/upload-token', () => ({
+    generateUploadToken: vi.fn(() => 'mock-upload-token'),
+    verifyUploadToken: vi.fn(() => true),
+    generateConfirmToken: vi.fn(() => 'mock-confirm-token'),
+    verifyConfirmToken: vi.fn(() => true),
+}))
 
 import { POST } from '@/app/api/orders/checkout/route'
 import { MAX_CHECKOUT_ITEMS } from '@/lib/validations/orders'
