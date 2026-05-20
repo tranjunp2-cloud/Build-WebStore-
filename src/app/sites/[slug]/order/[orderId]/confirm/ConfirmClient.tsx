@@ -23,6 +23,8 @@ export type ConfirmOrder = {
     total: number
     currency: string
     paymentMethod?: string
+    paymentStatus?: string
+    paymentReference?: string
     stripePaymentIntentId?: string
     customerName: string
     customerEmail: string
@@ -63,7 +65,9 @@ const CopyIcon = () => (
 )
 
 export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken }: Props) {
-    const [uploadStatus, setUploadStatus] = useState<UploadStatus>('empty')
+    const [uploadStatus, setUploadStatus] = useState<UploadStatus>(
+        order.paymentStatus === 'pending_verification' ? 'success' : 'empty'
+    )
     const [uploadFile, setUploadFile] = useState<File | null>(null)
     const [dragging, setDragging] = useState(false)
     const [uploadError, setUploadError] = useState('')

@@ -92,6 +92,8 @@ export default async function OrderConfirmPage({
                 total: raw.total,
                 currency: raw.currency,
                 paymentMethod: raw.paymentMethod,
+                paymentStatus: raw.paymentStatus,
+                paymentReference: raw.paymentReference,
                 stripePaymentIntentId: raw.stripePaymentIntentId,
                 customerName: raw.customerName,
                 customerEmail: raw.customerEmail,
