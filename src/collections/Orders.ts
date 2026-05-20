@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { autoLinkCustomer } from './orders-hooks/auto-link-customer'
 import { syncCustomerSnapshot } from './orders-hooks/sync-customer-snapshot'
+import { updatePaymentStatus } from './orders-hooks/update-payment-status'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
@@ -27,23 +28,7 @@ export const Orders: CollectionConfig = {
     hooks: {
         beforeChange: [
             autoLinkCustomer,
-            async ({ data, originalDoc }) => {
-                // COD: seller marks completed → auto paymentStatus=paid
-                if (
-                    data.status === 'completed' &&
-                    originalDoc?.status !== 'completed' &&
-                    originalDoc?.paymentMethod === 'cod'
-                ) {
-                    data.paymentStatus = 'paid'
-                }
-                // Any method cancelled → paymentStatus=cancelled (if still unpaid)
-                if (data.status === 'cancelled' && originalDoc?.status !== 'cancelled') {
-                    if (!data.paymentStatus || data.paymentStatus === 'unpaid') {
-                        data.paymentStatus = 'cancelled'
-                    }
-                }
-                return data
-            },
+            updatePaymentStatus,
         ],
         afterChange: [
             async ({ doc, operation, req }) => {

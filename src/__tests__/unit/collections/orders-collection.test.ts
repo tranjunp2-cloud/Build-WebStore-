@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { ORDER_STATUS_TRANSITIONS, Orders } from '@/collections/Orders'
+import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
+import { updatePaymentStatus } from '@/collections/orders-hooks/update-payment-status'
 
 // ─── TC-F10.09: Order status transitions ─────────────────────────────
 // ─── TC-F10.32: Bypass state machine validation ──────────────────────
@@ -113,8 +114,10 @@ describe('ORDER_STATUS_TRANSITIONS — helper validation', () => {
 
 // ─── TC-F10.01: COD Auto-pay Hook ──────────────────────────────────────
 describe('Orders collection — beforeChange hook', () => {
-    // Extract the beforeChange hook from Orders collection config
-    const beforeChangeHook = Orders.hooks?.beforeChange?.[0]
+    // Import the named payment-status hook directly to avoid array-index
+    // fragility (Orders.hooks.beforeChange has multiple entries: autoLinkCustomer
+    // prepended by F25, then updatePaymentStatus).
+    const beforeChangeHook = updatePaymentStatus
 
     beforeEach(() => {
         vi.clearAllMocks()
