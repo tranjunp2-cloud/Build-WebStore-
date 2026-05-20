@@ -200,6 +200,53 @@ _[Include thank-you message? Review request CTA? Cross-sell?]_
 
 ---
 
+## 9. `payment-timeout-cancelled-buyer` (new — F10 Bank Transfer flow)
+
+> Đơn hàng Bank Transfer auto-huỷ sau 24h nếu buyer không upload payment proof. Email giải thích rõ lý do timeout + CTA re-order. **Dedicated template** (không reuse `order-status` cancelled) vì tone explanatory + CTA khác hẳn admin-cancel flow.
+
+- **Recipient:** Buyer
+- **Trigger:** Cron job 24h timeout — order `pending_verification` quá hạn → auto-cancel + restock + send mail
+- **Template:** `src/lib/email/templates/payment-timeout-cancelled-buyer.ts` (NEW)
+- **Status color:** `#f59e0b` (warning amber — softer than cancel red, vì là time-based policy không phải failure)
+- **Status emoji:** ⏰
+- **Subject (EN):** `Order #{orderNumber} cancelled — payment window expired`
+- **Subject (MS):** `Pesanan #{orderNumber} dibatalkan — tempoh pembayaran tamat`
+- **i18n key prefix:** `email.paymentTimeout.*`
+
+### Input schema
+
+```ts
+paymentTimeoutCancelledBuyerEmail({
+    orderNumber, customerName, total, currency, paymentMethod,
+    expiredAt,          // Date — khi nào hết hạn
+    placedAt,           // Date — buyer đặt khi nào
+    reorderUrl,         // CTA chính: re-order với cart cũ
+    siteName, locale?
+})
+```
+
+### Layout (key sections)
+
+1. **Header amber** — emoji ⏰ + heading "Đơn hàng đã huỷ tự động"
+2. **Explanation block** — "Hệ thống không nhận được thanh toán trong 24h kể từ {placedAt}. Theo chính sách, đơn hàng đã huỷ tự động và sản phẩm đã được restock."
+3. **Order summary** — orderNumber, total, paymentMethod (Bank Transfer)
+4. **No-refund clarification** — "Không cần hoàn tiền (chưa thanh toán)" — tránh confusion
+5. **CTA primary** — "Đặt lại đơn hàng" → `reorderUrl`
+6. **CTA secondary** — "Liên hệ hỗ trợ nếu đã thanh toán" — phòng case edge transfer thành công nhưng không upload proof
+
+### Design reference
+
+_[Cần design mới — chưa có HTML trong bundle. Đề xuất Claude Design tạo thêm hoặc adapt từ `05-order-failed-buyer.html` (cùng amber tone)]_
+
+### Notes
+
+- **Phụ thuộc infra mới:** Cần Vercel Cron / scheduled job để detect timeout. Hiện chưa có endpoint — cần plan riêng cho cron job
+- **Race condition:** Nếu buyer vừa upload proof đúng lúc cron fire → cần lock (DB transaction) tránh double-process
+- **Companion seller email:** `payment-expired-seller` (P2 — nice-to-have) fire cùng lúc cho seller awareness
+- **i18n MS:** Translation cần MY-context — tránh dịch literal "expired" (dùng "tamat tempoh" thay vì "tamat masa")
+
+---
+
 ## Bonus: `order-confirmation` redesign
 
 > Template `order-confirmation` đã production-wired ở Stripe webhook, nhưng bundle có 1 thiết kế mới (`01-order-confirmation-buyer.html`). Cân nhắc adopt như visual refresh trong cùng plan rollout (out of scope `260519-1549-commerce-email-rollout` hiện tại — có thể add Phase 06 hoặc plan riêng).
