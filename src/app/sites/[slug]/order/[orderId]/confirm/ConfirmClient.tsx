@@ -461,35 +461,6 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         </div>
                     )}
 
-                    {/* ── Order Items ── */}
-                    <div className="ty-bank-block">
-                        <div className="ty-block-head" style={{ marginBottom: 14 }}>
-                            <div className="ty-block-titles">
-                                <h3>Order Items</h3>
-                                <p>{order.items.length} item{order.items.length !== 1 ? 's' : ''} in this order</p>
-                            </div>
-                        </div>
-                        <ul className="ty-items">
-                            {order.items.map((item, idx) => (
-                                <li key={idx} className="ty-item">
-                                    <div className="ty-item-th">
-                                        {item.imageUrl
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            ? <img src={item.imageUrl} alt={item.productName} />
-                                            : <ShoppingBag size={18} />}
-                                    </div>
-                                    <div className="ty-item-info">
-                                        <div className="ty-item-top" data-tooltip={item.productName}>
-                                            <p className="ty-item-nm">{item.productName}</p>
-                                            <span className="ty-item-pr">{formatPrice(item.unitPrice * item.quantity, currency)}</span>
-                                        </div>
-                                        {item.variant && <p className="ty-item-var">{item.variant}</p>}
-                                        <p className="ty-item-qty">Qty: {item.quantity} × {formatPrice(item.unitPrice, currency)}</p>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
                 </div>
 
                 {/* ── Summary ── */}
