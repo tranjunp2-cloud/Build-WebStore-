@@ -1,36 +1,61 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useFormContext, useFieldArray } from 'react-hook-form'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useFormContext, useFieldArray, useWatch } from 'react-hook-form'
 import type { FieldError } from 'react-hook-form'
 import { ProductFormValues } from './schema'
 import { Plus, Wand2, Trash2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatPrice } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { SkuMatrixMobile } from './SkuMatrixMobile'
-import { computeDuplicateIndicesForOptions, isNonEmptyTier } from './variant-utils'
+import { computeDuplicateIndicesForOptions, isNonEmptyTier, buildVariantMatrix, cartesianProductOfTiers } from './variant-utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 
 export function VariantsInventorySection() {
-    const { register, watch, setValue, getValues, control, formState, trigger } = useFormContext<ProductFormValues>()
+    const { register, setValue, getValues, control, formState, trigger } = useFormContext<ProductFormValues>()
     const { t } = useI18n()
     const [isGenerating, setIsGenerating] = useState(false)
+    const [tierToDelete, setTierToDelete] = useState<number | null>(null)
 
-    const hasVariants = watch('hasVariants')
     const errors = formState.errors
-    
+
     // Tiers setup
-    const { fields: tiers, append: appendTier, update: updateTier } = useFieldArray({
+    const { fields: tiers, append: appendTier, update: updateTier, remove: removeTier } = useFieldArray({
         control,
         name: 'tiers'
     })
-    
+
     // Matrix setup
     const { fields: variants, replace: replaceVariants } = useFieldArray({
         control,
         name: 'variants'
     })
 
-    const watchedTiers = watch('tiers') || []
+    // useWatch for all live values — avoids render loops and ref conflicts caused by watch()
+    const hasVariants = useWatch({ control, name: 'hasVariants' })
+    const watchedTiers = useWatch({ control, name: 'tiers' }) || []
+    const variantsLive = useWatch({ control, name: 'variants' })
+
+    const derivedMinPrice = useMemo(
+        () => variantsLive?.length
+            ? Math.min(...variantsLive.map(v => v.price != null ? Number(v.price) : 0))
+            : null,
+        [variantsLive]
+    )
+    const derivedMaxCompareAt = useMemo(
+        () => variantsLive?.length
+            ? Math.max(...variantsLive.map(v => v.compareAtPrice != null ? Number(v.compareAtPrice) : 0)) || null
+            : null,
+        [variantsLive]
+    )
+
+    // Sync baseInventory = sum of all variant stocks whenever variants change
+    useEffect(() => {
+        if (!hasVariants) return
+        const total = (variantsLive || []).reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+        setValue('baseInventory', total, { shouldDirty: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [variantsLive, hasVariants])
 
     const isAllTiersEmpty = watchedTiers.every(
         t => !t.name?.trim() && (t.options || []).every(o => !o?.trim())
@@ -48,17 +73,53 @@ export function VariantsInventorySection() {
     const activeTierNames = activeTiers.map(t => t.name.trim().toLowerCase()).filter(Boolean)
     const hasDuplicateTierNames = new Set(activeTierNames).size !== activeTierNames.length
 
-    // Clear stale variants whenever a tier becomes empty (active tier count drops)
-    const prevActiveTierCountRef = useRef<number | null>(null)
-    useEffect(() => {
-        const current = activeTiers.length
-        const prev = prevActiveTierCountRef.current
-        if (prev !== null && prev > current && (getValues('variants') || []).length > 0) {
-            replaceVariants([])
+    // Tracks basePrice used on last generate — used to detect user-customized variant prices
+    const lastGeneratedBasePriceRef = useRef<number | null>(null)
+    // Tracks baseSku used on last generate — used to sync auto-generated variant SKUs on prefix change
+    const lastGeneratedBaseSkuRef = useRef<string | null>(null)
+
+    // Rebuilds the variant matrix from the given tiers (or current form tiers if omitted).
+    // Pass tiersData pre-delete so regeneration uses the correct state before RHF propagates.
+    // prevBasePrice=null preserves all existing customized rows by variantName match.
+    const regenerateMatrix = (tiersData?: Array<{ name?: string; options?: string[] }>) => {
+        const allTiers = tiersData ?? (getValues('tiers') || [])
+        const combinations = cartesianProductOfTiers(allTiers)
+        const currentVariants = getValues('variants') || []
+        if (combinations.length === 0) {
+            if (currentVariants.length > 0) replaceVariants([])
+            return
         }
-        prevActiveTierCountRef.current = current
+        const basePrice = Number(getValues('basePrice')) || 0
+        const compareAtPrice = Number(getValues('compareAtPrice')) || 0
+        const baseInventory = Number(getValues('baseInventory')) || 0
+        const baseSku = getValues('baseSku') || 'SKU'
+        const next = buildVariantMatrix(
+            combinations,
+            { price: basePrice, compareAtPrice: compareAtPrice || undefined, inventory: baseInventory, sku: baseSku },
+            currentVariants,
+            null,
+            lastGeneratedBaseSkuRef.current ?? undefined,
+        )
+        replaceVariants(next)
+        lastGeneratedBaseSkuRef.current = baseSku
+    }
+
+    // Auto-fill basePrice/compareAtPrice from variant matrix (Bug 7)
+    // Keeps root DB fields accurate without requiring manual entry
+    useEffect(() => {
+        if (!hasVariants || !variantsLive?.length) return
+        const minPrice = Math.min(...variantsLive.map(v => v.price != null ? Number(v.price) : 0))
+        const maxCompare = Math.max(...variantsLive.map(v => v.compareAtPrice != null ? Number(v.compareAtPrice) : 0))
+        const curBase = Number(getValues('basePrice')) || 0
+        const curCompare = Number(getValues('compareAtPrice')) || 0
+        if (minPrice !== curBase)
+            setValue('basePrice', minPrice, { shouldDirty: false, shouldValidate: false })
+        // Collapses set+clear into one guarded write: undefined when no variant has a sale price
+        const newCompare = maxCompare > 0 ? maxCompare : undefined
+        if (newCompare !== (curCompare || undefined))
+            setValue('compareAtPrice', newCompare, { shouldDirty: false, shouldValidate: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTiers.length])
+    }, [variantsLive, hasVariants])
 
     const isGenerateDisabled = activeTiers.length === 0 || hasDuplicates || hasDuplicateTierNames || activeTiers.some(
         t => !t.name?.trim() || (t.options || []).filter(o => o?.trim()).length === 0
@@ -68,57 +129,27 @@ export function VariantsInventorySection() {
         if (isGenerating) return
         setIsGenerating(true)
         try {
-            // Evaluate master fields validation before generating matrix
-            const isValid = await trigger(['basePrice', 'compareAtPrice', 'baseSku', 'baseInventory']);
-            if (!isValid) return;
+            const isValid = await trigger(['basePrice', 'compareAtPrice', 'baseSku', 'baseInventory'])
+            if (!isValid) return
 
-            // Cartesian Product to generate variants Matrix
-            const liveTiers = getValues('tiers') || []
-            if (!liveTiers || liveTiers.length === 0) return;
+            const combinations = cartesianProductOfTiers(getValues('tiers') || [])
+            if (combinations.length === 0) return
 
-            const validTiers = liveTiers
-                .map(t => ({ ...t, options: t.options.filter(o => o.trim() !== '') }))
-                .filter(t => t.options.length > 0)
-
-            if (validTiers.length === 0) return;
-
-            let combinations: string[][] = [[]];
-
-            for (const tier of validTiers) {
-                const newCombinations: string[][] = []
-                for (const combo of combinations) {
-                    for (const option of tier.options) {
-                        newCombinations.push([...combo, option])
-                    }
-                }
-                combinations = newCombinations
-            }
-
-            const basePrice = getValues('basePrice') || 0;
-            const compareAtPrice = getValues('compareAtPrice') || 0;
-            const baseInventory = getValues('baseInventory') || 0;
-            const baseSku = getValues('baseSku') || 'SKU';
-
+            const basePrice = getValues('basePrice') || 0
+            const compareAtPrice = getValues('compareAtPrice') || 0
+            const baseInventory = getValues('baseInventory') || 0
+            const baseSku = getValues('baseSku') || 'SKU'
             const currentVariants = getValues('variants') || []
-            const newVariants = combinations.map((combo) => {
-                const variantName = combo.join(' - ')
-
-                // Preserve existing data for UX robustness (using live form values, not stale fields)
-                const existing = currentVariants.find(v => v.variantName === variantName)
-                if (existing) return existing
-
-                const suffix = combo.map(c => c.substring(0,3).toUpperCase()).join('-')
-                const skuCode = `${baseSku}-${suffix}`
-                return {
-                    id: crypto.randomUUID(),
-                    variantName,
-                    skuCode,
-                    price: basePrice,
-                    stock: baseInventory,
-                    compareAtPrice: compareAtPrice,
-                }
-            })
-
+            const prevBase = lastGeneratedBasePriceRef.current
+            const newVariants = buildVariantMatrix(
+                combinations,
+                { price: basePrice, compareAtPrice: compareAtPrice || undefined, inventory: baseInventory, sku: baseSku },
+                currentVariants,
+                prevBase,
+                lastGeneratedBaseSkuRef.current ?? undefined,
+            )
+            lastGeneratedBasePriceRef.current = Number(basePrice)
+            lastGeneratedBaseSkuRef.current = String(baseSku)
             replaceVariants(newVariants)
         } finally {
             setIsGenerating(false)
@@ -197,14 +228,27 @@ export function VariantsInventorySection() {
                             {errors.compareAtPrice && <p className="text-xs text-red-500">{errors.compareAtPrice.message}</p>}
                         </div>
                     </div>
-                    
+                    {hasVariants && (
+                        <p className="text-[12px] text-[#F8FAFC]/40 -mt-2">
+                            {t.dashboard.products.form.sections?.autoFilledFromVariants || 'Auto-filled from variants — edit individual variant prices below'}
+                        </p>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                             <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
                                 {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-[#F8FAFC]">*</span>
                             </label>
                             <input
-                                {...register('baseSku')}
+                                {...register('baseSku', {
+                                    onBlur: () => {
+                                        const current = getValues('baseSku') || 'SKU'
+                                        const hasMatrix = (getValues('variants') || []).length > 0
+                                        if (!hasMatrix) return
+                                        if (lastGeneratedBaseSkuRef.current === current) return
+                                        regenerateMatrix()
+                                    }
+                                })}
                                 placeholder="SKU-001"
                                 className={cn(
                                     "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
@@ -246,19 +290,31 @@ export function VariantsInventorySection() {
                             {tiers.map((tier, index) => (
                                 <div key={tier.id} className="flex flex-col gap-[10px] relative group">
                                     {/* Tier label — outside card, per Figma */}
-                                    <label className="text-[14px] font-medium text-[#F8FAFC] m-0">
-                                        {t.dashboard.products.form.sections?.tierFormat
-                                            ?.replace('{level}', String(index + 1))
-                                            .replace('{example}', index === 0
-                                                ? (t.dashboard.products.form.sections?.color || 'Color')
-                                                : (t.dashboard.products.form.sections?.size || 'Size'))
-                                            || `Option ${index + 1} (Example: ${index === 0 ? 'Color' : 'Size'})`}
-                                        {index > 0 && (
-                                            <span className="text-[12px] font-normal text-[#F8FAFC]/40 ml-1">
-                                                ({t.dashboard.products.form.sections?.optionalLabel || 'Optional'})
-                                            </span>
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[14px] font-medium text-[#F8FAFC] m-0">
+                                            {t.dashboard.products.form.sections?.tierFormat
+                                                ?.replace('{level}', String(index + 1))
+                                                .replace('{example}', index === 0
+                                                    ? (t.dashboard.products.form.sections?.color || 'Color')
+                                                    : (t.dashboard.products.form.sections?.size || 'Size'))
+                                                || `Option ${index + 1} (Example: ${index === 0 ? 'Color' : 'Size'})`}
+                                            {index > 0 && (
+                                                <span className="text-[12px] font-normal text-[#F8FAFC]/40 ml-1">
+                                                    ({t.dashboard.products.form.sections?.optionalLabel || 'Optional'})
+                                                </span>
+                                            )}
+                                        </label>
+                                        {tiers.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setTierToDelete(index)}
+                                                aria-label={t.dashboard.products.form.sections?.removeTier || 'Remove option'}
+                                                className="flex items-center justify-center h-8 w-8 rounded-lg border border-red-500/20 bg-red-500/10 text-red-500/80 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
                                         )}
-                                    </label>
+                                    </div>
 
                                     {/* Card */}
                                     <div className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-[#0B1120]/50 p-[17px]">
@@ -317,6 +373,11 @@ export function VariantsInventorySection() {
                                                                         const newOptions = [...(liveTier.options || [])]
                                                                         newOptions.splice(oIdx, 1)
                                                                         updateTier(index, { ...liveTier, options: newOptions })
+                                                                        if ((getValues('variants') || []).length > 0) {
+                                                                            regenerateMatrix((getValues('tiers') || []).map((t, i2) =>
+                                                                                i2 === index ? { ...liveTier, options: newOptions } : t
+                                                                            ))
+                                                                        }
                                                                     }}
                                                                     className="flex h-[44px] w-[38px] shrink-0 items-center justify-center rounded-xl border border-red-500/20 bg-red-500/10 text-red-500/80 hover:bg-red-500/20 hover:text-red-400 transition-colors"
                                                                 >
@@ -375,7 +436,7 @@ export function VariantsInventorySection() {
                         )}
 
                         {hasVariants && (
-                            <div className="pt-2">
+                            <div className="pt-2 flex flex-col gap-2">
                                 <button
                                     type="button"
                                     onClick={generateSkuTable}
@@ -390,6 +451,25 @@ export function VariantsInventorySection() {
                                     <Wand2 className="h-4 w-4" />
                                     {t.dashboard.products.form.sections?.createSkuTable || 'Generate variants'}
                                 </button>
+                                {/* RHF types variants errors per-index; superRefine root errors (variantsRequired) land on the array root — cast through FieldError which is the actual runtime shape */}
+                                {(errors.variants as unknown as FieldError)?.message && variants.length === 0 && (
+                                    <p className="text-[12px] text-red-500">
+                                        {(errors.variants as unknown as FieldError).message}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Derived price hint — live-computed from variant rows */}
+                        {hasVariants && variants.length > 0 && derivedMinPrice !== null && (
+                            <div className="text-[12px] text-[#F8FAFC]/50 leading-relaxed">
+                                {t.dashboard.products.form.sections?.derivedPricesHint || 'Derived from variants'}
+                                {': '}
+                                {t.dashboard.products.form.sections?.derivedMinLabel || 'min'}{' '}
+                                {formatPrice(derivedMinPrice, 'MYR')}
+                                {derivedMaxCompareAt !== null && (
+                                    <>{' '}{t.dashboard.products.form.sections?.derivedMaxCompareLabel || '/ max compare'}{' '}{formatPrice(derivedMaxCompareAt, 'MYR')}</>
+                                )}
                             </div>
                         )}
 
@@ -416,47 +496,47 @@ export function VariantsInventorySection() {
                                                     <td className="px-4 py-3 text-[#F8FAFC] text-[14px] font-normal min-w-[120px]">{v.variantName}</td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <input 
-                                                                {...register(`variants.${i}.skuCode`)} 
+                                                            <input
+                                                                {...register(`variants.${i}.skuCode`)}
                                                                 className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[140px] outline-none focus:ring-1 focus:ring-white transition-colors",
                                                                     errors.variants?.[i]?.skuCode ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
-                                                                )} 
+                                                                )}
                                                             />
                                                             {errors.variants?.[i]?.skuCode && <span className="text-[10px] text-red-500">{errors.variants[i]?.skuCode?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <input 
-                                                                type="number" 
-                                                                {...register(`variants.${i}.price`)} 
+                                                            <input
+                                                                type="number"
+                                                                {...register(`variants.${i}.price`)}
                                                                 className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
                                                                     errors.variants?.[i]?.price ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
-                                                                )} 
+                                                                )}
                                                             />
                                                             {errors.variants?.[i]?.price && <span className="text-[10px] text-red-500">{errors.variants[i]?.price?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <input 
-                                                                type="number" 
-                                                                {...register(`variants.${i}.compareAtPrice`)} 
+                                                            <input
+                                                                type="number"
+                                                                {...register(`variants.${i}.compareAtPrice`)}
                                                                 className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
                                                                     errors.variants?.[i]?.compareAtPrice ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
-                                                                )} 
+                                                                )}
                                                             />
                                                             {errors.variants?.[i]?.compareAtPrice && <span className="text-[10px] text-red-500">{errors.variants[i]?.compareAtPrice?.message}</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <input 
-                                                                type="number" 
-                                                                {...register(`variants.${i}.stock`)} 
+                                                            <input
+                                                                type="number"
+                                                                {...register(`variants.${i}.stock`)}
                                                                 className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
                                                                     errors.variants?.[i]?.stock ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
-                                                                )} 
+                                                                )}
                                                             />
                                                             {errors.variants?.[i]?.stock && <span className="text-[10px] text-red-500">{errors.variants[i]?.stock?.message}</span>}
                                                         </div>
@@ -467,13 +547,50 @@ export function VariantsInventorySection() {
                                     </table>
                                 </div>
                                 <div className="md:hidden">
-                                    <SkuMatrixMobile variants={variants} />
+                                    <SkuMatrixMobile variants={variants} variantsLive={variantsLive} />
                                 </div>
                             </div>
                         )}
                     </div>
                 )}
             </div>
+
+            {/* Tier delete confirmation dialog */}
+            <Dialog open={tierToDelete !== null} onOpenChange={(open) => { if (!open) setTierToDelete(null) }}>
+                <DialogContent className="max-w-sm bg-[#1E293B] border-white/10 text-[#F8FAFC]">
+                    <DialogHeader>
+                        <DialogTitle className="text-[16px] font-semibold text-[#F8FAFC]">
+                            {t.dashboard.products.form.sections?.removeTierConfirmTitle || 'Remove this option?'}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-[13px] text-[#F8FAFC]/60">
+                        {t.dashboard.products.form.sections?.removeTierConfirmDesc || 'This will also clear the variants matrix.'}
+                    </p>
+                    <DialogFooter className="gap-2 sm:gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setTierToDelete(null)}
+                            className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[14px] font-medium text-[#F8FAFC]/70 hover:bg-white/10 transition-colors"
+                        >
+                            {t.dashboard.products.form.sections?.removeTierCancelBtn || 'Cancel'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (tierToDelete === null) return
+                                const remainingTiers = (getValues('tiers') || []).filter((_, i) => i !== tierToDelete)
+                                const hasMatrix = (getValues('variants') || []).length > 0
+                                removeTier(tierToDelete)
+                                setTierToDelete(null)
+                                if (hasMatrix) regenerateMatrix(remainingTiers)
+                            }}
+                            className="flex-1 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-[14px] font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                        >
+                            {t.dashboard.products.form.sections?.removeTierConfirmBtn || 'Remove'}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

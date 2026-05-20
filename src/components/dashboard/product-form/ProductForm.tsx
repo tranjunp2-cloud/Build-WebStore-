@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { ChevronLeft, Save, Trash2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import { parseServerError, localizeFieldError } from '@/lib/products/server-errors'
 import { GeneralInfoSection } from './GeneralInfoSection'
 import { VariantsInventorySection } from './VariantsInventorySection'
 import { ShippingDimensionsSection } from './ShippingDimensionsSection'
@@ -122,7 +123,23 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                 }, 1000)
             }
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : t.dashboard.products.form.somethingWentWrong)
+            const parsed = parseServerError(error)
+            if (parsed) {
+                const errorsMap = t.dashboard.products.form.errors as Record<string, string>
+                for (const [path, entry] of Object.entries(parsed.fieldErrors)) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    methods.setError(path as any, { type: 'server', message: localizeFieldError(entry, errorsMap) })
+                }
+                const firstPath = Object.keys(parsed.fieldErrors)[0]
+                if (firstPath) {
+                    const el = document.querySelector(`[name="${firstPath}"]`)
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    else window.scrollTo({ top: 0, behavior: 'smooth' })
+                }
+                toast.error(parsed.message)
+            } else {
+                toast.error(error instanceof Error ? error.message : t.dashboard.products.form.somethingWentWrong)
+            }
         } finally {
             setIsSaving(false)
         }

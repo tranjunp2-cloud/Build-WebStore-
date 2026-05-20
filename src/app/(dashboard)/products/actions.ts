@@ -1,8 +1,57 @@
 'use server'
 
-import { getPayload } from 'payload'
+import { getPayload, type Where } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser, extractTenantId } from '@/lib/auth'
+
+// Upper bound for SKU conflict query results. If totalDocs exceeds this, the save is aborted
+// with a user-facing error. In practice a single SKU or small batch rarely matches > 100 products.
+// NOTE: This check is best-effort UX; it does not guarantee uniqueness under concurrent saves.
+// A DB-level UNIQUE constraint on (tenant_id, sku) is the authoritative integrity guarantee.
+const SKU_CONFLICT_QUERY_LIMIT = 100
+
+async function findConflictingSkus(
+    payload: Awaited<ReturnType<typeof getPayload>>,
+    skus: string[],
+    tenantId: string | number | null,
+    excludeId?: number
+): Promise<string[]> {
+    if (skus.length === 0) return []
+    // When tenantId is null (super-admin or single-tenant setup) no tenant filter is applied —
+    // the query spans all tenants. This is intentional: null-tenant users should not be able
+    // to create SKUs that conflict with any tenant's products.
+    const where: Where = {
+        and: [
+            { deletedAt: { exists: false } },
+            ...(tenantId ? [{ tenant: { equals: tenantId } }] : []),
+            ...(excludeId ? [{ id: { not_equals: excludeId } }] : []),
+            // Payload 3 dotted-path on array sub-fields (variants.sku → JOIN products_variants).
+            // WHERE shape locked by TC-F08-SKU-GLOBAL-10.
+            { or: [
+                { sku: { in: skus } },
+                { 'variants.sku': { in: skus } },
+            ]},
+        ],
+    }
+    const result = await payload.find({ collection: 'products', where, limit: SKU_CONFLICT_QUERY_LIMIT, depth: 0 })
+    if (result.docs.length === 0) return []
+    if (result.totalDocs > result.docs.length) {
+        throw new Error(
+            'Cannot verify SKU uniqueness: your account has too many matching products. Please contact support.'
+        )
+    }
+    const skusLower = new Set(skus.map(s => s.toLowerCase()))
+    const matched = new Set<string>()
+    for (const doc of result.docs) {
+        if (typeof doc.sku === 'string' && skusLower.has(doc.sku.toLowerCase())) matched.add(doc.sku)
+        if (Array.isArray(doc.variants)) {
+            for (const v of doc.variants as Array<{ sku?: string }>) {
+                if (v?.sku && typeof v.sku === 'string' && skusLower.has(v.sku.toLowerCase())) matched.add(v.sku)
+            }
+        }
+    }
+    return Array.from(matched)
+}
 
 export async function getProductsAction() {
     const user = await getCurrentUser()
@@ -54,9 +103,41 @@ export async function saveProductAction(rawData: unknown, id?: string | number) 
     if (!user) throw new Error('Unauthorized')
 
     const data = ProductServerSchema.parse(rawData);
-    
+
     const payload = await getPayload({ config: configPromise })
-    
+
+    const candidateSkus = [
+        ...(typeof data.sku === 'string' && data.sku.trim() ? [data.sku.trim()] : []),
+        ...((data.variants as Array<{ sku?: string }> | undefined) || [])
+            .map(v => typeof v.sku === 'string' ? v.sku.trim() : '')
+            .filter(Boolean),
+    ]
+    const tenantId = extractTenantId(user)
+    const numId = id ? (typeof id === 'string' ? parseInt(id, 10) : id) : undefined
+    if (numId !== undefined && Number.isNaN(numId)) throw new Error('Invalid product ID')
+    const conflicts = await findConflictingSkus(payload, candidateSkus, tenantId, numId)
+
+    if (conflicts.length > 0) {
+        const conflictsLower = new Set(conflicts.map(s => s.toLowerCase()))
+        const fieldErrors: Record<string, { code: string; values: string[] }> = {}
+
+        if (typeof data.sku === 'string' && data.sku.trim() && conflictsLower.has(data.sku.trim().toLowerCase())) {
+            fieldErrors['baseSku'] = { code: 'SKU_ALREADY_IN_USE', values: [data.sku.trim()] }
+        }
+        const variants = (data.variants as Array<{ sku?: string }> | undefined) || []
+        variants.forEach((v, i) => {
+            if (typeof v?.sku === 'string' && v.sku.trim() && conflictsLower.has(v.sku.trim().toLowerCase())) {
+                fieldErrors[`variants.${i}.skuCode`] = { code: 'SKU_ALREADY_IN_USE', values: [v.sku.trim()] }
+            }
+        })
+
+        throw new Error(JSON.stringify({
+            code: 'FIELD_ERRORS',
+            fieldErrors,
+            message: `SKU already in use: ${conflicts.join(', ')}`,
+        }))
+    }
+
     // Automatically attach default placeholder image if none provided
     if (!data.images || data.images.length === 0) {
         try {

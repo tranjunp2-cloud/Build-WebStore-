@@ -348,3 +348,74 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F08.176** | 6 images → rejected (max 5 per FR-09) | success=false | FR-09, TC-F08-01-14 |
 | **TC-F08.177** | i18n: BM product name `Baju Kurung Tradisional Melayu` Unicode preserved | success=true, name intact | TC-F08-01-21, TC-F08-G-02 |
 
+---
+
+## E) Bug #1032 regression guards [TC-F08-VAR-UTILS-*, TC-F08-bug-1032-*]
+
+Added in phase-05 to lock in the P0 fixes from GH-1032.
+
+### isNonEmptyTier — AND logic (Bug #1032-02/03)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-VAR-UTILS-01** | Tier with empty name + empty options | `false` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-02** | Tier with whitespace-only name + whitespace options | `false` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-03** | Tier with name but no options (AND fix) | `false` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-04** | Tier with options but no name (AND fix) | `false` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-05** | Tier with name AND valid options | `true` | products-variant-utils.test.ts |
+| **TC-F08-VAR-UTILS-06** | Undefined options — name alone is insufficient | `false` | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-03a** | name='Color', options=[''] (empty string) → false | `false` | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-03b** | name='Color', options=['red'] → true | `true` | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-03c** | name='', options=['red'] → false | `false` | products-variant-utils.test.ts |
+
+### buildVariantMatrix — preserve logic (Bug #1032-04)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-bug-1032-04a** | User-customized price (≠ prevBase) → row preserved | price unchanged | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-04b** | Row at prevBase price → replaced with new basePrice | price = new base | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-04c** | No existing row → new row at base price | price = base | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-04d** | prevBasePrice=null + existing variants → all preserved (no-regen guard) | price = existing (preserved) | products-variant-utils.test.ts |
+| **TC-F08-bug-1032-04e** | Preserved row with missing id → UUID generated | id truthy | products-variant-utils.test.ts |
+
+### getDisplayPrice — min variant price (Bug #1032-06)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-bug-1032-06a** | Variant product, variants=[10,5,20] → min=5, isVariant=true | {value:5, isVariant:true} | products-display-price.test.ts |
+| **TC-F08-bug-1032-06b** | Variant product, variants=[] → fallback root price, isVariant=false | {value:p.price, isVariant:false} | products-display-price.test.ts |
+| **TC-F08-bug-1032-06c** | Non-variant product → root price, isVariant=false | {value:p.price, isVariant:false} | products-display-price.test.ts |
+| **TC-F08-bug-1032-06d** | Variant with price=0 → value=0 (zero-cost variant, null-check guard) | {value:0, isVariant:true} | products-display-price.test.ts |
+
+### Schema contract — variant price/SKU round-trip (Bug #1032-01)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-01-20 (variant)** | basePrice=0 + hasVariants=true → schema accepts | success=true | products-crud.test.tsx |
+| **TC-F08-bug-1032-01** | hasVariants=true + baseSku='' → schema rejects (SKU always required) | success=false | products-crud.test.tsx |
+
+### SKU global uniqueness (Bug #1032 — server-side dedup)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-SKU-GLOBAL-01** | baseSku conflicts with active product → structured FIELD_ERRORS on baseSku | `fieldErrors.baseSku.code = 'SKU_ALREADY_IN_USE'` | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-02** | variant sku conflicts → FIELD_ERRORS on variants.0.skuCode | `fieldErrors['variants.0.skuCode'].code = 'SKU_ALREADY_IN_USE'` | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-03** | sku conflicts with soft-deleted product → allowed (no throw) | resolves without error | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-04** | update own product, same SKU → allowed (self-excluded) | resolves without error | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-05** | no sku provided → check skipped | resolves without error, mockFind not called | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-06** | different tenant SKU → no conflict | resolves without error | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-07** | both baseSku AND variant conflict → both paths in fieldErrors | both keys present | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-08** | case-insensitive: input 'sku-001', DB 'SKU-001' → field error | `fieldErrors.baseSku` present | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-09** | totalDocs (150) > docs.length (100) → plain verification error (not JSON) | `message` contains 'Cannot verify SKU uniqueness', not JSON-parseable | save-product-action.test.ts |
+| **TC-F08-SKU-GLOBAL-10** | WHERE clause shape-lock: both `sku` and `variants.sku` OR-branches present with correct IN values | `orBranch.or` contains both branches | save-product-action.test.ts |
+
+### Code review round-2 follow-ups (Bug #1032)
+
+| TC-ID | Scenario | Expected | File |
+|---|---|---|---|
+| **TC-F08-H1-01** | Open legacy product (basePrice=0, hasVariants=true) → warning banner visible | banner shown above ProductForm | Manual / e2e |
+| **TC-F08-M1-01** | All variant compareAtPrice cleared → auto-fill → root compareAtPrice set to undefined | root compareAtPrice = undefined | Manual / integration |
+| **TC-F08-L1-01** | Sort "Price: Low > High" — legacy variant product (price=0, min-variant=50) vs non-variant (price=10) | variant product sorts above non-variant | Manual |
+| **TC-F08-L2-01** | Variant row with price=undefined mid-edit → derivedMinPrice | treats undefined as 0 (null-check guard) | Manual |
+| **TC-F08-L3-01** | Save variant row with compareAtPrice=0 | DB receives undefined (filtered by \|\| undefined) | Manual / integration |
+
