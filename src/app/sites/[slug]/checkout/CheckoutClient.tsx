@@ -424,14 +424,14 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                     <div className={`ck-iw${fieldErrors.email ? ' err' : ''}`}>
                                         <input type="email" value={form.email} onChange={e => updateField('email', e.target.value)} onBlur={handleEmailBlur} placeholder="ahmad@email.com" />
                                     </div>
-                                    <p className="ck-ferr">{fieldErrors.email ?? ''}</p>
+                                    {fieldErrors.email && <p className="ck-ferr">{fieldErrors.email}</p>}
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.phone} (+60)</label>
                                     <div className={`ck-iw${fieldErrors.phone ? ' err' : ''}`}>
                                         <input type="tel" value={form.phone} onChange={e => updateField('phone', e.target.value)} onBlur={handlePhoneBlur} placeholder="+60 12 345 6789" />
                                     </div>
-                                    <p className="ck-ferr">{fieldErrors.phone ?? ''}</p>
+                                    {fieldErrors.phone && <p className="ck-ferr">{fieldErrors.phone}</p>}
                                 </div>
                             </div>
                         </div>
