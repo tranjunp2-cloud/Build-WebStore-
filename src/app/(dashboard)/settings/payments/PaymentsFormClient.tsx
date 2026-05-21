@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User } from 'lucide-react';
+import { CreditCard, Banknote, Landmark, QrCode, UploadCloud, Trash2, Info, Shield, AlertTriangle, MapPin, User, CheckCircle2, ExternalLink, Save, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe, type PaymentUpdates } from './actions';
+import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, disconnectStripe } from './actions';
 import { useI18n } from '@/i18n';
 import { StripeConnectBlock } from './StripeConnectBlock';
 import { StripeConnectedBar } from './StripeConnectedBar';
@@ -73,14 +73,15 @@ export function PaymentsFormClient({
     const [accountNumber, setAccountNumber] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isConnecting, setIsConnecting] = useState(false);
-    // 3-state Stripe Connect: no account → pending verify → verified
-    const [isVerified, setIsVerified] = useState(stripeOnboardingComplete);
+    // Stripe Connect states
+    const [isVerified, setIsVerified] = useState(!!stripeAccountId); // account connected
+    const [isChargesEnabled, setIsChargesEnabled] = useState(stripeOnboardingComplete); // KYC complete
     const [hasAccount, setHasAccount] = useState(!!stripeAccountId);
+    const [currentAccountId, setCurrentAccountId] = useState(stripeAccountId);
     const [isVerifying, setIsVerifying] = useState(false);
+    const [isDirty, setIsDirty] = useState(false);
+    const [isSavingAll, setIsSavingAll] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const accountHolderNameSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const bankNameSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const accountNumberSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
 
@@ -116,28 +117,40 @@ export function PaymentsFormClient({
         const stripeReturn = params.get('stripe');
         if (!stripeReturn) return;
 
-        if (stripeReturn === 'complete') {
+        if (stripeReturn === 'verified') {
+            setHasAccount(true);
+            // Confirm with server before unlocking card/fpx toggles — URL param is not trusted
+            if (tenantId) {
+                fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.data.onboardingComplete) {
+                            setIsVerified(true);
+                            setIsChargesEnabled(true);
+                            toast.success(pt.stripeReturnSuccess);
+                        } else {
+                            toast.info(pt.stripeReturnKycPending);
+                        }
+                    })
+                    .catch(() => toast.warning(pt.stripeReturnRefresh));
+            }
+        } else if (stripeReturn === 'complete') {
             setHasAccount(true); // ensure Verify button is shown
-            if (isVerified) {
+            if (isChargesEnabled) {
                 toast.success(pt.stripeReturnSuccess);
             } else {
                 toast.info(pt.stripeReturnKycPending);
             }
         } else if (stripeReturn === 'refresh') {
-            setHasAccount(true);
+            if (stripeAccountId) setHasAccount(true); // only restore if they had an account before redirect
             toast.warning(pt.stripeReturnRefresh);
         }
 
         router.replace('/settings/payments');
     }, []); // intentionally once on mount
 
-    // Initiate Stripe Connect onboarding (TC-F13.24, 25) — POST then redirect to oauthUrl
+    // Redirect to Stripe OAuth onboarding (TC-F13.24)
     const handleConnectStripe = async () => {
-        /* STRIPE_CONNECT_DISABLED — OAuth Connect flow temporarily disabled.
-         * Restore by uncommenting implementation in:
-         *   src/app/api/stripe/connect/onboard/route.ts
-         *   src/lib/payment/stripe.ts (getStripeOAuthUrl, exchangeOAuthCode)
-         *
         if (!tenantId || isConnecting) return;
         setIsConnecting(true);
         try {
@@ -147,27 +160,20 @@ export function PaymentsFormClient({
                 body: JSON.stringify({ tenantId }),
             });
             const data = await res.json();
-            if (!res.ok || !data.success || !data.data?.oauthUrl) {
-                toast.error(data.error?.message || pt.failConnectStripe);
-                setIsConnecting(false);
-                return;
+            if (data.success && data.data?.oauthUrl) {
+                window.location.href = data.data.oauthUrl;
+            } else {
+                toast.error(pt.failSaveSettings);
             }
-            // Same-tab redirect — OAuth callback needs session cookies; new tab may lose them
-            window.location.href = data.data.oauthUrl;
-            // Leave isConnecting=true intentionally — page is unloading
         } catch {
-            toast.error(pt.failConnectStripe);
+            toast.error(pt.failSaveSettings);
+        } finally {
             setIsConnecting(false);
         }
-        */
     };
 
     // Check Stripe account status and unlock UI if approved (TC-F13.26)
     const handleVerifyStripe = async () => {
-        /* STRIPE_CONNECT_DISABLED — verify status flow temporarily disabled.
-         * Restore by uncommenting implementation in:
-         *   src/app/api/stripe/connect/status/route.ts
-         *
         if (!tenantId || isVerifying) return;
         setIsVerifying(true);
         try {
@@ -177,13 +183,13 @@ export function PaymentsFormClient({
                 toast.error(pt.failVerifyStripe);
                 return;
             }
-            if (data.data.onboardingComplete) {
+            if (data.data.connected) {
                 setIsVerified(true);
+                if (data.data.accountId) setCurrentAccountId(data.data.accountId);
+            }
+            if (data.data.onboardingComplete) {
+                setIsChargesEnabled(true);
                 toast.success(pt.stripeReturnSuccess);
-            } else if (!data.data.detailsSubmitted) {
-                // Onboarding incomplete — drop back to connect mode so user can resume
-                setHasAccount(false);
-                toast.warning(pt.stripeVerifyPending);
             } else {
                 toast.warning(pt.stripeVerifyPending);
             }
@@ -192,48 +198,28 @@ export function PaymentsFormClient({
         } finally {
             setIsVerifying(false);
         }
-        */
     };
 
-    const saveSettings = async (updates: PaymentUpdates) => {
-        try {
-            const res = await updatePaymentSettings({ payment_cod: paymentCod, payment_qr: paymentQr, qr_image: qrImageId, ...updates });
-            if (!res.success) throw new Error(res.error || 'Failed to save');
-            return true;
-        } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : 'Failed to save');
-            return false;
-        }
-    };
-
-    const handleToggleCard = async (checked: boolean) => {
+    const handleToggleCard = (checked: boolean) => {
         setCardEnabled(checked);
-        const res = await updatePaymentSettings({ payment_card: checked });
-        if (res.success) toast.success(pt.successSave);
-        else { setCardEnabled(!checked); toast.error(pt.failSaveSettings); }
+        setIsDirty(true);
     };
 
-    const handleToggleFpx = async (checked: boolean) => {
+    const handleToggleFpx = (checked: boolean) => {
         setFpxEnabled(checked);
-        const res = await updatePaymentSettings({ payment_fpx: checked });
-        if (res.success) toast.success(pt.successSave);
-        else { setFpxEnabled(!checked); toast.error(pt.failSaveSettings); }
+        setIsDirty(true);
     };
 
-    const handleToggleCod = async (checked: boolean) => {
+    const handleToggleCod = (checked: boolean) => {
         setPaymentCod(checked);
-        const ok = await saveSettings({ payment_cod: checked });
-        if (ok) toast.success(pt.successSave);
-        else { setPaymentCod(!checked); toast.error(pt.failSaveSettings); }
+        setIsDirty(true);
     };
 
-    const handleToggleQr = async (checked: boolean) => {
+    const handleToggleQr = (checked: boolean) => {
         if (checked && !qrImageId && !qrPreviewUrl) { setQrWidgetExpanded(true); return; }
         setPaymentQr(checked);
         if (!checked) setQrWidgetExpanded(false);
-        const ok = await saveSettings({ payment_qr: checked });
-        if (ok) toast.success(pt.successSave);
-        else { setPaymentQr(!checked); toast.error(pt.failSaveConfig); }
+        setIsDirty(true);
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,10 +240,9 @@ export function PaymentsFormClient({
             const serverUrl = getImageUrl(uploadRes.doc as Media);
             if (serverUrl) setQrPreviewUrl(serverUrl);
             setPaymentQr(true);
-            const ok = await saveSettings({ payment_qr: true, qr_image: qrDocId });
+            setIsDirty(true);
             toast.dismiss('upload-qr');
-            if (ok) toast.success(pt.successSave);
-            else { toast.error(pt.failSaveConfig); setPaymentQr(false); setQrPreviewUrl(null); setQrImageId(null); }
+            toast.success(pt.uploadingQr);
         } catch (e: unknown) {
             toast.dismiss('upload-qr');
             toast.error(pt.uploadError + (e instanceof Error ? e.message : 'Upload failed'));
@@ -266,40 +251,60 @@ export function PaymentsFormClient({
         }
     };
 
-    const handleRemoveImage = async () => {
+    const handleRemoveImage = () => {
         setQrImageId(null); setQrPreviewUrl(null); setQrFileName(null); setPaymentQr(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
-        const ok = await saveSettings({ payment_qr: false, qr_image: null });
-        if (ok) toast.success(pt.removeSuccess);
-        else toast.error(pt.failClearQR);
+        setIsDirty(true);
     };
 
     const handleAccountHolderNameChange = useCallback((val: string) => {
         setAccountHolderName(val);
-        if (accountHolderNameSaveTimer.current) clearTimeout(accountHolderNameSaveTimer.current);
-        accountHolderNameSaveTimer.current = setTimeout(async () => {
-            const res = await updatePaymentSettings({ account_holder_name: val });
-            if (!res.success) toast.error(pt.failSaveSettings);
-        }, 800);
-    }, [pt.failSaveSettings]);
+        setIsDirty(true);
+    }, []);
 
     const handleBankNameChange = useCallback((val: string) => {
         setBankName(val);
-        if (bankNameSaveTimer.current) clearTimeout(bankNameSaveTimer.current);
-        bankNameSaveTimer.current = setTimeout(async () => {
-            const res = await updatePaymentSettings({ bank_name: val });
-            if (!res.success) toast.error(pt.failSaveSettings);
-        }, 800);
-    }, [pt.failSaveSettings]);
+        setIsDirty(true);
+    }, []);
 
     const handleAccountNumberChange = useCallback((val: string) => {
         setAccountNumber(val);
-        if (accountNumberSaveTimer.current) clearTimeout(accountNumberSaveTimer.current);
-        accountNumberSaveTimer.current = setTimeout(async () => {
-            const res = await updatePaymentSettings({ account_number: val });
-            if (!res.success) toast.error(pt.failSaveSettings);
-        }, 800);
-    }, [pt.failSaveSettings]);
+        setIsDirty(true);
+    }, []);
+
+    const handleSaveAll = async () => {
+        if (!isDirty || isSavingAll) return;
+        // Client-side guard: card/fpx cannot be enabled without completed Stripe onboarding
+        if ((cardEnabled || fpxEnabled) && !isChargesEnabled) {
+            setCardEnabled(false);
+            setFpxEnabled(false);
+            toast.error(pt.failVerifyStripe);
+            return;
+        }
+        setIsSavingAll(true);
+        try {
+            const res = await updatePaymentSettings({
+                payment_cod: paymentCod,
+                payment_qr: paymentQr,
+                payment_card: cardEnabled,
+                payment_fpx: fpxEnabled,
+                qr_image: qrImageId,
+                account_holder_name: accountHolderName || null,
+                bank_name: bankName || null,
+                account_number: accountNumber || null,
+            });
+            if (res.success) {
+                setIsDirty(false);
+                toast.success(pt.successSave);
+            } else {
+                toast.error(pt.failSaveSettings);
+            }
+        } catch {
+            toast.error(pt.failSaveSettings);
+        } finally {
+            setIsSavingAll(false);
+        }
+    };
 
     if (isLoading) return <div className="p-8 text-white">{pt.loading}</div>;
 
@@ -307,17 +312,16 @@ export function PaymentsFormClient({
         <div className="w-full space-y-[32px]">
             {/* Page header */}
             <div className="flex items-center gap-4">
-                <div className="w-[50px] h-[50px] flex items-center justify-center rounded-[16px] bg-teal-400/10 border border-teal-400/20 shrink-0">
-                    <CreditCard className="w-6 h-6 text-teal-400" />
+                <div className="w-[46px] h-[46px] flex items-center justify-center rounded-[12px] bg-sky-500/[0.12] border border-sky-500/[0.20] shrink-0">
+                    <CreditCard className="w-[22px] h-[22px] text-sky-400" />
                 </div>
                 <div>
-                    <h1 className="text-[24px] font-bold text-slate-50">{pt.title}</h1>
-                    <p className="mt-1 text-[14px] text-slate-400">{pt.subtitle}</p>
+                    <h1 className="text-[28px] font-bold text-slate-50 tracking-[-0.015em]">{pt.title}</h1>
+                    <p className="mt-[4px] text-[14px] text-slate-400">{pt.subtitle}</p>
                 </div>
             </div>
 
-            {/* STRIPE_CONNECT_DISABLED — Both-OFF warning hidden while Stripe section is off */}
-            {/* {isVerified && !cardEnabled && !fpxEnabled && (
+            {isChargesEnabled && isVerified && !cardEnabled && !fpxEnabled && (
                 <div className="flex items-start gap-[14px] p-[18px_20px] rounded-[14px] border border-amber-500/[0.24] bg-amber-500/[0.06]">
                     <div className="w-10 h-10 rounded-[10px] bg-amber-500/[0.12] border border-amber-500/[0.22] text-amber-400 grid place-items-center shrink-0">
                         <AlertTriangle className="w-[18px] h-[18px]" />
@@ -329,16 +333,9 @@ export function PaymentsFormClient({
                         </p>
                     </div>
                 </div>
-            )} */}
+            )}
 
-            {/* STRIPE_CONNECT_DISABLED — Stripe Payment Methods section hidden.
-                Restore by uncommenting this section and re-enabling:
-                  src/lib/payment/stripe.ts (OAuth functions)
-                  src/app/api/stripe/connect/onboard/route.ts
-                  src/app/api/stripe/connect/callback/route.ts
-                  handleConnectStripe + handleVerifyStripe handlers above
-            */}
-            {/* <section className="space-y-[14px]">
+            <section className="space-y-[14px]">
                 <div className="flex items-center gap-[10px] px-[4px] mt-[2px]">
                     <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" style={{ boxShadow: '0 0 10px #38bdf8' }} />
                     <h2 className="text-[13px] font-bold text-slate-300 uppercase tracking-[0.06em] m-0">{pt.stripeSectionTitle}</h2>
@@ -346,10 +343,11 @@ export function PaymentsFormClient({
                 </div>
 
                 {isVerified ? (
-                    <StripeConnectedBar accountId={stripeAccountId} onDisconnect={async () => {
+                    <StripeConnectedBar accountId={currentAccountId} onDisconnect={async () => {
                         const res = await disconnectStripe();
                         if (res.success) {
                             setIsVerified(false);
+                            setIsChargesEnabled(false);
                             setHasAccount(false);
                             setCardEnabled(false);
                             setFpxEnabled(false);
@@ -375,7 +373,7 @@ export function PaymentsFormClient({
                     <div className="space-y-[12px]">
                         <div className="anim-pay-card-d1">
                             <PaymentMethodCard
-                                icon={<CreditCard className="w-5 h-5" />}
+                                icon={<CreditCard className="w-[22px] h-[22px]" />}
                                 iconTone="brand"
                                 title={pt.cardTitle}
                                 feePill={pt.cardFee}
@@ -388,7 +386,7 @@ export function PaymentsFormClient({
                         </div>
                         <div className="anim-pay-card-d2">
                             <PaymentMethodCard
-                                icon={<Landmark className="w-5 h-5" />}
+                                icon={<Landmark className="w-[22px] h-[22px]" />}
                                 iconTone="purple"
                                 title={pt.fpxTitle}
                                 feePill={pt.fpxFee}
@@ -416,7 +414,7 @@ export function PaymentsFormClient({
                         </div>
                     </div>
                 )}
-            </section> */}
+            </section>
 
             {/* ─── Manual Methods ─── */}
             <section className="space-y-[14px]">
@@ -428,7 +426,7 @@ export function PaymentsFormClient({
 
                 <div className="space-y-[12px]">
                     <PaymentMethodCard
-                        icon={<Banknote className="w-5 h-5" />}
+                        icon={<Banknote className="w-[22px] h-[22px]" />}
                         iconTone="amber"
                         title={pt.codTitle}
                         desc={pt.codDesc}
@@ -444,7 +442,7 @@ export function PaymentsFormClient({
                     />
 
                     <PaymentMethodCard
-                        icon={<QrCode className="w-5 h-5" />}
+                        icon={<QrCode className="w-[22px] h-[22px]" />}
                         iconTone="teal"
                         title={pt.bankTransferTitle}
                         desc={pt.bankTransferDesc}
@@ -598,16 +596,49 @@ export function PaymentsFormClient({
                 </div>
             </section>
 
-            {/* Info banner */}
-            <div className="flex items-start gap-4 p-[20px_22px] rounded-[14px] border border-sky-500/[0.18] bg-sky-500/[0.06]">
-                <div className="w-9 h-9 shrink-0 flex items-center justify-center rounded-[10px] bg-sky-500/10">
-                    <Info className="w-4 h-4 text-sky-400" />
+            {/* Save bar */}
+            <div
+                className="sticky bottom-4 flex items-center justify-between px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
+                style={{ background: 'rgba(15,23,42,0.88)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
+            >
+                <div className="flex items-center gap-2 text-[13px]">
+                    {isDirty ? (
+                        <>
+                            <AlertCircle className="w-[14px] h-[14px] text-amber-400 shrink-0" />
+                            <span className="text-amber-300 font-medium">Unsaved changes</span>
+                        </>
+                    ) : (
+                        <>
+                            <CheckCircle2 className="w-[14px] h-[14px] text-emerald-400 shrink-0" />
+                            <span className="text-slate-400">{pt.savesAutomatic}</span>
+                        </>
+                    )}
                 </div>
-                <div>
-                    <h4 className="text-[14px] font-semibold text-slate-100">{pt.infoTitle}</h4>
-                    <p className="mt-1 text-[13px] text-slate-400 leading-relaxed">{pt.infoDesc}</p>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        className="inline-flex items-center gap-[6px] h-[34px] px-[12px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.08] hover:bg-white/[0.04] hover:text-slate-50 hover:border-white/[0.18] transition-all"
+                        onClick={() => toast.info(pt.infoDesc)}
+                    >
+                        <ExternalLink className="w-[13px] h-[13px]" />
+                        {pt.previewCheckout}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSaveAll}
+                        disabled={!isDirty || isSavingAll}
+                        className="inline-flex items-center gap-[6px] h-[34px] px-[14px] rounded-[8px] text-[13px] font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
+                        style={{
+                            background: 'linear-gradient(135deg, #2563eb 0%, #9333ea 100%)',
+                            boxShadow: isDirty ? '0 6px 18px rgba(37,99,235,0.35)' : 'none',
+                        }}
+                    >
+                        <Save className="w-[13px] h-[13px]" />
+                        {isSavingAll ? pt.saving : pt.saveChanges}
+                    </button>
                 </div>
             </div>
+
         </div>
     );
 }

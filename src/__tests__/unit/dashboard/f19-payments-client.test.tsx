@@ -41,16 +41,21 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
         expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
     });
 
-    it('[TC-F19.12] Allows toggling COD and saves changes (Auto-Save)', async () => {
+    it('[TC-F19.12] Allows toggling COD and saves changes', async () => {
         const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
             expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
         });
 
+        // Toggle COD on (marks form dirty)
         const checkboxes = container.querySelectorAll('input[type="checkbox"]') as NodeListOf<HTMLInputElement>;
         const codSwitch = checkboxes[0]; // Stripe not connected → Card/FPX hidden → COD[0], QR[1]
         fireEvent.click(codSwitch);
+
+        // Click Save changes button (form requires explicit save, no auto-save)
+        const saveBtn = screen.getByRole('button', { name: /save changes/i });
+        fireEvent.click(saveBtn);
 
         await waitFor(() => {
             expect(toast.success).toHaveBeenCalledWith('Changes saved! ✅');

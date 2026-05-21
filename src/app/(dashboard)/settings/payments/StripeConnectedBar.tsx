@@ -96,8 +96,12 @@ export function StripeConnectedBar({ accountId, onDisconnect }: Props) {
                             <button
                                 onClick={async () => {
                                     setIsDisconnecting(true);
-                                    onDisconnect?.();
-                                    setShowModal(false);
+                                    try {
+                                        await onDisconnect?.();
+                                    } finally {
+                                        setIsDisconnecting(false);
+                                        setShowModal(false);
+                                    }
                                 }}
                                 disabled={isDisconnecting}
                                 className="inline-flex items-center gap-2 h-9 px-[14px] rounded-[8px] text-[13px] font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60 disabled:cursor-wait"

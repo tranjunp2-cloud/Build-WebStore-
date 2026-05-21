@@ -14,54 +14,27 @@ vi.mock('payload', () => ({
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
+const mockGetStripeOAuthUrl = vi.fn()
+const mockGetConnectedAccountStatus = vi.fn()
+
 vi.mock('@/lib/payment/stripe', () => ({
-    getStripeOAuthUrl: vi.fn(
-        (tenantId: string) =>
-            `https://connect.stripe.com/oauth/authorize?client_id=ca_test&state=${tenantId}&response_type=code&scope=read_write`,
-    ),
-    getConnectedAccountStatus: vi.fn().mockResolvedValue({
-        accountId: 'acct_existing',
-        chargesEnabled: true,
-        payoutsEnabled: true,
-        detailsSubmitted: true,
-    }),
+    getStripeOAuthUrl: (...args: any[]) => mockGetStripeOAuthUrl(...args),
+    getConnectedAccountStatus: (...args: any[]) => mockGetConnectedAccountStatus(...args),
 }))
 
 import { POST as onboardPOST } from '@/app/api/stripe/connect/onboard/route'
 import { GET as statusGET } from '@/app/api/stripe/connect/status/route'
 
-// ─── TC-F13.24: Stripe Connect OAuth onboarding — DISABLED stub ───────
-// Route returns 503 DISABLED while Stripe Connect is temporarily off.
-// Full OAuth tests preserved below in STRIPE_CONNECT_DISABLED block.
+// ─── TC-F13.24: OAuth onboarding ─────────────────────────────────────
 
 describe('POST /api/stripe/connect/onboard [TC-F13.24]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
 
-    it('returns 503 DISABLED for all requests while Connect is off', async () => {
-        // Act
-        const req = { json: () => Promise.resolve({ tenantId: 'tenant-1' }) } as unknown as Request
-        const res = await onboardPOST(req, {} as any)
-        const body = await res.json()
+    it('[TC-F13.24] returns oauthUrl for authenticated tenant owner', async () => {
+        mockGetStripeOAuthUrl.mockReturnValue('https://connect.stripe.com/oauth/authorize?client_id=ca_test&state=tenant-1')
 
-        // Assert
-        expect(res.status).toBe(503)
-        expect(body.success).toBe(false)
-        expect(body.error.code).toBe('DISABLED')
-        expect(mockUpdate).not.toHaveBeenCalled()
-    })
-})
-
-/* STRIPE_CONNECT_DISABLED — full onboard tests preserved below.
- * Restore by re-enabling onboard/route.ts and getStripeOAuthUrl in stripe.ts.
- *
-describe('POST /api/stripe/connect/onboard [TC-F13.24] — full', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-    })
-
-    it('[TC-F13.24] returns OAuth URL with tenantId as state', async () => {
         const req = { json: () => Promise.resolve({ tenantId: 'tenant-1' }) } as unknown as Request
         const res = await onboardPOST(req, {} as any)
         const body = await res.json()
@@ -69,9 +42,7 @@ describe('POST /api/stripe/connect/onboard [TC-F13.24] — full', () => {
         expect(res.status).toBe(200)
         expect(body.success).toBe(true)
         expect(body.data.oauthUrl).toContain('connect.stripe.com/oauth/authorize')
-        expect(body.data.oauthUrl).toContain('state=tenant-1')
-        expect(body.data.oauthUrl).toContain('scope=read_write')
-        expect(mockUpdate).not.toHaveBeenCalled()
+        expect(mockGetStripeOAuthUrl).toHaveBeenCalledWith('tenant-1')
     })
 
     it('returns 422 when tenantId missing', async () => {
@@ -88,16 +59,23 @@ describe('POST /api/stripe/connect/onboard [TC-F13.24] — full', () => {
         expect(res.status).toBe(403)
     })
 })
-*/
 
 describe('GET /api/stripe/connect/status [TC-F13.03]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        mockGetConnectedAccountStatus.mockResolvedValue({
+            accountId: 'acct_existing',
+            chargesEnabled: true,
+            payoutsEnabled: true,
+            detailsSubmitted: true,
+            country: 'MY',
+            email: 'merchant@test.com',
+        })
     })
 
     it('returns connected account status with onboardingComplete', async () => {
         // Arrange
-        mockFindByID.mockResolvedValue({ id: 'tenant-1', stripeAccountId: 'acct_existing' })
+        mockFindByID.mockResolvedValue({ id: 'tenant-1', stripeAccountId: 'acct_existing', stripeOnboardingComplete: true })
 
         // Act
         const req = new Request('http://localhost/api/stripe/connect/status?tenantId=tenant-1')

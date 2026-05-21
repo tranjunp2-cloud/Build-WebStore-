@@ -433,6 +433,15 @@ async function handleAccountUpdated(
     const isOnboardingComplete =
         account.charges_enabled && account.details_submitted
 
+    // Warn if account has pending KYC deadline — will be suspended if not resolved
+    const requiresActionDeadline = account.requirements?.current_deadline
+    if (requiresActionDeadline) {
+        const deadline = new Date(requiresActionDeadline * 1000).toISOString()
+        console.warn(
+            `[Stripe Webhook] Tenant ${tenants.docs[0].id} has pending Stripe requirements due ${deadline} — merchant must submit documents`,
+        )
+    }
+
     await payload.update({
         collection: 'tenants',
         id: tenants.docs[0].id,

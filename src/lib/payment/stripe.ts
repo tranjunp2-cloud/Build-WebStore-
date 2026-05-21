@@ -2,16 +2,15 @@
  * Stripe Client + Connect Helpers
  *
  * Uses Direct Charges model:
- * - Payment goes directly to merchant's connected account
- * - PrimeWeb collects application_fee_amount (3%)
- * - Merchant sees payment in their own Stripe Dashboard
+ * - Payment goes directly to merchant's connected Stripe account
+ * - No platform fee — merchant pays Stripe's standard processing fees
  */
 import Stripe from 'stripe'
+import { createHmac, timingSafeEqual } from 'crypto'
 import type {
     CheckoutParams,
     CheckoutResult,
     ConnectAccountStatus,
-    ConnectOnboardResult,
     PaymentWebhookEvent,
     PaymentEventType,
 } from './types'
@@ -35,9 +34,45 @@ export function getStripeClient(): Stripe {
 
 // ── Connect Account Management ───────────────────────────────────────
 
-/* STRIPE_CONNECT_DISABLED — OAuth Connect flow temporarily disabled
- * Uncomment to re-enable seller OAuth Connect (requires STRIPE_CLIENT_ID env var).
- *
+// ── OAuth State Signing ──────────────────────────────────────────────
+
+function computeStateHmac(tenantId: string, secret: string): string {
+    return createHmac('sha256', secret).update(tenantId).digest('hex')
+}
+
+/**
+ * Produce a tamper-proof `state` param for Stripe OAuth.
+ * Format: `{tenantId}_{hmac}` signed with STRIPE_SECRET_KEY.
+ * Prevents an attacker from forging `state=victim_tenantId` in the callback.
+ */
+export function signOAuthState(tenantId: string): string {
+    const secret = process.env.STRIPE_SECRET_KEY
+    if (!secret) throw new Error('STRIPE_SECRET_KEY is not set')
+    const hmac = computeStateHmac(tenantId, secret)
+    return `${tenantId}_${hmac}`
+}
+
+/**
+ * Verify the signed OAuth state and return the tenantId, or null if tampered.
+ */
+export function verifyOAuthState(state: string): string | null {
+    const secret = process.env.STRIPE_SECRET_KEY
+    if (!secret) return null
+    const sepIdx = state.lastIndexOf('_')
+    if (sepIdx === -1) return null
+    const tenantId = state.substring(0, sepIdx)
+    const providedHmac = state.substring(sepIdx + 1)
+    const expected = computeStateHmac(tenantId, secret)
+    try {
+        const a = Buffer.from(providedHmac, 'hex')
+        const b = Buffer.from(expected, 'hex')
+        if (a.length !== b.length) return null
+        return timingSafeEqual(a, b) ? tenantId : null
+    } catch {
+        return null
+    }
+}
+
 export function getStripeOAuthUrl(tenantId: string): string {
     const clientId = process.env.STRIPE_CLIENT_ID
     if (!clientId) throw new Error('STRIPE_CLIENT_ID is not set')
@@ -46,7 +81,8 @@ export function getStripeOAuthUrl(tenantId: string): string {
         client_id: clientId,
         response_type: 'code',
         scope: 'read_write',
-        state: tenantId,
+        state: signOAuthState(tenantId),
+        prompt: 'login',
     })
 
     return `https://connect.stripe.com/oauth/authorize?${params.toString()}`
@@ -78,28 +114,6 @@ export async function deauthorizeStripeAccount(accountId: string): Promise<void>
         stripe_user_id: accountId,
     })
 }
-*/
-
-/**
- * Create an Account Link for Stripe-hosted onboarding.
- * Merchant clicks this URL to complete KYC + bank details.
- */
-export async function createAccountLink(
-    accountId: string,
-    refreshUrl: string,
-    returnUrl: string,
-): Promise<string> {
-    const stripe = getStripeClient()
-
-    const link = await stripe.accountLinks.create({
-        account: accountId,
-        refresh_url: refreshUrl,
-        return_url: returnUrl,
-        type: 'account_onboarding',
-    })
-
-    return link.url
-}
 
 /**
  * Get the onboarding/verification status of a connected account.
@@ -125,27 +139,28 @@ export async function getConnectedAccountStatus(
 
 /**
  * Create a Stripe Checkout Session on the merchant's connected account.
- * Uses Direct Charges: payment goes to merchant, PrimeWeb takes application_fee.
+ * Direct Charges: payment goes directly to merchant, no platform fee.
  */
 export async function createStripeCheckoutSession(
     params: CheckoutParams,
 ): Promise<CheckoutResult> {
-    const stripe = getStripeClient()
-
     if (!params.paymentMethodTypes || params.paymentMethodTypes.length === 0) {
         throw new Error('paymentMethodTypes must contain at least one method')
     }
 
-    const totalAmount = params.items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0,
-    )
-    // Use explicit cents override if provided, else compute from percent (default 3%).
-    // Route passes applicationFeeAmountCents=0 for US→MY cross-border (Stripe restriction).
-    const applicationFeeAmount =
-        params.applicationFeeAmountCents !== undefined
-            ? params.applicationFeeAmountCents
-            : Math.round(totalAmount * (params.applicationFeePercent ?? 3) / 100)
+    const stripe = getStripeClient()
+
+    const paymentIntentData: Stripe.Checkout.SessionCreateParams.PaymentIntentData = {
+        metadata: {
+            orderId: params.orderId,
+            ...(params.metadata ?? {}),
+        },
+    }
+
+    // Direct Charges: payment goes directly to merchant's connected account (required).
+    const requestOptions: Stripe.RequestOptions = {
+        stripeAccount: params.stripeAccountId,
+    }
 
     const session = await stripe.checkout.sessions.create(
         {
@@ -168,17 +183,9 @@ export async function createStripeCheckoutSession(
             metadata: params.metadata ?? {},
             success_url: params.successUrl,
             cancel_url: params.cancelUrl,
-            payment_intent_data: {
-                application_fee_amount: applicationFeeAmount,
-                metadata: {
-                    orderId: params.orderId,
-                    ...(params.metadata ?? {}),
-                },
-            },
+            payment_intent_data: paymentIntentData,
         },
-        {
-            stripeAccount: params.stripeAccountId,
-        },
+        requestOptions,
     )
 
     if (!session.url) {
