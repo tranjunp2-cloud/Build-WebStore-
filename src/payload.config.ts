@@ -34,6 +34,7 @@ import { AiGenerationRecords } from './collections/AiGenerationRecords'
 import { TemplateIssues } from './collections/TemplateIssues'
 import { ContentPacks } from './collections/ContentPacks'
 import { TemplateVersions } from './collections/TemplateVersions'
+import { Customers } from './collections/Customers'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -140,6 +141,7 @@ export default buildConfig({
     TemplateIssues,
     ContentPacks,
     TemplateVersions,
+    Customers,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

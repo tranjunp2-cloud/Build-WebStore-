@@ -56,11 +56,11 @@ src/
 
 ## Collections (`src/collections/`)
 
-19 Payload collections — schema source of truth:
+20 Payload collections — schema source of truth:
 
 - **Identity:** `Users`, `Tenants`, `Subscribers`, `Subscriptions`
 - **CMS:** `Pages`, `Sites`, `Templates`, `Media`, `Blogs`, `BlogCategories`
-- **Commerce:** `Products`, `Categories`, `Orders`, `ContactSubmissions`
+- **Commerce:** `Products`, `Categories`, `Orders`, `Customers`, `ContactSubmissions`
 - **Infra:** `AiUsageLogs`, `Analytics`, `Notifications`, `PushSubscriptions`, `SEOMetaJobs`
 
 Adding a new collection requires: Payload config + migration in `scripts/db-setup.js` + slug in `COLLECTION_SLUGS[]`. See `.claude/rules/database-schema.md`.
@@ -73,6 +73,7 @@ Adding a new collection requires: Payload config + migration in `scripts/db-setu
 - **Auth** (`src/app/api/auth/`, `src/lib/auth.ts`) — JWT + Payload session, OTP via AWS SES. SSO provisioning at `src/app/api/v1/sso/`.
 - **Shipping** (`src/lib/shipping/`) — F14 flat-rate Malaysia shipping. Modules: `constants.ts` (region defs, defaults, MY_STATES enum), `classify-region.ts` (state→region via isEastState), `calculate-fee.ts` (config + state + subtotal → fee + hint), `types.ts` (ShippingConfig/ShippingHint). APIs: `GET /api/sites/:siteId/shipping-config` (public read), `PATCH /api/sites/:siteId/shipping-config` (authed write), `POST /api/orders/calculate-shipping` (public calc with null/array body guard). Dashboard settings page at `src/app/(dashboard)/settings/shipping/`. Unit tests: `src/__tests__/api/orders-calculate-shipping.test.ts` (17 tests), `src/__tests__/unit/hooks/use-debounce.test.ts` (3 tests for checkout debounce). E2E: `e2e/f14-shipping.spec.ts` (US-F14-05 suite). See `docs/architecture/F14-shipping.md`.
 - **Storefront utilities** (`src/lib/storefront/`) — Cart + product handling for public storefront. Modules: `use-add-to-cart.ts` (hook: encapsulates add-to-cart, event tracking, editor guard, out-of-stock check), `editor-intercept.ts` (utility: blocks navigation inside editor iframe, shows toast), `checkout.ts` (checkout state), `index.ts` (barrel export). API: `GET /api/storefront/products` (public listing with inventory field, supports pagination + sorting). Product blocks (`products-featured`, `products-grid`, `product-quick-view`) wire the hook for real cart integration on storefront; quick-view modal implements 3-branch CTA logic (ctaUrl / hasLiveData / static). See GH-1018 changelog entry.
+- **Customers** (`src/collections/Customers.ts`) — F25 first-class shop buyers entity. Tenant-scoped with multi-address book and manual rank tag (bronze/silver/gold/vip). Auto-linked to Orders by tenant+email via beforeChange hook (idempotent upsert). Admin UI list/detail views, Orders history tab, CSV export (10k cap). Hard-delete forbidden (protects Order FK integrity). 39 automated tests (TC-F25-001..010) cover idempotency, access control, field validation. See `docs/architecture/F25-shop-customers.md` + `docs/prd/F25-shop-customers.md`.
 - **Site Renderer utilities** (`src/lib/site-renderer/`) — GH-1023 global block detection + injection. Pure utility functions: `detect-commerce-presence.ts` (scans pages for commerce block types), `extract-first-global-block.ts` (finds first block instance of given type), `has-header-cart.ts` (checks if header navigation includes cart button). Used by `SiteRenderer` to auto-inject globally-scoped blocks (cart widget, social, WhatsApp) into all pages. See GH-1023 changelog entry.
 - **Images / S3** (`src/lib/images/`, Payload plugin-cloud-storage) — upload via AWS SDK v3 to DO Spaces-compatible S3.
 - **Email** (`src/lib/email/send.ts`) — Custom utility over `payload.sendEmail()`. See `.claude/rules/email-smtp.md`.
