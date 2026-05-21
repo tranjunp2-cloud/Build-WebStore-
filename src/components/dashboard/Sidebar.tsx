@@ -35,7 +35,6 @@ import {
     Package,
     ShoppingCart,
     Users,
-    ShoppingCart,
     Menu,
     X,
     ChevronDown,
@@ -89,11 +88,6 @@ const NAV_ITEMS: NavItemConfig[] = [
         icon: ShoppingCart,
         href: '/orders',
         permissionId: 'orders',
-    },
-    {
-        label: { en: 'Orders', ms: 'Pesanan' },
-        icon: ShoppingCart,
-        href: '/orders',
     },
     {
         label: { en: 'Customers', ms: 'Pelanggan' },
