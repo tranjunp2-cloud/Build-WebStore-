@@ -63,7 +63,7 @@ export const orderStatusUpdateSchema = z.object({
         'completed', 'cancelled', 'refunded',
         'paid', 'processing', 'payment_failed',
     ]),
-    trackingNumber: z.string().optional(),
+    trackingNumber: z.string().min(3).max(100).optional(),
     notes: z.string().optional(),
 })
 

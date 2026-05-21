@@ -21,6 +21,13 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
 
     useEffect(() => { setMounted(true) }, [])
 
+    useEffect(() => {
+        if (!isOpen) return
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !isLoading) { setTrackingNumber(''); onBack() } }
+        document.addEventListener('keydown', onKey)
+        return () => document.removeEventListener('keydown', onKey)
+    }, [isOpen, isLoading, onBack])
+
     if (!isOpen || !mounted) return null
 
     const isDisabled = trackingNumber.trim() === '' || isLoading
@@ -29,6 +36,7 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
         <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-4"
             style={{ background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)' }}
+            onClick={(e) => { if (e.target === e.currentTarget && !isLoading) { setTrackingNumber(''); onBack() } }}
         >
             <div
                 className="flex flex-col items-center"
@@ -64,10 +72,11 @@ export function ShipOrderModal({ orderNumber, isOpen, isLoading, onBack, onConfi
 
                 {/* Tracking input */}
                 <div className="flex flex-col w-full" style={{ gap: 8, marginBottom: 24 }}>
-                    <label style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '1.43em', color: 'var(--dash-text)' }}>
+                    <label htmlFor="ship-tracking-input" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '1.43em', color: 'var(--dash-text)' }}>
                         {s.trackingLabel} *
                     </label>
                     <input
+                        id="ship-tracking-input"
                         type="text"
                         value={trackingNumber}
                         onChange={(e) => setTrackingNumber(e.target.value)}

@@ -36,6 +36,14 @@ const STATUS_EMOJIS: Record<OrderStatus, string> = {
     cancelled: '❌',
 }
 
+function escHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function safeHref(url: string): string {
+    return /^https?:\/\//i.test(url) ? escHtml(url) : '#'
+}
+
 export function orderStatusEmail(data: OrderStatusEmailData): { subject: string; html: string } {
     const { customerName, orderNumber, status, trackingNumber, trackingUrl, storeName = 'PrimeWeb', locale = 'en' } = data
     const t = (locales[locale] || locales.en).status
@@ -48,8 +56,8 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
             <p style="font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 8px; font-weight: 600;">${t.tracking}</p>
             <p style="font-size: 16px; font-weight: 700; margin: 0; letter-spacing: 0.5px;">
                 ${trackingUrl
-            ? `<a href="${trackingUrl}" style="color: #3b82f6; text-decoration: none;">${trackingNumber}</a>`
-            : trackingNumber
+            ? `<a href="${safeHref(trackingUrl)}" style="color: #3b82f6; text-decoration: none;">${escHtml(trackingNumber)}</a>`
+            : escHtml(trackingNumber)
         }
             </p>
         </div>
@@ -72,7 +80,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 8px;">${t.greeting} <strong>${customerName}</strong>,</p>
+                <p style="font-size: 16px; margin: 0 0 8px;">${t.greeting} <strong>${escHtml(customerName)}</strong>,</p>
                 <p style="font-size: 14px; color: #555; line-height: 1.7; margin: 0 0 24px;">
                     ${statusT.description}
                 </p>
@@ -80,7 +88,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
                 <!-- Order Number -->
                 <div style="background: #f8fafc; border-radius: 8px; padding: 16px; text-align: center;">
                     <p style="font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 4px;">${t.orderNumber}</p>
-                    <p style="font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 1px;">${orderNumber}</p>
+                    <p style="font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 1px;">${escHtml(orderNumber)}</p>
                 </div>
 
                 ${trackingHtml}
