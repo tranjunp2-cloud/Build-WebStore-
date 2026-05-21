@@ -342,7 +342,7 @@ export function PaymentsFormClient({
                     <span className="ml-auto text-[12px] text-slate-500">{pt.stripeSectionDesc}</span>
                 </div>
 
-                {isVerified ? (
+                {isVerified && isChargesEnabled ? (
                     <StripeConnectedBar accountId={currentAccountId} onDisconnect={async () => {
                         const res = await disconnectStripe();
                         if (res.success) {
@@ -355,7 +355,8 @@ export function PaymentsFormClient({
                             toast.error('Failed to disconnect Stripe');
                         }
                     }} />
-                ) : hasAccount ? (
+                ) : (isVerified && !isChargesEnabled) || hasAccount ? (
+                    // Connected but KYC/onboarding not yet confirmed — must verify before enabling Card/FPX
                     <StripeConnectBlock
                         mode="verify"
                         onVerify={handleVerifyStripe}
@@ -369,7 +370,7 @@ export function PaymentsFormClient({
                     />
                 )}
 
-                {isVerified && (
+                {isVerified && isChargesEnabled && (
                     <div className="space-y-[12px]">
                         <div className="anim-pay-card-d1">
                             <PaymentMethodCard
