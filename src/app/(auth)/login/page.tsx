@@ -60,8 +60,8 @@ function getRedirectByRole(
 
 /* ─── Figma Design Token Constants ─── */
 const INPUT_STYLE = {
-    background: 'rgba(30, 41, 59, 0.6)',
-    border: '1px solid rgba(59, 130, 246, 0.15)',
+    background: 'var(--auth-input-bg)',
+    border: '1px solid var(--auth-input-border)',
     boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
 } as const
 
@@ -304,14 +304,14 @@ function LoginFormContent() {
             {/* ─── Header: "Welcome back" + subtitle ─── */}
             <div className="flex flex-col text-center" style={{ gap: 8 }}>
                 <h1
-                    className="text-2xl font-semibold text-[#F8FAFC]"
-                    style={{ fontFamily: 'Inter, sans-serif', lineHeight: '32px', margin: 0 }}
+                    className="text-2xl font-semibold"
+                    style={{ fontFamily: 'Inter, sans-serif', lineHeight: '32px', margin: 0, color: 'var(--auth-text)' }}
                 >
                     {t.auth.welcomeBack}
                 </h1>
                 <p
-                    className="text-sm text-[#94A3B8]"
-                    style={{ fontFamily: 'Inter, sans-serif', lineHeight: '20px', margin: 0 }}
+                    className="text-sm"
+                    style={{ fontFamily: 'Inter, sans-serif', lineHeight: '20px', margin: 0, color: 'var(--auth-text-muted)' }}
                 >
                     {t.auth.signInSubtitle}
                 </p>
@@ -332,19 +332,19 @@ function LoginFormContent() {
                 <div className="flex flex-col" style={{ gap: 3 }}>
                     <label
                         htmlFor="email"
-                        className="text-sm font-medium text-[#94A3B8]"
-                        style={{ lineHeight: '1.43' }}
+                        className="text-sm font-medium"
+                        style={{ lineHeight: '1.43', color: 'var(--auth-text-muted)' }}
                     >
                         {t.auth.email}
                     </label>
                     <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--auth-text-muted)' }} />
                         <input
                             id="email"
                             type="email"
                             placeholder={t.auth.emailPlaceholder}
                             className={`
-                                w-full h-11 rounded-2xl pl-10 pr-4 text-sm text-white
+                                w-full h-11 rounded-2xl pl-10 pr-4 text-sm
                                 placeholder:text-[#94A3B8] outline-none
                                 focus:ring-2 focus:ring-blue-500/30 transition-all
                                 ${errors.email ? 'ring-2 ring-red-500/50' : ''}
@@ -353,6 +353,7 @@ function LoginFormContent() {
                                 ...INPUT_STYLE,
                                 fontFamily: 'Inter, sans-serif',
                                 lineHeight: '1.21',
+                                color: 'var(--auth-text)',
                             }}
                             {...register('email')}
                         />
@@ -366,19 +367,19 @@ function LoginFormContent() {
                 <div className="flex flex-col" style={{ gap: 3, marginTop: 24 }}>
                     <label
                         htmlFor="password"
-                        className="text-sm font-medium text-[#94A3B8]"
-                        style={{ lineHeight: '1.43' }}
+                        className="text-sm font-medium"
+                        style={{ lineHeight: '1.43', color: 'var(--auth-text-muted)' }}
                     >
                         {t.auth.password}
                     </label>
                     <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--auth-text-muted)' }} />
                         <input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
                             className={`
-                                w-full h-11 rounded-2xl pl-10 pr-10 text-sm text-white
+                                w-full h-11 rounded-2xl pl-10 pr-10 text-sm
                                 placeholder:text-[#94A3B8] outline-none
                                 focus:ring-2 focus:ring-blue-500/30 transition-all
                                 ${errors.password ? 'ring-2 ring-red-500/50' : ''}
@@ -387,13 +388,15 @@ function LoginFormContent() {
                                 ...INPUT_STYLE,
                                 fontFamily: 'Inter, sans-serif',
                                 lineHeight: '1.21',
+                                color: 'var(--auth-text)',
                             }}
                             {...register('password')}
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-white transition-colors bg-transparent border-none p-0 cursor-pointer"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors bg-transparent border-none p-0 cursor-pointer"
+                            style={{ color: 'var(--auth-text-muted)' }}
                             tabIndex={-1}
                         >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -466,7 +469,7 @@ function LoginFormContent() {
 export default function LoginPage() {
     const { t } = useI18n()
     return (
-        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center text-[#94A3B8]">{t.auth.loading}</div>}>
+        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center" style={{ color: 'var(--auth-text-muted)' }}>{t.auth.loading}</div>}>
             <LoginFormContent />
         </Suspense>
     )
