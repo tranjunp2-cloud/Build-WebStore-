@@ -86,20 +86,24 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             overrideAccess: false,
         })
 
-        // Fire-and-forget status update email to customer
-        const emailStatus = STATUS_EMAIL_MAP[newStatus]
-        if (emailStatus && order.customerEmail) {
-            const emailPayload = orderStatusEmail({
-                customerName: order.customerName as string,
-                orderNumber: order.orderNumber as string,
-                status: emailStatus,
-                trackingNumber: trackingNumber ?? (order.trackingNumber as string | undefined),
-            })
-            payload.sendEmail({
-                to: order.customerEmail as string,
-                subject: emailPayload.subject,
-                html: emailPayload.html,
-            }).catch((err) => payload.logger.error({ err, orderId: id, status: newStatus }, '[order-update] sendEmail failed'))
+        // Fire-and-forget status update email — isolated so a crash here never fails the update response
+        try {
+            const emailStatus = STATUS_EMAIL_MAP[newStatus]
+            if (emailStatus && order.customerEmail) {
+                const emailPayload = orderStatusEmail({
+                    customerName: order.customerName as string,
+                    orderNumber: order.orderNumber as string,
+                    status: emailStatus,
+                    trackingNumber: trackingNumber ?? (order.trackingNumber as string | undefined),
+                })
+                payload.sendEmail({
+                    to: order.customerEmail as string,
+                    subject: emailPayload.subject,
+                    html: emailPayload.html,
+                }).catch((err) => payload.logger.error({ err, orderId: id, status: newStatus }, '[order-update] sendEmail failed'))
+            }
+        } catch (emailErr) {
+            payload.logger.error({ emailErr, orderId: id, status: newStatus }, '[order-update] email construction failed')
         }
 
         return NextResponse.json({
