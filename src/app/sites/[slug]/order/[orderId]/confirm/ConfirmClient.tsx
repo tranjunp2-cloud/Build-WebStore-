@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
     Clock, Mail, Calendar, ShoppingBag, ReceiptText,
-    Truck, MapPin, Hash, Info,
+    Truck, MapPin, Hash, Info, Package,
     UploadCloud, FileImage, X, RotateCcw, Hourglass, AlertCircle,
     PhoneCall, PackageX, HandCoins, Banknote,
 } from 'lucide-react'
@@ -56,6 +56,17 @@ function maskEmail(email: string) {
     const user = email.slice(0, atIdx)
     const domain = email.slice(atIdx + 1)
     return `${user.slice(0, 2)}**@${domain}`
+}
+
+function addBusinessDays(date: Date, days: number): Date {
+    const result = new Date(date)
+    let added = 0
+    while (added < days) {
+        result.setDate(result.getDate() + 1)
+        const day = result.getDay()
+        if (day !== 0 && day !== 6) added++
+    }
+    return result
 }
 
 const ICON_OK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
@@ -119,6 +130,10 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const addrLine = [addr?.city, addr?.state, addr?.postcode].filter(Boolean).join(', ')
     const placed = new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
     const maskedEmail = maskEmail(order.customerEmail)
+    const fmtEstDay = (d: Date) => d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })
+    const estDelivery = (isCod || (isBT && !isPaid))
+        ? '3–5 working days (after verification)'
+        : `${fmtEstDay(addBusinessDays(new Date(), 3))} – ${fmtEstDay(addBusinessDays(new Date(), 5))}`
     const ccySymbol = currency === 'MYR' ? 'RM' : currency === 'SGD' ? 'S$' : '$'
 
     const heroCheckClass = isPaid ? '' : isSubmitted ? 'info' : isBT ? 'warning' : ''
@@ -550,6 +565,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         <div className="ty-summary-meta">
                             <div className="ty-meta-row"><Calendar size={13} /><span><strong>Placed</strong> · {placed}</span></div>
                             <div className="ty-meta-row"><Truck size={13} /><span><strong>Ships</strong> · {shipsText}</span></div>
+                            <div className="ty-meta-row"><Package size={13} /><span><strong>Est. Delivery</strong> · {estDelivery}</span></div>
                             {addrLine && <div className="ty-meta-row"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
                         </div>
                         <div className="ty-cta-row">
