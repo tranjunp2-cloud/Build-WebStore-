@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * GET /api/storefront/site-by-slug?slug=xxx
@@ -9,6 +10,17 @@ import config from '@payload-config'
  */
 export async function GET(req: Request) {
     try {
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || req.headers.get('x-real-ip')?.trim()
+            || 'unknown'
+        const rateCheck = await checkRateLimit(`storefront-site:${ip}`, 30, 60_000)
+        if (!rateCheck.allowed) {
+            return NextResponse.json({ error: 'Too many requests' }, {
+                status: 429,
+                headers: { 'Retry-After': String(Math.ceil((rateCheck.resetAt - Date.now()) / 1000)) },
+            })
+        }
+
         const url = new URL(req.url)
         const slug = url.searchParams.get('slug')?.trim()
 

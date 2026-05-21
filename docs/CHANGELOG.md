@@ -1,6 +1,6 @@
 ---
 owner: Dev
-last_updated: 2026-05-12
+last_updated: 2026-05-20
 ---
 
 # Project Changelog
@@ -14,6 +14,68 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 ---
 
 ## [Unreleased] — Staging
+
+### GH-1018 — Code Review Bug Fixes (iframe guard + DRY editor detection)
+
+**Bug fixes (fix/BUG-F05-1018-block-product-view-detail):**
+- **Quick View iframe guard tightened** — replaced over-broad `if (window.parent !== window)` with scoped `isInEditorPreview()` check. Fixes silent navigation break in non-editor iframe embeds (preview tools, embeds); preserves editor-preview toast behavior when `?editor` or `?builder` query param present.
+- **DRY editor detection** — extracted duplicated `window.parent !== window && (?editor || ?builder)` logic into `isInEditorPreview()` utility exported from `src/lib/storefront/editor-intercept.ts`. Consumed by `handleCartClick()`, `useAddToCart()`, and Quick View button handler. Includes SSR guard (`typeof window === 'undefined'` → false).
+
+**Impact:** Quick View button now navigates correctly in non-editor iframe embeds; add-to-cart toast still blocks navigation in editor preview.
+
+---
+
+### GH-1018 — Block Product Navigation + Add to Cart Wiring (F05 Bug Fix + Enhancement)
+
+**Bug → Feature:** Product block links (products-featured "View Details", products-grid "Quick View") navigated inside editor iframe, breaking layout. Enhanced to add real Add to Cart functionality on public storefront.
+
+**Implementation:**
+- **New hook:** `src/lib/storefront/use-add-to-cart.ts` — `useAddToCart(product, siteSlug, siteId)` hook encapsulates cart logic: adds item to `cartStore`, tracks `add_to_cart` event, editor guard via iframe detection (`window.parent !== window`), out-of-stock check via `product.inventory`.
+- **API enhancement:** `src/app/api/storefront/products/route.ts` (new) — public endpoint for product listing. Query params: `site` (required), `limit`, `page`, `sort`. Returns products with inventory field, variant details stripped to prevent schema drift.
+- **Block integration:** `src/blocks/products-featured/index.tsx` + `src/blocks/products-grid/index.tsx` + `src/blocks/product-quick-view/index.tsx` — extracted inner components (`HeroProductView`, `ProductCard`, `QuickViewModal`), wired `useAddToCart` hook. Quick-view modal implements 3-branch CTA logic: ctaUrl (navigation) → hasLiveData (real cart) → static (editor-guarded). "Add to Cart" button replaces "View Details" link on storefront (editor still shows navigation block).
+- **Product enrichment:** Products fetched via API now include `inventory` field; hooks check `inventory <= 0` to disable button.
+- **Type updates:** `src/blocks/product-quick-view/config.ts` — extended `QuickViewProduct` type with optional `slug` field (for dynamic quick-view modal); runtime block enriches products with `_id`, `_inventory`, `_compareAtPrice`, `_currencyCode` from API response.
+
+**Pattern:** Editor nav blocking via `window.parent !== window` iframe guard (posts toast); storefront nav via real cart actions + analytics tracking.
+
+**Impact:** 
+- Editor preview: Product blocks show "Add to Cart" text but clicking raises "Navigation is disabled" toast (unchanged from GH-1018 initial fix).
+- Public storefront: "Add to Cart" button functional, adds to cart, tracks event, disables if out-of-stock.
+
+**Non-breaking:** Existing editor behavior preserved. Public storefront now has working cart integration (previously unavailable).
+### F25 — Shop Customers Collection (Restore PW1 Parity)
+
+**Features:**
+- First-class Customers collection: email (normalized per-tenant), name, phone, rank (manual bronze/silver/gold/vip), addresses book (≤10 per customer)
+- Auto-link to Orders via beforeChange hook: orders with customerEmail auto-upsert Customer by (tenant_id, normalized_email), idempotent (5 orders same email = 1 Customer)
+- Tenant-scoped access control: users see only their tenant's customers; super-admin unrestricted; delete forbidden (protects Order FK integrity)
+- Admin UI: list view (search by email/name, filter by rank), detail view (edit addresses + rank), Orders history tab (custom Payload component), CSV export (10k row cap)
+- CSV export endpoint `/api/v1/customers/export?tenantId=X`: streams 7 columns (email, name, phone, rank, createdAt, addressCount, orderCount), formula-injection guarded, PII data cached privately
+
+**Acceptance Criteria:**
+- TC-F25-001..010: Email normalization, auto-link idempotency (5 orders = 1 Customer), empty/invalid email silent skip (non-throwing), database fault tolerance, tenant isolation (read+update+no delete), addresses validator (max 10), rank enum (bronze|silver|gold|vip only)
+
+**Code changes:**
+- New: `src/collections/Customers.ts` (177 LOC) — schema, Payload hooks, tenant-scoped access
+- New: `src/collections/orders-hooks/auto-link-customer.ts`, `sync-customer-snapshot.ts` — Order linkage hooks (non-throwing, idempotent upsert)
+- New: `src/app/api/v1/customers/export/route.ts` — CSV streaming with tenant isolation + 10k cap
+- New: `src/components/admin/customers-*.tsx` — Admin list/detail UI, custom Orders tab
+- Modified: `src/collections/Orders.ts` — add `customer` FK field + hook wiring
+- Modified: `src/payload.config.ts` — import + register Customers collection
+- Database: 9 migration entries (`customers.create_table`, `customers_addresses.create_table`, `orders.customer` FK, indices, Payload rels tables)
+
+**Tests:**
+- 39 automated tests (TC-F25-001..010): auto-link-customer.test.ts (5 tests), customers-access.test.ts (2 tests), customers-field-validation.test.ts (2 tests), customers-export.test.ts (2 tests) — all pass
+- Manual smoke matrix deferred (user QA post-merge): list/search/filter UI, Orders tab navigation, CSV 10k cap
+
+**Non-breaking:**
+- Order denormalized snapshot fields (`customerEmail/Name/Phone/shippingAddress`) untouched → backward-compatible
+- Existing orders without customer FK remain valid (NULL FK allowed)
+- Orphan backfill script pseudocode in phase-03 spec; not executed (pending US-MIGA-12 ETL plan)
+
+**Restores PW1 parity:** Tier-S priority #9, Group B3 / US-MIGA-12. PW2 entity built; historical data migration deferred.
+
+---
 
 ### GH-1024 — Block CRUD Helpers + Menu Block Nested Arrays (F08 Phase 03) + Code Review Fixes
 

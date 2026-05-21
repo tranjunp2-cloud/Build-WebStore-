@@ -43,50 +43,98 @@ describe('welcomeEmail', () => {
 // ─── Order Confirmation Email ───────────────────────────────────────────
 describe('orderConfirmationEmail', () => {
     const baseData = {
+        shopName: 'My Shop',
         orderNumber: 'ORD-001',
         customerName: 'Siti',
+        customerEmail: 'siti@test.com',
         items: [
-            { productName: 'Widget', quantity: 2, unitPrice: 50 },
-            { productName: 'Gadget', quantity: 1, unitPrice: 100 },
+            { name: 'Widget', quantity: 2, unitPrice: 50, lineTotal: 100 },
+            { name: 'Gadget', quantity: 1, unitPrice: 100, lineTotal: 100 },
         ],
         subtotal: 200,
-        tax: 12,
+        shippingFee: 8,
         total: 212,
+        paymentMethod: 'cod' as const,
+        orderDate: '2026-05-20T08:00:00.000Z',
+        orderPageUrl: 'https://example.com/orders/ORD-001',
         currency: 'MYR',
     }
 
-    it('defaults to EN locale', () => {
+    it('defaults to MS locale', () => {
         const result = orderConfirmationEmail(baseData)
-        expect(result.subject).toBe('Order Confirmed — ORD-001')
-        expect(result.html).toContain('Order Confirmed ✓')
-        expect(result.html).toContain('lang="en"')
+        expect(result.subject).toContain('ORD-001')
+        expect(result.html).toContain('lang="ms"')
+        expect(result.html).toContain('Siti')
     })
 
     it('renders EN locale with MYR format', () => {
         const result = orderConfirmationEmail({ ...baseData, locale: 'en' })
-        expect(result.subject).toContain('Order Confirmed')
-        expect(result.html).toContain('Item')
-        expect(result.html).toContain('Qty')
+        expect(result.subject).toContain('My Shop')
+        expect(result.subject).toContain('ORD-001')
+        expect(result.html).toContain('lang="en"')
         expect(result.html).toContain('MYR 212.00')
+        expect(result.html).toContain('Pay on delivery')
     })
 
     it('renders MS locale with RM format', () => {
         const result = orderConfirmationEmail({ ...baseData, locale: 'ms' })
-        expect(result.subject).toContain('Pesanan Disahkan')
-        expect(result.html).toContain('Barangan')
+        expect(result.subject).toContain('Anda telah berjaya membuat pesanan')
         expect(result.html).toContain('Kuantiti')
         expect(result.html).toContain('RM212.00')
         expect(result.html).toContain('lang="ms"')
+        expect(result.html).toContain('Bayar semasa penghantaran')
     })
 
-    it('includes shipping address with localized label', () => {
+    it('COD: prepaid=0, codPayment=total', () => {
+        const result = orderConfirmationEmail({ ...baseData, paymentMethod: 'cod', total: 212 })
+        expect(result.html).toContain('RM0.00') // prepaid
+        expect(result.html).toContain('RM212.00') // cod payment
+    })
+
+    it('Stripe: prepaid=total, codPayment=0', () => {
+        const result = orderConfirmationEmail({ ...baseData, paymentMethod: 'stripe', total: 212 })
+        // prepaid row shows total, cod row shows 0
+        const html = result.html
+        const prepaidIdx = html.indexOf('Pra-bayar')
+        const codIdx = html.indexOf('Bayar semasa')
+        // Both rows exist
+        expect(prepaidIdx).toBeGreaterThan(-1)
+        expect(codIdx).toBeGreaterThan(-1)
+    })
+
+    it('hides discount row when discountAmount is null', () => {
+        const result = orderConfirmationEmail({ ...baseData, discountAmount: null })
+        expect(result.html).not.toContain('Diskaun')
+    })
+
+    it('shows discount row with code when discountAmount provided', () => {
+        const result = orderConfirmationEmail({ ...baseData, discountAmount: 20, discountCode: 'SAVE20', locale: 'ms' })
+        expect(result.html).toContain('Diskaun')
+        expect(result.html).toContain('SAVE20')
+        expect(result.html).toContain('-RM20.00')
+    })
+
+    it('renders variant below product name', () => {
         const result = orderConfirmationEmail({
             ...baseData,
-            locale: 'ms',
-            shippingAddress: { line1: '123 Jalan Bukit', city: 'KL', state: 'WP', postcode: '50000' },
+            items: [{ name: 'Shirt', variant: 'Red / L', quantity: 1, unitPrice: 50, lineTotal: 50 }],
         })
-        expect(result.html).toContain('Alamat Penghantaran')
+        expect(result.html).toContain('Red / L')
+    })
+
+    it('renders shipping address in recipient block', () => {
+        const result = orderConfirmationEmail({
+            ...baseData,
+            customerAddress: { line1: '123 Jalan Bukit', city: 'KL', state: 'WP', postcode: '50000' },
+        })
         expect(result.html).toContain('123 Jalan Bukit')
+        expect(result.html).toContain('KL')
+    })
+
+    it('XSS: escapes customerName in HTML output', () => {
+        const result = orderConfirmationEmail({ ...baseData, customerName: '<script>alert(1)</script>' })
+        expect(result.html).not.toContain('<script>')
+        expect(result.html).toContain('&lt;script&gt;')
     })
 })
 
@@ -107,22 +155,34 @@ describe('orderStatusEmail', () => {
     })
 
     it('renders all EN statuses correctly', () => {
-        const statuses = ['processing', 'shipped', 'delivered', 'cancelled'] as const
-        const expectedTitles = ['Order is Processing', 'Order Shipped', 'Order Delivered', 'Order Cancelled']
-
-        statuses.forEach((status, i) => {
+        const cases: Array<{ status: Parameters<typeof orderStatusEmail>[0]['status']; title: string }> = [
+            { status: 'confirmed', title: 'Order Confirmed' },
+            { status: 'ready_to_ship', title: 'Order Ready to Ship' },
+            { status: 'processing', title: 'Order is Processing' },
+            { status: 'shipped', title: 'Order Shipped' },
+            { status: 'completed', title: 'Order Completed' },
+            { status: 'cancelled', title: 'Order Cancelled' },
+            { status: 'refunded', title: 'Order Refunded' },
+        ]
+        cases.forEach(({ status, title }) => {
             const result = orderStatusEmail({ ...baseData, status, locale: 'en' })
-            expect(result.html).toContain(expectedTitles[i])
+            expect(result.html).toContain(title)
         })
     })
 
     it('renders all MS statuses correctly', () => {
-        const statuses = ['processing', 'shipped', 'delivered', 'cancelled'] as const
-        const expectedTitles = ['Pesanan Sedang Diproses', 'Pesanan Telah Dihantar', 'Pesanan Telah Dihantar', 'Pesanan Dibatalkan']
-
-        statuses.forEach((status, i) => {
+        const cases: Array<{ status: Parameters<typeof orderStatusEmail>[0]['status']; title: string }> = [
+            { status: 'confirmed', title: 'Pesanan Telah Disahkan' },
+            { status: 'ready_to_ship', title: 'Pesanan Siap Dihantar' },
+            { status: 'processing', title: 'Pesanan Sedang Diproses' },
+            { status: 'shipped', title: 'Pesanan Telah Dihantar' },
+            { status: 'completed', title: 'Pesanan Selesai' },
+            { status: 'cancelled', title: 'Pesanan Dibatalkan' },
+            { status: 'refunded', title: 'Pesanan Telah Dikembalikan' },
+        ]
+        cases.forEach(({ status, title }) => {
             const result = orderStatusEmail({ ...baseData, status, locale: 'ms' })
-            expect(result.html).toContain(expectedTitles[i])
+            expect(result.html).toContain(title)
         })
     })
 

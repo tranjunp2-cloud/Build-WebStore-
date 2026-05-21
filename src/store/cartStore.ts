@@ -60,12 +60,15 @@ export const useCartStore = create<CartStore>((set, get) => ({
         let newItems: CartItem[]
 
         if (existing) {
+            const maxQty = item.inventory != null ? item.inventory : Infinity
+            if (existing.quantity >= maxQty) return
             newItems = get().items.map(i =>
                 i.productId === item.productId
-                    ? { ...i, quantity: i.quantity + 1 }
+                    ? { ...i, quantity: Math.min(i.quantity + 1, maxQty) }
                     : i
             )
         } else {
+            if ((item.inventory ?? Infinity) <= 0) return
             newItems = [...get().items, { ...item, quantity: 1 }]
         }
 
@@ -80,12 +83,15 @@ export const useCartStore = create<CartStore>((set, get) => ({
     },
 
     updateQuantity: (productId, quantity) => {
-        if (quantity <= 0) {
+        if (!Number.isFinite(quantity) || quantity <= 0) {
             get().removeItem(productId)
             return
         }
+        const existing = get().items.find(i => i.productId === productId)
+        // advisory cap — checkout validates actual stock server-side
+        const maxQty = existing?.inventory != null ? existing.inventory : Infinity
         const newItems = get().items.map(i =>
-            i.productId === productId ? { ...i, quantity } : i
+            i.productId === productId ? { ...i, quantity: Math.min(quantity, maxQty) } : i
         )
         saveCart(newItems)
         set({ items: newItems })

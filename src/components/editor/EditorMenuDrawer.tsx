@@ -20,6 +20,7 @@ import {
     LogOut,
     Package,
     Settings,
+    ShoppingCart,
     Users,
     X,
 } from 'lucide-react'
@@ -85,6 +86,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                 ],
             },
             { label: { en: 'Products', ms: 'Produk' }, href: '/products', icon: Package },
+            { label: { en: 'Orders', ms: 'Pesanan' }, href: '/orders', icon: ShoppingCart },
             { label: { en: 'Customers', ms: 'Pelanggan' }, href: '/customers', icon: Users },
             {
                 label: { en: 'Settings', ms: 'Tetapan' },

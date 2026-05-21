@@ -3,7 +3,7 @@
 import { getPayload } from 'payload';
 import config from '@payload-config';
 import { getCurrentTenantId } from '@/lib/auth';
-// import { deauthorizeStripeAccount } from '@/lib/payment/stripe'; // STRIPE_CONNECT_DISABLED
+import { deauthorizeStripeAccount } from '@/lib/payment/stripe';
 
 export type PaymentUpdates = {
     payment_cod?: boolean;
@@ -66,6 +66,13 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
         }
 
         if (updates.qr_image !== undefined) {
+            if (updates.qr_image !== null) {
+                // Verify the media was uploaded by this tenant (alt field tagged at upload time)
+                const media = await payload.findByID({ collection: 'media', id: updates.qr_image as string });
+                if (!media || (media as any).alt !== `qr-${tenantId}`) {
+                    return { success: false, error: 'Invalid media: not uploaded by this tenant.' };
+                }
+            }
             paymentsData.qr_image = updates.qr_image;
         }
 
@@ -159,7 +166,8 @@ export async function uploadQrMedia(formData: FormData) {
         const media = await payload.create({
             collection: 'media',
             data: {
-                alt: 'QR Code for Bank Transfer',
+                // Embed tenantId in alt to enable ownership verification in updatePaymentSettings
+                alt: `qr-${tenantId}`,
             },
             file: {
                 data: buffer,
@@ -185,18 +193,17 @@ export async function disconnectStripe() {
             return { success: false, error: 'Unauthorized' };
         }
 
-        /* STRIPE_CONNECT_DISABLED — deauthorize call temporarily disabled
         const tenant = await payload.findByID({ collection: 'tenants', id: tenantId });
-        const currentAccountId = (tenant as any)?.stripeAccountId as string | null | undefined;
+        const accountId = (tenant as any).stripeAccountId as string | null;
 
-        if (currentAccountId) {
+        if (accountId) {
             try {
-                await deauthorizeStripeAccount(currentAccountId);
-            } catch (deauthErr) {
-                console.warn('[disconnectStripe] deauthorize failed (continuing with DB cleanup):', deauthErr);
+                await deauthorizeStripeAccount(accountId);
+            } catch (err) {
+                // Non-fatal: revoke best-effort; still clear our DB record
+                console.error('Stripe deauthorize failed (continuing disconnect):', err);
             }
         }
-        */
 
         await payload.update({
             collection: 'tenants',

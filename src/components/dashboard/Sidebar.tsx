@@ -33,6 +33,7 @@ import {
     LogOut,
     ShieldCheck,
     Package,
+    ShoppingCart,
     Users,
     Menu,
     X,
@@ -77,6 +78,11 @@ const NAV_ITEMS: NavItemConfig[] = [
         label: { en: 'Products', ms: 'Produk' },
         icon: Package,
         href: '/products',
+    },
+    {
+        label: { en: 'Orders', ms: 'Pesanan' },
+        icon: ShoppingCart,
+        href: '/orders',
     },
     {
         label: { en: 'Customers', ms: 'Pelanggan' },

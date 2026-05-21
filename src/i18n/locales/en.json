@@ -352,12 +352,100 @@
       "sst": "SST (6%)",
       "total": "Total",
       "shippingAddress": "Shipping Address",
-      "footer": "Powered by PrimeWeb"
+      "footer": "Powered by PrimeWeb",
+      "recipientInfoHeading": "Recipient Information",
+      "fullName": "Full name",
+      "phone": "Phone",
+      "email": "Email",
+      "address": "Address",
+      "orderInfoHeading": "Order Information",
+      "orderStatus": "Order status",
+      "orderStatusSuccess": "Order placed",
+      "orderDate": "Order date",
+      "productName": "Product name",
+      "quantity": "Quantity",
+      "unitCost": "Unit price",
+      "discount": "Discount",
+      "shippingFee": "Shipping fee",
+      "prepaid": "Prepaid",
+      "codPayment": "Pay on delivery",
+      "paymentMethod": "Payment method",
+      "shippingProvider": "Shipping provider",
+      "buyerNote": "Buyer note",
+      "cta": "Click here to view your order",
+      "farewell": "See you on your next order!",
+      "copyright": "Copyright by"
+    },
+    "newOrder": {
+      "greeting": "You have a new order from",
+      "body": "Please review and process the order promptly.",
+      "orderStatusLabel": "Order status",
+      "orderStatusNew": "New Order",
+      "cta": "View Order Here",
+      "farewell": "Happy selling!"
+    },
+    "cancelledOrder": {
+      "body": "Your order has been cancelled.",
+      "orderStatusCancelled": "Cancelled",
+      "cancellationDate": "Cancellation date",
+      "cancellationNote": "Cancellation note",
+      "cta": "Place a new order",
+      "subject": "Order cancellation notice"
+    },
+    "shippedOrder": {
+      "body": "Thank you for your purchase. Your order has been shipped to you.",
+      "orderStatusShipped": "Shipped",
+      "shippedDate": "Shipped date",
+      "subject": "Your order has been shipped"
+    },
+    "autoCancelledOrder": {
+      "body": "Your order has been automatically cancelled because payment was not received within the required timeframe.",
+      "paymentExpiredTitle": "Payment period expired",
+      "paymentExpiredText": "The system did not receive payment within 24 hours of the order being placed ({elapsed}). Per policy, this order has been automatically cancelled and product stock has been restored.",
+      "orderStatusCancelled": "Auto-cancelled",
+      "cancellationDate": "Cancellation date",
+      "cancellationReason": "Cancellation reason",
+      "cancellationReasonValue": "Payment not received",
+      "restockedBadge": "Restocked",
+      "noRefundTitle": "No refund required",
+      "noRefundText": "This order was never paid, so no money was charged to your account. You can place a new order anytime.",
+      "originalTotalLabel": "Original order total",
+      "paymentMethodValue": "Not selected",
+      "paymentStatusLabel": "Payment status",
+      "paymentStatusValue": "Unpaid",
+      "cta": "Reorder",
+      "ctaSubtitle": "Items from your original order will be added back to your cart.",
+      "subject": "Order auto-cancelled"
+    },
+    "bankTransfer": {
+      "body": "Thank you for your order. Please complete your bank transfer using the details below and upload your payment receipt to confirm the order.",
+      "bankDetailsHeading": "Bank Transfer Details",
+      "bank": "Bank",
+      "accountNo": "Account No.",
+      "accountName": "Account Name",
+      "scanToPay": "Or Scan to Pay",
+      "referenceHeading": "IMPORTANT — Payment Reference",
+      "referenceInstruction": "Enter this code in your transfer notes / description field",
+      "deadlineLabel": "Payment required by",
+      "autoCancel": "Orders without payment confirmation will be automatically cancelled after 24 hours.",
+      "securityReminder": "Security reminder: We will never ask you to transfer money to a different account or via phone/WhatsApp. If you receive such requests, please ignore and report them.",
+      "uploadCta": "Upload Payment Receipt",
+      "fallbackLink": "Or copy this link:",
+      "orderStatusLabel": "Order status",
+      "orderStatusAwaitingPayment": "Awaiting Payment"
     },
     "status": {
       "greeting": "Hi",
       "orderNumber": "Order Number",
       "tracking": "Tracking",
+      "confirmed": {
+        "title": "Order Confirmed",
+        "description": "Your order has been confirmed by the seller and is now being prepared."
+      },
+      "ready_to_ship": {
+        "title": "Order Ready to Ship",
+        "description": "Your order is packed and ready. It will be handed over to the courier soon."
+      },
       "processing": {
         "title": "Order is Processing",
         "description": "Your order is being prepared. We will notify you when it has been shipped."
@@ -366,13 +454,17 @@
         "title": "Order Shipped",
         "description": "Your order is on its way. You can track your shipment below."
       },
-      "delivered": {
-        "title": "Order Delivered",
+      "completed": {
+        "title": "Order Completed",
         "description": "Your order has been delivered. Thank you for your purchase!"
       },
       "cancelled": {
         "title": "Order Cancelled",
         "description": "Your order has been cancelled. If you have any questions, please contact us."
+      },
+      "refunded": {
+        "title": "Order Refunded",
+        "description": "Your order has been refunded. The amount will be returned to your original payment method."
       }
     }
   },
@@ -756,6 +848,14 @@
         "shipped": "Shipped",
         "completed": "Completed"
       },
+      "ship": {
+        "title": "Ship Order",
+        "trackingLabel": "Tracking Number",
+        "trackingPlaceholder": "e.g., JT1234567890MY",
+        "back": "Back",
+        "confirm": "Confirm Shipment",
+        "confirming": "Shipping..."
+      },
       "cancel": {
         "title": "Cancel Order",
         "orderLabel": "Order",
@@ -802,6 +902,7 @@
         "currentStock": "Current Stock:",
         "productDetails": "Product Details",
         "skuIdentification": "SKU Identification",
+        "skuLabel": "SKU",
         "skuFallback": "N/A",
         "taxConfiguration": "Tax Configuration",
         "taxesSst": "Taxes: SST (6%) Incl.",
@@ -811,6 +912,7 @@
         "off": "OFF",
         "inventoryVariants": "Inventory Variants",
         "description": "Description",
+        "attributes": "Attributes",
         "deleteConfirm": "Are you certain?",
         "deleteProduct": "DELETE PRODUCT",
         "editProduct": "EDIT PRODUCT"
@@ -865,6 +967,7 @@
         "edit": "Edit",
         "delete": "Delete",
         "sku": "SKU:",
+        "fromPrefix": "From ",
         "filterBtn": "Filter",
         "failedToLoad": "Failed to load products",
         "retry": "Retry",
@@ -897,7 +1000,7 @@
         "aiSeoNameRequired": "Enter a product name first",
         "seoTitle": "Meta Title",
         "seoTitleHint": "{count}/70 chars",
-        "seoDescription": "Meta Description",
+        "seoDescription": "Description",
         "seoDescriptionHint": "{count}/160 chars — target 150-160",
         "seoSlug": "URL Slug",
         "images": "Product Images",
@@ -920,6 +1023,7 @@
         "toastRestored": "Product restored!",
         "deleteFailed": "Failed to delete product",
         "networkError": "Network error",
+        "legacyPriceWarning": "This product was saved before the variant pricing fix. The base price is RM 0 — please regenerate the variant matrix to refresh prices, or set per-variant prices and save to update.",
         "errors": {
           "nameMin": "Product name is too short (min 3 chars)",
           "priceRequired": "Valid price (≥ 0) is required",
@@ -956,11 +1060,13 @@
           "dimMax": "Dimension is too large",
           "maxTiers": "Maximum 2 variant tiers allowed",
           "maxVariants": "Maximum 900 variants allowed. Please reduce options.",
+          "variantsRequired": "Please generate the variants matrix before saving",
           "attrKeyRequired": "Attribute name is required",
           "attrValueRequired": "Attribute value is required",
           "attrMax": "Maximum 20 attributes allowed",
           "attrKeyLong": "Attribute name is too long (max 100 chars)",
-          "attrValueLong": "Attribute value is too long (max 500 chars)"
+          "attrValueLong": "Attribute value is too long (max 500 chars)",
+          "skuAlreadyInUse": "SKU \"{value}\" is already in use"
         },
         "categories": {
           "select": "Select categories...",
@@ -1051,6 +1157,15 @@
           "optionPlaceholderSmall": "e.g. Small",
           "addOption": "Add values",
           "addTier": "Add Option",
+          "removeTier": "Remove option",
+          "derivedPricesHint": "Derived from variants",
+          "derivedMinLabel": "min",
+          "derivedMaxCompareLabel": "/ max compare",
+          "removeTierConfirmTitle": "Remove this option?",
+          "removeTierConfirmDesc": "This will remove all variants containing this option. Remaining combinations will be preserved.",
+          "autoFilledFromVariants": "Auto-filled from variants — edit individual variant prices below",
+          "removeTierConfirmBtn": "Remove",
+          "removeTierCancelBtn": "Cancel",
           "createSkuTable": "Generate variants",
           "optionNameLabel": "Option name",
           "valuesLabel": "Values",
@@ -1288,9 +1403,11 @@
         "stripeConnectTitle": "Connect a Stripe account to start accepting Card & FPX",
         "stripeConnectDesc": "Funds settle straight into your linked bank account — Prime Web never touches them. Manual methods below keep working while you set this up.",
         "stripeConnectCta": "Connect Stripe Account",
-        "stripeStep1": "Redirect to Stripe",
-        "stripeStep2": "Verify business & bank (~5 min)",
-        "stripeStep3": "Card & FPX unlock automatically",
+        "stripeStep1": "Click \"Connect Stripe Account\"",
+        "stripeStep2": "Enter your Stripe credentials",
+        "stripeStep3": "Card & FPX unlock instantly",
+        "savesAutomatic": "Settings saved",
+        "previewCheckout": "Preview checkout",
         "stripeLockedTooltip": "Connect Stripe to enable",
         "stripeConnected": "Stripe account connected",
         "stripeNotConnected": "No Stripe account connected",
@@ -1304,14 +1421,14 @@
         "disconnectDesc": "This will disable Stripe payments on your storefront. You can reconnect at any time.",
         "disconnectKeep": "Keep Connected",
         "stripeSectionTitle": "Stripe Payment Methods",
-        "stripeSectionDesc": "Powered by Stripe Checkout · 3% platform fee",
+        "stripeSectionDesc": "Powered by Stripe Checkout",
         "manualSectionTitle": "Manual Methods",
         "manualSectionDesc": "You confirm payment manually after the order",
         "cardTitle": "Credit / Debit Card",
-        "cardFee": "3% fee",
+        "cardFee": "",
         "cardDesc": "Accept Visa, Mastercard and American Express via Stripe Checkout. Funds settle directly to your linked Stripe account.",
         "cardMeta": "MYR · International cards accepted",
-        "fpxFee": "3% fee",
+        "fpxFee": "",
         "fpxDesc": "Let buyers pay directly from their Malaysian bank account. MYR only — supports 15+ local banks.",
         "fpxMeta": "15 banks supported",
         "codDesc": "Buyer pays in cash when the courier delivers. You'll need to confirm receipt in the order before shipment is marked paid.",
@@ -1338,7 +1455,9 @@
         "stripeVerifyCta": "Verify Connection",
         "stripeVerifying": "Verifying...",
         "failVerifyStripe": "Verification failed. Please try again.",
-        "stripeVerifyPending": "Your Stripe account is still under review. Please check back soon."
+        "stripeVerifyPending": "Your Stripe account is still under review. Please check back soon.",
+        "saving": "Saving...",
+        "saveChanges": "Save changes"
       },
       "shipping": {
         "pageTitle": "Shipping",

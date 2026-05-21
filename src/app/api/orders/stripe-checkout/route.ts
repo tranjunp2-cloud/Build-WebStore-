@@ -219,8 +219,6 @@ export async function POST(request: NextRequest) {
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
         const siteSlug = (tenant as any).slug || tenantId
 
-        const applicationFeeAmountCents = 0 // cross-border fee unsupported (US platform + MY connected account)
-
         // Include shipping and tax as Stripe line items so buyer is charged the full order total
         const allCheckoutItems = [
             ...checkoutItems,
@@ -239,7 +237,6 @@ export async function POST(request: NextRequest) {
                 cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout?stripe_cancelled=1`,
                 stripeAccountId,
                 paymentMethodTypes: types,
-                applicationFeeAmountCents,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },
             })
         } catch (stripeErr: any) {
@@ -253,11 +250,20 @@ export async function POST(request: NextRequest) {
         }
 
         // Persist session ID for idempotent webhook processing
-        await payload.update({
-            collection: 'orders',
-            id: order.id,
-            data: { stripeSessionId: checkout.sessionId } as any,
-        })
+        try {
+            await payload.update({
+                collection: 'orders',
+                id: order.id,
+                data: { stripeSessionId: checkout.sessionId } as any,
+            })
+        } catch (updateErr) {
+            console.error('[stripe-checkout] Failed to save stripeSessionId, cleaning up:', updateErr)
+            await payload.delete({ collection: 'orders', id: order.id }).catch(() => null)
+            return NextResponse.json(
+                { success: false, error: { code: 'INTERNAL_ERROR', message: 'Checkout failed' } },
+                { status: 500 },
+            )
+        }
 
         return NextResponse.json({
             success: true,
