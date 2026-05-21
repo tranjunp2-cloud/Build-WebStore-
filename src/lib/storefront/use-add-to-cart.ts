@@ -4,7 +4,7 @@ import { useCallback } from 'react'
 import { useCartStore } from '@/store/cartStore'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
-import { isInEditorPreview, EDITOR_CART_TOAST_MSG } from '@/lib/storefront/editor-intercept'
+import { isInEditorPreview, EDITOR_CART_TOAST_MSG, getParentOrigin } from '@/lib/storefront/editor-intercept'
 
 type AddToCartProduct = {
     id: string
@@ -28,7 +28,7 @@ export function useAddToCart(product: AddToCartProduct, siteSlug: string, siteId
         if (isInEditorPreview()) {
             window.parent.postMessage(
                 { type: 'SHOW_TOAST', variant: 'info', message: EDITOR_CART_TOAST_MSG },
-                '*',
+                getParentOrigin(),
             )
             return
         }
