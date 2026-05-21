@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { BlockProps } from '../types'
+import type { BlockProps, ThemeConfig } from '../types'
 import type { ProductsGridConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
@@ -10,23 +10,113 @@ import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
-import { handleCartClick } from '@/lib/storefront/editor-intercept'
+import { handleCartClick, isInEditorPreview } from '@/lib/storefront/editor-intercept'
+import { useAddToCart } from '@/lib/storefront/use-add-to-cart'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
-const CART_ENABLED = true
 
 interface ProductItem {
     id: string
     slug: string
     name: string
     price: string
+    priceRaw: number
+    currency: string
+    inventory: number
+    compareAtPrice?: number
     image: string | null
+}
+
+function ProductCard({ product, variant, theme, siteBasePath, siteSlug, siteId }: {
+    product: ProductItem
+    variant: 'grid-3' | 'grid-4' | 'list'
+    theme: ThemeConfig
+    siteBasePath: string
+    siteSlug: string
+    siteId: string
+}) {
+    const router = useRouter()
+    const { handleAddToCart, isOutOfStock } = useAddToCart(
+        { ...product, imageUrl: product.image ?? undefined },
+        siteSlug,
+        siteId,
+    )
+
+    return (
+        <HoverCard
+            className={`group overflow-hidden rounded-2xl h-full flex ${variant === 'list' ? 'flex-row items-center gap-6 p-4' : 'flex-col'}`}
+            style={{
+                border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
+                background: `linear-gradient(135deg, ${theme.colorMode === 'dark' ? '#ffffff03' : '#00000003'}, transparent)`,
+            }}
+        >
+            <div className={`relative overflow-hidden bg-black/5 dark:bg-white/5 ${variant === 'list' ? 'w-32 h-32 rounded-xl flex-shrink-0' : 'aspect-square'}`}>
+                {product.image ? (
+                    <img
+                        src={product.image}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 mix-blend-multiply dark:mix-blend-normal"
+                        loading="lazy"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">🛍️</div>
+                )}
+                {/* Quick View Overlay */}
+                {variant !== 'list' && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                if (isInEditorPreview()) { handleCartClick(e); return }
+                                if (product.slug) router.push(`${siteBasePath}/products/${product.slug}`)
+                            }}
+                            className={`px-6 py-2 bg-white text-black font-semibold rounded-full transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 ${TOUCH_TARGET.min}`}
+                        >
+                            Quick View
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <div className={variant === 'list' ? 'flex-1 py-2' : `${CARD_PADDING.md} flex flex-col flex-1`}>
+                <Heading level={4} className="font-body mb-2">{product.name}</Heading>
+                <RichText text={product.price} as="p" className="text-xl font-heading mb-4" style={{ color: 'var(--brand-primary)' }} />
+
+                {variant !== 'list' && <div className="mt-auto" />}
+
+                <button
+                    type="button"
+                    disabled={isOutOfStock}
+                    className={`px-4 py-2 font-medium transition-all duration-300 ${TOUCH_TARGET.min} ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
+                    style={{
+                        backgroundColor: variant === 'list' ? `rgba(var(--brand-primary-rgb), 0.082)` : 'transparent',
+                        color: 'var(--brand-primary)',
+                        border: variant === 'list' ? 'none' : `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
+                        opacity: isOutOfStock ? 0.5 : 1,
+                        cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                        if (isOutOfStock || variant === 'list') return
+                        e.currentTarget.style.backgroundColor = CSS_VARS.primary
+                        e.currentTarget.style.color = theme.colorMode === 'dark' ? '#000' : '#fff'
+                    }}
+                    onMouseLeave={(e) => {
+                        if (isOutOfStock || variant === 'list') return
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.color = CSS_VARS.primary
+                    }}
+                    onClick={handleAddToCart}
+                >
+                    {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                </button>
+            </div>
+        </HoverCard>
+    )
 }
 
 export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGridConfig>) {
     const { headline = 'Featured Products', subheadline, limit = 6, variant = 'grid-3' } = block
-    const router = useRouter()
     const [products, setProducts] = useState<ProductItem[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -53,6 +143,10 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
                         slug: String(doc.slug || ''),
                         name: String(doc.name || ''),
                         price: `${currency} ${price.toFixed(2)}`,
+                        priceRaw: price,
+                        currency: currencyCode,
+                        inventory: Number(doc.inventory) || 0,
+                        compareAtPrice: typeof doc.compareAtPrice === 'number' ? doc.compareAtPrice : undefined,
                         image: images?.[0]?.image?.url ?? null,
                     }
                 })
@@ -64,7 +158,7 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
             .finally(() => setLoading(false))
 
         return () => controller.abort()
-    }, [limit, site])
+    }, [limit, site?.id])
 
     const gridCols = {
         'grid-3': 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
@@ -101,6 +195,8 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
     const siteBasePath = typeof siteRec?.siteBasePath === 'string'
         ? (siteRec.siteBasePath as string)
         : (siteRec?.tenantSlug ? `/sites/${siteRec.tenantSlug as string}` : '')
+    const siteSlug = String(siteRec?.tenantSlug || '')
+    const siteId = site?.id != null ? String(site.id) : ''
 
     return (
         <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
@@ -123,72 +219,14 @@ export function ProductsGridBlock({ block, theme, site }: BlockProps<ProductsGri
             <StaggerGrid className={`grid gap-8 ${gridCols}`}>
                 {products.map((product) => (
                     <StaggerItem key={product.id}>
-                        <HoverCard
-                            className={`group overflow-hidden rounded-2xl h-full flex ${variant === 'list' ? 'flex-row items-center gap-6 p-4' : 'flex-col'}`}
-                            style={{
-                                border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
-                                background: `linear-gradient(135deg, ${theme.colorMode === 'dark' ? '#ffffff03' : '#00000003'}, transparent)`,
-                            }}
-                        >
-                            <div className={`relative overflow-hidden bg-black/5 dark:bg-white/5 ${variant === 'list' ? 'w-32 h-32 rounded-xl flex-shrink-0' : 'aspect-square'}`}>
-                                {product.image ? (
-                                    <img
-                                        src={product.image}
-                                        alt={product.name}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 mix-blend-multiply dark:mix-blend-normal"
-                                        loading="lazy"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">🛍️</div>
-                                )}
-                                {/* Quick View Overlay */}
-                                {variant !== 'list' && (
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
-                                        <button
-                                            type="button"
-                                            onClick={() => product.slug && router.push(`${siteBasePath}/products/${product.slug}`)}
-                                            className={`px-6 py-2 bg-white text-black font-semibold rounded-full transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 ${TOUCH_TARGET.min}`}
-                                        >
-                                            Quick View
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className={variant === 'list' ? 'flex-1 py-2' : `${CARD_PADDING.md} flex flex-col flex-1`}>
-                                <Heading level={4} className="font-body mb-2">{product.name}</Heading>
-                                <RichText text={product.price} as="p" className="text-xl font-heading mb-4" style={{ color: 'var(--brand-primary)' }} />
-
-                                {variant !== 'list' && <div className="mt-auto" />}
-
-                                {CART_ENABLED && (
-                                <button
-                                    type="button"
-                                    className={`px-4 py-2 font-medium transition-all duration-300 ${TOUCH_TARGET.min} ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
-                                    style={{
-                                        backgroundColor: variant === 'list' ? `rgba(var(--brand-primary-rgb), 0.082)` : 'transparent',
-                                        color: 'var(--brand-primary)',
-                                        border: variant === 'list' ? 'none' : `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (variant !== 'list') {
-                                            e.currentTarget.style.backgroundColor = CSS_VARS.primary
-                                            e.currentTarget.style.color = theme.colorMode === 'dark' ? '#000' : '#fff'
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (variant !== 'list') {
-                                            e.currentTarget.style.backgroundColor = 'transparent'
-                                            e.currentTarget.style.color = CSS_VARS.primary
-                                        }
-                                    }}
-                                    onClick={handleCartClick}
-                                >
-                                    Add to Cart
-                                </button>
-                                )}
-                            </div>
-                        </HoverCard>
+                        <ProductCard
+                            product={product}
+                            variant={variant}
+                            theme={theme}
+                            siteBasePath={siteBasePath}
+                            siteSlug={siteSlug}
+                            siteId={siteId}
+                        />
                     </StaggerItem>
                 ))}
             </StaggerGrid>
