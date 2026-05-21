@@ -3,10 +3,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { notifyTenantOwners } from '@/lib/notifications/notify-tenant-owners'
 import { verifyUploadToken } from '@/lib/orders/upload-token'
+import { PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
 
 const UPLOADABLE_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
-const ACCEPTED_MIME = new Set(['image/jpeg', 'image/png', 'application/pdf'])
-const MAX_BYTES = 5 * 1024 * 1024
 
 // Token-free upload endpoint for the confirm page.
 // Accepts multipart/form-data with a 'file' field; creates the Media record
@@ -34,10 +33,10 @@ export async function POST(
     if (!verifyUploadToken(token, orderId)) {
         return NextResponse.json({ error: 'Invalid or expired upload token' }, { status: 403 })
     }
-    if (!ACCEPTED_MIME.has(file.type)) {
+    if (!PROOF_ACCEPTED_TYPES.includes(file.type)) {
         return NextResponse.json({ error: 'Invalid file type. Upload a JPEG, PNG, or PDF.' }, { status: 422 })
     }
-    if (file.size > MAX_BYTES) {
+    if (file.size > PROOF_MAX_SIZE_BYTES) {
         return NextResponse.json({ error: 'File too large. Maximum size is 5 MB.' }, { status: 422 })
     }
 
