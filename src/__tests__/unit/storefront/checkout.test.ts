@@ -383,12 +383,12 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
         expect(validatePaymentProof(file)).toBeNull()
     })
 
-    it('TC-F09.188: rejects PDF (unsupported type)', () => {
-        // Arrange
+    it('TC-F09.188: accepts PDF file within size limit', () => {
+        // Arrange — PDF now supported per DoD update
         const file = { type: 'application/pdf', size: 500 * 1024 }
 
         // Act + Assert
-        expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+        expect(validatePaymentProof(file)).toBeNull()
     })
 
     it('TC-F09.188: rejects GIF (unsupported type)', () => {
@@ -401,10 +401,18 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
 
     it('TC-F09.188: INVALID_TYPE takes precedence over FILE_TOO_LARGE', () => {
         // Arrange — wrong type AND oversized
-        const file = { type: 'application/pdf', size: PROOF_MAX_SIZE_BYTES + 1 }
+        const file = { type: 'image/gif', size: PROOF_MAX_SIZE_BYTES + 1 }
 
         // Act + Assert — type checked first
         expect(validatePaymentProof(file)).toBe('INVALID_TYPE')
+    })
+
+    it('TC-F09.188: rejects oversized PDF', () => {
+        // Arrange — PDF valid type but over 2 MB
+        const file = { type: 'application/pdf', size: PROOF_MAX_SIZE_BYTES + 1 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBe('FILE_TOO_LARGE')
     })
 })
 

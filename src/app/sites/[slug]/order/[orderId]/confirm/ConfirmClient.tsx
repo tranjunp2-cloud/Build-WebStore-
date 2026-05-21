@@ -10,6 +10,7 @@ import {
     PhoneCall, PackageX, HandCoins, Banknote,
 } from 'lucide-react'
 import { TY_CSS } from './confirm-styles'
+import { PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
 
 type OrderItem = { productName: string; quantity: number; unitPrice: number; variant?: string; imageUrl?: string }
 type ShippingAddress = { line1?: string; line2?: string; city?: string; state?: string; postcode?: string; country?: string }
@@ -71,7 +72,6 @@ function addBusinessDays(date: Date, days: number): Date {
 
 const ICON_OK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
 const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'application/pdf']
-const MAX_BYTES = 5 * 1024 * 1024
 
 const CopyIcon = () => (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -178,8 +178,8 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
             setUploadError('Invalid file type. Please upload a JPEG, PNG, or PDF.')
             return false
         }
-        if (f.size > MAX_BYTES) {
-            setUploadError('File too large. Maximum size is 5MB.')
+        if (f.size > PROOF_MAX_SIZE_BYTES) {
+            setUploadError('File too large. Maximum size is 2MB.')
             return false
         }
         setUploadError('')

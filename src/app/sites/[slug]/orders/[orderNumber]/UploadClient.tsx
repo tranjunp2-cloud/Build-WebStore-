@@ -8,6 +8,7 @@ import {
     countdownStyle, referenceBoxStyle, referenceCodeStyle, referenceLabelStyle,
     bankRowStyle, bankLabelStyle, bankValueStyle, cardStyle, sectionTitleStyle,
 } from './order-upload-styles'
+import { PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
 
 export interface UploadClientProps {
     orderId: string | number
@@ -40,7 +41,6 @@ function formatCountdown(ms: number): string {
 }
 
 const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'application/pdf']
-const MAX_BYTES = 5 * 1024 * 1024
 
 export default function UploadClient({
     orderId, slug, token, status, paymentReference, total, currency,
@@ -65,8 +65,8 @@ export default function UploadClient({
             toast.error('Invalid file type. Please upload a JPEG, PNG, or PDF.')
             return false
         }
-        if (f.size > MAX_BYTES) {
-            toast.error('File too large. Maximum size is 5MB.')
+        if (f.size > PROOF_MAX_SIZE_BYTES) {
+            toast.error('File too large. Maximum size is 2MB.')
             return false
         }
         return true
@@ -199,7 +199,7 @@ export default function UploadClient({
                                     Drag & drop or click to select
                                 </p>
                                 <p style={{ fontSize: 12, color: '#7b8390', margin: 0 }}>
-                                    JPEG, PNG or PDF · Max 5MB
+                                    JPEG, PNG or PDF · Max 2MB
                                 </p>
                             </>
                         )}
