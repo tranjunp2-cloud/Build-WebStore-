@@ -3980,6 +3980,13 @@ const MIGRATIONS = [
   { name: 'tenants.payments_bank_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_bank_name varchar;` },
   { name: 'tenants.payments_account_number', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_number varchar;` },
   { name: 'tenants.payments_account_holder_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_holder_name varchar;` },
+  // ── F08-1032: DB-level SKU uniqueness (case-insensitive, per-tenant / per-product) ──
+  // Closes concurrent-save gap in findConflictingSkus (application-layer check is NOT atomic).
+  // Partial index excludes soft-deleted rows and null-tenant (super-admin) products.
+  { name: 'products.sku_tenant_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS products_sku_tenant_uniq ON products (tenant_id, lower(sku)) WHERE sku IS NOT NULL AND deleted_at IS NULL AND tenant_id IS NOT NULL;` },
+  // Variant SKU uniqueness scoped per parent product (_parent_id = products.id).
+  // Cross-product variant SKU uniqueness is enforced at application layer (findConflictingSkus).
+  { name: 'products_variants.sku_parent_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS products_variants_sku_parent_uniq ON products_variants (_parent_id, lower(sku)) WHERE sku IS NOT NULL;` },
   // ── F25: Shop Customers collection ──
   { name: 'customers.create_table',
     sql: `CREATE TABLE IF NOT EXISTS customers (

@@ -20,6 +20,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { useI18n } from '@/i18n'
 import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
+import { getDisplayPrice } from '@/lib/products/display-price'
 
 type ProductImage = {
     url?: string
@@ -35,6 +36,7 @@ type Category = {
 type Variant = {
     id?: string
     name: string
+    sku?: string
     price: number
     stock: number
     status?: string
@@ -57,6 +59,7 @@ type Product = {
     createdAt: string
     hasVariants?: boolean
     variants?: Variant[]
+    attributes?: Array<{ key: string; value: string }>
     descText?: string
 }
 
@@ -199,9 +202,9 @@ export default function ProductsPage() {
                 case 'Oldest':
                     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
                 case 'Price: Low > High':
-                    return (a.price || 0) - (b.price || 0)
+                    return getDisplayPrice(a).value - getDisplayPrice(b).value
                 case 'Price: High > Low':
-                    return (b.price || 0) - (a.price || 0)
+                    return getDisplayPrice(b).value - getDisplayPrice(a).value
                 case 'Inventory: Low > High':
                     return (a.inventory || 0) - (b.inventory || 0)
                 default:
@@ -718,7 +721,8 @@ export default function ProductsPage() {
                                 {paginatedProducts.map(product => {
                                     const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                     const isOutOfStock = product.inventory <= 0
-                                    const priceDisplay = formatPrice(product.price, product.currency)
+                                    const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
+                                    const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
                                     const weightDisplay = product.weight ? `${product.weight} kg` : '0.5 kg'
                                     
                                     return (
@@ -831,7 +835,8 @@ export default function ProductsPage() {
                             {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const inv = product.inventory || 0
-                                const priceDisplay = formatPrice(product.price, product.currency)
+                                const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
+                                const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
 
                                 return (
                                     <div
