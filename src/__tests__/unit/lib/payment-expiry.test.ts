@@ -101,7 +101,7 @@ describe('paymentExpiryJob — happy path', () => {
                 elapsedTime: expect.stringMatching(/\d+ jam \d+ minit/),
             }),
         )
-        expect(payload.sendEmail).toHaveBeenCalledWith({ subject: 'Order cancelled', html: '<p>test</p>' })
+        expect(payload.sendEmail).toHaveBeenCalledWith({ to: 'customer1@test.com', subject: 'Order cancelled', html: '<p>test</p>' })
     })
 })
 
