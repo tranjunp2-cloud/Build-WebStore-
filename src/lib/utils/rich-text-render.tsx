@@ -32,6 +32,7 @@ const SAFE_STYLE_RULES: Array<RegExp> = [
 
 const SAFE_HREF_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:'])
 const SAFE_TARGETS = new Set(['_blank', '_self', '_parent', '_top'])
+const SAFE_REL_VALUES = new Set(['noopener', 'noreferrer', 'nofollow', 'author', 'license'])
 
 function isSafeHref(href: string): boolean {
     try { return SAFE_HREF_PROTOCOLS.has(new URL(href, 'https://x').protocol) }
@@ -69,10 +70,28 @@ export function sanitizeInlineHtml(html: string): string {
             if (safe) safeParts.push(`style="${safe}"`)
         }
         if (hrefMatch && isSafeHref(hrefMatch[1])) safeParts.push(`href="${hrefMatch[1]}"`)
-        if (targetMatch && SAFE_TARGETS.has(targetMatch[1])) safeParts.push(`target="${targetMatch[1]}"`)
-        if (relMatch) safeParts.push(`rel="${relMatch[1]}"`)
+        const safeTarget = targetMatch && SAFE_TARGETS.has(targetMatch[1]) ? targetMatch[1] : null
+        if (safeTarget) safeParts.push(`target="${safeTarget}"`)
+        // Enforce rel allowlist; ensure noopener noreferrer when target="_blank" (tabnapping prevention)
+        const isBlank = safeTarget === '_blank'
+        if (relMatch) {
+            const relTokens = relMatch[1].split(/\s+/).filter(v => SAFE_REL_VALUES.has(v))
+            if (isBlank) {
+                if (!relTokens.includes('noopener')) relTokens.push('noopener')
+                if (!relTokens.includes('noreferrer')) relTokens.push('noreferrer')
+            }
+            if (relTokens.length > 0) safeParts.push(`rel="${relTokens.join(' ')}"`)
+        } else if (isBlank) {
+            safeParts.push(`rel="noopener noreferrer"`)
+        }
         return safeParts.length > 0 ? `<${t} ${safeParts.join(' ')}>` : `<${t}>`
     })
+}
+
+/** Strip all HTML tags and decode entities — use for contexts that control their own color (e.g. tab labels). */
+export function plainText(html: string | null | undefined): string {
+    if (!html) return ''
+    return decodeHtmlEntities(html.replace(/<[^>]+>/g, ''))
 }
 
 export function hasInlineFormatting(text: string): boolean {

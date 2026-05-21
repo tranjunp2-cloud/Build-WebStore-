@@ -78,7 +78,8 @@ function SortableItem({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggle(id); }}
-        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border border-solid ${visible ? 'border-blue-400 bg-[#8EBAFF]' : 'border-white/20 bg-transparent'} transition-colors duration-200 cursor-pointer`}
+        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] border-2 border-solid transition-colors duration-200 cursor-pointer ${visible ? 'border-blue-400 bg-[#8EBAFF]' : ''}`}
+        style={!visible ? { borderColor: 'var(--dash-text-muted)', background: 'var(--dash-secondary-bg)' } : {}}
       >
         {visible && <Check className="h-3.5 w-3.5 text-white stroke-[3px]" />}
       </button>

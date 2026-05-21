@@ -169,11 +169,11 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
     }
 
     return (
-        <div className="blog-ckeditor-wrapper relative flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] overflow-hidden">
+        <div className="blog-ckeditor-wrapper relative flex flex-col bg-[var(--dash-secondary-bg)] border border-[var(--dash-border)] rounded-[16px] overflow-hidden">
             {/* Improve Text floating menu */}
             {showImproveMenu && selectedText && (
                 <div
-                    className="absolute z-50 flex flex-col gap-1 p-2 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl min-w-[180px]"
+                    className="absolute z-50 flex flex-col gap-1 p-2 bg-[var(--dash-secondary-bg)] border border-[var(--dash-border)] rounded-xl shadow-2xl min-w-[180px]"
                     style={{ top: improveMenuPos.top, left: improveMenuPos.left }}
                 >
                     <span className="text-[10px] uppercase tracking-wider text-gray-500 px-2 py-1">{t.dashboard.blog.editor.aiImproveLabel}</span>
@@ -200,8 +200,8 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
             )}
             {isRewriting && (
                 <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded-[16px]">
-                    <div className="flex items-center gap-2 text-sm text-white bg-[#1E293B] px-4 py-2 rounded-lg border border-white/10">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="flex items-center gap-2 text-sm text-[var(--dash-text)] bg-[var(--dash-secondary-bg)] px-4 py-2 rounded-lg border border-[var(--dash-border)]">
+                        <div className="w-4 h-4 border-2 border-[var(--dash-border)] border-t-[var(--dash-text-muted)] rounded-full animate-spin" />
                         {t.dashboard.blog.editor.aiRewriting}
                     </div>
                 </div>
@@ -286,7 +286,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                                 fontWeight: '400',
                                 fontSize: '12px',
                                 lineHeight: '1.333',
-                                color: 'rgba(248, 250, 252, 0.5)',
+                                color: 'var(--dash-text-muted)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 paddingRight: '8px',
@@ -333,11 +333,11 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }}
             />
 
-            {/* Complete dark theme CSS overrides */}
+            {/* Complete theme CSS overrides */}
             <style jsx global>{`
                 /* ===== EDITOR WRAPPER ===== */
                 .blog-ckeditor-wrapper {
-                    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+                    border: 1px solid var(--dash-border) !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor {
                     width: 100%;
@@ -366,7 +366,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     width: auto !important;
                     box-shadow: none !important;
                 }
-                
+
                 @media (max-width: 1279px) {
                     .blog-ckeditor-wrapper .ck.ck-editor__main {
                         order: 2 !important;
@@ -388,12 +388,12 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     }
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__top {
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+                    border-bottom: 1px solid var(--dash-border) !important;
                 }
 
                 /* ===== TOOLBAR ===== */
                 .blog-ckeditor-wrapper .ck.ck-toolbar {
-                    background: rgba(11, 17, 32, 0.5) !important;
+                    background: var(--dash-bg) !important;
                     border: none !important;
                     padding: 0 !important;
                     margin: 0 !important;
@@ -407,23 +407,23 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     align-content: flex-start !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-toolbar__separator {
-                    background: rgba(255, 255, 255, 0.08) !important;
+                    background: var(--dash-border) !important;
                     width: 1px !important;
                     height: 24px !important;
                     margin: 0 8px !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-toolbar .ck-toolbar__separator {
-                    background: rgba(255, 255, 255, 0.08) !important;
+                    background: var(--dash-border) !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-toolbar .ck-toolbar__items > .ck-dropdown > .ck-button .ck-icon {
-                    color: rgba(248, 250, 252, 0.6) !important;
+                    color: var(--dash-text-muted) !important;
                 }
 
                 /* ===== TOOLBAR BUTTONS ===== */
                 .blog-ckeditor-wrapper .ck.ck-button,
                 .blog-ckeditor-wrapper .ck.ck-button.ck-off,
                 .blog-ckeditor-wrapper a.ck.ck-button {
-                    color: rgba(248, 250, 252, 0.6) !important;
+                    color: var(--dash-text-muted) !important;
                     background: transparent !important;
                     border: none !important;
                     border-radius: 12px !important;
@@ -437,8 +437,8 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .blog-ckeditor-wrapper .ck.ck-button:hover,
                 .blog-ckeditor-wrapper .ck.ck-button.ck-off:hover {
-                    background: rgba(255, 255, 255, 0.08) !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-surface-hover) !important;
+                    color: var(--dash-text) !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-button.ck-on {
                     background: rgba(59, 130, 246, 0.15) !important;
@@ -453,7 +453,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     opacity: 0.3 !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-dropdown .ck-dropdown__arrow {
-                    color: rgba(248, 250, 252, 0.4) !important;
+                    color: var(--dash-text-muted) !important;
                 }
 
                 /* ===== EDITOR CONTENT AREA ===== */
@@ -463,7 +463,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 .blog-ckeditor-wrapper .ck.ck-editor__editable {
                     background: transparent !important;
                     border: none !important;
-                    color: #F8FAFC !important;
+                    color: var(--dash-text) !important;
                     font-family: 'Inter', sans-serif !important;
                     font-size: 14px !important;
                     line-height: 1.625em !important;
@@ -478,7 +478,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     outline: none !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable .ck-placeholder::before {
-                    color: rgba(255, 255, 255, 0.3) !important;
+                    color: var(--dash-text-muted) !important;
                     font-family: 'Inter', sans-serif !important;
                 }
 
@@ -497,21 +497,21 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable blockquote {
                     border-left: 3px solid #3B82F6 !important;
-                    color: rgba(248, 250, 252, 0.6) !important;
+                    color: var(--dash-text-muted) !important;
                     padding-left: 16px !important;
                     margin-left: 0 !important;
                     font-style: italic !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable ul,
                 .blog-ckeditor-wrapper .ck.ck-editor__editable ol {
-                    color: #F8FAFC !important;
+                    color: var(--dash-text) !important;
                     padding-left: 24px !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable li::marker {
-                    color: rgba(248, 250, 252, 0.5) !important;
+                    color: var(--dash-text-muted) !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable strong {
-                    color: #FFFFFF !important;
+                    color: var(--dash-text) !important;
                 }
 
                 /* ===== IMAGE IN EDITOR ===== */
@@ -538,8 +538,8 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 /* ===== ALL POPUP / BALLOON PANELS ===== */
                 .ck.ck-balloon-panel,
                 .ck.ck-balloon-panel_visible {
-                    background: #1E293B !important;
-                    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                    background: var(--dash-secondary-bg) !important;
+                    border: 1px solid var(--dash-border) !important;
                     border-radius: 12px !important;
                     box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.5) !important;
                     overflow: hidden !important;
@@ -553,19 +553,19 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 .ck.ck-balloon-panel .ck.ck-form,
                 .ck.ck-balloon-panel .ck.ck-link-form,
                 .ck.ck-balloon-panel .ck-responsive-form {
-                    background: #1E293B !important;
+                    background: var(--dash-secondary-bg) !important;
                     padding: 16px !important;
                     border: none !important;
                 }
                 .ck.ck-balloon-panel .ck.ck-form__header,
                 .ck.ck-balloon-panel .ck-form__header {
                     background: transparent !important;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+                    border-bottom: 1px solid var(--dash-border) !important;
                     padding: 0 0 12px 0 !important;
                 }
                 .ck.ck-balloon-panel .ck.ck-form__header .ck-form__header__label,
                 .ck.ck-balloon-panel .ck-form__header__label {
-                    color: #F8FAFC !important;
+                    color: var(--dash-text) !important;
                     font-family: 'Inter', sans-serif !important;
                     font-weight: 600 !important;
                     font-size: 14px !important;
@@ -578,9 +578,9 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 .ck.ck-balloon-panel input.ck-input,
                 .ck.ck-dropdown__panel .ck-input,
                 .ck.ck-dropdown__panel input {
-                    background: #0F172A !important;
-                    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-bg) !important;
+                    border: 1px solid var(--dash-border) !important;
+                    color: var(--dash-text) !important;
                     border-radius: 8px !important;
                     padding: 8px 12px !important;
                     font-family: 'Inter', sans-serif !important;
@@ -600,39 +600,39 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .ck.ck-balloon-panel .ck-input::placeholder,
                 .ck.ck-balloon-panel input::placeholder {
-                    color: rgba(248, 250, 252, 0.3) !important;
+                    color: var(--dash-text-muted) !important;
                 }
 
                 /* ===== LABELS ===== */
                 .ck.ck-balloon-panel .ck-labeled-field-view__label,
                 .ck.ck-balloon-panel label,
                 .ck.ck-dropdown__panel label {
-                    color: rgba(248, 250, 252, 0.6) !important;
+                    color: var(--dash-text-muted) !important;
                     font-family: 'Inter', sans-serif !important;
                     font-size: 12px !important;
                     font-weight: 500 !important;
                 }
                 .ck.ck-balloon-panel .ck-labeled-field-view__status {
-                    color: rgba(248, 250, 252, 0.4) !important;
+                    color: var(--dash-text-muted) !important;
                     font-size: 11px !important;
                 }
                 .ck.ck-labeled-field-view .ck-labeled-field-view__input-wrapper > .ck-label {
-                    background: #1E293B !important;
-                    color: rgba(248, 250, 252, 0.5) !important;
+                    background: var(--dash-secondary-bg) !important;
+                    color: var(--dash-text-muted) !important;
                 }
 
                 /* ===== BUTTONS IN POPUPS ===== */
                 .ck.ck-balloon-panel .ck-button,
                 .ck.ck-dropdown__panel .ck-button {
-                    color: rgba(248, 250, 252, 0.7) !important;
+                    color: var(--dash-text-muted) !important;
                     background: transparent !important;
                     border: none !important;
                     border-radius: 8px !important;
                 }
                 .ck.ck-balloon-panel .ck-button:hover,
                 .ck.ck-dropdown__panel .ck-button:hover {
-                    background: rgba(255, 255, 255, 0.08) !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-surface-hover) !important;
+                    color: var(--dash-text) !important;
                 }
                 .ck.ck-balloon-panel .ck-button-save,
                 .ck.ck-balloon-panel .ck-button-action {
@@ -645,12 +645,12 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     background: #2563EB !important;
                 }
                 .ck.ck-balloon-panel .ck-button-cancel {
-                    color: rgba(248, 250, 252, 0.5) !important;
+                    color: var(--dash-text-muted) !important;
                 }
 
                 /* ===== LINK ACTIONS ===== */
                 .ck.ck-link-actions {
-                    background: #1E293B !important;
+                    background: var(--dash-secondary-bg) !important;
                     border: none !important;
                     padding: 8px !important;
                 }
@@ -661,25 +661,25 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
 
                 /* ===== DROPDOWN PANELS ===== */
                 .ck.ck-dropdown__panel {
-                    background: #1E293B !important;
-                    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                    background: var(--dash-secondary-bg) !important;
+                    border: 1px solid var(--dash-border) !important;
                     border-radius: 12px !important;
                     box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.5) !important;
                     overflow: hidden !important;
                 }
                 .ck.ck-dropdown__panel .ck-image-insert__panel-view {
-                    background: #1E293B !important;
+                    background: var(--dash-secondary-bg) !important;
                     padding: 16px !important;
                 }
                 .ck.ck-dropdown__panel .ck-collapsible {
-                    background: #1E293B !important;
-                    border-color: rgba(255, 255, 255, 0.08) !important;
+                    background: var(--dash-secondary-bg) !important;
+                    border-color: var(--dash-border) !important;
                 }
                 .ck.ck-dropdown__panel .ck-collapsible .ck-collapsible__children {
-                    background: #1E293B !important;
+                    background: var(--dash-secondary-bg) !important;
                 }
                 .ck.ck-dropdown__panel .ck-collapsible > button {
-                    color: rgba(248, 250, 252, 0.7) !important;
+                    color: var(--dash-text-muted) !important;
                     background: transparent !important;
                 }
 
@@ -706,33 +706,33 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
 
                 /* ===== LISTS / MENUS ===== */
                 .ck.ck-list {
-                    background: #1E293B !important;
+                    background: var(--dash-secondary-bg) !important;
                 }
                 .ck.ck-list .ck-list__item .ck-button {
-                    color: rgba(248, 250, 252, 0.7) !important;
+                    color: var(--dash-text-muted) !important;
                     background: transparent !important;
                 }
                 .ck.ck-list .ck-list__item .ck-button:hover {
-                    background: rgba(255, 255, 255, 0.08) !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-surface-hover) !important;
+                    color: var(--dash-text) !important;
                 }
                 .ck.ck-list .ck-list__item .ck-button.ck-on {
                     background: rgba(59, 130, 246, 0.15) !important;
                     color: #3B82F6 !important;
                 }
                 .ck.ck-list .ck-list__separator {
-                    background: rgba(255, 255, 255, 0.08) !important;
+                    background: var(--dash-border) !important;
                 }
 
                 /* ===== SWITCH / TOGGLE ===== */
                 .ck.ck-balloon-panel .ck-switchbutton,
                 .ck.ck-dropdown__panel .ck-switchbutton {
-                    color: rgba(248, 250, 252, 0.7) !important;
+                    color: var(--dash-text-muted) !important;
                 }
                 .ck.ck-balloon-panel .ck-switchbutton .ck-button__toggle,
                 .ck.ck-dropdown__panel .ck-switchbutton .ck-button__toggle {
-                    background: rgba(255, 255, 255, 0.15) !important;
-                    border-color: rgba(255, 255, 255, 0.1) !important;
+                    background: var(--dash-surface-hover) !important;
+                    border-color: var(--dash-border) !important;
                 }
                 .ck.ck-balloon-panel .ck-switchbutton.ck-on .ck-button__toggle,
                 .ck.ck-dropdown__panel .ck-switchbutton.ck-on .ck-button__toggle {
@@ -741,8 +741,8 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
 
                 /* ===== TOOLTIP ===== */
                 .ck.ck-tooltip .ck-tooltip__text {
-                    background: #0F172A !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-bg) !important;
+                    color: var(--dash-text) !important;
                     border-radius: 6px !important;
                     font-family: 'Inter', sans-serif !important;
                     font-size: 12px !important;
@@ -770,64 +770,64 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     background: transparent;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable::-webkit-scrollbar-thumb {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: var(--dash-border);
                     border-radius: 3px;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable::-webkit-scrollbar-thumb:hover {
-                    background: rgba(255, 255, 255, 0.2);
+                    background: var(--dash-text-muted);
                 }
                 /* ===== DIALOG OVERLAY (Image via URL, etc.) ===== */
                 .ck.ck-dialog-overlay {
                     background: rgba(0, 0, 0, 0.6) !important;
                 }
                 .ck.ck-dialog {
-                    background: #1E293B !important;
-                    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                    background: var(--dash-secondary-bg) !important;
+                    border: 1px solid var(--dash-border) !important;
                     border-radius: 16px !important;
                     box-shadow: 0px 16px 48px rgba(0, 0, 0, 0.6) !important;
                     overflow: hidden !important;
-                    color: #F8FAFC !important;
+                    color: var(--dash-text) !important;
                 }
                 /* Dialog header */
                 .ck.ck-dialog .ck-form__header {
-                    background: #0F172A !important;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+                    background: var(--dash-bg) !important;
+                    border-bottom: 1px solid var(--dash-border) !important;
                     padding: 16px 20px !important;
                 }
                 .ck.ck-dialog .ck-form__header .ck-form__header__label {
-                    color: #F8FAFC !important;
+                    color: var(--dash-text) !important;
                     font-family: 'Inter', sans-serif !important;
                     font-weight: 600 !important;
                     font-size: 15px !important;
                 }
                 .ck.ck-dialog .ck-form__header .ck-button {
-                    color: rgba(248, 250, 252, 0.5) !important;
+                    color: var(--dash-text-muted) !important;
                     background: transparent !important;
                     border: none !important;
                     border-radius: 8px !important;
                 }
                 .ck.ck-dialog .ck-form__header .ck-button:hover {
-                    background: rgba(255, 255, 255, 0.08) !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-surface-hover) !important;
+                    color: var(--dash-text) !important;
                 }
                 /* Dialog body/content */
                 .ck.ck-dialog .ck-dialog__content {
-                    background: #1E293B !important;
+                    background: var(--dash-secondary-bg) !important;
                     padding: 20px !important;
                 }
                 /* Dialog actions footer */
                 .ck.ck-dialog .ck-dialog__actions {
-                    background: #1E293B !important;
-                    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+                    background: var(--dash-secondary-bg) !important;
+                    border-top: 1px solid var(--dash-border) !important;
                     padding: 12px 20px !important;
                 }
                 /* Dialog inputs */
                 .ck.ck-dialog .ck-input,
                 .ck.ck-dialog .ck-input-text,
                 .ck.ck-dialog input {
-                    background: #0F172A !important;
-                    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-bg) !important;
+                    border: 1px solid var(--dash-border) !important;
+                    color: var(--dash-text) !important;
                     border-radius: 8px !important;
                     padding: 10px 14px !important;
                     font-family: 'Inter', sans-serif !important;
@@ -844,29 +844,29 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .ck.ck-dialog .ck-input::placeholder,
                 .ck.ck-dialog input::placeholder {
-                    color: rgba(248, 250, 252, 0.3) !important;
+                    color: var(--dash-text-muted) !important;
                 }
                 /* Dialog labels */
                 .ck.ck-dialog .ck-labeled-field-view__label,
                 .ck.ck-dialog label,
                 .ck.ck-dialog .ck-label {
-                    color: rgba(248, 250, 252, 0.5) !important;
+                    color: var(--dash-text-muted) !important;
                     font-family: 'Inter', sans-serif !important;
                     font-size: 12px !important;
                     font-weight: 500 !important;
                 }
                 .ck.ck-dialog .ck-labeled-field-view__status {
-                    color: rgba(248, 250, 252, 0.4) !important;
+                    color: var(--dash-text-muted) !important;
                 }
                 .ck.ck-dialog .ck-labeled-field-view .ck-labeled-field-view__input-wrapper > .ck-label {
-                    background: #1E293B !important;
-                    color: rgba(248, 250, 252, 0.5) !important;
+                    background: var(--dash-secondary-bg) !important;
+                    color: var(--dash-text-muted) !important;
                 }
                 /* Dialog buttons */
                 .ck.ck-dialog .ck-button {
-                    color: rgba(248, 250, 252, 0.7) !important;
+                    color: var(--dash-text-muted) !important;
                     background: transparent !important;
-                    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                    border: 1px solid var(--dash-border) !important;
                     border-radius: 8px !important;
                     padding: 8px 20px !important;
                     font-family: 'Inter', sans-serif !important;
@@ -875,8 +875,8 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     cursor: pointer !important;
                 }
                 .ck.ck-dialog .ck-button:hover {
-                    background: rgba(255, 255, 255, 0.05) !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-surface-hover) !important;
+                    color: var(--dash-text) !important;
                 }
                 .ck.ck-dialog .ck-button-action,
                 .ck.ck-dialog .ck-button-save {
@@ -896,17 +896,17 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .ck-body-wrapper .ck.ck-balloon-panel,
                 .ck-body-wrapper .ck.ck-balloon-panel_visible {
-                    background: #1E293B !important;
-                    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                    background: var(--dash-secondary-bg) !important;
+                    border: 1px solid var(--dash-border) !important;
                     border-radius: 12px !important;
                     box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.5) !important;
                 }
                 .ck-body-wrapper .ck-input,
                 .ck-body-wrapper .ck-input-text,
                 .ck-body-wrapper input.ck-input {
-                    background: #0F172A !important;
-                    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-                    color: #F8FAFC !important;
+                    background: var(--dash-bg) !important;
+                    border: 1px solid var(--dash-border) !important;
+                    color: var(--dash-text) !important;
                     border-radius: 8px !important;
                     padding: 8px 12px !important;
                     font-family: 'Inter', sans-serif !important;
@@ -920,13 +920,13 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .ck-body-wrapper label,
                 .ck-body-wrapper .ck-label {
-                    color: rgba(248, 250, 252, 0.5) !important;
+                    color: var(--dash-text-muted) !important;
                 }
                 .ck-body-wrapper .ck-button {
-                    color: rgba(248, 250, 252, 0.7) !important;
+                    color: var(--dash-text-muted) !important;
                 }
                 .ck-body-wrapper .ck-button:hover {
-                    background: rgba(255, 255, 255, 0.08) !important;
+                    background: var(--dash-surface-hover) !important;
                 }
                 .ck-body-wrapper .ck-button-action {
                     background: #3B82F6 !important;
@@ -934,20 +934,20 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 }
                 .ck-body-wrapper .ck-link-form,
                 .ck-body-wrapper .ck-responsive-form {
-                    background: #1E293B !important;
+                    background: var(--dash-secondary-bg) !important;
                     padding: 16px !important;
                 }
                 .ck-body-wrapper .ck-form__header {
                     background: transparent !important;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+                    border-bottom: 1px solid var(--dash-border) !important;
                 }
                 .ck-body-wrapper .ck-form__header__label {
-                    color: #F8FAFC !important;
+                    color: var(--dash-text) !important;
                     font-family: 'Inter', sans-serif !important;
                     font-weight: 600 !important;
                 }
                 .ck-body-wrapper .ck-link-actions {
-                    background: #1E293B !important;
+                    background: var(--dash-secondary-bg) !important;
                 }
                 .ck-body-wrapper .ck-link-actions__preview {
                     color: #2DD4BF !important;

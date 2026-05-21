@@ -131,7 +131,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
     }
 
     return createPortal(
-        <div className="hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-[#0B0E14]/80 backdrop-blur-sm animate-in fade-in duration-200"
+        <div className="dash-shell hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-[#0B0E14]/80 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={onClose}
             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
             <div 

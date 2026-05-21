@@ -487,7 +487,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         onPointerDownOutside={() => setShowExitConfirm(false)}
                         onEscapeKeyDown={() => setShowExitConfirm(false)}
                     >
-                        <div className="w-full max-w-[360px] rounded-[18px] border border-[rgba(59,130,246,0.16)] bg-[linear-gradient(180deg,rgba(20,30,48,0.98)_0%,rgba(11,17,32,0.98)_100%)] px-6 pb-6 pt-6 shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
+                        <div className="w-full max-w-[360px] rounded-[18px] border border-[rgba(59,130,246,0.16)] bg-[var(--dash-surface)] px-6 pb-6 pt-6 shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
                             <div className="text-center">
                                 <Dialog.Title className="text-xl font-semibold text-white">
                                     {t.dashboard?.products?.bulkCreate?.exitButton}?

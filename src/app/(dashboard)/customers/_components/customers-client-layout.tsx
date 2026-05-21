@@ -170,9 +170,11 @@ export function CustomersClientLayout() {
             {/* Delete confirmation dialog */}
             <Dialog open={!!pendingDelete} onOpenChange={open => { if (!open) setPendingDelete(null) }}>
                 <DialogContent
-                    className="border-white/[0.08] max-w-[360px] rounded-[20px] p-6 gap-0"
-                    style={{ background: '#0d1322' }}
+                    className="max-w-[360px] rounded-[20px] p-6 gap-0"
+                    style={{ background: 'var(--dash-surface)', borderColor: 'var(--dash-border)' }}
                 >
+                    {/* dash-shell wrapper re-activates globals.css scoped overrides inside RadixUI portal */}
+                    <div className="dash-shell">
                     <DialogHeader className="mb-3">
                         <div className="flex items-center gap-3 mb-1">
                             <div className="flex items-center justify-center w-10 h-10 rounded-[12px] shrink-0" style={{ background: 'rgba(239,68,68,0.12)' }}>
@@ -206,6 +208,7 @@ export function CustomersClientLayout() {
                         >
                             {c.deleteButton}
                         </button>
+                    </div>
                     </div>
                 </DialogContent>
             </Dialog>

@@ -107,7 +107,7 @@ function Checkbox({
                     width: 18,
                     height: 18,
                     borderRadius: 6,
-                    border: checked || indeterminate ? '1px solid #2563EB' : '1px solid rgba(255, 255, 255, 0.16)',
+                    border: checked || indeterminate ? '1px solid #2563EB' : '1px solid var(--dash-border)',
                     background: checked || indeterminate ? '#2563EB' : 'transparent',
                     transition: 'background 0.2s, border 0.2s'
                 }}
@@ -156,7 +156,7 @@ function HeaderCell({ children }: { children: React.ReactNode }) {
                 lineHeight: '1.3333333333333333em',
                 letterSpacing: '0.025em',
                 textTransform: 'uppercase',
-                color: 'rgba(248, 250, 252, 0.6)',
+                color: 'var(--dash-text-muted)',
             }}
         >
             {children}
@@ -174,7 +174,7 @@ function EmptyOrderState({ text }: { text: string }) {
                     fontWeight: 400,
                     fontSize: 16,
                     lineHeight: '1.5em',
-                    color: 'rgba(248, 250, 252, 0.6)',
+                    color: 'var(--dash-text-muted)',
                 }}
             >
                 {text}
@@ -242,7 +242,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                             <div
                                 key={order.id}
                                 onClick={() => { if (onSelectOrder) onSelectOrder(order.id) }}
-                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer transition-colors border border-[rgba(255,255,255,0.08)] rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : isSelected ? 'bg-blue-500/5' : 'bg-slate-800/60'}`}
+                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer transition-colors border border-white/[0.08] rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : isSelected ? 'bg-blue-500/5' : 'bg-slate-800/60'}`}
                             >
                                 <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
                                     <Checkbox
@@ -286,7 +286,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                     </colgroup>
 
                     <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                        <tr style={{ background: 'rgba(11, 17, 32, 0.5)' }}>
+                        <tr style={{ background: 'var(--dash-surface)' }}>
                             <th className="text-left" style={{ height: 56, padding: '20px 24px', backdropFilter: 'blur(12px)' }}>
                                 <Checkbox
                                     checked={allSelected}
@@ -315,7 +315,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                         {loading ? (
                             <tr>
                                 <td colSpan={5} style={{ padding: '60px 24px', textAlign: 'center' }}>
-                                    <span style={{ color: 'rgba(248, 250, 252, 0.6)' }}>{o.tableHeaders.loading}</span>
+                                    <span style={{ color: 'var(--dash-text-muted)' }}>{o.tableHeaders.loading}</span>
                                 </td>
                             </tr>
                         ) : orders.length === 0 ? (
@@ -338,14 +338,14 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                     style={{
                                         height: rowHeight,
                                         borderBottom: i < orders.length - 1
-                                            ? '1px solid rgba(255, 255, 255, 0.05)'
+                                            ? '1px solid var(--dash-border)'
                                             : 'none',
                                         background: isDetailOpen
                                             ? 'rgba(59,130,246,0.12)'
                                             : isSelected ? 'rgba(59,130,246,0.06)' : undefined,
                                     }}
                                     onMouseEnter={e => {
-                                        if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.03)'
+                                        if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--dash-surface-hover)'
                                     }}
                                     onMouseLeave={e => {
                                         if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = ''
@@ -371,7 +371,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 fontWeight: 600,
                                                 fontSize: 14,
                                                 lineHeight: '1.4285714285714286em',
-                                                color: '#F8FAFC',
+                                                color: 'var(--dash-text)',
                                             }}
                                         >
                                             #{order.orderNumber}
@@ -384,7 +384,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 fontWeight: 400,
                                                 fontSize: 14,
                                                 lineHeight: '1.4285714285714286em',
-                                                color: '#F8FAFC',
+                                                color: 'var(--dash-text)',
                                             }}
                                         >
                                             {order.customerName || 'N/A'}
@@ -397,7 +397,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 fontWeight: 600,
                                                 fontSize: 14,
                                                 lineHeight: '1.4285714285714286em',
-                                                color: '#F8FAFC',
+                                                color: 'var(--dash-text)',
                                             }}
                                         >
                                             {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
@@ -471,7 +471,7 @@ export function OrdersTable({
 
     return (
         <div
-            className="flex flex-col w-full md:rounded-[16px] md:bg-slate-800/60 md:border md:border-[rgba(255,255,255,0.08)] md:p-[1px]"
+            className="flex flex-col w-full md:rounded-[16px] md:bg-slate-800/60 md:border md:border-white/[0.08] md:p-[1px]"
         >
             <Table
                 orders={orders}

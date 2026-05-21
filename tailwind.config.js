@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+    darkMode: 'class',
     content: [
         './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
         './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -37,6 +38,18 @@ module.exports = {
                 body: ['var(--font-body, var(--font-inter))', 'system-ui', 'sans-serif'],
             },
             colors: {
+                // Dashboard semantic color tokens — light/dark via CSS vars on :root / .dark
+                dash: {
+                    bg: 'var(--dash-bg)',
+                    surface: 'var(--dash-surface)',
+                    'surface-hover': 'var(--dash-surface-hover)',
+                    text: 'var(--dash-text)',
+                    'text-muted': 'var(--dash-text-muted)',
+                    border: 'var(--dash-border)',
+                    accent: 'var(--dash-accent)',
+                    overlay: 'var(--dash-overlay)',
+                    'secondary-bg': 'var(--dash-secondary-bg)',
+                },
                 // Studio admin CSS-var bridge tokens (scoped via .studio-shell)
                 // These allow using Tailwind classes like bg-studio-bg, text-studio-text etc.
                 // Actual values are set in studio.css; Tailwind just wires the var() references.

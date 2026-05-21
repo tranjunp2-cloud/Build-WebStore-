@@ -65,7 +65,7 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                     handleNavigate(e)
                 }
             }}
-            className="relative flex-1 min-w-0 flex flex-col justify-between rounded-[16px] border border-solid border-white/10 bg-[#1E293B] p-5 shadow-sm transition-colors duration-200 hover:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer overflow-hidden min-h-[260px]">
+            className="relative flex-1 min-w-0 flex flex-col justify-between rounded-[16px] border border-solid border-dash-border bg-dash-surface p-5 shadow-sm transition-colors duration-200 hover:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none cursor-pointer overflow-hidden min-h-[260px]">
             {/* Top Row: Icon and Fix Button */}
             <div className="flex items-start justify-between mb-4 relative z-10">
                 <div className="w-12 h-12 rounded-[16px] bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),_0px_10px_15px_-3px_rgba(0,0,0,0.1)] flex items-center justify-center">
@@ -84,11 +84,11 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
 
             {/* Middle Row: Text and Value */}
             <div className="flex flex-col gap-2 mb-4 relative z-10">
-                <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.seo.title || 'SEO Health'}</span>
+                <span className="text-[18px] text-dash-text-muted font-medium">{t.dashboard.overview.seo.title || 'SEO Health'}</span>
                 <div className="flex items-center gap-3">
                     <div className="flex items-baseline gap-1">
-                        <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">{score}</span>
-                        <span className="text-[20px] font-normal text-[#9CA3AF]">/ 100</span>
+                        <span className="text-[48px] font-bold text-dash-text tracking-tight leading-none">{score}</span>
+                        <span className="text-[20px] font-normal text-dash-text-muted">/ 100</span>
                     </div>
                 </div>
             </div>
@@ -109,7 +109,7 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                             </span>
                         </div>
                     ) : (
-                        <span className="text-[12px] font-medium text-green-400 leading-tight">
+                        <span className="text-[12px] font-medium text-green-600 dark:text-green-400 leading-tight">
                             {warnings.allGood || 'Looking great'}
                         </span>
                     )}
@@ -118,7 +118,7 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                 {/* Mini Circle Chart */}
                 <div className="relative flex justify-center items-center w-10 h-10 shrink-0">
                     <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="15.915" fill="none" stroke="#374151" strokeWidth="4" />
+                        <circle cx="18" cy="18" r="15.915" fill="none" stroke="var(--dash-border)" strokeWidth="4" />
                         <circle cx="18" cy="18" r="15.915" fill="none" stroke="#2B7FFF" strokeWidth="4"
                             strokeLinecap="round" strokeDasharray="100" strokeDashoffset={100 - score}
                             className="transition-all duration-1000 ease-out" />

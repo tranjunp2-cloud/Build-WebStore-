@@ -9,7 +9,7 @@ import type { PricingPlan } from '@/blocks/pricing/config'
 import { isMatrixVariant } from '@/blocks/pricing/variant-data-mapping'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
-import { decodeHtmlEntities } from '@/lib/utils/rich-text-render'
+import { decodeHtmlEntities, plainText } from '@/lib/utils/rich-text-render'
 
 type FieldBlurEvent = React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
 
@@ -73,7 +73,7 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
             <div className="space-y-1.5">
                 <FieldLabel>{s.pricingPriceUnit}</FieldLabel>
                 <Input
-                    defaultValue={plan.price}
+                    defaultValue={plainText(plan.price)}
                     placeholder={s.pricingPriceUnitPlaceholder}
                     variant="editor"
                     className={cn(priceError && 'border-red-500/60')}
@@ -82,6 +82,22 @@ export default function PlanFields({ plan, onChange, variant, pages }: PlanField
                         onChange('price', e.target.value)
                     }}
                 />
+            </div>
+
+            <div className="flex items-center justify-between">
+                <p className={labelClass}>{s.highlighted}</p>
+                <button
+                    type="button"
+                    onClick={() => onChange('highlighted', !plan.highlighted)}
+                    className={cn(
+                        'rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors',
+                        plan.highlighted
+                            ? 'bg-amber-500/15 text-amber-300'
+                            : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                    )}
+                >
+                    ★ {plan.highlighted ? s.highlighted : s.fcDefault}
+                </button>
             </div>
 
             {/* Description + Features hidden for matrix variants (managed via Feature Editor modal) */}

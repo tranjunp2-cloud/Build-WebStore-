@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { getShippingRate } from '@/lib/shipping'
+import { generatePaymentReference } from '@/lib/payment/reference'
+import { signOrderToken } from '@/lib/auth/order-token'
+import { generateConfirmToken } from '@/lib/orders/upload-token'
+import { bankTransferInstructionsEmail } from '@/lib/email/templates/bank-transfer-instructions'
+import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
+import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
+import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 
 export const maxDuration = 60
 
@@ -55,9 +63,9 @@ export async function POST(request: Request) {
                 { status: 422 }
             )
         }
-        if (paymentMethod === 'qr_banking' && pc?.enableQrBanking === false) {
+        if (paymentMethod === 'bank_transfer' && pc?.enableQrBanking === false) {
             return NextResponse.json(
-                { success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'QR Banking is not available for this store' } },
+                { success: false, error: { code: 'PAYMENT_METHOD_DISABLED', message: 'Bank Transfer is not available for this store' } },
                 { status: 422 }
             )
         }
@@ -153,6 +161,17 @@ export async function POST(request: Request) {
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + shippingFee + tax
 
+        // Compute bank_transfer-specific fields (before create)
+        let paymentReference: string | undefined
+        let magicLinkSecret: string | undefined
+        let paymentExpiresAt: Date | undefined
+
+        if (paymentMethod === 'bank_transfer') {
+            paymentReference = await generatePaymentReference(payload, tenantId)
+            magicLinkSecret = crypto.randomBytes(32).toString('hex')
+            paymentExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+        }
+
         // Create order
         const order = await payload.create({
             collection: 'orders',
@@ -168,8 +187,12 @@ export async function POST(request: Request) {
                 currency,
                 status: 'pending',
                 paymentMethod,
-                paymentStatus: paymentMethod === 'qr_banking' ? 'paid' : 'unpaid',
-                ...(paymentProofImage ? { paymentProofImage } : {}),
+                paymentStatus: paymentMethod === 'bank_transfer' ? 'awaiting_payment' : 'unpaid',
+                // bank_transfer: no proof at checkout
+                ...(paymentMethod !== 'bank_transfer' && paymentProofImage ? { paymentProofImage } : {}),
+                paymentReference: paymentReference ?? null,
+                magicLinkSecret: magicLinkSecret ?? null,
+                paymentExpiresAt: paymentExpiresAt ?? null,
                 customerEmail: customer.email,
                 customerName: customer.name,
                 customerPhone: customer.phone || '',
@@ -184,41 +207,151 @@ export async function POST(request: Request) {
             } as any,
         })
 
-        // Decrement inventory immediately for all manual payment methods
-        for (const item of aggregatedItems) {
-            try {
-                const product = await payload.findByID({
-                    collection: 'products',
-                    id: item.productId,
-                    depth: 0,
-                    overrideAccess: true,
-                })
-                const p = product as any
-                if (p.inventory !== undefined && p.inventory !== null) {
-                    await payload.update({
+        // Decrement inventory for COD only — bank_transfer reserves stock without decrement
+        // (decrement happens at Approve step in P06)
+        if (paymentMethod === 'cod') {
+            for (const item of aggregatedItems) {
+                try {
+                    const product = await payload.findByID({
                         collection: 'products',
                         id: item.productId,
-                        data: { inventory: Math.max(0, p.inventory - item.quantity) } as any,
+                        depth: 0,
+                        overrideAccess: true,
                     })
+                    const p = product as any
+                    if (p.inventory !== undefined && p.inventory !== null) {
+                        await payload.update({
+                            collection: 'products',
+                            id: item.productId,
+                            data: { inventory: Math.max(0, p.inventory - item.quantity) } as any,
+                        })
+                    }
+                } catch (err) {
+                    console.warn(`[Stock Decrement] Failed for product ${item.productId}:`, err)
                 }
-            } catch (err) {
-                console.warn(`[Stock Decrement] Failed for product ${item.productId}:`, err)
             }
         }
 
-        // TODO: Send order confirmation email to customer
+        // Resolve tenant slug + name once — used in both COD and bank_transfer email blocks
+        // Slug lives on the tenant, not the site — sites collection has no slug field
+        const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
+        const shopName = (tenantForSlug as any)?.name ?? ''
+        const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+        const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
+        const dashboardOrderUrl = `${baseUrl}/orders`
+        const siteLocale = (site as any).locale ?? 'ms'
 
-        return NextResponse.json({
+        // COD: confirmation to buyer + new-order notification to seller(s)
+        if (paymentMethod === 'cod') {
+            const codEmail = orderConfirmationEmail({
+                shopName,
+                orderNumber: orderNumber,
+                customerName: customer.name,
+                customerEmail: customer.email,
+                customerPhone: customer.phone ?? null,
+                customerAddress: customer.address ?? null,
+                items: orderItems.map((item) => ({
+                    name: item.productName,
+                    variant: item.variant || null,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    lineTotal: item.quantity * item.unitPrice,
+                })),
+                subtotal,
+                shippingFee,
+                total,
+                paymentMethod: 'cod',
+                orderDate: new Date().toISOString(),
+                orderPageUrl,
+                currency,
+                buyerNote: (order as any).notes ?? null,
+                locale: siteLocale,
+            })
+            payload.sendEmail({ to: customer.email, subject: codEmail.subject, html: codEmail.html })
+                .catch((err: unknown) => console.error('[Email COD confirmation]', err))
+
+            getTenantOwnerEmails(payload, tenantId).then((emails) => {
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl })
+                emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                    .catch((err: unknown) => console.error('[Email seller notify COD]', err)))
+            }).catch(() => {})
+        }
+
+        // bank_transfer: instructions to buyer + new-order notification to seller(s) + magic link for proof upload
+        let redirectUrl: string | undefined
+
+        if (paymentMethod === 'bank_transfer' && magicLinkSecret && paymentExpiresAt) {
+            const expSec = Math.floor(paymentExpiresAt.getTime() / 1000)
+            const token = await signOrderToken({
+                orderId: order.id,
+                secret: magicLinkSecret,
+                expSec,
+            })
+            redirectUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}?token=${token}`
+            const plainUploadUrl = orderPageUrl
+
+            const pcConfig = (site as any).paymentConfig
+            const btEmail = bankTransferInstructionsEmail({
+                shopName,
+                orderNumber: order.orderNumber,
+                customerName: customer.name,
+                customerEmail: customer.email,
+                customerPhone: customer.phone ?? null,
+                customerAddress: customer.address ?? null,
+                items: orderItems.map((item) => ({
+                    name: item.productName,
+                    variant: item.variant || null,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    lineTotal: item.quantity * item.unitPrice,
+                })),
+                subtotal,
+                shippingFee,
+                total: order.total,
+                currency: order.currency ?? 'MYR',
+                buyerNote: (order as any).notes ?? null,
+                orderDate: new Date().toISOString(),
+                paymentReference: paymentReference!,
+                magicLinkUrl: redirectUrl,
+                plainUploadUrl,
+                expiresAtIso: paymentExpiresAt.toISOString(),
+                bankName: pcConfig?.bankName ?? null,
+                bankAccountNo: pcConfig?.bankAccountNo ?? null,
+                bankAccountHolder: pcConfig?.bankAccountHolder ?? null,
+                merchantQrUrl: pcConfig?.merchantQrCode?.url ?? null,
+                locale: siteLocale,
+            })
+            payload.sendEmail({ to: customer.email, subject: btEmail.subject, html: btEmail.html })
+                .catch((err: unknown) => console.error('[Email BT instructions]', err))
+
+            getTenantOwnerEmails(payload, tenantId).then((emails) => {
+                const seller = newOrderSellerEmail({ shopName, orderNumber, customerName: customer.name, orderPageUrl: dashboardOrderUrl })
+                emails.forEach((to) => payload.sendEmail({ to, subject: seller.subject, html: seller.html })
+                    .catch((err: unknown) => console.error('[Email seller notify BT]', err)))
+            }).catch(() => {})
+        }
+
+        const confirmToken = generateConfirmToken(order.id, orderNumber)
+        const res = NextResponse.json({
             success: true,
             data: {
                 orderId: order.id,
                 orderNumber,
                 total,
                 currency,
-                status: 'pending',
                 paymentMethod,
+                ...(redirectUrl ? { redirectUrl } : {}),
             },
         })
+        // HttpOnly cookie so the confirm page can verify access without exposing token in URL
+        res.cookies.set(`ct_${order.id}`, confirmToken, {
+            httpOnly: true,
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60, // 30 days
+            path: '/',
+        })
+        return res
     } catch (error: any) {
         console.error('[Order Checkout Error]', error)
         return NextResponse.json(

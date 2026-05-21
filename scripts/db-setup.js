@@ -3953,17 +3953,28 @@ const MIGRATIONS = [
   { name: 'pages_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "pages_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
   { name: '_pages_v_blocks_menu_display.add_block_spacing', sql: `ALTER TABLE "_pages_v_blocks_menu_display" ADD COLUMN IF NOT EXISTS block_spacing jsonb;` },
 
+  // GH-1004: F10 v2.2 Bank Transfer verification schema fields
+  { name: 'orders.payment_reference_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_reference_idx ON orders (payment_reference);` },
+  { name: 'orders.payment_expires_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_expires_at timestamp;` },
+  { name: 'orders.payment_expires_at_idx', sql: `CREATE INDEX IF NOT EXISTS orders_payment_expires_at_idx ON orders (payment_expires_at);` },
+  { name: 'orders.payment_rejection_reason', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_rejection_reason varchar;` },
+  { name: 'orders.payment_rejection_detail', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_rejection_detail text;` },
+  { name: 'orders.payment_verified_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_at timestamp;` },
+  { name: 'orders.payment_verified_by_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_by_id integer;` },
+  { name: 'orders.magic_link_secret', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS magic_link_secret varchar;` },
+  { name: 'orders.verification_source', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS verification_source varchar DEFAULT 'manual';` },
+  { name: 'orders.auto_verified_at', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS auto_verified_at timestamp;` },
+  { name: 'orders.bank_transaction_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS bank_transaction_id varchar;` },
+  { name: 'orders.enum_payment_method_bank_transfer', sql: `DO $$ BEGIN ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'bank_transfer'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;` },
+  { name: 'orders.backfill_bank_transfer_method', sql: `UPDATE orders SET payment_method='bank_transfer' WHERE payment_method='qr_banking' AND payment_status NOT IN ('paid','cancelled','refunded') AND created_at > NOW() - INTERVAL '7 days';` },
   // ── F13: FPX + Card payment via Stripe Checkout Session (issue #963) ──
   { name: 'orders.stripe_charge_id', sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_charge_id varchar;` },
   { name: 'orders.stripe_charge_id_idx', sql: `CREATE INDEX IF NOT EXISTS orders_stripe_charge_id_idx ON orders(stripe_charge_id);` },
   { name: 'sites.payment_config_card_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_card_enabled boolean DEFAULT true;` },
   { name: 'sites.payment_config_fpx_enabled', sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS payment_config_fpx_enabled boolean DEFAULT true;` },
   // ── F13: Tenant-level Card/FPX master toggles (docs/architecture/F13-payment-gateway.md §4) ──
-  // Layer-1 of 2-layer config: tenant.payments_payment_card/fpx = master; sites.payment_config_* = per-site guard.
   { name: 'tenants.payments_payment_card', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_payment_card boolean DEFAULT false;` },
   { name: 'tenants.payments_payment_fpx', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_payment_fpx boolean DEFAULT false;` },
-  // Backfill: onboarded tenants get payment_card=true to preserve existing hardcoded ['card','fpx'] behavior (D-02).
-  // FPX stays false — requires explicit seller opt-in. Idempotent re-runs are safe.
   { name: 'tenants.payments_payment_card.backfill_onboarded', sql: `UPDATE tenants SET payments_payment_card = true WHERE stripe_onboarding_complete = true AND payments_payment_card = false;` },
   // ── F13: Bank Transfer bank_name + account_number for DuitNow QR section ──
   { name: 'tenants.payments_bank_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_bank_name varchar;` },
@@ -3976,6 +3987,54 @@ const MIGRATIONS = [
   // Variant SKU uniqueness scoped per parent product (_parent_id = products.id).
   // Cross-product variant SKU uniqueness is enforced at application layer (findConflictingSkus).
   { name: 'products_variants.sku_parent_unique_idx', sql: `CREATE UNIQUE INDEX IF NOT EXISTS products_variants_sku_parent_uniq ON products_variants (_parent_id, lower(sku)) WHERE sku IS NOT NULL;` },
+  // ── F25: Shop Customers collection ──
+  { name: 'customers.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS customers (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      email varchar NOT NULL,
+      name varchar NOT NULL,
+      phone varchar,
+      rank varchar,
+      notes text,
+      first_order_at timestamptz,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );` },
+  { name: 'customers.tenant_email_lower_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS customers_tenant_email_lower_uniq
+          ON customers (tenant_id, LOWER(TRIM(email)));` },
+  { name: 'customers.tenant_index',
+    sql: `CREATE INDEX IF NOT EXISTS customers_tenant_idx ON customers (tenant_id);` },
+  { name: 'customers_addresses.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS customers_addresses (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar,
+      line1 varchar NOT NULL,
+      line2 varchar,
+      city varchar,
+      state varchar,
+      postcode varchar,
+      country varchar DEFAULT 'Malaysia',
+      is_default boolean DEFAULT false
+    );` },
+  { name: 'customers_addresses.parent_index',
+    sql: `CREATE INDEX IF NOT EXISTS customers_addresses_parent_idx
+          ON customers_addresses (_parent_id);` },
+  { name: 'payload_locked_documents_rels.customers_id',
+    sql: `ALTER TABLE payload_locked_documents_rels
+          ADD COLUMN IF NOT EXISTS customers_id integer;` },
+  { name: 'payload_preferences_rels.customers_id',
+    sql: `ALTER TABLE payload_preferences_rels
+          ADD COLUMN IF NOT EXISTS customers_id integer;` },
+  // ── F25 phase-03: Orders → Customer FK ──
+  { name: 'orders.customer',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },
+  { name: 'orders.customer_id_index',
+    sql: `CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders (customer_id);` },
 ];
 
 async function runMigrations(pool) {
@@ -4010,6 +4069,7 @@ const COLLECTION_SLUGS = [
   'template_issues',
   'content_packs',
   'template_versions',
+  'customers',
 ];
 
 /**
@@ -4455,6 +4515,13 @@ async function main() {
   -- F10 Array/Nested Bypass
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS variant
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_proof_image
+  -- F10 v2.2 Relationship Bypass: paymentVerifiedBy → Payload uses payment_verified_by_id column;
+  -- bare name registered here so check-migrations CI can match the field name.
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_by
+
+  -- F25 phase-03 Relationship Bypass: customer → Payload uses customer_id column;
+  -- bare name registered here so check-migrations CI can match the field name.
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer
 
   -- F19 Payments Group Bypass
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments

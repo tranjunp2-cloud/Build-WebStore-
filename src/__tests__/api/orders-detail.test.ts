@@ -7,10 +7,14 @@ vi.mock('@/lib/auth', () => ({
 
 const mockFindByID = vi.fn()
 const mockUpdate = vi.fn()
+const mockSendEmail = vi.fn(() => Promise.resolve())
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, update: mockUpdate })),
+    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, update: mockUpdate, sendEmail: mockSendEmail })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
+vi.mock('@/lib/email/templates/order-status', () => ({
+    orderStatusEmail: vi.fn(() => ({ subject: 'Order Confirmed', html: '<p>confirmed</p>' })),
+}))
 
 import { PATCH, GET } from '@/app/api/orders/[id]/route'
 

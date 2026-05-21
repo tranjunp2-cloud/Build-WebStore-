@@ -150,20 +150,20 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
     }
 
     return (
-        <div className="fixed inset-0 w-screen h-screen z-[999] flex flex-col items-end xl:items-center justify-end xl:justify-center border-0 bg-[rgba(15,23,42,0.7)] backdrop-blur-sm xl:p-4 animate-in fade-in duration-200">
-            <div className="flex flex-col p-[1px] w-full xl:w-[768px] max-h-[90vh] items-start bg-[#1E293B] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-t-[16px] xl:rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] relative overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 duration-300">
+        <div className="fixed inset-0 w-screen h-screen z-[999] flex flex-col items-end xl:items-center justify-end xl:justify-center border-0 bg-[var(--dash-overlay)] backdrop-blur-sm xl:p-4 animate-in fade-in duration-200">
+            <div className="flex flex-col p-[1px] w-full xl:w-[768px] max-h-[90vh] items-start bg-[var(--dash-surface)] border-[1px] border-solid border-[var(--dash-border)] rounded-t-[16px] xl:rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] relative overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 duration-300">
                 {/* Mobile drag handle */}
                 <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">
                     <div className="bg-[rgba(255,255,255,0.2)] h-[4px] rounded-[9999px] shrink-0 w-[48px]" />
                 </div>
                 {/* Header (31611:5304) */}
-                <div className="flex flex-row justify-between items-center w-full px-[24px] py-[12px]" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                    <span className="font-['Inter'] font-[700] text-[20px] leading-[1.4em] text-[#F8FAFC]">{t.dashboard.blog.categoryModal.title}</span>
+                <div className="flex flex-row justify-between items-center w-full px-[24px] py-[12px]" style={{ borderBottom: '1px solid var(--dash-border)' }}>
+                    <span className="font-['Inter'] font-[700] text-[20px] leading-[1.4em] text-[var(--dash-text)]">{t.dashboard.blog.categoryModal.title}</span>
                     <button
                         onClick={(e) => { e.preventDefault(); onClose(); }}
                         className="flex flex-col items-center justify-center pt-[8px] px-[8px] pb-[0px] w-[36px] h-[36px] rounded-[12px] hover:bg-white/5 transition-colors"
                     >
-                        <X className="w-[20px] h-[20px] text-[rgba(248,250,252,0.6)]" strokeWidth={1.666} />
+                        <X className="w-[20px] h-[20px] text-[var(--dash-text-muted)]" strokeWidth={1.666} />
                     </button>
                 </div>
 
@@ -172,19 +172,19 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                     <div className="flex flex-col w-full gap-[12px]">
                         {/* Title Row (31611:5328) */}
                         <div className="flex flex-row justify-between items-center w-full h-[20px] shrink-0">
-                            <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{t.dashboard.blog.categoryModal.existingTitle}</span>
-                            <span className="font-['Inter'] font-[400] text-[12px] leading-[1.6666666666666667em] text-[#F8FAFC]">{t.dashboard.blog.categoryModal.itemsCount.replace('{count}', categories.length.toString())}</span>
+                            <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[var(--dash-text)]">{t.dashboard.blog.categoryModal.existingTitle}</span>
+                            <span className="font-['Inter'] font-[400] text-[12px] leading-[1.6666666666666667em] text-[var(--dash-text-muted)]">{t.dashboard.blog.categoryModal.itemsCount.replace('{count}', categories.length.toString())}</span>
                         </div>
 
                         {/* List Frame (31611:5417) */}
                         <div className="flex flex-col w-full -space-y-[1px] overflow-y-auto overflow-x-hidden nice-scrollbar pr-[2px]" style={{ maxHeight: '286px' }}>
                             {loading ? (
-                                <div className="flex flex-col p-[12px] border-[1px] border-solid border-[#374151] rounded-[12px] animate-pulse h-[52px]">
-                                    <div className="w-[100px] h-[16px] bg-white/10 rounded-[4px] mt-[4px]"></div>
+                                <div className="flex flex-col p-[12px] border-[1px] border-solid border-[var(--dash-border)] rounded-[12px] animate-pulse h-[52px]">
+                                    <div className="w-[100px] h-[16px] rounded-[4px] mt-[4px]" style={{ backgroundColor: 'var(--dash-border)' }}></div>
                                 </div>
                             ) : categories.length === 0 ? (
-                                <div className="flex flex-col p-[12px] border-[1px] border-solid border-[#374151] rounded-[12px] items-center justify-center py-[24px]">
-                                    <span className="text-[#9F9FA9] text-[14px]">{t.dashboard.blog.categoryModal.noCategories}</span>
+                                <div className="flex flex-col p-[12px] border-[1px] border-solid border-[var(--dash-border)] rounded-[12px] items-center justify-center py-[24px]">
+                                    <span className="text-[var(--dash-text-muted)] text-[14px]">{t.dashboard.blog.categoryModal.noCategories}</span>
                                 </div>
                             ) : (
                                 categories.map((cat, index) => {
@@ -195,7 +195,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                     return editingId === cat.id ? (
                                         <div
                                             key={cat.id}
-                                            className={`flex flex-row items-center justify-between p-[12px] border-[1px] border-solid border-[#374151] bg-[#161E2E] gap-[12px] ${roundedClass}`}
+                                            className={`flex flex-row items-center justify-between p-[12px] border-[1px] border-solid border-[var(--dash-border)] bg-[var(--dash-surface-hover)] gap-[12px] ${roundedClass}`}
                                             style={{ boxSizing: 'border-box' }}
                                         >
                                             <input
@@ -204,7 +204,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                                 onKeyDown={e => e.key === 'Enter' && handleUpdate()}
                                                 autoFocus
                                                 disabled={isUpdating}
-                                                className="flex-1 h-[48px] bg-[#0B1120] border border-[rgba(255,255,255,0.08)] rounded-[8px] px-[12px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] outline-none text-[#FAFAFA] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] disabled:opacity-50"
+                                                className="flex-1 h-[48px] bg-[var(--dash-bg)] border border-[var(--dash-border)] rounded-[8px] px-[12px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] outline-none text-[var(--dash-text)] font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] disabled:opacity-50"
                                             />
                                             <div className="flex flex-row items-center gap-[24px]">
                                                 <button
@@ -226,11 +226,11 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                     ) : (
                                         <div
                                             key={cat.id}
-                                            className={`group flex flex-row items-center justify-between p-[12px] border-[1px] border-solid border-[rgba(255,255,255,0.08)] bg-transparent hover:bg-[#161E2E] transition-colors ${roundedClass}`}
+                                            className={`group flex flex-row items-center justify-between p-[12px] border-[1px] border-solid border-[var(--dash-border)] bg-transparent hover:bg-[var(--dash-surface-hover)] transition-colors ${roundedClass}`}
                                             style={{ boxSizing: 'border-box' }}
                                         >
-                                            <div className="flex flex-row items-center px-[12px] py-[4px] bg-[rgba(255,255,255,0.1)] border-[1px] border-solid border-[rgba(255,255,255,0.3)] rounded-[12px] w-fit h-[26px]">
-                                                <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[#FFFFFF]">
+                                            <div className="flex flex-row items-center px-[12px] py-[4px] rounded-[12px] w-fit h-[26px]" style={{ backgroundColor: 'var(--dash-surface-hover)', border: '1px solid var(--dash-border)' }}>
+                                                <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[var(--dash-text)]">
                                                     {cat.name}
                                                 </span>
                                             </div>
@@ -271,13 +271,13 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                         ) : (
                             <Plus className="w-[24px] h-[24px] text-[#3B82F6]" strokeWidth={2} />
                         )}
-                        <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#FFFFFF]">{t.dashboard.blog.categoryModal.addNewBtn}</span>
+                        <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[var(--dash-text)]">{t.dashboard.blog.categoryModal.addNewBtn}</span>
                     </button>
 
                     {/* Add new Category Form */}
                     {showCreateInput && (
-                        <div className="flex flex-col w-full p-[16px] mt-[4px] gap-[8px] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px]">
-                            <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[#FAFAFA]">{t.dashboard.blog.categoryModal.categoryNameLabel}</span>
+                        <div className="flex flex-col w-full p-[16px] mt-[4px] gap-[8px] border-[1px] border-solid border-[var(--dash-border)] rounded-[16px]">
+                            <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[var(--dash-text)]">{t.dashboard.blog.categoryModal.categoryNameLabel}</span>
                             <div className="flex flex-row gap-[16px] w-full">
                                 <input
                                     value={newName}
@@ -285,14 +285,14 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                     onKeyDown={e => e.key === 'Enter' && handleCreate()}
                                     autoFocus
                                     placeholder={t.dashboard.blog.categoryModal.categoryNamePlaceholder}
-                                    className="flex-1 min-w-0 h-[48px] bg-[#0B1120] border-[1px] border-solid border-white/[0.08] rounded-[12px] px-[16px] font-['Inter'] font-[400] text-[14px] text-[#FFFFFF] outline-none placeholder-[#9F9FA9] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)]"
+                                    className="flex-1 min-w-0 h-[48px] bg-[var(--dash-bg)] border-[1px] border-solid border-[var(--dash-border)] rounded-[12px] px-[16px] font-['Inter'] font-[400] text-[14px] text-[var(--dash-text)] outline-none placeholder:text-[var(--dash-text-muted)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)]"
                                 />
                                 <button
                                     onClick={handleCreate}
                                     disabled={!newName.trim() || isCreating}
-                                    className="flex justify-center items-center px-0 py-0 w-[112px] h-[48px] rounded-[12px] bg-[linear-gradient(90deg,#2DD4BF_0%,#3B82F6_100%)] hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
+                                    className="flex justify-center items-center px-0 py-0 w-[112px] h-[48px] rounded-[12px] bg-gradient-to-r from-teal-400 to-blue-500 hover:opacity-90 disabled:opacity-50 transition-opacity shrink-0"
                                 >
-                                    {isCreating ? <Loader2 className="w-[20px] h-[20px] text-white animate-spin" /> : <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.categoryModal.saveBtn}</span>}
+                                    {isCreating ? <Loader2 className="w-[20px] h-[20px] text-white animate-spin" /> : <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.categoryModal.saveBtn}</span>}
                                 </button>
                             </div>
                         </div>
@@ -300,12 +300,12 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                 </div>
 
                 {/* Footer (31611:5388) */}
-                <div className="flex flex-row justify-end items-center w-full pr-[24px] h-[72px]" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <div className="flex flex-row justify-end items-center w-full pr-[24px] h-[72px]" style={{ borderTop: '1px solid var(--dash-border)' }}>
                     <button
                         onClick={(e) => { e.preventDefault(); onClose(); }}
-                        className="flex flex-col justify-center items-center px-[16px] py-[8px] h-[48px] bg-[#0B1120] border border-[rgba(255,255,255,0.08)] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] transition-colors hover:bg-white/5 cursor-pointer"
+                        className="flex flex-col justify-center items-center px-[16px] py-[8px] h-[48px] bg-[var(--dash-bg)] border border-[var(--dash-border)] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] transition-colors hover:bg-[var(--dash-surface-hover)] cursor-pointer"
                     >
-                        <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA]">{t.dashboard.blog.categoryModal.closeBtn}</span>
+                        <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[var(--dash-text)]">{t.dashboard.blog.categoryModal.closeBtn}</span>
                     </button>
                 </div>
             </div>
@@ -313,20 +313,20 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
             {/* Delete Confirmation Modal (31611:5609) */}
             {deleteTarget && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 rounded-[16px]">
-                    <div className="flex flex-col shrink-0 items-center gap-[13px] p-[25px_10px] w-full max-w-[433px] bg-[#0B1120] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px] relative">
+                    <div className="flex flex-col shrink-0 items-center gap-[13px] p-[25px_10px] w-full max-w-[433px] bg-[var(--dash-surface)] border-[1px] border-solid border-[var(--dash-border)] rounded-[16px] relative">
                         {/* Icon Container */}
                         <div className="flex justify-center items-center px-[16px] w-[64px] h-[64px] bg-[rgba(240,177,0,0.1)] rounded-full">
                             <AlertTriangle className="w-[32px] h-[32px] text-[#F0B100]" strokeWidth={2.666} />
                         </div>
 
                         {/* Heading */}
-                        <span className="font-['Inter'] font-[700] text-[20px] leading-[1.4em] text-center text-[#F8FAFC]">
+                        <span className="font-['Inter'] font-[700] text-[20px] leading-[1.4em] text-center text-[var(--dash-text)]">
                             {t.dashboard.blog.categoryModal.removeTitle}
                         </span>
 
                         {/* Paragraph */}
                         <div className="flex flex-row justify-center items-center w-full px-[10px]">
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-center text-[rgba(248,250,252,0.6)] whitespace-pre-line">
+                            <span className="font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-center text-[var(--dash-text-muted)] whitespace-pre-line">
                                 {t.dashboard.blog.categoryModal.removeConfirmMsg.replace('{name}', deleteTarget.name)}
                             </span>
                         </div>
@@ -344,9 +344,9 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                         <div className="flex flex-row gap-[12px] w-full max-w-[398px] mt-[6px] px-[10px]">
                             <button
                                 onClick={(e) => { e.preventDefault(); setDeleteTarget(null); }}
-                                className="flex flex-1 justify-center items-center pt-[12px] pb-[14px] px-0 border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px] hover:bg-white/5 transition-colors cursor-pointer"
+                                className="flex flex-1 justify-center items-center pt-[12px] pb-[14px] px-0 border-[1px] border-solid border-[var(--dash-border)] rounded-[16px] hover:bg-[var(--dash-surface-hover)] transition-colors cursor-pointer"
                             >
-                                <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#F8FAFC]">{t.dashboard.blog.categoryModal.cancelBtn}</span>
+                                <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[var(--dash-text)]">{t.dashboard.blog.categoryModal.cancelBtn}</span>
                             </button>
                             <button
                                 onClick={(e) => { e.preventDefault(); handleDelete(); }}
@@ -354,9 +354,9 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                 className="flex flex-1 justify-center items-center gap-[8px] pt-[12px] pb-[14px] px-0 bg-[#FB2C36] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] rounded-[16px] hover:bg-opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
                             >
                                 {isDeleting ? (
-                                    <><Loader2 className="w-[20px] h-[20px] text-white animate-spin" /><span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.categoryModal.deletingBtn}</span></>
+                                    <><Loader2 className="w-[20px] h-[20px] text-white animate-spin" /><span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.categoryModal.deletingBtn}</span></>
                                 ) : (
-                                    <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.categoryModal.deleteBtn}</span>
+                                    <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-white">{t.dashboard.blog.categoryModal.deleteBtn}</span>
                                 )}
                             </button>
                         </div>

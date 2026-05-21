@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
+import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
 
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
@@ -19,6 +20,10 @@ export interface OrderDetail {
     paymentStatus: string
     paymentMethod: string
     paymentProofImage?: string | { url?: string } | null
+    paymentReference?: string
+    paymentRejectionReason?: string
+    paymentVerifiedAt?: string
+    paymentVerifiedBy?: string | { id: string; email?: string } | null
     subtotal: number
     shippingFee: number
     tax: number
@@ -36,6 +41,7 @@ export interface OrderDetail {
         country?: string
     }
     items: {
+        product?: string | number
         productName: string
         variant?: string
         quantity: number
@@ -59,8 +65,8 @@ function SectionCard({
             style={{
                 display: 'flex',
                 flexDirection: 'column',
-                background: 'rgba(30, 41, 59, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                background: 'var(--dash-secondary-bg)',
+                border: '1px solid var(--dash-border)',
                 borderRadius: 16,
                 ...style,
             }}
@@ -82,7 +88,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
                 lineHeight: '1.3333333333333333em',
                 letterSpacing: '0.025em',
                 textTransform: 'uppercase',
-                color: 'rgba(248, 250, 252, 0.6)',
+                color: 'var(--dash-text-muted)',
             }}
         >
             {children}
@@ -118,7 +124,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
                         fontWeight: 400,
                         fontSize: 12,
                         lineHeight: '1.3333333333333333em',
-                        color: 'rgba(248, 250, 252, 0.4)',
+                        color: 'var(--dash-text-muted)',
                     }}
                 >
                     {label}
@@ -130,7 +136,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
                         fontWeight: 400,
                         fontSize: 14,
                         lineHeight: '1.4285714285714286em',
-                        color: '#F8FAFC',
+                        color: 'var(--dash-text)',
                     }}
                 >
                     {value}
@@ -184,8 +190,8 @@ const IconUnconfirmed = () => (
 
 const IconRefund = () => (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M2 8C2 9.18669 2.35189 10.3467 3.01118 11.3334C3.67047 12.3201 4.60754 13.0892 5.7039 13.5433C6.80026 13.9974 8.00666 14.1162 9.17054 13.8847C10.3344 13.6532 11.4035 13.0818 12.2426 12.2426C13.0818 11.4035 13.6532 10.3344 13.8847 9.17054C14.1162 8.00666 13.9974 6.80026 13.5433 5.7039C13.0892 4.60754 12.3201 3.67047 11.3334 3.01118C10.3467 2.35189 9.18669 2 8 2C6.32263 2.00631 4.71265 2.66082 3.50667 3.82667L2 5.33333" stroke="#F8FAFC" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M2 2V5.33333H5.33333" stroke="#F8FAFC" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M2 8C2 9.18669 2.35189 10.3467 3.01118 11.3334C3.67047 12.3201 4.60754 13.0892 5.7039 13.5433C6.80026 13.9974 8.00666 14.1162 9.17054 13.8847C10.3344 13.6532 11.4035 13.0818 12.2426 12.2426C13.0818 11.4035 13.6532 10.3344 13.8847 9.17054C14.1162 8.00666 13.9974 6.80026 13.5433 5.7039C13.0892 4.60754 12.3201 3.67047 11.3334 3.01118C10.3467 2.35189 9.18669 2 8 2C6.32263 2.00631 4.71265 2.66082 3.50667 3.82667L2 5.33333" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M2 2V5.33333H5.33333" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 )
 
@@ -308,7 +314,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
 
     return (
         <div
-            className="flex flex-col items-start shrink-0 self-stretch rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(30,41,59,0.60)] h-[118px] md:h-[130.5px] p-[17px] pb-[1px] md:p-[21px] md:pb-[1px] gap-[12px] md:gap-[16px]"
+            className="flex flex-col items-start shrink-0 self-stretch rounded-[16px] border border-white/[0.08] bg-[rgba(30,41,59,0.60)] h-[118px] md:h-[130.5px] p-[17px] pb-[1px] md:p-[21px] md:pb-[1px] gap-[12px] md:gap-[16px]"
         >
             {/* Section label */}
             <span className="font-inter font-semibold text-[12px] uppercase tracking-[0.025em] text-[rgba(248,250,252,0.6)] leading-[1.333em]">
@@ -344,7 +350,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
                                     style={{
                                         marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
                                         height: 2,
-                                        background: (i + 1) <= currentStep ? '#10B981' : 'rgba(255, 255, 255, 0.1)',
+                                        background: (i + 1) <= currentStep ? '#10B981' : 'var(--dash-border)',
                                     }}
                                 />
                             )}
@@ -378,8 +384,8 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
                 gap: 12,
                 alignSelf: 'stretch',
                 borderRadius: 16,
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                background: 'rgba(30, 41, 59, 0.60)',
+                border: '1px solid var(--dash-border)',
+                background: 'var(--dash-secondary-bg)',
             }}
         >
             <span
@@ -390,7 +396,7 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
                     lineHeight: '1.3333333333333333em',
                     letterSpacing: '2.500000099341075%',
                     textTransform: 'uppercase',
-                    color: 'rgba(248, 250, 252, 0.6)',
+                    color: 'var(--dash-text-muted)',
                 }}
             >
                 {d.customerInfo}
@@ -456,8 +462,8 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                 gap: 12,
                 alignSelf: 'stretch',
                 borderRadius: 16,
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                background: 'rgba(30, 41, 59, 0.60)',
+                border: '1px solid var(--dash-border)',
+                background: 'var(--dash-secondary-bg)',
             }}
         >
             <span
@@ -468,7 +474,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                     lineHeight: '1.3333333333333333em',
                     letterSpacing: '0.025em',
                     textTransform: 'uppercase',
-                    color: 'rgba(248, 250, 252, 0.6)',
+                    color: 'var(--dash-text-muted)',
                 }}
             >
                 {d.paymentInfo}
@@ -484,10 +490,10 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                     </div>
                     {/* Text container */}
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, lineHeight: '16px', color: 'rgba(248, 250, 252, 0.4)' }}>
+                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, lineHeight: '16px', color: 'var(--dash-text-muted)' }}>
                             {d.method}
                         </span>
-                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#F8FAFC' }}>
+                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
                             {order.paymentMethod}
                         </span>
                     </div>
@@ -501,7 +507,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                     </div>
                     {/* Text container */}
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, lineHeight: '16px', color: 'rgba(248, 250, 252, 0.4)' }}>
+                        <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, lineHeight: '16px', color: 'var(--dash-text-muted)' }}>
                             {d.paymentStatus}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '20px', color: statusColor }}>
@@ -511,12 +517,12 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                 </div>
 
                 {/* Payment Receipt Image: explicitly height 160 */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, width: '100%', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 16, padding: 1, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 160, width: '100%', border: '1px solid var(--dash-border)', borderRadius: 16, padding: 1, flexShrink: 0, overflow: 'hidden', position: 'relative' }}>
                     {order.paymentProofImage ? (
                         <Image src={typeof order.paymentProofImage === 'string' ? order.paymentProofImage : order.paymentProofImage?.url || ''} alt="Payment Receipt" fill className="object-cover" />
                     ) : (
-                        <div className="w-full flex items-center justify-center h-full text-center p-4" style={{ background: 'rgba(255, 255, 255, 0.05)', borderRadius: 15 }}>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, color: 'rgba(248, 250, 252, 0.4)' }}>
+                        <div className="w-full flex items-center justify-center h-full text-center p-4" style={{ background: 'var(--dash-surface-hover)', borderRadius: 15 }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 12, color: 'var(--dash-text-muted)' }}>
                                 No Payment Receipt Provided
                             </span>
                         </div>
@@ -555,7 +561,7 @@ function OrderItems({ order }: { order: OrderDetail }) {
                                         fontWeight: 500,
                                         fontSize: 14,
                                         lineHeight: '20px',
-                                        color: '#F8FAFC',
+                                        color: 'var(--dash-text)',
                                     }}
                                 >
                                     {item.productName}
@@ -566,7 +572,7 @@ function OrderItems({ order }: { order: OrderDetail }) {
                                         fontWeight: 400,
                                         fontSize: 12,
                                         lineHeight: '16px',
-                                        color: 'rgba(248, 250, 252, 0.5)',
+                                        color: 'var(--dash-text-muted)',
                                     }}
                                 >
                                     {item.variant ? `${item.variant} × ${item.quantity}` : `${d.qty}: ${item.quantity}`}
@@ -579,7 +585,7 @@ function OrderItems({ order }: { order: OrderDetail }) {
                                     fontWeight: 600,
                                     fontSize: 14,
                                     lineHeight: '20px',
-                                    color: '#F8FAFC',
+                                    color: 'var(--dash-text)',
                                 }}
                             >
                                 {order.currency} {(item.unitPrice * item.quantity).toFixed(2)}
@@ -615,28 +621,28 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                     <div style={{ gap: 8, display: 'flex', flexDirection: 'column' }}>
                         {/* Subtotal */}
                         <div className="flex items-center justify-between">
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'rgba(248, 250, 252, 0.6)' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
                                 {d.subtotal}
                             </span>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#F8FAFC' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
                                 {order.currency} {order.subtotal?.toFixed(2) || '0.00'}
                             </span>
                         </div>
                         {/* Shipping Fee */}
                         <div className="flex items-center justify-between">
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'rgba(248, 250, 252, 0.6)' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
                                 {d.shippingFee}
                             </span>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#F8FAFC' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
                                 {order.currency} {order.shippingFee?.toFixed(2) || '0.00'}
                             </span>
                         </div>
                         {/* Tax */}
                         <div className="flex items-center justify-between">
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'rgba(248, 250, 252, 0.6)' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text-muted)' }}>
                                 {d.tax}
                             </span>
-                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: '#F8FAFC' }}>
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
                                 {order.currency} {order.tax?.toFixed(2) || '0.00'}
                             </span>
                         </div>
@@ -645,7 +651,7 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                     {/* Grand Total — separated by margin 12, border top, padding 13 */}
                     <div
                         className="flex items-center justify-between"
-                        style={{ marginTop: 12, paddingTop: 13, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}
+                        style={{ marginTop: 12, paddingTop: 13, borderTop: '1px solid var(--dash-border)' }}
                     >
                         <span
                             style={{
@@ -653,7 +659,7 @@ function OrderSummary({ order }: { order: OrderDetail }) {
                                 fontWeight: 700,
                                 fontSize: 16,
                                 lineHeight: '24px',
-                                color: '#F8FAFC',
+                                color: 'var(--dash-text)',
                             }}
                         >
                             {d.total}
@@ -739,11 +745,11 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
                 {/* Primary Action Button — always visible, disabled for terminal statuses */}
                 {(() => {
-                    const isTerminal = ['cancelled', 'refunded', 'completed', 'shipped'].includes(status)
+                    const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const primaryDisabled = isLoading || isTerminal
                     return (
                         <button
-                            onClick={() => handleAction(status === 'ready_to_ship' ? 'shipped' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')}
+                            onClick={() => handleAction(status === 'shipped' ? 'completed' : status === 'ready_to_ship' ? 'shipped' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')}
                             disabled={primaryDisabled}
                             className={`flex items-center justify-center transition-opacity font-bold ${primaryDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-90'}`}
                             style={{
@@ -765,7 +771,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 }}
                             >
                                 {isLoading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
-                                {status === 'ready_to_ship' ? a.shipOrder : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
+                                {status === 'shipped' ? a.completeOrder : status === 'ready_to_ship' ? a.shipOrder : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
                             </span>
                         </button>
                     )
@@ -810,7 +816,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 style={{
                                     height: 50,
                                     borderRadius: 16,
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                    border: '1px solid var(--dash-border)',
                                 }}
                             >
                                 <IconRefund />
@@ -820,7 +826,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                         fontWeight: 600,
                                         fontSize: 16,
                                         lineHeight: '1.5em',
-                                        color: '#F8FAFC',
+                                        color: 'var(--dash-text)',
                                     }}
                                 >
                                     {a.refund}
@@ -904,7 +910,7 @@ export function OrderDetailPanel({
                         fontWeight: 700,
                         fontSize: 20,
                         lineHeight: '1.4em',
-                        color: '#F8FAFC',
+                        color: 'var(--dash-text)',
                     }}
                 >
                     {d.title} #{order?.orderNumber || orderId}
@@ -912,7 +918,7 @@ export function OrderDetailPanel({
 
                 {/* Close button — layout_HCW45V: 36×36, padding 8px 8px 0 */}
                 <button
-                    className="flex items-start justify-center hover:opacity-70 transition-opacity"
+                    className="flex items-start justify-center text-dash-text-muted hover:opacity-70 transition-opacity"
                     style={{
                         width: 36,
                         height: 36,
@@ -923,7 +929,7 @@ export function OrderDetailPanel({
                     onClick={onClose}
                 >
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M5 5L15 15M15 5L5 15" stroke="rgba(248,250,252,0.6)" strokeWidth="1.67" strokeLinecap="round" />
+                        <path d="M5 5L15 15M15 5L5 15" stroke="currentColor" strokeWidth="1.67" strokeLinecap="round" />
                     </svg>
                 </button>
             </div>
@@ -941,6 +947,14 @@ export function OrderDetailPanel({
                     <div className="z-20 md:static md:p-0 md:m-0 md:bg-transparent">
                         <ActionButtons order={order} onUpdate={() => { fetchOrder(); onUpdate?.(); }} />
                     </div>
+
+                    {/* BT Verification Block */}
+                    {(order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'pending_verification') || (order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'paid') ? (
+                        <ManualPaymentVerificationBlock
+                            order={order}
+                            onUpdate={() => { fetchOrder(); onUpdate?.(); }}
+                        />
+                    ) : null}
 
                     {/* Customer Information */}
                     <CustomerInformation order={order} />

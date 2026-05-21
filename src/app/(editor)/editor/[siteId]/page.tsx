@@ -1279,7 +1279,7 @@ export default function EditorPage() {
     )
 
     return (
-        <div className="flex h-[100dvh] flex-col bg-[#0B1120]">
+        <div className="flex h-[100dvh] overflow-hidden flex-col bg-[#0B1120]">
             <EditorMenuDrawer
                 siteId={siteId}
                 open={isMenuOpen}
@@ -1421,7 +1421,7 @@ export default function EditorPage() {
                     )}
                 </div>
             ) : (
-                <div className="flex flex-1 overflow-hidden">
+                <div className="flex flex-1 min-h-0 overflow-hidden">
                     <div
                         className="shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-in-out"
                         style={{
