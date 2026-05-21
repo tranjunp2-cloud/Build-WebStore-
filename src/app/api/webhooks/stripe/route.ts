@@ -129,9 +129,9 @@ async function handleCheckoutCompleted(
         return
     }
 
-    // Idempotency: if stripeSessionId is already written to any order (regardless of status),
-    // the webhook was already processed successfully — do not re-run side-effects.
-    // Relies on the DB-level UNIQUE constraint on stripeSessionId (Orders collection).
+    // Idempotency: skip only if the order was already transitioned out of 'pending'.
+    // NOTE: stripe-checkout/route.ts writes stripeSessionId to the order BEFORE the buyer pays,
+    // so we cannot treat "sessionId exists" as "already processed" — we must check status too.
     const existing = await payload.find({
         collection: 'orders',
         where: {
@@ -140,7 +140,7 @@ async function handleCheckoutCompleted(
         limit: 1,
     })
 
-    if (existing.docs.length > 0) {
+    if (existing.docs.length > 0 && (existing.docs[0] as any).status !== 'pending') {
         console.log(`[Stripe Webhook] Order already processed for session ${stripeSessionId}`)
         return
     }

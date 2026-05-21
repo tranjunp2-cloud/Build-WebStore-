@@ -4,9 +4,11 @@ import { Link, ArrowRight, ShieldCheck, Loader2, BadgeCheck } from 'lucide-react
 import { useI18n } from '@/i18n';
 
 interface Props {
-    mode?: 'connect' | 'verify';
+    mode?: 'connect' | 'onboard' | 'verify';
     onConnect?: () => void;
     isConnecting?: boolean;
+    onOnboard?: () => void;
+    isOnboarding?: boolean;
     onVerify?: () => void;
     isVerifying?: boolean;
 }
@@ -15,6 +17,8 @@ export function StripeConnectBlock({
     mode = 'connect',
     onConnect,
     isConnecting = false,
+    onOnboard,
+    isOnboarding = false,
     onVerify,
     isVerifying = false,
 }: Props) {
@@ -22,15 +26,16 @@ export function StripeConnectBlock({
     const pt = t.dashboard.settings.payments;
 
     const isVerifyMode = mode === 'verify';
-    const isLoading = isVerifyMode ? isVerifying : isConnecting;
+    const isOnboardMode = mode === 'onboard';
+    const isLoading = isVerifyMode ? isVerifying : isOnboardMode ? isOnboarding : isConnecting;
 
-    const title = isVerifyMode ? pt.stripeVerifyTitle : pt.stripeConnectTitle;
-    const desc = isVerifyMode ? pt.stripeVerifyDesc : pt.stripeConnectDesc;
-    const ctaLabel = isVerifyMode ? pt.stripeVerifyCta : pt.stripeConnectCta;
-    const loadingLabel = isVerifyMode ? pt.stripeVerifying : pt.stripeConnecting;
-    const handleClick = isVerifyMode ? onVerify : onConnect;
+    const title = isVerifyMode ? pt.stripeVerifyTitle : isOnboardMode ? pt.stripeOnboardTitle : pt.stripeConnectTitle;
+    const desc = isVerifyMode ? pt.stripeVerifyDesc : isOnboardMode ? pt.stripeOnboardDesc : pt.stripeConnectDesc;
+    const ctaLabel = isVerifyMode ? pt.stripeVerifyCta : isOnboardMode ? pt.stripeOnboardCta : pt.stripeConnectCta;
+    const loadingLabel = isVerifyMode ? pt.stripeVerifying : isOnboardMode ? pt.stripeOnboarding : pt.stripeConnecting;
+    const handleClick = isVerifyMode ? onVerify : isOnboardMode ? onOnboard : onConnect;
 
-    const steps = isVerifyMode
+    const steps = (isVerifyMode || isOnboardMode)
         ? null
         : [pt.stripeStep1, pt.stripeStep2, pt.stripeStep3];
 
@@ -104,8 +109,10 @@ export function StripeConnectBlock({
                     style={{
                         background: isVerifyMode
                             ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
-                            : 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
-                        boxShadow: isVerifyMode
+                            : isOnboardMode
+                                ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
+                                : 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
+                        boxShadow: (isVerifyMode || isOnboardMode)
                             ? '0 4px 14px rgba(251,191,36,0.30)'
                             : '0 4px 14px rgba(14,165,233,0.30)',
                     }}
@@ -115,6 +122,16 @@ export function StripeConnectBlock({
                         : <>{ctaLabel}<ArrowRight className="w-4 h-4" /></>
                     }
                 </button>
+                {isOnboardMode && (
+                    <button
+                        type="button"
+                        onClick={onVerify}
+                        disabled={isVerifying}
+                        className="text-[12px] text-slate-500 hover:text-slate-300 transition-colors whitespace-nowrap underline underline-offset-2"
+                    >
+                        {isVerifying ? pt.stripeVerifying : pt.stripeOnboardSecondary}
+                    </button>
+                )}
                 <div className="inline-flex items-center gap-[6px] text-[11.5px] text-slate-500 whitespace-nowrap">
                     <ShieldCheck className="w-3 h-3 text-emerald-400" />
                     {pt.stripeTrust}

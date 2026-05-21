@@ -7,6 +7,7 @@ import { stripeCheckoutSchema } from '@/lib/validations/orders'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
+import { generateConfirmToken } from '@/lib/orders/upload-token'
 
 /**
  * POST /api/orders/stripe-checkout
@@ -265,10 +266,18 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        return NextResponse.json({
+        const confirmToken = generateConfirmToken(order.id, orderNumber)
+        const res = NextResponse.json({
             success: true,
             data: { orderId: order.id, orderNumber, sessionUrl: checkout.url },
         })
+        res.cookies.set(`ct_${order.id}`, confirmToken, {
+            httpOnly: true,
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60,
+            path: '/',
+        })
+        return res
     } catch (err: any) {
         console.error('[stripe-checkout] Unexpected error:', err.message)
         return NextResponse.json(

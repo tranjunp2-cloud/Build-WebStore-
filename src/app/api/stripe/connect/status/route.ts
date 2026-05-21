@@ -79,6 +79,7 @@ export const GET = withAuth(async (user, request) => {
             data: {
                 connected: true,
                 accountId: status.accountId,
+                email: status.email,
                 chargesEnabled: status.chargesEnabled,
                 payoutsEnabled: status.payoutsEnabled,
                 detailsSubmitted: status.detailsSubmitted,

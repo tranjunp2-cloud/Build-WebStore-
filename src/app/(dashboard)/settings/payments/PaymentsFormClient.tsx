@@ -79,6 +79,8 @@ export function PaymentsFormClient({
     const [hasAccount, setHasAccount] = useState(!!stripeAccountId);
     const [currentAccountId, setCurrentAccountId] = useState(stripeAccountId);
     const [isVerifying, setIsVerifying] = useState(false);
+    const [isOnboarding, setIsOnboarding] = useState(false);
+    const [detailsSubmitted, setDetailsSubmitted] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -129,6 +131,7 @@ export function PaymentsFormClient({
                             setIsChargesEnabled(true);
                             toast.success(pt.stripeReturnSuccess);
                         } else {
+                            if (data.success && data.data.detailsSubmitted) setDetailsSubmitted(true);
                             toast.info(pt.stripeReturnKycPending);
                         }
                     })
@@ -172,6 +175,29 @@ export function PaymentsFormClient({
         }
     };
 
+    // Redirect to Stripe Account Link to complete business onboarding (KYC, bank account)
+    const handleOnboardStripe = async () => {
+        if (!tenantId || isOnboarding) return;
+        setIsOnboarding(true);
+        try {
+            const res = await fetch('/api/stripe/connect/account-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tenantId }),
+            });
+            const data = await res.json();
+            if (data.success && data.data?.url) {
+                window.location.href = data.data.url;
+            } else {
+                toast.error(pt.failSaveSettings);
+            }
+        } catch {
+            toast.error(pt.failSaveSettings);
+        } finally {
+            setIsOnboarding(false);
+        }
+    };
+
     // Check Stripe account status and unlock UI if approved (TC-F13.26)
     const handleVerifyStripe = async () => {
         if (!tenantId || isVerifying) return;
@@ -186,6 +212,7 @@ export function PaymentsFormClient({
             if (data.data.connected) {
                 setIsVerified(true);
                 if (data.data.accountId) setCurrentAccountId(data.data.accountId);
+                if (data.data.detailsSubmitted) setDetailsSubmitted(true);
             }
             if (data.data.onboardingComplete) {
                 setIsChargesEnabled(true);
@@ -343,22 +370,27 @@ export function PaymentsFormClient({
                 </div>
 
                 {isVerified && isChargesEnabled ? (
-                    <StripeConnectedBar accountId={currentAccountId} onDisconnect={async () => {
+                    <StripeConnectedBar accountId={currentAccountId} tenantId={tenantId ?? ''} onDisconnect={async () => {
                         const res = await disconnectStripe();
                         if (res.success) {
                             setIsVerified(false);
                             setIsChargesEnabled(false);
                             setHasAccount(false);
+                            setDetailsSubmitted(false);
                             setCardEnabled(false);
                             setFpxEnabled(false);
                         } else {
                             toast.error('Failed to disconnect Stripe');
                         }
                     }} />
-                ) : (isVerified && !isChargesEnabled) || hasAccount ? (
-                    // Connected but KYC/onboarding not yet confirmed — must verify before enabling Card/FPX
+                ) : (isVerified || hasAccount) && !isChargesEnabled ? (
+                    // Connected but onboarding incomplete:
+                    // - detailsSubmitted=false → seller hasn't filled Stripe business form yet → show Complete Setup
+                    // - detailsSubmitted=true  → submitted but Stripe still reviewing → show Verify
                     <StripeConnectBlock
-                        mode="verify"
+                        mode={detailsSubmitted ? 'verify' : 'onboard'}
+                        onOnboard={handleOnboardStripe}
+                        isOnboarding={isOnboarding}
                         onVerify={handleVerifyStripe}
                         isVerifying={isVerifying}
                     />

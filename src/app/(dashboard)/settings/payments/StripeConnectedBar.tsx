@@ -6,14 +6,24 @@ import { useI18n } from '@/i18n';
 
 interface Props {
     accountId: string | null;
+    tenantId: string;
     onDisconnect?: () => void;
 }
 
-export function StripeConnectedBar({ accountId, onDisconnect }: Props) {
+export function StripeConnectedBar({ accountId, tenantId, onDisconnect }: Props) {
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
     const [showModal, setShowModal] = useState(false);
     const [isDisconnecting, setIsDisconnecting] = useState(false);
+    const [accountEmail, setAccountEmail] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!tenantId) return;
+        fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
+            .then(r => r.json())
+            .then(d => { if (d.success && d.data?.email) setAccountEmail(d.data.email); })
+            .catch(() => {});
+    }, [tenantId]);
 
     useEffect(() => {
         if (!showModal) return;
@@ -46,7 +56,10 @@ export function StripeConnectedBar({ accountId, onDisconnect }: Props) {
                     </div>
                     <div className="flex items-center gap-[6px] text-[12px] text-slate-400">
                         <ShieldCheck className="w-[11px] h-[11px]" />
-                        PCI DSS Level 1 · Funds settle to your linked bank
+                        {accountEmail
+                            ? <>{accountEmail} · PCI DSS Level 1</>
+                            : <>PCI DSS Level 1 · Funds settle to your linked bank</>
+                        }
                     </div>
                 </div>
                 <div className="flex gap-[6px] shrink-0">
