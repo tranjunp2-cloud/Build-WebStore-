@@ -66,7 +66,7 @@ export default function UploadClient({
             return false
         }
         if (f.size > PROOF_MAX_SIZE_BYTES) {
-            toast.error('File too large. Maximum size is 2MB.')
+            toast.error('File too large. Maximum size is 5MB.')
             return false
         }
         return true
@@ -199,7 +199,7 @@ export default function UploadClient({
                                     Drag & drop or click to select
                                 </p>
                                 <p style={{ fontSize: 12, color: '#7b8390', margin: 0 }}>
-                                    JPEG, PNG or PDF · Max 2MB
+                                    JPEG, PNG or PDF · Max 5MB
                                 </p>
                             </>
                         )}

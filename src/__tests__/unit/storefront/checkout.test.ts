@@ -367,7 +367,7 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
         expect(validatePaymentProof(file)).toBeNull()
     })
 
-    it('TC-F09.188: rejects file exceeding 2 MB limit', () => {
+    it('TC-F09.188: rejects file exceeding 5 MB limit', () => {
         // Arrange — 1 byte over limit
         const file = { type: 'image/jpeg', size: PROOF_MAX_SIZE_BYTES + 1 }
 
@@ -375,7 +375,7 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
         expect(validatePaymentProof(file)).toBe('FILE_TOO_LARGE')
     })
 
-    it('TC-F09.188: accepts file exactly at 2 MB boundary (inclusive)', () => {
+    it('TC-F09.188: accepts file exactly at 5 MB boundary (inclusive)', () => {
         // Arrange — exactly at limit
         const file = { type: 'image/png', size: PROOF_MAX_SIZE_BYTES }
 
@@ -408,7 +408,7 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
     })
 
     it('TC-F09.188: rejects oversized PDF', () => {
-        // Arrange — PDF valid type but over 2 MB
+        // Arrange — PDF valid type but over 5 MB
         const file = { type: 'application/pdf', size: PROOF_MAX_SIZE_BYTES + 1 }
 
         // Act + Assert

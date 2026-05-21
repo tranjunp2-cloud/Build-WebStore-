@@ -179,7 +179,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
             return false
         }
         if (f.size > PROOF_MAX_SIZE_BYTES) {
-            setUploadError('File too large. Maximum size is 2MB.')
+            setUploadError('File too large. Maximum size is 5MB.')
             return false
         }
         setUploadError('')

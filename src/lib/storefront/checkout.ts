@@ -58,7 +58,7 @@ export function generateOrderNumber(): string {
 }
 
 export const PROOF_ACCEPTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
-export const PROOF_MAX_SIZE_BYTES = 2 * 1024 * 1024 // 2 MB
+export const PROOF_MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 export type ProofValidationError = 'INVALID_TYPE' | 'FILE_TOO_LARGE'
 

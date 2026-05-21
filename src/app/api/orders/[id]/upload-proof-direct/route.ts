@@ -37,7 +37,7 @@ export async function POST(
         return NextResponse.json({ error: 'Invalid file type. Upload a JPEG, PNG, or PDF.' }, { status: 422 })
     }
     if (file.size > PROOF_MAX_SIZE_BYTES) {
-        return NextResponse.json({ error: 'File too large. Maximum size is 2 MB.' }, { status: 422 })
+        return NextResponse.json({ error: 'File too large. Maximum size is 5 MB.' }, { status: 422 })
     }
 
     const payload = await getPayload({ config })
