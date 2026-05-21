@@ -73,7 +73,7 @@ describe('getStripeOAuthUrl [TC-F13.122, TC-F13.123]', () => {
 
     it('[TC-F13.122] generates OAuth authorize URL with required params', () => {
         vi.stubEnv('STRIPE_CLIENT_ID', 'ca_test_clientid')
-        vi.stubEnv('STRIPE_OAUTH_STATE_SECRET', 'state_secret_test')
+        vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
 
         const url = getStripeOAuthUrl('tenant-1')
         const parsed = new URL(url)

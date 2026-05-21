@@ -42,13 +42,12 @@ function computeStateHmac(tenantId: string, secret: string): string {
 
 /**
  * Produce a tamper-proof `state` param for Stripe OAuth.
- * Format: `{tenantId}_{hmac}` signed with STRIPE_OAUTH_STATE_SECRET (dedicated HMAC key,
- * separate from the Stripe API secret to enforce key separation).
+ * Format: `{tenantId}_{hmac}` signed with STRIPE_SECRET_KEY.
  * Prevents an attacker from forging `state=victim_tenantId` in the callback.
  */
 export function signOAuthState(tenantId: string): string {
-    const secret = process.env.STRIPE_OAUTH_STATE_SECRET
-    if (!secret) throw new Error('STRIPE_OAUTH_STATE_SECRET is not set')
+    const secret = process.env.STRIPE_SECRET_KEY
+    if (!secret) throw new Error('STRIPE_SECRET_KEY is not set')
     const hmac = computeStateHmac(tenantId, secret)
     return `${tenantId}_${hmac}`
 }
@@ -57,7 +56,7 @@ export function signOAuthState(tenantId: string): string {
  * Verify the signed OAuth state and return the tenantId, or null if tampered.
  */
 export function verifyOAuthState(state: string): string | null {
-    const secret = process.env.STRIPE_OAUTH_STATE_SECRET
+    const secret = process.env.STRIPE_SECRET_KEY
     if (!secret) return null
     const sepIdx = state.lastIndexOf('_')
     if (sepIdx === -1) return null
