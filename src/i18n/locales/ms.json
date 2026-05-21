@@ -848,6 +848,14 @@
         "shipped": "Dihantar",
         "completed": "Selesai"
       },
+      "ship": {
+        "title": "Hantar Pesanan",
+        "trackingLabel": "Nombor Penjejakan",
+        "trackingPlaceholder": "cth., JT1234567890MY",
+        "back": "Kembali",
+        "confirm": "Sahkan Penghantaran",
+        "confirming": "Menghantar..."
+      },
       "cancel": {
         "title": "Batal Pesanan",
         "orderLabel": "Pesanan",

@@ -61,6 +61,14 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             )
         }
 
+        // Tracking number required when transitioning to shipped
+        if (newStatus === 'shipped' && !trackingNumber) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Tracking number is required when shipping' } },
+                { status: 422 }
+            )
+        }
+
         // Build update data
         const updateData: any = { status: newStatus }
         if (trackingNumber) updateData.trackingNumber = trackingNumber
@@ -77,7 +85,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             overrideAccess: false,
         })
 
-        // Send buyer notification for relevant status changes
+        // Send buyer notification for relevant status changes — isolated so email failure never fails the update response
         if (BUYER_EMAIL_STATUSES.has(newStatus) && (order as any).customerEmail) {
             try {
                 const customerEmail = (order as any).customerEmail
@@ -160,8 +168,8 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                     payload.sendEmail({ to: customerEmail, subject: statusEmailData.subject, html: statusEmailData.html })
                         .catch((err: unknown) => console.error('[Email status notify]', err))
                 }
-            } catch (err) {
-                console.error('[Email build]', err)
+            } catch (emailErr) {
+                payload.logger.error({ emailErr, orderId: id, status: newStatus }, '[order-update] email construction failed')
             }
         }
 
@@ -170,6 +178,12 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             data: updated,
         })
     } catch (error: any) {
+        if (error?.status === 404 || error?.name === 'NotFound') {
+            return NextResponse.json(
+                { success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } },
+                { status: 404 }
+            )
+        }
         console.error('[Order Update Error]', error)
         return NextResponse.json(
             { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order operation failed' } },
@@ -205,6 +219,12 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
 
         return NextResponse.json({ success: true, data: order })
     } catch (error: any) {
+        if (error?.status === 404 || error?.name === 'NotFound') {
+            return NextResponse.json(
+                { success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } },
+                { status: 404 }
+            )
+        }
         console.error('[Order Detail Error]', error)
         return NextResponse.json(
             { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order operation failed' } },

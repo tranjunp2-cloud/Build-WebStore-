@@ -81,7 +81,7 @@ describe('POST /api/orders/create', () => {
                 siteId: 'invalid-site',
                 items: [{ productId: 'prod-1', quantity: 1 }],
                 customer: { name: 'John Doe', email: 'john@example.com' },
-                paymentMethod: 'cod'
+                paymentMethod: 'cod',
             })
         })
 
@@ -100,7 +100,7 @@ describe('POST /api/orders/create', () => {
                 siteId: 'site-123',
                 items: [{ productId: 'prod-1', quantity: 2 }],
                 customer: { name: 'John Doe', email: 'john@example.com' },
-                paymentMethod: 'cod'
+                paymentMethod: 'cod',
             })
         })
 

@@ -848,6 +848,14 @@
         "shipped": "Shipped",
         "completed": "Completed"
       },
+      "ship": {
+        "title": "Ship Order",
+        "trackingLabel": "Tracking Number",
+        "trackingPlaceholder": "e.g., JT1234567890MY",
+        "back": "Back",
+        "confirm": "Confirm Shipment",
+        "confirming": "Shipping..."
+      },
       "cancel": {
         "title": "Cancel Order",
         "orderLabel": "Order",
