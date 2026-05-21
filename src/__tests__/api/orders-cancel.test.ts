@@ -7,11 +7,14 @@ vi.mock('@/lib/auth', () => ({
 
 const mockFindByID = vi.fn()
 const mockUpdate = vi.fn()
+const mockSendEmail = vi.fn().mockResolvedValue(undefined)
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, update: mockUpdate })),
+    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, update: mockUpdate, sendEmail: mockSendEmail })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
-vi.mock('@/lib/email/send', () => ({ sendEmail: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/email/templates/order-cancelled', () => ({
+    orderCancelledEmail: vi.fn(() => ({ subject: 'Order cancelled', html: '<p>cancelled</p>' })),
+}))
 
 import { POST } from '@/app/api/orders/[id]/cancel/route'
 
@@ -81,8 +84,6 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
     })
 
     it('[TC-F10.16-FIX-1] Cancellation email sent to customerEmail field', async () => {
-        const { sendEmail } = await import('@/lib/email/send')
-
         mockFindByID
             .mockResolvedValueOnce({ id: 'order-1', status: 'pending', items: [], customerEmail: 'test@example.com', customerName: 'John Doe' })
         mockUpdate
@@ -94,11 +95,9 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
 
         expect(res.status).toBe(200)
         expect(body.success).toBe(true)
-        // Verify email was sent to customerEmail field (not customer.email)
-        expect(sendEmail).toHaveBeenCalledWith(
-            expect.objectContaining({
-                to: 'test@example.com'
-            })
+        // Verify email sent via payload.sendEmail to customerEmail field (fire-and-forget)
+        expect(mockSendEmail).toHaveBeenCalledWith(
+            expect.objectContaining({ to: 'test@example.com' })
         )
     })
 

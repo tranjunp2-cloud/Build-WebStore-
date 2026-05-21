@@ -38,18 +38,47 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
             const siteObj = typeof order.site === 'object' ? order.site : null
             const tenantObj = siteObj?.tenant && typeof siteObj.tenant === 'object' ? siteObj.tenant : null
             const siteSlug = (tenantObj as any)?.slug ?? ''
-            payload
-                .sendEmail(
-                    orderExpiredEmail({
+            const shopName = (tenantObj as any)?.name ?? siteSlug
+            const siteLocale = (siteObj as any)?.locale ?? 'ms'
+            const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+            const reorderUrl = siteSlug ? `${baseUrl}/sites/${siteSlug}/products` : `${baseUrl}/`
+
+            const cancellationDate = new Date().toISOString()
+            const elapsedMs = order.createdAt ? Date.now() - new Date(order.createdAt).getTime() : null
+            const elapsedTime = elapsedMs != null
+                ? siteLocale === 'en'
+                    ? `${Math.floor(elapsedMs / 3600000)} hours ${Math.floor((elapsedMs % 3600000) / 60000)} minutes`
+                    : `${Math.floor(elapsedMs / 3600000)} jam ${Math.floor((elapsedMs % 3600000) / 60000)} minit`
+                : null
+
+            const orderItems = ((order.items ?? []) as any[]).map((item: any) => ({
+                name: item.productName ?? item.name ?? '',
+                variant: item.variant ?? null,
+                quantity: item.quantity ?? 1,
+                unitPrice: item.unitPrice ?? 0,
+                lineTotal: (item.quantity ?? 1) * (item.unitPrice ?? 0),
+            }))
+
+            const emailTemplate = orderExpiredEmail({
+                        shopName,
                         orderNumber: order.orderNumber,
                         customerName: order.customerName,
+                        customerEmail: order.customerEmail ?? '',
+                        customerPhone: order.customerPhone ?? null,
+                        customerAddress: order.shippingAddress ?? null,
+                        items: orderItems,
+                        subtotal: order.subtotal ?? 0,
+                        shippingFee: order.shippingFee ?? 0,
                         total: order.total,
                         currency: order.currency,
-                        productListUrl: siteSlug
-                            ? `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/sites/${siteSlug}/products`
-                            : `${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/`,
-                    }),
-                )
+                        orderDate: order.createdAt,
+                        cancellationDate,
+                        elapsedTime,
+                        reorderUrl,
+                        locale: siteLocale,
+                    })
+            payload
+                .sendEmail({ to: order.customerEmail, subject: emailTemplate.subject, html: emailTemplate.html })
                 .catch((e: unknown) =>
                     payload.logger.error({ err: e, orderId: order.id }, 'order-expired email failed'),
                 )

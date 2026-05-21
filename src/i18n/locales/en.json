@@ -352,12 +352,100 @@
       "sst": "SST (6%)",
       "total": "Total",
       "shippingAddress": "Shipping Address",
-      "footer": "Powered by PrimeWeb"
+      "footer": "Powered by PrimeWeb",
+      "recipientInfoHeading": "Recipient Information",
+      "fullName": "Full name",
+      "phone": "Phone",
+      "email": "Email",
+      "address": "Address",
+      "orderInfoHeading": "Order Information",
+      "orderStatus": "Order status",
+      "orderStatusSuccess": "Order placed",
+      "orderDate": "Order date",
+      "productName": "Product name",
+      "quantity": "Quantity",
+      "unitCost": "Unit price",
+      "discount": "Discount",
+      "shippingFee": "Shipping fee",
+      "prepaid": "Prepaid",
+      "codPayment": "Pay on delivery",
+      "paymentMethod": "Payment method",
+      "shippingProvider": "Shipping provider",
+      "buyerNote": "Buyer note",
+      "cta": "Click here to view your order",
+      "farewell": "See you on your next order!",
+      "copyright": "Copyright by"
+    },
+    "newOrder": {
+      "greeting": "You have a new order from",
+      "body": "Please review and process the order promptly.",
+      "orderStatusLabel": "Order status",
+      "orderStatusNew": "New Order",
+      "cta": "View Order Here",
+      "farewell": "Happy selling!"
+    },
+    "cancelledOrder": {
+      "body": "Your order has been cancelled.",
+      "orderStatusCancelled": "Cancelled",
+      "cancellationDate": "Cancellation date",
+      "cancellationNote": "Cancellation note",
+      "cta": "Place a new order",
+      "subject": "Order cancellation notice"
+    },
+    "shippedOrder": {
+      "body": "Thank you for your purchase. Your order has been shipped to you.",
+      "orderStatusShipped": "Shipped",
+      "shippedDate": "Shipped date",
+      "subject": "Your order has been shipped"
+    },
+    "autoCancelledOrder": {
+      "body": "Your order has been automatically cancelled because payment was not received within the required timeframe.",
+      "paymentExpiredTitle": "Payment period expired",
+      "paymentExpiredText": "The system did not receive payment within 24 hours of the order being placed ({elapsed}). Per policy, this order has been automatically cancelled and product stock has been restored.",
+      "orderStatusCancelled": "Auto-cancelled",
+      "cancellationDate": "Cancellation date",
+      "cancellationReason": "Cancellation reason",
+      "cancellationReasonValue": "Payment not received",
+      "restockedBadge": "Restocked",
+      "noRefundTitle": "No refund required",
+      "noRefundText": "This order was never paid, so no money was charged to your account. You can place a new order anytime.",
+      "originalTotalLabel": "Original order total",
+      "paymentMethodValue": "Not selected",
+      "paymentStatusLabel": "Payment status",
+      "paymentStatusValue": "Unpaid",
+      "cta": "Reorder",
+      "ctaSubtitle": "Items from your original order will be added back to your cart.",
+      "subject": "Order auto-cancelled"
+    },
+    "bankTransfer": {
+      "body": "Thank you for your order. Please complete your bank transfer using the details below and upload your payment receipt to confirm the order.",
+      "bankDetailsHeading": "Bank Transfer Details",
+      "bank": "Bank",
+      "accountNo": "Account No.",
+      "accountName": "Account Name",
+      "scanToPay": "Or Scan to Pay",
+      "referenceHeading": "IMPORTANT — Payment Reference",
+      "referenceInstruction": "Enter this code in your transfer notes / description field",
+      "deadlineLabel": "Payment required by",
+      "autoCancel": "Orders without payment confirmation will be automatically cancelled after 24 hours.",
+      "securityReminder": "Security reminder: We will never ask you to transfer money to a different account or via phone/WhatsApp. If you receive such requests, please ignore and report them.",
+      "uploadCta": "Upload Payment Receipt",
+      "fallbackLink": "Or copy this link:",
+      "orderStatusLabel": "Order status",
+      "orderStatusAwaitingPayment": "Awaiting Payment"
     },
     "status": {
       "greeting": "Hi",
       "orderNumber": "Order Number",
       "tracking": "Tracking",
+      "confirmed": {
+        "title": "Order Confirmed",
+        "description": "Your order has been confirmed by the seller and is now being prepared."
+      },
+      "ready_to_ship": {
+        "title": "Order Ready to Ship",
+        "description": "Your order is packed and ready. It will be handed over to the courier soon."
+      },
       "processing": {
         "title": "Order is Processing",
         "description": "Your order is being prepared. We will notify you when it has been shipped."
@@ -366,13 +454,17 @@
         "title": "Order Shipped",
         "description": "Your order is on its way. You can track your shipment below."
       },
-      "delivered": {
-        "title": "Order Delivered",
+      "completed": {
+        "title": "Order Completed",
         "description": "Your order has been delivered. Thank you for your purchase!"
       },
       "cancelled": {
         "title": "Order Cancelled",
         "description": "Your order has been cancelled. If you have any questions, please contact us."
+      },
+      "refunded": {
+        "title": "Order Refunded",
+        "description": "Your order has been refunded. The amount will be returned to your original payment method."
       }
     }
   },
