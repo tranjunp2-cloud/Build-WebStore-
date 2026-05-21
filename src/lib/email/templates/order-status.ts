@@ -12,6 +12,15 @@ type OrderStatus = 'confirmed' | 'ready_to_ship' | 'processing' | 'shipped' | 'c
 
 const locales = { en: en.email, ms: ms.email } as const
 
+function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+}
+
 interface OrderStatusEmailData {
     customerName: string
     orderNumber: string
@@ -48,6 +57,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
     const statusT = t[status]
     const emoji = STATUS_EMOJIS[status]
     const color = STATUS_COLORS[status]
+    const esc = escapeHtml
 
     const trackingHtml = (status === 'shipped' && trackingNumber) ? `
         <div style="background: #eff6ff; border-radius: 8px; padding: 16px; margin: 24px 0;">
@@ -78,7 +88,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 8px;">${t.greeting} <strong>${customerName}</strong>,</p>
+                <p style="font-size: 16px; margin: 0 0 8px;">${t.greeting} <strong>${esc(customerName)}</strong>,</p>
                 <p style="font-size: 14px; color: #555; line-height: 1.7; margin: 0 0 24px;">
                     ${statusT.description}
                 </p>
@@ -86,7 +96,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
                 <!-- Order Number -->
                 <div style="background: #f8fafc; border-radius: 8px; padding: 16px; text-align: center;">
                     <p style="font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 4px;">${t.orderNumber}</p>
-                    <p style="font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 1px;">${orderNumber}</p>
+                    <p style="font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 1px;">${esc(orderNumber)}</p>
                 </div>
 
                 ${trackingHtml}
@@ -94,7 +104,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
 
             <!-- Footer -->
             <div style="background: #fafafa; padding: 24px 32px; text-align: center; border-top: 1px solid #eee;">
-                <p style="font-size: 12px; color: #999; margin: 0;">Powered by ${storeName}</p>
+                <p style="font-size: 12px; color: #999; margin: 0;">Powered by ${esc(storeName)}</p>
             </div>
         </div>
     </div>

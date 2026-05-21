@@ -46,7 +46,9 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
             const cancellationDate = new Date().toISOString()
             const elapsedMs = order.createdAt ? Date.now() - new Date(order.createdAt).getTime() : null
             const elapsedTime = elapsedMs != null
-                ? `${Math.floor(elapsedMs / 3600000)} jam ${Math.floor((elapsedMs % 3600000) / 60000)} minit`
+                ? siteLocale === 'en'
+                    ? `${Math.floor(elapsedMs / 3600000)} hours ${Math.floor((elapsedMs % 3600000) / 60000)} minutes`
+                    : `${Math.floor(elapsedMs / 3600000)} jam ${Math.floor((elapsedMs % 3600000) / 60000)} minit`
                 : null
 
             const orderItems = ((order.items ?? []) as any[]).map((item: any) => ({

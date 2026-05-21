@@ -110,7 +110,8 @@ export function orderExpiredEmail(data: OrderExpiredData): { subject: string; ht
             <td align="right" style="padding:6px 14px;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13.5px;color:#EF4444;">-${fp(data.discountAmount)}</td>
         </tr>` : ''
 
-    const subject = `${esc(data.shopName)} - ${tA.subject} - ${esc(data.orderNumber)}`
+    const subject = `${data.shopName} - ${tA.subject} - ${data.orderNumber}`
+    const htmlTitle = `${esc(data.shopName)} - ${tA.subject} - ${esc(data.orderNumber)}`
 
     return {
         subject,
@@ -119,7 +120,7 @@ export function orderExpiredEmail(data: OrderExpiredData): { subject: string; ht
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${subject}</title>
+<title>${htmlTitle}</title>
 <style>
   body{margin:0;background:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
   img{max-width:100%;height:auto;display:block;}

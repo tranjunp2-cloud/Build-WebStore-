@@ -121,7 +121,8 @@ export function orderShippedEmail(data: OrderShippedData): { subject: string; ht
             <td colspan="2"></td>
         </tr>` : ''
 
-    const subject = `${esc(data.shopName)} - ${tS.subject} - ${esc(data.orderNumber)}`
+    const subject = `${data.shopName} - ${tS.subject} - ${data.orderNumber}`
+    const htmlTitle = `${esc(data.shopName)} - ${tS.subject} - ${esc(data.orderNumber)}`
 
     return {
         subject,
@@ -130,7 +131,7 @@ export function orderShippedEmail(data: OrderShippedData): { subject: string; ht
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${subject}</title>
+<title>${htmlTitle}</title>
 <style>
   body{margin:0;background:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;word-wrap:break-word;}
   img{max-width:100%;height:auto;display:block;}
