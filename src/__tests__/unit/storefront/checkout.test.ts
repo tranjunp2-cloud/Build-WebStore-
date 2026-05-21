@@ -391,6 +391,14 @@ describe('[TC-F09.188] Payment Proof Validator (validatePaymentProof)', () => {
         expect(validatePaymentProof(file)).toBeNull()
     })
 
+    it('TC-F09.188: accepts image/jpg (non-standard MIME used by some mobile browsers)', () => {
+        // Arrange — iOS Safari / Samsung Internet may report image/jpg instead of image/jpeg
+        const file = { type: 'image/jpg', size: 1 * 1024 * 1024 }
+
+        // Act + Assert
+        expect(validatePaymentProof(file)).toBeNull()
+    })
+
     it('TC-F09.188: rejects GIF (unsupported type)', () => {
         // Arrange
         const file = { type: 'image/gif', size: 100 * 1024 }

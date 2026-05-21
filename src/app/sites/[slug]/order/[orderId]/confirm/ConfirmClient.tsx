@@ -10,7 +10,7 @@ import {
     PhoneCall, PackageX, HandCoins, Banknote,
 } from 'lucide-react'
 import { TY_CSS } from './confirm-styles'
-import { PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
+import { PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
 
 type OrderItem = { productName: string; quantity: number; unitPrice: number; variant?: string; imageUrl?: string }
 type ShippingAddress = { line1?: string; line2?: string; city?: string; state?: string; postcode?: string; country?: string }
@@ -71,8 +71,6 @@ function addBusinessDays(date: Date, days: number): Date {
 }
 
 const ICON_OK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
-const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'application/pdf']
-
 const CopyIcon = () => (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
@@ -131,9 +129,10 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const placed = new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
     const maskedEmail = maskEmail(order.customerEmail)
     const fmtEstDay = (d: Date) => d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })
+    const today = new Date()
     const estDelivery = (isCod || (isBT && !isPaid))
         ? '3–5 working days (after verification)'
-        : `${fmtEstDay(addBusinessDays(new Date(), 3))} – ${fmtEstDay(addBusinessDays(new Date(), 5))}`
+        : `${fmtEstDay(addBusinessDays(today, 3))} – ${fmtEstDay(addBusinessDays(today, 5))}`
     const ccySymbol = currency === 'MYR' ? 'RM' : currency === 'SGD' ? 'S$' : '$'
 
     const heroCheckClass = isPaid ? '' : isSubmitted ? 'info' : isBT ? 'warning' : ''
@@ -174,7 +173,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const shipsText = isCod ? 'After phone verification' : isBT && !isPaid ? 'Within 24 h after verification' : 'Within 24 h'
 
     const validateFile = (f: File): boolean => {
-        if (!ACCEPTED_MIME.includes(f.type)) {
+        if (!PROOF_ACCEPTED_TYPES.includes(f.type)) {
             setUploadError('Invalid file type. Please upload a JPEG, PNG, or PDF.')
             return false
         }
