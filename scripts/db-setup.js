@@ -3980,6 +3980,54 @@ const MIGRATIONS = [
   { name: 'tenants.payments_bank_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_bank_name varchar;` },
   { name: 'tenants.payments_account_number', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_number varchar;` },
   { name: 'tenants.payments_account_holder_name', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_account_holder_name varchar;` },
+  // ── F25: Shop Customers collection ──
+  { name: 'customers.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS customers (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      email varchar NOT NULL,
+      name varchar NOT NULL,
+      phone varchar,
+      rank varchar,
+      notes text,
+      first_order_at timestamptz,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );` },
+  { name: 'customers.tenant_email_lower_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS customers_tenant_email_lower_uniq
+          ON customers (tenant_id, LOWER(TRIM(email)));` },
+  { name: 'customers.tenant_index',
+    sql: `CREATE INDEX IF NOT EXISTS customers_tenant_idx ON customers (tenant_id);` },
+  { name: 'customers_addresses.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS customers_addresses (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar,
+      line1 varchar NOT NULL,
+      line2 varchar,
+      city varchar,
+      state varchar,
+      postcode varchar,
+      country varchar DEFAULT 'Malaysia',
+      is_default boolean DEFAULT false
+    );` },
+  { name: 'customers_addresses.parent_index',
+    sql: `CREATE INDEX IF NOT EXISTS customers_addresses_parent_idx
+          ON customers_addresses (_parent_id);` },
+  { name: 'payload_locked_documents_rels.customers_id',
+    sql: `ALTER TABLE payload_locked_documents_rels
+          ADD COLUMN IF NOT EXISTS customers_id integer;` },
+  { name: 'payload_preferences_rels.customers_id',
+    sql: `ALTER TABLE payload_preferences_rels
+          ADD COLUMN IF NOT EXISTS customers_id integer;` },
+  // ── F25 phase-03: Orders → Customer FK ──
+  { name: 'orders.customer',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },
+  { name: 'orders.customer_id_index',
+    sql: `CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders (customer_id);` },
 ];
 
 async function runMigrations(pool) {
@@ -4014,6 +4062,7 @@ const COLLECTION_SLUGS = [
   'template_issues',
   'content_packs',
   'template_versions',
+  'customers',
 ];
 
 /**
@@ -4462,6 +4511,10 @@ async function main() {
   -- F10 v2.2 Relationship Bypass: paymentVerifiedBy → Payload uses payment_verified_by_id column;
   -- bare name registered here so check-migrations CI can match the field name.
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_verified_by
+
+  -- F25 phase-03 Relationship Bypass: customer → Payload uses customer_id column;
+  -- bare name registered here so check-migrations CI can match the field name.
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer
 
   -- F19 Payments Group Bypass
   ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments
