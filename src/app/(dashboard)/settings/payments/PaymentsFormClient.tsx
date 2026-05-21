@@ -136,7 +136,7 @@ export function PaymentsFormClient({
             }
         } else if (stripeReturn === 'complete') {
             setHasAccount(true); // ensure Verify button is shown
-            if (isVerified) {
+            if (isChargesEnabled) {
                 toast.success(pt.stripeReturnSuccess);
             } else {
                 toast.info(pt.stripeReturnKycPending);
@@ -634,7 +634,7 @@ export function PaymentsFormClient({
                         }}
                     >
                         <Save className="w-[13px] h-[13px]" />
-                        {isSavingAll ? 'Saving...' : 'Save changes'}
+                        {isSavingAll ? pt.saving : pt.saveChanges}
                     </button>
                 </div>
             </div>

@@ -14,6 +14,11 @@ vi.mock('payload', () => ({
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
+const mockDeauth = vi.fn()
+vi.mock('@/lib/payment/stripe', () => ({
+    deauthorizeStripeAccount: (...args: unknown[]) => mockDeauth(...args),
+}))
+
 import { disconnectStripe } from '@/app/(dashboard)/settings/payments/actions'
 
 // ─── TC-F13.87: disconnectStripe server action ─────────────────────────
@@ -22,6 +27,7 @@ describe('disconnectStripe [TC-F13.87]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         mockGetTenantId.mockResolvedValue('1')
+        mockDeauth.mockResolvedValue(undefined)
     })
 
     it('clears DB fields on happy path', async () => {
@@ -66,5 +72,17 @@ describe('disconnectStripe [TC-F13.87]', () => {
         const result = await disconnectStripe()
 
         expect(result.success).toBe(false)
+    })
+
+    // Resilience: deauthorize is best-effort — DB cleanup must still run even if Stripe call fails
+    it('clears DB even when deauthorize throws (legacy account / network error)', async () => {
+        mockFindByID.mockResolvedValue({ stripeAccountId: 'acct_xxx' })
+        mockUpdate.mockResolvedValue({})
+        mockDeauth.mockRejectedValueOnce(new Error('no_application_for_account'))
+
+        const result = await disconnectStripe()
+
+        expect(result).toEqual({ success: true })
+        expect(mockUpdate).toHaveBeenCalled()
     })
 })

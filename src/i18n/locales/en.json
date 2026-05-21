@@ -1406,7 +1406,7 @@
         "stripeStep1": "Click \"Connect Stripe Account\"",
         "stripeStep2": "Enter your Stripe credentials",
         "stripeStep3": "Card & FPX unlock instantly",
-        "savesAutomatic": "All changes are saved automatically",
+        "savesAutomatic": "Settings saved",
         "previewCheckout": "Preview checkout",
         "stripeLockedTooltip": "Connect Stripe to enable",
         "stripeConnected": "Stripe account connected",
@@ -1455,7 +1455,9 @@
         "stripeVerifyCta": "Verify Connection",
         "stripeVerifying": "Verifying...",
         "failVerifyStripe": "Verification failed. Please try again.",
-        "stripeVerifyPending": "Your Stripe account is still under review. Please check back soon."
+        "stripeVerifyPending": "Your Stripe account is still under review. Please check back soon.",
+        "saving": "Saving...",
+        "saveChanges": "Save changes"
       },
       "shipping": {
         "pageTitle": "Shipping",

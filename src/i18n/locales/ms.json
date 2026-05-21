@@ -1406,7 +1406,7 @@
         "stripeStep1": "Klik \"Sambung Akaun Stripe\"",
         "stripeStep2": "Masukkan kelayakan Stripe anda",
         "stripeStep3": "Kad & FPX dibuka serta-merta",
-        "savesAutomatic": "Semua perubahan disimpan secara automatik",
+        "savesAutomatic": "Tetapan disimpan",
         "previewCheckout": "Pratonton daftar bayar",
         "stripeLockedTooltip": "Sambungkan Stripe untuk mengaktifkan",
         "stripeConnected": "Akaun Stripe disambungkan",
@@ -1455,7 +1455,9 @@
         "stripeVerifyCta": "Sahkan Sambungan",
         "stripeVerifying": "Mengesahkan...",
         "failVerifyStripe": "Pengesahan gagal. Sila cuba lagi.",
-        "stripeVerifyPending": "Akaun Stripe anda masih dalam semakan. Sila semak semula tidak lama lagi."
+        "stripeVerifyPending": "Akaun Stripe anda masih dalam semakan. Sila semak semula tidak lama lagi.",
+        "saving": "Menyimpan...",
+        "saveChanges": "Simpan perubahan"
       },
       "shipping": {
         "pageTitle": "Penghantaran",
