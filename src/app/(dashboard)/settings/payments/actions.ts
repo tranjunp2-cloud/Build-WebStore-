@@ -66,6 +66,13 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
         }
 
         if (updates.qr_image !== undefined) {
+            if (updates.qr_image !== null) {
+                // Verify the media was uploaded by this tenant (alt field tagged at upload time)
+                const media = await payload.findByID({ collection: 'media', id: updates.qr_image as string });
+                if (!media || (media as any).alt !== `qr-${tenantId}`) {
+                    return { success: false, error: 'Invalid media: not uploaded by this tenant.' };
+                }
+            }
             paymentsData.qr_image = updates.qr_image;
         }
 
@@ -159,7 +166,8 @@ export async function uploadQrMedia(formData: FormData) {
         const media = await payload.create({
             collection: 'media',
             data: {
-                alt: 'QR Code for Bank Transfer',
+                // Embed tenantId in alt to enable ownership verification in updatePaymentSettings
+                alt: `qr-${tenantId}`,
             },
             file: {
                 data: buffer,

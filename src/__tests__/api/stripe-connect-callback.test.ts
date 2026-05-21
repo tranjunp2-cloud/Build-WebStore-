@@ -15,6 +15,8 @@ vi.mock('payload', () => ({
 vi.mock('@payload-config', () => ({ default: {} }))
 
 vi.mock('@/lib/payment/stripe', () => ({
+    // Returns the raw state string as tenantId — tests pass plain 'tenant_1' (not HMAC-signed)
+    verifyOAuthState: vi.fn((state: string) => state || null),
     exchangeOAuthCode: vi.fn().mockResolvedValue({ stripeUserId: 'acct_test_123' }),
     getConnectedAccountStatus: vi.fn().mockResolvedValue({
         accountId: 'acct_test_123',

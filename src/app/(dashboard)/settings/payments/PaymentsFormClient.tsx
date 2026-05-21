@@ -119,9 +119,21 @@ export function PaymentsFormClient({
 
         if (stripeReturn === 'verified') {
             setHasAccount(true);
-            setIsVerified(true);
-            setIsChargesEnabled(true);
-            toast.success(pt.stripeReturnSuccess);
+            // Confirm with server before unlocking card/fpx toggles — URL param is not trusted
+            if (tenantId) {
+                fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.data.onboardingComplete) {
+                            setIsVerified(true);
+                            setIsChargesEnabled(true);
+                            toast.success(pt.stripeReturnSuccess);
+                        } else {
+                            toast.info(pt.stripeReturnKycPending);
+                        }
+                    })
+                    .catch(() => toast.warning(pt.stripeReturnRefresh));
+            }
         } else if (stripeReturn === 'complete') {
             setHasAccount(true); // ensure Verify button is shown
             if (isVerified) {
@@ -262,6 +274,13 @@ export function PaymentsFormClient({
 
     const handleSaveAll = async () => {
         if (!isDirty || isSavingAll) return;
+        // Client-side guard: card/fpx cannot be enabled without completed Stripe onboarding
+        if ((cardEnabled || fpxEnabled) && !isChargesEnabled) {
+            setCardEnabled(false);
+            setFpxEnabled(false);
+            toast.error(pt.failVerifyStripe);
+            return;
+        }
         setIsSavingAll(true);
         try {
             const res = await updatePaymentSettings({

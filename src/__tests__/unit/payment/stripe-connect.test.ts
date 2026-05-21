@@ -35,6 +35,7 @@ vi.mock('stripe', () => {
 import {
     getStripeClient,
     getStripeOAuthUrl,
+    verifyOAuthState,
     exchangeOAuthCode,
     getConnectedAccountStatus,
     createStripeCheckoutSession,
@@ -72,15 +73,18 @@ describe('getStripeOAuthUrl [TC-F13.122, TC-F13.123]', () => {
 
     it('[TC-F13.122] generates OAuth authorize URL with required params', () => {
         vi.stubEnv('STRIPE_CLIENT_ID', 'ca_test_clientid')
+        vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123')
 
         const url = getStripeOAuthUrl('tenant-1')
         const parsed = new URL(url)
 
         expect(parsed.origin + parsed.pathname).toBe('https://connect.stripe.com/oauth/authorize')
         expect(parsed.searchParams.get('client_id')).toBe('ca_test_clientid')
-        expect(parsed.searchParams.get('state')).toBe('tenant-1')
+        // State is HMAC-signed — verify it decodes back to the tenantId
+        expect(verifyOAuthState(parsed.searchParams.get('state')!)).toBe('tenant-1')
         expect(parsed.searchParams.get('scope')).toBe('read_write')
         expect(parsed.searchParams.get('response_type')).toBe('code')
+        expect(parsed.searchParams.get('prompt')).toBe('login')
     })
 
     it('[TC-F13.123] throws when STRIPE_CLIENT_ID is not set', () => {
