@@ -226,16 +226,24 @@ function ResetPasswordForm() {
                     >
                         {t.auth.reset.newPassword}
                     </label>
-                    <div className="relative" style={{ marginTop: 4 }}>
-                        <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2" style={{ color: 'var(--auth-text-muted)' }} />
+                    <div
+                        className={`relative rounded-xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.password ? 'ring-2 ring-red-500/50' : ''}`}
+                        style={{
+                            marginTop: 4,
+                            background: 'var(--auth-input-bg)',
+                            border: '1px solid var(--auth-input-border)',
+                            boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
+                        }}
+                    >
+                        <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
                         <input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.reset.newPasswordPlaceholder}
-                            className={inputClasses(!!errors.password)}
+                            className="w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[#94A3B8] outline-none"
                             style={{
-                                background: 'var(--auth-input-bg)',
-                                border: '1px solid var(--auth-input-border)',
+                                background: 'transparent',
+                                border: 'none',
                                 fontFamily: 'Inter, sans-serif',
                                 lineHeight: '1.21em',
                                 color: 'var(--auth-text)',
@@ -247,7 +255,7 @@ function ResetPasswordForm() {
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent transition-colors"
-                            style={{ color: 'var(--auth-text-subtle)' }}
+                            style={{ color: 'var(--auth-text)' }}
                             tabIndex={-1}
                         >
                             {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -288,16 +296,24 @@ function ResetPasswordForm() {
                     >
                         {t.auth.reset.confirmPassword}
                     </label>
-                    <div className="relative" style={{ marginTop: 4 }}>
-                        <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2" style={{ color: 'var(--auth-text-muted)' }} />
+                    <div
+                        className={`relative rounded-xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.confirmPassword ? 'ring-2 ring-red-500/50' : ''}`}
+                        style={{
+                            marginTop: 4,
+                            background: 'var(--auth-input-bg)',
+                            border: '1px solid var(--auth-input-border)',
+                            boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
+                        }}
+                    >
+                        <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
                         <input
                             id="confirmPassword"
                             type={showConfirm ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className={inputClasses(!!errors.confirmPassword)}
+                            className="w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[#94A3B8] outline-none"
                             style={{
-                                background: 'var(--auth-input-bg)',
-                                border: '1px solid var(--auth-input-border)',
+                                background: 'transparent',
+                                border: 'none',
                                 fontFamily: 'Inter, sans-serif',
                                 lineHeight: '1.21em',
                                 color: 'var(--auth-text)',
@@ -308,7 +324,7 @@ function ResetPasswordForm() {
                             type="button"
                             onClick={() => setShowConfirm(!showConfirm)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent transition-colors"
-                            style={{ color: 'var(--auth-text-subtle)' }}
+                            style={{ color: 'var(--auth-text)' }}
                             tabIndex={-1}
                         >
                             {showConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}

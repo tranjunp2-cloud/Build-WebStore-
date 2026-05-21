@@ -95,7 +95,7 @@ html:not(.dark) {
   --auth-card-border: rgba(59, 130, 246, 0.18);
   --auth-card-shadow: 0px 8px 32px rgba(0,0,0,0.08), inset 0px 1px 0px rgba(255,255,255,0.8);
   --auth-text: #0F172A;
-  --auth-text-muted: #64748B;
+  --auth-text-muted: #475569;
   --auth-text-subtle: rgba(15, 23, 42, 0.5);
   --auth-input-bg: rgba(255, 255, 255, 0.85);
   --auth-input-border: rgba(59, 130, 246, 0.2);
@@ -150,12 +150,8 @@ html:not(.dark) {
 .dash-shell .text-slate-500,
 .dash-shell .text-\[\#9CA3AF\],
 .dash-shell .text-gray-500 { color: var(--dash-text-muted); }
-/* text-white: remap to theme text, but preserve white on gradient/colored backgrounds */
+/* text-white: remap to theme text; preserve white only on inline-style gradients and solid colored bg */
 .dash-shell .text-white { color: var(--dash-text); }
-.dash-shell [class*="from-"].text-white,
-.dash-shell [class*="from-"] .text-white,
-.dash-shell [class*="bg-gradient"].text-white,
-.dash-shell [class*="bg-gradient"] .text-white,
 .dash-shell [style*="linear-gradient"].text-white,
 .dash-shell [style*="linear-gradient"] .text-white,
 .dash-shell .bg-blue-600 .text-white,
@@ -179,6 +175,7 @@ html:not(.dark) .dash-shell .hover\:bg-white\/10:hover { background-color: rgba(
 /* text-gray-200/300 (dark-mode text, nearly invisible on white) */
 .dash-shell .text-gray-200,
 .dash-shell .text-gray-300 { color: var(--dash-text); }
+.dash-shell .text-gray-400 { color: var(--dash-text-muted); }
 /* bg-slate-800/60 opacity variant — include md: responsive variant (OrdersTable container) */
 .dash-shell .bg-slate-800\/60,
 .dash-shell .md\:bg-slate-800\/60 { background-color: var(--dash-secondary-bg); }

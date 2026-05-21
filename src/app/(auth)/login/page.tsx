@@ -59,7 +59,8 @@ function getRedirectByRole(
 }
 
 /* ─── Figma Design Token Constants ─── */
-const INPUT_STYLE = {
+// Background on wrapper, not input — prevents native input rendering layer from covering icons
+const INPUT_WRAPPER_STYLE = {
     background: 'var(--auth-input-bg)',
     border: '1px solid var(--auth-input-border)',
     boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
@@ -337,20 +338,19 @@ function LoginFormContent() {
                     >
                         {t.auth.email}
                     </label>
-                    <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--auth-text-muted)' }} />
+                    <div
+                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.email ? 'ring-2 ring-red-500/50' : ''}`}
+                        style={INPUT_WRAPPER_STYLE}
+                    >
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
                         <input
                             id="email"
                             type="email"
                             placeholder={t.auth.emailPlaceholder}
-                            className={`
-                                w-full h-11 rounded-2xl pl-10 pr-4 text-sm
-                                placeholder:text-[#94A3B8] outline-none
-                                focus:ring-2 focus:ring-blue-500/30 transition-all
-                                ${errors.email ? 'ring-2 ring-red-500/50' : ''}
-                            `}
+                            className="w-full h-11 rounded-2xl pl-10 pr-4 text-sm placeholder:text-[#94A3B8] outline-none"
                             style={{
-                                ...INPUT_STYLE,
+                                background: 'transparent',
+                                border: 'none',
                                 fontFamily: 'Inter, sans-serif',
                                 lineHeight: '1.21',
                                 color: 'var(--auth-text)',
@@ -372,20 +372,19 @@ function LoginFormContent() {
                     >
                         {t.auth.password}
                     </label>
-                    <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--auth-text-muted)' }} />
+                    <div
+                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.password ? 'ring-2 ring-red-500/50' : ''}`}
+                        style={INPUT_WRAPPER_STYLE}
+                    >
+                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
                         <input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className={`
-                                w-full h-11 rounded-2xl pl-10 pr-10 text-sm
-                                placeholder:text-[#94A3B8] outline-none
-                                focus:ring-2 focus:ring-blue-500/30 transition-all
-                                ${errors.password ? 'ring-2 ring-red-500/50' : ''}
-                            `}
+                            className="w-full h-11 rounded-2xl pl-10 pr-10 text-sm placeholder:text-[#94A3B8] outline-none"
                             style={{
-                                ...INPUT_STYLE,
+                                background: 'transparent',
+                                border: 'none',
                                 fontFamily: 'Inter, sans-serif',
                                 lineHeight: '1.21',
                                 color: 'var(--auth-text)',
@@ -396,7 +395,7 @@ function LoginFormContent() {
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors bg-transparent border-none p-0 cursor-pointer"
-                            style={{ color: 'var(--auth-text-muted)' }}
+                            style={{ color: 'var(--auth-text)' }}
                             tabIndex={-1}
                         >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

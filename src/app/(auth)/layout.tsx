@@ -5,7 +5,6 @@ import { AppShell } from '@/components/AppShell'
 import { AuthToaster } from './AuthToaster'
 import { I18nProvider, Locale } from '@/i18n'
 import { ThemeProvider } from '@/providers/theme-provider'
-import { ThemeToggle } from '@/components/dashboard/theme-toggle'
 
 export default async function AuthLayout({
     children,
@@ -27,11 +26,6 @@ export default async function AuthLayout({
                         className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8"
                         style={{ background: 'var(--auth-bg)' }}
                     >
-                        {/* Theme toggle — top-right corner */}
-                        <div className="absolute top-4 right-4 z-20">
-                            <ThemeToggle />
-                        </div>
-
                         {/* Animated gradient orbs */}
                         <div className="pointer-events-none fixed inset-0 overflow-hidden">
                             <div className="absolute -left-20 -top-20 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-blue-600/20 to-cyan-500/10 blur-[120px]" />

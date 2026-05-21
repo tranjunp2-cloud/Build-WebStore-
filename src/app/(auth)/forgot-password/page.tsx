@@ -271,21 +271,23 @@ export default function ForgotPasswordPage() {
                     >
                         {t.auth.forgot.emailLabel}
                     </label>
-                    <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--auth-text-muted)' }} />
+                    <div
+                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.email ? 'ring-2 ring-red-500/50' : ''}`}
+                        style={{
+                            background: 'var(--auth-input-bg)',
+                            border: '1px solid var(--auth-input-border)',
+                            boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
+                        }}
+                    >
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
                         <input
                             id="email"
                             type="email"
                             placeholder={t.auth.forgot.emailPlaceholder}
-                            className={`
-                                w-full h-11 rounded-2xl pl-10 pr-4 text-sm
-                                placeholder:text-[#94A3B8] outline-none
-                                focus:ring-2 focus:ring-blue-500/30 transition-all
-                                ${errors.email ? 'ring-2 ring-red-500/50' : ''}
-                            `}
+                            className="w-full h-11 rounded-2xl pl-10 pr-4 text-sm placeholder:text-[#94A3B8] outline-none"
                             style={{
-                                background: 'var(--auth-input-bg)',
-                                border: '1px solid var(--auth-input-border)',
+                                background: 'transparent',
+                                border: 'none',
                                 fontFamily: 'Inter, sans-serif',
                                 lineHeight: '1.21',
                                 color: 'var(--auth-text)',
