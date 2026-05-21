@@ -7,6 +7,7 @@ import { ProductImageWithFallback } from './ProductImageWithFallback'
 import { ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useI18n } from '@/i18n'
+import { getDisplayPrice } from '@/lib/products/display-price'
 
 // We extend the Product type locally as page.tsx might not have all fields typed
 type Category = {
@@ -46,6 +47,7 @@ export type DetailedProduct = {
     images?: Array<{ image: ProductImage | string | null; alt?: string }>
     variants?: Variant[]
     hasVariants?: boolean
+    attributes?: Array<{ key: string; value: string }>
 }
 
 interface ProductQuickViewModalProps {
@@ -108,8 +110,9 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
     // Process Categories (Assuming populated)
     const categoryNames = product.category?.map(c => typeof c === 'object' ? c.name : 'Unknown').join(' / ') || ''
 
-    // Pricing
-    const hasDiscount = product.compareAtPrice && product.compareAtPrice > product.price
+    // Pricing — use getDisplayPrice so variant products show "From RM X.XX" (min variant price)
+    const { value: displayPriceValue, isVariant: priceIsVariant } = getDisplayPrice(product)
+    const hasDiscount = !priceIsVariant && product.compareAtPrice && product.compareAtPrice > product.price
     const discountPercent = hasDiscount ? Math.round(((product.compareAtPrice! - product.price) / product.compareAtPrice!) * 100) : 0
 
     // Stock Level
@@ -229,7 +232,10 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                                 <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.pricing || 'Pricing'}</span>
                                 <div className="flex items-end gap-[16px]">
                                     <span className="text-[36px] font-[900] text-[#E1E2EB] leading-[1.11]">
-                                        {formatPrice(product.price, product.currency)}
+                                        {priceIsVariant && (
+                                            <span className="text-[18px] font-normal text-[#C1C6D7]/60 mr-1">{t.dashboard?.products?.list?.fromPrefix || 'From'}</span>
+                                        )}
+                                        {formatPrice(displayPriceValue, product.currency)}
                                     </span>
                                     {hasDiscount && (
                                         <>
@@ -256,8 +262,15 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                                         {product.variants.map((v, idx) => (
                                             <div key={idx} className="flex items-center justify-between px-[16px] py-[12px] rounded-[8px] bg-[#1D2026] border border-white/5">
                                                 <div className="flex items-center gap-[8px]">
-                                                    <div className="w-[8px] h-[8px] rounded-full bg-[#44DDC1]" />
-                                                    <span className="text-[14px] font-medium text-[#E1E2EB]">{v.name}</span>
+                                                    <div className="w-[8px] h-[8px] rounded-full bg-[#44DDC1] shrink-0" />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[14px] font-medium text-[#E1E2EB]">{v.name}</span>
+                                                        {v.sku && (
+                                                            <span className="text-[11px] text-[#C1C6D7]/60">
+                                                                {t.dashboard?.products?.quickView?.skuLabel || 'SKU'}: {v.sku}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center justify-center px-[8px] py-[4px] bg-white/5 rounded-[4px]">
                                                     <span className="text-[12px] font-medium text-[#C1C6D7]">
@@ -273,12 +286,31 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
 
                         {/* Description (Node 30928:4051) */}
                         {descText && (
-                            <div className="flex flex-col pb-[48px]">
-                                <div className="flex flex-col gap-[11px]">
+                            <div className="flex flex-col pb-[40px]">
+                                <div className="flex flex-col gap-[11px] pb-[32px] border-b border-[#414754]/10">
                                     <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.description || 'Description'}</span>
                                     <p className="font-sans text-[14px] leading-[1.625] text-[#C1C6D7] whitespace-pre-wrap">
                                         {descText}
                                     </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Attributes */}
+                        {product.attributes && product.attributes.length > 0 && (
+                            <div className="flex flex-col pb-[48px]">
+                                <div className="flex flex-col gap-[16px]">
+                                    <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">
+                                        {t.dashboard?.products?.quickView?.attributes || 'Attributes'}
+                                    </span>
+                                    <div className="flex flex-col gap-[8px]">
+                                        {product.attributes.map((attr, idx) => (
+                                            <div key={idx} className="flex items-center justify-between px-[16px] py-[10px] rounded-[8px] bg-[#1D2026] border border-white/5">
+                                                <span className="text-[12px] font-bold text-[#C1C6D7] uppercase tracking-[0.05em]">{attr.key}</span>
+                                                <span className="text-[13px] font-medium text-[#E1E2EB]">{attr.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}

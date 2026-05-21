@@ -35,6 +35,7 @@ export function VariantsInventorySection() {
     const hasVariants = useWatch({ control, name: 'hasVariants' })
     const watchedTiers = useWatch({ control, name: 'tiers' }) || []
     const variantsLive = useWatch({ control, name: 'variants' })
+    const currency = useWatch({ control, name: 'currency' }) ?? 'MYR'
 
     const derivedMinPrice = useMemo(
         () => variantsLive?.length
@@ -466,9 +467,9 @@ export function VariantsInventorySection() {
                                 {t.dashboard.products.form.sections?.derivedPricesHint || 'Derived from variants'}
                                 {': '}
                                 {t.dashboard.products.form.sections?.derivedMinLabel || 'min'}{' '}
-                                {formatPrice(derivedMinPrice, 'MYR')}
+                                {formatPrice(derivedMinPrice, currency)}
                                 {derivedMaxCompareAt !== null && (
-                                    <>{' '}{t.dashboard.products.form.sections?.derivedMaxCompareLabel || '/ max compare'}{' '}{formatPrice(derivedMaxCompareAt, 'MYR')}</>
+                                    <>{' '}{t.dashboard.products.form.sections?.derivedMaxCompareLabel || '/ max compare'}{' '}{formatPrice(derivedMaxCompareAt, currency)}</>
                                 )}
                             </div>
                         )}

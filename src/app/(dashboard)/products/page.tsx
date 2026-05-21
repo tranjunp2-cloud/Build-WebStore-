@@ -36,6 +36,7 @@ type Category = {
 type Variant = {
     id?: string
     name: string
+    sku?: string
     price: number
     stock: number
     status?: string
@@ -58,6 +59,7 @@ type Product = {
     createdAt: string
     hasVariants?: boolean
     variants?: Variant[]
+    attributes?: Array<{ key: string; value: string }>
     descText?: string
 }
 

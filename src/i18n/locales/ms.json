@@ -801,6 +801,7 @@
         "currentStock": "Stok Semasa:",
         "productDetails": "Butiran Produk",
         "skuIdentification": "Pengenalan SKU",
+        "skuLabel": "SKU",
         "skuFallback": "Tiada",
         "taxConfiguration": "Konfigurasi Cukai",
         "taxesSst": "Cukai: SST (6%) Incl.",
@@ -810,6 +811,7 @@
         "off": "DISKAUN",
         "inventoryVariants": "Varian Inventori",
         "description": "Penerangan",
+        "attributes": "Atribut",
         "deleteConfirm": "Adakah anda pasti?",
         "deleteProduct": "PADAM PRODUK",
         "editProduct": "SUNTING PRODUK"

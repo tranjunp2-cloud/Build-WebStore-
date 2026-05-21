@@ -90,6 +90,7 @@ export default function ProductEditPage() {
                         compareAtPrice: data.compareAtPrice != null ? parseFloat(data.compareAtPrice) : undefined,
                         baseInventory: data.inventory != null ? parseInt(data.inventory) : undefined,
                         baseSku: data.sku || '',
+                        currency: data.currency || 'MYR',
                         
                         tiers: (data.variantConfigs || []).map((t: any, idx: number) => ({
                             id: t.id || `tier-${idx}`,
@@ -168,7 +169,7 @@ export default function ProductEditPage() {
                     .filter((a) => a.key?.trim() && a.value?.trim())
                     .map((a) => ({ key: a.key.trim(), value: a.value.trim() })),
                 ...(isNew ? { status: 'draft' } : {}),
-                currency: 'MYR'
+                currency: data.currency || 'MYR'
             }
 
             await saveProductAction(body, isNew ? undefined : productId)

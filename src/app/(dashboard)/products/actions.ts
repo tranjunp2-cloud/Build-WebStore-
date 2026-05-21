@@ -6,8 +6,12 @@ import { getCurrentUser, extractTenantId } from '@/lib/auth'
 
 // Upper bound for SKU conflict query results. If totalDocs exceeds this, the save is aborted
 // with a user-facing error. In practice a single SKU or small batch rarely matches > 100 products.
-// NOTE: This check is best-effort UX; it does not guarantee uniqueness under concurrent saves.
-// A DB-level UNIQUE constraint on (tenant_id, sku) is the authoritative integrity guarantee.
+// NOTE: This check is best-effort UX — two limitations apply:
+//   1. NOT concurrent-safe: two parallel saves with the same SKU can both pass this check.
+//   2. Case-sensitive match only: the `in:` query generates SQL IN (...) which is case-sensitive
+//      on Postgres. "ABC-001" and "abc-001" are treated as distinct SKUs here. For true
+//      case-insensitive enforcement, add a DB-level UNIQUE index on lower(sku) per tenant.
+// A DB-level constraint (ideally case-insensitive) is the authoritative integrity guarantee.
 const SKU_CONFLICT_QUERY_LIMIT = 100
 
 async function findConflictingSkus(
@@ -40,6 +44,9 @@ async function findConflictingSkus(
             'Cannot verify SKU uniqueness: your account has too many matching products. Please contact support.'
         )
     }
+    // Case-fold both sides so the application-layer check is case-insensitive.
+    // The SQL IN query above is case-sensitive, so this only catches exact-case matches
+    // returned by the DB — it does NOT detect cross-case conflicts (e.g. "ABC" vs "abc").
     const skusLower = new Set(skus.map(s => s.toLowerCase()))
     const matched = new Set<string>()
     for (const doc of result.docs) {

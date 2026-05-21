@@ -801,6 +801,7 @@
         "currentStock": "Current Stock:",
         "productDetails": "Product Details",
         "skuIdentification": "SKU Identification",
+        "skuLabel": "SKU",
         "skuFallback": "N/A",
         "taxConfiguration": "Tax Configuration",
         "taxesSst": "Taxes: SST (6%) Incl.",
@@ -810,6 +811,7 @@
         "off": "OFF",
         "inventoryVariants": "Inventory Variants",
         "description": "Description",
+        "attributes": "Attributes",
         "deleteConfirm": "Are you certain?",
         "deleteProduct": "DELETE PRODUCT",
         "editProduct": "EDIT PRODUCT"
