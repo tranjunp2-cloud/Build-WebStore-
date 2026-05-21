@@ -6,13 +6,11 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { orderStatusUpdateSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
 import { orderStatusEmail } from '@/lib/email/templates/order-status'
+import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
+import { orderShippedEmail } from '@/lib/email/templates/order-shipped'
 
-// Map order workflow statuses to email template statuses
-const STATUS_EMAIL_MAP: Record<string, 'processing' | 'shipped' | 'cancelled'> = {
-    confirmed: 'processing',
-    shipped: 'shipped',
-    cancelled: 'cancelled',
-}
+// Statuses that trigger a buyer notification email
+const BUYER_EMAIL_STATUSES = new Set(['confirmed', 'shipped', 'completed', 'cancelled', 'refunded'])
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -75,6 +73,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const updateData: any = { status: newStatus }
         if (trackingNumber) updateData.trackingNumber = trackingNumber
         if (notes) updateData.notes = notes
+        if (newStatus === 'cancelled' && notes) updateData.cancelReason = notes
 
 
 
@@ -86,24 +85,92 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             overrideAccess: false,
         })
 
-        // Fire-and-forget status update email — isolated so a crash here never fails the update response
-        try {
-            const emailStatus = STATUS_EMAIL_MAP[newStatus]
-            if (emailStatus && order.customerEmail) {
-                const emailPayload = orderStatusEmail({
-                    customerName: order.customerName as string,
-                    orderNumber: order.orderNumber as string,
-                    status: emailStatus,
-                    trackingNumber: trackingNumber ?? (order.trackingNumber as string | undefined),
-                })
-                payload.sendEmail({
-                    to: order.customerEmail as string,
-                    subject: emailPayload.subject,
-                    html: emailPayload.html,
-                }).catch((err) => payload.logger.error({ err, orderId: id, status: newStatus }, '[order-update] sendEmail failed'))
+        // Send buyer notification for relevant status changes — isolated so email failure never fails the update response
+        if (BUYER_EMAIL_STATUSES.has(newStatus) && (order as any).customerEmail) {
+            try {
+                const customerEmail = (order as any).customerEmail
+                const orderNumber = (order as any).orderNumber ?? id
+
+                if (newStatus === 'cancelled' || newStatus === 'shipped') {
+                    const tenantId = typeof (order as any).tenant === 'object'
+                        ? (order as any).tenant.id
+                        : (order as any).tenant
+                    const tenant = tenantId
+                        ? await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
+                        : null
+                    const shopName = (tenant as any)?.name ?? ''
+                    const shopSlug = (tenant as any)?.slug ?? String(tenantId ?? '')
+                    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+                    const siteLocale = typeof (order as any).site === 'object'
+                        ? ((order as any).site?.locale ?? 'ms')
+                        : 'ms'
+
+                    const orderItems = ((order as any).items ?? []).map((item: any) => ({
+                        name: item.productName,
+                        variant: item.variant || null,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        lineTotal: item.quantity * item.unitPrice,
+                    }))
+
+                    if (newStatus === 'cancelled') {
+                        const cancelEmail = orderCancelledEmail({
+                            shopName,
+                            orderNumber,
+                            customerName: (order as any).customerName ?? '',
+                            customerEmail,
+                            customerPhone: (order as any).customerPhone ?? null,
+                            customerAddress: (order as any).shippingAddress ?? null,
+                            items: orderItems,
+                            subtotal: (order as any).subtotal ?? 0,
+                            shippingFee: (order as any).shippingFee ?? 0,
+                            total: (order as any).total ?? 0,
+                            paymentMethod: (order as any).paymentMethod ?? 'cod',
+                            orderDate: (order as any).createdAt,
+                            cancellationDate: new Date().toISOString(),
+                            cancellationNote: notes ?? (order as any).cancelReason ?? null,
+                            shopUrl: `${baseUrl}/sites/${shopSlug}`,
+                            currency: (order as any).currency ?? 'MYR',
+                            locale: siteLocale,
+                        })
+                        payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
+                            .catch((err: unknown) => console.error('[Email cancel notify]', err))
+                    } else {
+                        const shippedEmail = orderShippedEmail({
+                            shopName,
+                            orderNumber,
+                            customerName: (order as any).customerName ?? '',
+                            customerEmail,
+                            customerPhone: (order as any).customerPhone ?? null,
+                            customerAddress: (order as any).shippingAddress ?? null,
+                            items: orderItems,
+                            subtotal: (order as any).subtotal ?? 0,
+                            shippingFee: (order as any).shippingFee ?? 0,
+                            total: (order as any).total ?? 0,
+                            paymentMethod: (order as any).paymentMethod ?? 'cod',
+                            shippingProvider: (order as any).shippingProvider ?? null,
+                            orderDate: (order as any).createdAt,
+                            shippedDate: new Date().toISOString(),
+                            orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
+                            currency: (order as any).currency ?? 'MYR',
+                            locale: siteLocale,
+                        })
+                        payload.sendEmail({ to: customerEmail, subject: shippedEmail.subject, html: shippedEmail.html })
+                            .catch((err: unknown) => console.error('[Email shipped notify]', err))
+                    }
+                } else {
+                    const statusEmailData = orderStatusEmail({
+                        customerName: (order as any).customerName ?? '',
+                        orderNumber,
+                        status: newStatus as any,
+                        trackingNumber: trackingNumber ?? (order as any).trackingNumber ?? undefined,
+                    })
+                    payload.sendEmail({ to: customerEmail, subject: statusEmailData.subject, html: statusEmailData.html })
+                        .catch((err: unknown) => console.error('[Email status notify]', err))
+                }
+            } catch (emailErr) {
+                payload.logger.error({ emailErr, orderId: id, status: newStatus }, '[order-update] email construction failed')
             }
-        } catch (emailErr) {
-            payload.logger.error({ emailErr, orderId: id, status: newStatus }, '[order-update] email construction failed')
         }
 
         return NextResponse.json({

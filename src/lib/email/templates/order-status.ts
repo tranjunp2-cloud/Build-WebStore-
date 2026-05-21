@@ -8,9 +8,22 @@ import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 
 type EmailLocale = 'en' | 'ms'
-type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled'
+type OrderStatus = 'confirmed' | 'ready_to_ship' | 'processing' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
 
 const locales = { en: en.email, ms: ms.email } as const
+
+function escapeHtml(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+}
+
+function safeHref(url: string): string {
+    return /^https?:\/\//i.test(url) ? escapeHtml(url) : '#'
+}
 
 interface OrderStatusEmailData {
     customerName: string
@@ -23,25 +36,23 @@ interface OrderStatusEmailData {
 }
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
+    confirmed: '#14C2BB',
+    ready_to_ship: '#f59e0b',
     processing: '#f59e0b',
     shipped: '#3b82f6',
-    delivered: '#10b981',
+    completed: '#10b981',
     cancelled: '#ef4444',
+    refunded: '#8b5cf6',
 }
 
 const STATUS_EMOJIS: Record<OrderStatus, string> = {
+    confirmed: '✅',
+    ready_to_ship: '📦',
     processing: '⏳',
     shipped: '🚚',
-    delivered: '✅',
+    completed: '🎉',
     cancelled: '❌',
-}
-
-function escHtml(s: string): string {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-function safeHref(url: string): string {
-    return /^https?:\/\//i.test(url) ? escHtml(url) : '#'
+    refunded: '↩️',
 }
 
 export function orderStatusEmail(data: OrderStatusEmailData): { subject: string; html: string } {
@@ -50,14 +61,15 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
     const statusT = t[status]
     const emoji = STATUS_EMOJIS[status]
     const color = STATUS_COLORS[status]
+    const esc = escapeHtml
 
     const trackingHtml = (status === 'shipped' && trackingNumber) ? `
         <div style="background: #eff6ff; border-radius: 8px; padding: 16px; margin: 24px 0;">
             <p style="font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 8px; font-weight: 600;">${t.tracking}</p>
             <p style="font-size: 16px; font-weight: 700; margin: 0; letter-spacing: 0.5px;">
                 ${trackingUrl
-            ? `<a href="${safeHref(trackingUrl)}" style="color: #3b82f6; text-decoration: none;">${escHtml(trackingNumber)}</a>`
-            : escHtml(trackingNumber)
+            ? `<a href="${safeHref(trackingUrl)}" style="color: #3b82f6; text-decoration: none;">${esc(trackingNumber)}</a>`
+            : esc(trackingNumber)
         }
             </p>
         </div>
@@ -80,7 +92,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 8px;">${t.greeting} <strong>${escHtml(customerName)}</strong>,</p>
+                <p style="font-size: 16px; margin: 0 0 8px;">${t.greeting} <strong>${esc(customerName)}</strong>,</p>
                 <p style="font-size: 14px; color: #555; line-height: 1.7; margin: 0 0 24px;">
                     ${statusT.description}
                 </p>
@@ -88,7 +100,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
                 <!-- Order Number -->
                 <div style="background: #f8fafc; border-radius: 8px; padding: 16px; text-align: center;">
                     <p style="font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 4px;">${t.orderNumber}</p>
-                    <p style="font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 1px;">${escHtml(orderNumber)}</p>
+                    <p style="font-size: 20px; font-weight: 700; margin: 0; letter-spacing: 1px;">${esc(orderNumber)}</p>
                 </div>
 
                 ${trackingHtml}
@@ -96,7 +108,7 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
 
             <!-- Footer -->
             <div style="background: #fafafa; padding: 24px 32px; text-align: center; border-top: 1px solid #eee;">
-                <p style="font-size: 12px; color: #999; margin: 0;">Powered by ${storeName}</p>
+                <p style="font-size: 12px; color: #999; margin: 0;">Powered by ${esc(storeName)}</p>
             </div>
         </div>
     </div>

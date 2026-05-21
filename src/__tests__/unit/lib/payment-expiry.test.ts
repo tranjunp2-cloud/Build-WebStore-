@@ -6,23 +6,42 @@
  * TC-F10-06-12: update error is caught per-order; others still process
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { paymentExpiryJob } from '@/lib/jobs/payment-expiry'
+import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
 
 vi.mock('@/lib/email/templates/order-expired', () => ({
     orderExpiredEmail: vi.fn(() => ({ subject: 'Order cancelled', html: '<p>test</p>' })),
 }))
 
+const orderExpiredEmailMock = vi.mocked(orderExpiredEmail)
+
 const makeOrder = (id: number, overrides: Record<string, unknown> = {}) => ({
     id,
     orderNumber: `ECH-00${id}`,
     customerName: `Customer ${id}`,
-    total: 100 * id,
+    customerEmail: `customer${id}@test.com`,
+    customerPhone: `0123456${id}`,
+    shippingAddress: {
+        line1: `${id} Jalan Test`,
+        city: 'Kuala Lumpur',
+        state: 'WP',
+        postcode: '50000',
+        country: 'MY',
+    },
+    items: [
+        { productName: `Product A`, variant: 'Size M', quantity: 2, unitPrice: 50 * id },
+        { productName: `Product B`, variant: null, quantity: 1, unitPrice: 30 * id },
+    ],
+    subtotal: 130 * id,
+    shippingFee: 8,
+    total: 138 * id,
     currency: 'MYR',
     paymentMethod: 'bank_transfer',
     paymentStatus: 'awaiting_payment',
     paymentExpiresAt: new Date(Date.now() - 60_000).toISOString(),
-    site: { slug: 'test-shop' },
+    createdAt: new Date(Date.now() - 26 * 3600_000).toISOString(), // 26h ago
+    site: { tenant: { slug: 'test-shop', name: 'Test Shop' } },
     ...overrides,
 })
 
@@ -55,6 +74,34 @@ describe('paymentExpiryJob — happy path', () => {
             }),
         )
         expect(result).toEqual({ processed: 3, errors: 0, total: 3 })
+    })
+
+    it('passes full order data to orderExpiredEmail', async () => {
+        const order = makeOrder(1)
+        const payload = makePayload([order])
+
+        await paymentExpiryJob(payload as any)
+
+        expect(orderExpiredEmailMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                shopName: 'Test Shop',
+                orderNumber: 'ECH-001',
+                customerName: 'Customer 1',
+                customerEmail: 'customer1@test.com',
+                customerPhone: '01234561',
+                items: [
+                    expect.objectContaining({ name: 'Product A', variant: 'Size M', quantity: 2, unitPrice: 50 }),
+                    expect.objectContaining({ name: 'Product B', variant: null, quantity: 1, unitPrice: 30 }),
+                ],
+                subtotal: 130,
+                shippingFee: 8,
+                total: 138,
+                currency: 'MYR',
+                reorderUrl: expect.stringContaining('/sites/test-shop/products'),
+                elapsedTime: expect.stringMatching(/\d+ jam \d+ minit/),
+            }),
+        )
+        expect(payload.sendEmail).toHaveBeenCalledWith({ to: 'customer1@test.com', subject: 'Order cancelled', html: '<p>test</p>' })
     })
 })
 

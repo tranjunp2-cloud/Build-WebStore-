@@ -110,37 +110,40 @@ export const getProductFormSchema = (t: ProductFormI18n) => {
         metaDescription: z.string().max(160, errorT.seoDescMax || 'SEO description should not exceed 160 characters').optional(),
         urlSlug: z.string().trim().min(1, errorT.urlSlugRequired || 'URL Slug is required').regex(/^[a-z0-9-]+$/, errorT.urlSlugInvalid || 'Slug must be lowercase alphanumeric with hyphens'),
 
+        currency: z.string().optional().default('MYR'),
+
         // Attributes (key/value pairs, max 20)
         attributes: z.array(z.object({
             key: z.string().trim().min(1, errorT.attrKeyRequired || 'Attribute name is required').max(100, errorT.attrKeyLong || 'Attribute name is too long'),
             value: z.string().trim().min(1, errorT.attrValueRequired || 'Attribute value is required').max(500, errorT.attrValueLong || 'Attribute value is too long'),
         })).max(20, errorT.attrMax || 'Maximum 20 attributes allowed').optional(),
     }).superRefine((data, ctx) => {
-        // Price required
-        if (data.basePrice === undefined || data.basePrice === null) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.priceMin || 'Price is required', path: ['basePrice'] });
+        if (!data.hasVariants) {
+            // Non-variant mode: base fields required
+            if (data.basePrice === undefined || data.basePrice === null) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.priceMin || 'Price is required', path: ['basePrice'] });
+            }
+            if (!data.baseSku || data.baseSku.trim() === '') {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.skuRequired || 'SKU Code is required', path: ['baseSku'] });
+            }
+            if (data.baseInventory === undefined || data.baseInventory === null) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.stockMin || 'Inventory must be provided', path: ['baseInventory'] });
+            }
+            if (data.compareAtPrice !== undefined && data.compareAtPrice > 0 && data.basePrice !== undefined) {
+                if (data.compareAtPrice <= data.basePrice) {
+                    ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.comparePriceInvalid || 'Compare at price must be strictly GREATER than base price', path: ['compareAtPrice'] });
+                }
+            }
+        } else {
+            // Variant mode: matrix must be generated
+            if (!data.variants || data.variants.length === 0) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.variantsRequired || 'Please generate the variants matrix before saving', path: ['variants'] });
+            }
+            // baseSku always required (used as prefix for variant SKU codes)
+            if (!data.baseSku || data.baseSku.trim() === '') {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.skuRequired || 'SKU Code is required', path: ['baseSku'] });
+            }
         }
-        
-        // SKU required
-        if (!data.baseSku || data.baseSku.trim() === '') {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.skuRequired || 'SKU Code is required', path: ['baseSku'] });
-        }
-        
-        // Inventory required
-        if (data.baseInventory === undefined || data.baseInventory === null) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: errorT.stockMin || 'Inventory must be provided', path: ['baseInventory'] });
-        }
-
-        if (data.compareAtPrice !== undefined && data.compareAtPrice > 0 && data.basePrice !== undefined) {
-             if (data.compareAtPrice <= data.basePrice) {
-                 ctx.addIssue({
-                     code: z.ZodIssueCode.custom,
-                     message: errorT.comparePriceInvalid || 'Compare at price must be strictly GREATER than base price',
-                     path: ['compareAtPrice']
-                 });
-             }
-        }
-
     });
 };
 

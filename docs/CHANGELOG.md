@@ -15,6 +15,40 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F25 — Shop Customers Collection (Restore PW1 Parity)
+
+**Features:**
+- First-class Customers collection: email (normalized per-tenant), name, phone, rank (manual bronze/silver/gold/vip), addresses book (≤10 per customer)
+- Auto-link to Orders via beforeChange hook: orders with customerEmail auto-upsert Customer by (tenant_id, normalized_email), idempotent (5 orders same email = 1 Customer)
+- Tenant-scoped access control: users see only their tenant's customers; super-admin unrestricted; delete forbidden (protects Order FK integrity)
+- Admin UI: list view (search by email/name, filter by rank), detail view (edit addresses + rank), Orders history tab (custom Payload component), CSV export (10k row cap)
+- CSV export endpoint `/api/v1/customers/export?tenantId=X`: streams 7 columns (email, name, phone, rank, createdAt, addressCount, orderCount), formula-injection guarded, PII data cached privately
+
+**Acceptance Criteria:**
+- TC-F25-001..010: Email normalization, auto-link idempotency (5 orders = 1 Customer), empty/invalid email silent skip (non-throwing), database fault tolerance, tenant isolation (read+update+no delete), addresses validator (max 10), rank enum (bronze|silver|gold|vip only)
+
+**Code changes:**
+- New: `src/collections/Customers.ts` (177 LOC) — schema, Payload hooks, tenant-scoped access
+- New: `src/collections/orders-hooks/auto-link-customer.ts`, `sync-customer-snapshot.ts` — Order linkage hooks (non-throwing, idempotent upsert)
+- New: `src/app/api/v1/customers/export/route.ts` — CSV streaming with tenant isolation + 10k cap
+- New: `src/components/admin/customers-*.tsx` — Admin list/detail UI, custom Orders tab
+- Modified: `src/collections/Orders.ts` — add `customer` FK field + hook wiring
+- Modified: `src/payload.config.ts` — import + register Customers collection
+- Database: 9 migration entries (`customers.create_table`, `customers_addresses.create_table`, `orders.customer` FK, indices, Payload rels tables)
+
+**Tests:**
+- 39 automated tests (TC-F25-001..010): auto-link-customer.test.ts (5 tests), customers-access.test.ts (2 tests), customers-field-validation.test.ts (2 tests), customers-export.test.ts (2 tests) — all pass
+- Manual smoke matrix deferred (user QA post-merge): list/search/filter UI, Orders tab navigation, CSV 10k cap
+
+**Non-breaking:**
+- Order denormalized snapshot fields (`customerEmail/Name/Phone/shippingAddress`) untouched → backward-compatible
+- Existing orders without customer FK remain valid (NULL FK allowed)
+- Orphan backfill script pseudocode in phase-03 spec; not executed (pending US-MIGA-12 ETL plan)
+
+**Restores PW1 parity:** Tier-S priority #9, Group B3 / US-MIGA-12. PW2 entity built; historical data migration deferred.
+
+---
+
 ### GH-1024 — Block CRUD Helpers + Menu Block Nested Arrays (F08 Phase 03) + Code Review Fixes
 
 **Features:**

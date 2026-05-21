@@ -1,4 +1,7 @@
 import type { CollectionConfig } from 'payload'
+import { autoLinkCustomer } from './orders-hooks/auto-link-customer'
+import { syncCustomerSnapshot } from './orders-hooks/sync-customer-snapshot'
+import { updatePaymentStatus } from './orders-hooks/update-payment-status'
 
 /**
  * Valid status transitions for manual orders (COD/QR Banking).
@@ -24,23 +27,8 @@ export const Orders: CollectionConfig = {
     slug: 'orders',
     hooks: {
         beforeChange: [
-            async ({ data, originalDoc }) => {
-                // COD: seller marks completed → auto paymentStatus=paid
-                if (
-                    data.status === 'completed' &&
-                    originalDoc?.status !== 'completed' &&
-                    originalDoc?.paymentMethod === 'cod'
-                ) {
-                    data.paymentStatus = 'paid'
-                }
-                // Any method cancelled → paymentStatus=cancelled (if still unpaid)
-                if (data.status === 'cancelled' && originalDoc?.status !== 'cancelled') {
-                    if (!data.paymentStatus || data.paymentStatus === 'unpaid') {
-                        data.paymentStatus = 'cancelled'
-                    }
-                }
-                return data
-            },
+            autoLinkCustomer,
+            updatePaymentStatus,
         ],
         afterChange: [
             async ({ doc, operation, req }) => {
@@ -62,6 +50,7 @@ export const Orders: CollectionConfig = {
                     .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))
                 return doc
             },
+            syncCustomerSnapshot,
         ],
     },
     admin: {
@@ -335,6 +324,16 @@ export const Orders: CollectionConfig = {
         {
             name: 'customerPhone',
             type: 'text',
+        },
+        {
+            name: 'customer',
+            type: 'relationship',
+            relationTo: 'customers',
+            index: true,
+            admin: {
+                description: 'Auto-linked customer record (matched by email + tenant).',
+                readOnly: true,
+            },
         },
         {
             name: 'shippingAddress',

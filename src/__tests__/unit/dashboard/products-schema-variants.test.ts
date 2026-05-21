@@ -14,6 +14,8 @@ describe('GH-935: Variant Tier Schema Validation (superRefine behavior)', () => 
         baseInventory: 10,
         urlSlug: 'test-product',
     }
+    // Minimal valid variant row required whenever hasVariants=true (schema enforces variantsRequired)
+    const minVariant = { id: 'v1', variantName: 'Red - S', skuCode: 'SKU-RS', price: 50, stock: 10 }
 
     describe('Empty tier handling (fully empty tiers should be skipped)', () => {
         it('should PASS when all tiers are fully empty (no name, no options)', () => {
@@ -22,7 +24,8 @@ describe('GH-935: Variant Tier Schema Validation (superRefine behavior)', () => 
                 hasVariants: true,
                 tiers: [
                     { id: '1', name: '', options: [] }
-                ]
+                ],
+                variants: [minVariant],
             })
             expect(result.success).toBe(true)
         })
@@ -31,7 +34,8 @@ describe('GH-935: Variant Tier Schema Validation (superRefine behavior)', () => 
             const result = schema.safeParse({
                 ...baseValidData,
                 hasVariants: true,
-                tiers: []
+                tiers: [],
+                variants: [minVariant],
             })
             expect(result.success).toBe(true)
         })
@@ -43,7 +47,8 @@ describe('GH-935: Variant Tier Schema Validation (superRefine behavior)', () => 
                 tiers: [
                     { id: '1', name: '', options: [] }, // empty, will be skipped
                     { id: '2', name: 'Color', options: ['Red', 'Blue'] }
-                ]
+                ],
+                variants: [minVariant],
             })
             expect(result.success).toBe(true)
         })
@@ -123,7 +128,8 @@ describe('GH-935: Variant Tier Schema Validation (superRefine behavior)', () => 
                 hasVariants: true,
                 tiers: [
                     { id: '1', name: 'Color', options: ['Red', 'Blue', 'Green'] }
-                ]
+                ],
+                variants: [minVariant],
             })
             expect(result.success).toBe(true)
         })
@@ -135,7 +141,8 @@ describe('GH-935: Variant Tier Schema Validation (superRefine behavior)', () => 
                 tiers: [
                     { id: '1', name: 'Color', options: ['Red', 'Blue'] },
                     { id: '2', name: 'Size', options: ['S', 'M', 'L'] }
-                ]
+                ],
+                variants: [minVariant],
             })
             expect(result.success).toBe(true)
         })

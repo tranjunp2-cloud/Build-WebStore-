@@ -15,6 +15,15 @@ vi.mock('@/lib/auth/order-token', () => ({
 vi.mock('@/lib/email/templates/bank-transfer-instructions', () => ({
     bankTransferInstructionsEmail: vi.fn(() => ({ subject: 'test', html: '<p>test</p>' })),
 }))
+vi.mock('@/lib/email/templates/order-confirmation', () => ({
+    orderConfirmationEmail: vi.fn(() => ({ subject: 'test', html: '<p>test</p>' })),
+}))
+vi.mock('@/lib/email/templates/new-order-seller', () => ({
+    newOrderSellerEmail: vi.fn(() => ({ subject: 'test', html: '<p>test</p>' })),
+}))
+vi.mock('@/lib/email/get-tenant-owner-emails', () => ({
+    getTenantOwnerEmails: vi.fn(() => Promise.resolve([])),
+}))
 vi.mock('@/lib/orders/upload-token', () => ({
     generateUploadToken: vi.fn(() => 'mock-upload-token'),
     verifyUploadToken: vi.fn(() => true),

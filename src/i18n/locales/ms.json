@@ -352,12 +352,100 @@
       "sst": "SST (6%)",
       "total": "Jumlah Besar",
       "shippingAddress": "Alamat Penghantaran",
-      "footer": "Dikuasakan oleh PrimeWeb"
+      "footer": "Dikuasakan oleh PrimeWeb",
+      "recipientInfoHeading": "Maklumat penerima",
+      "fullName": "Nama penuh",
+      "phone": "Telefon",
+      "email": "Emel",
+      "address": "Alamat",
+      "orderInfoHeading": "Maklumat pesanan",
+      "orderStatus": "Status pesanan",
+      "orderStatusSuccess": "Pesanan berjaya",
+      "orderDate": "Tarikh pesanan",
+      "productName": "Nama produk",
+      "quantity": "Kuantiti",
+      "unitCost": "Kos unit",
+      "discount": "Diskaun",
+      "shippingFee": "Kos penghantaran",
+      "prepaid": "Pra-bayar",
+      "codPayment": "Bayar semasa penghantaran",
+      "paymentMethod": "Kaedah pembayaran",
+      "shippingProvider": "Pembekal penghantaran",
+      "buyerNote": "Nota daripada pembeli",
+      "cta": "Klik sini untuk menyemak pesanan anda",
+      "farewell": "Jumpa anda di pesanan seterusnya!",
+      "copyright": "Hak cipta oleh"
+    },
+    "newOrder": {
+      "greeting": "Anda mempunyai pesanan baharu dari",
+      "body": "Sila semak dan proses pesanan dengan segera.",
+      "orderStatusLabel": "Status pesanan",
+      "orderStatusNew": "Pesanan Baharu",
+      "cta": "Lihat pesanan di sini",
+      "farewell": "Selamat menjual!"
+    },
+    "cancelledOrder": {
+      "body": "Pesanan anda telah dibatalkan.",
+      "orderStatusCancelled": "Dibatalkan",
+      "cancellationDate": "Tarikh pembatalan",
+      "cancellationNote": "Nota pembatalan",
+      "cta": "Jom buat pesanan baharu",
+      "subject": "Makluman pembatalan pesanan"
+    },
+    "shippedOrder": {
+      "body": "Terima kasih atas pembelian anda. Pesanan anda telah dihantar kepada anda.",
+      "orderStatusShipped": "Dihantar",
+      "shippedDate": "Tarikh penghantaran",
+      "subject": "Pesanan anda telah dihantar"
+    },
+    "autoCancelledOrder": {
+      "body": "Pesanan anda telah dibatalkan secara automatik kerana bayaran tidak diterima dalam tempoh yang ditetapkan.",
+      "paymentExpiredTitle": "Tempoh bayaran tamat",
+      "paymentExpiredText": "Sistem tidak menerima bayaran dalam tempoh 24 jam selepas pesanan dibuat ({elapsed}). Mengikut polisi, pesanan ini dibatalkan secara automatik dan stok produk telah dipulihkan.",
+      "orderStatusCancelled": "Dibatalkan automatik",
+      "cancellationDate": "Tarikh pembatalan",
+      "cancellationReason": "Sebab pembatalan",
+      "cancellationReasonValue": "Bayaran tidak diterima",
+      "restockedBadge": "Distok semula",
+      "noRefundTitle": "Tiada bayaran balik diperlukan",
+      "noRefundText": "Pesanan ini belum dibayar, jadi tiada wang yang ditolak daripada akaun anda. Anda boleh terus pesan semula bila-bila masa.",
+      "originalTotalLabel": "Jumlah pesanan asal",
+      "paymentMethodValue": "Belum dipilih",
+      "paymentStatusLabel": "Status bayaran",
+      "paymentStatusValue": "Belum dibayar",
+      "cta": "Pesan semula",
+      "ctaSubtitle": "Item dalam pesanan asal akan dimasukkan semula ke dalam troli anda.",
+      "subject": "Pesanan dibatalkan secara automatik"
+    },
+    "bankTransfer": {
+      "body": "Terima kasih atas pesanan anda. Sila lengkapkan pindahan bank menggunakan maklumat di bawah dan muat naik resit pembayaran anda untuk mengesahkan pesanan.",
+      "bankDetailsHeading": "Maklumat Pindahan Bank",
+      "bank": "Bank",
+      "accountNo": "No. Akaun",
+      "accountName": "Nama Akaun",
+      "scanToPay": "Atau Imbas untuk Bayar",
+      "referenceHeading": "PENTING — Rujukan Pembayaran",
+      "referenceInstruction": "Masukkan kod ini dalam nota / keterangan pindahan anda",
+      "deadlineLabel": "Pembayaran diperlukan sebelum",
+      "autoCancel": "Pesanan tanpa pengesahan pembayaran akan dibatalkan secara automatik selepas 24 jam.",
+      "securityReminder": "Peringatan keselamatan: Kami tidak akan meminta anda memindahkan wang ke akaun lain atau melalui telefon/WhatsApp. Jika anda menerima permintaan sedemikian, sila abaikan dan laporkan.",
+      "uploadCta": "Muat Naik Resit Pembayaran",
+      "fallbackLink": "Atau salin pautan ini:",
+      "orderStatusLabel": "Status pesanan",
+      "orderStatusAwaitingPayment": "Menunggu Pembayaran"
     },
     "status": {
       "greeting": "Hai",
       "orderNumber": "Nombor Pesanan",
       "tracking": "Penjejakan",
+      "confirmed": {
+        "title": "Pesanan Telah Disahkan",
+        "description": "Pesanan anda telah disahkan oleh penjual dan sedang disediakan."
+      },
+      "ready_to_ship": {
+        "title": "Pesanan Siap Dihantar",
+        "description": "Pesanan anda telah dibungkus dan sedia. Ia akan diserahkan kepada kurier tidak lama lagi."
+      },
       "processing": {
         "title": "Pesanan Sedang Diproses",
         "description": "Pesanan anda sedang disediakan. Kami akan memaklumkan anda apabila ia telah dihantar."
@@ -366,13 +454,17 @@
         "title": "Pesanan Telah Dihantar",
         "description": "Pesanan anda sedang dalam perjalanan. Anda boleh menjejaki penghantaran di bawah."
       },
-      "delivered": {
-        "title": "Pesanan Telah Dihantar",
-        "description": "Pesanan anda telah dihantar. Terima kasih atas pembelian anda!"
+      "completed": {
+        "title": "Pesanan Selesai",
+        "description": "Pesanan anda telah diterima. Terima kasih atas pembelian anda!"
       },
       "cancelled": {
         "title": "Pesanan Dibatalkan",
         "description": "Pesanan anda telah dibatalkan. Jika ada sebarang pertanyaan, sila hubungi kami."
+      },
+      "refunded": {
+        "title": "Pesanan Telah Dikembalikan",
+        "description": "Pesanan anda telah dikembalikan. Jumlah akan dikreditkan semula ke kaedah pembayaran asal anda."
       }
     }
   },
@@ -810,6 +902,7 @@
         "currentStock": "Stok Semasa:",
         "productDetails": "Butiran Produk",
         "skuIdentification": "Pengenalan SKU",
+        "skuLabel": "SKU",
         "skuFallback": "Tiada",
         "taxConfiguration": "Konfigurasi Cukai",
         "taxesSst": "Cukai: SST (6%) Incl.",
@@ -819,6 +912,7 @@
         "off": "DISKAUN",
         "inventoryVariants": "Varian Inventori",
         "description": "Penerangan",
+        "attributes": "Atribut",
         "deleteConfirm": "Adakah anda pasti?",
         "deleteProduct": "PADAM PRODUK",
         "editProduct": "SUNTING PRODUK"
@@ -873,6 +967,7 @@
         "edit": "Sunting",
         "delete": "Padam",
         "sku": "SKU:",
+        "fromPrefix": "Dari ",
         "filterBtn": "Tapis",
         "failedToLoad": "Gagal memuatkan produk",
         "retry": "Cuba Lagi",
@@ -905,7 +1000,7 @@
         "aiSeoNameRequired": "Masukkan nama produk dahulu",
         "seoTitle": "Tajuk Meta",
         "seoTitleHint": "{count}/70 aksara",
-        "seoDescription": "Penerangan Meta",
+        "seoDescription": "Penerangan",
         "seoDescriptionHint": "{count}/160 aksara — sasaran 150-160",
         "seoSlug": "Slug URL",
         "images": "Gambar Produk",
@@ -928,6 +1023,7 @@
         "toastRestored": "Produk dipulihkan!",
         "deleteFailed": "Gagal memadam produk",
         "networkError": "Ralat rangkaian",
+        "legacyPriceWarning": "Produk ini disimpan sebelum pembaikan harga varian. Harga asas ialah RM 0 — sila jana semula matriks varian untuk menyegarkan harga, atau tetapkan harga setiap varian dan simpan untuk mengemas kini.",
         "errors": {
           "nameMin": "Nama produk terlalu pendek (min 3 abjad)",
           "priceRequired": "Harga sah (≥ 0) diperlukan",
@@ -964,11 +1060,13 @@
           "dimMax": "Dimensi terlalu besar",
           "maxTiers": "Maksimum 2 tahap variasi dibenarkan",
           "maxVariants": "Maksimum 900 variasi dibenarkan. Sila kurangkan pilihan.",
+          "variantsRequired": "Sila jana matriks varian sebelum menyimpan",
           "attrKeyRequired": "Nama sifat diperlukan",
           "attrValueRequired": "Nilai sifat diperlukan",
           "attrMax": "Maksimum 20 sifat dibenarkan",
           "attrKeyLong": "Nama sifat terlalu panjang (maks 100 aksara)",
-          "attrValueLong": "Nilai sifat terlalu panjang (maks 500 aksara)"
+          "attrValueLong": "Nilai sifat terlalu panjang (maks 500 aksara)",
+          "skuAlreadyInUse": "SKU \"{value}\" sudah digunakan"
         },
         "categories": {
           "select": "Pilih kategori...",
@@ -1059,6 +1157,15 @@
           "optionPlaceholderSmall": "cth. Kecil",
           "addOption": "Tambah nilai",
           "addTier": "Tambah Pilihan",
+          "removeTier": "Buang pilihan",
+          "derivedPricesHint": "Diperoleh dari varian",
+          "derivedMinLabel": "min",
+          "derivedMaxCompareLabel": "/ maks. banding",
+          "removeTierConfirmTitle": "Buang pilihan ini?",
+          "removeTierConfirmDesc": "Ini akan mengalih keluar semua varian yang mengandungi pilihan ini. Kombinasi yang tinggal akan dipelihara.",
+          "autoFilledFromVariants": "Diisi secara automatik daripada varian — edit harga varian individu di bawah",
+          "removeTierConfirmBtn": "Buang",
+          "removeTierCancelBtn": "Batal",
           "createSkuTable": "Jana varian",
           "optionNameLabel": "Nama pilihan",
           "valuesLabel": "Nilai",
