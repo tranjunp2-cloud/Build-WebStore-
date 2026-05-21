@@ -7,11 +7,13 @@ import { toast } from 'sonner';
 import { inviteStaffAction, updateStaff } from './actions';
 import type { StaffMember } from './StaffDirectoryClient';
 
-const CUSTOM_FEATURE_IDS = ['blog', 'builder', 'settings'] as const;
+const CUSTOM_FEATURE_IDS = ['builder', 'blog', 'products', 'orders', 'settings'] as const;
 const CUSTOM_FEATURE_FALLBACKS: Record<string, string> = {
-    blog: 'Blog Management',
-    builder: 'Store Design (Builder)',
-    settings: 'Settings & Domain',
+    builder: 'Store Editor',
+    blog: 'Blog',
+    products: 'Product',
+    orders: 'Order',
+    settings: 'Setting',
 };
 
 export function StaffDrawer({

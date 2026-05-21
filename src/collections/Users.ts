@@ -31,6 +31,8 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
     return doc
 }
 
+const ALLOWED_PERMISSIONS = new Set(['products', 'orders', 'blog', 'builder', 'settings'])
+
 async function injectUser(req: any) {
     if (req.user) return;
     const authHeader = (typeof req.headers.get === 'function')
@@ -264,7 +266,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 tenants: [
                                     ...normalizedExisting,
-                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : [] }
+                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string' && ALLOWED_PERMISSIONS.has(p)) : [] }
                                 ]
                             }
                         })
@@ -282,7 +284,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 roles: role === 'owner' ? ['tenant-owner'] : [],
                                 tenants: [
-                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : [] }
+                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string' && ALLOWED_PERMISSIONS.has(p)) : [] }
                                 ]
                             }
                         })
@@ -471,7 +473,7 @@ export const Users: CollectionConfig = {
 
                 const normalizedTenants = normalizeTenants(targetUser.tenants || [])
                 normalizedTenants[targetTenantIndex].role = role
-                normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : []
+                normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string' && ALLOWED_PERMISSIONS.has(p)) : []
 
                 // Sync platform roles when owner status changes.
                 // 'tenant-owner' gates login redirect (login/page.tsx) and password reset flow (check-reset-flow).
