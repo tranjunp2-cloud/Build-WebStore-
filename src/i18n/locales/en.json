@@ -848,6 +848,14 @@
         "shipped": "Shipped",
         "completed": "Completed"
       },
+      "ship": {
+        "title": "Ship Order",
+        "trackingLabel": "Tracking Number",
+        "trackingPlaceholder": "e.g., JT1234567890MY",
+        "back": "Back",
+        "confirm": "Confirm Shipment",
+        "confirming": "Shipping..."
+      },
       "cancel": {
         "title": "Cancel Order",
         "orderLabel": "Order",
@@ -1395,9 +1403,11 @@
         "stripeConnectTitle": "Connect a Stripe account to start accepting Card & FPX",
         "stripeConnectDesc": "Funds settle straight into your linked bank account — Prime Web never touches them. Manual methods below keep working while you set this up.",
         "stripeConnectCta": "Connect Stripe Account",
-        "stripeStep1": "Redirect to Stripe",
-        "stripeStep2": "Verify business & bank (~5 min)",
-        "stripeStep3": "Card & FPX unlock automatically",
+        "stripeStep1": "Click \"Connect Stripe Account\"",
+        "stripeStep2": "Enter your Stripe credentials",
+        "stripeStep3": "Card & FPX unlock instantly",
+        "savesAutomatic": "Settings saved",
+        "previewCheckout": "Preview checkout",
         "stripeLockedTooltip": "Connect Stripe to enable",
         "stripeConnected": "Stripe account connected",
         "stripeNotConnected": "No Stripe account connected",
@@ -1411,14 +1421,14 @@
         "disconnectDesc": "This will disable Stripe payments on your storefront. You can reconnect at any time.",
         "disconnectKeep": "Keep Connected",
         "stripeSectionTitle": "Stripe Payment Methods",
-        "stripeSectionDesc": "Powered by Stripe Checkout · 3% platform fee",
+        "stripeSectionDesc": "Powered by Stripe Checkout",
         "manualSectionTitle": "Manual Methods",
         "manualSectionDesc": "You confirm payment manually after the order",
         "cardTitle": "Credit / Debit Card",
-        "cardFee": "3% fee",
+        "cardFee": "",
         "cardDesc": "Accept Visa, Mastercard and American Express via Stripe Checkout. Funds settle directly to your linked Stripe account.",
         "cardMeta": "MYR · International cards accepted",
-        "fpxFee": "3% fee",
+        "fpxFee": "",
         "fpxDesc": "Let buyers pay directly from their Malaysian bank account. MYR only — supports 15+ local banks.",
         "fpxMeta": "15 banks supported",
         "codDesc": "Buyer pays in cash when the courier delivers. You'll need to confirm receipt in the order before shipment is marked paid.",
@@ -1445,7 +1455,9 @@
         "stripeVerifyCta": "Verify Connection",
         "stripeVerifying": "Verifying...",
         "failVerifyStripe": "Verification failed. Please try again.",
-        "stripeVerifyPending": "Your Stripe account is still under review. Please check back soon."
+        "stripeVerifyPending": "Your Stripe account is still under review. Please check back soon.",
+        "saving": "Saving...",
+        "saveChanges": "Save changes"
       },
       "shipping": {
         "pageTitle": "Shipping",

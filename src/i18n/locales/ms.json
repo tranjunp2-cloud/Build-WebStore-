@@ -848,6 +848,14 @@
         "shipped": "Dihantar",
         "completed": "Selesai"
       },
+      "ship": {
+        "title": "Hantar Pesanan",
+        "trackingLabel": "Nombor Penjejakan",
+        "trackingPlaceholder": "cth., JT1234567890MY",
+        "back": "Kembali",
+        "confirm": "Sahkan Penghantaran",
+        "confirming": "Menghantar..."
+      },
       "cancel": {
         "title": "Batal Pesanan",
         "orderLabel": "Pesanan",
@@ -1395,9 +1403,11 @@
         "stripeConnectTitle": "Sambungkan akaun Stripe untuk mula menerima Kad & FPX",
         "stripeConnectDesc": "Dana terus masuk ke akaun bank anda — Prime Web tidak menyentuhnya. Kaedah manual di bawah terus berfungsi semasa anda menyediakan ini.",
         "stripeConnectCta": "Sambungkan Akaun Stripe",
-        "stripeStep1": "Hala semula ke Stripe",
-        "stripeStep2": "Sahkan perniagaan & bank (~5 min)",
-        "stripeStep3": "Kad & FPX dibuka automatik",
+        "stripeStep1": "Klik \"Sambung Akaun Stripe\"",
+        "stripeStep2": "Masukkan kelayakan Stripe anda",
+        "stripeStep3": "Kad & FPX dibuka serta-merta",
+        "savesAutomatic": "Tetapan disimpan",
+        "previewCheckout": "Pratonton daftar bayar",
         "stripeLockedTooltip": "Sambungkan Stripe untuk mengaktifkan",
         "stripeConnected": "Akaun Stripe disambungkan",
         "stripeNotConnected": "Tiada akaun Stripe disambungkan",
@@ -1411,14 +1421,14 @@
         "disconnectDesc": "Ini akan melumpuhkan pembayaran Stripe di kedai anda. Anda boleh menyambung semula pada bila-bila masa.",
         "disconnectKeep": "Kekalkan Sambungan",
         "stripeSectionTitle": "Kaedah Pembayaran Stripe",
-        "stripeSectionDesc": "Dikuasakan oleh Stripe Checkout · Yuran platform 3%",
+        "stripeSectionDesc": "Dikuasakan oleh Stripe Checkout",
         "manualSectionTitle": "Kaedah Manual",
         "manualSectionDesc": "Anda mengesahkan pembayaran secara manual selepas pesanan",
         "cardTitle": "Kad Kredit / Debit",
-        "cardFee": "Yuran 3%",
+        "cardFee": "",
         "cardDesc": "Terima Visa, Mastercard dan American Express melalui Stripe Checkout. Dana terus ke akaun Stripe anda.",
         "cardMeta": "MYR · Kad antarabangsa diterima",
-        "fpxFee": "Yuran 3%",
+        "fpxFee": "",
         "fpxDesc": "Biarkan pembeli membayar terus dari akaun bank Malaysia mereka. MYR sahaja — menyokong 15+ bank tempatan.",
         "fpxMeta": "15 bank disokong",
         "codDesc": "Pembeli membayar tunai semasa penghantaran. Anda perlu mengesahkan penerimaan dalam pesanan sebelum penghantaran ditanda bayar.",
@@ -1445,7 +1455,9 @@
         "stripeVerifyCta": "Sahkan Sambungan",
         "stripeVerifying": "Mengesahkan...",
         "failVerifyStripe": "Pengesahan gagal. Sila cuba lagi.",
-        "stripeVerifyPending": "Akaun Stripe anda masih dalam semakan. Sila semak semula tidak lama lagi."
+        "stripeVerifyPending": "Akaun Stripe anda masih dalam semakan. Sila semak semula tidak lama lagi.",
+        "saving": "Menyimpan...",
+        "saveChanges": "Simpan perubahan"
       },
       "shipping": {
         "pageTitle": "Penghantaran",

@@ -1,9 +1,48 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Loader2, X, ZoomIn } from 'lucide-react'
 import { toast } from 'sonner'
 import { RejectPaymentModal } from './RejectPaymentModal'
+
+function ProofLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+        document.addEventListener('keydown', onKey)
+        return () => document.removeEventListener('keydown', onKey)
+    }, [onClose])
+
+    return createPortal(
+        <div
+            onClick={onClose}
+            style={{
+                position: 'fixed', inset: 0, zIndex: 9999,
+                background: 'rgba(0,0,0,0.9)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+        >
+            <button
+                onClick={onClose}
+                style={{
+                    position: 'absolute', top: 16, right: 16,
+                    background: 'rgba(255,255,255,0.1)', border: 'none',
+                    borderRadius: 8, padding: 8, cursor: 'pointer', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+            >
+                <X size={20} />
+            </button>
+            <img
+                src={url}
+                alt="Payment proof full view"
+                onClick={(e) => e.stopPropagation()}
+                style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 12 }}
+            />
+        </div>,
+        document.body
+    )
+}
 
 interface ManualPaymentVerificationBlockProps {
     order: {
@@ -32,9 +71,44 @@ function getProofUrl(img: string | { url?: string } | null | undefined): string 
     return img.url ?? null
 }
 
+function ProofImageThumbnail({ url, onOpen, labelStyle }: { url: string; onOpen: () => void; labelStyle: React.CSSProperties }) {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ ...labelStyle, fontSize: 11 }}>Payment Receipt</span>
+            <div style={{ position: 'relative', cursor: 'pointer' }} onClick={onOpen}>
+                <img
+                    src={url}
+                    alt="Payment proof"
+                    style={{
+                        width: '100%',
+                        maxHeight: 200,
+                        objectFit: 'cover',
+                        borderRadius: 10,
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        display: 'block',
+                    }}
+                />
+                <div
+                    style={{
+                        position: 'absolute', inset: 0, borderRadius: 10,
+                        background: 'rgba(0,0,0,0)', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0.35)' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0)' }}
+                >
+                    <ZoomIn size={28} color="#fff" style={{ opacity: 0.9 }} />
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymentVerificationBlockProps) {
     const [isApproving, setIsApproving] = useState(false)
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
+    const [lightboxOpen, setLightboxOpen] = useState(false)
 
     const proofUrl = getProofUrl(order.paymentProofImage)
 
@@ -110,40 +184,22 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                     )}
 
                     {/* Proof image */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <span style={{ ...labelStyle, fontSize: 11 }}>Payment Receipt</span>
-                        {proofUrl ? (
-                            <img
-                                src={proofUrl}
-                                alt="Payment proof"
-                                onClick={() => window.open(proofUrl, '_blank')}
-                                style={{
-                                    width: '100%',
-                                    maxHeight: 200,
-                                    objectFit: 'cover',
-                                    borderRadius: 10,
-                                    cursor: 'pointer',
-                                    border: '1px solid rgba(255,255,255,0.08)',
-                                }}
-                            />
-                        ) : (
-                            <div
-                                style={{
-                                    height: 80,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: 'rgba(255,255,255,0.05)',
-                                    borderRadius: 10,
-                                    border: '1px solid rgba(255,255,255,0.08)',
-                                }}
-                            >
+                    {proofUrl ? (
+                        <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} />
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <span style={{ ...labelStyle, fontSize: 11 }}>Payment Receipt</span>
+                            <div style={{
+                                height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                background: 'rgba(255,255,255,0.05)', borderRadius: 10,
+                                border: '1px solid rgba(255,255,255,0.08)',
+                            }}>
                                 <span style={{ ...valueStyle, color: 'rgba(248,250,252,0.4)', fontSize: 12 }}>
                                     No receipt uploaded
                                 </span>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* Amount + buyer */}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -211,6 +267,10 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                         onClose={() => setIsRejectModalOpen(false)}
                     />
                 )}
+
+                {lightboxOpen && proofUrl && (
+                    <ProofLightbox url={proofUrl} onClose={() => setLightboxOpen(false)} />
+                )}
             </>
         )
     }
@@ -263,6 +323,25 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                         <span style={{ ...labelStyle, fontSize: 11 }}>Verified By</span>
                         <span style={valueStyle}>{verifierEmail}</span>
                     </div>
+                )}
+
+                {proofUrl && <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} />}
+
+                {lightboxOpen && proofUrl && (
+                    <ProofLightbox url={proofUrl} onClose={() => setLightboxOpen(false)} />
+                )}
+            </div>
+        )
+    }
+
+    // Other statuses (awaiting_payment, cancelled, refunded…) — show proof if uploaded
+    if (proofUrl) {
+        return (
+            <div style={cardStyle}>
+                <span style={labelStyle}>Payment Verification</span>
+                <ProofImageThumbnail url={proofUrl} onOpen={() => setLightboxOpen(true)} labelStyle={labelStyle} />
+                {lightboxOpen && (
+                    <ProofLightbox url={proofUrl} onClose={() => setLightboxOpen(false)} />
                 )}
             </div>
         )

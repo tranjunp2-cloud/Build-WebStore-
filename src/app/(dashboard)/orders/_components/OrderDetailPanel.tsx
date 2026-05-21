@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useI18n } from '@/i18n'
 import { CancelOrderModal } from './CancelOrderModal'
+import { ShipOrderModal } from './ShipOrderModal'
 import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock'
 
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
@@ -350,7 +351,7 @@ function OrderProgress({ status }: { status: OrderStatus }) {
                                     style={{
                                         marginTop: 15, // Icon is 32x32 on mobile -> center is at 16, line is 2px high -> 15px.
                                         height: 2,
-                                        background: (i + 1) <= currentStep ? '#10B981' : 'var(--dash-border)',
+                                        background: i <= currentStep ? '#10B981' : 'rgba(255,255,255,0.15)',
                                     }}
                                 />
                             )}
@@ -687,19 +688,23 @@ function OrderSummary({ order }: { order: OrderDetail }) {
 function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () => void }) {
     const { t } = useI18n()
     const a = t.dashboard.orders.actions
+    const p = t.dashboard.orders.progress
     const [isLoading, setIsLoading] = useState(false)
     const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+    const [isShipModalOpen, setIsShipModalOpen] = useState(false)
     const { status, id, orderNumber } = order
 
     const isTerminalStatus = status === 'completed' || status === 'cancelled' || status === 'refunded'
 
-    const handleAction = async (newStatus: OrderStatus) => {
+    const handleAction = async (newStatus: OrderStatus, trackingNumber?: string) => {
         setIsLoading(true)
         try {
+            const body: Record<string, string> = { status: newStatus }
+            if (trackingNumber) body.trackingNumber = trackingNumber
             const res = await fetch(`/api/orders/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus }),
+                body: JSON.stringify(body),
             })
             if (!res.ok) {
                 const data = await res.json()
@@ -749,7 +754,10 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                     const primaryDisabled = isLoading || isTerminal
                     return (
                         <button
-                            onClick={() => handleAction(status === 'shipped' ? 'completed' : status === 'ready_to_ship' ? 'shipped' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')}
+                            onClick={() => {
+                                if (status === 'ready_to_ship') { setIsShipModalOpen(true); return }
+                                handleAction(status === 'shipped' ? 'completed' : status === 'confirmed' ? 'ready_to_ship' : 'confirmed')
+                            }}
                             disabled={primaryDisabled}
                             className={`flex items-center justify-center transition-opacity font-bold ${primaryDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-90'}`}
                             style={{
@@ -771,7 +779,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                                 }}
                             >
                                 {isLoading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
-                                {status === 'shipped' ? a.completeOrder : status === 'ready_to_ship' ? a.shipOrder : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
+                                {status === 'completed' ? p.completed : status === 'shipped' ? p.completed : status === 'ready_to_ship' ? p.shipped : status === 'confirmed' ? a.readyToShip : a.confirmOrder}
                             </span>
                         </button>
                     )
@@ -781,7 +789,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const cancelDisabled = isLoading || isTerminal || !['pending', 'confirmed', 'paid', 'processing'].includes(status)
-                    const refundDisabled = isLoading || isTerminal || !['shipped', 'completed'].includes(status)
+                    const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
                             {/* Cancel Order Button */}
@@ -836,6 +844,14 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                     )
                 })()}
             </div>
+
+            <ShipOrderModal
+                orderNumber={orderNumber}
+                isOpen={isShipModalOpen}
+                isLoading={isLoading}
+                onBack={() => setIsShipModalOpen(false)}
+                onConfirm={(trackingNumber) => { setIsShipModalOpen(false); handleAction('shipped', trackingNumber) }}
+            />
 
             <CancelOrderModal
                 orderNumber={orderNumber}

@@ -278,24 +278,14 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                     style={{ tableLayout: 'fixed', minWidth: 960 }}
                 >
                     <colgroup>
-                        <col style={{ width: '11.06%' }} />
-                        <col style={{ width: '17.58%' }} />
-                        <col style={{ width: '26.15%' }} />
-                        <col style={{ width: '17.47%' }} />
-                        <col style={{ width: '27.74%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '30%' }} />
                     </colgroup>
 
                     <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                         <tr style={{ background: 'var(--dash-surface)' }}>
-                            <th className="text-left" style={{ height: 56, padding: '20px 24px', backdropFilter: 'blur(12px)' }}>
-                                <Checkbox
-                                    checked={allSelected}
-                                    indeterminate={someSelected}
-                                    onChange={toggleAll}
-                                    inputRef={allCheckboxRef}
-                                    aria-label="Select all rows"
-                                />
-                            </th>
                             <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
                                 <HeaderCell>{o.tableHeaders.orderNumber}</HeaderCell>
                             </th>
@@ -314,13 +304,13 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan={5} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                <td colSpan={4} style={{ padding: '60px 24px', textAlign: 'center' }}>
                                     <span style={{ color: 'var(--dash-text-muted)' }}>{o.tableHeaders.loading}</span>
                                 </td>
                             </tr>
                         ) : orders.length === 0 ? (
                             <tr>
-                                <td colSpan={5} style={{ padding: 0 }}>
+                                <td colSpan={4} style={{ padding: 0 }}>
                                     <EmptyOrderState text={o.tableHeaders.noOrders} />
                                 </td>
                             </tr>
@@ -354,16 +344,6 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                         if (onSelectOrder) onSelectOrder(order.id)
                                     }}
                                 >
-                                    <td
-                                        style={{ padding: '18px 24px' }}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <Checkbox
-                                            checked={isSelected}
-                                            onChange={() => toggleRow(order.id)}
-                                            aria-label={`Select order ${order.id}`}
-                                        />
-                                    </td>
                                     <td style={{ padding: `${textPadY}px 24px` }}>
                                         <span
                                             style={{
@@ -471,7 +451,7 @@ export function OrdersTable({
 
     return (
         <div
-            className="flex flex-col w-full md:rounded-[16px] md:bg-slate-800/60 md:border md:border-white/[0.08] md:p-[1px]"
+            className="flex flex-col w-full md:rounded-[16px] md:overflow-hidden md:bg-slate-800/60 md:border md:border-white/[0.08] md:p-[1px]"
         >
             <Table
                 orders={orders}

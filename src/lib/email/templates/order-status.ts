@@ -21,6 +21,10 @@ function escapeHtml(s: string): string {
         .replace(/'/g, '&#x27;')
 }
 
+function safeHref(url: string): string {
+    return /^https?:\/\//i.test(url) ? escapeHtml(url) : '#'
+}
+
 interface OrderStatusEmailData {
     customerName: string
     orderNumber: string
@@ -64,8 +68,8 @@ export function orderStatusEmail(data: OrderStatusEmailData): { subject: string;
             <p style="font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 8px; font-weight: 600;">${t.tracking}</p>
             <p style="font-size: 16px; font-weight: 700; margin: 0; letter-spacing: 0.5px;">
                 ${trackingUrl
-            ? `<a href="${trackingUrl}" style="color: #3b82f6; text-decoration: none;">${trackingNumber}</a>`
-            : trackingNumber
+            ? `<a href="${safeHref(trackingUrl)}" style="color: #3b82f6; text-decoration: none;">${esc(trackingNumber)}</a>`
+            : esc(trackingNumber)
         }
             </p>
         </div>

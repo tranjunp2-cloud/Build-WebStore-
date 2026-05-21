@@ -13,18 +13,24 @@ import { TOUCH_TARGET } from '@/lib/design-tokens'
 import { SectionWrapper } from '@/blocks/shared/SectionWrapper'
 import { getGalleryImages } from '@/lib/images/industry-images'
 import { handleCartClick } from '@/lib/storefront/editor-intercept'
+import { useAddToCart } from '@/lib/storefront/use-add-to-cart'
+import type { ThemeConfig } from '../types'
 
 const CURRENCY_DISPLAY: Record<string, string> = { MYR: 'RM', USD: 'USD', SGD: 'SGD' }
-const CART_ENABLED = true
 
 interface FeaturedProduct {
     id: string
     slug: string
     name: string
     price: string
+    priceRaw: number
+    currency: string
+    inventory: number
+    compareAtPrice?: number
     description: string
     image: string | null
     tags: string[]
+    isFallback?: boolean
 }
 
 function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
@@ -32,6 +38,109 @@ function ProductsFeaturedSection({ children }: { children: React.ReactNode }) {
         <SectionWrapper as={AnimatedSection} padding="default" container="default" background="transparent" className="relative overflow-hidden" innerClassName="relative z-10">
             {children}
         </SectionWrapper>
+    )
+}
+
+function HeroProductView({ product, block, theme, siteBasePath, siteSlug, siteId }: {
+    product: FeaturedProduct
+    block: { sectionLabel?: string }
+    theme: ThemeConfig
+    siteBasePath: string
+    siteSlug: string
+    siteId: string
+}) {
+    const { handleAddToCart, isOutOfStock } = useAddToCart(
+        { ...product, imageUrl: product.image ?? undefined },
+        siteSlug,
+        siteId,
+    )
+    const isFallback = product.isFallback ?? false
+
+    return (
+        <ProductsFeaturedSection>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                {/* Left: Product Image */}
+                <div className="relative group">
+                    <GradientBlob color={CSS_VARS.primary} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.15} />
+                    <div className="relative z-10 rounded-2xl overflow-hidden animate-float" style={{ animationDuration: '6s' }}>
+                        {product.image ? (
+                            <img
+                                src={product.image}
+                                alt={product.name}
+                                className="w-full h-auto object-cover transform scale-110 drop-shadow-2xl mix-blend-multiply dark:mix-blend-normal"
+                            />
+                        ) : (
+                            <div className="w-full aspect-square bg-black/5 flex items-center justify-center text-8xl opacity-20">🛍️</div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Right: Info */}
+                <div className="flex flex-col justify-center">
+                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+
+                    {product.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-6">
+                            {product.tags.map((tag) => (
+                                <Caption key={tag} className="px-3 py-1 rounded-full font-semibold tracking-wider uppercase"
+                                    style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)', border: `1px solid rgba(var(--brand-primary-rgb), 0.188)` }}>
+                                    {tag}
+                                </Caption>
+                            ))}
+                        </div>
+                    )}
+
+                    <RichText text={product.name} as="h2" className="text-5xl lg:text-7xl font-bold font-heading mb-6 leading-tight" />
+                    <RichText text={product.price} as="p" className="text-4xl font-heading mb-6" style={{ color: 'var(--brand-primary)' }} />
+
+                    {product.description && (
+                        <Body size="lg" className="opacity-70 mb-10 max-w-lg">
+                            {product.description}
+                        </Body>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        {!isFallback && (
+                            <button
+                                type="button"
+                                disabled={isOutOfStock}
+                                className={`px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 ${TOUCH_TARGET.min}`}
+                                style={{
+                                    backgroundColor: 'var(--brand-primary)',
+                                    color: theme.colorMode === 'dark' ? '#000' : '#fff',
+                                    opacity: isOutOfStock ? 0.5 : 1,
+                                    cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                                }}
+                                onClick={handleAddToCart}
+                            >
+                                {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                            </button>
+                        )}
+                        {product.slug && (
+                            <Link
+                                href={`${siteBasePath}/products/${product.slug}`}
+                                className={`px-8 py-4 rounded-full font-bold text-lg transition-colors inline-block text-center ${TOUCH_TARGET.min}`}
+                                style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`, color: theme.colorMode === 'dark' ? '#fff' : '#000' }}
+                                onClick={handleCartClick}
+                            >
+                                View Details
+                            </Link>
+                        )}
+                    </div>
+                </div>
+            </div>
+            {/* Inline CSS for float animation */}
+            <style>{`
+                @keyframes float {
+                    0% { transform: translateY(0px); }
+                    50% { transform: translateY(-15px); }
+                    100% { transform: translateY(0px); }
+                }
+                .animate-float {
+                    animation: float ease-in-out infinite;
+                }
+            `}</style>
+        </ProductsFeaturedSection>
     )
 }
 
@@ -67,6 +176,10 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                         slug: String(doc.slug || ''),
                         name: String(doc.name || ''),
                         price: `${currency} ${price.toFixed(2)}`,
+                        priceRaw: price,
+                        currency: currencyCode,
+                        inventory: Number(doc.inventory) || 0,
+                        compareAtPrice: typeof doc.compareAtPrice === 'number' ? doc.compareAtPrice : undefined,
                         description: String(doc.shortDescription || ''),
                         image: images?.[0]?.image?.url ?? null,
                         tags: [],
@@ -80,7 +193,7 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
             .finally(() => setLoading(false))
 
         return () => controller.abort()
-    }, [site, variant])
+    }, [site?.id, variant])
 
     if (loading) {
         return (
@@ -106,9 +219,13 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                 slug: '',
                 name: headline,
                 price: '',
+                priceRaw: 0,
+                currency: 'MYR',
+                inventory: 0,
                 description: subheadline || '',
                 image: img ?? null,
                 tags: [],
+                isFallback: true,
             }))
             : [
                 {
@@ -116,9 +233,13 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
                     slug: '',
                     name: headline,
                     price: '',
+                    priceRaw: 0,
+                    currency: 'MYR',
+                    inventory: 0,
                     description: subheadline || '',
                     image: fallbackImages[0] ?? null,
                     tags: [],
+                    isFallback: true,
                 },
             ]
 
@@ -185,83 +306,13 @@ export function ProductsFeaturedBlock({ block, theme, site }: BlockProps<Product
 
     // Default: hero-product split view
     return (
-        <ProductsFeaturedSection>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                {/* Left: Huge Product Image */}
-                <div className="relative group">
-                    <GradientBlob color={CSS_VARS.primary} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.15} />
-                    <div className="relative z-10 rounded-2xl overflow-hidden animate-float" style={{ animationDuration: '6s' }}>
-                        {product.image ? (
-                            <img
-                                src={product.image}
-                                alt={product.name}
-                                className="w-full h-auto object-cover transform scale-110 drop-shadow-2xl mix-blend-multiply dark:mix-blend-normal"
-                            />
-                        ) : (
-                            <div className="w-full aspect-square bg-black/5 flex items-center justify-center text-8xl opacity-20">🛍️</div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Right: Info */}
-                <div className="flex flex-col justify-center">
-                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-
-                    {product.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-6">
-                            {product.tags.map((tag) => (
-                                <Caption key={tag} className="px-3 py-1 rounded-full font-semibold tracking-wider uppercase"
-                                    style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)', border: `1px solid rgba(var(--brand-primary-rgb), 0.188)` }}>
-                                    {tag}
-                                </Caption>
-                            ))}
-                        </div>
-                    )}
-
-                    <RichText text={product.name} as="h2" className="text-5xl lg:text-7xl font-bold font-heading mb-6 leading-tight" />
-
-                    <RichText text={product.price} as="p" className="text-4xl font-heading mb-6" style={{ color: 'var(--brand-primary)' }} />
-
-                    {product.description && (
-                        <Body size="lg" className="opacity-70 mb-10 max-w-lg">
-                            {product.description}
-                        </Body>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        {CART_ENABLED && (
-                        <button
-                            type="button"
-                            className={`px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105 ${TOUCH_TARGET.min}`}
-                            style={{ backgroundColor: 'var(--brand-primary)', color: theme.colorMode === 'dark' ? '#000' : '#fff' }}
-                            onClick={handleCartClick}
-                        >
-                            Add to Cart
-                        </button>
-                        )}
-                        {product.slug && (
-                            <Link
-                                href={`${siteBasePath}/products/${product.slug}`}
-                                className={`px-8 py-4 rounded-full font-bold text-lg transition-colors inline-block text-center ${TOUCH_TARGET.min}`}
-                                style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`, color: theme.colorMode === 'dark' ? '#fff' : '#000' }}
-                            >
-                                View Details
-                            </Link>
-                        )}
-                    </div>
-                </div>
-            </div>
-            {/* Inline CSS for float animation */}
-            <style>{`
-                @keyframes float {
-                    0% { transform: translateY(0px); }
-                    50% { transform: translateY(-15px); }
-                    100% { transform: translateY(0px); }
-                }
-                .animate-float {
-                    animation: float ease-in-out infinite;
-                }
-            `}</style>
-        </ProductsFeaturedSection>
+        <HeroProductView
+            product={product}
+            block={block}
+            theme={theme}
+            siteBasePath={siteBasePath}
+            siteSlug={String(siteRec?.tenantSlug || '')}
+            siteId={site?.id != null ? String(site.id) : ''}
+        />
     )
 }

@@ -3,6 +3,7 @@ import { BaseBlockSchema } from '../types'
 
 export type QuickViewProduct = {
     name: string
+    slug?: string
     price: number
     originalPrice?: number
     imageUrls: string[]
@@ -31,6 +32,7 @@ export const ProductQuickViewConfigSchema = BaseBlockSchema.extend({
     subheadline: z.string().optional(),
     products: z.array(z.object({
         name: z.string(),
+        slug: z.string().optional(),
         price: z.number(),
         originalPrice: z.number().optional(),
         imageUrls: z.array(z.string()).default([]),
