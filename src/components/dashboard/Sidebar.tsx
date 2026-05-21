@@ -83,7 +83,6 @@ const NAV_ITEMS: NavItemConfig[] = [
         label: { en: 'Orders', ms: 'Pesanan' },
         icon: ShoppingCart,
         href: '/orders',
-        badge: true,
     },
     {
         label: { en: 'Customers', ms: 'Pelanggan' },
