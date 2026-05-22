@@ -347,7 +347,7 @@ function LoginFormContent() {
                             id="email"
                             type="email"
                             placeholder={t.auth.emailPlaceholder}
-                            className="w-full h-11 rounded-2xl pl-10 pr-4 text-sm placeholder:text-[#94A3B8] outline-none"
+                            className="w-full h-11 rounded-2xl pl-10 pr-4 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
                             style={{
                                 background: 'transparent',
                                 border: 'none',
@@ -381,7 +381,7 @@ function LoginFormContent() {
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className="w-full h-11 rounded-2xl pl-10 pr-10 text-sm placeholder:text-[#94A3B8] outline-none"
+                            className="w-full h-11 rounded-2xl pl-10 pr-10 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
                             style={{
                                 background: 'transparent',
                                 border: 'none',

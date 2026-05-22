@@ -166,9 +166,6 @@ function ResetPasswordForm() {
         }
     }
 
-    const inputClasses = (hasError: boolean) =>
-        `w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[#94A3B8] outline-none focus:ring-2 focus:ring-blue-500/30 transition-all ${hasError ? 'ring-2 ring-red-500/50 border-transparent' : ''}`
-
     return (
         <div className="animate-in fade-in duration-500 w-full flex flex-col items-center">
             {/* Header */}
@@ -240,7 +237,7 @@ function ResetPasswordForm() {
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder={t.auth.reset.newPasswordPlaceholder}
-                            className="w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[#94A3B8] outline-none"
+                            className="w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
                             style={{
                                 background: 'transparent',
                                 border: 'none',
@@ -310,7 +307,7 @@ function ResetPasswordForm() {
                             id="confirmPassword"
                             type={showConfirm ? 'text' : 'password'}
                             placeholder={t.auth.passwordPlaceholder}
-                            className="w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[#94A3B8] outline-none"
+                            className="w-full h-12 rounded-xl pl-10 pr-10 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
                             style={{
                                 background: 'transparent',
                                 border: 'none',

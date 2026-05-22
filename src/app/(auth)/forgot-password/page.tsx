@@ -284,7 +284,7 @@ export default function ForgotPasswordPage() {
                             id="email"
                             type="email"
                             placeholder={t.auth.forgot.emailPlaceholder}
-                            className="w-full h-11 rounded-2xl pl-10 pr-4 text-sm placeholder:text-[#94A3B8] outline-none"
+                            className="w-full h-11 rounded-2xl pl-10 pr-4 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
                             style={{
                                 background: 'transparent',
                                 border: 'none',
