@@ -150,8 +150,12 @@ html:not(.dark) {
 .dash-shell .text-slate-500,
 .dash-shell .text-\[\#9CA3AF\],
 .dash-shell .text-gray-500 { color: var(--dash-text-muted); }
-/* text-white: remap to theme text; preserve white only on inline-style gradients and solid colored bg */
+/* text-white: remap to theme text; preserve white on gradient/colored backgrounds */
 .dash-shell .text-white { color: var(--dash-text); }
+.dash-shell [class*="from-"].text-white,
+.dash-shell [class*="from-"] .text-white,
+.dash-shell [class*="bg-gradient"].text-white,
+.dash-shell [class*="bg-gradient"] .text-white,
 .dash-shell [style*="linear-gradient"].text-white,
 .dash-shell [style*="linear-gradient"] .text-white,
 .dash-shell .bg-blue-600 .text-white,
