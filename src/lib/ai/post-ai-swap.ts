@@ -152,7 +152,7 @@ export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
 /** One telemetry entry emitted per swap decision (swap OR skip-with-reason). */
 export interface SwapTelemetry {
     blockType: string
-    action: 'swapped' | 'kept-user-data' | 'kept-not-generic' | 'kept-no-composer' | 'kept-composer-error'
+    action: 'swapped' | 'kept-user-data' | 'kept-not-generic' | 'kept-no-composer' | 'kept-composer-error' | 'kept-lang-dynamic'
     reason: string | null
     matchedPhrases?: string[]
 }
@@ -222,6 +222,15 @@ export function postAISwapStep(
         // match AI blocks that happen to reuse library copy.
         if (hasUserDataReference(block, bizPartial)) {
             telemetry.push({ blockType: bt, action: 'kept-user-data', reason: null })
+            return block
+        }
+
+        // Guard 1b: dynamic language trust — for non-English generation, GPT
+        // already wrote content in the user's language. Swapping with a library
+        // block would throw away that contextual content. Structural strings
+        // (headline, subheadline) are patched by the i18n normalize chain below.
+        if (language && language !== 'en' && bt === 'testimonials') {
+            telemetry.push({ blockType: bt, action: 'kept-lang-dynamic', reason: `lang:${language}` })
             return block
         }
 
