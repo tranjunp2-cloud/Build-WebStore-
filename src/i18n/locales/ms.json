@@ -361,6 +361,8 @@
       "orderInfoHeading": "Maklumat pesanan",
       "orderStatus": "Status pesanan",
       "orderStatusSuccess": "Pesanan berjaya",
+      "orderStatusConfirmed": "Disahkan oleh penjual",
+      "bodyConfirmed": "Pesanan anda telah disahkan oleh penjual dan sedang disediakan.",
       "orderDate": "Tarikh pesanan",
       "productName": "Nama produk",
       "quantity": "Kuantiti",

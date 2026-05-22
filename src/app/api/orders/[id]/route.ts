@@ -6,6 +6,7 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { orderStatusUpdateSchema } from '@/lib/validations/orders'
 import { ORDER_STATUS_TRANSITIONS } from '@/collections/Orders'
 import { orderStatusEmail } from '@/lib/email/templates/order-status'
+import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { orderCancelledEmail } from '@/lib/email/templates/order-cancelled'
 import { orderShippedEmail } from '@/lib/email/templates/order-shipped'
 
@@ -91,7 +92,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                 const customerEmail = (order as any).customerEmail
                 const orderNumber = (order as any).orderNumber ?? id
 
-                if (newStatus === 'cancelled' || newStatus === 'shipped') {
+                if (newStatus === 'cancelled' || newStatus === 'shipped' || newStatus === 'confirmed') {
                     const tenantId = typeof (order as any).tenant === 'object'
                         ? (order as any).tenant.id
                         : (order as any).tenant
@@ -113,7 +114,28 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                         lineTotal: item.quantity * item.unitPrice,
                     }))
 
-                    if (newStatus === 'cancelled') {
+                    if (newStatus === 'confirmed') {
+                        const confirmedEmail = orderConfirmationEmail({
+                            shopName,
+                            orderNumber,
+                            customerName: (order as any).customerName ?? '',
+                            customerEmail,
+                            customerPhone: (order as any).customerPhone ?? null,
+                            customerAddress: (order as any).shippingAddress ?? null,
+                            items: orderItems,
+                            subtotal: (order as any).subtotal ?? 0,
+                            shippingFee: (order as any).shippingFee ?? 0,
+                            total: (order as any).total ?? 0,
+                            paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : 'stripe',
+                            orderDate: (order as any).createdAt,
+                            orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
+                            currency: (order as any).currency ?? 'MYR',
+                            locale: siteLocale,
+                            event: 'confirmed',
+                        })
+                        payload.sendEmail({ to: customerEmail, subject: confirmedEmail.subject, html: confirmedEmail.html })
+                            .catch((err: unknown) => console.error('[Email confirmed notify]', err))
+                    } else if (newStatus === 'cancelled') {
                         const cancelEmail = orderCancelledEmail({
                             shopName,
                             orderNumber,
@@ -136,6 +158,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                         payload.sendEmail({ to: customerEmail, subject: cancelEmail.subject, html: cancelEmail.html })
                             .catch((err: unknown) => console.error('[Email cancel notify]', err))
                     } else {
+                        // newStatus === 'shipped'
                         const shippedEmail = orderShippedEmail({
                             shopName,
                             orderNumber,
