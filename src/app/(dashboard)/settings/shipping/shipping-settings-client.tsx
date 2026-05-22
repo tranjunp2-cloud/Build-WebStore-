@@ -78,30 +78,33 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
     }
 
     // raw defaults to current state; paste handlers pass the new value directly to avoid stale closure
+    // Empty field treated as 0 (free shipping) instead of Required error
     const handleWestBlur = (raw = westRateRm) => {
-        const r = validateRate(raw, { maxSen: RATE_MAX, messages: msgs })
+        const effective = raw.trim() === '' ? '0' : raw
+        const r = validateRate(effective, { maxSen: RATE_MAX, messages: msgs })
         setWestRateError(r.error)
-        if (r.error) {
-            setWestRateWarning('')
-        } else {
-            const p = parseRateRm(raw)
-            if (p !== null && raw.trim() !== '') setWestRateRm(p.toFixed(2))
+        if (!r.error) {
+            const p = parseRateRm(effective)
+            if (p !== null) setWestRateRm(p.toFixed(2))
             setWestRateWarning(r.warning ?? '')
+        } else {
+            setWestRateWarning('')
         }
-        runCrossField(raw, eastRateRm, freeAboveRm)
+        runCrossField(effective, eastRateRm, freeAboveRm)
     }
 
     const handleEastBlur = (raw = eastRateRm) => {
-        const r = validateRate(raw, { maxSen: RATE_MAX, messages: msgs })
+        const effective = raw.trim() === '' ? '0' : raw
+        const r = validateRate(effective, { maxSen: RATE_MAX, messages: msgs })
         setEastRateError(r.error)
-        if (r.error) {
-            setEastRateWarning('')
-        } else {
-            const p = parseRateRm(raw)
-            if (p !== null && raw.trim() !== '') setEastRateRm(p.toFixed(2))
+        if (!r.error) {
+            const p = parseRateRm(effective)
+            if (p !== null) setEastRateRm(p.toFixed(2))
             setEastRateWarning(r.warning ?? '')
+        } else {
+            setEastRateWarning('')
         }
-        runCrossField(westRateRm, raw, freeAboveRm)
+        runCrossField(westRateRm, effective, freeAboveRm)
     }
 
     const handleFreeBlur = (raw = freeAboveRm) => {
@@ -129,8 +132,10 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
         if (savingRef.current) return
         savingRef.current = true
 
-        const wR = validateRate(westRateRm, { maxSen: RATE_MAX, messages: msgs })
-        const eR = validateRate(eastRateRm, { maxSen: RATE_MAX, messages: msgs })
+        const effectiveWest = westRateRm.trim() === '' ? '0' : westRateRm
+        const effectiveEast = eastRateRm.trim() === '' ? '0' : eastRateRm
+        const wR = validateRate(effectiveWest, { maxSen: RATE_MAX, messages: msgs })
+        const eR = validateRate(effectiveEast, { maxSen: RATE_MAX, messages: msgs })
         const fR = freeEnabled
             ? validateRate(freeAboveRm, { maxSen: FREE_ABOVE_MAX, minSen: 1, required: true, messages: freeMsgs })
             : { error: '' }
@@ -141,6 +146,10 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
             savingRef.current = false
             return
         }
+
+        // Normalize to formatted RM string so body and post-save state are consistent
+        const savedWest = parseRateRm(effectiveWest)?.toFixed(2) ?? effectiveWest
+        const savedEast = parseRateRm(effectiveEast)?.toFixed(2) ?? effectiveEast
 
         // RF-05: preserve existing enabled state — saving rate settings must not silently re-enable disabled shipping
         const shippingEnabled = initial == null ? true : initial.enabled !== false
@@ -153,14 +162,18 @@ export function ShippingSettingsClient({ siteId, initial }: Props) {
                 credentials: 'include',
                 body: JSON.stringify({
                     enabled: shippingEnabled,
-                    westRateRm: westRateRm !== '' ? westRateRm : null,
-                    eastRateRm: eastRateRm !== '' ? eastRateRm : null,
+                    westRateRm: savedWest,
+                    eastRateRm: savedEast,
                     freeAboveRm: freeEnabled ? (freeAboveRm || null) : null,
                 }),
             })
             const json = await res.json()
             if (!res.ok || !json.success) throw new Error(json.error?.message || 'Failed to save')
-            snapshotRef.current = snap(westRateRm, eastRateRm, freeEnabled, freeAboveRm)
+            setWestRateRm(savedWest)
+            setEastRateRm(savedEast)
+            setWestRateWarning(wR.warning ?? '')
+            setEastRateWarning(eR.warning ?? '')
+            snapshotRef.current = snap(savedWest, savedEast, freeEnabled, freeAboveRm)
             setLastSaveSucceeded(true)
             toast.success(s.savedSuccess)
         } catch (err: unknown) {

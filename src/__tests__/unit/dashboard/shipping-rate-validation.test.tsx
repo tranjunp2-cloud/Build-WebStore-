@@ -197,12 +197,12 @@ describe('ShippingSettingsClient [TC-F14.34..F14.39]', () => {
         })
     }
 
-    it('[TC-F14.34] pasting -1 into west rate silently rejects — field cleared, no error shown', () => {
+    it('[TC-F14.34] pasting -1 into west rate silently rejects — field resets to 0.00 (free ship), no error shown', () => {
         renderClient()
         const input = screen.getByPlaceholderText('8.00')
         pasteText(input, '-1')
-        // INPUT_FILTER rejects leading "-" → filtered='', onBlur('') → no error
-        expect(input).toHaveValue('')
+        // INPUT_FILTER rejects leading "-" → filtered='', onBlur('') → empty→0 → 0.00 + warnFree
+        expect(input).toHaveValue('0.00')
         expect(screen.queryByRole('alert')).toBeNull()
         expect(input).not.toHaveAttribute('aria-invalid')
     })
@@ -250,5 +250,25 @@ describe('ShippingSettingsClient [TC-F14.34..F14.39]', () => {
         pasteText(input, 'RM 8.00')
         expect(input).toHaveValue('8.00')
         expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('[TC-F14.40] blurring west rate when empty sets to 0.00 (free ship), no Required error', () => {
+        renderClient()
+        const input = screen.getByPlaceholderText('8.00')
+        fireEvent.change(input, { target: { value: '' } })
+        fireEvent.blur(input)
+        expect(input).toHaveValue('0.00')
+        expect(screen.queryByRole('alert')).toBeNull()
+        expect(input).not.toHaveAttribute('aria-invalid')
+    })
+
+    it('[TC-F14.41] blurring east rate when empty sets to 0.00 (free ship), no Required error', () => {
+        renderClient()
+        const input = screen.getByPlaceholderText('15.00')
+        fireEvent.change(input, { target: { value: '' } })
+        fireEvent.blur(input)
+        expect(input).toHaveValue('0.00')
+        expect(screen.queryByRole('alert')).toBeNull()
+        expect(input).not.toHaveAttribute('aria-invalid')
     })
 })
