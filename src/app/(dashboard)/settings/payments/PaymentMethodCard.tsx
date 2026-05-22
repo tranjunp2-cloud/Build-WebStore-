@@ -39,7 +39,7 @@ export function PaymentMethodCard({
         <div className={cn(
             'rounded-[16px] p-[20px_22px] border transition-all duration-200',
             'shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_6px_18px_-10px_rgba(0,0,0,0.45)]',
-            locked ? 'opacity-70 bg-[#0f1729] border-white/[0.08]' : 'bg-[#141e2e] border-dash-border',
+            locked ? 'opacity-70 bg-[#0f1729] border-dash-border' : 'bg-[#141e2e] border-dash-border',
             highlight && !locked && 'border-sky-500/[0.30] shadow-[0_0_0_1px_rgba(14,165,233,0.18),0_8px_24px_-8px_rgba(14,165,233,0.18)]',
         )}>
             <div className="flex items-start gap-4">

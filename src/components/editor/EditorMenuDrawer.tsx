@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
     Dialog,
@@ -255,7 +256,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                         <Link href="/settings/profile" onClick={guardedNavigate('/settings/profile')} className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px hover:bg-white/5 transition-colors">
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-[0_0_0_2px_rgba(59,130,246,0.3)] overflow-hidden bg-[rgba(255,255,255,0.06)]">
                                 {userAvatarUrl
-                                    ? <img src={userAvatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                                    ? <Image src={userAvatarUrl} alt="avatar" width={32} height={32} className="w-full h-full object-cover" />
                                     : <span className="text-[12px] font-bold text-white">{userInitial || '?'}</span>
                                 }
                             </div>

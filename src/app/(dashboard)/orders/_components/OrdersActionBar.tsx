@@ -79,7 +79,7 @@ export function OrdersActionBar({
                         placeholder={o.search}
                         onChange={(e) => onSearch?.(e.target.value)}
                         style={{ border: '1px solid var(--dash-border)' }}
-                        className="w-full h-[50px] pl-[48px] pr-[16px] py-[12px] bg-dash-surface rounded-[16px] text-[16px] leading-[1.2102272510528564em] font-normal text-dash-text placeholder-dash-text-muted focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors"
+                        className="w-full h-[50px] pl-[48px] pr-[16px] py-[12px] bg-dash-surface rounded-[16px] text-[16px] leading-[1.2102272510528564em] font-normal text-dash-text placeholder:text-dash-text-muted focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors"
                     />
                 </div>
 

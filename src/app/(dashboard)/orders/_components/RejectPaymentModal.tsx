@@ -126,7 +126,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                             style={{
                                 padding: '10px 14px',
                                 background: 'var(--dash-secondary-bg)',
-                                border: `1px solid ${detailError ? '#FB2C36' : 'var(--dash-border)'}`,
+                                border: `1px solid ${detailError ? 'var(--dash-error)' : 'var(--dash-border)'}`,
                                 borderRadius: 12,
                                 fontFamily: 'Inter, sans-serif',
                                 fontSize: 14,
@@ -136,7 +136,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                             }}
                         />
                         {detailError && (
-                            <span style={{ fontSize: 12, color: '#FB2C36' }}>{detailError}</span>
+                            <span style={{ fontSize: 12, color: 'var(--dash-error)' }}>{detailError}</span>
                         )}
                     </div>
                 )}
@@ -167,7 +167,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                         style={{
                             height: 48,
                             borderRadius: 12,
-                            background: isLoading ? 'rgba(251, 44, 54, 0.5)' : 'rgba(251, 44, 54, 1)',
+                            background: isLoading ? 'rgba(251, 44, 54, 0.5)' : 'var(--dash-error)',
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 600,
                             fontSize: 15,
