@@ -160,6 +160,9 @@ html:not(.dark) {
 .dash-shell .bg-green-600 .text-white,
 .dash-shell .bg-\[\#FB2C36\] .text-white,
 .dash-shell .bg-cyan-500 .text-white { color: #fff !important; }
+/* AI Fix All Issues gradient btn — light=white, dark=black */
+.dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #fff !important; }
+.dark .dash-shell .bg-\[linear-gradient\(167deg\,\#3B82F6_0\%\,\#2DD4BF_100\%\)\].text-white { color: #0F172A !important; }
 /* bg-white/opacity → light mode only: white-on-white → dark tint; dark mode keeps original white shimmer */
 html:not(.dark) .dash-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
 html:not(.dark) .dash-shell .bg-white\/5 { background-color: rgba(0,0,0,0.04); }
