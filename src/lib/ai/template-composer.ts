@@ -375,78 +375,85 @@ function featuresFromProducts(
 
 export function buildFeatures(biz: BusinessSample, category: string, language?: string): Record<string, unknown> {
   const i18n = getBlockStrings(language)
-  const featureMap: Record<string, { icon: string; title: string; description: string }[]> = {
+  type FItem = { icon: string; title: string; description: string; title_ms?: string; description_ms?: string }
+  const featureMap: Record<string, FItem[]> = {
     restaurant: [
-      { icon: 'Utensils', title: 'Authentic Recipes', description: 'Traditional recipes passed down through generations, using only the freshest local ingredients.' },
-      { icon: 'Award', title: 'Halal Certified', description: 'All our ingredients and preparation methods are JAKIM halal-certified for your peace of mind.' },
-      { icon: 'Truck', title: 'Fast Delivery', description: 'Available on GrabFood, Foodpanda, and direct ordering with free delivery within 5km.' },
+      { icon: 'Utensils', title: 'Authentic Recipes', description: 'Traditional recipes passed down through generations, using only the freshest local ingredients.', title_ms: 'Resipi Autentik', description_ms: 'Resipi tradisional yang diwarisi turun-temurun, menggunakan bahan-bahan tempatan yang paling segar.' },
+      { icon: 'Award', title: 'Halal Certified', description: 'All our ingredients and preparation methods are JAKIM halal-certified for your peace of mind.', title_ms: 'Bersijil Halal', description_ms: 'Semua bahan dan kaedah penyediaan kami bersijil halal JAKIM untuk ketenangan minda anda.' },
+      { icon: 'Truck', title: 'Fast Delivery', description: 'Available on GrabFood, Foodpanda, and direct ordering with free delivery within 5km.', title_ms: 'Penghantaran Pantas', description_ms: 'Tersedia di GrabFood, Foodpanda, dan tempahan terus dengan penghantaran percuma dalam radius 5km.' },
     ],
     ecommerce: [
-      { icon: 'ShieldCheck', title: 'Secure Payment', description: 'Pay safely with FPX, credit card, or e-wallets. All transactions are encrypted and protected.' },
-      { icon: 'Truck', title: 'Free Shipping', description: 'Enjoy free shipping on orders above RM 150. Express delivery available for RM 10.' },
-      { icon: 'RefreshCcw', title: '30-Day Returns', description: 'Not satisfied? Return within 30 days for a full refund. No questions asked.' },
+      { icon: 'ShieldCheck', title: 'Secure Payment', description: 'Pay safely with FPX, credit card, or e-wallets. All transactions are encrypted and protected.', title_ms: 'Pembayaran Selamat', description_ms: 'Bayar dengan selamat menggunakan FPX, kad kredit, atau e-dompet. Semua transaksi dienkripsi dan dilindungi.' },
+      { icon: 'Truck', title: 'Free Shipping', description: 'Enjoy free shipping on orders above RM 150. Express delivery available for RM 10.', title_ms: 'Penghantaran Percuma', description_ms: 'Nikmati penghantaran percuma untuk pesanan melebihi RM 150. Penghantaran ekspres tersedia pada RM 10.' },
+      { icon: 'RefreshCcw', title: '30-Day Returns', description: 'Not satisfied? Return within 30 days for a full refund. No questions asked.', title_ms: 'Pulangan 30 Hari', description_ms: 'Tidak berpuas hati? Pulangkan dalam masa 30 hari untuk bayaran balik penuh. Tanpa soal jawab.' },
     ],
     beauty: [
-      { icon: 'Sparkles', title: 'Premium Products', description: 'We use only halal-certified, dermatologist-tested products from Korea and Japan.' },
-      { icon: 'Clock', title: 'Easy Booking', description: 'Book your appointment online 24/7. Walk-ins welcome but booking guarantees your slot.' },
-      { icon: 'Heart', title: 'Personalised Care', description: 'Every treatment is customised to your skin type and concerns for the best results.' },
+      { icon: 'Sparkles', title: 'Premium Products', description: 'We use only halal-certified, dermatologist-tested products from Korea and Japan.', title_ms: 'Produk Premium', description_ms: 'Kami hanya menggunakan produk bersijil halal yang diuji oleh dermatologi dari Korea dan Jepun.' },
+      { icon: 'Clock', title: 'Easy Booking', description: 'Book your appointment online 24/7. Walk-ins welcome but booking guarantees your slot.', title_ms: 'Tempahan Mudah', description_ms: 'Tempah temujanji anda dalam talian 24/7. Pelawat tanpa temu janji dialu-alukan tetapi tempahan menjamin slot anda.' },
+      { icon: 'Heart', title: 'Personalised Care', description: 'Every treatment is customised to your skin type and concerns for the best results.', title_ms: 'Penjagaan Peribadi', description_ms: 'Setiap rawatan disesuaikan dengan jenis kulit dan kebimbangan anda untuk hasil terbaik.' },
     ],
     tech: [
-      { icon: 'Zap', title: 'Lightning Fast', description: 'Our infrastructure delivers sub-100ms response times with 99.9% uptime SLA.' },
-      { icon: 'Shield', title: 'Enterprise Security', description: 'Bank-grade encryption, SOC 2 compliance, and regular penetration testing.' },
-      { icon: 'Headphones', title: '24/7 Support', description: 'Our Malaysian support team is available round the clock via chat, email, and phone.' },
+      { icon: 'Zap', title: 'Lightning Fast', description: 'Our infrastructure delivers sub-100ms response times with 99.9% uptime SLA.', title_ms: 'Laju Seperti Kilat', description_ms: 'Infrastruktur kami memberikan masa tindak balas bawah 100ms dengan SLA masa aktif 99.9%.' },
+      { icon: 'Shield', title: 'Enterprise Security', description: 'Bank-grade encryption, SOC 2 compliance, and regular penetration testing.', title_ms: 'Keselamatan Perusahaan', description_ms: 'Enkripsi tahap bank, pematuhan SOC 2, dan ujian penembusan berkala.' },
+      { icon: 'Headphones', title: '24/7 Support', description: 'Our Malaysian support team is available round the clock via chat, email, and phone.', title_ms: 'Sokongan 24/7', description_ms: 'Pasukan sokongan Malaysia kami sedia membantu sepanjang masa melalui sembang, e-mel, dan telefon.' },
     ],
     health: [
-      { icon: 'Stethoscope', title: 'Expert Doctors', description: 'Our team of experienced doctors provide comprehensive healthcare for your whole family.' },
-      { icon: 'CreditCard', title: 'Insurance Accepted', description: 'We accept all major insurance panels including Great Eastern, AIA, and Prudential.' },
-      { icon: 'Clock', title: 'Minimal Wait Time', description: 'Our efficient scheduling ensures you spend less time waiting and more time getting care.' },
+      { icon: 'Stethoscope', title: 'Expert Doctors', description: 'Our team of experienced doctors provide comprehensive healthcare for your whole family.', title_ms: 'Doktor Pakar', description_ms: 'Pasukan doktor berpengalaman kami menyediakan penjagaan kesihatan menyeluruh untuk seluruh keluarga anda.' },
+      { icon: 'CreditCard', title: 'Insurance Accepted', description: 'We accept all major insurance panels including Great Eastern, AIA, and Prudential.', title_ms: 'Insurans Diterima', description_ms: 'Kami menerima semua panel insurans utama termasuk Great Eastern, AIA, dan Prudential.' },
+      { icon: 'Clock', title: 'Minimal Wait Time', description: 'Our efficient scheduling ensures you spend less time waiting and more time getting care.', title_ms: 'Masa Menunggu Minimum', description_ms: 'Penjadualan kami yang cekap memastikan anda menghabiskan lebih sedikit masa menunggu dan lebih banyak masa mendapat penjagaan.' },
     ],
     education: [
-      { icon: 'GraduationCap', title: 'Proven Results', description: 'Over 90% of our students achieve A grades in their subjects. Results speak for themselves.' },
-      { icon: 'Users', title: 'Small Class Sizes', description: 'Maximum 15 students per class ensures personal attention and better learning outcomes.' },
-      { icon: 'BookOpen', title: 'Updated Curriculum', description: 'Our materials follow the latest KSSM/KBSM syllabus and SPM exam format.' },
+      { icon: 'GraduationCap', title: 'Proven Results', description: 'Over 90% of our students achieve A grades in their subjects. Results speak for themselves.', title_ms: 'Keputusan Terbukti', description_ms: 'Lebih 90% pelajar kami mencapai gred A dalam mata pelajaran mereka. Keputusan berbicara sendiri.' },
+      { icon: 'Users', title: 'Small Class Sizes', description: 'Maximum 15 students per class ensures personal attention and better learning outcomes.', title_ms: 'Saiz Kelas Kecil', description_ms: 'Maksimum 15 pelajar setiap kelas memastikan perhatian peribadi dan hasil pembelajaran yang lebih baik.' },
+      { icon: 'BookOpen', title: 'Updated Curriculum', description: 'Our materials follow the latest KSSM/KBSM syllabus and SPM exam format.', title_ms: 'Kurikulum Terkini', description_ms: 'Bahan kami mengikuti silibus KSSM/KBSM terkini dan format peperiksaan SPM.' },
     ],
     realestate: [
-      { icon: 'Home', title: 'Premium Listings', description: 'Curated selection of the finest properties in KL, PJ, and the Klang Valley.' },
-      { icon: 'Shield', title: 'Trusted Agent', description: 'Licensed REN with over 10 years of experience and 500+ successful transactions.' },
-      { icon: 'TrendingUp', title: 'Market Insights', description: 'Get data-driven property valuations and investment advice from our expert team.' },
+      { icon: 'Home', title: 'Premium Listings', description: 'Curated selection of the finest properties in KL, PJ, and the Klang Valley.', title_ms: 'Penyenaraian Premium', description_ms: 'Pilihan hartanah terbaik yang dikurasi di KL, PJ, dan Lembah Klang.' },
+      { icon: 'Shield', title: 'Trusted Agent', description: 'Licensed REN with over 10 years of experience and 500+ successful transactions.', title_ms: 'Ejen Dipercayai', description_ms: 'REN berlesen dengan pengalaman lebih 10 tahun dan 500+ transaksi berjaya.' },
+      { icon: 'TrendingUp', title: 'Market Insights', description: 'Get data-driven property valuations and investment advice from our expert team.', title_ms: 'Pandangan Pasaran', description_ms: 'Dapatkan penilaian hartanah berasaskan data dan nasihat pelaburan daripada pasukan pakar kami.' },
     ],
     fitness: [
-      { icon: 'Dumbbell', title: 'Expert Trainers', description: 'Certified personal trainers with specialisation in body transformation and sports performance.' },
-      { icon: 'Users', title: 'Group Classes', description: 'Over 30 group classes per week including HIIT, yoga, spin, and boxing.' },
-      { icon: 'Clock', title: 'Flexible Hours', description: 'Open from 6 AM to 11 PM daily. Train on your schedule, not ours.' },
+      { icon: 'Dumbbell', title: 'Expert Trainers', description: 'Certified personal trainers with specialisation in body transformation and sports performance.', title_ms: 'Jurulatih Pakar', description_ms: 'Jurulatih peribadi bertauliah dengan pengkhususan dalam transformasi badan dan prestasi sukan.' },
+      { icon: 'Users', title: 'Group Classes', description: 'Over 30 group classes per week including HIIT, yoga, spin, and boxing.', title_ms: 'Kelas Berkumpulan', description_ms: 'Lebih 30 kelas berkumpulan seminggu termasuk HIIT, yoga, spin, dan tinju.' },
+      { icon: 'Clock', title: 'Flexible Hours', description: 'Open from 6 AM to 11 PM daily. Train on your schedule, not ours.', title_ms: 'Waktu Fleksibel', description_ms: 'Buka dari 6 pagi hingga 11 malam setiap hari. Berlatih mengikut jadual anda, bukan jadual kami.' },
     ],
     creative: [
-      { icon: 'Palette', title: 'Award-Winning Design', description: 'Our team has won multiple design awards and delivered for 200+ brands across Malaysia.' },
-      { icon: 'Layers', title: 'Full-Service Agency', description: 'From branding to web design to packaging — we handle everything under one roof.' },
-      { icon: 'Zap', title: 'Fast Turnaround', description: 'Logo in 5 days, brand identity in 2 weeks. We respect your timeline.' },
+      { icon: 'Palette', title: 'Award-Winning Design', description: 'Our team has won multiple design awards and delivered for 200+ brands across Malaysia.', title_ms: 'Reka Bentuk Pemenang Anugerah', description_ms: 'Pasukan kami telah memenangi pelbagai anugerah reka bentuk dan berkhidmat untuk 200+ jenama di seluruh Malaysia.' },
+      { icon: 'Layers', title: 'Full-Service Agency', description: 'From branding to web design to packaging — we handle everything under one roof.', title_ms: 'Agensi Perkhidmatan Penuh', description_ms: 'Dari penjenamaan hingga reka bentuk web dan pembungkusan — kami menguruskan segalanya di bawah satu bumbung.' },
+      { icon: 'Zap', title: 'Fast Turnaround', description: 'Logo in 5 days, brand identity in 2 weeks. We respect your timeline.', title_ms: 'Penyelesaian Pantas', description_ms: 'Logo dalam 5 hari, identiti jenama dalam 2 minggu. Kami menghormati jadual masa anda.' },
     ],
     business: [
-      { icon: 'BarChart', title: 'Data-Driven Strategy', description: 'Our consulting approach combines market data with decades of industry experience.' },
-      { icon: 'Globe', title: 'Regional Expertise', description: 'Deep knowledge of ASEAN markets with offices in KL, Singapore, and Jakarta.' },
-      { icon: 'Handshake', title: 'Trusted Advisor', description: 'Confidential, objective advice from experienced C-suite professionals.' },
+      { icon: 'BarChart', title: 'Data-Driven Strategy', description: 'Our consulting approach combines market data with decades of industry experience.', title_ms: 'Strategi Berasaskan Data', description_ms: 'Pendekatan perundingan kami menggabungkan data pasaran dengan dekad pengalaman industri.' },
+      { icon: 'Globe', title: 'Regional Expertise', description: 'Deep knowledge of ASEAN markets with offices in KL, Singapore, and Jakarta.', title_ms: 'Kepakaran Serantau', description_ms: 'Pengetahuan mendalam tentang pasaran ASEAN dengan pejabat di KL, Singapura, dan Jakarta.' },
+      { icon: 'Handshake', title: 'Trusted Advisor', description: 'Confidential, objective advice from experienced C-suite professionals.', title_ms: 'Penasihat Dipercayai', description_ms: 'Nasihat sulit dan objektif daripada profesional C-suite yang berpengalaman.' },
     ],
     fnb: [
-      { icon: 'Coffee', title: 'Quality Ingredients', description: 'We source premium beans and ingredients to deliver the authentic taste you love.' },
-      { icon: 'Wifi', title: 'Work-Friendly Space', description: 'Free Wi-Fi, power outlets at every table, and a quiet corner for focused work.' },
-      { icon: 'Heart', title: 'Made with Love', description: 'Every drink and dish is prepared fresh, following recipes perfected over decades.' },
+      { icon: 'Coffee', title: 'Quality Ingredients', description: 'We source premium beans and ingredients to deliver the authentic taste you love.', title_ms: 'Bahan Berkualiti', description_ms: 'Kami mendapatkan kacang dan bahan premium untuk menyampaikan rasa autentik yang anda sukai.' },
+      { icon: 'Wifi', title: 'Work-Friendly Space', description: 'Free Wi-Fi, power outlets at every table, and a quiet corner for focused work.', title_ms: 'Ruang Mesra Kerja', description_ms: 'Wi-Fi percuma, soket kuasa di setiap meja, dan sudut yang tenang untuk kerja berfokus.' },
+      { icon: 'Heart', title: 'Made with Love', description: 'Every drink and dish is prepared fresh, following recipes perfected over decades.', title_ms: 'Dibuat dengan Penuh Kasih', description_ms: 'Setiap minuman dan hidangan disediakan segar, mengikut resipi yang telah disempurnakan selama berdekad.' },
     ],
     events: [
-      { icon: 'Calendar', title: 'Flawless Planning', description: 'From venue selection to day-of coordination, we handle every detail so you can enjoy the moment.' },
-      { icon: 'Users', title: 'Experienced Team', description: 'Over 500 events delivered across weddings, corporate functions, and private celebrations.' },
-      { icon: 'Star', title: 'Custom Packages', description: 'Tailored packages from intimate gatherings of 20 to grand celebrations of 500+ guests.' },
+      { icon: 'Calendar', title: 'Flawless Planning', description: 'From venue selection to day-of coordination, we handle every detail so you can enjoy the moment.', title_ms: 'Perancangan Sempurna', description_ms: 'Dari pemilihan lokasi hingga penyelarasan hari majlis, kami menguruskan setiap butiran supaya anda boleh menikmati setiap detik.' },
+      { icon: 'Users', title: 'Experienced Team', description: 'Over 500 events delivered across weddings, corporate functions, and private celebrations.', title_ms: 'Pasukan Berpengalaman', description_ms: 'Lebih 500 acara telah disampaikan merangkumi perkahwinan, fungsi korporat, dan sambutan peribadi.' },
+      { icon: 'Star', title: 'Custom Packages', description: 'Tailored packages from intimate gatherings of 20 to grand celebrations of 500+ guests.', title_ms: 'Pakej Disesuaikan', description_ms: 'Pakej yang disesuaikan daripada perhimpunan intim 20 orang hingga perayaan besar 500+ tetamu.' },
     ],
     blog: [
-      { icon: 'PenTool', title: 'Expert Writers', description: 'Our team of experienced writers and editors deliver well-researched, engaging content daily.' },
-      { icon: 'TrendingUp', title: 'Trending Topics', description: 'Stay ahead with the latest insights, trends, and stories that matter to Malaysians.' },
-      { icon: 'Mail', title: 'Weekly Newsletter', description: 'Get the best stories delivered to your inbox every week. Join 10,000+ subscribers.' },
+      { icon: 'PenTool', title: 'Expert Writers', description: 'Our team of experienced writers and editors deliver well-researched, engaging content daily.', title_ms: 'Penulis Pakar', description_ms: 'Pasukan penulis dan editor berpengalaman kami menyampaikan kandungan yang dikaji dengan baik dan menarik setiap hari.' },
+      { icon: 'TrendingUp', title: 'Trending Topics', description: 'Stay ahead with the latest insights, trends, and stories that matter to Malaysians.', title_ms: 'Topik Semasa', description_ms: 'Sentiasa terkini dengan pandangan, trend, dan cerita terbaru yang penting bagi rakyat Malaysia.' },
+      { icon: 'Mail', title: 'Weekly Newsletter', description: 'Get the best stories delivered to your inbox every week. Join 10,000+ subscribers.', title_ms: 'Surat Berita Mingguan', description_ms: 'Dapatkan cerita terbaik dihantar ke peti masuk anda setiap minggu. Sertai 10,000+ pelanggan.' },
     ],
     travel: [
-      { icon: 'Map', title: 'Local Expertise', description: 'Born and raised in Malaysia — we know the hidden gems, best routes, and insider tips.' },
-      { icon: 'Shield', title: 'Safe & Insured', description: 'All tours include travel insurance and are led by licensed, first-aid certified guides.' },
-      { icon: 'DollarSign', title: 'Best Price Guarantee', description: 'Competitive RM pricing with no hidden fees. Price match guarantee on all packages.' },
+      { icon: 'Map', title: 'Local Expertise', description: 'Born and raised in Malaysia — we know the hidden gems, best routes, and insider tips.', title_ms: 'Kepakaran Tempatan', description_ms: 'Lahir dan dibesarkan di Malaysia — kami mengetahui permata tersembunyi, laluan terbaik, dan tip eksklusif.' },
+      { icon: 'Shield', title: 'Safe & Insured', description: 'All tours include travel insurance and are led by licensed, first-aid certified guides.', title_ms: 'Selamat & Dilindungi', description_ms: 'Semua lawatan termasuk insurans perjalanan dan dipimpin oleh pemandu berlesen dan bertauliah pertolongan cemas.' },
+      { icon: 'DollarSign', title: 'Best Price Guarantee', description: 'Competitive RM pricing with no hidden fees. Price match guarantee on all packages.', title_ms: 'Jaminan Harga Terbaik', description_ms: 'Harga RM yang kompetitif tanpa caj tersembunyi. Jaminan padanan harga untuk semua pakej.' },
     ],
   }
+
+  const localizeFeature = (item: FItem) => ({
+    icon: item.icon,
+    title: (language === 'ms' && item.title_ms) ? item.title_ms : item.title,
+    description: (language === 'ms' && item.description_ms) ? item.description_ms : item.description,
+  })
 
   const canned = featureMap[category] ?? featureMap['business']!
   // Plan 260414-2249 phase-01: when user supplies ≥2 products, emit
@@ -456,7 +463,7 @@ export function buildFeatures(biz: BusinessSample, category: string, language?: 
   const features =
     userProducts.length >= 2
       ? featuresFromProducts(userProducts, category, canned.length)
-      : canned
+      : canned.map(localizeFeature)
   return {
     blockType: 'features',
     variant: 'grid-3',
@@ -704,6 +711,7 @@ export function buildAbout(biz: BusinessSample, language?: string): Record<strin
     headline: `${i18n.about.headlinePrefix} ${biz.name}`,
     body: biz.description,
     layout: 'image-right',
+    sectionLabel: i18n.footer.aboutUs,
   }
 }
 
@@ -1151,78 +1159,85 @@ function buildPortfolioGrid(): Record<string, unknown> {
 }
 
 export function buildServiceCards(biz: BusinessSample, category: string, language?: string): Record<string, unknown> {
-  const servicesMap: Record<string, { title: string; description: string; icon: string; price?: string; priceUnit?: string }[]> = {
+  type SItem = { title: string; description: string; icon: string; price?: string; priceUnit?: string; title_ms?: string; description_ms?: string }
+  const servicesMap: Record<string, SItem[]> = {
     business: [
-      { title: 'Strategy Consulting', description: 'C-suite advisory and market strategy development.', icon: 'BarChart', price: 'RM 500', priceUnit: '/hour' },
-      { title: 'Market Entry', description: 'Comprehensive market research and entry planning for ASEAN.', icon: 'Globe', price: 'From RM 25,000', priceUnit: '/project' },
-      { title: 'M&A Advisory', description: 'Due diligence and deal structuring for mergers and acquisitions.', icon: 'Handshake', price: 'From RM 50,000', priceUnit: '/project' },
+      { title: 'Strategy Consulting', description: 'C-suite advisory and market strategy development.', icon: 'BarChart', price: 'RM 500', priceUnit: '/hour', title_ms: 'Perundingan Strategi', description_ms: 'Penasihat C-suite dan pembangunan strategi pasaran.' },
+      { title: 'Market Entry', description: 'Comprehensive market research and entry planning for ASEAN.', icon: 'Globe', price: 'From RM 25,000', priceUnit: '/project', title_ms: 'Kemasukan Pasaran', description_ms: 'Penyelidikan pasaran menyeluruh dan perancangan kemasukan untuk ASEAN.' },
+      { title: 'M&A Advisory', description: 'Due diligence and deal structuring for mergers and acquisitions.', icon: 'Handshake', price: 'From RM 50,000', priceUnit: '/project', title_ms: 'Penasihat M&A', description_ms: 'Due diligence dan penstrukturan perjanjian untuk penggabungan dan pemerolehan.' },
     ],
     beauty: [
-      { title: 'Facial Treatment', description: 'Customised facials for every skin type and concern.', icon: 'Sparkles', price: 'From RM 120', priceUnit: '/session' },
-      { title: 'Nail Art', description: 'Classic to creative nail designs using premium products.', icon: 'Palette', price: 'From RM 45', priceUnit: '/session' },
-      { title: 'Lash Extensions', description: 'Natural to dramatic lash looks that last 3-4 weeks.', icon: 'Eye', price: 'From RM 120', priceUnit: '/set' },
+      { title: 'Facial Treatment', description: 'Customised facials for every skin type and concern.', icon: 'Sparkles', price: 'From RM 120', priceUnit: '/session', title_ms: 'Rawatan Muka', description_ms: 'Rawatan muka yang disesuaikan untuk setiap jenis kulit dan kebimbangan.' },
+      { title: 'Nail Art', description: 'Classic to creative nail designs using premium products.', icon: 'Palette', price: 'From RM 45', priceUnit: '/session', title_ms: 'Seni Kuku', description_ms: 'Reka bentuk kuku klasik hingga kreatif menggunakan produk premium.' },
+      { title: 'Lash Extensions', description: 'Natural to dramatic lash looks that last 3-4 weeks.', icon: 'Eye', price: 'From RM 120', priceUnit: '/set', title_ms: 'Sambungan Bulu Mata', description_ms: 'Penampilan bulu mata semula jadi hingga dramatik yang tahan 3-4 minggu.' },
     ],
     health: [
-      { title: 'General Consultation', description: 'Doctor consultation for acute and chronic conditions, all age groups.', icon: 'Stethoscope', price: 'From RM 80', priceUnit: '/visit' },
-      { title: 'Health Screening', description: 'Comprehensive blood panel, ECG and imaging with specialist review.', icon: 'Activity', price: 'From RM 550', priceUnit: '/package' },
-      { title: 'Minor Procedures', description: 'Wound dressing, vaccinations, IV drip and nebuliser therapy.', icon: 'Syringe', price: 'From RM 60', priceUnit: '/procedure' },
+      { title: 'General Consultation', description: 'Doctor consultation for acute and chronic conditions, all age groups.', icon: 'Stethoscope', price: 'From RM 80', priceUnit: '/visit', title_ms: 'Perundingan Umum', description_ms: 'Perundingan doktor untuk keadaan akut dan kronik, semua kumpulan umur.' },
+      { title: 'Health Screening', description: 'Comprehensive blood panel, ECG and imaging with specialist review.', icon: 'Activity', price: 'From RM 550', priceUnit: '/package', title_ms: 'Saringan Kesihatan', description_ms: 'Panel darah menyeluruh, ECG dan pengimejan dengan ulasan pakar.' },
+      { title: 'Minor Procedures', description: 'Wound dressing, vaccinations, IV drip and nebuliser therapy.', icon: 'Syringe', price: 'From RM 60', priceUnit: '/procedure', title_ms: 'Prosedur Kecil', description_ms: 'Pembalutan luka, vaksinasi, titisan IV dan terapi nebulizer.' },
     ],
     tech: [
-      { title: 'Managed Hosting', description: '99.9% uptime SLA on AWS Singapore + KL redundancy.', icon: 'Server', price: 'From RM 299', priceUnit: '/month' },
-      { title: 'DevOps Setup', description: 'CI/CD pipelines, observability stack and on-call runbook.', icon: 'GitBranch', price: 'From RM 8,000', priceUnit: '/project' },
-      { title: '24/7 Support', description: 'Dedicated account engineer with 15-minute response SLA.', icon: 'Headphones', price: 'From RM 2,500', priceUnit: '/month' },
+      { title: 'Managed Hosting', description: '99.9% uptime SLA on AWS Singapore + KL redundancy.', icon: 'Server', price: 'From RM 299', priceUnit: '/month', title_ms: 'Pengehosan Terurus', description_ms: 'SLA masa aktif 99.9% pada AWS Singapura + redundansi KL.' },
+      { title: 'DevOps Setup', description: 'CI/CD pipelines, observability stack and on-call runbook.', icon: 'GitBranch', price: 'From RM 8,000', priceUnit: '/project', title_ms: 'Persediaan DevOps', description_ms: 'Saluran CI/CD, tumpukan kebolehperhatian dan buku panduan on-call.' },
+      { title: '24/7 Support', description: 'Dedicated account engineer with 15-minute response SLA.', icon: 'Headphones', price: 'From RM 2,500', priceUnit: '/month', title_ms: 'Sokongan 24/7', description_ms: 'Jurutera akaun khusus dengan SLA tindak balas 15 minit.' },
     ],
     education: [
-      { title: 'Group Classes', description: 'Small-group SPM and UPSR tuition, max 8 students per class.', icon: 'Users', price: 'From RM 200', priceUnit: '/month' },
-      { title: '1-on-1 Tutoring', description: 'Personalised coaching with weekly progress reports to parents.', icon: 'User', price: 'From RM 120', priceUnit: '/hour' },
-      { title: 'Exam Bootcamp', description: 'Intensive revision programme in the month before major exams.', icon: 'GraduationCap', price: 'From RM 800', priceUnit: '/bootcamp' },
+      { title: 'Group Classes', description: 'Small-group SPM and UPSR tuition, max 8 students per class.', icon: 'Users', price: 'From RM 200', priceUnit: '/month', title_ms: 'Kelas Berkumpulan', description_ms: 'Tuisyen kumpulan kecil SPM dan UPSR, maksimum 8 pelajar setiap kelas.' },
+      { title: '1-on-1 Tutoring', description: 'Personalised coaching with weekly progress reports to parents.', icon: 'User', price: 'From RM 120', priceUnit: '/hour', title_ms: 'Pengajaran 1-lawan-1', description_ms: 'Bimbingan peribadi dengan laporan kemajuan mingguan kepada ibu bapa.' },
+      { title: 'Exam Bootcamp', description: 'Intensive revision programme in the month before major exams.', icon: 'GraduationCap', price: 'From RM 800', priceUnit: '/bootcamp', title_ms: 'Kem Latihan Peperiksaan', description_ms: 'Program ulang kaji intensif dalam sebulan sebelum peperiksaan utama.' },
     ],
     fitness: [
-      { title: 'Personal Training', description: 'Customised 1-on-1 strength + cardio programming with nutrition plan.', icon: 'Dumbbell', price: 'From RM 150', priceUnit: '/session' },
-      { title: 'Group Classes', description: 'HIIT, yoga, pilates and spin classes every morning and evening.', icon: 'Users', price: 'From RM 250', priceUnit: '/month' },
-      { title: 'Sports Rehab', description: 'Physiotherapy and injury recovery for weekend warriors and athletes.', icon: 'HeartPulse', price: 'From RM 180', priceUnit: '/session' },
+      { title: 'Personal Training', description: 'Customised 1-on-1 strength + cardio programming with nutrition plan.', icon: 'Dumbbell', price: 'From RM 150', priceUnit: '/session', title_ms: 'Latihan Peribadi', description_ms: 'Program kekuatan + kardio 1-lawan-1 yang disesuaikan dengan pelan pemakanan.' },
+      { title: 'Group Classes', description: 'HIIT, yoga, pilates and spin classes every morning and evening.', icon: 'Users', price: 'From RM 250', priceUnit: '/month', title_ms: 'Kelas Berkumpulan', description_ms: 'Kelas HIIT, yoga, pilates dan spin setiap pagi dan petang.' },
+      { title: 'Sports Rehab', description: 'Physiotherapy and injury recovery for weekend warriors and athletes.', icon: 'HeartPulse', price: 'From RM 180', priceUnit: '/session', title_ms: 'Pemulihan Sukan', description_ms: 'Fisioterapi dan pemulihan kecederaan untuk atlet dan pejuang hujung minggu.' },
     ],
     creative: [
-      { title: 'Brand Identity', description: 'Logo, colour system, typography and full brand guidelines.', icon: 'Palette', price: 'From RM 3,500', priceUnit: '/project' },
-      { title: 'Web Design', description: 'Conversion-focused website design with UX audit and wireframes.', icon: 'Monitor', price: 'From RM 5,500', priceUnit: '/project' },
-      { title: 'Content Creation', description: 'Monthly social media content, photography and short-form video.', icon: 'Camera', price: 'From RM 2,800', priceUnit: '/month' },
+      { title: 'Brand Identity', description: 'Logo, colour system, typography and full brand guidelines.', icon: 'Palette', price: 'From RM 3,500', priceUnit: '/project', title_ms: 'Identiti Jenama', description_ms: 'Logo, sistem warna, tipografi dan panduan jenama penuh.' },
+      { title: 'Web Design', description: 'Conversion-focused website design with UX audit and wireframes.', icon: 'Monitor', price: 'From RM 5,500', priceUnit: '/project', title_ms: 'Reka Bentuk Web', description_ms: 'Reka bentuk laman web berfokus penukaran dengan audit UX dan rangka kawat.' },
+      { title: 'Content Creation', description: 'Monthly social media content, photography and short-form video.', icon: 'Camera', price: 'From RM 2,800', priceUnit: '/month', title_ms: 'Penciptaan Kandungan', description_ms: 'Kandungan media sosial bulanan, fotografi dan video format pendek.' },
     ],
     restaurant: [
-      { title: 'Dine-In Experience', description: 'Curated multi-course menu with seasonal specials and optional wine pairing.', icon: 'Utensils', price: 'From RM 88', priceUnit: '/pax' },
-      { title: 'Private Events', description: 'Restaurant buy-out for weddings, birthdays and corporate dinners.', icon: 'Calendar', price: 'From RM 2,500', priceUnit: '/event' },
-      { title: 'Catering Service', description: 'Full-service off-site catering for groups of 20-200.', icon: 'Truck', price: 'From RM 45', priceUnit: '/pax' },
+      { title: 'Dine-In Experience', description: 'Curated multi-course menu with seasonal specials and optional wine pairing.', icon: 'Utensils', price: 'From RM 88', priceUnit: '/pax', title_ms: 'Pengalaman Makan Di Tempat', description_ms: 'Menu berbilang hidangan yang dikurasi dengan keistimewaan bermusim dan padanan minuman pilihan.' },
+      { title: 'Private Events', description: 'Restaurant buy-out for weddings, birthdays and corporate dinners.', icon: 'Calendar', price: 'From RM 2,500', priceUnit: '/event', title_ms: 'Acara Peribadi', description_ms: 'Pembelian restoran untuk perkahwinan, hari jadi dan makan malam korporat.' },
+      { title: 'Catering Service', description: 'Full-service off-site catering for groups of 20-200.', icon: 'Truck', price: 'From RM 45', priceUnit: '/pax', title_ms: 'Perkhidmatan Katering', description_ms: 'Katering luar tapak perkhidmatan penuh untuk kumpulan 20-200 orang.' },
     ],
     fnb: [
-      { title: 'Retail Store', description: 'Daily fresh bakes and heritage kuih available at all outlets.', icon: 'Store', price: 'From RM 5', priceUnit: '/item' },
-      { title: 'Party Platters', description: 'Pre-order trays and boxes for birthdays, office meetings and family gatherings.', icon: 'Package', price: 'From RM 120', priceUnit: '/tray' },
-      { title: 'Corporate Catering', description: 'Buffet + plated meal service for offices in Klang Valley.', icon: 'Truck', price: 'From RM 18', priceUnit: '/pax' },
+      { title: 'Retail Store', description: 'Daily fresh bakes and heritage kuih available at all outlets.', icon: 'Store', price: 'From RM 5', priceUnit: '/item', title_ms: 'Kedai Runcit', description_ms: 'Barang bakar segar harian dan kuih warisan tersedia di semua cawangan.' },
+      { title: 'Party Platters', description: 'Pre-order trays and boxes for birthdays, office meetings and family gatherings.', icon: 'Package', price: 'From RM 120', priceUnit: '/tray', title_ms: 'Dulang Parti', description_ms: 'Dulang dan kotak pre-tempahan untuk hari jadi, mesyuarat pejabat dan perhimpunan keluarga.' },
+      { title: 'Corporate Catering', description: 'Buffet + plated meal service for offices in Klang Valley.', icon: 'Truck', price: 'From RM 18', priceUnit: '/pax', title_ms: 'Katering Korporat', description_ms: 'Perkhidmatan makan malam buffet dan plated untuk pejabat di Lembah Klang.' },
     ],
     ecommerce: [
-      { title: 'Fast Delivery', description: 'Next-day shipping to Klang Valley and 2-day nationwide delivery.', icon: 'Truck', price: 'Free', priceUnit: 'over RM 150' },
-      { title: 'Easy Returns', description: 'Hassle-free 14-day return policy with free pickup service.', icon: 'RotateCcw', price: 'Free', priceUnit: 'returns' },
-      { title: 'WhatsApp Concierge', description: 'Personal shopping assistance and styling advice on demand.', icon: 'MessageCircle', price: 'Free', priceUnit: 'all customers' },
+      { title: 'Fast Delivery', description: 'Next-day shipping to Klang Valley and 2-day nationwide delivery.', icon: 'Truck', price: 'Free', priceUnit: 'over RM 150', title_ms: 'Penghantaran Pantas', description_ms: 'Penghantaran hari berikutnya ke Lembah Klang dan penghantaran 2 hari ke seluruh negara.' },
+      { title: 'Easy Returns', description: 'Hassle-free 14-day return policy with free pickup service.', icon: 'RotateCcw', price: 'Free', priceUnit: 'returns', title_ms: 'Pemulangan Mudah', description_ms: 'Polisi pemulangan 14 hari tanpa kerumitan dengan perkhidmatan kutipan percuma.' },
+      { title: 'WhatsApp Concierge', description: 'Personal shopping assistance and styling advice on demand.', icon: 'MessageCircle', price: 'Free', priceUnit: 'all customers', title_ms: 'Concierge WhatsApp', description_ms: 'Bantuan membeli-belah peribadi dan nasihat gaya atas permintaan.' },
     ],
     realestate: [
-      { title: 'Property Viewing', description: 'Guided viewings with market briefing and neighbourhood tour.', icon: 'Home', price: 'Free', priceUnit: 'consultation' },
-      { title: 'Sale & Purchase', description: 'End-to-end transaction handling: negotiation, SPA, loan and legal.', icon: 'FileText', price: '2%', priceUnit: 'of sale price' },
-      { title: 'Investment Advisory', description: 'ROI analysis, rental yield forecasting and portfolio structuring.', icon: 'TrendingUp', price: 'From RM 500', priceUnit: '/session' },
+      { title: 'Property Viewing', description: 'Guided viewings with market briefing and neighbourhood tour.', icon: 'Home', price: 'Free', priceUnit: 'consultation', title_ms: 'Tontonan Hartanah', description_ms: 'Tontonan berpandu dengan taklimat pasaran dan lawatan kejiranan.' },
+      { title: 'Sale & Purchase', description: 'End-to-end transaction handling: negotiation, SPA, loan and legal.', icon: 'FileText', price: '2%', priceUnit: 'of sale price', title_ms: 'Jual Beli', description_ms: 'Pengendalian transaksi dari awal hingga akhir: rundingan, SPA, pinjaman dan undang-undang.' },
+      { title: 'Investment Advisory', description: 'ROI analysis, rental yield forecasting and portfolio structuring.', icon: 'TrendingUp', price: 'From RM 500', priceUnit: '/session', title_ms: 'Penasihat Pelaburan', description_ms: 'Analisis ROI, ramalan hasil sewa dan penstrukturan portfolio.' },
     ],
     events: [
-      { title: 'Wedding Planning', description: 'Full-service wedding coordination from proposal to reception.', icon: 'Heart', price: 'From RM 8,000', priceUnit: '/wedding' },
-      { title: 'Corporate Events', description: 'Product launches, galas and team-building for 50-1000 PAX.', icon: 'Briefcase', price: 'From RM 15,000', priceUnit: '/event' },
-      { title: 'Décor & Styling', description: 'Floral design, lighting and stage setup for any celebration.', icon: 'Sparkles', price: 'From RM 3,500', priceUnit: '/event' },
+      { title: 'Wedding Planning', description: 'Full-service wedding coordination from proposal to reception.', icon: 'Heart', price: 'From RM 8,000', priceUnit: '/wedding', title_ms: 'Perancangan Perkahwinan', description_ms: 'Penyelarasan perkahwinan perkhidmatan penuh dari lamaran hingga majlis.' },
+      { title: 'Corporate Events', description: 'Product launches, galas and team-building for 50-1000 PAX.', icon: 'Briefcase', price: 'From RM 15,000', priceUnit: '/event', title_ms: 'Acara Korporat', description_ms: 'Pelancaran produk, gala dan pembinaan pasukan untuk 50-1000 pax.' },
+      { title: 'Décor & Styling', description: 'Floral design, lighting and stage setup for any celebration.', icon: 'Sparkles', price: 'From RM 3,500', priceUnit: '/event', title_ms: 'Dekorasi & Penggayaan', description_ms: 'Reka bentuk bunga, pencahayaan dan persediaan pentas untuk sebarang perayaan.' },
     ],
     travel: [
-      { title: 'Day Tours', description: 'Half-day and full-day curated experiences in KL, Penang and Melaka.', icon: 'Map', price: 'From RM 180', priceUnit: '/pax' },
-      { title: 'Multi-Day Packages', description: 'Peninsular and East Malaysia itineraries with hotels and transport.', icon: 'Backpack', price: 'From RM 680', priceUnit: '/pax' },
-      { title: 'Custom Itineraries', description: 'Tailor-made trips designed around your schedule and interests.', icon: 'Compass', price: 'From RM 1,500', priceUnit: '/pax' },
+      { title: 'Day Tours', description: 'Half-day and full-day curated experiences in KL, Penang and Melaka.', icon: 'Map', price: 'From RM 180', priceUnit: '/pax', title_ms: 'Lawatan Sehari', description_ms: 'Pengalaman dikurasi separuh hari dan sehari penuh di KL, Pulau Pinang dan Melaka.' },
+      { title: 'Multi-Day Packages', description: 'Peninsular and East Malaysia itineraries with hotels and transport.', icon: 'Backpack', price: 'From RM 680', priceUnit: '/pax', title_ms: 'Pakej Berbilang Hari', description_ms: 'Itinerari Semenanjung dan Malaysia Timur dengan hotel dan pengangkutan.' },
+      { title: 'Custom Itineraries', description: 'Tailor-made trips designed around your schedule and interests.', icon: 'Compass', price: 'From RM 1,500', priceUnit: '/pax', title_ms: 'Itinerari Tersuai', description_ms: 'Perjalanan yang dibuat khas mengikut jadual dan minat anda.' },
     ],
     blog: [
-      { title: 'Sponsored Articles', description: 'Long-form branded features published on our main blog.', icon: 'FileText', price: 'From RM 2,500', priceUnit: '/article' },
-      { title: 'Newsletter Placements', description: 'Featured slot in our weekly newsletter reaching 20k+ readers.', icon: 'Mail', price: 'From RM 800', priceUnit: '/placement' },
-      { title: 'Podcast Interviews', description: 'Guest spot on our flagship podcast with cross-promotion.', icon: 'Mic', price: 'From RM 1,500', priceUnit: '/episode' },
+      { title: 'Sponsored Articles', description: 'Long-form branded features published on our main blog.', icon: 'FileText', price: 'From RM 2,500', priceUnit: '/article', title_ms: 'Artikel Tajaan', description_ms: 'Ciri jenama bentuk panjang yang diterbitkan di blog utama kami.' },
+      { title: 'Newsletter Placements', description: 'Featured slot in our weekly newsletter reaching 20k+ readers.', icon: 'Mail', price: 'From RM 800', priceUnit: '/placement', title_ms: 'Penempatan Surat Berita', description_ms: 'Slot utama dalam surat berita mingguan kami yang mencapai 20k+ pembaca.' },
+      { title: 'Podcast Interviews', description: 'Guest spot on our flagship podcast with cross-promotion.', icon: 'Mic', price: 'From RM 1,500', priceUnit: '/episode', title_ms: 'Temu Bual Podcast', description_ms: 'Slot tetamu dalam podcast unggulan kami dengan promosi silang.' },
     ],
   }
+
+  const localizeService = (s: SItem) => ({
+    ...s,
+    title: (language === 'ms' && s.title_ms) ? s.title_ms : s.title,
+    description: (language === 'ms' && s.description_ms) ? s.description_ms : s.description,
+  })
 
   const i18n = getBlockStrings(language)
   const canned = servicesMap[category] ?? servicesMap['business']!
@@ -1240,7 +1255,7 @@ export function buildServiceCards(biz: BusinessSample, category: string, languag
           icon: card.icon,
           cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
         }))
-      : canned.map((s) => ({
+      : canned.map(localizeService).map((s) => ({
           ...s,
           cta: { label: i18n.serviceCards.ctaLabel, url: '/contact' },
         }))

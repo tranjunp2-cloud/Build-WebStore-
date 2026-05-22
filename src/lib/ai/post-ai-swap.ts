@@ -105,8 +105,20 @@ function normalizeClientLogosHeadline(
 ): Record<string, unknown>[] {
     const i18n = getBlockStrings(language)
     return blocks.map((block) => {
-        if (block.blockType !== 'client-logos') return block
+        if (block.blockType !== 'client-logos' && block.blockType !== 'logo-cloud') return block
         return { ...block, headline: i18n.clientLogos.headline }
+    })
+}
+
+/** Patch about block sectionLabel — GPT defaults to English "About Us" even for non-English sites. */
+function normalizeAboutSectionLabel(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'about') return block
+        return { ...block, sectionLabel: i18n.footer.aboutUs }
     })
 }
 
@@ -295,7 +307,8 @@ export function postAISwapStep(
     const contact = normalizeContactLabels(nav, language)
     const logos = normalizeClientLogosHeadline(contact, language)
     const features = normalizeFeaturesHeadline(logos, language, biz.name)
-    const final = normalizeTestimonialsSubheadline(features, language)
+    const testimonials = normalizeTestimonialsSubheadline(features, language)
+    const final = normalizeAboutSectionLabel(testimonials, language)
     return { blocks: final, telemetry }
 }
 

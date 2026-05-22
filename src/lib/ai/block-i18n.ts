@@ -222,7 +222,7 @@ const STRINGS: Record<string, BlockStrings> = {
             subheadline: 'Orang-orang di sebalik kejayaan kami.',
         },
         serviceCards: { headline: 'Perkhidmatan Kami', subheadline: (name) => `Temui apa yang ${name} boleh lakukan untuk anda.`, ctaLabel: 'Ketahui Lebih Lanjut' },
-        clientLogos: { headline: 'Dipercayai Oleh' },
+        clientLogos: { headline: 'Dipercayai Oleh Pemimpin Industri' },
         gallery: { headline: 'Kerja-kerja Kami' },
         newsletter: {
             headlineStayUpdated: (name) => `Ikuti Perkembangan Terbaru ${name}`,
@@ -294,7 +294,7 @@ const STRINGS: Record<string, BlockStrings> = {
             subheadline: 'Những con người tạo nên điều kỳ diệu.',
         },
         serviceCards: { headline: 'Dịch Vụ Của Chúng Tôi', subheadline: (name) => `Khám phá những gì ${name} có thể làm cho bạn.`, ctaLabel: 'Tìm Hiểu Thêm' },
-        clientLogos: { headline: 'Được Tin Tưởng Bởi' },
+        clientLogos: { headline: 'Được Tin Tưởng Bởi Các Lãnh Đạo Ngành' },
         gallery: { headline: 'Tác Phẩm Của Chúng Tôi' },
         newsletter: {
             headlineStayUpdated: (name) => `Cập Nhật Mới Nhất Từ ${name}`,

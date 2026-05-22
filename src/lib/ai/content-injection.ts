@@ -585,7 +585,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'logo-cloud',
                 variant: 'row',
-                headline: 'Trusted By',
+                headline: i18n.clientLogos.headline,
                 logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
                     .slice(0, 6)
                     .map((l) => ({ name: l.name, logo: { url: l.url ?? '', alt: l.name } })),
@@ -595,7 +595,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'client-logos',
                 variant: 'scroll',
-                headline: 'Trusted By Industry Leaders',
+                headline: i18n.clientLogos.headline,
                 // Seed library lacks image urls (copyright); pass name as alt + empty url.
                 // Render falls back to initials badge placeholder — see LogoImage in client-logos/index.tsx.
                 logos: (content.logos ?? pickLogosByCategory(category, 6, ctx.seed ?? 0))
