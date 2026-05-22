@@ -363,6 +363,8 @@
       "orderStatusSuccess": "Order placed",
       "orderStatusConfirmed": "Confirmed by seller",
       "bodyConfirmed": "Your order has been confirmed by the seller and is now being prepared.",
+      "orderStatusCompleted": "Delivered",
+      "bodyCompleted": "Your order has been delivered. Thank you for your purchase!",
       "orderDate": "Order date",
       "productName": "Product name",
       "quantity": "Quantity",

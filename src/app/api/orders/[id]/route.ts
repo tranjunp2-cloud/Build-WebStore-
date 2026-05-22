@@ -92,7 +92,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                 const customerEmail = (order as any).customerEmail
                 const orderNumber = (order as any).orderNumber ?? id
 
-                if (newStatus === 'cancelled' || newStatus === 'shipped' || newStatus === 'confirmed') {
+                if (newStatus === 'cancelled' || newStatus === 'shipped' || newStatus === 'confirmed' || newStatus === 'completed') {
                     const tenantId = typeof (order as any).tenant === 'object'
                         ? (order as any).tenant.id
                         : (order as any).tenant
@@ -114,8 +114,8 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                         lineTotal: item.quantity * item.unitPrice,
                     }))
 
-                    if (newStatus === 'confirmed') {
-                        const confirmedEmail = orderConfirmationEmail({
+                    if (newStatus === 'confirmed' || newStatus === 'completed') {
+                        const richEmail = orderConfirmationEmail({
                             shopName,
                             orderNumber,
                             customerName: (order as any).customerName ?? '',
@@ -131,10 +131,10 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                             orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
                             currency: (order as any).currency ?? 'MYR',
                             locale: siteLocale,
-                            event: 'confirmed',
+                            event: newStatus as 'confirmed' | 'completed',
                         })
-                        payload.sendEmail({ to: customerEmail, subject: confirmedEmail.subject, html: confirmedEmail.html })
-                            .catch((err: unknown) => console.error('[Email confirmed notify]', err))
+                        payload.sendEmail({ to: customerEmail, subject: richEmail.subject, html: richEmail.html })
+                            .catch((err: unknown) => console.error(`[Email ${newStatus} notify]`, err))
                     } else if (newStatus === 'cancelled') {
                         const cancelEmail = orderCancelledEmail({
                             shopName,

@@ -363,6 +363,8 @@
       "orderStatusSuccess": "Pesanan berjaya",
       "orderStatusConfirmed": "Disahkan oleh penjual",
       "bodyConfirmed": "Pesanan anda telah disahkan oleh penjual dan sedang disediakan.",
+      "orderStatusCompleted": "Telah dihantar",
+      "bodyCompleted": "Pesanan anda telah dihantar. Terima kasih atas pembelian anda!",
       "orderDate": "Tarikh pesanan",
       "productName": "Nama produk",
       "quantity": "Kuantiti",

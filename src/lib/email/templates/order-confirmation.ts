@@ -46,8 +46,8 @@ export interface OrderConfirmationData {
     orderPageUrl: string
     currency: string
     buyerNote?: string | null
-    /** 'placed' = initial order creation email (default) | 'confirmed' = seller confirmed the order */
-    event?: 'placed' | 'confirmed'
+    /** 'placed' = initial order creation | 'confirmed' = seller confirmed | 'completed' = order delivered */
+    event?: 'placed' | 'confirmed' | 'completed'
     locale?: EmailLocale
 }
 
@@ -89,12 +89,17 @@ export function orderConfirmationEmail(
     const locale = data.locale ?? 'ms'
     const t = (locales[locale] ?? locales.ms).order
     const isConfirmed = data.event === 'confirmed'
+    const isCompleted = data.event === 'completed'
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
 
-    const bodyText = isConfirmed ? (t as any).bodyConfirmed : t.body
-    const statusLabel = isConfirmed ? (t as any).orderStatusConfirmed : t.orderStatusSuccess
+    const bodyText = isConfirmed ? (t as any).bodyConfirmed
+        : isCompleted ? (t as any).bodyCompleted
+        : t.body
+    const statusLabel = isConfirmed ? (t as any).orderStatusConfirmed
+        : isCompleted ? (t as any).orderStatusCompleted
+        : t.orderStatusSuccess
 
     const prepaid = data.paymentMethod === 'stripe' ? data.total : 0
     const cod = data.paymentMethod === 'cod' ? data.total : 0
@@ -134,6 +139,10 @@ export function orderConfirmationEmail(
         ? (locale === 'ms'
             ? `${esc(data.shopName)} - Pesanan anda telah disahkan - ${esc(data.orderNumber)}`
             : `${esc(data.shopName)} - Your order has been confirmed - ${esc(data.orderNumber)}`)
+        : isCompleted
+        ? (locale === 'ms'
+            ? `${esc(data.shopName)} - Pesanan anda telah selesai - ${esc(data.orderNumber)}`
+            : `${esc(data.shopName)} - Your order has been completed - ${esc(data.orderNumber)}`)
         : (locale === 'ms'
             ? `${esc(data.shopName)} - Anda telah berjaya membuat pesanan - ${esc(data.orderNumber)}`
             : `${esc(data.shopName)} - Your order has been placed - ${esc(data.orderNumber)}`)
