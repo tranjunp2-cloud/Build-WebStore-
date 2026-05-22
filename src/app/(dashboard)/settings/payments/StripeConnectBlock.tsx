@@ -41,8 +41,8 @@ export function StripeConnectBlock({
                 gridTemplateColumns: '56px 1fr auto',
                 borderColor: isVerifyMode ? 'rgba(251,191,36,0.35)' : 'rgba(14,165,233,0.32)',
                 background: isVerifyMode
-                    ? 'radial-gradient(circle at 0% 0%, rgba(251,191,36,0.12) 0%, transparent 55%), radial-gradient(circle at 100% 100%, rgba(245,158,11,0.08) 0%, transparent 55%), #141e2e'
-                    : 'radial-gradient(circle at 0% 0%, rgba(14,165,233,0.18) 0%, transparent 55%), radial-gradient(circle at 100% 100%, rgba(45,212,191,0.14) 0%, transparent 55%), #141e2e',
+                    ? 'radial-gradient(circle at 0% 0%, rgba(251,191,36,0.12) 0%, transparent 55%), radial-gradient(circle at 100% 100%, rgba(245,158,11,0.08) 0%, transparent 55%), var(--dash-surface)'
+                    : 'radial-gradient(circle at 0% 0%, rgba(14,165,233,0.18) 0%, transparent 55%), radial-gradient(circle at 100% 100%, rgba(45,212,191,0.14) 0%, transparent 55%), var(--dash-surface)',
                 boxShadow: isVerifyMode
                     ? '0 0 0 1px rgba(251,191,36,0.06), 0 16px 40px -16px rgba(251,191,36,0.25)'
                     : '0 0 0 1px rgba(14,165,233,0.06), 0 16px 40px -16px rgba(14,165,233,0.35)',

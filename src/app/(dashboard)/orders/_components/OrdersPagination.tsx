@@ -161,7 +161,7 @@ export function OrdersPagination({
                 onClick={() => onPageChange?.(currentPage - 1)}
                 disabled={currentPage <= 1}
                 aria-label="Previous page"
-                className="flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center justify-center rounded-[8px] hover:bg-dash-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ height: 36, padding: '8px 12px', gap: 4 }}
             >
                 <ChevronLeft />
@@ -218,7 +218,7 @@ export function OrdersPagination({
                 onClick={() => onPageChange?.(currentPage + 1)}
                 disabled={currentPage >= totalPages}
                 aria-label="Next page"
-                className="flex items-center justify-center rounded-[8px] hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center justify-center rounded-[8px] hover:bg-dash-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ height: 36, padding: '8px 12px', gap: 4 }}
             >
                 <div className="flex items-center justify-center" style={{ gap: 10 }}>

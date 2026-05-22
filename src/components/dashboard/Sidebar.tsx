@@ -341,7 +341,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                             className={cn(
                                 'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
                                 locale === 'ms'
-                                    ? '!bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
+                                    ? '!bg-[#2DD4BF] !text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
                                     : 'text-dash-text-muted hover:text-dash-text'
                             )}
                         >
@@ -353,7 +353,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                             className={cn(
                                 'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
                                 locale === 'en'
-                                    ? '!bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
+                                    ? '!bg-[#2DD4BF] !text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
                                     : 'text-dash-text-muted hover:text-dash-text'
                             )}
                         >

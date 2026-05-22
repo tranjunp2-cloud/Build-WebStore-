@@ -56,11 +56,26 @@
   --dash-text-muted: #64748B;
   --dash-border: #E2E8F0;
   --dash-accent: #2563EB;
+  --dash-error: #FB2C36;
   --dash-overlay: rgba(0, 0, 0, 0.35);
   --dash-secondary-bg: #F1F5F9;
+  --save-bar-bg: rgba(248, 250, 252, 0.92);
+
+  /* Editor semantic tokens — light mode */
+  --editor-bg: #F1F5F9;
+  --editor-surface: #FFFFFF;
+  --editor-surface-deep: #F8FAFC;
+  --editor-surface-elevated: #FFFFFF;
+  --editor-text: #0F172A;
+  --editor-text-muted: #64748B;
+  --editor-text-subtle: #94A3B8;
+  --editor-border: rgba(0, 0, 0, 0.08);
+  --editor-border-subtle: rgba(0, 0, 0, 0.05);
+  --editor-overlay-bg: rgba(0, 0, 0, 0.04);
+  --editor-overlay-hover: rgba(0, 0, 0, 0.06);
 }
 
-/* Dashboard semantic tokens — dark mode overrides */
+/* Dashboard + Editor semantic tokens — dark mode overrides */
 .dark {
   --dash-bg: #0B1120;
   --dash-surface: #161E2E;
@@ -71,6 +86,20 @@
   --dash-accent: #2563EB;
   --dash-overlay: rgba(0, 0, 0, 0.5);
   --dash-secondary-bg: #1F2937;
+  --save-bar-bg: rgba(15, 23, 42, 0.88);
+
+  /* Editor semantic tokens — dark mode */
+  --editor-bg: #0B1120;
+  --editor-surface: #0F172A;
+  --editor-surface-deep: #0B1120;
+  --editor-surface-elevated: #1E293B;
+  --editor-text: #F8FAFC;
+  --editor-text-muted: #94A3B8;
+  --editor-text-subtle: #64748B;
+  --editor-border: rgba(255, 255, 255, 0.06);
+  --editor-border-subtle: rgba(255, 255, 255, 0.04);
+  --editor-overlay-bg: rgba(255, 255, 255, 0.04);
+  --editor-overlay-hover: rgba(255, 255, 255, 0.06);
 }
 
 /* ── Auth semantic tokens ───────────────────────────────────────────────── */
@@ -113,10 +142,14 @@ html:not(.dark) {
 }
 
 .dash-shell .bg-zinc-950,
-.dash-shell .bg-\[\#0B1120\] { background-color: var(--dash-bg); }
+.dash-shell .bg-\[\#0B1120\],
+.dash-shell .bg-\[\#0f1729\],
+.dash-shell .bg-\[\#0d1525\] { background-color: var(--dash-bg); }
 .dash-shell .bg-zinc-900,
 .dash-shell .bg-slate-900,
-.dash-shell .bg-\[\#161E2E\] { background-color: var(--dash-surface); }
+.dash-shell .bg-\[\#161E2E\],
+.dash-shell .bg-\[\#141e2e\],
+.dash-shell .bg-\[\#1a2540\] { background-color: var(--dash-surface); }
 .dash-shell .bg-zinc-800,
 .dash-shell .bg-slate-800,
 .dash-shell .bg-\[\#1E293B\],
@@ -426,6 +459,15 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 /* ── Phase 06: hover text slate (drag handle, arrows) ───────────────────── */
 .dash-shell .hover\:text-slate-300:hover,
 .dash-shell .hover\:text-slate-400:hover { color: var(--dash-text-muted); }
+/* near-white hover text (invisible on light bg) */
+.dash-shell .hover\:text-slate-50:hover,
+.dash-shell .hover\:text-white:hover { color: var(--dash-text); }
+/* near-white hover bg (invisible on light bg) */
+.dash-shell .hover\:bg-white\/\[0\.04\]:hover,
+.dash-shell .hover\:bg-white\/\[0\.05\]:hover,
+.dash-shell .hover\:bg-white\/\[0\.08\]:hover { background-color: var(--dash-surface-hover); }
+/* near-white hover border */
+.dash-shell .hover\:border-white\/\[0\.18\]:hover { border-color: var(--dash-border); }
 
 /* ── Phase 06: near-white text variants ──────────────────────────────────── */
 .dash-shell .text-\[\#FAFAFA\] { color: var(--dash-text); }
@@ -446,6 +488,304 @@ html:not(.dark) .dash-shell .bg-\[rgba\(248\,250\,252\,0\.3\)\] { background-col
 html:not(.dark) .dash-shell .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02); }
 html:not(.dark) .dash-shell .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
 html:not(.dark) .dash-shell .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.03); }
+
+/* ── Editor Shell — Legacy Color Overrides ────────────────────────────── */
+/* Remaps hardcoded Tailwind dark utilities to editor-* semantic tokens.
+   Scoped to .editor-shell; the preview <iframe> is a separate document — unaffected.
+   New components should use editor-* tokens directly. */
+.editor-shell {
+  background-color: var(--editor-bg);
+  color: var(--editor-text);
+}
+
+/* Solid dark hex bgs → editor surface tokens */
+.editor-shell .bg-\[\#0B1120\],
+.editor-shell .bg-\[\#0b1120\],
+.editor-shell .bg-\[\#080e1d\] { background-color: var(--editor-bg); }
+.editor-shell .bg-\[\#0F172A\],
+.editor-shell .bg-\[\#0f172a\],
+.editor-shell .bg-\[\#0f1923\],
+.editor-shell .bg-\[\#111827\],
+.editor-shell .bg-\[\#111A2D\],
+.editor-shell .bg-\[\#151b2b\],
+.editor-shell .bg-\[\#172033\] { background-color: var(--editor-surface); }
+.editor-shell .bg-\[\#1E293B\],
+.editor-shell .bg-\[\#1e293b\],
+.editor-shell .bg-\[\#1F2937\],
+.editor-shell .bg-\[\#1f2937\],
+.editor-shell .bg-\[\#253046\] { background-color: var(--editor-surface-elevated); }
+
+/* Tailwind named dark bg classes */
+.editor-shell .bg-slate-900,
+.editor-shell .bg-gray-900 { background-color: var(--editor-bg); }
+.editor-shell .bg-slate-800,
+.editor-shell .bg-gray-800 { background-color: var(--editor-surface); }
+.editor-shell .bg-slate-700,
+.editor-shell .bg-gray-700 { background-color: var(--editor-surface-elevated); }
+html:not(.dark) .editor-shell .bg-slate-800\/30 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-slate-900\/80 { background-color: rgba(0,0,0,0.06); }
+
+/* Hover bg hex variants */
+.editor-shell .hover\:bg-\[\#2A3750\]:hover { background-color: var(--editor-surface-elevated); }
+.editor-shell .hover\:bg-\[\#0d1528\]:hover { background-color: var(--editor-bg); }
+
+/* text-white: remap to theme text; preserve white on gradient/colored bgs */
+.editor-shell .text-white { color: var(--editor-text); }
+.editor-shell [class*="from-"].text-white,
+.editor-shell [class*="from-"] .text-white,
+.editor-shell [class*="bg-gradient"].text-white,
+.editor-shell [class*="bg-gradient"] .text-white,
+.editor-shell [class*="linear-gradient"].text-white,
+.editor-shell [class*="linear-gradient"] .text-white { color: #fff !important; }
+
+/* text-white opacity variants */
+.editor-shell .text-white\/80,
+.editor-shell .text-white\/70 { color: var(--editor-text); }
+.editor-shell .text-white\/50,
+.editor-shell .text-white\/40,
+.editor-shell .text-white\/30 { color: var(--editor-text-muted); }
+
+/* Slate text → editor text tokens */
+.editor-shell .text-slate-50,
+.editor-shell .text-slate-100,
+.editor-shell .text-slate-200 { color: var(--editor-text); }
+.editor-shell .text-slate-300,
+.editor-shell .text-slate-400,
+.editor-shell .text-slate-500 { color: var(--editor-text-muted); }
+
+/* gray text → editor text tokens */
+.editor-shell .text-gray-200 { color: var(--editor-text); }
+.editor-shell .text-gray-300,
+.editor-shell .text-gray-400,
+.editor-shell .text-gray-500,
+.editor-shell .text-gray-600 { color: var(--editor-text-muted); }
+
+/* Hex text — near-white (invisible in light) → editor-text */
+.editor-shell .text-\[\#F8FAFC\],
+.editor-shell .text-\[\#f8fafc\] { color: var(--editor-text); }
+.editor-shell .text-\[\#94A3B8\],
+.editor-shell .text-\[\#94a3b8\],
+.editor-shell .text-\[\#CBD5E1\],
+.editor-shell .text-\[\#c2c6d6\] { color: var(--editor-text-muted); }
+/* dark hex text (fine in light, invisible in dark) */
+.editor-shell .text-\[\#0B1120\] { color: var(--editor-text); }
+/* rgba near-white text */
+.editor-shell .text-\[rgba\(248\,250\,252\,0\.7\)\] { color: var(--editor-text); }
+.editor-shell .text-\[rgba\(248\,250\,252\,0\.6\)\],
+.editor-shell .text-\[rgba\(248\,250\,252\,0\.5\)\] { color: var(--editor-text-muted); }
+
+/* info-card pale text (light-colored for dark bg) → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#B9F8CF\],
+html:not(.dark) .editor-shell .text-\[\#b9f8cf\] { color: #15803d; }
+html:not(.dark) .editor-shell .text-\[rgba\(185\,248\,207\,0\.7\)\] { color: #166534; }
+html:not(.dark) .editor-shell .text-\[\#FFF085\] { color: #854d0e; }
+html:not(.dark) .editor-shell .text-\[rgba\(255\,240\,133\,0\.7\)\] { color: #92400e; }
+html:not(.dark) .editor-shell .text-\[\#FCA5A5\] { color: #b91c1c; }
+html:not(.dark) .editor-shell .text-\[rgba\(252\,165\,165\,0\.7\)\] { color: #b91c1c; }
+html:not(.dark) .editor-shell .text-\[\#93C5FD\] { color: #1d4ed8; }
+html:not(.dark) .editor-shell .text-\[rgba\(147\,197\,253\,0\.7\)\] { color: #1e40af; }
+html:not(.dark) .editor-shell .text-cyan-300 { color: #0e7490; }
+html:not(.dark) .editor-shell .text-cyan-400 { color: #0e7490; }
+html:not(.dark) .editor-shell .text-cyan-200\/70 { color: #155e75; }
+html:not(.dark) .editor-shell .text-amber-300 { color: #92400e; }
+html:not(.dark) .editor-shell .text-amber-300\/80 { color: #92400e; }
+html:not(.dark) .editor-shell .text-amber-400 { color: #b45309; }
+html:not(.dark) .editor-shell .text-emerald-400 { color: #15803d; }
+/* Draft badge: pale gray text/bg/border → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#d1d5dc\] { color: #475569; }
+html:not(.dark) .editor-shell .bg-\[rgba\(106\,114\,130\,0\.2\)\] { background-color: rgba(71,85,105,0.12); }
+html:not(.dark) .editor-shell .border-\[rgba\(106\,114\,130\,0\.3\)\] { border-color: rgba(71,85,105,0.3); }
+/* Delete button pale pink text → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#FFC9C9\] { color: #b91c1c; }
+/* Other pale accent colors → readable in light mode */
+html:not(.dark) .editor-shell .text-\[\#adc6ff\] { color: #1d4ed8; }
+html:not(.dark) .editor-shell .hover\:text-\[\#5EEAD4\]:hover { color: #0e7490; }
+
+/* Borders → editor border tokens */
+.editor-shell .border-white\/5,
+.editor-shell .border-white\/\[0\.05\] { border-color: var(--editor-border-subtle); }
+.editor-shell .border-white\/10,
+.editor-shell .border-white\/\[0\.06\],
+.editor-shell .border-white\/\[0\.08\],
+.editor-shell .border-white\/20 { border-color: var(--editor-border); }
+.editor-shell .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: var(--editor-border); }
+
+/* hover:text → remap to readable values in light mode */
+.editor-shell .hover\:text-white:hover,
+.editor-shell .hover\:text-slate-50:hover,
+.editor-shell .hover\:text-slate-200:hover,
+.editor-shell .hover\:text-\[\#F8FAFC\]:hover,
+.editor-shell .hover\:text-\[\#f8fafc\]:hover { color: var(--editor-text); }
+.editor-shell .hover\:text-slate-300:hover,
+.editor-shell .hover\:text-slate-400:hover,
+.editor-shell .hover\:text-slate-500:hover { color: var(--editor-text-muted); }
+
+/* Placeholder text */
+.editor-shell .placeholder\:text-slate-500::placeholder,
+.editor-shell .placeholder\:text-slate-400::placeholder { color: var(--editor-text-muted); }
+
+/* bg-white/opacity → light mode only: white-on-white → dark tint */
+html:not(.dark) .editor-shell .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-shell .bg-white\/5 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.05\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-white\/10 { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .editor-shell .bg-\[rgba\(255\,255\,255\,0\.05\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-\[rgba\(255\,255\,255\,0\.08\)\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .hover\:bg-\[rgba\(255\,255\,255\,0\.05\)\]:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .hover\:bg-\[rgba\(255\,255\,255\,0\.08\)\]:hover { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-\[rgba\(248\,250\,252\,0\.6\)\] { background-color: rgba(0,0,0,0.04); }
+
+/* dark rgba bgs → light mode only: remap to subtle tints */
+html:not(.dark) .editor-shell .bg-\[rgba\(30\,41\,59\,0\.3\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .bg-\[rgba\(11\,17\,32\,0\.3\)\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-shell .bg-\[rgba\(30\,41\,59\,0\.6\)\],
+html:not(.dark) .editor-shell .bg-\[rgba\(30\,41\,59\,0\.8\)\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-\[rgba\(31\,41\,55\,0\.5\)\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .bg-\[rgba\(17\,24\,39\,0\.55\)\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .bg-\[rgba\(15\,23\,42\,0\.7\)\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-\[rgba\(11\,17\,32\,0\.72\)\] { background-color: rgba(0,0,0,0.06); }
+
+/* bg-[rgba(11,17,32,0.5)] — editor variant Input/Textarea bg */
+html:not(.dark) .editor-shell .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(0,0,0,0.04); }
+
+/* hex bg opacity variants — header/panel with backdrop-blur use these */
+.editor-shell .bg-\[\#0F172A\]\/90 { background-color: var(--editor-surface); }
+.editor-shell .bg-\[\#1E293B\]\/80,
+.editor-shell .bg-\[\#1E293B\]\/95 { background-color: var(--editor-surface-elevated); }
+/* focus-within variant not in main sweep — light mode: stays themed white on focus */
+html:not(.dark) .editor-shell .focus-within\:bg-\[\#1E293B\]:focus-within { background-color: var(--editor-surface-elevated); }
+html:not(.dark) .editor-shell .bg-\[\#0B1120\]\/60 { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .bg-\[\#0B1120\]\/80 { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-shell .bg-\[\#0B1120\]\/95 { background-color: rgba(0,0,0,0.07); }
+
+/* hover:bg-white/opacity → light mode only: invisible hover → dark tint */
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.02\]:hover { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-shell .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-shell .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .editor-shell .hover\:bg-white\/15:hover { background-color: rgba(0,0,0,0.09); }
+html:not(.dark) .editor-shell .hover\:bg-white\/\[0\.12\]:hover { background-color: rgba(0,0,0,0.08); }
+
+/* ── Editor Shell: input/textarea/select visibility in light mode ─────────── */
+/* bg overrides turn input bgs white (same as page bg) → need distinct bg */
+html:not(.dark) .editor-shell input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"]),
+html:not(.dark) .editor-shell textarea,
+html:not(.dark) .editor-shell select {
+  background-color: #F8FAFC !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: var(--editor-text) !important;
+}
+html:not(.dark) .editor-shell input:not([type="color"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="range"])::placeholder,
+html:not(.dark) .editor-shell textarea::placeholder {
+  color: var(--editor-text-subtle) !important;
+}
+
+/* ── Editor Portal — portal-rendered dialogs/dropdowns (outside .editor-shell) ── */
+/* Same remapping as .editor-shell but scoped to .editor-portal class.
+   Add editor-portal to DialogContent / DropdownMenu.Content in editor components. */
+.editor-portal {
+  background-color: var(--editor-bg);
+  color: var(--editor-text);
+}
+.editor-portal .bg-\[\#0B1120\],
+.editor-portal .bg-\[\#0b1120\],
+.editor-portal .bg-\[\#080e1d\] { background-color: var(--editor-bg); }
+.editor-portal .bg-\[\#0F172A\],
+.editor-portal .bg-\[\#0f172a\],
+.editor-portal .bg-\[\#0f1923\],
+.editor-portal .bg-\[\#111827\],
+.editor-portal .bg-\[\#111A2D\],
+.editor-portal .bg-\[\#151b2b\],
+.editor-portal .bg-\[\#172033\] { background-color: var(--editor-surface); }
+.editor-portal .bg-\[\#1E293B\],
+.editor-portal .bg-\[\#1e293b\],
+.editor-portal .bg-\[\#1F2937\],
+.editor-portal .bg-\[\#1f2937\],
+.editor-portal .bg-\[\#253046\] { background-color: var(--editor-surface-elevated); }
+.editor-portal .text-white { color: var(--editor-text); }
+.editor-portal [class*="from-"].text-white,
+.editor-portal [class*="from-"] .text-white,
+.editor-portal [class*="bg-gradient"].text-white,
+.editor-portal [class*="bg-gradient"] .text-white { color: #fff !important; }
+.editor-portal .text-white\/80,
+.editor-portal .text-white\/70 { color: var(--editor-text); }
+.editor-portal .text-white\/50,
+.editor-portal .text-white\/40,
+.editor-portal .text-white\/30 { color: var(--editor-text-muted); }
+.editor-portal .text-slate-50,
+.editor-portal .text-slate-100,
+.editor-portal .text-slate-200 { color: var(--editor-text); }
+.editor-portal .text-slate-300,
+.editor-portal .text-slate-400,
+.editor-portal .text-slate-500 { color: var(--editor-text-muted); }
+.editor-portal .text-gray-200 { color: var(--editor-text); }
+.editor-portal .text-gray-300,
+.editor-portal .text-gray-400,
+.editor-portal .text-gray-500,
+.editor-portal .text-gray-600 { color: var(--editor-text-muted); }
+.editor-portal .text-\[\#F8FAFC\],
+.editor-portal .text-\[\#f8fafc\] { color: var(--editor-text); }
+.editor-portal .text-\[\#94A3B8\],
+.editor-portal .text-\[\#94a3b8\],
+.editor-portal .text-\[\#CBD5E1\] { color: var(--editor-text-muted); }
+.editor-portal .text-\[\#0B1120\] { color: var(--editor-text); }
+.editor-portal .text-\[rgba\(248\,250\,252\,0\.7\)\] { color: var(--editor-text); }
+.editor-portal .text-\[rgba\(248\,250\,252\,0\.6\)\],
+.editor-portal .text-\[rgba\(248\,250\,252\,0\.5\)\] { color: var(--editor-text-muted); }
+.editor-portal .hover\:text-white:hover,
+.editor-portal .hover\:text-slate-50:hover,
+.editor-portal .hover\:text-slate-200:hover,
+.editor-portal .hover\:text-\[\#F8FAFC\]:hover,
+.editor-portal .hover\:text-\[\#f8fafc\]:hover { color: var(--editor-text); }
+.editor-portal .hover\:text-slate-300:hover,
+.editor-portal .hover\:text-slate-400:hover,
+.editor-portal .hover\:text-slate-500:hover { color: var(--editor-text-muted); }
+.editor-portal .border-white\/5,
+.editor-portal .border-white\/\[0\.05\] { border-color: var(--editor-border-subtle); }
+.editor-portal .border-white\/10,
+.editor-portal .border-white\/\[0\.06\],
+.editor-portal .border-white\/\[0\.08\],
+.editor-portal .border-white\/20 { border-color: var(--editor-border); }
+.editor-portal .border-\[rgba\(255\,255\,255\,0\.08\)\] { border-color: var(--editor-border); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-portal .bg-white\/5 { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.05\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-portal .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-portal .bg-white\/10 { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .editor-portal .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(0,0,0,0.05); }
+html:not(.dark) .editor-portal .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.07); }
+html:not(.dark) .editor-portal .hover\:bg-\[rgba\(255\,255\,255\,0\.05\)\]:hover { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .hover\:bg-\[rgba\(255\,255\,255\,0\.08\)\]:hover { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .editor-portal .bg-\[rgba\(30\,41\,59\,0\.3\)\] { background-color: rgba(0,0,0,0.04); }
+html:not(.dark) .editor-portal .bg-\[rgba\(11\,17\,32\,0\.3\)\] { background-color: rgba(0,0,0,0.03); }
+html:not(.dark) .editor-portal .bg-\[rgba\(30\,41\,59\,0\.6\)\] { background-color: var(--editor-surface-elevated); }
+html:not(.dark) .editor-portal .bg-\[rgba\(11\,17\,32\,0\.5\)\] { background-color: rgba(0,0,0,0.04); }
+
+/* info-card pale text → readable colors in light mode */
+html:not(.dark) .editor-portal .text-\[\#B9F8CF\] { color: #15803d; }
+html:not(.dark) .editor-portal .text-\[rgba\(185\,248\,207\,0\.7\)\] { color: #166534; }
+html:not(.dark) .editor-portal .text-\[\#FFF085\] { color: #854d0e; }
+html:not(.dark) .editor-portal .text-\[rgba\(255\,240\,133\,0\.7\)\] { color: #92400e; }
+html:not(.dark) .editor-portal .text-\[\#FCA5A5\] { color: #b91c1c; }
+html:not(.dark) .editor-portal .text-\[rgba\(252\,165\,165\,0\.7\)\] { color: #b91c1c; }
+html:not(.dark) .editor-portal .text-\[\#93C5FD\] { color: #1d4ed8; }
+html:not(.dark) .editor-portal .text-\[rgba\(147\,197\,253\,0\.7\)\] { color: #1e40af; }
+html:not(.dark) .editor-portal .text-\[\#F0B100\] { color: #92400e; }
+html:not(.dark) .editor-portal .text-\[\#F87171\] { color: #b91c1c; }
+html:not(.dark) .editor-portal .text-\[\#60A5FA\] { color: #1d4ed8; }
+html:not(.dark) .editor-portal .text-\[\#4ede9f\] { color: #15803d; }
+html:not(.dark) .editor-portal .text-\[\#ff9b8f\] { color: #c2410c; }
+html:not(.dark) .editor-portal .text-\[\#adc6ff\] { color: #1d4ed8; }
 
 /* ── Base Styles ──────────────────────────────────────────────────────────── */
 @layer base {

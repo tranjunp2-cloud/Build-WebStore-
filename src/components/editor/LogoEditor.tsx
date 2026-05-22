@@ -176,10 +176,10 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                 </button>
             )}
             <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
-                <DialogContent className="max-w-sm border-white/[0.08] bg-[#0F172A] text-white">
+                <DialogContent className="editor-portal max-w-sm dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] dark:bg-[#0F172A] bg-white dark:text-white text-slate-900">
                     <DialogHeader>
-                        <DialogTitle className="text-white">{le.removeTitle}</DialogTitle>
-                        <DialogDescription className="text-slate-400">
+                        <DialogTitle className="dark:text-white text-slate-900">{le.removeTitle}</DialogTitle>
+                        <DialogDescription className="dark:text-slate-400 text-slate-500">
                             {le.confirmRemove}
                         </DialogDescription>
                     </DialogHeader>
@@ -187,7 +187,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                         <button
                             type="button"
                             onClick={() => setShowRemoveDialog(false)}
-                            className="flex-1 rounded-[10px] border border-white/[0.08] py-2 text-[13px] font-medium text-slate-300 hover:bg-white/5 transition-colors"
+                            className="flex-1 rounded-[10px] border dark:border-white/[0.08] border-[rgba(0,0,0,0.1)] py-2 text-[13px] font-medium dark:text-slate-300 text-slate-600 dark:hover:bg-white/5 hover:bg-slate-50 transition-colors"
                         >
                             {le.cancel}
                         </button>
