@@ -52,8 +52,8 @@ export function VariantsInventorySection() {
 
     // Sync baseInventory = sum of all variant stocks whenever variants change
     useEffect(() => {
-        if (!hasVariants) return
-        const total = (variantsLive || []).reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
+        if (!hasVariants || !variantsLive?.length) return
+        const total = variantsLive.reduce((sum, v) => sum + (Number(v.stock) || 0), 0)
         setValue('baseInventory', total, { shouldDirty: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [variantsLive, hasVariants])
