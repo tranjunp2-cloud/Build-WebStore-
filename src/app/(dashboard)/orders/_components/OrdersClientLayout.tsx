@@ -74,10 +74,10 @@ export function OrdersClientLayout() {
         <div className="relative flex flex-col gap-[22px] w-full">
             {/* Page Header */}
             <div className="flex flex-col gap-1 w-full">
-                <h1 className="text-2xl font-bold text-[#F8FAFC] leading-8">
+                <h1 className="text-2xl font-bold text-dash-text leading-8">
                     {o.pageTitle}
                 </h1>
-                <p className="text-sm font-normal text-[rgba(248,250,252,0.6)] leading-5">
+                <p className="text-sm font-normal text-dash-text-muted leading-5">
                     {o.pageSubtitle}
                 </p>
             </div>

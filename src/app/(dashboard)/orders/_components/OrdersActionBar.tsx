@@ -79,7 +79,7 @@ export function OrdersActionBar({
                         placeholder={o.search}
                         onChange={(e) => onSearch?.(e.target.value)}
                         style={{ border: '1px solid var(--dash-border)' }}
-                        className="w-full h-[50px] pl-[48px] pr-[16px] py-[12px] bg-[#1E293B] rounded-[16px] text-[16px] leading-[1.2102272510528564em] font-normal text-[#F8FAFC] placeholder-[rgba(248,250,252,0.4)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors"
+                        className="w-full h-[50px] pl-[48px] pr-[16px] py-[12px] bg-[#1E293B] rounded-[16px] text-[16px] leading-[1.2102272510528564em] font-normal text-dash-text placeholder-[rgba(248,250,252,0.4)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-colors"
                     />
                 </div>
 
@@ -90,9 +90,9 @@ export function OrdersActionBar({
                         <button
                             onClick={() => setIsDatesOpen(!isDatesOpen)}
                             style={{ border: '1px solid var(--dash-border)' }}
-                            className="flex items-center justify-between w-full md:w-[143px] h-[50px] pl-[15px] pr-[12px] bg-[#1E293B] rounded-[16px] hover:bg-white/5 transition-colors shrink-0"
+                            className="flex items-center justify-between w-full md:w-[143px] h-[50px] pl-[15px] pr-[12px] bg-dash-surface rounded-[16px] hover:bg-dash-surface-hover transition-colors shrink-0"
                         >
-                            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-[#F8FAFC] truncate">
+                            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-dash-text truncate">
                                 {DATES_OPTIONS[selectedDateIdx].label}
                             </span>
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={`shrink-0 transition-transform ${isDatesOpen ? 'rotate-180' : ''}`}>
@@ -110,7 +110,7 @@ export function OrdersActionBar({
                                     </svg>
                                 </div>
                                 {/* List */}
-                                <div className="flex flex-col w-full bg-[#1F2937] py-[8px] rounded-[2px] z-0 overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
+                                <div className="flex flex-col w-full bg-dash-surface py-[8px] rounded-[2px] z-0 overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
                                     {DATES_OPTIONS.map((option, index) => (
                                         <button
                                             key={option.value}
@@ -119,9 +119,9 @@ export function OrdersActionBar({
                                                 setIsDatesOpen(false)
                                                 onFilterDate?.(option.value)
                                             }}
-                                            className={`flex items-center w-full px-[12px] py-[5px] text-left transition-colors ${selectedDateIdx === index ? 'bg-[#0B1120] hover:bg-[#0B1120]/80' : 'hover:bg-[#0B1120]/50'}`}
+                                            className={`flex items-center w-full px-[12px] py-[5px] text-left transition-colors ${selectedDateIdx === index ? 'bg-dash-bg hover:bg-dash-surface-hover' : 'hover:bg-dash-surface-hover'}`}
                                         >
-                                            <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-[#FFFFFF]">
+                                            <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-dash-text">
                                                 {option.label}
                                             </span>
                                         </button>
@@ -136,9 +136,9 @@ export function OrdersActionBar({
                         <button
                             onClick={() => setIsStatusOpen(!isStatusOpen)}
                             style={{ border: '1px solid var(--dash-border)' }}
-                            className="flex items-center justify-between w-full md:w-[138px] h-[50px] pl-[15px] pr-[12px] bg-[#1E293B] rounded-[16px] hover:bg-white/5 transition-colors shrink-0"
+                            className="flex items-center justify-between w-full md:w-[138px] h-[50px] pl-[15px] pr-[12px] bg-dash-surface rounded-[16px] hover:bg-dash-surface-hover transition-colors shrink-0"
                         >
-                            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-[#F8FAFC] truncate">
+                            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-dash-text truncate">
                                 {STATUS_OPTIONS[selectedStatusIdx].label}
                             </span>
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={`shrink-0 transition-transform ${isStatusOpen ? 'rotate-180' : ''}`}>
@@ -156,7 +156,7 @@ export function OrdersActionBar({
                                     </svg>
                                 </div>
                                 {/* List */}
-                                <div className="flex flex-col w-full bg-[#1F2937] py-[8px] rounded-[2px] z-0 overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
+                                <div className="flex flex-col w-full bg-dash-surface py-[8px] rounded-[2px] z-0 overflow-hidden" style={{ border: '1px solid var(--dash-border)' }}>
                                     {STATUS_OPTIONS.map((option, index) => (
                                         <button
                                             key={option.value}
@@ -165,9 +165,9 @@ export function OrdersActionBar({
                                                 setIsStatusOpen(false)
                                                 onFilterStatus?.(option.value)
                                             }}
-                                            className={`flex items-center w-full px-[12px] py-[5px] text-left transition-colors ${selectedStatusIdx === index ? 'bg-[#0B1120] hover:bg-[#0B1120]/80' : 'hover:bg-[#0B1120]/50'}`}
+                                            className={`flex items-center w-full px-[12px] py-[5px] text-left transition-colors ${selectedStatusIdx === index ? 'bg-dash-bg hover:bg-dash-surface-hover' : 'hover:bg-dash-surface-hover'}`}
                                         >
-                                            <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-[#FFFFFF]">
+                                            <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-dash-text">
                                                 {option.label}
                                             </span>
                                         </button>

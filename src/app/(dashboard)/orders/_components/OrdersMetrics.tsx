@@ -56,7 +56,7 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
             {metrics.map((item, index) => (
                 <div
                     key={index}
-                    className="h-[84px] bg-slate-800/60 border border-white/[0.08] rounded-2xl p-[17px] flex items-center gap-[12px]"
+                    className="h-[84px] bg-dash-surface border border-dash-border rounded-2xl p-[17px] flex items-center gap-[12px]"
                 >
                     {/* Icon Container */}
                     <div

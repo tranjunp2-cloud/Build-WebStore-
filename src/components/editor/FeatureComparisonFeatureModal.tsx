@@ -78,7 +78,7 @@ export default function FeatureComparisonFeatureModal({ open, onOpenChange, feat
     return (
         <Dialog open={open} onOpenChange={(v) => { if (!v) handleCancel() }}>
             <DialogContent
-                className="w-[768px] max-w-[95vw] max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0 bg-[#0b1120] border border-[rgba(255,255,255,0.08)] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
+                className="editor-portal w-[768px] max-w-[95vw] max-h-[90vh] p-0 overflow-hidden flex flex-col gap-0 dark:bg-[#0b1120] bg-white dark:border-[rgba(255,255,255,0.08)] border-[rgba(0,0,0,0.1)] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]"
                 onInteractOutside={e => { e.preventDefault(); handleCancel() }}
                 onEscapeKeyDown={e => { e.preventDefault(); handleCancel() }}
             >

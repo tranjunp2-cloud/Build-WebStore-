@@ -71,20 +71,20 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
             <div
                 className="flex flex-col w-full max-w-md"
                 style={{
-                    background: '#0B1120',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: 'var(--dash-surface)',
+                    border: '1px solid var(--dash-border)',
                     borderRadius: 16,
                     padding: 24,
                 }}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between mb-5">
-                    <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 18, color: '#F8FAFC' }}>
+                    <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 18, color: 'var(--dash-text)' }}>
                         Reject Payment
                     </span>
                     <button onClick={onClose} disabled={isLoading} className="hover:opacity-70 transition-opacity">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M5 5L15 15M15 5L5 15" stroke="rgba(248,250,252,0.6)" strokeWidth="1.67" strokeLinecap="round" />
+                            <path d="M5 5L15 15M15 5L5 15" stroke="var(--dash-text-muted)" strokeWidth="1.67" strokeLinecap="round" />
                         </svg>
                     </button>
                 </div>
@@ -95,7 +95,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                         <label
                             key={r.value}
                             className="flex items-center gap-3 cursor-pointer"
-                            style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: '#F8FAFC' }}
+                            style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: 'var(--dash-text)' }}
                         >
                             <input
                                 type="radio"
@@ -114,7 +114,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                 {/* Detail textarea — shown only for 'other' */}
                 {reason === 'other' && (
                     <div className="flex flex-col gap-1 mb-4">
-                        <label style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 13, color: '#F8FAFC' }}>
+                        <label style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 13, color: 'var(--dash-text)' }}>
                             Details *
                         </label>
                         <textarea
@@ -125,12 +125,12 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                             rows={3}
                             style={{
                                 padding: '10px 14px',
-                                background: '#1E293B',
-                                border: `1px solid ${detailError ? '#FB2C36' : 'rgba(255, 255, 255, 0.08)'}`,
+                                background: 'var(--dash-secondary-bg)',
+                                border: `1px solid ${detailError ? '#FB2C36' : 'var(--dash-border)'}`,
                                 borderRadius: 12,
                                 fontFamily: 'Inter, sans-serif',
                                 fontSize: 14,
-                                color: '#F8FAFC',
+                                color: 'var(--dash-text)',
                                 resize: 'none',
                                 outline: 'none',
                             }}
@@ -150,11 +150,11 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                         style={{
                             height: 48,
                             borderRadius: 12,
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            border: '1px solid var(--dash-border)',
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 600,
                             fontSize: 15,
-                            color: '#F8FAFC',
+                            color: 'var(--dash-text)',
                             opacity: isLoading ? 0.5 : 1,
                         }}
                     >

@@ -156,6 +156,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             user: {
                 firstName: (user as Record<string, unknown>).firstName as string || null,
                 email: user.email || null,
+                avatar: (user as Record<string, unknown>).avatar ?? null,
                 // Role from matched tenant — guaranteed to exist since tenant check at line 56 already returns 403 if no match
                 role: (rawTenants.find((t: { tenant: TenantRef; role?: string }) => resolveTenantId(t.tenant) === siteTenantId) as { role?: string })?.role || 'viewer',
             },

@@ -320,8 +320,8 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
     if (!mounted) return null
 
     const modal = createPortal(
-        <div 
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-[#F8FAFC] antialiased"
+        <div
+            className="dash-shell fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 text-[#F8FAFC] antialiased"
             style={{ fontFamily: "'Inter', sans-serif" }}
         >
             <div className="flex flex-col max-h-[90vh] w-full max-w-[896px] rounded-[24px] bg-[#1E293B] shadow-2xl border border-white/[0.08] overflow-hidden">
@@ -338,7 +338,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         </h2>
                     </div>
                     {/* Description */}
-                    <p className="text-[14px] text-[#F8FAFC]/60">
+                    <p className="text-[14px] text-dash-text-muted">
                         {t.dashboard?.products?.bulkCreate?.subtitle || 'Review and edit before saving'}
                     </p>
                 </div>
@@ -348,15 +348,15 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                     {isParsing ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
                             <Loader2 className="w-10 h-10 animate-spin text-teal-400" />
-                            <p className="text-[#F8FAFC]/60 text-[14px] font-medium">{t.dashboard?.products?.bulkCreate?.aiWorking || 'AI magic is working...'}</p>
+                            <p className="text-dash-text-muted text-[14px] font-medium">{t.dashboard?.products?.bulkCreate?.aiWorking || 'AI magic is working...'}</p>
                         </div>
                     ) : (
                         <>
                             {/* Table Container 30963:11548 */}
-                            <div className="rounded-2xl bg-[#0B1120]/30 overflow-hidden shrink-0">
+                            <div className="rounded-2xl bg-black/[0.04] dark:bg-[#0B1120]/30 overflow-hidden shrink-0">
                                 <table className="w-full text-left border-collapse table-fixed">
                                     {/* Table Header 30963:11550 */}
-                                    <thead className="bg-[#0B1120]/60 h-[48px]">
+                                    <thead className="bg-black/[0.06] dark:bg-[#0B1120]/60 h-[48px]">
                                         <tr>
                                             <th className="w-[48px] align-middle text-center pl-2">
                                                 <label className="relative flex items-center justify-center cursor-pointer w-[14px] h-[14px]">
@@ -375,16 +375,16 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                                     </div>
                                                 </label>
                                             </th>
-                                            <th className="align-middle text-[11px] font-bold text-[#F8FAFC]/60 w-[110px] md:w-[322px] px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.name || 'NAME'}</th>
-                                            <th className="align-middle text-[11px] font-bold text-[#F8FAFC]/60 w-[90px] md:w-[322px] px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.price || 'PRICE'}</th>
-                                            <th className="align-middle text-[11px] font-bold text-[#F8FAFC]/60 w-[70px] md:w-auto px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.variants || 'VARIANTS'}</th>
+                                            <th className="align-middle text-[11px] font-bold text-dash-text-muted w-[110px] md:w-[322px] px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.name || 'NAME'}</th>
+                                            <th className="align-middle text-[11px] font-bold text-dash-text-muted w-[90px] md:w-[322px] px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.price || 'PRICE'}</th>
+                                            <th className="align-middle text-[11px] font-bold text-dash-text-muted w-[70px] md:w-auto px-2 tracking-wider">{t.dashboard?.products?.bulkCreate?.table?.variants || 'VARIANTS'}</th>
                                         </tr>
                                     </thead>
                                     {/* Table Body 30963:11560 */}
                                     <tbody>
                                         {products.length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} className="h-[62px] text-center text-[#F8FAFC]/60 text-[14px]">
+                                                <td colSpan={4} className="h-[62px] text-center text-dash-text-muted text-[14px]">
                                                     {t.dashboard?.products?.bulkCreate?.table?.empty || 'Product list is empty.'}
                                                 </td>
                                             </tr>
@@ -430,7 +430,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                                         />
                                                     </td>
                                                     <td className="align-middle px-2">
-                                                        <div className="text-[12px] md:text-[14px] text-[#F8FAFC]/70 max-w-[60px] md:max-w-full truncate break-words whitespace-normal leading-tight">
+                                                        <div className="text-[12px] md:text-[14px] text-dash-text-muted max-w-[60px] md:max-w-full truncate break-words whitespace-normal leading-tight">
                                                             {p.variants?.length ? p.variants.map(v => v.name).join(', ') : (t.dashboard?.products?.bulkCreate?.table?.defaultVariant || 'Default')}
                                                         </div>
                                                     </td>
@@ -446,7 +446,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                 <div className="rounded-2xl bg-teal-400/5 border border-teal-400/20 p-4 mt-6 shrink-0">
                                     <p className="text-[14px] leading-snug">
                                         <span className="font-bold text-[#2DD4BF]">{t.dashboard?.products?.bulkCreate?.note?.label || 'Note: '}</span>
-                                        <span className="text-[#F8FAFC]/60">{t.dashboard?.products?.bulkCreate?.note?.description || 'Products will be saved as Draft'}</span>
+                                        <span className="text-dash-text-muted">{t.dashboard?.products?.bulkCreate?.note?.description || 'Products will be saved as Draft'}</span>
                                     </p>
                                 </div>
                             )}
@@ -487,12 +487,12 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                         onPointerDownOutside={() => setShowExitConfirm(false)}
                         onEscapeKeyDown={() => setShowExitConfirm(false)}
                     >
-                        <div className="w-full max-w-[360px] rounded-[18px] border border-[rgba(59,130,246,0.16)] bg-[var(--dash-surface)] px-6 pb-6 pt-6 shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
+                        <div className="dash-shell w-full max-w-[360px] rounded-[18px] border border-[rgba(59,130,246,0.16)] bg-[var(--dash-surface)] px-6 pb-6 pt-6 shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
                             <div className="text-center">
-                                <Dialog.Title className="text-xl font-semibold text-white">
+                                <Dialog.Title className="text-xl font-semibold text-dash-text">
                                     {t.dashboard?.products?.bulkCreate?.exitButton}?
                                 </Dialog.Title>
-                                <Dialog.Description className="mt-2 text-sm leading-6 text-[#CBD5E1]">
+                                <Dialog.Description className="mt-2 text-sm leading-6 text-dash-text-muted">
                                     {t.dashboard?.products?.bulkCreate?.unsavedWarning}
                                 </Dialog.Description>
                             </div>
@@ -500,7 +500,7 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
                                 <Dialog.Close asChild>
                                     <button
                                         type="button"
-                                        className="flex h-11 items-center justify-center rounded-[10px] border border-[rgba(59,130,246,0.04)] bg-[rgba(255,255,255,0.05)] text-sm font-medium text-white transition-colors hover:bg-[rgba(255,255,255,0.08)]"
+                                        className="flex h-11 items-center justify-center rounded-[10px] border border-dash-border bg-dash-secondary-bg text-sm font-medium text-dash-text transition-colors hover:bg-dash-surface-hover"
                                     >
                                         {t.dashboard?.products?.bulkCreate?.stayButton}
                                     </button>

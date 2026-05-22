@@ -141,7 +141,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                 {/* Close Button - absolute to the drawer itself */}
                 <button 
                     onClick={onClose}
-                    className="absolute top-[32px] -left-[18px] z-20 w-[36px] h-[36px] flex items-center justify-center rounded-full bg-[#0B1120] border border-white/10 text-white hover:bg-white/10 transition-colors shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                    className="absolute top-[32px] -left-[18px] z-20 w-[36px] h-[36px] flex items-center justify-center rounded-full bg-[var(--dash-surface)] border border-[var(--dash-border)] text-[var(--dash-text)] hover:bg-[var(--dash-surface-hover)] transition-colors shadow-md"
                 >
                     <ChevronRight className="w-5 h-5" />
                 </button>
@@ -242,8 +242,8 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                                             <span className="text-[20px] font-normal text-[#C1C6D7]/40 line-through leading-[1.4] mb-[2px]">
                                                 {formatPrice(product.compareAtPrice!, product.currency)}
                                             </span>
-                                            <div className="flex items-center justify-center px-[8px] py-[2px] bg-[#FFB695]/10 rounded-[2px] mb-[6px]">
-                                                <span className="text-[10px] font-bold text-[#FFB695] uppercase">
+                                            <div className="flex items-center justify-center px-[8px] py-[2px] bg-orange-500/10 dark:bg-[#FFB695]/10 rounded-[2px] mb-[6px]">
+                                                <span className="text-[10px] font-bold text-orange-500 dark:text-[#FFB695] uppercase">
                                                     {discountPercent}% {t.dashboard?.products?.quickView?.off || 'OFF'}
                                                 </span>
                                             </div>
@@ -322,13 +322,12 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                             onClick={() => {
                                 onDelete(product)
                             }}
-                            className="flex items-center justify-center gap-[8px] px-[16px] py-[8px] rounded-[4px] uppercase tracking-[0.1em] hover:opacity-80 transition-opacity"
-                            style={{ 
-                                background: 'transparent', 
-                                border: 'none', 
-                                color: '#FFB4AB',
+                            className="flex items-center justify-center gap-[8px] px-[16px] py-[8px] rounded-[4px] uppercase tracking-[0.1em] hover:opacity-80 transition-opacity text-red-500 dark:text-[#FFB4AB]"
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
                                 fontSize: '12px',
-                                fontWeight: 700 
+                                fontWeight: 700
                             }}
                         >
                             <Trash2 className="w-[14px] h-[14px]" />

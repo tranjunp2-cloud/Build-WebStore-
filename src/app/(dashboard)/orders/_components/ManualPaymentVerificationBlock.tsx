@@ -84,7 +84,7 @@ function ProofImageThumbnail({ url, onOpen, labelStyle }: { url: string; onOpen:
                         maxHeight: 200,
                         objectFit: 'cover',
                         borderRadius: 10,
-                        border: '1px solid rgba(255,255,255,0.08)',
+                        border: '1px solid var(--dash-border)',
                         display: 'block',
                     }}
                 />
@@ -133,8 +133,8 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
     const cardStyle: React.CSSProperties = {
         display: 'flex',
         flexDirection: 'column',
-        background: 'rgba(30, 41, 59, 0.6)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'var(--dash-surface)',
+        border: '1px solid var(--dash-border)',
         borderRadius: 16,
         padding: 17,
         gap: 12,
@@ -146,14 +146,14 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
         fontSize: 12,
         letterSpacing: '0.025em',
         textTransform: 'uppercase',
-        color: 'rgba(248, 250, 252, 0.6)',
+        color: 'var(--dash-text-muted)',
     }
 
     const valueStyle: React.CSSProperties = {
         fontFamily: 'Inter, sans-serif',
         fontWeight: 400,
         fontSize: 14,
-        color: '#F8FAFC',
+        color: 'var(--dash-text)',
     }
 
     if (order.paymentStatus === 'pending_verification') {
@@ -191,10 +191,10 @@ export function ManualPaymentVerificationBlock({ order, onUpdate }: ManualPaymen
                             <span style={{ ...labelStyle, fontSize: 11 }}>Payment Receipt</span>
                             <div style={{
                                 height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                background: 'rgba(255,255,255,0.05)', borderRadius: 10,
-                                border: '1px solid rgba(255,255,255,0.08)',
+                                background: 'var(--dash-secondary-bg)', borderRadius: 10,
+                                border: '1px solid var(--dash-border)',
                             }}>
-                                <span style={{ ...valueStyle, color: 'rgba(248,250,252,0.4)', fontSize: 12 }}>
+                                <span style={{ ...valueStyle, color: 'var(--dash-text-muted)', fontSize: 12 }}>
                                     No receipt uploaded
                                 </span>
                             </div>
