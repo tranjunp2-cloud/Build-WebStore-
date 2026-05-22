@@ -476,7 +476,9 @@ export function buildTestimonials(content: CategoryContent, bizName?: string, la
     headline: headlineFull,
     subheadline: i18n.testimonials.subheadline,
     testimonials: content.testimonials.slice(0, 6).map((t) => ({
-      quote: t.quote,
+      quote: (language === 'ms' && t.quote_ms) ? t.quote_ms
+           : (language === 'vi' && t.quote_vi) ? t.quote_vi
+           : t.quote,
       name: t.name,
       title: t.title,
       company: t.company,

@@ -73,6 +73,8 @@ export const businessContent: CategoryContent = {
       rating: 5,
       quote:
         'Dato\' Rahman\'s team guided us through a complex cross-border acquisition. Their RM 500/hour rate delivered value far exceeding the cost. Exceptional strategic thinking and execution.',
+      quote_ms:
+        'Pasukan Dato\' Rahman membimbing kami melalui pengambilalihan rentas sempadan yang kompleks. Kadar RM 500/jam mereka memberikan nilai yang jauh melebihi kos. Pemikiran strategik dan pelaksanaan yang luar biasa.',
     },
     {
       name: 'Lim Bee Hwa',
@@ -81,6 +83,8 @@ export const businessContent: CategoryContent = {
       rating: 5,
       quote:
         'Marcus & Co has been handling our accounts for 5 years. They saved us over RM 40,000 in tax through proper planning last year alone. Reliable, responsive, and reasonably priced.',
+      quote_ms:
+        'Marcus & Co telah menguruskan akaun kami selama 5 tahun. Mereka menjimatkan lebih RM 40,000 cukai kami melalui perancangan yang betul tahun lepas sahaja. Boleh dipercayai, responsif, dan harga berpatutan.',
     },
     {
       name: 'Harith Iskandar',
@@ -89,6 +93,8 @@ export const businessContent: CategoryContent = {
       rating: 4,
       quote:
         'Lex & Partners helped us draft employment contracts for our remote team across ASEAN. They understood the cross-border nuances perfectly. The bilingual service was a huge plus for our diverse team.',
+      quote_ms:
+        'Lex & Partners membantu kami merangka kontrak pekerjaan untuk pasukan jauh kami di seluruh ASEAN. Mereka memahami nuansa rentas sempadan dengan sempurna. Perkhidmatan dwibahasa adalah satu kelebihan besar untuk pasukan kami yang pelbagai.',
     },
     {
       name: 'Puan Sharifah',
@@ -97,6 +103,8 @@ export const businessContent: CategoryContent = {
       rating: 5,
       quote:
         'GreenVentures transformed our approach to sustainability. Their ESG assessment identified quick wins that actually saved us money while improving our Bursa sustainability score. A worthwhile investment.',
+      quote_ms:
+        'GreenVentures mengubah pendekatan kami terhadap kemampanan. Penilaian ESG mereka mengenal pasti kemenangan cepat yang sebenarnya menjimatkan wang kami sambil meningkatkan skor kemampanan Bursa kami. Pelaburan yang berbaloi.',
     },
   ],
   faqItems: [
