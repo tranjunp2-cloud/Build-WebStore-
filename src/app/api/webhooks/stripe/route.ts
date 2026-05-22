@@ -237,13 +237,17 @@ async function handleCheckoutCompleted(
                 locale: siteLocale,
             })
 
-            await sendEmail({
+            const sent = await sendEmail({
                 to: order.customerEmail,
                 subject: emailData.subject,
                 html: emailData.html,
             })
 
-            console.log(`[Stripe Webhook] Confirmation email sent to ${order.customerEmail}`)
+            if (sent) {
+                console.log(`[Stripe Webhook] Confirmation email sent to ${order.customerEmail}`)
+            } else {
+                console.warn(`[Stripe Webhook] Confirmation email failed (sendEmail returned false) for ${order.customerEmail}`)
+            }
         } catch (emailErr) {
             console.error('[Stripe Webhook] Failed to send confirmation email:', emailErr)
             // Don't fail the webhook — email is non-critical
