@@ -57,7 +57,7 @@ export function GeneralInfoSection({ categories, isEdit }: Props) {
             {/* Category */}
             <div className="flex flex-col gap-2" id="categoryIds">
                 <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43]">
-                    {t.dashboard.products.form.sections?.category || 'Category'}
+                    {t.dashboard.products.form.sections?.category || 'Category'} <span className="text-[#F8FAFC]">*</span>
                 </label>
                 <CategorySelect 
                     categories={categories}
