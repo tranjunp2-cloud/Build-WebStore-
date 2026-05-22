@@ -76,6 +76,8 @@ describe('F18 CMS Core Layout', () => {
             userInitial: 'T',
             mobileOpen: false,
             setMobileOpen: vi.fn(),
+            currentUserRole: 'owner',
+            permissions: ['builder', 'blog', 'products', 'orders', 'settings'],
         }
 
         it('[TC-F18.01] Renders Desktop sidebar and links correctly', () => {

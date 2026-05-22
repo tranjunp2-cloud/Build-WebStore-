@@ -131,11 +131,11 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
     }
 
     return createPortal(
-        <div className="dash-shell hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-[#0B0E14]/80 backdrop-blur-sm animate-in fade-in duration-200"
+        <div className="hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={onClose}
             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-            <div 
-                className="relative flex flex-col md:flex-row w-full max-w-[1024px] h-[calc(100vh-32px)] bg-[#191C22] rounded-tl-[16px] shadow-[-25px_0_50px_-12px_rgba(0,0,0,0.5)] border-t border-l border-white/[0.05] animate-in slide-in-from-right duration-300"
+            <div
+                className="dash-shell relative flex flex-col md:flex-row w-full max-w-[1024px] h-[calc(100vh-32px)] bg-[#191C22] rounded-tl-[16px] shadow-[-25px_0_50px_-12px_rgba(0,0,0,0.5)] border-t border-l border-white/[0.05] animate-in slide-in-from-right duration-300"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Close Button - absolute to the drawer itself */}

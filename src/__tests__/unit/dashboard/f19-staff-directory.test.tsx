@@ -30,13 +30,41 @@ vi.mock('@/i18n', () => ({
     useI18n: () => ({
         locale: 'en',
         t: {
-            staff: {
-                custom_features: {
-                    products: 'Products & Inventory',
-                    orders: 'Orders & Fulfillment',
-                    blog: 'Blog Management',
-                    builder: 'Store Design (Builder)',
-                    settings: 'Settings & Domain'
+            Staff: {
+                drawer: {
+                    inviteTitle: 'Invite Staff',
+                    editTitle: 'Edit Permissions',
+                    saveBtn: 'Save Changes',
+                    sendInviteBtn: 'Send Invite',
+                    cancelBtn: 'Cancel',
+                    email: 'Email Address',
+                    emailNeeded: 'Send an invitation to join your store.',
+                    errorEmailRequired: 'Please enter an email address',
+                    errorEmailInvalid: 'Invalid email address',
+                    errorEmailTooLong: 'Email must not exceed 254 characters',
+                    errorSelfInvite: 'You cannot invite yourself',
+                    errorGeneric: 'Something went wrong. Please try again.',
+                    roles: {
+                        label: 'Select Role',
+                        admin: 'Manager',
+                        adminDesc: 'Can manage everything except delete the store.',
+                        custom: 'Custom Features',
+                        customDesc: 'Select specific access individually'
+                    },
+                    features: {
+                        builder: 'Store Editor',
+                        blog: 'Blog',
+                        products: 'Product',
+                        orders: 'Order',
+                        settings: 'Setting'
+                    }
+                },
+                toast: {
+                    inviteSent: 'Invitation sent successfully!',
+                    inviteFailed: 'Failed to send invitation',
+                    staffUpdated: 'Staff updated successfully!',
+                    staffUpdateFailed: 'Failed to update staff',
+                    permissionRequired: 'Please select at least one custom permission'
                 }
             }
         }
@@ -147,7 +175,7 @@ describe('F19 Staff Management (StaffDirectoryClient & StaffDrawer)', () => {
             fireEvent.click(screen.getByText('Custom Features'));
 
             // The exact hardcoded labels in StaffDrawer (products & orders are hidden)
-            const blogFeature = screen.getByText('Blog Management');
+            const blogFeature = screen.getByText('Blog');
             fireEvent.click(blogFeature);
 
             // Click Send Invite

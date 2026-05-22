@@ -723,7 +723,7 @@ export default function ProductsPage() {
                                     const isOutOfStock = product.inventory <= 0
                                     const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                     const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
-                                    const weightDisplay = product.weight ? `${product.weight} kg` : '0.5 kg'
+                                    const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
                                     
                                     return (
                                         <div key={product.id} onClick={() => setQuickViewProduct(product as DetailedProduct)} className="group grid grid-cols-[80px_minmax(250px,2fr)_minmax(120px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_120px_100px] gap-4 px-6 py-4 items-center hover:bg-white/[0.02] cursor-pointer transition-colors">

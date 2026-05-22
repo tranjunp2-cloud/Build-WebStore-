@@ -48,6 +48,7 @@ export default async function DashboardLayout({
         return tId === tenantId
     })
     const currentUserRole = currentTenantInfo?.role || 'viewer'
+    const userPermissions = (currentTenantInfo as { permissions?: string[] } | undefined)?.permissions ?? []
     const isSuperAdmin = Boolean(typedUser?.roles?.includes('super-admin'))
 
     const cookieStore = await cookies()
@@ -59,7 +60,7 @@ export default async function DashboardLayout({
             <ThemeProvider initialTheme={initialTheme}>
                 <I18nProvider defaultLocale="en">
                     <TooltipProvider delayDuration={300}>
-                        <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} isSuperAdmin={isSuperAdmin}>
+                        <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} userAvatarUrl={userAvatarUrl} currentUserRole={currentUserRole} userPermissions={userPermissions} isSuperAdmin={isSuperAdmin}>
                             {children}
                         </CMSLayoutClient>
                         {typedUser && (
