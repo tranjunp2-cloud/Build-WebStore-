@@ -8,6 +8,7 @@ import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
 import type { TenantMembership } from '@/lib/normalize-tenants'
+import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -30,8 +31,6 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
 
     return doc
 }
-
-const ALLOWED_PERMISSIONS = new Set(['products', 'orders', 'blog', 'builder', 'settings'])
 
 async function injectUser(req: any) {
     if (req.user) return;
