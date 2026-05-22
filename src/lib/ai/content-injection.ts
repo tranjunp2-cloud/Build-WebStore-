@@ -165,10 +165,13 @@ function rotateSlice<T>(pool: readonly T[], seed: number): T[] {
     return seededShuffle(pool, seed)
 }
 
-/** Normalized testimonial for Zod schema shape. */
-function mapTestimonial(t: TestimonialSample): Block {
+/** Normalized testimonial for Zod schema shape. Picks language-specific quote when available. */
+function mapTestimonial(t: TestimonialSample, language?: string): Block {
+    const quote = (language === 'ms' && t.quote_ms) ? t.quote_ms
+                : (language === 'vi' && t.quote_vi) ? t.quote_vi
+                : t.quote
     return {
-        quote: t.quote,
+        quote,
         name: t.name,
         title: t.title ?? 'Customer',
         company: t.company ?? '',
@@ -306,7 +309,7 @@ export function buildBlockFromLibrary(
                 blockType: 'testimonials',
                 variant: 'cards',
                 headline: i18n.testimonials.headline,
-                testimonials: testimonialSlice.slice(0, 4).map(mapTestimonial),
+                testimonials: testimonialSlice.slice(0, 4).map((t) => mapTestimonial(t, ctx.language)),
             }
 
         case 'faq':
@@ -634,7 +637,7 @@ export function padItems(
         const pool = rotateSlice(content.testimonials, baseSeed)
         let i = 0
         while (result.length < minCount && i < pool.length) {
-            const candidate = mapTestimonial(pool[i]!)
+            const candidate = mapTestimonial(pool[i]!, ctx.language)
             const isDupe = result.some(
                 (r) =>
                     typeof r === 'object' && r !== null && (r as Block).name === candidate.name,
