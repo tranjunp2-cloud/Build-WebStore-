@@ -157,7 +157,7 @@ export default function ForgotPasswordPage() {
                             className="flex flex-col items-stretch"
                             style={{ gap: '8px', width: '382px', maxWidth: '100%' }}
                         >
-                            {/* Title: "Email Sent" — Inter 600, 20px, 1.4em, center, #F8FAFC */}
+                            {/* Title: "Email Sent" — Inter 600, 20px, 1.4em, center */}
                             <h2
                                 style={{
                                     fontFamily: 'Inter, sans-serif',
@@ -165,14 +165,14 @@ export default function ForgotPasswordPage() {
                                     fontSize: '20px',
                                     lineHeight: '1.4em',
                                     textAlign: 'center',
-                                    color: '#F8FAFC',
+                                    color: 'var(--auth-text)',
                                     margin: 0,
                                 }}
                             >
                                 {t.auth.forgot.emailSentTitle}
                             </h2>
 
-                            {/* Description — Inter 400, 14px, 1.625em, center, rgba(248,250,252,0.7) */}
+                            {/* Description — Inter 400, 14px, 1.625em, center */}
                             <p
                                 style={{
                                     fontFamily: 'Inter, sans-serif',
@@ -180,7 +180,7 @@ export default function ForgotPasswordPage() {
                                     fontSize: '14px',
                                     lineHeight: '1.625em',
                                     textAlign: 'center',
-                                    color: 'rgba(248, 250, 252, 0.7)',
+                                    color: 'var(--auth-text-muted)',
                                     margin: 0,
                                 }}
                             >
@@ -189,7 +189,7 @@ export default function ForgotPasswordPage() {
                         </div>
                     </div>
 
-                    {/* Bottom text — Inter 400, 12px, 1.333em, center, rgba(248,250,252,0.5) */}
+                    {/* Bottom text — Inter 400, 12px, 1.333em, center */}
                     <p
                         className="w-full"
                         style={{
@@ -198,7 +198,7 @@ export default function ForgotPasswordPage() {
                             fontSize: '12px',
                             lineHeight: '1.333em',
                             textAlign: 'center',
-                            color: 'rgba(248, 250, 252, 0.5)',
+                            color: 'var(--auth-text-subtle)',
                             margin: 0,
                         }}
                     >
@@ -219,13 +219,13 @@ export default function ForgotPasswordPage() {
             {/* Header */}
             <div className="flex flex-col items-center justify-center text-center mx-auto" style={{ gap: 8, maxWidth: 382 }}>
                 <h1
-                    className="text-[#F8FAFC]"
                     style={{
                         fontFamily: 'Inter, sans-serif',
                         fontSize: 24,
                         fontWeight: 700,
                         lineHeight: '32px',
                         margin: 0,
+                        color: 'var(--auth-text)',
                     }}
                 >
                     {t.auth.forgot.title}
@@ -233,7 +233,7 @@ export default function ForgotPasswordPage() {
                 <p
                     className="text-center"
                     style={{
-                        color: 'rgba(248, 250, 252, 0.70)',
+                        color: 'var(--auth-text-muted)',
                         fontFamily: 'Inter, sans-serif',
                         fontSize: 14,
                         fontWeight: 400,
@@ -262,7 +262,7 @@ export default function ForgotPasswordPage() {
                     <label
                         htmlFor="email"
                         style={{
-                            color: 'rgba(248, 250, 252, 0.8)',
+                            color: 'var(--auth-text-muted)',
                             fontFamily: 'Inter, sans-serif',
                             fontSize: 14,
                             fontWeight: 500,
@@ -271,24 +271,26 @@ export default function ForgotPasswordPage() {
                     >
                         {t.auth.forgot.emailLabel}
                     </label>
-                    <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                    <div
+                        className={`relative rounded-2xl focus-within:ring-2 focus-within:ring-blue-500/30 transition-all ${errors.email ? 'ring-2 ring-red-500/50' : ''}`}
+                        style={{
+                            background: 'var(--auth-input-bg)',
+                            border: '1px solid var(--auth-input-border)',
+                            boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
+                        }}
+                    >
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--auth-text)' }} />
                         <input
                             id="email"
                             type="email"
                             placeholder={t.auth.forgot.emailPlaceholder}
-                            className={`
-                                w-full h-11 rounded-2xl pl-10 pr-4 text-sm text-white
-                                placeholder:text-[#94A3B8] outline-none
-                                focus:ring-2 focus:ring-blue-500/30 transition-all
-                                ${errors.email ? 'ring-2 ring-red-500/50' : ''}
-                            `}
+                            className="w-full h-11 rounded-2xl pl-10 pr-4 text-sm placeholder:text-[color:var(--auth-text-subtle)] outline-none"
                             style={{
-                                background: '#1E293B',
-                                border: '1px solid rgba(255, 255, 255, 0.08)',
-                                boxShadow: '0px 0px 0px 0.057px rgba(59, 130, 246, 0)',
+                                background: 'transparent',
+                                border: 'none',
                                 fontFamily: 'Inter, sans-serif',
                                 lineHeight: '1.21',
+                                color: 'var(--auth-text)',
                             }}
                             {...register('email')}
                         />

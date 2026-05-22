@@ -223,7 +223,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                         {/* Figma: Chevron 16x16 */}
                         <ChevronDown
                             className={cn(
-                                'h-4 w-4 shrink-0 text-[rgba(248,250,252,0.7)] transition-transform duration-200',
+                                'h-4 w-4 shrink-0 text-dash-text-muted transition-transform duration-200',
                                 isGroupExpanded && 'rotate-180'
                             )}
                         />
@@ -320,7 +320,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 {/* Figma: Language row — layout_6MREP8 — row, center, self-stretch, gap 8px */}
                 <div className="flex items-center gap-2">
                     {/* Figma: Globe Icon 16x16 */}
-                    <Globe className="h-4 w-4 shrink-0 text-dash-text-muted" />
+                    <Globe className="h-4 w-4 shrink-0 text-dash-text" />
                     {/* Figma: Pill — language switcher */}
                     <div className="flex flex-1 items-center rounded-[16px] border border-dash-border bg-dash-surface px-1 h-[38px]">
                         {/* Figma: MY button — layout_CR9BUZ — padding 6px 12px, radius 12, h=28 */}
@@ -370,7 +370,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     className="flex items-center gap-3 rounded-[16px] border border-dash-border bg-transparent outline-none pl-4 h-[44px] text-[14px] font-medium text-dash-text hover:bg-dash-surface-hover cursor-pointer transition-colors"
                 >
                     {/* Figma: Icon 16x16 */}
-                    <LogOut className="h-4 w-4 shrink-0" />
+                    <LogOut className="h-4 w-4 shrink-0 text-dash-text" />
                     <span>{locale === 'ms' ? 'Log Keluar' : 'Logout'}</span>
                 </button>
             </div>
