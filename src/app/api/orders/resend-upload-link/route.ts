@@ -28,6 +28,10 @@ export async function POST(req: Request) {
     if (!orderNumber || !email) {
         return NextResponse.json({ success: true })
     }
+    // Reject obviously invalid orderNumber early (anti-DoS, anti-enumeration)
+    if (orderNumber.length > 50 || !/^ORD-/.test(orderNumber)) {
+        return NextResponse.json({ success: true })
+    }
 
     try {
         const payload = await getPayload({ config })
@@ -45,6 +49,8 @@ export async function POST(req: Request) {
         // Validate email matches and order is BT pending
         if ((order.customerEmail ?? '').toLowerCase() !== email) return NextResponse.json({ success: true })
         if (order.paymentMethod !== 'bank_transfer') return NextResponse.json({ success: true })
+        const TERMINAL_ORDER_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'shipped'])
+        if (TERMINAL_ORDER_STATUSES.has(order.status ?? '')) return NextResponse.json({ success: true })
         if (!RESENDABLE_STATUSES.has(order.paymentStatus ?? '')) return NextResponse.json({ success: true })
 
         // Generate fresh upload token (24h) for the resume route

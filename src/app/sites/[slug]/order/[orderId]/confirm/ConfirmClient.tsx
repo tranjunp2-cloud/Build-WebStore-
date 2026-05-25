@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
@@ -118,6 +117,26 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         })
         return () => cleanup.forEach(fn => fn())
     }, [])
+
+    // Intercept browser back button and tab close when BT upload is still pending
+    useEffect(() => {
+        if (order.paymentMethod !== 'bank_transfer' || uploadStatus === 'success') return
+        window.history.pushState(null, '', window.location.href)
+        const onPop = () => {
+            window.history.pushState(null, '', window.location.href)
+            setLeaveHref(`/sites/${slug}/products`)
+        }
+        const onBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            e.returnValue = ''
+        }
+        window.addEventListener('popstate', onPop)
+        window.addEventListener('beforeunload', onBeforeUnload)
+        return () => {
+            window.removeEventListener('popstate', onPop)
+            window.removeEventListener('beforeunload', onBeforeUnload)
+        }
+    }, [order.paymentMethod, uploadStatus, slug])
 
     const currency = order.currency || 'MYR'
     const shippingFee = order.shippingFee ?? 0
@@ -237,7 +256,16 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         <div className="ty-page">
             {/* ── Header ── */}
             <header className="ty-hd">
-                <Link href={`/sites/${slug}/products`} className="ty-back"><ArrowLeft size={16} /></Link>
+                <button
+                    className="ty-back"
+                    onClick={() => {
+                        if (isBT && uploadStatus !== 'success') {
+                            setLeaveHref(`/sites/${slug}/products`)
+                        } else {
+                            clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)
+                        }
+                    }}
+                ><ArrowLeft size={16} /></button>
                 <h1 className="ty-h1">Order Confirmation</h1>
                 <div className="ty-crumbs">
                     <span>Cart</span><ChevronRight size={12} />

@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import {
@@ -129,32 +130,23 @@ async function handleCheckoutCompleted(
         return
     }
 
-    // Idempotency: skip only if the order was already transitioned out of 'pending'.
-    // NOTE: stripe-checkout/route.ts writes stripeSessionId to the order BEFORE the buyer pays,
-    // so we cannot treat "sessionId exists" as "already processed" — we must check status too.
-    const existing = await payload.find({
-        collection: 'orders',
-        where: {
-            stripeSessionId: { equals: stripeSessionId },
-        },
-        limit: 1,
-    })
-
-    if (existing.docs.length > 0 && (existing.docs[0] as any).status !== 'pending') {
-        console.log(`[Stripe Webhook] Order already processed for session ${stripeSessionId}`)
+    // Atomic status transition: UPDATE WHERE status = 'pending' — only the first concurrent invocation wins.
+    // NOTE: stripe-checkout/route.ts writes stripeSessionId BEFORE payment, so checking sessionId alone
+    // cannot distinguish "already processed" from "not yet paid". Raw SQL is required for atomicity.
+    const transitionResult = await payload.db.drizzle.execute(sql`
+        UPDATE orders SET status = 'new'
+        WHERE id = ${parseInt(orderId)} AND status = 'pending'
+        RETURNING id
+    `)
+    if (!transitionResult.rows?.length) {
+        console.log(`[Stripe Webhook] Order ${orderId} already transitioned — skipping concurrent delivery`)
         return
     }
 
-    // Guard: verify the order is still pending before triggering side-effects.
-    // Combined with the stripeSessionId check above, this minimises the concurrent-delivery race window.
+    // Verify order exists (guard against client_reference_id pointing to a deleted order)
     const targetOrder = await payload.findByID({ collection: 'orders', id: orderId })
     if (!targetOrder) {
-        console.warn(`[Stripe Webhook] Order ${orderId} not found`)
-        return
-    }
-    const existingStatus = (targetOrder as any).status
-    if (existingStatus && existingStatus !== 'pending') {
-        console.log(`[Stripe Webhook] Order ${orderId} already in status '${existingStatus}' — skipping`)
+        console.warn(`[Stripe Webhook] Order ${orderId} not found after transition — unexpected state`)
         return
     }
 
@@ -167,13 +159,11 @@ async function handleCheckoutCompleted(
         const paymentMethod: 'card' | 'fpx' =
             enabledTypes.length === 1 && enabledTypes[0] === 'fpx' ? 'fpx' : 'card'
 
-        // session.payment_intent is always a string in webhook events (not expanded).
-        // stripeChargeId requires expand: ['payment_intent'] — deferred to Wave 7.
+        // Record Stripe IDs (idempotent — status already set atomically above)
         await payload.update({
             collection: 'orders',
             id: orderId,
             data: {
-                status: 'new',
                 stripeSessionId,
                 stripePaymentIntentId: typeof session.payment_intent === 'string'
                     ? session.payment_intent
@@ -446,12 +436,16 @@ async function handleAccountUpdated(
         )
     }
 
+    const tenantUpdateData: Record<string, unknown> = { stripeOnboardingComplete: isOnboardingComplete }
+    // Mirror handleAccountDeauthorized: disable card/FPX if Stripe revokes charges_enabled
+    if (!isOnboardingComplete) {
+        tenantUpdateData.payments = { payment_card: false, payment_fpx: false }
+    }
+
     await payload.update({
         collection: 'tenants',
         id: tenants.docs[0].id,
-        data: {
-            stripeOnboardingComplete: isOnboardingComplete,
-        },
+        data: tenantUpdateData,
     })
 
     console.log(

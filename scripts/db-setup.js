@@ -3841,7 +3841,10 @@ const MIGRATIONS = [
   { name: 'malaysia_postcodes.create_table', sql: `CREATE TABLE IF NOT EXISTS malaysia_postcodes (id serial PRIMARY KEY, postcode varchar(5) NOT NULL UNIQUE, district_id integer NOT NULL REFERENCES malaysia_districts(id));` },
   { name: 'malaysia_postcodes.create_idx', sql: `CREATE INDEX IF NOT EXISTS idx_malaysia_postcodes_district ON malaysia_postcodes(district_id);` },
   // Normalize state names to match MY_STATES enum used by checkout validation (Zod)
-  { name: 'malaysia_states.normalize_names', sql: `UPDATE malaysia_states SET name = 'Penang' WHERE name = 'Pulau Pinang'; UPDATE malaysia_states SET name = 'Kuala Lumpur' WHERE name = 'W.P. Kuala Lumpur'; UPDATE malaysia_states SET name = 'Putrajaya' WHERE name = 'W.P. Putrajaya'; UPDATE malaysia_states SET name = 'Labuan' WHERE name = 'W.P. Labuan';` },
+  { name: 'malaysia_states.normalize_penang', sql: `UPDATE malaysia_states SET name = 'Penang' WHERE name = 'Pulau Pinang'` },
+  { name: 'malaysia_states.normalize_kl', sql: `UPDATE malaysia_states SET name = 'Kuala Lumpur' WHERE name = 'W.P. Kuala Lumpur'` },
+  { name: 'malaysia_states.normalize_putrajaya', sql: `UPDATE malaysia_states SET name = 'Putrajaya' WHERE name = 'W.P. Putrajaya'` },
+  { name: 'malaysia_states.normalize_labuan', sql: `UPDATE malaysia_states SET name = 'Labuan' WHERE name = 'W.P. Labuan'` },
 
   // GH-960 — _pages_v column required by CI check (billing_toggle is a block field, harmless extra col)
   { name: '_pages_v.version_billing_toggle', sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_billing_toggle varchar;` },

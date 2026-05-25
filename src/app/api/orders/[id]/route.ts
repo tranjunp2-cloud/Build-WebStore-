@@ -126,7 +126,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                             subtotal: (order as any).subtotal ?? 0,
                             shippingFee: (order as any).shippingFee ?? 0,
                             total: (order as any).total ?? 0,
-                            paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : 'stripe',
+                            paymentMethod: (order as any).paymentMethod === 'cod' ? 'cod' : (order as any).paymentMethod === 'bank_transfer' ? 'bank_transfer' : 'stripe',
                             orderDate: (order as any).createdAt,
                             orderPageUrl: `${baseUrl}/sites/${shopSlug}/orders/${orderNumber}`,
                             currency: (order as any).currency ?? 'MYR',

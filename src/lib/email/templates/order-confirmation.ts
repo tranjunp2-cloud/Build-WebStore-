@@ -39,8 +39,8 @@ export interface OrderConfirmationData {
     discountCode?: string | null
     shippingFee: number
     total: number
-    /** 'cod' = pay on delivery | 'stripe' = paid online */
-    paymentMethod: 'cod' | 'stripe'
+    /** 'cod' = pay on delivery | 'stripe' = paid online | 'bank_transfer' = manual bank transfer */
+    paymentMethod: 'cod' | 'stripe' | 'bank_transfer'
     shippingProvider?: string | null
     orderDate: string
     orderPageUrl: string
@@ -101,7 +101,7 @@ export function orderConfirmationEmail(
         : isCompleted ? (t as any).orderStatusCompleted
         : t.orderStatusSuccess
 
-    const prepaid = data.paymentMethod === 'stripe' ? data.total : 0
+    const prepaid = (data.paymentMethod === 'stripe' || data.paymentMethod === 'bank_transfer') ? data.total : 0
     const cod = data.paymentMethod === 'cod' ? data.total : 0
 
     const itemRows = data.items.map((item) => `
@@ -277,7 +277,7 @@ export function orderConfirmationEmail(
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
           <tr>
             <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.paymentMethod}</td>
-            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${data.paymentMethod === 'cod' ? (locale === 'ms' ? 'COD' : 'COD') : (locale === 'ms' ? 'Kad / FPX' : 'Card / FPX')}</td>
+            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${data.paymentMethod === 'cod' ? 'COD' : data.paymentMethod === 'bank_transfer' ? (locale === 'ms' ? 'Pindahan Bank' : 'Bank Transfer') : (locale === 'ms' ? 'Kad / FPX' : 'Card / FPX')}</td>
             <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.buyerNote}</td>
             <td align="right" style="padding:6px 0;color:#94A3B8;">${data.buyerNote ? esc(data.buyerNote) : '—'}</td>
           </tr>
