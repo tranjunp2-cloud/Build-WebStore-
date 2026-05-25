@@ -40,6 +40,11 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             )
         }
 
+        // Idempotency: already cancelled → treat as success (prevents double restock on concurrent requests)
+        if ((order.status as string) === 'cancelled') {
+            return NextResponse.json({ success: true, data: order, restock: [] })
+        }
+
         // Validate that cancellation is allowed
         const currentStatus = order.status as string
         const allowed = ORDER_STATUS_TRANSITIONS[currentStatus] || []

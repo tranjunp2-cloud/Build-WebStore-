@@ -861,6 +861,7 @@
         "orderLabel": "Order",
         "reasonLabel": "Reason for cancellation",
         "reasonRequired": "Cancel reason is required.",
+        "reasonMaxLength": "Maximum 500 characters",
         "reasonPlaceholder": "e.g., Customer requested via phone, out of stock, false order...",
         "warning": "This action cannot be undone. The inventory components associated with this order will be restocked automatically.",
         "back": "Back",
