@@ -158,7 +158,11 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                                 {c.reasonRequired}
                             </span>
                         ) : <span />}
-                        <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: reason.length >= 450 ? '#FB2C36' : 'var(--dash-text-muted)' }}>
+                        <span
+                            title={c.reasonMaxLength}
+                            aria-label={c.reasonMaxLength}
+                            style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: reason.length >= 450 ? '#FB2C36' : 'var(--dash-text-muted)' }}
+                        >
                             {reason.length}/500
                         </span>
                     </div>
