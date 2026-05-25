@@ -1,8 +1,9 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F25 - Shop Customers
-> **Phiên bản:** 2.0 | **Cập nhật:** 2026-05-21 (refactor sang format table chuẩn F08 — thêm 16 TC: TC-F25-03-01..04 sync/perf, TC-F25-04-01..02 address defaults, TC-F25-05-04..07 CSV details, TC-F25-06-01..04 Orders tab UI, TC-F25-08-01..09 E2E admin flows) | **Thực hiện:** QA Team
+> **Phiên bản:** 2.1 | **Cập nhật:** 2026-05-25 (sync với state thực tế: 9 test files, 112 PASS + 7 todo; refactor CSV helpers → module riêng) | **Thực hiện:** QA Team
 
 ### Changelog
-- **v2.0 (2026-05-21)** — Refactor sang format table chuẩn F08. Group lại 26 TC + 9 E2E thành 8 US logical groups (Schema, Auto-link, Sync, Access, Address, CSV Export, Orders Tab UI, E2E). Thêm 16 TC mới phủ gap: sync snapshot hook (TC-F25-03-01..02), firstOrderAt immutability (TC-F25-02-06), auto-link update perf (TC-F25-02-07), address country default + multiple isDefault (TC-F25-04-01..02), CSV formula-injection guard + RFC 4180 escape + filename sanitize + auth errors (TC-F25-05-04..07), Orders tab Component (TC-F25-06-01..04), E2E admin flows (TC-F25-08-01..09).
+- **v2.1 (2026-05-25)** — Sync với state thực tế trên branch `test/verify-issue-1024`. Tạo 6 file tests mới (sync-customer-snapshot, customers-hooks-and-behavior, customers-edge-cases, customers-orders-tab, customers-export-csv-helpers, e2e/f25-customers.spec) + 1 source extraction (`src/lib/customers/csv-helpers.ts`). Final: 9 unit/integration files = 112 PASS + 7 todo (TC-F25-06-08 boundary cần extract `resolveTenantIds`). E2E spec 9 tests compile OK (defer execution chờ staging).
+- **v2.0 (2026-05-21)** — Refactor sang format table chuẩn F08. Group lại 26 TC + 9 E2E thành 8 US logical groups. (⚠️ v2.0 claim 116 tests sai — thực tế tại snapshot chỉ 39; v2.1 sửa.)
 - **v1.0 (2026-05-20)** — Initial 10 TCs (TC-F25-001..010): auto-link, access control, field validation, CSV export.
 
 > **Nguồn Tham chiếu:** PRD (`F25-shop-customers.md`), Architecture (`F25-shop-customers.md`), Design (`F25-shop-customers-design.md`)
@@ -148,21 +149,26 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 
 ## 4. Test Files Locations + Counts
 
+> **Verified:** 2026-05-25 via `npx vitest run src/__tests__/unit/customers/ src/__tests__/integration/customers-export.test.ts` — 9 files, 112 PASS + 7 todo (14.62s).
+
 | Test File | Location | TC Coverage | Test Count |
 |:---|:---|:---|:---:|
 | `auto-link-customer.test.ts` | `src/__tests__/unit/customers/` | TC-F25-02-01..05, 02-07 | ✅ 7 PASS |
-| `sync-customer-snapshot.test.ts` | `src/__tests__/unit/customers/` | TC-F25-03-01..02 | ✅ **8 PASS** (NEW) |
+| `sync-customer-snapshot.test.ts` | `src/__tests__/unit/customers/` | TC-F25-03-01..02 + edge | ✅ 11 PASS |
 | `customers-access.test.ts` | `src/__tests__/unit/customers/` | TC-F25-05-01..02 | ✅ 8 PASS |
 | `customers-field-validation.test.ts` | `src/__tests__/unit/customers/` | TC-F25-01-01..03, 04-01 | ✅ 15 PASS |
-| `customers-hooks-and-behavior.test.ts` | `src/__tests__/unit/customers/` | TC-F25-01-04..05, 02-06, 04-02 | ✅ **12 PASS** (NEW) |
-| `customers-edge-cases.test.ts` | `src/__tests__/unit/customers/` | TC-F25-01-06..09, 02-08..11, 04-03, 06-08 | ✅ **21 PASS** (NEW round 2) |
-| `customers-orders-tab.test.tsx` | `src/__tests__/unit/customers/` | TC-F25-05-03, 07-01..04 | ✅ 14 PASS |
+| `customers-hooks-and-behavior.test.ts` | `src/__tests__/unit/customers/` | TC-F25-01-04..05, 02-06, 04-01..02 | ✅ 11 PASS |
+| `customers-edge-cases.test.ts` | `src/__tests__/unit/customers/` | TC-F25-01-06..09, 02-08..11, 04-03, 06-08 | ✅ 19 PASS + 🟡 7 todo |
+| `customers-orders-tab.test.tsx` | `src/__tests__/unit/customers/` | TC-F25-05-03, 07-01..04 | ✅ 16 PASS |
 | `customers-export.test.ts` | `src/__tests__/integration/` | TC-F25-06-01, 05..07 | ✅ 9 PASS |
-| `customers-export-csv-helpers.test.ts` | `src/__tests__/unit/customers/` | TC-F25-06-02..04 | ✅ **12 PASS** (NEW) |
-| `f25-customers.spec.ts` (E2E) | `e2e/` | TC-F25-08-01..09 | ✅ 10 tests valid |
-| **TOTAL** | — | **TC-F25-01..09-XX** | **106 unit/integration PASS + 10 E2E = 116 tests** |
+| `customers-export-csv-helpers.test.ts` | `src/__tests__/unit/customers/` | TC-F25-06-02..04 | ✅ 16 PASS |
+| `f25-customers.spec.ts` (E2E) | `e2e/` | TC-F25-08-01..09 | 🟡 9 specs compile (needs staging server) |
+| **TOTAL** | — | **TC-F25-01..09-XX** | **112 PASS + 7 todo + 9 E2E specs** |
 
-**Status:** Wave 6 baseline (39 unit/integration) ✅ all PASS. Wave 7 supplements: 14 ✅ ready / 12 🟡 draft / 10 E2E valid.
+**Source modules supporting tests:**
+- `src/lib/customers/csv-helpers.ts` — NEW (2026-05-25): extract `csvField` / `toCsvLine` / `sanitizeFilenameSegment` từ route handler → enable unit testing. `src/app/api/v1/customers/export/route.ts` re-imports từ module này; integration tests 9/9 PASS regression confirmed.
+
+**7 todo cases (TC-F25-06-08):** boundary tests cho `EXPORT_ROW_CAP` (0/10000/10001), `resolveTenantIds` sentinel. Blocked: các function này module-private trong `route.ts`. Fix: extract sang module riêng (giống pattern csv-helpers) → convert sang real tests.
 
 ---
 
@@ -188,28 +194,29 @@ Post-merge, user QA team thực hiện 3 manual scenarios:
 | TC-F25-01-02 | §7 FR-08 | §3.1 rank enum | customers-field-validation.test.ts | ✅ |
 | TC-F25-01-03 | §7 FR-03, §8 BR-06 | §3.2 maxRows | customers-field-validation.test.ts | ✅ |
 | TC-F25-01-04 | §7 FR-01, §8 BR-02 | §5.1 beforeChange | (existing) | ✅ |
-| TC-F25-01-05 | §7 FR-01, §8 BR-02 | beforeChange hook | customers-field-validation.test.ts | 🟡 Draft |
+| TC-F25-01-05 | §7 FR-01, §8 BR-02 | beforeChange hook | customers-hooks-and-behavior.test.ts | ✅ |
 | TC-F25-02-01 | §7 FR-02, §8 BR-02 | §5.1 beforeChange | auto-link-customer.test.ts | ✅ |
 | TC-F25-02-02 | §8 BR-08 | §2.1 hook flow | auto-link-customer.test.ts | ✅ |
 | TC-F25-02-03 | §8 BR-04 | §2.1 edge case | auto-link-customer.test.ts | ✅ |
 | TC-F25-02-04 | §8 BR-04 | §2.1 email validation | auto-link-customer.test.ts | ✅ |
 | TC-F25-02-05 | §8 BR-03 (non-throwing) | §5.2 try/catch | auto-link-customer.test.ts | ✅ |
-| TC-F25-02-06 | §7 FR-10, §8 BR-09 | §2.1 firstOrderAt | auto-link-customer.test.ts | 🟡 Draft |
-| TC-F25-02-07 | §7 FR-02 (perf) | §2.1 update path | auto-link-customer.test.ts | 🟡 Draft |
-| TC-F25-03-01 | §7 FR-02, §9.2 flow | §2.2 syncCustomerSnapshot | sync-customer-snapshot.test.ts | 🟡 Draft |
-| TC-F25-03-02 | §7 FR-02 (latest-wins) | §2.2 sync hook | sync-customer-snapshot.test.ts | 🟡 Draft |
-| TC-F25-04-01 | §7 FR-03, design §3.1 | §3.1 country default | customers-field-validation.test.ts | 🟡 Draft |
-| TC-F25-04-02 | design §3.2 (KISS) | — | customers-field-validation.test.ts | 🟡 Draft |
+| TC-F25-02-06 | §7 FR-10, §8 BR-09 | §2.1 firstOrderAt | customers-hooks-and-behavior.test.ts | ✅ |
+| TC-F25-02-07 | §7 FR-02 (perf) | §2.1 update path | auto-link-customer.test.ts | ✅ |
+| TC-F25-03-01 | §7 FR-02, §9.2 flow | §2.2 syncCustomerSnapshot | sync-customer-snapshot.test.ts | ✅ |
+| TC-F25-03-02 | §7 FR-02 (latest-wins) | §2.2 sync hook | sync-customer-snapshot.test.ts | ✅ |
+| TC-F25-04-01 | §7 FR-03, design §3.1 | §3.1 country default | customers-hooks-and-behavior.test.ts | ✅ |
+| TC-F25-04-02 | design §3.2 (KISS) | — | customers-hooks-and-behavior.test.ts | ✅ |
 | TC-F25-05-01 | §7 FR-09, §8 BR-01 | §6 access control | customers-access.test.ts | ✅ |
 | TC-F25-05-02 | §7 FR-09, §8 BR-07 | §6 delete forbidden | customers-access.test.ts | ✅ |
 | TC-F25-05-03 | §7 FR-06, code review M3 | §4.1 component spec | customers-orders-tab.test.tsx | ✅ |
 | TC-F25-06-01 | §7 FR-07, §8 BR-01 | §7 CSV tenant isolation | customers-export.test.ts | ✅ |
-| TC-F25-06-02 | §7 FR-07 | §7 formula guard | customers-csv.test.ts | 🟡 Draft |
-| TC-F25-06-03 | §7 FR-07 | RFC 4180 | customers-csv.test.ts | 🟡 Draft |
-| TC-F25-06-04 | §7 FR-07 | §7.3 filename | customers-export.test.ts | 🟡 Draft |
-| TC-F25-06-05 | §7 FR-07 (validation) | §7.4 error responses | customers-export.test.ts | 🟡 Draft |
-| TC-F25-06-06 | §7 FR-09 | §7.4 auth | customers-export.test.ts | 🟡 Draft |
+| TC-F25-06-02 | §7 FR-07 | §7 formula guard | customers-export-csv-helpers.test.ts | ✅ |
+| TC-F25-06-03 | §7 FR-07 | RFC 4180 | customers-export-csv-helpers.test.ts | ✅ |
+| TC-F25-06-04 | §7 FR-07 | §7.3 filename | customers-export-csv-helpers.test.ts | ✅ |
+| TC-F25-06-05 | §7 FR-07 (validation) | §7.4 error responses | customers-export.test.ts | ✅ |
+| TC-F25-06-06 | §7 FR-09 | §7.4 auth | customers-export.test.ts | ✅ |
 | TC-F25-06-07 | §7 FR-07 (cap) | §7 row cap | customers-export.test.ts | ✅ |
+| TC-F25-06-08 | §7 FR-07 (boundary) | §7 row cap | customers-edge-cases.test.ts | 🟡 7 todo (cần extract `resolveTenantIds`) |
 | TC-F25-07-01 | §7 FR-06 | §4.4 new customer state | customers-orders-tab.test.tsx | ✅ |
 | TC-F25-07-02 | §7 FR-06 | §4.4 empty state | customers-orders-tab.test.tsx | ✅ |
 | TC-F25-07-03 | §7 FR-06 | §4.3 pagination | customers-orders-tab.test.tsx | ✅ |
@@ -230,19 +237,21 @@ npm test -- src/__tests__/(unit|integration)/customers
 npx playwright test e2e/f25-customers.spec.ts
 ```
 
-**Expected (Wave 7 supplements done):**
+**Verified 2026-05-25:**
 ```
-✓ auto-link-customer.test.ts (9 tests)
-✓ sync-customer-snapshot.test.ts (~5 tests — draft)
-✓ customers-access.test.ts (2 tests)
-✓ customers-field-validation.test.ts (~7 tests — extended)
-✓ customers-orders-tab.test.tsx (14 tests ✅)
-✓ customers-export.test.ts (~7 tests — extended)
-✓ customers-csv.test.ts (~5 tests — draft)
-✓ f25-customers.spec.ts E2E (10 tests)
+✓ auto-link-customer.test.ts (7 tests)
+✓ sync-customer-snapshot.test.ts (11 tests)
+✓ customers-access.test.ts (8 tests)
+✓ customers-field-validation.test.ts (15 tests)
+✓ customers-hooks-and-behavior.test.ts (11 tests)
+✓ customers-edge-cases.test.ts (19 tests | 7 todo)
+✓ customers-orders-tab.test.tsx (16 tests)
+✓ customers-export.test.ts (9 tests — integration)
+✓ customers-export-csv-helpers.test.ts (16 tests)
 
-Test Files  8 passed
-     Tests  ~55 passed
+Test Files  9 passed (9)
+     Tests  112 passed | 7 todo (119)
+   Duration 14.62s
 ```
 
 **Coverage targets:** Lines ≥ 70%, Branches ≥ 70%, Functions ≥ 70%.
@@ -251,19 +260,17 @@ Test Files  8 passed
 
 ## 8. Known Gaps / Future Work
 
+> **Updated 2026-05-25:** v2.0 Draft items đã shipped trong v2.1. Còn lại 3 nhóm gaps thực tế.
+
 | Gap | Wave | Reason |
 |:---|:---|:---|
-| Sync snapshot hook tests (TC-F25-03-01..02) | Wave 7 — Draft | Hook implemented; tests pending |
-| firstOrderAt immutability (TC-F25-02-06) | Wave 7 — Draft | Critical BR-09 — cần coverage |
-| Auto-link update optimization (TC-F25-02-07) | Wave 7 — Draft | Perf path uncovered |
-| Address defaults + multiple isDefault (TC-F25-04-01..02) | Wave 7 — Draft | Field-level behaviors |
-| CSV escape + formula-injection (TC-F25-06-02..03) | Wave 7 — Draft | Security-critical |
-| CSV filename + 400/401 errors (TC-F25-06-04..06) | Wave 7 — Draft | Edge cases endpoint |
-| Email normalization on update (TC-F25-01-05) | Wave 7 — Draft | beforeChange cover update path |
-| Concurrent order creation (race condition) | Wave 7+ | Idempotency tested; concurrency edge case cần load test |
+| TC-F25-06-08 boundary (0/10000/10001 rows) | Wave 7 | 7 todo. Cần extract `resolveTenantIds` + `EXPORT_ROW_CAP` từ route.ts → module riêng (giống pattern csv-helpers.ts) để unit test. Partial coverage qua integration test (TC-F25-06-07). |
+| E2E spec execution (TC-F25-08-01..09) | Wave 7 | 9 specs compile OK trong `e2e/f25-customers.spec.ts`; cần staging server + `TEST_EMAIL`/`TEST_PASSWORD` env vars để run. |
+| Concurrent order creation (race condition) | Wave 7+ | Idempotency tested via mock; real concurrency edge case cần load test infra |
 | Large export stress (100k+ customers) | Wave 7+ | 10k cap + manual smoke đủ Wave 6 |
 | PW1 ETL import validation | Wave 7 (US-MIGA-12) | Separate plan scope |
 | Performance regression test | Wave 7+ | Baseline established |
+| GDPR/anonymize delete flow | Wave 8+ | Out of F25 scope (hard-delete forbidden by design) |
 
 ---
 
