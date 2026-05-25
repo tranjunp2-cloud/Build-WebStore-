@@ -393,6 +393,21 @@ export function PaymentsFormClient({
                         isOnboarding={isOnboarding}
                         onVerify={handleVerifyStripe}
                         isVerifying={isVerifying}
+                        connectedAccountId={currentAccountId}
+                        tenantId={tenantId ?? ''}
+                        onDisconnect={async () => {
+                            const res = await disconnectStripe();
+                            if (res.success) {
+                                setIsVerified(false);
+                                setIsChargesEnabled(false);
+                                setHasAccount(false);
+                                setDetailsSubmitted(false);
+                                setCardEnabled(false);
+                                setFpxEnabled(false);
+                            } else {
+                                toast.error('Failed to disconnect Stripe');
+                            }
+                        }}
                     />
                 ) : (
                     <StripeConnectBlock

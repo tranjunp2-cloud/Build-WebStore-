@@ -1,6 +1,7 @@
 "use client";
 
-import { Link, ArrowRight, ShieldCheck, Loader2, BadgeCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, ArrowRight, ShieldCheck, Loader2, BadgeCheck, Unlink } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
 interface Props {
@@ -11,6 +12,9 @@ interface Props {
     isOnboarding?: boolean;
     onVerify?: () => void;
     isVerifying?: boolean;
+    connectedAccountId?: string | null;
+    tenantId?: string;
+    onDisconnect?: () => Promise<void>;
 }
 
 export function StripeConnectBlock({
@@ -21,12 +25,25 @@ export function StripeConnectBlock({
     isOnboarding = false,
     onVerify,
     isVerifying = false,
+    connectedAccountId,
+    tenantId,
+    onDisconnect,
 }: Props) {
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
+    const [accountEmail, setAccountEmail] = useState<string | null>(null);
+    const [isDisconnecting, setIsDisconnecting] = useState(false);
 
     const isVerifyMode = mode === 'verify';
     const isOnboardMode = mode === 'onboard';
+
+    useEffect(() => {
+        if (!(isOnboardMode || isVerifyMode) || !tenantId) return;
+        fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
+            .then(r => r.json())
+            .then(d => { if (d.success && d.data?.email) setAccountEmail(d.data.email); })
+            .catch(() => {});
+    }, [isOnboardMode, isVerifyMode, tenantId]);
     const isLoading = isVerifyMode ? isVerifying : isOnboardMode ? isOnboarding : isConnecting;
 
     const title = isVerifyMode ? pt.stripeVerifyTitle : isOnboardMode ? pt.stripeOnboardTitle : pt.stripeConnectTitle;
@@ -82,9 +99,37 @@ export function StripeConnectBlock({
                 <h4 className="text-[17px] font-bold text-slate-50 tracking-tight mt-[2px] mb-[6px]">
                     {title}
                 </h4>
-                <p className="text-[13.5px] text-slate-400 leading-[1.55] mb-[14px] max-w-[540px]">
+                <p className="text-[13.5px] text-slate-400 leading-[1.55] mb-[12px] max-w-[540px]">
                     {desc}
                 </p>
+                {(isOnboardMode || isVerifyMode) && connectedAccountId && (
+                    <div className="inline-flex items-center gap-[8px] mb-[14px] px-[10px] py-[5px] rounded-[8px] border border-white/[0.07] bg-white/[0.04]">
+                        <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" />
+                        <span className="font-mono text-[12px] text-slate-300 tracking-tight">
+                            {connectedAccountId}
+                        </span>
+                        {accountEmail && (
+                            <span className="text-[12px] text-slate-400">· {accountEmail}</span>
+                        )}
+                        {onDisconnect && (
+                            <button
+                                type="button"
+                                disabled={isDisconnecting}
+                                onClick={async () => {
+                                    setIsDisconnecting(true);
+                                    try { await onDisconnect(); } finally { setIsDisconnecting(false); }
+                                }}
+                                className="inline-flex items-center gap-[4px] ml-[4px] text-[11.5px] text-slate-500 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-wait whitespace-nowrap"
+                            >
+                                {isDisconnecting
+                                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                                    : <Unlink className="w-3 h-3" />
+                                }
+                                {pt.stripeSwitchAccount}
+                            </button>
+                        )}
+                    </div>
+                )}
                 {steps && (
                     <ul className="flex flex-wrap gap-[14px_24px] list-none m-0 p-0">
                         {steps.map((step, i) => (

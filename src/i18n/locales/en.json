@@ -1459,6 +1459,7 @@
         "stripeOnboardCta": "Complete Setup",
         "stripeOnboarding": "Redirecting to Stripe...",
         "stripeOnboardSecondary": "Already done? Check status",
+        "stripeSwitchAccount": "Switch account",
         "stripeVerifyTitle": "Almost there — verify your Stripe account",
         "stripeVerifyDesc": "You've completed the setup on Stripe. Click Verify to confirm your account is approved and unlock Card & FPX payments.",
         "stripeVerifyCta": "Verify Connection",
@@ -3253,6 +3254,26 @@
       "paymentFailed": "Payment could not be started. Please try again.",
       "redirectingTitle": "Redirecting to Stripe Checkout",
       "redirectingDesc": "Please don't close this window. You'll be returned here after payment."
+    },
+    "confirmPage": {
+      "leaveWarningBanner": "Action Required — Receipt Not Uploaded",
+      "leaveWarningTitle": "Upload receipt before you go",
+      "leaveWarningBody": "Your order will not be processed until we receive your payment receipt. Without it, the seller cannot verify your transfer.",
+      "leaveAnyway": "Leave anyway",
+      "stayUpload": "Stay & Upload",
+      "sumStatusBtS1": "Action Required — Upload Receipt",
+      "sumStatusBtS2": "We can't ship until your transfer is verified."
+    },
+    "resendUpload": {
+      "checkEmailTitle": "Check your email",
+      "checkEmailDesc": "If the email matches order #{orderNumber}, we've sent you a link to upload your payment receipt.",
+      "receiptRequired": "Payment receipt required",
+      "awaitingVerification": "Your order is awaiting payment verification. Enter your email to receive a new upload link.",
+      "emailLabel": "Email address used during checkout",
+      "emailPlaceholder": "your@email.com",
+      "sending": "Sending…",
+      "sendLink": "Send upload link",
+      "errorMessage": "Something went wrong. Please try again."
     },
     "notFound": {
       "code": "404",

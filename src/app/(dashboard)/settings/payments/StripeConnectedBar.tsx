@@ -32,7 +32,7 @@ export function StripeConnectedBar({ accountId, tenantId, onDisconnect }: Props)
         return () => window.removeEventListener('keydown', onKey);
     }, [showModal]);
 
-    const shortId = accountId ? `${accountId.slice(0, 14)}…` : 'acct_…';
+    const shortId = accountId ?? 'acct_…';
 
     return (
         <>

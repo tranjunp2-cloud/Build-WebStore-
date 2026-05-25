@@ -10,6 +10,7 @@ import {
     PhoneCall, PackageX, HandCoins, Banknote,
 } from 'lucide-react'
 import { TY_CSS } from './confirm-styles'
+import { useI18n } from '@/i18n'
 
 type OrderItem = { productName: string; quantity: number; unitPrice: number; variant?: string; imageUrl?: string }
 type ShippingAddress = { line1?: string; line2?: string; city?: string; state?: string; postcode?: string; country?: string }
@@ -70,6 +71,8 @@ const CopyIcon = () => (
 
 export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken }: Props) {
     const router = useRouter()
+    const { t } = useI18n()
+    const cp = t.storefront.confirmPage
 
     const clearAndNavigate = useCallback(async (href: string, clearToken: boolean) => {
         if (clearToken) {
@@ -152,7 +155,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         : isSubmitted
             ? { tone: 'blue', s1: 'Awaiting seller confirmation', s2: 'Seller will verify your transfer shortly.' }
             : isBT
-                ? { tone: 'amber', s1: 'Action Required — Upload Receipt', s2: "We can't ship until your transfer is verified." }
+                ? { tone: 'amber', s1: cp.sumStatusBtS1, s2: cp.sumStatusBtS2 }
                 : isCod
                     ? { tone: 'blue', s1: 'Pending phone verification', s2: "We'll call to confirm your address." }
                     : { tone: 'teal', s1: 'Payment received · Processing', s2: 'Warehouse is preparing your parcel.' }
@@ -577,23 +580,24 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
             {/* Leave warning modal — shown when BT buyer navigates away without uploading proof */}
             {leaveHref && (
                 <div
-                    style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,18,0.72)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: '24px', zIndex: 200 }}
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', padding: '24px', zIndex: 200 }}
                     onClick={() => setLeaveHref('')}
                 >
                     <div
-                        style={{ background: '#141e2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 50px -12px rgba(0,0,0,0.65)' }}
+                        style={{ background: 'var(--card)', border: '1px solid var(--bd)', borderRadius: '16px', overflow: 'hidden', maxWidth: '420px', width: '100%', boxShadow: '0 20px 60px -16px rgba(15,23,42,0.20),0 4px 16px -4px rgba(15,23,42,0.12)' }}
                         onClick={e => e.stopPropagation()}
                     >
-                        <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: '20px' }}>
-                            <div style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }}><AlertCircle size={22} /></div>
-                            <div>
-                                <p style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: '0 0 8px' }}>Upload receipt before you go</p>
-                                <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.55, margin: 0 }}>Your order will not be processed until we receive your payment receipt. Without it, the seller cannot verify your transfer.</p>
-                            </div>
+                        <div style={{ background: '#fff4dc', borderBottom: '1px solid #f1d693', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <AlertCircle size={15} style={{ color: '#8a5c0a', flexShrink: 0 }} />
+                            <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#8a5c0a', margin: 0 }}>{cp.leaveWarningBanner}</p>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                            <button className="ty-btn ghost" style={{ color: '#64748b' }} onClick={() => clearAndNavigate(leaveHref, isOrderSuccess)}>Leave anyway</button>
-                            <button className="ty-btn primary" onClick={() => setLeaveHref('')}>Stay &amp; Upload</button>
+                        <div style={{ padding: '20px' }}>
+                            <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--f1)', margin: '0 0 8px' }}>{cp.leaveWarningTitle}</p>
+                            <p style={{ fontSize: '13px', color: 'var(--f3)', lineHeight: 1.6, margin: '0 0 20px' }}>{cp.leaveWarningBody}</p>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button className="ty-btn ghost" onClick={() => clearAndNavigate(leaveHref, isOrderSuccess)}>{cp.leaveAnyway}</button>
+                                <button className="ty-btn primary" onClick={() => setLeaveHref('')}>{cp.stayUpload}</button>
+                            </div>
                         </div>
                     </div>
                 </div>
