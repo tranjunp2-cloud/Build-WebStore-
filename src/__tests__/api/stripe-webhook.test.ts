@@ -70,11 +70,11 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_1', client_reference_id: 'order-1' },
+            data: { id: 'sess_1', client_reference_id: '1' },
         })
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
-        mockFindByID.mockResolvedValue({ id: 'order-1', items: [], customerEmail: 'test@test.com', orderNumber: 'ORD-001' })
+        mockFindByID.mockResolvedValue({ id: '1', items: [], customerEmail: 'test@test.com', orderNumber: 'ORD-001' })
 
         const res = await POST(createRequest('{}', 'sig_valid'))
         expect(res.status).toBe(200)
@@ -151,7 +151,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_dup', client_reference_id: 'order-dup' },
+            data: { id: 'sess_dup', client_reference_id: '103' },
         })
         // Atomic SQL transition returns 0 rows — order was already processed by another invocation
         mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
@@ -170,7 +170,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
             type: 'payment_success',
             data: {
                 id: 'sess_fpx_123',
-                client_reference_id: 'order-fpx',
+                client_reference_id: '201',
                 payment_method_types: ['fpx'],
                 payment_intent: 'pi_fpx_456',
             },
@@ -178,7 +178,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockFind.mockResolvedValue({ docs: [] }) // Not already processed
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-fpx',
+            id: '201',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-FPX-001',
@@ -195,7 +195,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: 'order-fpx',
+                id: '201',
                 data: expect.objectContaining({
                     paymentMethod: 'fpx',
                 }),
@@ -211,7 +211,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
             type: 'payment_success',
             data: {
                 id: 'sess_card_123',
-                client_reference_id: 'order-card',
+                client_reference_id: '202',
                 payment_method_types: ['card'],
                 payment_intent: 'pi_card_456',
             },
@@ -219,7 +219,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-card',
+            id: '202',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-CARD-001',
@@ -236,7 +236,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: 'order-card',
+                id: '202',
                 data: expect.objectContaining({
                     paymentMethod: 'card',
                 }),
@@ -254,7 +254,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
             type: 'payment_success',
             data: {
                 id: 'sess_charge_123',
-                client_reference_id: 'order-charge',
+                client_reference_id: '203',
                 payment_method_types: ['fpx'],
                 payment_intent: 'pi_with_charge', // string — as Stripe actually sends it
             },
@@ -262,7 +262,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-charge',
+            id: '203',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-CHARGE-001',
@@ -354,12 +354,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_notify_fail', client_reference_id: 'order-notify' },
+            data: { id: 'sess_notify_fail', client_reference_id: '204' },
         })
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-notify',
+            id: '204',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-NOTIFY-001',
@@ -383,12 +383,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_email_fail', client_reference_id: 'order-email' },
+            data: { id: 'sess_email_fail', client_reference_id: '205' },
         })
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-email',
+            id: '205',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-EMAIL-001',
@@ -491,12 +491,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_success', client_reference_id: 'order-success', payment_intent: 'pi_success' },
+            data: { id: 'sess_success', client_reference_id: '206', payment_intent: 'pi_success' },
         })
         mockFind.mockResolvedValue({ docs: [] }) // Not already processed
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-success',
+            id: '206',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-SUCCESS-001',
@@ -512,7 +512,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: 'order-success',
+                id: '206',
                 data: expect.objectContaining({ stripePaymentIntentId: 'pi_success' }),
             }),
         )

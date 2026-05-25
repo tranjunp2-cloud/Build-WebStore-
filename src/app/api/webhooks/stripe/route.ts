@@ -149,12 +149,18 @@ async function handleCheckoutCompleted(
         return
     }
 
+    const orderIdInt = parseInt(orderId, 10)
+    if (Number.isNaN(orderIdInt)) {
+        console.warn('[Stripe Webhook] client_reference_id is not a valid integer:', orderId)
+        return
+    }
+
     // Atomic status transition: UPDATE WHERE status = 'pending' — only the first concurrent invocation wins.
     // NOTE: stripe-checkout/route.ts writes stripeSessionId BEFORE payment, so checking sessionId alone
     // cannot distinguish "already processed" from "not yet paid". Raw SQL is required for atomicity.
     const transitionResult = await payload.db.drizzle.execute(sql`
         UPDATE orders SET status = 'new'
-        WHERE id = ${parseInt(orderId)} AND status = 'pending'
+        WHERE id = ${orderIdInt} AND status = 'pending'
         RETURNING id
     `)
     if (!transitionResult.rows?.length) {
