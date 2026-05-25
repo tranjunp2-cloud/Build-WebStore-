@@ -84,6 +84,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const [uploadFile, setUploadFile] = useState<File | null>(null)
     const [dragging, setDragging] = useState(false)
     const [uploadError, setUploadError] = useState('')
+    const [leaveHref, setLeaveHref] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -553,7 +554,13 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             {addrLine && <div className="ty-meta-row"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
                         </div>
                         <div className="ty-cta-row">
-                            <button className="ty-btn primary lg" onClick={() => clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)}>
+                            <button className="ty-btn primary lg" onClick={() => {
+                                if (isBT && uploadStatus !== 'success') {
+                                    setLeaveHref(`/sites/${slug}/products`)
+                                } else {
+                                    clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)
+                                }
+                            }}>
                                 <ShoppingBag size={15} /> Continue Shopping
                             </button>
                             {(!isBT || isPaid) && (
@@ -566,6 +573,31 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                     </div>
                 </div>
             </div>
+
+            {/* Leave warning modal — shown when BT buyer navigates away without uploading proof */}
+            {leaveHref && (
+                <div
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,18,0.72)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: '24px', zIndex: 200 }}
+                    onClick={() => setLeaveHref('')}
+                >
+                    <div
+                        style={{ background: '#141e2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 50px -12px rgba(0,0,0,0.65)' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', marginBottom: '20px' }}>
+                            <div style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }}><AlertCircle size={22} /></div>
+                            <div>
+                                <p style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: '0 0 8px' }}>Upload receipt before you go</p>
+                                <p style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.55, margin: 0 }}>Your order will not be processed until we receive your payment receipt. Without it, the seller cannot verify your transfer.</p>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <button className="ty-btn ghost" style={{ color: '#64748b' }} onClick={() => clearAndNavigate(leaveHref, isOrderSuccess)}>Leave anyway</button>
+                            <button className="ty-btn primary" onClick={() => setLeaveHref('')}>Stay &amp; Upload</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style>{TY_CSS}</style>
         </div>
