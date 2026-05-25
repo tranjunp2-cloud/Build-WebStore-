@@ -40,7 +40,7 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(body.success).toBe(true)
     })
 
-    it('rejects cancellation from terminal state [TC-F10.16]', async () => {
+    it('[TC-F10-03-04] rejects cancellation from terminal state', async () => {
         mockFindByID.mockResolvedValue({ id: 'order-1', status: 'completed', items: [] })
 
         const req = { json: () => Promise.resolve({ reason: 'Too late' }) } as unknown as Request
