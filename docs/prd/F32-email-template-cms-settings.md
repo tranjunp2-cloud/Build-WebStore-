@@ -5,7 +5,7 @@
 > **Target Release:** TBD (post v1.0)
 > **Epic:** Email Customization & Tenant Branding
 > **Updated:** 2026-05-21
-> **Related:** [architecture/email-templates.md](../architecture/email-templates.md), [design/email-templates-design.md](../design/email-templates-design.md), [plans/260521-1349-f32-email-cms-settings/](../../plans/260521-1349-f32-email-cms-settings/)
+> **Related:** [design/F32-email-template-settings-design.md](../design/F32-email-template-settings-design.md) (admin UI design), [architecture/email-templates.md](../architecture/email-templates.md), [design/email-templates-design.md](../design/email-templates-design.md) (email content design), [plans/260521-1349-f32-email-cms-settings/](../../plans/260521-1349-f32-email-cms-settings/)
 > **Origin:** PW1 (PrimeWeb v1) implemented this feature. PW2 currently has all templates hardcoded in `src/lib/email/templates/*.ts`.
 
 ## 1. Context & Problem Statement
