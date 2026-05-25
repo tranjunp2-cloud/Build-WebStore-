@@ -44,10 +44,11 @@ export async function GET(request: Request) {
         await payload.update({
             collection: 'tenants',
             id: tenantId,
+            // Payload update data type is overly strict; cast required until generated types exist
             data: {
                 stripeAccountId: stripeUserId,
                 stripeOnboardingComplete: onboardingComplete,
-            } as any,
+            } as Record<string, unknown>,
         })
 
         const redirectParam = onboardingComplete ? 'verified' : 'complete'

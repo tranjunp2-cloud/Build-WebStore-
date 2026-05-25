@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
 import { getStripeOAuthUrl } from '@/lib/payment/stripe'
+import type { TenantMembership } from '@/lib/normalize-tenants'
 
 /**
  * POST /api/stripe/connect/onboard
@@ -20,7 +21,7 @@ export const POST = withAuth(async (user, request) => {
             )
         }
 
-        const userTenantIds = ((user as any).tenants || []).map((t: any) =>
+        const userTenantIds = ((user.tenants ?? []) as TenantMembership[]).map((t) =>
             String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
         )
         if (!userTenantIds.includes(String(tenantId))) {
@@ -36,7 +37,7 @@ export const POST = withAuth(async (user, request) => {
             success: true,
             data: { oauthUrl },
         })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Stripe Connect Onboard Error]', error)
         return NextResponse.json(
             { success: false, error: { code: 'INTERNAL_ERROR', message: 'Stripe onboarding failed' } },

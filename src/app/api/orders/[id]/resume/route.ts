@@ -3,6 +3,19 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { verifyUploadToken, generateConfirmToken } from '@/lib/orders/upload-token'
 
+/** Minimal shape of an order document for the resume-upload flow. */
+interface OrderDoc {
+    id: string | number
+    orderNumber: string
+    tenant?: string | number | { id: string | number }
+}
+
+/** Minimal shape of a tenant document for the resume-upload flow. */
+interface TenantDoc {
+    id: string | number
+    slug?: string
+}
+
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
 
 /**
@@ -35,15 +48,15 @@ export async function GET(
             overrideAccess: true,
             depth: 1,
         })
-        const order = result.docs[0] as any
+        const order = result.docs[0] as unknown as OrderDoc | undefined
         if (!order) return NextResponse.redirect(`${fallbackUrl}?error=not-found`)
 
         // Resolve shop slug for confirm page URL
-        const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
+        const tenantId = typeof order.tenant === 'object' ? (order.tenant as { id: string | number }).id : order.tenant
         const tenant = tenantId
             ? await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
             : null
-        const slug = (tenant as any)?.slug ?? ''
+        const slug = (tenant as unknown as TenantDoc | null)?.slug ?? ''
         if (!slug) return NextResponse.redirect(`${fallbackUrl}?error=not-found`)
 
         const confirmPageUrl = `${BASE_URL}/sites/${slug}/order/${orderId}/confirm`

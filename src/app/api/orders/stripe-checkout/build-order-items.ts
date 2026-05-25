@@ -1,4 +1,16 @@
 import { NextResponse } from 'next/server'
+import type { Payload } from 'payload'
+
+/** Minimal shape of a product document used in build-order-items flow. */
+interface ProductDoc {
+    id: string | number
+    name: string
+    price: number
+    currency?: string
+    inventory?: number | null
+    tenant?: string | number | { id: string | number }
+    images?: Array<{ url?: string }>
+}
 
 export interface OrderItemRow {
     product: number | string
@@ -28,7 +40,7 @@ export interface BuildResult {
  * Returns an errorResponse if any product is missing, out of stock, or belongs to a different tenant.
  */
 export async function buildOrderItems(
-    payload: any,
+    payload: Payload,
     items: Array<{ productId: string | number; quantity: number; variant?: string }>,
     tenantId?: number | string,
 ): Promise<BuildResult> {
@@ -55,7 +67,7 @@ export async function buildOrderItems(
         }
 
         // Cross-tenant IDOR guard: reject if product has no tenant or belongs to a different tenant
-        const p = product as any
+        const p = product as unknown as ProductDoc
         if (tenantId !== undefined) {
             const productTenantId = typeof p.tenant === 'object' ? p.tenant?.id : p.tenant
             if (!productTenantId || String(productTenantId) !== String(tenantId)) {
