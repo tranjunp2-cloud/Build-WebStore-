@@ -69,7 +69,7 @@ export const orderStatusUpdateSchema = z.object({
 
 // --- Cancel Order ---
 export const orderCancelSchema = z.object({
-    reason: z.string().trim().min(1, 'Cancel reason is required').max(500, 'Cancel reason must be 500 characters or less'),
+    reason: z.string().trim().min(1, 'Cancel reason is required').max(500, 'Cancel reason must not exceed 500 characters'),
 })
 
 // --- Bulk Status Update ---

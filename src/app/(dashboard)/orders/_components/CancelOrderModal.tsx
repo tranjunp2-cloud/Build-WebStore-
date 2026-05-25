@@ -152,11 +152,16 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                             outline: 'none',
                         }}
                     />
-                    {showError && (
-                        <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#FB2C36' }}>
-                            {c.reasonRequired}
+                    <div className="flex justify-between items-center" style={{ minHeight: 16 }}>
+                        {showError ? (
+                            <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#FB2C36' }}>
+                                {c.reasonRequired}
+                            </span>
+                        ) : <span />}
+                        <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: reason.length >= 450 ? '#FB2C36' : 'var(--dash-text-muted)' }}>
+                            {reason.length}/500
                         </span>
-                    )}
+                    </div>
                 </div>
 
                 {/* Buttons Row */}

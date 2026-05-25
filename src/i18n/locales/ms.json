@@ -861,6 +861,7 @@
         "orderLabel": "Pesanan",
         "reasonLabel": "Sebab pembatalan",
         "reasonRequired": "Sebab pembatalan diperlukan.",
+        "reasonMaxLength": "Maksimum 500 aksara",
         "reasonPlaceholder": "cth., Pelanggan meminta melalui telefon, stok habis, pesanan palsu...",
         "warning": "Tindakan ini tidak boleh dibatalkan. Komponen inventori yang berkaitan dengan pesanan ini akan disimpan semula secara automatik.",
         "back": "Kembali",
