@@ -4,6 +4,25 @@ import config from '@payload-config'
 import { generateUploadToken } from '@/lib/orders/upload-token'
 import { resendUploadLinkEmail } from '@/lib/email/templates/resend-upload-link'
 
+/** Minimal shape of a bank-transfer order document for resend-upload-link flow. */
+interface BtOrderDoc {
+    id: string | number
+    orderNumber: string
+    customerEmail: string
+    customerName?: string | null
+    paymentMethod: string
+    paymentStatus: string
+    status: string
+    tenant?: string | number | { id: string | number }
+    site?: string | number | { id: string | number; locale?: string }
+}
+
+/** Minimal shape of a tenant document for resend-upload-link flow. */
+interface TenantDoc {
+    id: string | number
+    name?: string | null
+}
+
 const RESENDABLE_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
 
@@ -43,7 +62,7 @@ export async function POST(req: Request) {
             overrideAccess: true,
             depth: 1,
         })
-        const order = result.docs[0] as any
+        const order = result.docs[0] as unknown as BtOrderDoc | undefined
         if (!order) return NextResponse.json({ success: true })
 
         // Validate email matches and order is BT pending
@@ -58,12 +77,13 @@ export async function POST(req: Request) {
         const resumeUrl = `${BASE_URL}/api/orders/${order.id}/resume?ut=${encodeURIComponent(uploadToken)}`
 
         // Resolve shop slug for email context
-        const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
-        const tenant = tenantId
+        const tenantId = typeof order.tenant === 'object' ? (order.tenant as { id: string | number }).id : order.tenant
+        const tenantDoc = tenantId
             ? await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
             : null
-        const shopName = (tenant as any)?.name ?? ''
-        const siteLocale = typeof order.site === 'object' ? (order.site?.locale ?? 'ms') : 'ms'
+        const tenantTyped = tenantDoc as unknown as TenantDoc | null
+        const shopName = tenantTyped?.name ?? ''
+        const siteLocale = typeof order.site === 'object' ? ((order.site as { locale?: string })?.locale ?? 'ms') : 'ms'
 
         const emailData = resendUploadLinkEmail({
             shopName,

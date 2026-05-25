@@ -1,3 +1,7 @@
+// NOTE: This file uses `(order as any)` and `(tenant as any)` casts throughout because
+// payload-types.ts is not yet generated (Payload CMS generated types do not exist in this project).
+// These casts are intentional and will be removed once `npx payload generate:types` is integrated
+// into the build pipeline. See docs/tracking/OPEN_BLOCKERS.md for tracking.
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -71,7 +75,8 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         }
 
         // Build update data
-        const updateData: any = { status: newStatus }
+        // Payload update data type is overly strict; cast required until generated types exist
+        const updateData: Record<string, unknown> = { status: newStatus }
         if (trackingNumber) updateData.trackingNumber = trackingNumber
         if (notes) updateData.notes = notes
         if (newStatus === 'cancelled' && notes) updateData.cancelReason = notes
@@ -106,7 +111,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                         ? ((order as any).site?.locale ?? 'ms')
                         : 'ms'
 
-                    const orderItems = ((order as any).items ?? []).map((item: any) => ({
+                    const orderItems = ((order as any).items ?? [] as Array<{ productName: string; variant?: string | null; quantity: number; unitPrice: number }>).map((item: { productName: string; variant?: string | null; quantity: number; unitPrice: number }) => ({
                         name: item.productName,
                         variant: item.variant || null,
                         quantity: item.quantity,
@@ -200,8 +205,8 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             success: true,
             data: updated,
         })
-    } catch (error: any) {
-        if (error?.status === 404 || error?.name === 'NotFound') {
+    } catch (error: unknown) {
+        if ((error as { status?: number; name?: string })?.status === 404 || (error as { name?: string })?.name === 'NotFound') {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } },
                 { status: 404 }
@@ -241,8 +246,8 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
         }
 
         return NextResponse.json({ success: true, data: order })
-    } catch (error: any) {
-        if (error?.status === 404 || error?.name === 'NotFound') {
+    } catch (error: unknown) {
+        if ((error as { status?: number; name?: string })?.status === 404 || (error as { name?: string })?.name === 'NotFound') {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } },
                 { status: 404 }

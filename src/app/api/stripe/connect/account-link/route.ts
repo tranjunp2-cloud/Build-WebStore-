@@ -3,6 +3,14 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import { getStripeClient } from '@/lib/payment/stripe'
+import type { TenantMembership } from '@/lib/normalize-tenants'
+
+/** Minimal shape of a tenant document for Stripe Connect account-link flow. */
+interface TenantDoc {
+    id: string | number
+    stripeAccountId?: string | null
+    stripeOnboardingComplete?: boolean
+}
 
 /**
  * POST /api/stripe/connect/account-link
@@ -25,7 +33,7 @@ export const POST = withAuth(async (user, request) => {
             )
         }
 
-        const userTenantIds = ((user as any).tenants || []).map((t: any) =>
+        const userTenantIds = ((user.tenants ?? []) as TenantMembership[]).map((t) =>
             String(typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
         )
         if (!userTenantIds.includes(String(tenantId))) {
@@ -44,7 +52,7 @@ export const POST = withAuth(async (user, request) => {
             )
         }
 
-        const stripeAccountId = (tenant as any).stripeAccountId
+        const stripeAccountId = (tenant as unknown as TenantDoc).stripeAccountId
         if (!stripeAccountId) {
             return NextResponse.json(
                 { success: false, error: { code: 'VALIDATION_ERROR', message: 'No Stripe account connected. Complete OAuth first.' } },
@@ -65,7 +73,7 @@ export const POST = withAuth(async (user, request) => {
             success: true,
             data: { url: accountLink.url },
         })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Stripe Account Link Error]', error)
         return NextResponse.json(
             { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to create Stripe onboarding link' } },
