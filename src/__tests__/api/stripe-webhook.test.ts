@@ -5,6 +5,7 @@ const mockFind = vi.fn()
 const mockUpdate = vi.fn()
 const mockFindByID = vi.fn()
 const mockCreate = vi.fn()
+const mockDrizzleExecute = vi.fn()
 
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
@@ -12,6 +13,7 @@ vi.mock('payload', () => ({
         update: mockUpdate,
         findByID: mockFindByID,
         create: mockCreate,
+        db: { drizzle: { execute: mockDrizzleExecute } },
     })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -45,6 +47,8 @@ function createRequest(body: string, signature?: string) {
 describe('POST /api/webhooks/stripe [TC-F13]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        // Default: atomic SQL transition succeeds (1 row updated = order was pending → now new)
+        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
     })
 
     // TC-F13.90 / TC-F13.32: Missing signature → 400 (mandatory, no bypass)
@@ -143,14 +147,14 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         expect(res.status).toBe(200) // TC-F13.136: reconcile pending — 200 vs 500 decision
     })
 
-    it('[TC-F13.34] skips already processed orders (idempotency) — status=new guard', async () => {
+    it('[TC-F13.34] skips already processed orders (idempotency) — atomic SQL returns 0 rows', async () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
             data: { id: 'sess_dup', client_reference_id: 'order-dup' },
         })
-        // Webhook queries WHERE stripeSessionId=X AND status='new' — returns doc means already processed
-        mockFind.mockResolvedValue({ docs: [{ id: 'order-dup', status: 'new' }] })
+        // Atomic SQL transition returns 0 rows — order was already processed by another invocation
+        mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
 
         const res = await POST(createRequest('{}', 'sig_valid'))
         expect(res.status).toBe(200)
@@ -186,14 +190,14 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
 
         // Assert
         expect(res.status).toBe(200)
-        // First update call should set paymentMethod to 'fpx'
+        // Atomic SQL sets status; payload.update persists Stripe IDs + paymentMethod
+        expect(mockDrizzleExecute).toHaveBeenCalled()
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
                 id: 'order-fpx',
                 data: expect.objectContaining({
                     paymentMethod: 'fpx',
-                    status: 'new',
                 }),
             }),
         )
@@ -227,14 +231,14 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
 
         // Assert
         expect(res.status).toBe(200)
-        // Update should set paymentMethod to 'card'
+        // Atomic SQL sets status; payload.update persists Stripe IDs + paymentMethod
+        expect(mockDrizzleExecute).toHaveBeenCalled()
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
                 id: 'order-card',
                 data: expect.objectContaining({
                     paymentMethod: 'card',
-                    status: 'new',
                 }),
             }),
         )
@@ -394,14 +398,10 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         // Act
         const res = await POST(createRequest('{}', 'sig_valid'))
 
-        // Assert — 200 still returned; order update happened before email
+        // Assert — 200 still returned; atomic SQL set status, then Stripe IDs persisted
         expect(res.status).toBe(200)
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                collection: 'orders',
-                data: expect.objectContaining({ status: 'new' }),
-            }),
-        )
+        expect(mockDrizzleExecute).toHaveBeenCalled()
+        expect(mockUpdate).toHaveBeenCalled()
     })
 
     // ─── TC-F13.116: checkout.session.expired — graceful skip ───────────
@@ -506,13 +506,14 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         // Act
         const res = await POST(createRequest('{}', 'sig_valid'))
 
-        // Assert
+        // Assert — status atomically set via SQL; payload.update persists Stripe IDs
         expect(res.status).toBe(200)
+        expect(mockDrizzleExecute).toHaveBeenCalled()
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
                 id: 'order-success',
-                data: expect.objectContaining({ status: 'new' }),
+                data: expect.objectContaining({ stripePaymentIntentId: 'pi_success' }),
             }),
         )
     })

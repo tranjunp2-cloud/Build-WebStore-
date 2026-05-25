@@ -21,6 +21,13 @@ vi.mock('@/lib/payment/stripe', () => ({
     createStripeCheckoutSession: vi.fn(),
 }))
 
+vi.mock('@/lib/orders/upload-token', () => ({
+    generateConfirmToken: vi.fn(() => 'mock-confirm-token'),
+    generateUploadToken: vi.fn(() => 'mock-upload-token'),
+    verifyConfirmToken: vi.fn(() => true),
+    verifyUploadToken: vi.fn(() => true),
+}))
+
 vi.mock('@/app/api/orders/stripe-checkout/build-order-items', () => ({
     buildOrderItems: vi.fn(),
 }))
