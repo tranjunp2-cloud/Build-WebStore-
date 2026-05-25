@@ -17,16 +17,27 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
     const { t } = useI18n()
     const c = t.dashboard.orders.cancel
     const [reason, setReason] = useState('')
+    const [touched, setTouched] = useState(false)
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {
         setMounted(true)
     }, [])
 
+    // Reset form state whenever modal closes so stale errors don't persist on re-open
+    useEffect(() => {
+        if (!isOpen) {
+            setReason('')
+            setTouched(false)
+        }
+    }, [isOpen])
+
     if (!isOpen || !mounted) return null
 
+    const isEmpty = reason.trim() === ''
+    const showError = touched && isEmpty
     // Determine if button should be disabled (empty reason or currently loading)
-    const isDisabled = reason.trim() === '' || isLoading
+    const isDisabled = isEmpty || isLoading
 
     return createPortal(
         <div
@@ -85,10 +96,25 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                         fontSize: 14,
                         lineHeight: '1.4285714285714286em',
                         color: 'var(--dash-text-muted)',
-                        marginBottom: 24
+                        marginBottom: 12
                     }}
                 >
                     {c.orderLabel} {orderNumber}
+                </p>
+
+                {/* Warning — restock notice (TC-F10-03-10) */}
+                <p
+                    className="w-full text-center"
+                    style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: 400,
+                        fontSize: 13,
+                        lineHeight: '1.4em',
+                        color: '#F0B100',
+                        marginBottom: 24
+                    }}
+                >
+                    {c.warning}
                 </p>
 
                 {/* Form Field */}
@@ -107,13 +133,15 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                     <textarea
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
+                        onBlur={() => setTouched(true)}
                         placeholder={c.reasonPlaceholder}
                         disabled={isLoading}
+                        maxLength={500}
                         style={{
                             height: 128,
                             padding: '12px 16px',
                             background: 'var(--dash-secondary-bg)',
-                            border: '1px solid var(--dash-border)',
+                            border: `1px solid ${showError ? '#FB2C36' : 'var(--dash-border)'}`,
                             borderRadius: 16,
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 400,
@@ -124,6 +152,11 @@ export function CancelOrderModal({ orderNumber, isOpen, isLoading, onBack, onCon
                             outline: 'none',
                         }}
                     />
+                    {showError && (
+                        <span style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#FB2C36' }}>
+                            {c.reasonRequired}
+                        </span>
+                    )}
                 </div>
 
                 {/* Buttons Row */}

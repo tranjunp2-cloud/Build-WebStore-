@@ -58,6 +58,13 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
         expect(res.status).toBe(400)
     })
 
+    it('[TC-F10-03-03] Rejects whitespace-only reason', async () => {
+        const req = { json: () => Promise.resolve({ reason: '   ' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+
+        expect(res.status).toBe(400)
+    })
+
     it('returns 404 when order not found', async () => {
         mockFindByID.mockResolvedValue(null)
 
@@ -156,5 +163,27 @@ describe('POST /api/orders/[id]/cancel [TC-F10.16]', () => {
                 })
             })
         )
+    })
+
+    it('[TC-F10-03-07] Idempotency: already-cancelled order returns success without re-restocking', async () => {
+        mockFindByID.mockResolvedValueOnce({ id: 'order-4', status: 'cancelled', items: [{ product: 'prod-1', quantity: 1 }] })
+
+        const req = { json: () => Promise.resolve({ reason: 'Duplicate request' }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body.success).toBe(true)
+        // No update or restock should occur
+        expect(mockUpdate).not.toHaveBeenCalled()
+        expect(body.restock).toEqual([])
+    })
+
+    it('[TC-F10-03-11] Rejects cancel reason exceeding 500 characters', async () => {
+        const longReason = 'a'.repeat(501)
+        const req = { json: () => Promise.resolve({ reason: longReason }) } as unknown as Request
+        const res = await POST(req, ctx as any)
+
+        expect(res.status).toBe(400)
     })
 })
