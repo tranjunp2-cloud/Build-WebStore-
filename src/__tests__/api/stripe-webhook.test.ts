@@ -139,9 +139,10 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_err', client_reference_id: 'order-err' },
+            data: { id: 'sess_err', client_reference_id: '102' },
         })
-        mockFind.mockRejectedValue(new Error('DB error'))
+        // Simulate DB error after atomic SQL succeeds — findByID throws
+        mockFindByID.mockRejectedValueOnce(new Error('DB error'))
 
         const res = await POST(createRequest('{}', 'sig_valid'))
         expect(res.status).toBe(200) // TC-F13.136: reconcile pending — 200 vs 500 decision

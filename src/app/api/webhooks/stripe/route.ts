@@ -200,7 +200,8 @@ async function handleCheckoutCompleted(
 
         console.log(`[Stripe Webhook] Order ${orderId} marked as new`)
 
-        // Reduce stock with optimistic locking (prevents race condition)
+        // Reduce stock — safe here: atomic SQL above ensures only one invocation reaches this point.
+        // decrementStock retries on Payload API errors, not on concurrent writes.
         const order = await payload.findByID({
             collection: 'orders',
             id: orderId,
