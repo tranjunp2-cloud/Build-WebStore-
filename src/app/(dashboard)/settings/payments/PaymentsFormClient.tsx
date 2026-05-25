@@ -574,14 +574,14 @@ export function PaymentsFormClient({
                                         onBlurCapture={e => (e.currentTarget.style.boxShadow = '', e.currentTarget.style.borderColor = 'var(--dash-border)')}
                                     >
                                         <div className="px-[12px] h-[40px] grid place-items-center shrink-0" style={{ borderRight: '1px solid var(--dash-border)' }}>
-                                            <User className="w-[14px] h-[14px] text-slate-400 opacity-70" />
+                                            <User className="w-[14px] h-[14px] text-dash-text-muted" />
                                         </div>
                                         <input
                                             type="text"
                                             value={accountHolderName}
                                             onChange={e => handleAccountHolderNameChange(e.target.value)}
                                             placeholder={pt.accountHolderNamePlaceholder}
-                                            className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-medium placeholder:text-slate-600 min-w-0"
+                                            className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                         />
                                     </div>
                                     <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
@@ -605,7 +605,7 @@ export function PaymentsFormClient({
                                                 value={bankName}
                                                 onChange={e => handleBankNameChange(e.target.value)}
                                                 placeholder="e.g. Maybank Berhad"
-                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-600"
+                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600"
                                             />
                                         </div>
                                         <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
@@ -629,7 +629,7 @@ export function PaymentsFormClient({
                                                 value={accountNumber}
                                                 onChange={e => handleAccountNumberChange(e.target.value)}
                                                 placeholder="5141 2287 ••••"
-                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-600 min-w-0"
+                                                className="flex-1 bg-transparent border-none outline-none px-[12px] h-[40px] text-[14px] text-slate-100 font-mono font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 min-w-0"
                                             />
                                         </div>
                                         <div className="flex items-center gap-[6px] text-[12px] text-slate-500">
@@ -647,7 +647,7 @@ export function PaymentsFormClient({
             {/* Save bar */}
             <div
                 className="sticky bottom-4 flex items-center justify-between px-[18px] py-[12px] rounded-[14px] border border-white/[0.08] mt-6"
-                style={{ background: 'rgba(15,23,42,0.88)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
+                style={{ background: 'var(--save-bar-bg)', backdropFilter: 'blur(12px)', boxShadow: '0 20px 30px -10px rgba(0,0,0,0.6)' }}
             >
                 <div className="flex items-center gap-2 text-[13px]">
                     {isDirty ? (
@@ -665,7 +665,7 @@ export function PaymentsFormClient({
                 <div className="flex gap-2">
                     <button
                         type="button"
-                        className="inline-flex items-center gap-[6px] h-[34px] px-[12px] rounded-[8px] text-[13px] font-semibold text-slate-300 border border-white/[0.08] hover:bg-white/[0.04] hover:text-slate-50 hover:border-white/[0.18] transition-all"
+                        className="inline-flex items-center gap-[6px] h-[34px] px-[12px] rounded-[8px] text-[13px] font-semibold text-dash-text-muted border border-dash-border hover:bg-dash-surface-hover hover:text-dash-text transition-all"
                         onClick={() => toast.info(pt.infoDesc)}
                     >
                         <ExternalLink className="w-[13px] h-[13px]" />

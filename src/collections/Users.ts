@@ -8,6 +8,7 @@ import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
 import { normalizeTenants } from '@/lib/normalize-tenants'
 import type { TenantMembership } from '@/lib/normalize-tenants'
+import { ALLOWED_PERMISSIONS } from '@/lib/permissions'
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -264,7 +265,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 tenants: [
                                     ...normalizedExisting,
-                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : [] }
+                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string' && ALLOWED_PERMISSIONS.has(p)) : [] }
                                 ]
                             }
                         })
@@ -282,7 +283,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 roles: role === 'owner' ? ['tenant-owner'] : [],
                                 tenants: [
-                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : [] }
+                                    { tenant: tenantIdForPayload, role, status: 'pending', permissions: role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string' && ALLOWED_PERMISSIONS.has(p)) : [] }
                                 ]
                             }
                         })
@@ -471,7 +472,7 @@ export const Users: CollectionConfig = {
 
                 const normalizedTenants = normalizeTenants(targetUser.tenants || [])
                 normalizedTenants[targetTenantIndex].role = role
-                normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string') : []
+                normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []).filter((p): p is string => typeof p === 'string' && ALLOWED_PERMISSIONS.has(p)) : []
 
                 // Sync platform roles when owner status changes.
                 // 'tenant-owner' gates login redirect (login/page.tsx) and password reset flow (check-reset-flow).

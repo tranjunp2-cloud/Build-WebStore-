@@ -39,7 +39,7 @@ export function StripeConnectedBar({ accountId, tenantId, onDisconnect }: Props)
             <div
                 className="flex items-center gap-[14px] px-[16px] py-[12px] mb-[18px] rounded-[12px] border border-emerald-500/[0.26]"
                 style={{
-                    background: 'linear-gradient(90deg, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.02) 60%, transparent 100%), #141e2e',
+                    background: 'linear-gradient(90deg, rgba(16,185,129,0.10) 0%, rgba(16,185,129,0.02) 60%, transparent 100%), var(--dash-surface)',
                     boxShadow: '0 1px 0 rgba(255,255,255,0.02) inset',
                 }}
             >
@@ -67,14 +67,14 @@ export function StripeConnectedBar({ accountId, tenantId, onDisconnect }: Props)
                         href="https://dashboard.stripe.com"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-slate-300 border border-white/[0.08] rounded-[8px] hover:bg-white/[0.04] hover:text-slate-50 hover:border-white/[0.18] transition-all"
+                        className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-dash-text-muted border border-dash-border rounded-[8px] hover:bg-dash-surface-hover hover:text-dash-text transition-all"
                     >
                         <ExternalLink className="w-3 h-3" />
                         {pt.stripeManage}
                     </a>
                     <button
                         onClick={() => setShowModal(true)}
-                        className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-slate-300 border border-white/[0.08] rounded-[8px] hover:bg-white/[0.04] hover:text-slate-50 hover:border-white/[0.18] transition-all"
+                        className="inline-flex items-center gap-[6px] h-[30px] px-[11px] text-[12px] font-semibold text-dash-text-muted border border-dash-border rounded-[8px] hover:bg-dash-surface-hover hover:text-dash-text transition-all"
                     >
                         <Unlink className="w-3 h-3" />
                         {pt.stripeDisconnect}

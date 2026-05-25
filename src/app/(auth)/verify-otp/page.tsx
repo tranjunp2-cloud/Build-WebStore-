@@ -212,8 +212,8 @@ function VerifyOTPContent() {
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                     </svg>
                 </div>
-                <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Inter, sans-serif' }}>{t.auth.otp.noEmail}</h2>
-                <p className="mt-2 text-sm" style={{ color: 'rgba(248, 250, 252, 0.70)', fontFamily: 'Inter, sans-serif' }}>
+                <h2 className="text-xl font-bold" style={{ fontFamily: 'Inter, sans-serif', color: 'var(--auth-text)' }}>{t.auth.otp.noEmail}</h2>
+                <p className="mt-2 text-sm" style={{ color: 'var(--auth-text-muted)', fontFamily: 'Inter, sans-serif' }}>
                     {t.auth.otp.noEmailDesc}
                 </p>
                 <div className="mt-8 w-full flex flex-col items-center" style={{ gap: 24 }}>
@@ -301,7 +301,7 @@ function VerifyOTPContent() {
 
                 {/* Text block — gap: 8px */}
                 <div className="flex flex-col items-center w-full" style={{ gap: '8px' }}>
-                    {/* Title: "Two-Step Verification" — Inter 700, 24px, 1.333em, center, #F8FAFC */}
+                    {/* Title: "Two-Step Verification" — Inter 700, 24px, 1.333em, center */}
                     <h1
                         style={{
                             fontFamily: 'Inter, sans-serif',
@@ -309,14 +309,14 @@ function VerifyOTPContent() {
                             fontSize: '24px',
                             lineHeight: '1.333em',
                             textAlign: 'center',
-                            color: '#F8FAFC',
+                            color: 'var(--auth-text)',
                             margin: 0,
                         }}
                     >
                         {t.auth.otp.title}
                     </h1>
 
-                    {/* Description — Inter 400, 14px, 1.4286em, center, rgba(248,250,252,0.7) */}
+                    {/* Description — Inter 400, 14px, 1.4286em, center */}
                     <p
                         style={{
                             fontFamily: 'Inter, sans-serif',
@@ -324,12 +324,12 @@ function VerifyOTPContent() {
                             fontSize: '14px',
                             lineHeight: '1.4286em',
                             textAlign: 'center',
-                            color: 'rgba(248, 250, 252, 0.7)',
+                            color: 'var(--auth-text-muted)',
                             margin: 0,
                         }}
                     >
                         {t.auth.otp.description}{' '}
-                        <span style={{ fontWeight: 500, color: '#F8FAFC' }}>{maskEmail(email)}</span>
+                        <span style={{ fontWeight: 500, color: 'var(--auth-text)' }}>{maskEmail(email)}</span>
                     </p>
                 </div>
             </div>
@@ -377,17 +377,17 @@ function VerifyOTPContent() {
                                 minWidth: '36px',
                                 height: '56px',
                                 borderRadius: '16px',
-                                background: '#1E293B',
+                                background: 'var(--auth-input-bg)',
                                 border: digit
                                     ? '2px solid rgba(59, 130, 246, 0.5)'
                                     : error
                                         ? '2px solid rgba(239, 68, 68, 0.4)'
-                                        : '2px solid rgba(255, 255, 255, 0.08)',
+                                        : '2px solid var(--auth-input-border)',
                                 textAlign: 'center',
                                 fontSize: '20px',
                                 fontWeight: 700,
                                 fontFamily: 'Inter, sans-serif',
-                                color: '#FFFFFF',
+                                color: 'var(--auth-text)',
                                 caretColor: '#3B82F6',
                             }}
                         />
@@ -431,7 +431,7 @@ function VerifyOTPContent() {
 
             {/* Bottom: Resend text + Language Switcher */}
             <div className="flex flex-col w-full items-center" style={{ gap: '16px', marginTop: '24px' }}>
-                {/* Resend code — Figma: Inter 400, 14px, 1.4286em, center, rgba(248,250,252,0.6), plain text */}
+                {/* Resend code — Figma: Inter 400, 14px, 1.4286em, center */}
                 <p
                     onClick={resendCooldown <= 0 && !isResending ? handleResend : undefined}
                     style={{
@@ -440,7 +440,7 @@ function VerifyOTPContent() {
                         fontSize: '14px',
                         lineHeight: '1.4286em',
                         textAlign: 'center',
-                        color: 'rgba(248, 250, 252, 0.6)',
+                        color: 'var(--auth-text-subtle)',
                         margin: 0,
                         cursor: resendCooldown <= 0 && !isResending ? 'pointer' : 'default',
                     }}

@@ -2233,9 +2233,11 @@
         }
       },
       "features": {
-        "blog": "Blog Management",
-        "builder": "Store Design (Builder)",
-        "settings": "Settings & Domain"
+        "builder": "Store Editor",
+        "blog": "Blog",
+        "products": "Product",
+        "orders": "Order",
+        "settings": "Setting"
       }
     },
     "removeModal": {

@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
     Clock, Mail, Calendar, ShoppingBag, ReceiptText,
-    Truck, MapPin, Hash, Info,
+    Truck, MapPin, Hash, Info, Package,
     UploadCloud, FileImage, X, RotateCcw, Hourglass, AlertCircle,
     PhoneCall, PackageX, HandCoins, Banknote,
 } from 'lucide-react'
 import { TY_CSS } from './confirm-styles'
 import { useI18n } from '@/i18n'
+import { PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
 
 type OrderItem = { productName: string; quantity: number; unitPrice: number; variant?: string; imageUrl?: string }
 type ShippingAddress = { line1?: string; line2?: string; city?: string; state?: string; postcode?: string; country?: string }
@@ -59,10 +60,18 @@ function maskEmail(email: string) {
     return `${user.slice(0, 2)}**@${domain}`
 }
 
-const ICON_OK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
-const ACCEPTED_MIME = ['image/jpeg', 'image/png', 'application/pdf']
-const MAX_BYTES = 5 * 1024 * 1024
+function addBusinessDays(date: Date, days: number): Date {
+    const result = new Date(date)
+    let added = 0
+    while (added < days) {
+        result.setDate(result.getDate() + 1)
+        const day = result.getDay()
+        if (day !== 0 && day !== 6) added++
+    }
+    return result
+}
 
+const ICON_OK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
 const CopyIcon = () => (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
@@ -123,6 +132,11 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const addrLine = [addr?.city, addr?.state, addr?.postcode].filter(Boolean).join(', ')
     const placed = new Date().toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })
     const maskedEmail = maskEmail(order.customerEmail)
+    const fmtEstDay = (d: Date) => d.toLocaleDateString('en-MY', { day: 'numeric', month: 'short' })
+    const today = new Date()
+    const estDelivery = (isCod || (isBT && !isPaid))
+        ? '3–5 working days (after verification)'
+        : `${fmtEstDay(addBusinessDays(today, 3))} – ${fmtEstDay(addBusinessDays(today, 5))}`
     const ccySymbol = currency === 'MYR' ? 'RM' : currency === 'SGD' ? 'S$' : '$'
 
     const heroCheckClass = isPaid ? '' : isSubmitted ? 'info' : isBT ? 'warning' : ''
@@ -163,11 +177,11 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const shipsText = isCod ? 'After phone verification' : isBT && !isPaid ? 'Within 24 h after verification' : 'Within 24 h'
 
     const validateFile = (f: File): boolean => {
-        if (!ACCEPTED_MIME.includes(f.type)) {
+        if (!PROOF_ACCEPTED_TYPES.includes(f.type)) {
             setUploadError('Invalid file type. Please upload a JPEG, PNG, or PDF.')
             return false
         }
-        if (f.size > MAX_BYTES) {
+        if (f.size > PROOF_MAX_SIZE_BYTES) {
             setUploadError('File too large. Maximum size is 5MB.')
             return false
         }
@@ -554,6 +568,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         <div className="ty-summary-meta">
                             <div className="ty-meta-row"><Calendar size={13} /><span><strong>Placed</strong> · {placed}</span></div>
                             <div className="ty-meta-row"><Truck size={13} /><span><strong>Ships</strong> · {shipsText}</span></div>
+                            <div className="ty-meta-row"><Package size={13} /><span><strong>Est. Delivery</strong> · {estDelivery}</span></div>
                             {addrLine && <div className="ty-meta-row"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
                         </div>
                         <div className="ty-cta-row">

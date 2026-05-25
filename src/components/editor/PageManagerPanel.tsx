@@ -537,7 +537,7 @@ export function PageManagerPanel({
                     />
 
                     <div className="relative flex h-full items-center justify-center px-4 py-6">
-                        <div className="w-full max-w-[347px] rounded-[18px] border border-[rgba(59,130,246,0.16)] bg-[linear-gradient(180deg,rgba(20,30,48,0.98)_0%,rgba(11,17,32,0.98)_100%)] px-[25px] pb-[25px] pt-[25px] shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
+                        <div className="w-full max-w-[347px] rounded-[18px] border border-[rgba(59,130,246,0.16)] dark:bg-[linear-gradient(180deg,rgba(20,30,48,0.98)_0%,rgba(11,17,32,0.98)_100%)] bg-white px-[25px] pb-[25px] pt-[25px] shadow-[0_24px_48px_rgba(2,6,23,0.45)]">
                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(251,44,54,0.28)] bg-[rgba(127,29,29,0.22)] text-[#FCA5A5]">
                                 <AlertTriangle className="h-8 w-8" />
                             </div>

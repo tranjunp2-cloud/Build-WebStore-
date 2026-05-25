@@ -111,7 +111,7 @@ export default function EditorPage() {
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop')
     const [activeSidebarTab, setActiveSidebarTab] = useState<EditorSidebarTabId>('chat')
     const [isMenuOpen, setIsMenuOpen] = useState(false)
-    const [userData, setUserData] = useState<{ name: string; initial: string; role: string } | null>(null)
+    const [userData, setUserData] = useState<{ name: string; initial: string; role: string; avatarUrl?: string | null } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [chatBlockContext, setChatBlockContext] = useState<{ blockIndex: number; blockType: string } | null>(null)
     const [isCompactLayout, setIsCompactLayout] = useState(false)
@@ -261,7 +261,9 @@ export default function EditorPage() {
                 // Extract user info for menu drawer
                 if (data.user) {
                     const name = data.user.firstName || data.user.email?.split('@')[0] || 'User'
-                    setUserData({ name, initial: name.charAt(0).toUpperCase(), role: data.user.role || 'viewer' })
+                    const av = data.user.avatar
+                    const avatarUrl = av && typeof av === 'object' ? (av.url ?? null) : typeof av === 'string' ? av : null
+                    setUserData({ name, initial: name.charAt(0).toUpperCase(), role: data.user.role || 'viewer', avatarUrl })
                 }
 
                 if (data.page) {
@@ -1279,7 +1281,7 @@ export default function EditorPage() {
     )
 
     return (
-        <div className="flex h-[100dvh] overflow-hidden flex-col bg-[#0B1120]">
+        <div className="editor-shell flex h-[100dvh] overflow-hidden flex-col bg-[#0B1120]">
             <EditorMenuDrawer
                 siteId={siteId}
                 open={isMenuOpen}
@@ -1287,6 +1289,7 @@ export default function EditorPage() {
                 currentUserRole={userData?.role}
                 userName={userData?.name}
                 userInitial={userData?.initial}
+                userAvatarUrl={userData?.avatarUrl}
                 hasUnsavedChanges={hasUnsavedChanges}
             />
 

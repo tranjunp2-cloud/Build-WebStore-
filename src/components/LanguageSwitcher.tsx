@@ -46,7 +46,7 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
         }
         const inactiveStyle: React.CSSProperties = {
             background: 'transparent',
-            color: 'rgba(248, 250, 252, 0.6)',
+            color: 'var(--auth-text-muted)',
         }
         const tabBase: React.CSSProperties = {
             display: 'flex',
@@ -79,7 +79,7 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
                 }}
             >
                 <Globe
-                    style={{ width: 16, height: 16, flexShrink: 0, color: 'rgba(248, 250, 252, 0.5)' }}
+                    style={{ width: 16, height: 16, flexShrink: 0, color: 'var(--auth-text)' }}
                 />
                 <div
                     style={{
@@ -89,8 +89,8 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
                         padding: '0 4px',
                         height: 42,
                         borderRadius: 16,
-                        background: '#1E293B',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        background: 'var(--auth-input-bg)',
+                        border: '1px solid var(--auth-input-border)',
                     }}
                 >
                     <button

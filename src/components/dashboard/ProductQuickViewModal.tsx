@@ -131,17 +131,17 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
     }
 
     return createPortal(
-        <div className="dash-shell hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-[#0B0E14]/80 backdrop-blur-sm animate-in fade-in duration-200"
+        <div className="hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={onClose}
             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-            <div 
-                className="relative flex flex-col md:flex-row w-full max-w-[1024px] h-[calc(100vh-32px)] bg-[#191C22] rounded-tl-[16px] shadow-[-25px_0_50px_-12px_rgba(0,0,0,0.5)] border-t border-l border-white/[0.05] animate-in slide-in-from-right duration-300"
+            <div
+                className="dash-shell relative flex flex-col md:flex-row w-full max-w-[1024px] h-[calc(100vh-32px)] bg-[#191C22] rounded-tl-[16px] shadow-[-25px_0_50px_-12px_rgba(0,0,0,0.5)] border-t border-l border-white/[0.05] animate-in slide-in-from-right duration-300"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Close Button - absolute to the drawer itself */}
                 <button 
                     onClick={onClose}
-                    className="absolute top-[32px] -left-[18px] z-20 w-[36px] h-[36px] flex items-center justify-center rounded-full bg-[#0B1120] border border-white/10 text-white hover:bg-white/10 transition-colors shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                    className="absolute top-[32px] -left-[18px] z-20 w-[36px] h-[36px] flex items-center justify-center rounded-full bg-[var(--dash-surface)] border border-[var(--dash-border)] text-[var(--dash-text)] hover:bg-[var(--dash-surface-hover)] transition-colors shadow-md"
                 >
                     <ChevronRight className="w-5 h-5" />
                 </button>
@@ -242,8 +242,8 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                                             <span className="text-[20px] font-normal text-[#C1C6D7]/40 line-through leading-[1.4] mb-[2px]">
                                                 {formatPrice(product.compareAtPrice!, product.currency)}
                                             </span>
-                                            <div className="flex items-center justify-center px-[8px] py-[2px] bg-[#FFB695]/10 rounded-[2px] mb-[6px]">
-                                                <span className="text-[10px] font-bold text-[#FFB695] uppercase">
+                                            <div className="flex items-center justify-center px-[8px] py-[2px] bg-orange-500/10 dark:bg-[#FFB695]/10 rounded-[2px] mb-[6px]">
+                                                <span className="text-[10px] font-bold text-orange-500 dark:text-[#FFB695] uppercase">
                                                     {discountPercent}% {t.dashboard?.products?.quickView?.off || 'OFF'}
                                                 </span>
                                             </div>
@@ -322,13 +322,12 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                             onClick={() => {
                                 onDelete(product)
                             }}
-                            className="flex items-center justify-center gap-[8px] px-[16px] py-[8px] rounded-[4px] uppercase tracking-[0.1em] hover:opacity-80 transition-opacity"
-                            style={{ 
-                                background: 'transparent', 
-                                border: 'none', 
-                                color: '#FFB4AB',
+                            className="flex items-center justify-center gap-[8px] px-[16px] py-[8px] rounded-[4px] uppercase tracking-[0.1em] hover:opacity-80 transition-opacity text-red-500 dark:text-[#FFB4AB]"
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
                                 fontSize: '12px',
-                                fontWeight: 700 
+                                fontWeight: 700
                             }}
                         >
                             <Trash2 className="w-[14px] h-[14px]" />

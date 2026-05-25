@@ -23,7 +23,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import {
     LayoutDashboard,
     Globe,
@@ -48,6 +48,7 @@ import { useI18n } from '@/i18n'
 interface NavChild {
     label: { en: string; ms: string }
     href: string
+    permissionId?: string
 }
 
 interface NavItemConfig {
@@ -57,6 +58,7 @@ interface NavItemConfig {
     children?: NavChild[]
     badge?: boolean
     superAdminOnly?: boolean
+    permissionId?: string
 }
 
 const NAV_ITEMS: NavItemConfig[] = [
@@ -69,20 +71,23 @@ const NAV_ITEMS: NavItemConfig[] = [
         label: { en: 'My Website', ms: 'Laman Web Saya' },
         icon: LayoutTemplate,
         href: '/editor',
+        permissionId: 'builder',
         children: [
-            { label: { en: 'Editor', ms: 'Editor' }, href: '/editor' },
-            { label: { en: 'Blog', ms: 'Blog' }, href: '/blog' },
+            { label: { en: 'Editor', ms: 'Editor' }, href: '/editor', permissionId: 'builder' },
+            { label: { en: 'Blog', ms: 'Blog' }, href: '/blog', permissionId: 'blog' },
         ],
     },
     {
         label: { en: 'Products', ms: 'Produk' },
         icon: Package,
         href: '/products',
+        permissionId: 'products',
     },
     {
         label: { en: 'Orders', ms: 'Pesanan' },
         icon: ShoppingCart,
         href: '/orders',
+        permissionId: 'orders',
     },
     {
         label: { en: 'Customers', ms: 'Pelanggan' },
@@ -93,11 +98,12 @@ const NAV_ITEMS: NavItemConfig[] = [
         label: { en: 'Settings', ms: 'Tetapan' },
         icon: Settings,
         href: '/settings',
+        // No group-level permissionId — Settings group always visible because Profile is accessible to all roles
         children: [
-            { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
-            { label: { en: 'Payments', ms: 'Pembayaran' }, href: '/settings/payments' },
+            { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains', permissionId: 'settings' },
+            { label: { en: 'Payments', ms: 'Pembayaran' }, href: '/settings/payments', permissionId: 'settings' },
             { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff' },
-            { label: { en: 'Shipping', ms: 'Penghantaran' }, href: '/settings/shipping' },
+            { label: { en: 'Shipping', ms: 'Penghantaran' }, href: '/settings/shipping', permissionId: 'settings' },
             { label: { en: 'Account profile', ms: 'Profil Akaun' }, href: '/settings/profile' },
         ],
     },
@@ -121,6 +127,7 @@ type SidebarProps = {
     userName: string
     userInitial: string
     currentUserRole?: string
+    permissions?: string[]
     isSuperAdmin?: boolean
     mobileOpen: boolean
     setMobileOpen: (open: boolean) => void
@@ -128,9 +135,8 @@ type SidebarProps = {
 
 // ─── Component ───────────────────────────────────────────────────────────
 
-export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', isSuperAdmin = false, mobileOpen, setMobileOpen }: SidebarProps) {
+export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', permissions = [], isSuperAdmin = false, mobileOpen, setMobileOpen }: SidebarProps) {
     const pathname = usePathname()
-    const router = useRouter()
     const { locale, toggleLocale } = useI18n()
     const [expandedGroups, setExpandedGroups] = useState<string[]>(() => {
         const expanded: string[] = []
@@ -142,33 +148,39 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
         return expanded
     })
 
-    // Filter NAV_ITEMS based on access rights
+    // Filter NAV_ITEMS based on role + custom permissions
     const accessibleNavItems = useMemo(() => {
-        return NAV_ITEMS
-            .filter(item => !item.superAdminOnly || isSuperAdmin)
-            .map(item => {
-                if (item.href === '/settings' && item.children) {
-                    // Return copied item with filtered children
-                    return {
-                        ...item,
-                        children: item.children.filter(child => {
-                            // Only owner can see Staff menu
-                            if (child.href === '/settings/staff') {
-                                return currentUserRole === 'owner';
-                            }
+        const isOwner = currentUserRole === 'owner'
+        // editor/viewer are legacy roles — treat as full access to avoid silently breaking existing staff
+        const hasFullAccess = isOwner || currentUserRole === 'admin' || currentUserRole === 'editor' || currentUserRole === 'viewer'
 
-                            return true;
-                        })
-                    }
-                }
-                return item;
+        return NAV_ITEMS
+            .filter(item => {
+                if (item.superAdminOnly) return isSuperAdmin
+                if (item.href === '/customers') return hasFullAccess  // Customers: owner/admin only
+                if (!item.permissionId) return true          // Dashboard, Help Center always visible
+                if (hasFullAccess) return true
+                // My Website group: visible if user has builder OR blog
+                if (item.href === '/editor') return permissions.includes('builder') || permissions.includes('blog')
+                return permissions.includes(item.permissionId)
             })
-    }, [currentUserRole, isSuperAdmin]);
+            .map(item => {
+                if (!item.children) return item
+                const filteredChildren = item.children.filter(child => {
+                    if (child.href === '/settings/staff') return isOwner  // Staff: owner only
+                    if (!child.permissionId) return true
+                    if (hasFullAccess) return true
+                    return permissions.includes(child.permissionId)
+                })
+                return { ...item, children: filteredChildren }
+            })
+            .filter(item => !item.children || item.children.length > 0)  // hide empty groups
+    }, [currentUserRole, permissions, isSuperAdmin]);
 
     // Close sidebar on route change
     useEffect(() => {
         setMobileOpen(false)
-    }, [pathname])
+    }, [pathname, setMobileOpen])
 
     // Close on Escape
     useEffect(() => {
@@ -223,7 +235,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                         {/* Figma: Chevron 16x16 */}
                         <ChevronDown
                             className={cn(
-                                'h-4 w-4 shrink-0 text-[rgba(248,250,252,0.7)] transition-transform duration-200',
+                                'h-4 w-4 shrink-0 text-dash-text-muted transition-transform duration-200',
                                 isGroupExpanded && 'rotate-180'
                             )}
                         />
@@ -320,7 +332,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                 {/* Figma: Language row — layout_6MREP8 — row, center, self-stretch, gap 8px */}
                 <div className="flex items-center gap-2">
                     {/* Figma: Globe Icon 16x16 */}
-                    <Globe className="h-4 w-4 shrink-0 text-dash-text-muted" />
+                    <Globe className="h-4 w-4 shrink-0 text-dash-text" />
                     {/* Figma: Pill — language switcher */}
                     <div className="flex flex-1 items-center rounded-[16px] border border-dash-border bg-dash-surface px-1 h-[38px]">
                         {/* Figma: MY button — layout_CR9BUZ — padding 6px 12px, radius 12, h=28 */}
@@ -329,7 +341,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                             className={cn(
                                 'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
                                 locale === 'ms'
-                                    ? '!bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
+                                    ? '!bg-[#2DD4BF] !text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
                                     : 'text-dash-text-muted hover:text-dash-text'
                             )}
                         >
@@ -341,7 +353,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                             className={cn(
                                 'flex-1 flex items-center justify-center rounded-[12px] h-[28px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
                                 locale === 'en'
-                                    ? '!bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
+                                    ? '!bg-[#2DD4BF] !text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
                                     : 'text-dash-text-muted hover:text-dash-text'
                             )}
                         >
@@ -370,7 +382,7 @@ export function DashboardSidebar({ userName, userInitial, currentUserRole = 'vie
                     className="flex items-center gap-3 rounded-[16px] border border-dash-border bg-transparent outline-none pl-4 h-[44px] text-[14px] font-medium text-dash-text hover:bg-dash-surface-hover cursor-pointer transition-colors"
                 >
                     {/* Figma: Icon 16x16 */}
-                    <LogOut className="h-4 w-4 shrink-0" />
+                    <LogOut className="h-4 w-4 shrink-0 text-dash-text" />
                     <span>{locale === 'ms' ? 'Log Keluar' : 'Logout'}</span>
                 </button>
             </div>

@@ -761,7 +761,7 @@ const CK_CSS = `
 .s-mt{font-size:11px;color:var(--f3);margin:3px 0 0;}
 .s-qty{display:inline-block;padding:1px 6px;background:var(--inp);border-radius:999px;font-size:10px;color:var(--f2);margin-right:4px;font-family:monospace;}
 .s-pr{font-size:13px;font-weight:700;color:var(--f2);white-space:nowrap;font-family:monospace;padding-top:1px;}
-.sum-nudge{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;background:var(--tl5);border:1px solid var(--tl2);border-radius:8px;font-size:12px;color:var(--f3);margin:6px 0;}
+.sum-nudge{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;background:var(--tl5);border:1px solid var(--tl2);border-radius:8px;font-size:12px;color:var(--f2);margin:6px 0;}
 .sum-nudge svg{margin-top:2px;}
 .sum-nudge svg{color:var(--tl);flex-shrink:0;}
 .sum-nudge strong{color:var(--tl7);}

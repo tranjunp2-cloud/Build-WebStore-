@@ -111,7 +111,7 @@ export function StaffDirectoryClient({
                     <button
                         type="button"
                         onClick={() => { setEditingStaff(null); setIsDrawerOpen(true); }}
-                        style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', boxShadow: '0px 4px 6px -4px rgba(59, 130, 246, 0.3), 0px 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
+                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)', boxShadow: '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' }}
                         className="flex items-center justify-center gap-[8px] h-[48px] px-[24px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
                     >
                         <UserPlus className="h-5 w-5" />

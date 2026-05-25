@@ -242,7 +242,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                             <div
                                 key={order.id}
                                 onClick={() => { if (onSelectOrder) onSelectOrder(order.id) }}
-                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer transition-colors border border-white/[0.08] rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : isSelected ? 'bg-blue-500/5' : 'bg-slate-800/60'}`}
+                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer transition-colors border rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : isSelected ? 'bg-blue-500/5 border-dash-border' : 'bg-dash-surface border-dash-border'}`}
                             >
                                 <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
                                     <Checkbox

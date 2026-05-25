@@ -7,10 +7,10 @@ import { cn } from '@/lib/utils';
 type IconTone = 'brand' | 'purple' | 'amber' | 'teal' | '';
 
 const TONE: Record<string, string> = {
-    brand:  'bg-sky-500/10 border-sky-500/[0.25] text-sky-400',
-    purple: 'bg-purple-500/10 border-purple-500/[0.22] text-purple-300',
-    amber:  'bg-amber-500/10 border-amber-500/[0.22] text-amber-400',
-    teal:   'bg-teal-400/10 border-teal-400/[0.22] text-teal-400',
+    brand:  'bg-sky-500/10 border-sky-500/[0.25] text-sky-600 dark:text-sky-400',
+    purple: 'bg-purple-500/10 border-purple-500/[0.22] text-purple-600 dark:text-purple-300',
+    amber:  'bg-amber-500/10 border-amber-500/[0.22] text-amber-600 dark:text-amber-400',
+    teal:   'bg-teal-400/10 border-teal-400/[0.22] text-teal-600 dark:text-teal-400',
     '':     'bg-white/[0.04] border-white/[0.08] text-slate-400',
 };
 
@@ -39,7 +39,7 @@ export function PaymentMethodCard({
         <div className={cn(
             'rounded-[16px] p-[20px_22px] border transition-all duration-200',
             'shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_6px_18px_-10px_rgba(0,0,0,0.45)]',
-            locked ? 'opacity-70 bg-[#0f1729] border-white/[0.08]' : 'bg-[#141e2e] border-white/[0.12]',
+            locked ? 'opacity-70 bg-[#0f1729] border-dash-border' : 'bg-[#141e2e] border-dash-border',
             highlight && !locked && 'border-sky-500/[0.30] shadow-[0_0_0_1px_rgba(14,165,233,0.18),0_8px_24px_-8px_rgba(14,165,233,0.18)]',
         )}>
             <div className="flex items-start gap-4">

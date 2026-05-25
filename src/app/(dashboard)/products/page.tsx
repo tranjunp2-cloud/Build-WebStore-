@@ -442,7 +442,7 @@ export default function ProductsPage() {
                     <div className="flex md:hidden flex-col gap-[12px] w-full">
                         {/* Row 1: Search Input */}
                         <div className="relative w-full h-[50px]">
-                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40" alt="Search" />
+                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-4 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             <input
                                 type="text"
                                 value={searchQuery}
@@ -462,7 +462,7 @@ export default function ProductsPage() {
                                 )}
                             >
                                 <span>{sortTranslateMap[sortBy]}</span>
-                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" />
+                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" className="invert dark:invert-0" />
                             </button>
                             {isDropdownOpen && (
                                 <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-20">
@@ -487,7 +487,7 @@ export default function ProductsPage() {
                                 isAdvancedFiltersOpen ? "border-[#3B82F6]/50 text-white" : "border-white/[0.08] text-[#F8FAFC]"
                             )}
                         >
-                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" />
+                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
                             <span>
                                 {t.dashboard.products.list.filterBtn}{(selectedCategories.length > 0 || saleStatus !== 'All Products' || showLowStock)
                                     ? ` (${selectedCategories.length + (saleStatus !== 'All Products' ? 1 : 0) + (showLowStock ? 1 : 0)})`
@@ -500,7 +500,7 @@ export default function ProductsPage() {
                     <div className="hidden md:flex items-center gap-[17px] w-full">
                         {/* Search Input */}
                         <div className="relative flex-1 h-[50px]">
-                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" alt="Search" />
+                            <Image src="/images/figma/search-icon.svg" width={20} height={20} className="absolute left-3 top-1/2 -translate-y-1/2 invert dark:invert-0" alt="Search" />
                             <input
                                 type="text"
                                 value={searchQuery}
@@ -520,7 +520,7 @@ export default function ProductsPage() {
                                 )}
                             >
                                 <span className="text-[16px] font-medium">{sortTranslateMap[sortBy]}</span>
-                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" />
+                                <Image src="/images/figma/dropdown-arrow-icon.svg" width={20} height={20} alt="Sort" className="invert dark:invert-0" />
                             </button>
                             {isDropdownOpen && (
                                 <div className="absolute top-[calc(100%+8px)] left-0 w-[189px] z-20">
@@ -546,7 +546,7 @@ export default function ProductsPage() {
                                 isAdvancedFiltersOpen ? "border-[#3B82F6]/50 text-white" : "border-white/[0.08] text-[#F8FAFC] hover:bg-white/5"
                             )}
                         >
-                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" />
+                            <Image src="/images/figma/filter-icon.svg" width={20} height={20} alt="Filter" className="invert dark:invert-0" />
                             {t.dashboard.products.list.filterBtn}
                         </button>
                     </div>
@@ -723,7 +723,7 @@ export default function ProductsPage() {
                                     const isOutOfStock = product.inventory <= 0
                                     const { value: dpValue, isVariant: dpIsVariant } = getDisplayPrice(product)
                                     const priceDisplay = `${dpIsVariant ? (t.dashboard.products.list.fromPrefix || 'From ') : ''}${formatPrice(dpValue, product.currency)}`
-                                    const weightDisplay = product.weight ? `${product.weight} kg` : '0.5 kg'
+                                    const weightDisplay = product.weight != null && product.weight > 0 ? `${product.weight} kg` : '—'
                                     
                                     return (
                                         <div key={product.id} onClick={() => setQuickViewProduct(product as DetailedProduct)} className="group grid grid-cols-[80px_minmax(250px,2fr)_minmax(120px,1fr)_minmax(100px,1fr)_minmax(100px,1fr)_120px_100px] gap-4 px-6 py-4 items-center hover:bg-white/[0.02] cursor-pointer transition-colors">
