@@ -138,7 +138,7 @@ export async function generateSiteWithAI(
     const { contentLang: detectedLang, gpLang, blockLang } = language === 'auto'
         ? detectLanguage(inputText)
         : { contentLang: language as ContentLang, gpLang: EXPLICIT_LANG_NAMES[language] ?? 'English', blockLang: language }
-    if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en') {
+    if (genMode === 'template-first' && !hasCustomInput && detectedLang === 'en' && blockLang === 'en') {
         // Note: template-first uses the curated composer (static content) + GPT for
         // hero/SEO text only. Block prompt overrides apply to AI-first path only.
         const templateResult = await generateTemplateFirst(
