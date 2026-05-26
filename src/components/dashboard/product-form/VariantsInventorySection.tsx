@@ -558,7 +558,7 @@ export function VariantsInventorySection() {
 
             {/* Tier delete confirmation dialog */}
             <Dialog open={tierToDelete !== null} onOpenChange={(open) => { if (!open) setTierToDelete(null) }}>
-                <DialogContent className="max-w-sm bg-[#1E293B] border-white/10 text-[#F8FAFC]">
+                <DialogContent className="dash-shell max-w-sm bg-[#1E293B] border-white/10 text-[#F8FAFC]">
                     <DialogHeader>
                         <DialogTitle className="text-[16px] font-semibold text-[#F8FAFC]">
                             {t.dashboard.products.form.sections?.removeTierConfirmTitle || 'Remove this option?'}
@@ -571,7 +571,7 @@ export function VariantsInventorySection() {
                         <button
                             type="button"
                             onClick={() => setTierToDelete(null)}
-                            className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[14px] font-medium text-[#F8FAFC]/70 hover:bg-white/10 transition-colors"
+                            className="flex-1 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-[14px] font-medium text-[#F8FAFC] hover:bg-white/10 transition-colors"
                         >
                             {t.dashboard.products.form.sections?.removeTierCancelBtn || 'Cancel'}
                         </button>
@@ -585,7 +585,7 @@ export function VariantsInventorySection() {
                                 setTierToDelete(null)
                                 if (hasMatrix) regenerateMatrix(remainingTiers)
                             }}
-                            className="flex-1 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-[14px] font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                            className="flex-1 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-2 text-[14px] font-medium text-red-400 hover:bg-red-500/25 transition-colors"
                         >
                             {t.dashboard.products.form.sections?.removeTierConfirmBtn || 'Remove'}
                         </button>
