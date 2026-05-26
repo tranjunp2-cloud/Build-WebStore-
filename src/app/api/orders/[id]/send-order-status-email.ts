@@ -27,6 +27,8 @@ export async function sendOrderStatusEmail(
     const customerEmail = (order as any).customerEmail
     const orderNumber = (order as any).orderNumber
 
+    if (!customerEmail) return
+
     if (newStatus === 'cancelled' || newStatus === 'shipped' || newStatus === 'confirmed' || newStatus === 'completed') {
         const tenantId = typeof (order as any).tenant === 'object'
             ? (order as any).tenant.id

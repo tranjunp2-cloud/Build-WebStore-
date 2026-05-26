@@ -39,6 +39,23 @@ export async function handlePaymentFailed(
 
     const order = orders.docs[0] as unknown as OrderDoc
 
+    // IDOR guard: connected merchant must own the payment intent they're claiming failed
+    if (event.connectedAccountId) {
+        const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
+        const ownerTenant = await payload.findByID({
+            collection: 'tenants',
+            id: tenantId,
+            depth: 0,
+            overrideAccess: true,
+        }).catch(() => null) as any
+        if (ownerTenant?.stripeAccountId && ownerTenant.stripeAccountId !== event.connectedAccountId) {
+            console.error(
+                `[Stripe Webhook] SECURITY: forged payment_intent.payment_failed — account ${event.connectedAccountId} ≠ tenant ${String(tenantId)} account ${ownerTenant.stripeAccountId}`,
+            )
+            return
+        }
+    }
+
     // Skip if order already moved past payment stage (late-arriving event, out-of-order delivery)
     const skipStatuses = ['new', 'confirmed', 'ready_to_ship', 'shipped', 'completed', 'refunded', 'payment_failed', 'cancelled']
     if (skipStatuses.includes(order.status)) {

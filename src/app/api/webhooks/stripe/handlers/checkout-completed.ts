@@ -52,6 +52,11 @@ export async function handleCheckoutCompleted(
         console.warn('[Stripe Webhook] checkout.session.completed without client_reference_id')
         return
     }
+    if (!/^\d+$/.test(orderId)) {
+        console.warn('[Stripe Webhook] invalid client_reference_id (non-numeric):', orderId)
+        return
+    }
+    const orderIdInt = parseInt(orderId, 10)
 
     // IDOR guard: verify the connected Stripe account that fired this webhook is the same account
     // as the order's tenant. Prevents a connected merchant from creating a forged checkout session
@@ -59,7 +64,7 @@ export async function handleCheckoutCompleted(
     if (event.connectedAccountId) {
         const preCheckResult = await payload.find({
             collection: 'orders',
-            where: { id: { equals: parseInt(orderId) } },
+            where: { id: { equals: orderIdInt } },
             depth: 0,
             limit: 1,
             overrideAccess: true,
@@ -89,7 +94,7 @@ export async function handleCheckoutCompleted(
     // cannot distinguish "already processed" from "not yet paid". Raw SQL is required for atomicity.
     const transitionResult = await payload.db.drizzle.execute(sql`
         UPDATE orders SET status = 'new', payment_status = 'paid'
-        WHERE id = ${parseInt(orderId)} AND status = 'pending'
+        WHERE id = ${orderIdInt} AND status = 'pending'
         RETURNING id
     `)
     if (!transitionResult.rows?.length) {

@@ -32,6 +32,7 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                     cancel_reason = 'Auto-cancelled: payment not received within 24h'
                 WHERE id = ${order.id}
                 AND payment_status IN ('awaiting_payment', 'pending_verification')
+                AND status IN ('pending', 'new')
                 RETURNING id
             `)
             if (!updateResult.rows?.length) {
@@ -81,11 +82,13 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
                         reorderUrl,
                         locale: siteLocale,
                     })
-            payload
-                .sendEmail({ to: order.customerEmail, subject: emailTemplate.subject, html: emailTemplate.html })
-                .catch((e: unknown) =>
-                    payload.logger.error({ err: e, orderId: order.id }, 'order-expired email failed'),
-                )
+            if (order.customerEmail) {
+                payload
+                    .sendEmail({ to: order.customerEmail, subject: emailTemplate.subject, html: emailTemplate.html })
+                    .catch((e: unknown) =>
+                        payload.logger.error({ err: e, orderId: order.id }, 'order-expired email failed'),
+                    )
+            }
 
             processed++
         } catch (e: unknown) {

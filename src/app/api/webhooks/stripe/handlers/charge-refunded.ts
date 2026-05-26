@@ -33,6 +33,23 @@ export async function handleChargeRefunded(
 
     const order = orders.docs[0] as any
 
+    // IDOR guard: connected merchant must own the payment intent they're claiming a refund on
+    if (event.connectedAccountId) {
+        const tenantId = typeof order.tenant === 'object' ? (order.tenant as any).id : order.tenant
+        const ownerTenant = await payload.findByID({
+            collection: 'tenants',
+            id: tenantId,
+            depth: 0,
+            overrideAccess: true,
+        }).catch(() => null) as any
+        if (ownerTenant?.stripeAccountId && ownerTenant.stripeAccountId !== event.connectedAccountId) {
+            console.error(
+                `[Stripe Webhook] SECURITY: forged charge.refunded — account ${event.connectedAccountId} ≠ tenant ${tenantId} account ${ownerTenant.stripeAccountId}`,
+            )
+            return
+        }
+    }
+
     if (order.status === 'refunded') {
         console.log(`[Stripe Webhook] Order ${order.id} already refunded — skipping`)
         return
@@ -41,7 +58,7 @@ export async function handleChargeRefunded(
     await payload.update({
         collection: 'orders',
         id: order.id,
-        data: { status: 'refunded' } as any,
+        data: { status: 'refunded', paymentStatus: 'refunded' } as any,
     })
 
     console.log(`[Stripe Webhook] Order ${order.id} marked refunded via charge.refunded`)

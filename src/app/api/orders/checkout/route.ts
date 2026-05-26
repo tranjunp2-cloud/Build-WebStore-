@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -223,23 +224,18 @@ export async function POST(request: Request) {
 
         // Decrement inventory for COD only — bank_transfer reserves stock without decrement
         // (decrement happens at Approve step in P06)
+        // Atomic SQL prevents double-decrement from concurrent requests (no read-then-write race)
         if (paymentMethod === 'cod') {
             for (const item of aggregatedItems) {
                 try {
-                    const product = await payload.findByID({
-                        collection: 'products',
-                        id: item.productId,
-                        depth: 0,
-                        overrideAccess: true,
-                    })
-                    const p = product as any
-                    if (p.inventory !== undefined && p.inventory !== null) {
-                        await payload.update({
-                            collection: 'products',
-                            id: item.productId,
-                            data: { inventory: Math.max(0, p.inventory - item.quantity) } as any,
-                        })
-                    }
+                    const productId = typeof item.productId === 'string' && !isNaN(Number(item.productId))
+                        ? Number(item.productId) : item.productId
+                    await (payload.db.drizzle as any).execute(sql`
+                        UPDATE products
+                        SET inventory = GREATEST(0, inventory - ${item.quantity})
+                        WHERE id = ${productId}
+                        AND inventory IS NOT NULL
+                    `)
                 } catch (err) {
                     console.warn(`[Stock Decrement] Failed for product ${item.productId}:`, err)
                 }

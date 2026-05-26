@@ -111,6 +111,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     }
 
     const originalStatus = order.status
+    const originalPaymentStatus = order.paymentStatus
 
     // Update DB to 'refunded' BEFORE calling Stripe so the charge.refunded webhook
     // (which fires moments after the Stripe API call) sees the order as already refunded
@@ -118,7 +119,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     await payload.update({
         collection: 'orders',
         id,
-        data: { status: 'refunded' } as any,
+        data: { status: 'refunded', paymentStatus: 'refunded' } as any,
     })
 
     try {
@@ -167,11 +168,11 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
 
         return NextResponse.json({ success: true, data: { refundId: refund.id } })
     } catch (err: any) {
-        // Roll back order status so merchant can retry
+        // Roll back order status + paymentStatus so merchant can retry
         await payload.update({
             collection: 'orders',
             id,
-            data: { status: originalStatus } as any,
+            data: { status: originalStatus, paymentStatus: originalPaymentStatus } as any,
         }).catch(() => {})
         console.error('[Refund] Stripe refund failed:', err.message)
         return NextResponse.json(

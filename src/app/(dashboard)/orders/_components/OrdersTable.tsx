@@ -432,6 +432,17 @@ export function OrdersTable({
     const [totalPages, setTotalPages] = useState(1)
     const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set())
 
+    // Refs keep latest filter values accessible inside the silentFetch effect without
+    // adding them as deps (which would turn silent-refresh into a full reload on every filter change)
+    const searchQueryRef = useRef(searchQuery)
+    const statusFilterRef = useRef(statusFilter)
+    const dateFilterRef = useRef(dateFilter)
+    const onOrdersLoadedRef = useRef(onOrdersLoaded)
+    useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
+    useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
+    useEffect(() => { dateFilterRef.current = dateFilter }, [dateFilter])
+    useEffect(() => { onOrdersLoadedRef.current = onOrdersLoaded }, [onOrdersLoaded])
+
     useEffect(() => {
         async function fetchOrders() {
             try {
@@ -467,9 +478,10 @@ export function OrdersTable({
         async function silentFetch() {
             try {
                 let url = `/api/orders?page=1&limit=10`
-                if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
-                if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
-                if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
+                // Use refs to read latest filter values — avoids stale closure without triggering full reload on filter change
+                if (searchQueryRef.current) url += `&search=${encodeURIComponent(searchQueryRef.current)}`
+                if (statusFilterRef.current && statusFilterRef.current !== 'all') url += `&status=${encodeURIComponent(statusFilterRef.current)}`
+                if (dateFilterRef.current && dateFilterRef.current !== 'all') url += `&date=${encodeURIComponent(dateFilterRef.current)}`
 
                 const res = await fetch(url)
                 if (!res.ok) return
@@ -500,7 +512,7 @@ export function OrdersTable({
                     }, 4000)
                 }
                 setTotalPages(data.totalPages || 1)
-                if (onOrdersLoaded) onOrdersLoaded(incoming)
+                if (onOrdersLoadedRef.current) onOrdersLoadedRef.current(incoming)
             } catch (err) {
                 console.error('[Orders] Silent refresh failed:', err)
             }
