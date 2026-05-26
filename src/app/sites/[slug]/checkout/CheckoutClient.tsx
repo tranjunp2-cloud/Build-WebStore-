@@ -97,7 +97,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const longTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; phone?: string; line1?: string }>({})
+    const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; phone?: string; line1?: string; state?: string; city?: string; postcode?: string }>({})
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
@@ -209,6 +209,18 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         if (err) setFieldErrors(prev => ({ ...prev, phone: err }))
     }
 
+    const handleStateBlur = () => {
+        if (!selectedStateId) setFieldErrors(prev => ({ ...prev, state: 'Please select a state' }))
+    }
+
+    const handleCityBlur = () => {
+        if (selectedStateId && !selectedDistrictId) setFieldErrors(prev => ({ ...prev, city: 'Please select a city' }))
+    }
+
+    const handlePostcodeBlur = () => {
+        if (selectedDistrictId && !form.postcode) setFieldErrors(prev => ({ ...prev, postcode: 'Please select a postcode' }))
+    }
+
     const handleStateChange = (stateId: string) => {
         setSelectedStateId(stateId)
         const st = states.find(s => s.id === Number(stateId))
@@ -218,6 +230,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         setSelectedDistrictId('')
         setDistricts([])
         setPostcodeOpts([])
+        if (stateId) setFieldErrors(prev => ({ ...prev, state: undefined, city: undefined, postcode: undefined }))
         if (!stateId) return
         setDistrictsLoading(true)
         fetch(`/api/geo/districts?stateId=${stateId}`)
@@ -233,6 +246,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         updateField('city', d?.name || '')
         updateField('postcode', '')
         setPostcodeOpts([])
+        if (districtId) setFieldErrors(prev => ({ ...prev, city: undefined, postcode: undefined }))
         if (!districtId) return
         setPostcodesLoading(true)
         fetch(`/api/geo/postcodes?districtId=${districtId}`)
@@ -494,30 +508,33 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className="ck-row c3">
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.state}</label>
-                                    <div className="ck-iw ck-sel">
-                                        <select value={selectedStateId} onChange={e => handleStateChange(e.target.value)} disabled={statesLoading}>
+                                    <div className={`ck-iw ck-sel${fieldErrors.state ? ' err' : ''}`}>
+                                        <select value={selectedStateId} onChange={e => handleStateChange(e.target.value)} onBlur={handleStateBlur} disabled={statesLoading}>
                                             <option value="">{statesLoading ? 'Loading…' : '— Select State —'}</option>
                                             {states.map(s => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
                                         </select>
                                     </div>
+                                    {fieldErrors.state && <p className="ck-ferr">{fieldErrors.state}</p>}
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.city}</label>
-                                    <div className="ck-iw ck-sel">
-                                        <select value={selectedDistrictId} onChange={e => handleDistrictChange(e.target.value)} disabled={!selectedStateId || districtsLoading}>
+                                    <div className={`ck-iw ck-sel${fieldErrors.city ? ' err' : ''}`}>
+                                        <select value={selectedDistrictId} onChange={e => handleDistrictChange(e.target.value)} onBlur={handleCityBlur} disabled={!selectedStateId || districtsLoading}>
                                             <option value="">{districtsLoading ? 'Loading…' : '— Select City —'}</option>
                                             {districts.map(d => <option key={d.id} value={String(d.id)}>{d.name}</option>)}
                                         </select>
                                     </div>
+                                    {fieldErrors.city && <p className="ck-ferr">{fieldErrors.city}</p>}
                                 </div>
                                 <div className="ck-f">
                                     <label className="ck-lb">{ck.postcode}</label>
-                                    <div className="ck-iw ck-sel">
-                                        <select value={form.postcode} onChange={e => updateField('postcode', e.target.value)} disabled={!selectedDistrictId || postcodesLoading}>
+                                    <div className={`ck-iw ck-sel${fieldErrors.postcode ? ' err' : ''}`}>
+                                        <select value={form.postcode} onChange={e => { updateField('postcode', e.target.value); if (e.target.value) setFieldErrors(prev => ({ ...prev, postcode: undefined })) }} onBlur={handlePostcodeBlur} disabled={!selectedDistrictId || postcodesLoading}>
                                             <option value="">{postcodesLoading ? 'Loading…' : '— Select —'}</option>
                                             {postcodeOpts.map(p => <option key={p} value={p}>{p}</option>)}
                                         </select>
                                     </div>
+                                    {fieldErrors.postcode && <p className="ck-ferr">{fieldErrors.postcode}</p>}
                                 </div>
                             </div>
                         </div>
