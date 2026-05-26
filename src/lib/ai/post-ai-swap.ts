@@ -49,7 +49,7 @@ import {
 } from './template-composer'
 import { hasUserDataReference, isGenericContent } from './content-rules'
 import type { ThemeMood } from './theme-moods'
-import { getBlockStrings } from './block-i18n'
+import { getBlockStrings, hasDedicatedStrings } from './block-i18n'
 
 /**
  * Replace nav link labels for known URL slugs with i18n equivalents.
@@ -328,8 +328,12 @@ export function postAISwapStep(
 
     if (!language) return { blocks: swapped, telemetry }
 
-    // Normalize structural labels on any block type — covers GPT-generated blocks
-    // that weren't swapped but still have English structural strings.
+    // For languages with dedicated i18n strings (en/ms/vi), normalize structural
+    // labels to ensure consistency. For other languages (Japanese, Chinese, etc.),
+    // GPT was instructed to generate in the correct language — trust its output
+    // rather than overwriting with English fallback strings.
+    if (!hasDedicatedStrings(language)) return { blocks: swapped, telemetry }
+
     const nav = normalizeNavLinks(swapped, language)
     const contact = normalizeContactLabels(nav, language)
     const logos = normalizeClientLogosHeadline(contact, language)

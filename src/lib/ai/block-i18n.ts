@@ -325,3 +325,15 @@ export function getBlockStrings(lang?: string): BlockStrings {
     const prefix = lang.split('-')[0]
     return STRINGS[prefix] ?? STRINGS.en
 }
+
+/**
+ * Returns true only when there are dedicated i18n strings for this language
+ * (i.e. not the English fallback). Used by the normalization chain in
+ * post-ai-swap to decide whether to trust GPT's output vs. override it.
+ */
+export function hasDedicatedStrings(lang?: string): boolean {
+    if (!lang) return false
+    if (STRINGS[lang]) return true
+    const prefix = lang.split('-')[0]
+    return !!STRINGS[prefix]
+}
