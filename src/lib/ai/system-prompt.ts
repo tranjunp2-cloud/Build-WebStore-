@@ -429,11 +429,21 @@ export function buildUserPrompt(
 
   const resolvedLangName = gpLang
     ?? (language === 'ms' ? 'Malay (Bahasa Melayu)' : language === 'vi' ? 'Vietnamese' : language === 'auto' ? null : 'English')
-  const langInstruction = resolvedLangName
-    ? `Generate ALL content in ${resolvedLangName}. Every word of the website must be in ${resolvedLangName} — do not mix languages. This includes feature card titles and descriptions, testimonial quotes, FAQ questions and answers, button labels, and navigation items. Never write English text in a ${resolvedLangName} site.`
-    : "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
+  let langInstruction: string
+  if (!resolvedLangName) {
+    langInstruction = "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
+  } else if (resolvedLangName === 'English') {
+    langInstruction = "Generate ALL content in English."
+  } else {
+    langInstruction = `LANGUAGE REQUIREMENT — CRITICAL:
+Generate EVERY word of this website in ${resolvedLangName}. Absolutely no English words anywhere in the output.
 
-  parts.push(`\n${langInstruction} Make it look premium and professional.`)
+NAVIGATION LABELS (most common mistake): The navigation block link labels MUST be in ${resolvedLangName}. Never output "Home", "About", "Services", "Contact", or "Get Started" as navigation labels — translate each of these to their natural ${resolvedLangName} equivalents.
+
+ALL other content must also be in ${resolvedLangName}: headlines, descriptions, testimonials, FAQ questions and answers, feature card titles, button labels, form labels, footer links, section titles — every single piece of text.`
+  }
+
+  parts.push(`\n${langInstruction}\n\nMake it look premium and professional.`)
 
   return parts.join('\n')
 }
