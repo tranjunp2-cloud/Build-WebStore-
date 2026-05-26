@@ -124,7 +124,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         window.history.pushState(null, '', window.location.href)
         const onPop = () => {
             window.history.pushState(null, '', window.location.href)
-            setLeaveHref(`/sites/${slug}/products`)
+            setLeaveHref(`/sites/${slug}`)
         }
         const onBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault()
@@ -260,9 +260,9 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                     className="ty-back"
                     onClick={() => {
                         if (isBT && uploadStatus !== 'success') {
-                            setLeaveHref(`/sites/${slug}/products`)
+                            setLeaveHref(`/sites/${slug}`)
                         } else {
-                            clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)
+                            clearAndNavigate(`/sites/${slug}`, isOrderSuccess)
                         }
                     }}
                 ><ArrowLeft size={16} /></button>
@@ -602,9 +602,9 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                         <div className="ty-cta-row">
                             <button className="ty-btn primary lg" onClick={() => {
                                 if (isBT && uploadStatus !== 'success') {
-                                    setLeaveHref(`/sites/${slug}/products`)
+                                    setLeaveHref(`/sites/${slug}`)
                                 } else {
-                                    clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)
+                                    clearAndNavigate(`/sites/${slug}`, isOrderSuccess)
                                 }
                             }}>
                                 <ShoppingBag size={15} /> Continue Shopping
