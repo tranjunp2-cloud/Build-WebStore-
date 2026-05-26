@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { toast } from 'sonner'
-import { Toaster } from '@/components/ui/sonner'
 import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
     Calendar, CreditCard, Copy, Check, Hash, MapPin, ShieldCheck,
@@ -53,15 +51,6 @@ type Props = { order: OrderData; slug: string }
 
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
 
-const STATUS_CHANGE_LABELS: Record<string, { text: string; type: 'success' | 'error' }> = {
-    new:          { text: 'Your order is being processed!',   type: 'success' },
-    confirmed:    { text: 'Your order has been confirmed!',   type: 'success' },
-    ready_to_ship: { text: 'Your order is ready to ship!',   type: 'success' },
-    shipped:      { text: 'Your order has been shipped!',     type: 'success' },
-    completed:    { text: 'Your order has been delivered!',   type: 'success' },
-    cancelled:    { text: 'Your order has been cancelled.',   type: 'error' },
-    refunded:     { text: 'Your order has been refunded.',    type: 'error' },
-}
 
 function getTrackingStatus(status: string): TrackingStatus {
     if (status === 'shipped') return 'in-transit'
@@ -435,11 +424,6 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                         paymentStatus: data.paymentStatus,
                         trackingNumber: data.trackingNumber,
                     }))
-                    const label = STATUS_CHANGE_LABELS[data.status]
-                    if (label) {
-                        if (label.type === 'error') toast.error(label.text, { duration: 6000 })
-                        else toast.success(label.text, { duration: 6000 })
-                    }
                     if (data.terminal) es.close()
                 }
             } catch {
@@ -461,7 +445,6 @@ export default function OrderTrackingClient({ order, slug }: Props) {
 
     return (
         <div className={`ot-page${isDelivered ? ' is-delivered' : ''}`}>
-            <Toaster position="top-center" />
             <header className="ck-header">
                 <h1>Order Tracking</h1>
                 <div className="crumbs">
