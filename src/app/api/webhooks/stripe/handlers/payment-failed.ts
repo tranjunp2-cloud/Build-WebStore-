@@ -68,6 +68,7 @@ export async function handlePaymentFailed(
         id: order.id,
         data: {
             status: 'payment_failed',
+            paymentStatus: 'failed',
             stripePaymentIntentId: paymentIntentId,
         },
     })

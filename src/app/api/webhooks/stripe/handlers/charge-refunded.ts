@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
@@ -45,16 +46,17 @@ export async function handleChargeRefunded(
     const tenantId = typeof order.tenant === 'object' ? (order.tenant as any).id : order.tenant
     if (!await verifyConnectedAccountOwnership(payload, event.connectedAccountId, tenantId, `charge.refunded order ${order.id}`)) return
 
-    if (order.status === 'refunded') {
-        console.log(`[Stripe Webhook] Order ${order.id} already refunded — skipping`)
+    // Atomic guard: only the first concurrent delivery wins — prevents duplicate refund emails
+    // under Stripe's at-least-once delivery guarantee.
+    const updateResult = await (payload.db.drizzle as any).execute(sql`
+        UPDATE orders SET status = 'refunded', payment_status = 'refunded'
+        WHERE id = ${order.id} AND status != 'refunded'
+        RETURNING id
+    `)
+    if (!updateResult.rows?.length) {
+        console.log(`[Stripe Webhook] Order ${order.id} already refunded — skipping concurrent delivery`)
         return
     }
-
-    await payload.update({
-        collection: 'orders',
-        id: order.id,
-        data: { status: 'refunded', paymentStatus: 'refunded' } as any,
-    })
 
     console.log(`[Stripe Webhook] Order ${order.id} marked refunded via charge.refunded`)
 
@@ -88,7 +90,7 @@ export async function handleChargeRefunded(
         refundDate: new Date().toISOString(),
         shopUrl: `${baseUrl}/sites/${siteSlug}`,
         currency: order.currency ?? 'MYR',
-        locale: (order.locale as 'en' | 'ms') ?? 'ms',
+        locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
     })
 
     payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })

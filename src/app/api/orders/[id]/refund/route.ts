@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
@@ -113,14 +114,22 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
     const originalStatus = order.status
     const originalPaymentStatus = order.paymentStatus
 
+    // Atomic CAS: only the first concurrent request wins — prevents double-email if merchant double-clicks.
     // Update DB to 'refunded' BEFORE calling Stripe so the charge.refunded webhook
     // (which fires moments after the Stripe API call) sees the order as already refunded
     // and skips sending a duplicate confirmation email.
-    await payload.update({
-        collection: 'orders',
-        id,
-        data: { status: 'refunded', paymentStatus: 'refunded' } as any,
-    })
+    const casResult = await (payload.db.drizzle as any).execute(sql`
+        UPDATE orders SET status = 'refunded', payment_status = 'refunded'
+        WHERE id = ${order.id}
+        AND status = ANY(ARRAY['new','paid','confirmed','ready_to_ship','shipped','completed'])
+        RETURNING id
+    `)
+    if (!casResult.rows?.length) {
+        return NextResponse.json(
+            { success: false, error: { code: 'ALREADY_REFUNDED', message: 'Order has already been refunded' } },
+            { status: 400 },
+        )
+    }
 
     try {
         const stripe = getStripeClient()
@@ -160,7 +169,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
                 refundDate: new Date().toISOString(),
                 shopUrl: `${baseUrl}/sites/${siteSlug}`,
                 currency: order.currency ?? 'MYR',
-                locale: (order.locale as 'en' | 'ms') ?? 'ms',
+                locale: ((typeof order.site === 'object' ? (order.site as any)?.locale : null) ?? 'ms') as 'en' | 'ms',
             })
             payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })
                 .catch((err: unknown) => payload.logger.error({ err }, '[Refund] sendEmail failed'))

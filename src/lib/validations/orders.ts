@@ -39,7 +39,7 @@ export const orderCreateSchema = z.object({
     customer: z.object({
         name: z.string().min(1),
         email: z.string().email(),
-        phone: z.string().optional(),
+        phone: z.string().trim().min(1, 'Phone number is required').max(30),
         address: z.object({
             line1: z.string().trim().min(1, 'Address line 1 is required'),
             line2: z.string().optional(),

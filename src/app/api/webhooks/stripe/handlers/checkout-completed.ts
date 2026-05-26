@@ -69,29 +69,28 @@ export async function handleCheckoutCompleted(
 
     // IDOR guard: verify the connected Stripe account that fired this webhook owns the order's tenant.
     // Runs before any writes — fail-closed (unknown order or missing stripeAccountId both reject).
-    if (event.connectedAccountId) {
-        const preCheckResult = await payload.find({
-            collection: 'orders',
-            where: { id: { equals: orderIdInt } },
-            depth: 0,
-            limit: 1,
-            overrideAccess: true,
-        }).catch(() => null)
-        const preCheckDoc = preCheckResult?.docs[0] as any
-        if (!preCheckDoc) {
-            console.warn(`[Stripe Webhook] connected-account event for unknown order ${orderIdInt} — skipping`)
-            return
-        }
-        const ownerTenantId = typeof preCheckDoc.tenant === 'object' ? preCheckDoc.tenant.id : preCheckDoc.tenant
-        if (!ownerTenantId) {
-            console.warn(`[Stripe Webhook] connected-account event for order ${orderIdInt} with no tenant — skipping`)
-            return
-        }
-        const allowed = await verifyConnectedAccountOwnership(
-            payload, event.connectedAccountId, ownerTenantId, `checkout.session.completed order ${orderIdInt}`,
-        )
-        if (!allowed) return
+    // Note: the connectedAccountId guard at the top of this function already ensures this block always runs.
+    const preCheckResult = await payload.find({
+        collection: 'orders',
+        where: { id: { equals: orderIdInt } },
+        depth: 0,
+        limit: 1,
+        overrideAccess: true,
+    }).catch(() => null)
+    const preCheckDoc = preCheckResult?.docs[0] as any
+    if (!preCheckDoc) {
+        console.warn(`[Stripe Webhook] connected-account event for unknown order ${orderIdInt} — skipping`)
+        return
     }
+    const ownerTenantId = typeof preCheckDoc.tenant === 'object' ? preCheckDoc.tenant.id : preCheckDoc.tenant
+    if (!ownerTenantId) {
+        console.warn(`[Stripe Webhook] connected-account event for order ${orderIdInt} with no tenant — skipping`)
+        return
+    }
+    const allowed = await verifyConnectedAccountOwnership(
+        payload, event.connectedAccountId, ownerTenantId, `checkout.session.completed order ${orderIdInt}`,
+    )
+    if (!allowed) return
 
     // Atomic status transition: UPDATE WHERE status = 'pending' — only the first concurrent invocation wins.
     // NOTE: stripe-checkout/route.ts writes stripeSessionId BEFORE payment, so checking sessionId alone
