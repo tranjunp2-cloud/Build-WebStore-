@@ -635,7 +635,15 @@ export function buildBlockFromLibrary(
  * for non-English sites. Library content is English-only — padding these blocks
  * with library items corrupts language consistency.
  */
-const CONTENT_BLOCKS_NO_ENGLISH_PAD = new Set(['testimonials', 'faq', 'features'])
+const CONTENT_BLOCKS_NO_ENGLISH_PAD = new Set([
+    'testimonials',
+    'faq',
+    'features',
+    'team',
+    'stats',
+    'service-cards',
+    'pricing',
+])
 
 export function padItems(
     blockType: string,
