@@ -178,6 +178,7 @@ ${blockList}
 - Unsupported language (Tamil, Mandarin) → fallback to English
 - Vietnamese slang/abbreviations → interpret and generate professional Vietnamese
   Example: "ban banh mi ship tan noi" → Bakery/restaurant selling bánh mì with delivery
+- CRITICAL for non-English: EVERY piece of item-level text must be in the target language — feature card titles and descriptions, testimonial quotes, FAQ questions and answers, CTA button labels. NEVER output English placeholder phrases like "Authentic Recipes", "Fast Delivery", "Learn More" for non-English sites.
 
 ## PROFESSIONAL DESIGN RULES (CRITICAL — these make websites look hand-designed, not AI-generated)
 
@@ -429,7 +430,7 @@ export function buildUserPrompt(
   const resolvedLangName = gpLang
     ?? (language === 'ms' ? 'Malay (Bahasa Melayu)' : language === 'vi' ? 'Vietnamese' : language === 'auto' ? null : 'English')
   const langInstruction = resolvedLangName
-    ? `Generate ALL content in ${resolvedLangName}. Every word of the website must be in ${resolvedLangName} — do not mix languages.`
+    ? `Generate ALL content in ${resolvedLangName}. Every word of the website must be in ${resolvedLangName} — do not mix languages. This includes feature card titles and descriptions, testimonial quotes, FAQ questions and answers, button labels, and navigation items. Never write English text in a ${resolvedLangName} site.`
     : "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
 
   parts.push(`\n${langInstruction} Make it look premium and professional.`)
