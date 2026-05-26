@@ -97,7 +97,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const longTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [fieldErrors, setFieldErrors] = useState<{ email?: string; phone?: string }>({})
+    const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
@@ -185,9 +185,13 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const updateField = (field: keyof CheckoutForm, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
-        if (field === 'email' || field === 'phone') {
+        if (field === 'name' || field === 'email' || field === 'phone') {
             setFieldErrors(prev => ({ ...prev, [field]: undefined }))
         }
+    }
+
+    const handleNameBlur = () => {
+        if (!form.name.trim()) setFieldErrors(prev => ({ ...prev, name: 'Full name is required' }))
     }
 
     const handleEmailBlur = () => {
@@ -442,7 +446,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.fullName}</label>
-                                <div className="ck-iw"><input value={form.name} onChange={e => updateField('name', e.target.value)} placeholder="e.g. Ahmad bin Ibrahim" /></div>
+                                <div className={`ck-iw${fieldErrors.name ? ' err' : ''}`}><input value={form.name} onChange={e => updateField('name', e.target.value)} onBlur={handleNameBlur} placeholder="e.g. Ahmad bin Ibrahim" /></div>
+                                {fieldErrors.name && <p className="ck-ferr">{fieldErrors.name}</p>}
                             </div>
                             <div className="ck-row c2">
                                 <div className="ck-f">
