@@ -707,8 +707,8 @@ const CK_CSS = `
 .ck-sel select{appearance:none;padding-right:36px;cursor:pointer;}
 .ck-sel::after{content:"";position:absolute;right:14px;top:50%;width:8px;height:8px;border-right:1.5px solid var(--f3);border-bottom:1.5px solid var(--f3);transform:translateY(-70%) rotate(45deg);pointer-events:none;}
 .ck-row{display:grid;gap:14px;margin-top:14px;}
-.ck-row.c2{grid-template-columns:1fr 1fr;}
-.ck-row.c3{grid-template-columns:1fr 1fr 1fr;}
+.ck-row.c2{grid-template-columns:1fr 1fr;align-items:start;}
+.ck-row.c3{grid-template-columns:1fr 1fr 1fr;align-items:start;}
 .ck-row.c2>*,.ck-row.c3>*{display:flex;flex-direction:column;margin-top:0;}
 .ck-row.c2>* .ck-iw,.ck-row.c3>* .ck-iw{margin-top:auto;}
 /* Error */
