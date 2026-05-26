@@ -74,16 +74,21 @@ export async function handleAccountUpdated(
         )
     }
 
+    const tenantDoc = tenants.docs[0] as any
+    const wasOnboardingComplete = tenantDoc.stripeOnboardingComplete ?? false
+
     const tenantUpdateData: Record<string, unknown> = { stripeOnboardingComplete: isOnboardingComplete }
-    // Sync payment flags with Stripe's charges_enabled state.
-    // Re-enable when Stripe recovers from a KYC interrupt to unblock the merchant's storefront.
-    tenantUpdateData.payments = isOnboardingComplete
-        ? { payment_card: true, payment_fpx: true }
-        : { payment_card: false, payment_fpx: false }
+    // Sync payment flags only when onboarding status actually changes (false→true or true→false).
+    // Skipping on no-op events preserves any payment method preferences the merchant set manually.
+    if (isOnboardingComplete !== wasOnboardingComplete) {
+        tenantUpdateData.payments = isOnboardingComplete
+            ? { payment_card: true, payment_fpx: true }
+            : { payment_card: false, payment_fpx: false }
+    }
 
     await payload.update({
         collection: 'tenants',
-        id: tenants.docs[0].id,
+        id: tenantDoc.id,
         data: tenantUpdateData,
     })
 

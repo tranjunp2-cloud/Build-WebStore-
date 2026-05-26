@@ -110,6 +110,17 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         )
     }
 
+    const originalStatus = order.status
+
+    // Update DB to 'refunded' BEFORE calling Stripe so the charge.refunded webhook
+    // (which fires moments after the Stripe API call) sees the order as already refunded
+    // and skips sending a duplicate confirmation email.
+    await payload.update({
+        collection: 'orders',
+        id,
+        data: { status: 'refunded' } as any,
+    })
+
     try {
         const stripe = getStripeClient()
         const refund = await stripe.refunds.create(
@@ -117,19 +128,13 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
             { stripeAccount: stripeAccountId, idempotencyKey: `refund-${id}` },
         )
 
-        await payload.update({
-            collection: 'orders',
-            id,
-            data: { status: 'refunded' } as any,
-        })
-
         console.log(`[Refund] Order ${id} refunded — Stripe refund ${refund.id}`)
 
         // Fire-and-forget refund confirmation email to buyer
         if (order.customerEmail) {
             const tenant = typeof order.tenant === 'object' ? order.tenant : null
             const shopName = tenant?.name ?? 'Shop'
-            const siteSlug = tenant?.siteSlug ?? ''
+            const siteSlug = tenant?.slug ?? ''
             const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
             const email = orderRefundedEmail({
                 shopName,
@@ -162,6 +167,12 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
 
         return NextResponse.json({ success: true, data: { refundId: refund.id } })
     } catch (err: any) {
+        // Roll back order status so merchant can retry
+        await payload.update({
+            collection: 'orders',
+            id,
+            data: { status: originalStatus } as any,
+        }).catch(() => {})
         console.error('[Refund] Stripe refund failed:', err.message)
         return NextResponse.json(
             { success: false, error: { code: 'REFUND_FAILED', message: 'Refund could not be processed' } },
