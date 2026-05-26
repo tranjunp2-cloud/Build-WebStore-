@@ -344,6 +344,7 @@ export function buildBlockFromLibrary(
                 variant: 'form',
                 headline: i18n.contact.headline,
                 subheadline: i18n.contact.subheadline,
+                sectionLabel: i18n.navigation.contact,
                 // Plan 07 — user-supplied contact fields win over canned pool.
                 address: userAddress ?? biz?.address ?? '',
                 phone: userPhone ?? biz?.phone ?? '',
