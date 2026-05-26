@@ -85,8 +85,11 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const clearAndNavigate = useCallback(async (href: string, clearToken: boolean) => {
         if (clearToken) {
             await fetch(`/api/orders/${order.id}/clear-confirm-token`, { method: 'DELETE' }).catch(() => {})
+            // Replace history entry so back button cannot return to confirm page after order is done
+            window.location.replace(href)
+        } else {
+            router.push(href)
         }
-        router.push(href)
     }, [order.id, router])
 
     const [uploadStatus, setUploadStatus] = useState<UploadStatus>(
