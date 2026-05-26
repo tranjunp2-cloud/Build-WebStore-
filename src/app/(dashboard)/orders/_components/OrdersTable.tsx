@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n'
 import { OrdersPagination } from './OrdersPagination'
 
 // ───────── TYPES ─────────
-export type OrderStatus = 'pending' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
 
 export interface Order {
     id: string
@@ -19,6 +19,7 @@ export interface Order {
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; borderColor: string; dotColor: string; textColor: string }> = {
     'pending': { bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)', dotColor: '#FF6900', textColor: '#FF8904' },
+    'new': { bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)', dotColor: '#FF6900', textColor: '#FF8904' },
     'confirmed': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
     'ready_to_ship': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
     'shipped': { bg: 'rgba(0,201,80,0.1)', borderColor: 'rgba(0,201,80,0.3)', dotColor: '#00C950', textColor: '#05DF72' },
@@ -33,6 +34,7 @@ const STATUS_STYLE: Record<OrderStatus, { bg: string; borderColor: string; dotCo
 function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string>): string {
     const keyMap: Record<OrderStatus, string> = {
         'pending': 'pending',
+        'new': 'pending',
         'confirmed': 'confirmed',
         'ready_to_ship': 'readyToShip',
         'shipped': 'shipped',
@@ -190,9 +192,10 @@ interface TableProps {
     selectedOrderId?: string | null
     selectedRows: Set<string>
     onSelectionChange: (selectedIds: Set<string>) => void
+    newOrderIds?: Set<string>
 }
 
-function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, onSelectionChange }: TableProps) {
+function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, onSelectionChange, newOrderIds }: TableProps) {
     const { t } = useI18n()
     const o = t.dashboard.orders
     const statusLabels = o.status
@@ -242,7 +245,8 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                             <div
                                 key={order.id}
                                 onClick={() => { if (onSelectOrder) onSelectOrder(order.id) }}
-                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer transition-colors border rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : isSelected ? 'bg-blue-500/5 border-dash-border' : 'bg-dash-surface border-dash-border'}`}
+                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer border rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : newOrderIds?.has(order.id) ? 'bg-emerald-500/10 border-emerald-500/30' : isSelected ? 'bg-blue-500/5 border-dash-border' : 'bg-dash-surface border-dash-border'}`}
+                                style={{ transition: 'background 1s ease-out, border-color 1s ease-out' }}
                             >
                                 <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
                                     <Checkbox
@@ -324,7 +328,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                             return (
                                 <tr
                                     key={order.id}
-                                    className="transition-colors cursor-pointer"
+                                    className="cursor-pointer"
                                     style={{
                                         height: rowHeight,
                                         borderBottom: i < orders.length - 1
@@ -332,13 +336,16 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                             : 'none',
                                         background: isDetailOpen
                                             ? 'rgba(59,130,246,0.12)'
-                                            : isSelected ? 'rgba(59,130,246,0.06)' : undefined,
+                                            : newOrderIds?.has(order.id)
+                                                ? 'rgba(0,201,80,0.12)'
+                                                : isSelected ? 'rgba(59,130,246,0.06)' : undefined,
+                                        transition: 'background 1s ease-out',
                                     }}
                                     onMouseEnter={e => {
-                                        if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--dash-surface-hover)'
+                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id)) (e.currentTarget as HTMLTableRowElement).style.background = 'var(--dash-surface-hover)'
                                     }}
                                     onMouseLeave={e => {
-                                        if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = ''
+                                        if (!isSelected && !isDetailOpen && !newOrderIds?.has(order.id)) (e.currentTarget as HTMLTableRowElement).style.background = ''
                                     }}
                                     onClick={() => {
                                         if (onSelectOrder) onSelectOrder(order.id)
@@ -400,6 +407,7 @@ export function OrdersTable({
     onSelectOrder,
     selectedOrderId,
     refreshCounter = 0,
+    silentRefreshTrigger = 0,
     selectedRows = new Set(),
     onSelectionChange,
     onOrdersLoaded,
@@ -410,6 +418,7 @@ export function OrdersTable({
     onSelectOrder?: (orderId: string) => void
     selectedOrderId?: string | null
     refreshCounter?: number
+    silentRefreshTrigger?: number
     selectedRows?: Set<string>
     onSelectionChange?: (selectedIds: Set<string>) => void
     onOrdersLoaded?: (orders: Order[]) => void
@@ -421,6 +430,7 @@ export function OrdersTable({
     const [loading, setLoading] = useState(true)
     const [page, setPage] = useState(1)
     const [totalPages, setTotalPages] = useState(1)
+    const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set())
 
     useEffect(() => {
         async function fetchOrders() {
@@ -449,6 +459,49 @@ export function OrdersTable({
         fetchOrders()
     }, [page, refreshCounter, searchQuery, statusFilter, dateFilter])
 
+    // Silent background merge — only on page 1, no loading spinner, preserves scroll/selection
+    useEffect(() => {
+        if (silentRefreshTrigger === 0) return
+        if (page !== 1) return
+
+        async function silentFetch() {
+            try {
+                let url = `/api/orders?page=1&limit=10`
+                if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
+                if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
+                if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
+
+                const res = await fetch(url)
+                if (!res.ok) return
+                const data = await res.json()
+                if (!data.success || !data.docs) return
+
+                const incoming: Order[] = data.docs
+                setOrders((prev) => {
+                    const existingIds = new Set(prev.map((o) => o.id))
+                    const fresh = incoming.filter((o) => !existingIds.has(o.id))
+                    if (fresh.length === 0) return prev
+                    // Highlight new rows then fade out after 4s
+                    const freshIds = new Set(fresh.map((o) => o.id))
+                    setNewOrderIds((prev) => new Set([...prev, ...freshIds]))
+                    setTimeout(() => {
+                        setNewOrderIds((cur) => {
+                            const next = new Set(cur)
+                            freshIds.forEach((id) => next.delete(id))
+                            return next
+                        })
+                    }, 4000)
+                    return [...fresh, ...prev]
+                })
+                setTotalPages(data.totalPages || 1)
+                if (onOrdersLoaded) onOrdersLoaded(incoming)
+            } catch (err) {
+                console.error('[Orders] Silent refresh failed:', err)
+            }
+        }
+        silentFetch()
+    }, [silentRefreshTrigger])
+
     return (
         <div
             className="flex flex-col w-full md:rounded-[16px] md:overflow-hidden md:bg-slate-800/60 md:border md:border-white/[0.08] md:p-[1px]"
@@ -460,6 +513,7 @@ export function OrdersTable({
                 selectedOrderId={selectedOrderId}
                 selectedRows={selectedRows}
                 onSelectionChange={onSelectionChange || (() => { })}
+                newOrderIds={newOrderIds}
             />
 
             <div className="flex items-center justify-end px-6 py-3">
