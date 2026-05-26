@@ -52,7 +52,6 @@ type OrderData = {
 type Props = { order: OrderData; slug: string }
 
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
-const POLL_INTERVAL = 30_000
 
 const STATUS_CHANGE_LABELS: Record<string, { text: string; type: 'success' | 'error' }> = {
     new:          { text: 'Your order is being processed!',   type: 'success' },
@@ -422,14 +421,12 @@ export default function OrderTrackingClient({ order, slug }: Props) {
     useEffect(() => {
         if (TERMINAL_STATUSES.has(statusRef.current)) return
 
-        const orderNumber = order.orderNumber
+        const url = `/api/orders/stream/${order.orderNumber}?slug=${encodeURIComponent(slug)}`
+        const es = new EventSource(url)
 
-        async function poll() {
+        es.onmessage = (e) => {
             try {
-                const res = await fetch(`/api/orders/track/${orderNumber}?slug=${encodeURIComponent(slug)}`)
-                if (!res.ok) return
-                const data = await res.json()
-
+                const data = JSON.parse(e.data)
                 if (data.status !== statusRef.current) {
                     statusRef.current = data.status
                     setLiveOrder(prev => ({
@@ -443,26 +440,19 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                         if (label.type === 'error') toast.error(label.text, { duration: 6000 })
                         else toast.success(label.text, { duration: 6000 })
                     }
-                    if (data.terminal) clearInterval(timerId)
+                    if (data.terminal) es.close()
                 }
             } catch {
-                // retry on next tick
+                // ignore malformed events
             }
         }
 
-        const timerId = setInterval(() => {
-            if (!document.hidden) poll()
-        }, POLL_INTERVAL)
-
-        function onVisible() {
-            if (!document.hidden) poll()
+        es.onerror = () => {
+            // Close on terminal — EventSource auto-reconnects otherwise
+            if (TERMINAL_STATUSES.has(statusRef.current)) es.close()
         }
-        document.addEventListener('visibilitychange', onVisible)
 
-        return () => {
-            clearInterval(timerId)
-            document.removeEventListener('visibilitychange', onVisible)
-        }
+        return () => es.close()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
