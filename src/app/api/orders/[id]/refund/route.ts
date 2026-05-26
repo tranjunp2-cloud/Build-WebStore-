@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getStripeClient } from '@/lib/payment/stripe'
+import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -105,6 +106,42 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
         })
 
         console.log(`[Refund] Order ${id} refunded — Stripe refund ${refund.id}`)
+
+        // Fire-and-forget refund confirmation email to buyer
+        if (order.customerEmail) {
+            const tenant = typeof order.tenant === 'object' ? order.tenant : null
+            const shopName = tenant?.name ?? 'Shop'
+            const siteSlug = tenant?.siteSlug ?? ''
+            const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
+            const email = orderRefundedEmail({
+                shopName,
+                orderNumber: order.orderNumber,
+                customerName: order.customerName ?? '',
+                customerEmail: order.customerEmail,
+                customerPhone: order.customerPhone ?? null,
+                customerAddress: order.shippingAddress ?? null,
+                items: (order.items ?? []).map((item: any) => ({
+                    name: item.productName ?? item.name ?? '',
+                    variant: item.variantName ?? null,
+                    quantity: item.quantity ?? 1,
+                    unitPrice: item.unitPrice ?? 0,
+                    lineTotal: item.lineTotal ?? 0,
+                })),
+                subtotal: order.subtotal ?? 0,
+                shippingFee: order.shippingFee ?? 0,
+                total: order.total ?? 0,
+                refundAmount: order.total ?? 0,
+                paymentMethod: order.paymentMethod ?? 'stripe',
+                orderDate: order.createdAt,
+                refundDate: new Date().toISOString(),
+                shopUrl: `${baseUrl}/sites/${siteSlug}`,
+                currency: order.currency ?? 'MYR',
+                locale: (order.locale as 'en' | 'ms') ?? 'ms',
+            })
+            payload.sendEmail({ to: order.customerEmail, subject: email.subject, html: email.html })
+                .catch((err: unknown) => payload.logger.error({ err }, '[Refund] sendEmail failed'))
+        }
+
         return NextResponse.json({ success: true, data: { refundId: refund.id } })
     } catch (err: any) {
         console.error('[Refund] Stripe refund failed:', err.message)

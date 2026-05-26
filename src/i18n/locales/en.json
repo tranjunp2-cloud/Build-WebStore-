@@ -396,6 +396,14 @@
       "cta": "Place a new order",
       "subject": "Order cancellation notice"
     },
+    "refundedOrder": {
+      "body": "Your order has been refunded. The amount will be returned to your original payment method within 5–10 business days.",
+      "orderStatusRefunded": "Refunded",
+      "refundDate": "Refund date",
+      "refundNote": "Refund note",
+      "cta": "Place a new order",
+      "subject": "Order refund confirmation"
+    },
     "shippedOrder": {
       "body": "Thank you for your purchase. Your order has been shipped to you.",
       "orderStatusShipped": "Shipped",

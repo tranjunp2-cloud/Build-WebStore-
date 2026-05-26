@@ -396,6 +396,14 @@
       "cta": "Jom buat pesanan baharu",
       "subject": "Makluman pembatalan pesanan"
     },
+    "refundedOrder": {
+      "body": "Pesanan anda telah dikembalikan. Jumlah akan dikreditkan semula ke kaedah pembayaran asal anda dalam masa 5–10 hari bekerja.",
+      "orderStatusRefunded": "Dikembalikan",
+      "refundDate": "Tarikh bayaran balik",
+      "refundNote": "Nota bayaran balik",
+      "cta": "Jom buat pesanan baharu",
+      "subject": "Pengesahan bayaran balik pesanan"
+    },
     "shippedOrder": {
       "body": "Terima kasih atas pembelian anda. Pesanan anda telah dihantar kepada anda.",
       "orderStatusShipped": "Dihantar",

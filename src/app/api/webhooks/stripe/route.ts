@@ -11,6 +11,7 @@ import { sendEmail } from '@/lib/email/send'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
+import { handleChargeRefunded } from './handlers/charge-refunded'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 
 /** Minimal shape of a tenant document for webhook notification logic. */
@@ -120,6 +121,10 @@ export async function POST(request: NextRequest) {
 
             case 'account_deauthorized':
                 await handleAccountDeauthorized(payload, event)
+                break
+
+            case 'refund_completed':
+                await handleChargeRefunded(payload, event)
                 break
 
             default:

@@ -240,6 +240,7 @@ export function normalizeStripeEvent(
         'customer.subscription.updated': 'subscription_updated',
         'account.updated': 'account_updated',
         'account.application.deauthorized': 'account_deauthorized',
+        'charge.refunded': 'refund_completed',
     }
 
     const normalizedType = typeMap[event.type]
