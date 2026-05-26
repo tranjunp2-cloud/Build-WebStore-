@@ -819,7 +819,7 @@ export default function BlogEditorPage() {
                                         </span>
                                     </button>
                                 </PopoverTrigger>
-                                <PopoverContent className="dash-shell w-auto p-0 bg-[#0B1120] border-[rgba(255,255,255,0.08)] text-[#F8FAFC]" align="start">
+                                <PopoverContent className="dash-shell w-auto p-0 border-[rgba(255,255,255,0.08)] text-[#F8FAFC]" align="start" style={{ backgroundColor: 'var(--dash-bg)' }}>
                                     <CalendarUI
                                         mode="single"
                                         selected={publishDate}

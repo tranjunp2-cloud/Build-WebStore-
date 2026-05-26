@@ -558,7 +558,7 @@ export function VariantsInventorySection() {
 
             {/* Tier delete confirmation dialog */}
             <Dialog open={tierToDelete !== null} onOpenChange={(open) => { if (!open) setTierToDelete(null) }}>
-                <DialogContent className="dash-shell max-w-sm bg-[#1E293B] border-white/10 text-[#F8FAFC]">
+                <DialogContent className="dash-shell max-w-sm border-white/10 text-[#F8FAFC]" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>
                     <DialogHeader>
                         <DialogTitle className="text-[16px] font-semibold text-[#F8FAFC]">
                             {t.dashboard.products.form.sections?.removeTierConfirmTitle || 'Remove this option?'}

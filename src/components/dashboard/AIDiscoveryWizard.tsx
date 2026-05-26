@@ -129,7 +129,8 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   }
 
   return (
-    <div className="dash-shell fixed inset-0 z-[100] flex items-center justify-center bg-[#000000]/60 backdrop-blur-[2px] p-6 sm:p-4">
+    <div className="dash-shell">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#000000]/60 backdrop-blur-[2px] p-6 sm:p-4">
       {/* Modal Container */}
       <div
         className="relative w-full max-w-[340px] sm:max-w-[672px] h-auto max-h-[90vh] bg-[#0F172A]/95 border border-solid border-white/10 rounded-[24px] shadow-[0_0_40px_rgba(59,130,246,0.15)] flex flex-col sm:overflow-hidden touch-pan-y backdrop-blur-xl shrink-0"
@@ -304,6 +305,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

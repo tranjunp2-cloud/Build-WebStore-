@@ -32,7 +32,7 @@ export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
                     {labelMap[status]}
                 </span>
             </TooltipTrigger>
-            <TooltipContent>{tooltipMap[status]}</TooltipContent>
+            <TooltipContent className="dash-shell" style={{ backgroundColor: 'var(--dash-secondary-bg)' }}>{tooltipMap[status]}</TooltipContent>
         </Tooltip>
     )
 }
