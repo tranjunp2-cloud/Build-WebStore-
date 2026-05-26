@@ -46,6 +46,14 @@ export async function handleCheckoutCompleted(
     event: PaymentWebhookEvent,
 ) {
     const session = event.data
+
+    // Direct Charges: every legitimate checkout.session.completed must carry a connectedAccountId.
+    // A platform-level event for this handler is unexpected and likely misconfigured or forged.
+    if (!event.connectedAccountId) {
+        console.error('[Stripe Webhook] SECURITY: checkout.session.completed without connectedAccountId — Direct Charges require connected account context; rejecting')
+        return
+    }
+
     const stripeSessionId = session.id
     const orderId = session.client_reference_id
 

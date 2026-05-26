@@ -168,7 +168,14 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
 
         return NextResponse.json({ success: true, data: { refundId: refund.id } })
     } catch (err: any) {
-        // Roll back order status + paymentStatus so merchant can retry
+        // Before rolling back, re-fetch the order — the charge.refunded webhook may have already
+        // arrived and set status to 'refunded' (network timeout on our side, but Stripe processed it).
+        // Rolling back in that case would silently undo the webhook's state update.
+        const currentOrder = await payload.findByID({ collection: 'orders', id }).catch(() => null) as any
+        if (!currentOrder || currentOrder.status === 'refunded') {
+            console.log('[Refund] Stripe call failed but order already refunded (webhook race) — skipping rollback')
+            return NextResponse.json({ success: true, data: { refundId: null } })
+        }
         await payload.update({
             collection: 'orders',
             id,

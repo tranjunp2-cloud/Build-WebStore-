@@ -97,5 +97,9 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
         }
     }
 
+    if (result.totalDocs > opts.limit) {
+        console.error(`[payment-expiry] Batch limit reached: processed ${opts.limit} of ${result.totalDocs} — ${result.totalDocs - opts.limit} orders skipped this run; increase limit or add pagination`)
+    }
+
     return { processed, errors, total: result.totalDocs }
 }

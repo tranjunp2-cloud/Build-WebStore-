@@ -224,21 +224,62 @@ export async function POST(request: Request) {
 
         // Decrement inventory for COD only — bank_transfer reserves stock without decrement
         // (decrement happens at Approve step in P06)
-        // Atomic SQL prevents double-decrement from concurrent requests (no read-then-write race)
+        // CAS-style: UPDATE WHERE inventory >= qty prevents oversell under concurrent requests.
+        // Compensation: if any item fails the CAS, re-increment all already-decremented items
+        // and delete the order so the buyer sees a clear out-of-stock error.
         if (paymentMethod === 'cod') {
+            const decremented: Array<{ productId: number | string; quantity: number }> = []
+            let failedItem: string | undefined
+
             for (const item of aggregatedItems) {
+                const productId = typeof item.productId === 'string' && !isNaN(Number(item.productId))
+                    ? Number(item.productId) : item.productId
                 try {
-                    const productId = typeof item.productId === 'string' && !isNaN(Number(item.productId))
-                        ? Number(item.productId) : item.productId
-                    await (payload.db.drizzle as any).execute(sql`
+                    const result = await (payload.db.drizzle as any).execute(sql`
                         UPDATE products
-                        SET inventory = GREATEST(0, inventory - ${item.quantity})
+                        SET inventory = inventory - ${item.quantity}
                         WHERE id = ${productId}
                         AND inventory IS NOT NULL
+                        AND inventory >= ${item.quantity}
+                        RETURNING id
                     `)
+                    if (result.rows?.length) {
+                        decremented.push({ productId, quantity: item.quantity })
+                    } else {
+                        failedItem = String(item.productId)
+                        break
+                    }
                 } catch (err) {
-                    console.warn(`[Stock Decrement] Failed for product ${item.productId}:`, err)
+                    console.warn(`[Stock Decrement] CAS failed for product ${item.productId}:`, err)
+                    failedItem = String(item.productId)
+                    break
                 }
+            }
+
+            if (failedItem) {
+                // Compensate: re-increment all previously decremented items
+                for (const p of decremented) {
+                    try {
+                        await (payload.db.drizzle as any).execute(sql`
+                            UPDATE products SET inventory = inventory + ${p.quantity}
+                            WHERE id = ${p.productId} AND inventory IS NOT NULL
+                        `)
+                    } catch (e) {
+                        console.error(`[Stock Decrement] Compensation re-increment failed for product ${p.productId}:`, e)
+                    }
+                }
+                // Delete the just-created order to keep DB consistent
+                await payload.delete({ collection: 'orders', id: order.id, overrideAccess: true }).catch(() => {})
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: {
+                            code: 'OUT_OF_STOCK',
+                            message: `Product ${failedItem} ran out of stock — please reduce quantity and try again`,
+                        },
+                    },
+                    { status: 422 },
+                )
             }
         }
 

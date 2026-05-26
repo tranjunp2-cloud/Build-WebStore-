@@ -13,6 +13,13 @@ export async function handleChargeRefunded(
     event: PaymentWebhookEvent,
 ) {
     const charge = event.data
+
+    // Direct Charges: every legitimate charge.refunded must carry a connectedAccountId.
+    if (!event.connectedAccountId) {
+        console.error('[Stripe Webhook] SECURITY: charge.refunded without connectedAccountId — Direct Charges require connected account context; rejecting')
+        return
+    }
+
     const paymentIntentId = charge.payment_intent as string | undefined
 
     if (!paymentIntentId) {

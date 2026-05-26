@@ -15,6 +15,13 @@ export async function handlePaymentFailed(
     event: PaymentWebhookEvent,
 ) {
     const paymentIntent = event.data
+
+    // Direct Charges: every legitimate payment_intent.payment_failed must carry a connectedAccountId.
+    if (!event.connectedAccountId) {
+        console.error('[Stripe Webhook] SECURITY: payment_intent.payment_failed without connectedAccountId — Direct Charges require connected account context; rejecting')
+        return
+    }
+
     const paymentIntentId = paymentIntent.id
 
     // Try finding order by stripePaymentIntentId first
