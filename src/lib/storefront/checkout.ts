@@ -42,6 +42,7 @@ export function validateCheckoutForm(form: CheckoutForm): { valid: boolean; erro
     if (form.email && !EMAIL_REGEX.test(form.email)) errors.push('Invalid email format')
     if (!form.phone.trim()) errors.push('Phone number is required')
     else if (!MY_PHONE_REGEX.test(form.phone.trim())) errors.push('Invalid phone format')
+    if (!form.line1.trim()) errors.push('Address line 1 is required')
     return { valid: errors.length === 0, errors }
 }
 

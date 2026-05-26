@@ -3201,7 +3201,7 @@
       "emailAddress": "Email Address *",
       "phone": "Phone * (+60)",
       "shippingAddress": "Shipping Address",
-      "addressLine1": "Address Line 1",
+      "addressLine1": "Address Line 1 *",
       "addressLine2": "Address Line 2 (optional)",
       "city": "City",
       "state": "State",

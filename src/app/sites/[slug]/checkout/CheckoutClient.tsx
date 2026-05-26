@@ -97,7 +97,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const longTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
+    const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; phone?: string; line1?: string }>({})
     const [themeCSS, setThemeCSS] = useState(initialThemeCSS)
     const [fontHeading, setFontHeading] = useState(initialFontHeading)
     const [fontBody, setFontBody] = useState(initialFontBody)
@@ -185,13 +185,17 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const updateField = (field: keyof CheckoutForm, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
-        if (field === 'name' || field === 'email' || field === 'phone') {
+        if (field === 'name' || field === 'email' || field === 'phone' || field === 'line1') {
             setFieldErrors(prev => ({ ...prev, [field]: undefined }))
         }
     }
 
     const handleNameBlur = () => {
         if (!form.name.trim()) setFieldErrors(prev => ({ ...prev, name: 'Full name is required' }))
+    }
+
+    const handleLine1Blur = () => {
+        if (!form.line1.trim()) setFieldErrors(prev => ({ ...prev, line1: 'Address line 1 is required' }))
     }
 
     const handleEmailBlur = () => {
@@ -264,7 +268,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
-        form.city && form.postcode && items.length > 0 &&
+        form.line1.trim() && form.city && form.postcode && items.length > 0 &&
         (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe')
     )
 
@@ -480,7 +484,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine1}</label>
-                                <div className="ck-iw"><input value={form.line1} onChange={e => updateField('line1', e.target.value)} placeholder="No. 17, Jalan Kenari 22..." /></div>
+                                <div className={`ck-iw${fieldErrors.line1 ? ' err' : ''}`}><input value={form.line1} onChange={e => updateField('line1', e.target.value)} onBlur={handleLine1Blur} placeholder="No. 17, Jalan Kenari 22..." /></div>
+                                {fieldErrors.line1 && <p className="ck-ferr">{fieldErrors.line1}</p>}
                             </div>
                             <div className="ck-f">
                                 <label className="ck-lb">{ck.addressLine2}</label>

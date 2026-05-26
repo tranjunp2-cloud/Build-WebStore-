@@ -3201,7 +3201,7 @@
       "emailAddress": "Alamat E-mel *",
       "phone": "Telefon * (+60)",
       "shippingAddress": "Alamat Penghantaran",
-      "addressLine1": "Alamat Baris 1",
+      "addressLine1": "Alamat Baris 1 *",
       "addressLine2": "Alamat Baris 2 (pilihan)",
       "city": "Bandar",
       "state": "Negeri",
