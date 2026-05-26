@@ -3199,7 +3199,7 @@
       "contactInfo": "Contact Information",
       "fullName": "Full Name *",
       "emailAddress": "Email Address *",
-      "phone": "Phone (e.g. +60 12-345 6789)",
+      "phone": "Phone * (+60)",
       "shippingAddress": "Shipping Address",
       "addressLine1": "Address Line 1",
       "addressLine2": "Address Line 2 (optional)",

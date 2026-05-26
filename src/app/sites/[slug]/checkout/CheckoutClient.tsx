@@ -452,7 +452,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                     {fieldErrors.email && <p className="ck-ferr">{fieldErrors.email}</p>}
                                 </div>
                                 <div className="ck-f">
-                                    <label className="ck-lb">{ck.phone} (+60)</label>
+                                    <label className="ck-lb">{ck.phone}</label>
                                     <div className={`ck-iw${fieldErrors.phone ? ' err' : ''}`}>
                                         <input type="tel" value={form.phone} onChange={e => updateField('phone', e.target.value)} onBlur={handlePhoneBlur} placeholder="+60 12 345 6789" />
                                     </div>
