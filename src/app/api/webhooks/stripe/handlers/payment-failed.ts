@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
+import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 
 /** Minimal shape of an order document used in payment-failed handler. */
 interface OrderDoc {
@@ -25,11 +26,16 @@ export async function handlePaymentFailed(
 
     // Fallback: search by the order ID stored in PaymentIntent metadata
     if (orders.docs.length === 0 && paymentIntent.metadata?.orderId) {
-        orders = await payload.find({
-            collection: 'orders',
-            where: { id: { equals: paymentIntent.metadata.orderId } },
-            limit: 1,
-        })
+        const metaOrderId = String(paymentIntent.metadata.orderId)
+        if (!/^\d+$/.test(metaOrderId)) {
+            console.warn('[Stripe Webhook] payment_failed: non-numeric metadata.orderId:', metaOrderId)
+        } else {
+            orders = await payload.find({
+                collection: 'orders',
+                where: { id: { equals: parseInt(metaOrderId, 10) } },
+                limit: 1,
+            })
+        }
     }
 
     if (orders.docs.length === 0) {
@@ -40,21 +46,8 @@ export async function handlePaymentFailed(
     const order = orders.docs[0] as unknown as OrderDoc
 
     // IDOR guard: connected merchant must own the payment intent they're claiming failed
-    if (event.connectedAccountId) {
-        const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
-        const ownerTenant = await payload.findByID({
-            collection: 'tenants',
-            id: tenantId,
-            depth: 0,
-            overrideAccess: true,
-        }).catch(() => null) as any
-        if (ownerTenant?.stripeAccountId && ownerTenant.stripeAccountId !== event.connectedAccountId) {
-            console.error(
-                `[Stripe Webhook] SECURITY: forged payment_intent.payment_failed — account ${event.connectedAccountId} ≠ tenant ${String(tenantId)} account ${ownerTenant.stripeAccountId}`,
-            )
-            return
-        }
-    }
+    const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
+    if (!await verifyConnectedAccountOwnership(payload, event.connectedAccountId, tenantId, `payment_intent.payment_failed order ${order.id}`)) return
 
     // Skip if order already moved past payment stage (late-arriving event, out-of-order delivery)
     const skipStatuses = ['new', 'confirmed', 'ready_to_ship', 'shipped', 'completed', 'refunded', 'payment_failed', 'cancelled']

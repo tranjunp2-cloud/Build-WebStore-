@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
+import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 
 /**
  * Handles charge.refunded Stripe webhook event.
@@ -34,21 +35,8 @@ export async function handleChargeRefunded(
     const order = orders.docs[0] as any
 
     // IDOR guard: connected merchant must own the payment intent they're claiming a refund on
-    if (event.connectedAccountId) {
-        const tenantId = typeof order.tenant === 'object' ? (order.tenant as any).id : order.tenant
-        const ownerTenant = await payload.findByID({
-            collection: 'tenants',
-            id: tenantId,
-            depth: 0,
-            overrideAccess: true,
-        }).catch(() => null) as any
-        if (ownerTenant?.stripeAccountId && ownerTenant.stripeAccountId !== event.connectedAccountId) {
-            console.error(
-                `[Stripe Webhook] SECURITY: forged charge.refunded — account ${event.connectedAccountId} ≠ tenant ${tenantId} account ${ownerTenant.stripeAccountId}`,
-            )
-            return
-        }
-    }
+    const tenantId = typeof order.tenant === 'object' ? (order.tenant as any).id : order.tenant
+    if (!await verifyConnectedAccountOwnership(payload, event.connectedAccountId, tenantId, `charge.refunded order ${order.id}`)) return
 
     if (order.status === 'refunded') {
         console.log(`[Stripe Webhook] Order ${order.id} already refunded — skipping`)
@@ -67,7 +55,7 @@ export async function handleChargeRefunded(
 
     const tenant = typeof order.tenant === 'object' ? order.tenant : null
     const shopName = tenant?.name ?? 'Shop'
-    const siteSlug = tenant?.slug ?? ''
+    const siteSlug = tenant?.slug ?? String((tenant as any)?.id ?? '')
     const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
 
     const email = orderRefundedEmail({

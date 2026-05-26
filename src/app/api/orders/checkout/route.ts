@@ -357,6 +357,7 @@ export async function POST(request: Request) {
         // HttpOnly cookie so the confirm page can verify access without exposing token in URL
         res.cookies.set(`ct_${order.id}`, confirmToken, {
             httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             maxAge: 30 * 24 * 60 * 60, // 30 days
             path: '/',

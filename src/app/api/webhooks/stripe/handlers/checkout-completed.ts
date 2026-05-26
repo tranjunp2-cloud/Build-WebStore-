@@ -5,6 +5,7 @@ import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation
 import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
+import { verifyConnectedAccountOwnership } from './verify-account-ownership'
 
 /** Minimal shape of a tenant document for webhook notification logic. */
 export interface TenantDoc {
@@ -58,9 +59,8 @@ export async function handleCheckoutCompleted(
     }
     const orderIdInt = parseInt(orderId, 10)
 
-    // IDOR guard: verify the connected Stripe account that fired this webhook is the same account
-    // as the order's tenant. Prevents a connected merchant from creating a forged checkout session
-    // with client_reference_id pointing to another tenant's order and marking it as paid.
+    // IDOR guard: verify the connected Stripe account that fired this webhook owns the order's tenant.
+    // Runs before any writes — fail-closed (unknown order or missing stripeAccountId both reject).
     if (event.connectedAccountId) {
         const preCheckResult = await payload.find({
             collection: 'orders',
@@ -70,23 +70,19 @@ export async function handleCheckoutCompleted(
             overrideAccess: true,
         }).catch(() => null)
         const preCheckDoc = preCheckResult?.docs[0] as any
-        if (preCheckDoc) {
-            const ownerTenantId = typeof preCheckDoc.tenant === 'object' ? preCheckDoc.tenant.id : preCheckDoc.tenant
-            if (ownerTenantId) {
-                const ownerTenant = await payload.findByID({
-                    collection: 'tenants',
-                    id: ownerTenantId,
-                    depth: 0,
-                    overrideAccess: true,
-                }).catch(() => null) as any
-                if (ownerTenant?.stripeAccountId && ownerTenant.stripeAccountId !== event.connectedAccountId) {
-                    console.error(
-                        `[Stripe Webhook] SECURITY: forged webhook — connected account ${event.connectedAccountId} ≠ tenant ${ownerTenantId} account ${ownerTenant.stripeAccountId} for order ${orderId}`,
-                    )
-                    return
-                }
-            }
+        if (!preCheckDoc) {
+            console.warn(`[Stripe Webhook] connected-account event for unknown order ${orderIdInt} — skipping`)
+            return
         }
+        const ownerTenantId = typeof preCheckDoc.tenant === 'object' ? preCheckDoc.tenant.id : preCheckDoc.tenant
+        if (!ownerTenantId) {
+            console.warn(`[Stripe Webhook] connected-account event for order ${orderIdInt} with no tenant — skipping`)
+            return
+        }
+        const allowed = await verifyConnectedAccountOwnership(
+            payload, event.connectedAccountId, ownerTenantId, `checkout.session.completed order ${orderIdInt}`,
+        )
+        if (!allowed) return
     }
 
     // Atomic status transition: UPDATE WHERE status = 'pending' — only the first concurrent invocation wins.
@@ -103,7 +99,7 @@ export async function handleCheckoutCompleted(
     }
 
     // Verify order exists (guard against client_reference_id pointing to a deleted order)
-    const targetOrder = await payload.findByID({ collection: 'orders', id: orderId })
+    const targetOrder = await payload.findByID({ collection: 'orders', id: orderIdInt })
     if (!targetOrder) {
         console.warn(`[Stripe Webhook] Order ${orderId} not found after transition — unexpected state`)
         return
@@ -120,7 +116,7 @@ export async function handleCheckoutCompleted(
         // Record Stripe IDs (idempotent — status already set atomically above)
         await payload.update({
             collection: 'orders',
-            id: orderId,
+            id: orderIdInt,
             data: {
                 stripeSessionId,
                 // Stripe types: payment_intent is string|PaymentIntent; .id only exists on expanded object
@@ -133,10 +129,9 @@ export async function handleCheckoutCompleted(
 
         console.log(`[Stripe Webhook] Order ${orderId} marked as new`)
 
-        // Reduce stock with optimistic locking (prevents race condition)
         const order = await payload.findByID({
             collection: 'orders',
-            id: orderId,
+            id: orderIdInt,
             depth: 1,
         }) as unknown as OrderDoc | null
 
@@ -233,51 +228,21 @@ export async function handleCheckoutCompleted(
     }
 }
 
-/**
- * Decrement product inventory with error-based retry.
- * Uses Payload's native API (no raw SQL) — hooks fire normally.
- * Note: read-then-write is not atomic; concurrent webhook retries may under-decrement.
- * Retries up to maxRetries times on API/validation errors.
- */
+/** Atomically decrement product inventory — safe for concurrent webhook deliveries. */
 async function decrementStock(
     payload: Payload,
     productId: number | string,
     quantity: number,
-    maxRetries = 3,
 ) {
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-            const product = await payload.findByID({
-                collection: 'products',
-                id: productId,
-            })
-
-            const productTyped = product as unknown as { inventory?: number } | null
-            if (!productTyped || (productTyped.inventory ?? 0) <= 0) {
-                return // Out of stock or product not found
-            }
-
-            const currentInventory = productTyped.inventory ?? 0
-            const newInventory = Math.max(0, currentInventory - quantity)
-
-            await payload.update({
-                collection: 'products',
-                id: productId,
-                data: { inventory: newInventory },
-            })
-
-            console.log(
-                `[Stripe Webhook] Stock updated: product ${productId} (${currentInventory} → ${newInventory})`,
-            )
-            return // Success
-        } catch (err) {
-            if (attempt < maxRetries - 1) {
-                console.warn(
-                    `[Stripe Webhook] Stock update retry ${attempt + 1}/${maxRetries} for product ${productId}`,
-                )
-                continue // Retry with fresh read
-            }
-            console.error(`[Stripe Webhook] Failed to update stock for product ${productId}:`, err)
-        }
+    try {
+        await (payload.db.drizzle as any).execute(sql`
+            UPDATE products
+            SET inventory = GREATEST(0, inventory - ${quantity})
+            WHERE id = ${productId}
+            AND inventory IS NOT NULL
+        `)
+        console.log(`[Stripe Webhook] Stock decremented: product ${productId} -${quantity}`)
+    } catch (err) {
+        console.error(`[Stripe Webhook] Failed to update stock for product ${productId}:`, err)
     }
 }
