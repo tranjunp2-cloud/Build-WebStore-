@@ -46,14 +46,15 @@ function ContactSection({ showBlob = true, compact = false, children }: ContactS
 type ContactHeaderProps = {
     headline?: string
     subtext?: string
+    sectionLabel?: string
     className?: string
 }
 
 /** Section header: SectionLabel + h2 + subtext. Used 5 times. */
-function ContactHeader({ headline, subtext, className = 'text-center max-w-2xl mx-auto mb-16' }: ContactHeaderProps) {
+function ContactHeader({ headline, subtext, sectionLabel = 'Contact', className = 'text-center max-w-2xl mx-auto mb-16' }: ContactHeaderProps) {
     return (
         <div className={className}>
-            <SectionLabel color={CSS_VARS.primary}>Contact</SectionLabel>
+            <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>
             <Heading level={2} className="mb-4">
                 {headline || 'Contact Us'}
             </Heading>
@@ -321,7 +322,7 @@ function SubmitButton({ label = 'Send Message →', isSubmitting = false }: { la
 
 export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) {
     const mergedBlock = mergeContactInfoWithSite(block, site?.contactInfo)
-    const { headline, subtext, email, phone, address, formFields = [], variant = 'form', submitLabel, phoneLabel = 'Phone', addressLabel = 'Address', emailLabel = 'Email' } = mergedBlock
+    const { headline, subtext, sectionLabel, email, phone, address, formFields = [], variant = 'form', submitLabel, phoneLabel = 'Phone', addressLabel = 'Address', emailLabel = 'Email' } = mergedBlock
     const siteId = site?.id ? String(site.id) : undefined
 
     // ── Card Float variant ────────────────────────────────────────────────
@@ -333,7 +334,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                     style={{ background: `linear-gradient(180deg, rgba(var(--brand-primary-rgb), 0.05), transparent)` }}
                 />
                 <SectionWrapper as="div" padding="default" container="default" background="transparent" innerClassName="relative z-10">
-                    <ContactHeader headline={headline} subtext={subtext} className="text-center max-w-2xl mx-auto mb-10" />
+                    <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} className="text-center max-w-2xl mx-auto mb-10" />
 
                     {/* Plan 260415 contact-bugfix — Floating card dùng theme surface
                         thay vì hardcode bg-white/dark:bg-zinc-900. Dark theme + brand
@@ -394,7 +395,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     if (variant === 'map-split') {
         return (
             <ContactSection>
-                <ContactHeader headline={headline} subtext={subtext} />
+                <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} />
 
                 {/* Plan 260415 — drop inner max-w-5xl; outer CONTACT_CONTAINER already caps at max-w-6xl. */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
@@ -482,7 +483,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     if (variant === 'info-only') {
         return (
             <ContactSection>
-                <ContactHeader headline={headline} subtext={subtext} />
+                <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
                     {email && <ContactInfoCard icon={Mail} label={emailLabel} value={email} type="email" layout="center" iconBoxSize="lg" />}
                     {phone && <ContactInfoCard icon={Phone} label={phoneLabel} value={phone} type="phone" layout="center" iconBoxSize="lg" />}
@@ -496,7 +497,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     if (variant === 'split') {
         return (
             <ContactSection>
-                <ContactHeader headline={headline} subtext={subtext} />
+                <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} />
                 {/* Plan 260415 — drop inner max-w-5xl; outer CONTACT_CONTAINER already caps at max-w-6xl. */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
                     {/* Form */}
@@ -522,7 +523,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     const hasContactInfo = !!(email || phone || address)
     return (
         <ContactSection>
-            <ContactHeader headline={headline} subtext={subtext} />
+            <ContactHeader headline={headline} subtext={subtext} sectionLabel={sectionLabel} />
             {hasContactInfo ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                     {/* Contact Info */}
