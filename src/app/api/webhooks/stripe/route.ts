@@ -223,7 +223,7 @@ async function handleCheckoutCompleted(
         const tenantTyped = tenantDoc as unknown as TenantDoc | null
         const shopName = tenantTyped?.name ?? ''
         const siteSlug = tenantTyped?.slug ?? ''
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.orderNumber}`
         const dashboardOrderUrl = `${baseUrl}/orders`
         // site.locale is constrained to 'en'|'ms' by the Sites collection; cast is safe

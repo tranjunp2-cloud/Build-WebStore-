@@ -40,7 +40,7 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
             const siteSlug = (tenantObj as any)?.slug ?? ''
             const shopName = (tenantObj as any)?.name ?? siteSlug
             const siteLocale = (siteObj as any)?.locale ?? 'ms'
-            const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+            const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
             const reorderUrl = siteSlug ? `${baseUrl}/sites/${siteSlug}/products` : `${baseUrl}/`
 
             const cancellationDate = new Date().toISOString()

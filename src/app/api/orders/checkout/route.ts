@@ -237,7 +237,7 @@ export async function POST(request: Request) {
         const tenantForSlug = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true })
         const shopName = (tenantForSlug as any)?.name ?? ''
         const siteSlug = (tenantForSlug as any)?.slug ?? String(siteId)
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
+        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? ''
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}`
         const dashboardOrderUrl = `${baseUrl}/orders`
         const siteLocale = (site as any).locale ?? 'ms'
