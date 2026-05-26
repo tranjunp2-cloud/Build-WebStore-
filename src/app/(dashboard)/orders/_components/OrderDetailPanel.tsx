@@ -731,6 +731,25 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
         }
     }
 
+    const handleRefund = async () => {
+        setIsLoading(true)
+        try {
+            const res = await fetch(`/api/orders/${id}/refund`, { method: 'POST' })
+            if (!res.ok) {
+                const data = await res.json()
+                console.error('Failed to refund order:', data.error)
+                throw new Error('API_ERROR')
+            }
+            toast.success(t.dashboard.orders.toast.updated)
+            onUpdate()
+        } catch (error: unknown) {
+            console.error('Refund order error:', error)
+            toast.error(t.dashboard.orders.toast.updateFailed)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
     const handleCancel = async (reason: string) => {
         setIsLoading(true)
         try {
@@ -799,7 +818,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const cancelDisabled = isLoading || isTerminal || !['pending', 'confirmed', 'paid', 'processing'].includes(status)
-                    const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
+                    const refundDisabled = isLoading || !['new', 'paid', 'confirmed', 'ready_to_ship', 'shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
                             {/* Cancel Order Button */}
@@ -828,7 +847,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
 
                             {/* Refund Button */}
                             <button
-                                onClick={() => handleAction('refunded')}
+                                onClick={handleRefund}
                                 disabled={refundDisabled}
                                 className={`flex-1 flex items-center justify-center gap-2 font-bold transition-opacity ${refundDisabled ? 'cursor-not-allowed opacity-30' : 'hover:opacity-80'}`}
                                 style={{
