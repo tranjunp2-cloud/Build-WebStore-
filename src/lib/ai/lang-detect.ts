@@ -29,6 +29,18 @@ export interface DetectedLanguage {
 // Vietnamese-exclusive diacritical marks — not shared with French/Spanish/Portuguese.
 const VI_DIACRITICS_RE = /[ăđơưắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/
 
+// Non-Latin script ranges — single character is enough (script is unambiguous).
+// Japanese: hiragana (3040-309F) or katakana (30A0-30FF) — uniquely Japanese, not shared with Chinese.
+const JAPANESE_RE = /[぀-ヿ]/
+// Korean: Hangul syllables — uniquely Korean.
+const KOREAN_RE = /[가-힣]/
+// Arabic script.
+const ARABIC_RE = /[؀-ۿ]/
+// Thai script.
+const THAI_RE = /[฀-๿]/
+// CJK Unified Ideographs (Chinese/Japanese shared) — used as Chinese fallback when no kana present.
+const CJK_RE = /[一-鿿豈-﫿]/
+
 // Unambiguous Malay business nouns — 1 match is enough.
 const MALAY_HIGH_PRECISION = new Set([
     'kedai', 'warung', 'restoran', 'klinik', 'syarikat', 'perniagaan', 'butik',
@@ -200,6 +212,25 @@ export function detectLanguage(text: string): DetectedLanguage {
     // Vietnamese: exclusive diacritical marks (zero false-positives)
     if (VI_DIACRITICS_RE.test(text)) {
         return { contentLang: 'vi', gpLang: 'Vietnamese', blockLang: 'vi' }
+    }
+
+    // Non-Latin script fast paths — single character is definitive.
+    // Checked before franc because franc needs long text to reliably detect these.
+    if (JAPANESE_RE.test(text)) {
+        return { contentLang: 'en', gpLang: 'Japanese', blockLang: 'ja' }
+    }
+    if (KOREAN_RE.test(text)) {
+        return { contentLang: 'en', gpLang: 'Korean', blockLang: 'ko' }
+    }
+    if (ARABIC_RE.test(text)) {
+        return { contentLang: 'en', gpLang: 'Arabic', blockLang: 'ar' }
+    }
+    if (THAI_RE.test(text)) {
+        return { contentLang: 'en', gpLang: 'Thai', blockLang: 'th' }
+    }
+    // CJK without kana → treat as Chinese (Mandarin)
+    if (CJK_RE.test(text)) {
+        return { contentLang: 'en', gpLang: 'Chinese (Mandarin)', blockLang: 'zh' }
     }
 
     const lower = text.toLowerCase()
