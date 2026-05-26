@@ -192,6 +192,14 @@ export function buildBlockFromLibrary(
     category: string,
     ctx: InjectionContext = {},
 ): Block | null {
+    // Content-heavy blocks (testimonials, features, faq) use English-only library
+    // data. For non-English sites, returning null tells the structure-enforcer to
+    // skip injection — GPT should provide these blocks in the target language.
+    // Structural blocks (nav, footer, hero, contact, about, cta) are still injected.
+    if (ctx.language && ctx.language !== 'en' && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)) {
+        return null
+    }
+
     // Fallback to 'business' category content when category is unknown — ensures
     // gap-filler can still inject generic blocks for long-tail industries.
     const content = getCategoryContent(category) ?? getCategoryContent('business')
