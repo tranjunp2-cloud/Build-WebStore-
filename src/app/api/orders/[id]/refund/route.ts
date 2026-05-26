@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { withAuth } from '@/lib/auth'
 import { getStripeClient } from '@/lib/payment/stripe'
 import { orderRefundedEmail } from '@/lib/email/templates/order-refunded'
+import type { User } from 'payload'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -14,18 +16,9 @@ type RouteContext = { params: Promise<{ id: string }> }
  *
  * Returns: { success, data: { refundId } }
  */
-export async function POST(request: NextRequest, ctx: RouteContext) {
+export const POST = withAuth<RouteContext>(async (user: User, request: Request, ctx: RouteContext) => {
     const { id } = await ctx.params
     const payload = await getPayload({ config })
-
-    // Auth: require dashboard session
-    const { user } = await payload.auth({ headers: request.headers })
-    if (!user) {
-        return NextResponse.json(
-            { success: false, error: { code: 'UNAUTHORIZED' } },
-            { status: 401 },
-        )
-    }
 
     // Fetch order with tenant expanded (depth: 1)
     let order: any
@@ -42,7 +35,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     }
 
     // IDOR: verify the order belongs to the requesting user's tenant
-    const userTenantIds: (string | number)[] = (user.tenants ?? []).map((t: any) =>
+    const userTenantIds: (string | number)[] = ((user as any).tenants ?? []).map((t: any) =>
         typeof t.tenant === 'object' ? t.tenant.id : t.tenant,
     )
     const orderTenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
@@ -71,23 +64,48 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
         )
     }
 
-    const stripePaymentIntentId = order.stripePaymentIntentId
-    if (!stripePaymentIntentId) {
-        return NextResponse.json(
-            {
-                success: false,
-                error: { code: 'NO_PAYMENT_INTENT', message: 'No Stripe payment found for this order' },
-            },
-            { status: 400 },
-        )
-    }
-
     // Resolve merchant's connected Stripe account
     const stripeAccountId =
         typeof order.tenant === 'object' ? order.tenant.stripeAccountId : undefined
     if (!stripeAccountId) {
         return NextResponse.json(
             { success: false, error: { code: 'PAYMENT_NOT_CONFIGURED' } },
+            { status: 400 },
+        )
+    }
+
+    let stripePaymentIntentId: string | undefined = order.stripePaymentIntentId
+
+    // If payment intent not cached (e.g. webhook didn't fire yet), fetch it from Stripe via session
+    if (!stripePaymentIntentId && order.stripeSessionId) {
+        try {
+            const stripe = getStripeClient()
+            const session = await stripe.checkout.sessions.retrieve(
+                order.stripeSessionId,
+                { expand: ['payment_intent'] },
+                { stripeAccount: stripeAccountId },
+            )
+            const pi = session.payment_intent
+            stripePaymentIntentId = typeof pi === 'string' ? pi : (pi as any)?.id
+            if (stripePaymentIntentId) {
+                // Backfill so future calls don't need to fetch again
+                await payload.update({
+                    collection: 'orders',
+                    id,
+                    data: { stripePaymentIntentId } as any,
+                })
+            }
+        } catch (err: any) {
+            console.error('[Refund] Failed to retrieve Stripe session:', err.message)
+        }
+    }
+
+    if (!stripePaymentIntentId) {
+        return NextResponse.json(
+            {
+                success: false,
+                error: { code: 'NO_PAYMENT_INTENT', message: 'No Stripe payment found for this order' },
+            },
             { status: 400 },
         )
     }
@@ -150,4 +168,4 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
             { status: 502 },
         )
     }
-}
+})

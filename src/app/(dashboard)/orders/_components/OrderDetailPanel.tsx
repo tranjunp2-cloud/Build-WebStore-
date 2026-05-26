@@ -12,7 +12,7 @@ import { ManualPaymentVerificationBlock } from './ManualPaymentVerificationBlock
 // ───────── ORDER DETAIL PANEL — Node 31155:10172 ─────────
 //
 // ─── TYPES & MOCKS ───
-export type OrderStatus = 'pending' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+export type OrderStatus = 'pending' | 'new' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
 
 export interface OrderDetail {
     id: string | number
@@ -311,11 +311,12 @@ function OrderProgress({ status }: { status: OrderStatus }) {
     const STEPS = getProgressSteps(progressLabels)
     const STATUS_TO_STEP: Record<OrderStatus, number> = {
         pending: 0,
+        new: 0,    // Stripe paid, awaiting merchant confirmation — same step as pending
         confirmed: 1,
         ready_to_ship: 2,
         shipped: 3,
         completed: 4,
-        cancelled: -1, // No progress if cancelled
+        cancelled: -1,
         refunded: -1,
         paid: 1,
         payment_failed: -1,
@@ -817,7 +818,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {/* Bottom Row — layout_BH1FFS: row, gap 12px */}
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
-                    const cancelDisabled = isLoading || isTerminal || !['pending', 'confirmed', 'paid', 'processing'].includes(status)
+                    const cancelDisabled = isLoading || isTerminal || !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
                     const refundDisabled = isLoading || !['new', 'paid', 'confirmed', 'ready_to_ship', 'shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
