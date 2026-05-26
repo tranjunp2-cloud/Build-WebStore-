@@ -173,6 +173,18 @@ export const SWAPPABLE_BLOCKS: ReadonlySet<string> = new Set([
     'cta',
 ])
 
+/**
+ * Content-heavy blocks where item copy (testimonial quotes, feature
+ * titles/descriptions, FAQ Q&A) should come from GPT for non-English sites.
+ * The English-only library would discard GPT's language-specific output.
+ * Structural strings are still patched by the i18n normalize chain.
+ */
+export const GPT_CONTENT_BLOCKS: ReadonlySet<string> = new Set([
+    'testimonials',
+    'features',
+    'faq',
+])
+
 /** One telemetry entry emitted per swap decision (swap OR skip-with-reason). */
 export interface SwapTelemetry {
     blockType: string
@@ -250,10 +262,13 @@ export function postAISwapStep(
         }
 
         // Guard 1b: dynamic language trust — for non-English generation, GPT
-        // already wrote content in the user's language. Swapping with a library
-        // block would throw away that contextual content. Structural strings
-        // (headline, subheadline) are patched by the i18n normalize chain below.
-        if (language && language !== 'en' && bt === 'testimonials') {
+        // already wrote content in the user's language. Swapping with an English
+        // library block would discard GPT's language-specific copy. Structural
+        // strings (headline, subheadline, sectionLabel) are patched by the i18n
+        // normalize chain below regardless.
+        // Covers content-heavy blocks where item copy (quotes, feature titles,
+        // FAQ Q&A) must come from GPT, not the English-only library.
+        if (language && language !== 'en' && GPT_CONTENT_BLOCKS.has(bt)) {
             telemetry.push({ blockType: bt, action: 'kept-lang-dynamic', reason: `lang:${language}` })
             return block
         }
