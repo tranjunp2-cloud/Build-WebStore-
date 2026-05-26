@@ -412,8 +412,11 @@ export default function OrderTrackingClient({ order, slug }: Props) {
 
         const url = `/api/orders/stream/${order.orderNumber}?slug=${encodeURIComponent(slug)}`
         const es = new EventSource(url)
+        let errorCount = 0
+        const MAX_ERRORS = 5
 
         es.onmessage = (e) => {
+            errorCount = 0
             try {
                 const data = JSON.parse(e.data)
                 if (data.status !== statusRef.current) {
@@ -432,8 +435,10 @@ export default function OrderTrackingClient({ order, slug }: Props) {
         }
 
         es.onerror = () => {
-            // Close on terminal — EventSource auto-reconnects otherwise
-            if (TERMINAL_STATUSES.has(statusRef.current)) es.close()
+            if (TERMINAL_STATUSES.has(statusRef.current)) { es.close(); return }
+            // Stop reconnecting after repeated failures (e.g. persistent 404/500)
+            errorCount++
+            if (errorCount >= MAX_ERRORS) es.close()
         }
 
         return () => es.close()

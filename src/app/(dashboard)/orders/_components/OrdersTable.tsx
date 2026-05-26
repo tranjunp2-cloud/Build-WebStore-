@@ -477,12 +477,11 @@ export function OrdersTable({
                 if (!data.success || !data.docs) return
 
                 const incoming: Order[] = data.docs
-                setOrders((prev) => {
-                    const existingIds = new Set(prev.map((o) => o.id))
-                    const fresh = incoming.filter((o) => !existingIds.has(o.id))
-                    if (fresh.length === 0) return prev
-                    // Highlight new rows then fade out after 4s
+                const existingIds = new Set(orders.map((o) => o.id))
+                const fresh = incoming.filter((o) => !existingIds.has(o.id))
+                if (fresh.length > 0) {
                     const freshIds = new Set(fresh.map((o) => o.id))
+                    setOrders((prev) => [...fresh, ...prev])
                     setNewOrderIds((prev) => new Set([...prev, ...freshIds]))
                     setTimeout(() => {
                         setNewOrderIds((cur) => {
@@ -491,8 +490,7 @@ export function OrdersTable({
                             return next
                         })
                     }, 4000)
-                    return [...fresh, ...prev]
-                })
+                }
                 setTotalPages(data.totalPages || 1)
                 if (onOrdersLoaded) onOrdersLoaded(incoming)
             } catch (err) {

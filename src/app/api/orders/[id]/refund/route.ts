@@ -114,7 +114,7 @@ export const POST = withAuth<RouteContext>(async (user: User, request: Request, 
         const stripe = getStripeClient()
         const refund = await stripe.refunds.create(
             { payment_intent: stripePaymentIntentId },
-            { stripeAccount: stripeAccountId },
+            { stripeAccount: stripeAccountId, idempotencyKey: `refund-${id}` },
         )
 
         await payload.update({

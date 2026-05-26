@@ -147,8 +147,9 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const isCod = order.paymentMethod === 'cod'
     const isStripe = !isBT && !isCod
     const isPaid = order.paymentStatus === 'paid'
-    // Order is "done" from the confirm page POV: BT approved, Stripe charged, or COD placed
-    const isOrderSuccess = isPaid || isCod || isStripe
+    // Order is "done" from the confirm page POV: payment confirmed or COD placed.
+    // Stripe without isPaid means webhook hasn't fired yet — don't clear token prematurely.
+    const isOrderSuccess = isPaid || isCod
     const isSubmitted = isBT && uploadStatus === 'success' && !isPaid
     const addr = order.shippingAddress
     const addrLine = [addr?.city, addr?.state, addr?.postcode].filter(Boolean).join(', ')

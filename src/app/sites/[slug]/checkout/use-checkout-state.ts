@@ -244,7 +244,7 @@ export function useCheckoutState({
 
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
-        form.city && form.postcode && items.length > 0 &&
+        form.line1.trim() && form.city && form.postcode && items.length > 0 &&
         (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe')
     )
 

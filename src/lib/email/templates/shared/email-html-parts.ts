@@ -237,10 +237,11 @@ export function buildPaymentMetaBlock(
 }
 
 export function buildCtaBlock(href: string, ctaText: string): string {
+    const safeHref = href.replace(/&/g, '&amp;')
     return `
       <!-- CTA -->
       <tr><td align="center" style="padding:26px 40px 14px;">
-        <a href="${href}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${ctaText}</a>
+        <a href="${safeHref}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${ctaText}</a>
       </td></tr>`
 }
 
