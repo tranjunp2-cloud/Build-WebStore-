@@ -75,10 +75,11 @@ export async function handleAccountUpdated(
     }
 
     const tenantUpdateData: Record<string, unknown> = { stripeOnboardingComplete: isOnboardingComplete }
-    // Mirror handleAccountDeauthorized: disable card/FPX if Stripe revokes charges_enabled
-    if (!isOnboardingComplete) {
-        tenantUpdateData.payments = { payment_card: false, payment_fpx: false }
-    }
+    // Sync payment flags with Stripe's charges_enabled state.
+    // Re-enable when Stripe recovers from a KYC interrupt to unblock the merchant's storefront.
+    tenantUpdateData.payments = isOnboardingComplete
+        ? { payment_card: true, payment_fpx: true }
+        : { payment_card: false, payment_fpx: false }
 
     await payload.update({
         collection: 'tenants',

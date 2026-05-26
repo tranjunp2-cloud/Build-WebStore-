@@ -18,13 +18,13 @@ export const stripeCheckoutSchema = z.object({
         email: z.string().email(),
         phone: z.string().max(30).optional(),
         address: z.object({
-            line1: z.string().optional(),
+            line1: z.string().trim().min(1, 'Address line 1 is required'),
             line2: z.string().optional(),
             city: z.string().optional(),
             state: z.string().optional(),
             postcode: z.string().optional(),
             country: z.string().optional(),
-        }).optional(),
+        }),
     }),
 })
 
@@ -41,13 +41,13 @@ export const orderCreateSchema = z.object({
         email: z.string().email(),
         phone: z.string().optional(),
         address: z.object({
-            line1: z.string().optional(),
+            line1: z.string().trim().min(1, 'Address line 1 is required'),
             line2: z.string().optional(),
             city: z.string().optional(),
             state: z.enum([...MY_STATES]).optional(),
             postcode: z.string().optional(),
             country: z.string().optional(),
-        }).optional(),
+        }),
     }),
     paymentMethod: z.enum(['cod', 'bank_transfer']),
     paymentProofImage: z.string().optional(),

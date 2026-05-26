@@ -477,12 +477,20 @@ export function OrdersTable({
                 if (!data.success || !data.docs) return
 
                 const incoming: Order[] = data.docs
-                const existingIds = new Set(orders.map((o) => o.id))
-                const fresh = incoming.filter((o) => !existingIds.has(o.id))
-                if (fresh.length > 0) {
-                    const freshIds = new Set(fresh.map((o) => o.id))
-                    setOrders((prev) => [...fresh, ...prev])
-                    setNewOrderIds((prev) => new Set([...prev, ...freshIds]))
+                // Use a captured variable to read computed fresh IDs after the updater runs.
+                // This avoids both stale closure (functional form reads fresh prev) and
+                // side-effect-in-updater (setNewOrderIds called outside, once, not in updater).
+                let capturedFreshIds: Set<string> | null = null
+                setOrders((prev) => {
+                    const existingIds = new Set(prev.map((o) => o.id))
+                    const fresh = incoming.filter((o) => !existingIds.has(o.id))
+                    if (fresh.length === 0) return prev
+                    capturedFreshIds = new Set(fresh.map((o) => o.id))
+                    return [...fresh, ...prev]
+                })
+                if (capturedFreshIds) {
+                    const freshIds = capturedFreshIds as Set<string>
+                    setNewOrderIds((cur) => new Set([...cur, ...freshIds]))
                     setTimeout(() => {
                         setNewOrderIds((cur) => {
                             const next = new Set(cur)

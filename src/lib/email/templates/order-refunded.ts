@@ -195,7 +195,7 @@ export function orderRefundedEmail(data: OrderRefundedData): { subject: string; 
 
       <!-- CTA -->
       <tr><td align="center" style="padding:26px 40px 14px;">
-        <a href="${data.shopUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tR.cta}</a>
+        <a href="${esc(data.shopUrl)}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tR.cta}</a>
       </td></tr>
 
       <tr><td align="center" style="padding:10px 40px 6px;">

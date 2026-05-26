@@ -50,7 +50,7 @@ export async function handleChargeRefunded(
 
     const tenant = typeof order.tenant === 'object' ? order.tenant : null
     const shopName = tenant?.name ?? 'Shop'
-    const siteSlug = tenant?.siteSlug ?? ''
+    const siteSlug = tenant?.slug ?? ''
     const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
 
     const email = orderRefundedEmail({
