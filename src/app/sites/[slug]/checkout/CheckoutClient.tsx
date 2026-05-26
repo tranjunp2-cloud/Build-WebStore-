@@ -355,7 +355,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             <div className="ck-empty">
                 <ShoppingBag size={48} />
                 <h2>{ck.cartEmpty}</h2>
-                <Link href={`/sites/${slug}/products`}>{ck.browseProducts}</Link>
+                <Link href={`/sites/${slug}`}>{ck.browseProducts}</Link>
                 <style>{`
                   .ck-empty{font-family:var(--bf);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px;background:#eff1f3;}
                   .ck-empty svg{opacity:.2;}
@@ -409,7 +409,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
 
                 {/* ── Header ───────────────────────────────── */}
                 <header className="ck-hd">
-                    <Link href={`/sites/${slug}/products`} className="ck-back">
+                    <Link href={`/sites/${slug}`} className="ck-back">
                         <ArrowLeft size={16} />
                     </Link>
                     <h1 className="ck-h1">Checkout</h1>
