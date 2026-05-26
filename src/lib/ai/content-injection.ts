@@ -622,6 +622,13 @@ export function buildBlockFromLibrary(
  * start offset rotates per-business; same-category gens no longer converge on
  * the same first 4 testimonials.
  */
+/**
+ * Block types where item copy (quotes, Q&A, feature titles) must come from GPT
+ * for non-English sites. Library content is English-only — padding these blocks
+ * with library items corrupts language consistency.
+ */
+const CONTENT_BLOCKS_NO_ENGLISH_PAD = new Set(['testimonials', 'faq', 'features'])
+
 export function padItems(
     blockType: string,
     existing: readonly unknown[],
@@ -630,6 +637,14 @@ export function padItems(
     ctx: InjectionContext = {},
 ): unknown[] {
     if (existing.length >= minCount) return [...existing]
+
+    // For non-English sites, skip library padding for content-heavy blocks.
+    // GPT has already generated items in the target language; adding English
+    // library items would produce mixed-language output (e.g. 3 Vietnamese
+    // FAQ + 2 English FAQ). Return GPT's items as-is even if below minCount.
+    if (ctx.language && ctx.language !== 'en' && CONTENT_BLOCKS_NO_ENGLISH_PAD.has(blockType)) {
+        return [...existing]
+    }
 
     const content = getCategoryContent(category)
     const result: unknown[] = [...existing]
