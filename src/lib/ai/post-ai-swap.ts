@@ -122,6 +122,18 @@ function normalizeAboutSectionLabel(
     })
 }
 
+/** Patch contact block sectionLabel — GPT defaults to English "Contact" even for non-English sites. */
+function normalizeContactSectionLabel(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const i18n = getBlockStrings(language)
+    return blocks.map((block) => {
+        if (block.blockType !== 'contact') return block
+        return { ...block, sectionLabel: i18n.navigation.contact }
+    })
+}
+
 /**
  * Patch features headline on ALL features blocks regardless of swap status.
  * Needed because non-generic GPT features are kept (not swapped) but still
@@ -308,7 +320,8 @@ export function postAISwapStep(
     const logos = normalizeClientLogosHeadline(contact, language)
     const features = normalizeFeaturesHeadline(logos, language, biz.name)
     const testimonials = normalizeTestimonialsSubheadline(features, language)
-    const final = normalizeAboutSectionLabel(testimonials, language)
+    const about = normalizeAboutSectionLabel(testimonials, language)
+    const final = normalizeContactSectionLabel(about, language)
     return { blocks: final, telemetry }
 }
 

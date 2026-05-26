@@ -504,6 +504,7 @@ function buildContact(biz: BusinessSample, language?: string): Record<string, un
     variant: 'split',
     headline: i18n.contact.headline,
     subtext: i18n.contact.subheadlineWithBiz(biz.name),
+    sectionLabel: i18n.navigation.contact,
     email: biz.email,
     phone: biz.phone,
     address: biz.address,
