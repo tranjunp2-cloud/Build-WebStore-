@@ -39,13 +39,15 @@ export interface OrderConfirmationData {
     discountCode?: string | null
     shippingFee: number
     total: number
-    /** 'cod' = pay on delivery | 'stripe' = paid online */
-    paymentMethod: 'cod' | 'stripe'
+    /** 'cod' = pay on delivery | 'stripe' = paid online | 'bank_transfer' = manual bank transfer */
+    paymentMethod: 'cod' | 'stripe' | 'bank_transfer'
     shippingProvider?: string | null
     orderDate: string
     orderPageUrl: string
     currency: string
     buyerNote?: string | null
+    /** 'placed' = initial order creation | 'confirmed' = seller confirmed | 'completed' = order delivered */
+    event?: 'placed' | 'confirmed' | 'completed'
     locale?: EmailLocale
 }
 
@@ -86,11 +88,20 @@ export function orderConfirmationEmail(
 ): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
     const t = (locales[locale] ?? locales.ms).order
+    const isConfirmed = data.event === 'confirmed'
+    const isCompleted = data.event === 'completed'
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
 
-    const prepaid = data.paymentMethod === 'stripe' ? data.total : 0
+    const bodyText = isConfirmed ? (t as any).bodyConfirmed
+        : isCompleted ? (t as any).bodyCompleted
+        : t.body
+    const statusLabel = isConfirmed ? (t as any).orderStatusConfirmed
+        : isCompleted ? (t as any).orderStatusCompleted
+        : t.orderStatusSuccess
+
+    const prepaid = (data.paymentMethod === 'stripe' || data.paymentMethod === 'bank_transfer') ? data.total : 0
     const cod = data.paymentMethod === 'cod' ? data.total : 0
 
     const itemRows = data.items.map((item) => `
@@ -124,9 +135,17 @@ export function orderConfirmationEmail(
             <td colspan="3" style="padding:6px 0;color:#94A3B8;">${esc(data.buyerNote)}</td>
         </tr>` : ''
 
-    const subject = locale === 'ms'
-        ? `${esc(data.shopName)} - Anda telah berjaya membuat pesanan - ${esc(data.orderNumber)}`
-        : `${esc(data.shopName)} - Your order has been placed - ${esc(data.orderNumber)}`
+    const subject = isConfirmed
+        ? (locale === 'ms'
+            ? `${esc(data.shopName)} - Pesanan anda telah disahkan - ${esc(data.orderNumber)}`
+            : `${esc(data.shopName)} - Your order has been confirmed - ${esc(data.orderNumber)}`)
+        : isCompleted
+        ? (locale === 'ms'
+            ? `${esc(data.shopName)} - Pesanan anda telah selesai - ${esc(data.orderNumber)}`
+            : `${esc(data.shopName)} - Your order has been completed - ${esc(data.orderNumber)}`)
+        : (locale === 'ms'
+            ? `${esc(data.shopName)} - Anda telah berjaya membuat pesanan - ${esc(data.orderNumber)}`
+            : `${esc(data.shopName)} - Your order has been placed - ${esc(data.orderNumber)}`)
 
     return {
         subject,
@@ -169,7 +188,7 @@ export function orderConfirmationEmail(
         <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting} ${esc(data.customerName)},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
-        <div style="font-size:14px;line-height:22px;color:#475569;">${t.body}</div>
+        <div style="font-size:14px;line-height:22px;color:#475569;">${bodyText}</div>
       </td></tr>
 
       <!-- Recipient info -->
@@ -207,7 +226,7 @@ export function orderConfirmationEmail(
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
           <tr>
             <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderStatus}</td>
-            <td style="padding:8px 16px 8px 0;color:#10B981;vertical-align:top;font-weight:600;">${t.orderStatusSuccess}</td>
+            <td style="padding:8px 16px 8px 0;color:#10B981;vertical-align:top;font-weight:600;">${statusLabel}</td>
             <td width="120" style="padding:8px 0;color:#0F172A;font-weight:500;vertical-align:top;">${t.orderDate}</td>
             <td style="padding:8px 16px 8px 0;color:#0F172A;vertical-align:top;font-weight:600;">${formatDate(data.orderDate, locale)}</td>
           </tr>
@@ -258,7 +277,7 @@ export function orderConfirmationEmail(
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;line-height:22px;">
           <tr>
             <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.paymentMethod}</td>
-            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${data.paymentMethod === 'cod' ? (locale === 'ms' ? 'COD' : 'COD') : (locale === 'ms' ? 'Kad / FPX' : 'Card / FPX')}</td>
+            <td style="padding:6px 14px 6px 0;color:#94A3B8;">${data.paymentMethod === 'cod' ? 'COD' : data.paymentMethod === 'bank_transfer' ? (locale === 'ms' ? 'Pindahan Bank' : 'Bank Transfer') : (locale === 'ms' ? 'Kad / FPX' : 'Card / FPX')}</td>
             <td width="170" style="padding:6px 0;color:#0F172A;font-weight:500;">${t.buyerNote}</td>
             <td align="right" style="padding:6px 0;color:#94A3B8;">${data.buyerNote ? esc(data.buyerNote) : '—'}</td>
           </tr>

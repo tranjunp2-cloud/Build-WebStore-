@@ -5,6 +5,7 @@ const mockFind = vi.fn()
 const mockUpdate = vi.fn()
 const mockFindByID = vi.fn()
 const mockCreate = vi.fn()
+const mockDrizzleExecute = vi.fn()
 
 vi.mock('payload', () => ({
     getPayload: vi.fn(() => Promise.resolve({
@@ -12,6 +13,7 @@ vi.mock('payload', () => ({
         update: mockUpdate,
         findByID: mockFindByID,
         create: mockCreate,
+        db: { drizzle: { execute: mockDrizzleExecute } },
     })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -45,6 +47,8 @@ function createRequest(body: string, signature?: string) {
 describe('POST /api/webhooks/stripe [TC-F13]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        // Default: atomic SQL transition succeeds (1 row updated = order was pending → now new)
+        mockDrizzleExecute.mockResolvedValue({ rows: [{ id: 1 }] })
     })
 
     // TC-F13.90 / TC-F13.32: Missing signature → 400 (mandatory, no bypass)
@@ -66,11 +70,11 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_1', client_reference_id: 'order-1' },
+            data: { id: 'sess_1', client_reference_id: '1' },
         })
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
-        mockFindByID.mockResolvedValue({ id: 'order-1', items: [], customerEmail: 'test@test.com', orderNumber: 'ORD-001' })
+        mockFindByID.mockResolvedValue({ id: '1', items: [], customerEmail: 'test@test.com', orderNumber: 'ORD-001' })
 
         const res = await POST(createRequest('{}', 'sig_valid'))
         expect(res.status).toBe(200)
@@ -135,22 +139,23 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_err', client_reference_id: 'order-err' },
+            data: { id: 'sess_err', client_reference_id: '102' },
         })
-        mockFind.mockRejectedValue(new Error('DB error'))
+        // Simulate DB error after atomic SQL succeeds — findByID throws
+        mockFindByID.mockRejectedValueOnce(new Error('DB error'))
 
         const res = await POST(createRequest('{}', 'sig_valid'))
         expect(res.status).toBe(200) // TC-F13.136: reconcile pending — 200 vs 500 decision
     })
 
-    it('[TC-F13.34] skips already processed orders (idempotency) — status=new guard', async () => {
+    it('[TC-F13.34] skips already processed orders (idempotency) — atomic SQL returns 0 rows', async () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_dup', client_reference_id: 'order-dup' },
+            data: { id: 'sess_dup', client_reference_id: '103' },
         })
-        // Webhook queries WHERE stripeSessionId=X AND status='new' — returns doc means already processed
-        mockFind.mockResolvedValue({ docs: [{ id: 'order-dup', status: 'new' }] })
+        // Atomic SQL transition returns 0 rows — order was already processed by another invocation
+        mockDrizzleExecute.mockResolvedValueOnce({ rows: [] })
 
         const res = await POST(createRequest('{}', 'sig_valid'))
         expect(res.status).toBe(200)
@@ -166,7 +171,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
             type: 'payment_success',
             data: {
                 id: 'sess_fpx_123',
-                client_reference_id: 'order-fpx',
+                client_reference_id: '201',
                 payment_method_types: ['fpx'],
                 payment_intent: 'pi_fpx_456',
             },
@@ -174,7 +179,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockFind.mockResolvedValue({ docs: [] }) // Not already processed
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-fpx',
+            id: '201',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-FPX-001',
@@ -186,14 +191,14 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
 
         // Assert
         expect(res.status).toBe(200)
-        // First update call should set paymentMethod to 'fpx'
+        // Atomic SQL sets status; payload.update persists Stripe IDs + paymentMethod
+        expect(mockDrizzleExecute).toHaveBeenCalled()
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: 'order-fpx',
+                id: '201',
                 data: expect.objectContaining({
                     paymentMethod: 'fpx',
-                    status: 'new',
                 }),
             }),
         )
@@ -207,7 +212,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
             type: 'payment_success',
             data: {
                 id: 'sess_card_123',
-                client_reference_id: 'order-card',
+                client_reference_id: '202',
                 payment_method_types: ['card'],
                 payment_intent: 'pi_card_456',
             },
@@ -215,7 +220,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-card',
+            id: '202',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-CARD-001',
@@ -227,14 +232,14 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
 
         // Assert
         expect(res.status).toBe(200)
-        // Update should set paymentMethod to 'card'
+        // Atomic SQL sets status; payload.update persists Stripe IDs + paymentMethod
+        expect(mockDrizzleExecute).toHaveBeenCalled()
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: 'order-card',
+                id: '202',
                 data: expect.objectContaining({
                     paymentMethod: 'card',
-                    status: 'new',
                 }),
             }),
         )
@@ -250,7 +255,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
             type: 'payment_success',
             data: {
                 id: 'sess_charge_123',
-                client_reference_id: 'order-charge',
+                client_reference_id: '203',
                 payment_method_types: ['fpx'],
                 payment_intent: 'pi_with_charge', // string — as Stripe actually sends it
             },
@@ -258,7 +263,7 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-charge',
+            id: '203',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-CHARGE-001',
@@ -350,12 +355,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_notify_fail', client_reference_id: 'order-notify' },
+            data: { id: 'sess_notify_fail', client_reference_id: '204' },
         })
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-notify',
+            id: '204',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-NOTIFY-001',
@@ -379,12 +384,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_email_fail', client_reference_id: 'order-email' },
+            data: { id: 'sess_email_fail', client_reference_id: '205' },
         })
         mockFind.mockResolvedValue({ docs: [] })
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-email',
+            id: '205',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-EMAIL-001',
@@ -394,14 +399,10 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         // Act
         const res = await POST(createRequest('{}', 'sig_valid'))
 
-        // Assert — 200 still returned; order update happened before email
+        // Assert — 200 still returned; atomic SQL set status, then Stripe IDs persisted
         expect(res.status).toBe(200)
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({
-                collection: 'orders',
-                data: expect.objectContaining({ status: 'new' }),
-            }),
-        )
+        expect(mockDrizzleExecute).toHaveBeenCalled()
+        expect(mockUpdate).toHaveBeenCalled()
     })
 
     // ─── TC-F13.116: checkout.session.expired — graceful skip ───────────
@@ -491,12 +492,12 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         mockVerify.mockReturnValue({ type: 'checkout.session.completed' })
         mockNormalize.mockReturnValue({
             type: 'payment_success',
-            data: { id: 'sess_success', client_reference_id: 'order-success', payment_intent: 'pi_success' },
+            data: { id: 'sess_success', client_reference_id: '206', payment_intent: 'pi_success' },
         })
         mockFind.mockResolvedValue({ docs: [] }) // Not already processed
         mockUpdate.mockResolvedValue({})
         mockFindByID.mockResolvedValue({
-            id: 'order-success',
+            id: '206',
             items: [],
             customerEmail: 'buyer@test.com',
             orderNumber: 'ORD-SUCCESS-001',
@@ -506,13 +507,14 @@ describe('POST /api/webhooks/stripe [TC-F13]', () => {
         // Act
         const res = await POST(createRequest('{}', 'sig_valid'))
 
-        // Assert
+        // Assert — status atomically set via SQL; payload.update persists Stripe IDs
         expect(res.status).toBe(200)
+        expect(mockDrizzleExecute).toHaveBeenCalled()
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'orders',
-                id: 'order-success',
-                data: expect.objectContaining({ status: 'new' }),
+                id: '206',
+                data: expect.objectContaining({ stripePaymentIntentId: 'pi_success' }),
             }),
         )
     })
