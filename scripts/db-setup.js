@@ -3940,6 +3940,8 @@ const MIGRATIONS = [
   { name: '_pages_v_blocks_contact.add_i18n_labels', sql: `ALTER TABLE "_pages_v_blocks_contact" ADD COLUMN IF NOT EXISTS submit_label varchar DEFAULT 'Send Message', ADD COLUMN IF NOT EXISTS phone_label varchar DEFAULT 'Phone', ADD COLUMN IF NOT EXISTS address_label varchar DEFAULT 'Address', ADD COLUMN IF NOT EXISTS email_label varchar DEFAULT 'Email';` },
   { name: 'pages_blocks_testimonials.add_subheadline', sql: `ALTER TABLE "pages_blocks_testimonials" ADD COLUMN IF NOT EXISTS subheadline varchar;` },
   { name: '_pages_v_blocks_testimonials.add_subheadline', sql: `ALTER TABLE "_pages_v_blocks_testimonials" ADD COLUMN IF NOT EXISTS subheadline varchar;` },
+  { name: 'pages_blocks_contact.add_section_label', sql: `ALTER TABLE "pages_blocks_contact" ADD COLUMN IF NOT EXISTS section_label varchar;` },
+  { name: '_pages_v_blocks_contact.add_section_label', sql: `ALTER TABLE "_pages_v_blocks_contact" ADD COLUMN IF NOT EXISTS section_label varchar;` },
 ];
 
 async function runMigrations(pool) {

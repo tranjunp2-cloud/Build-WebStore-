@@ -297,6 +297,7 @@ export function buildBlockFromLibrary(
             return {
                 blockType: 'about',
                 variant: 'simple',
+                sectionLabel: i18n.footer.aboutUs,
                 headline: `${i18n.about.headlinePrefix} ${name}`,
                 // Plan 07 — prefer user description, fall back to canned pool.
                 body: userDescription

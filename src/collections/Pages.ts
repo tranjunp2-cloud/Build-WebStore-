@@ -176,6 +176,7 @@ const ContactBlock = {
                 { label: 'Minimal Inline', value: 'minimal-inline' },
             ],
         },
+        { name: 'sectionLabel', type: 'text' },
         { name: 'headline', type: 'text', defaultValue: 'Contact Us' },
         { name: 'subtext', type: 'textarea' },
         { name: 'email', type: 'email' },
