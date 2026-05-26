@@ -191,7 +191,8 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     }
 
     const handleEmailBlur = () => {
-        const err = validateEmail(form.email)
+        const v = form.email.trim()
+        const err = !v ? 'Email address is required' : validateEmail(form.email)
         if (err) setFieldErrors(prev => ({ ...prev, email: err }))
     }
 
