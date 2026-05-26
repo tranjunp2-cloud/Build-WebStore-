@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import type { Payload } from 'payload'
 import { orderExpiredEmail } from '@/lib/email/templates/order-expired'
 
@@ -23,16 +24,19 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
 
     for (const order of result.docs as any[]) {
         try {
-            await payload.update({
-                collection: 'orders',
-                id: order.id,
-                data: {
-                    status: 'cancelled',
-                    paymentStatus: 'cancelled',
-                    cancelReason: 'Auto-cancelled: payment not received within 24h',
-                },
-                overrideAccess: true,
-            })
+            // Atomic guard: only the first concurrent invocation wins — prevents duplicate emails
+            const updateResult = await (payload.db.drizzle as any).execute(sql`
+                UPDATE orders
+                SET status = 'cancelled',
+                    payment_status = 'cancelled',
+                    cancel_reason = 'Auto-cancelled: payment not received within 24h'
+                WHERE id = ${order.id}
+                AND payment_status IN ('awaiting_payment', 'pending_verification')
+                RETURNING id
+            `)
+            if (!updateResult.rows?.length) {
+                continue  // already processed by a concurrent cron invocation
+            }
 
             // Slug lives on the tenant, not the site — sites collection has no slug field
             const siteObj = typeof order.site === 'object' ? order.site : null

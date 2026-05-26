@@ -53,6 +53,37 @@ export async function handleCheckoutCompleted(
         return
     }
 
+    // IDOR guard: verify the connected Stripe account that fired this webhook is the same account
+    // as the order's tenant. Prevents a connected merchant from creating a forged checkout session
+    // with client_reference_id pointing to another tenant's order and marking it as paid.
+    if (event.connectedAccountId) {
+        const preCheckResult = await payload.find({
+            collection: 'orders',
+            where: { id: { equals: parseInt(orderId) } },
+            depth: 0,
+            limit: 1,
+            overrideAccess: true,
+        }).catch(() => null)
+        const preCheckDoc = preCheckResult?.docs[0] as any
+        if (preCheckDoc) {
+            const ownerTenantId = typeof preCheckDoc.tenant === 'object' ? preCheckDoc.tenant.id : preCheckDoc.tenant
+            if (ownerTenantId) {
+                const ownerTenant = await payload.findByID({
+                    collection: 'tenants',
+                    id: ownerTenantId,
+                    depth: 0,
+                    overrideAccess: true,
+                }).catch(() => null) as any
+                if (ownerTenant?.stripeAccountId && ownerTenant.stripeAccountId !== event.connectedAccountId) {
+                    console.error(
+                        `[Stripe Webhook] SECURITY: forged webhook — connected account ${event.connectedAccountId} ≠ tenant ${ownerTenantId} account ${ownerTenant.stripeAccountId} for order ${orderId}`,
+                    )
+                    return
+                }
+            }
+        }
+    }
+
     // Atomic status transition: UPDATE WHERE status = 'pending' — only the first concurrent invocation wins.
     // NOTE: stripe-checkout/route.ts writes stripeSessionId BEFORE payment, so checking sessionId alone
     // cannot distinguish "already processed" from "not yet paid". Raw SQL is required for atomicity.
