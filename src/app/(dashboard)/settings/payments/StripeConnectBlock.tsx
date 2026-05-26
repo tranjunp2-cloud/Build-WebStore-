@@ -1,36 +1,58 @@
 "use client";
 
-import { Link, ArrowRight, ShieldCheck, Loader2, BadgeCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, ArrowRight, ShieldCheck, Loader2, BadgeCheck, Unlink } from 'lucide-react';
 import { useI18n } from '@/i18n';
 
 interface Props {
-    mode?: 'connect' | 'verify';
+    mode?: 'connect' | 'onboard' | 'verify';
     onConnect?: () => void;
     isConnecting?: boolean;
+    onOnboard?: () => void;
+    isOnboarding?: boolean;
     onVerify?: () => void;
     isVerifying?: boolean;
+    connectedAccountId?: string | null;
+    tenantId?: string;
+    onDisconnect?: () => Promise<void>;
 }
 
 export function StripeConnectBlock({
     mode = 'connect',
     onConnect,
     isConnecting = false,
+    onOnboard,
+    isOnboarding = false,
     onVerify,
     isVerifying = false,
+    connectedAccountId,
+    tenantId,
+    onDisconnect,
 }: Props) {
     const { t } = useI18n();
     const pt = t.dashboard.settings.payments;
+    const [accountEmail, setAccountEmail] = useState<string | null>(null);
+    const [isDisconnecting, setIsDisconnecting] = useState(false);
 
     const isVerifyMode = mode === 'verify';
-    const isLoading = isVerifyMode ? isVerifying : isConnecting;
+    const isOnboardMode = mode === 'onboard';
 
-    const title = isVerifyMode ? pt.stripeVerifyTitle : pt.stripeConnectTitle;
-    const desc = isVerifyMode ? pt.stripeVerifyDesc : pt.stripeConnectDesc;
-    const ctaLabel = isVerifyMode ? pt.stripeVerifyCta : pt.stripeConnectCta;
-    const loadingLabel = isVerifyMode ? pt.stripeVerifying : pt.stripeConnecting;
-    const handleClick = isVerifyMode ? onVerify : onConnect;
+    useEffect(() => {
+        if (!(isOnboardMode || isVerifyMode) || !tenantId) return;
+        fetch(`/api/stripe/connect/status?tenantId=${tenantId}`)
+            .then(r => r.json())
+            .then(d => { if (d.success && d.data?.email) setAccountEmail(d.data.email); })
+            .catch(() => {});
+    }, [isOnboardMode, isVerifyMode, tenantId]);
+    const isLoading = isVerifyMode ? isVerifying : isOnboardMode ? isOnboarding : isConnecting;
 
-    const steps = isVerifyMode
+    const title = isVerifyMode ? pt.stripeVerifyTitle : isOnboardMode ? pt.stripeOnboardTitle : pt.stripeConnectTitle;
+    const desc = isVerifyMode ? pt.stripeVerifyDesc : isOnboardMode ? pt.stripeOnboardDesc : pt.stripeConnectDesc;
+    const ctaLabel = isVerifyMode ? pt.stripeVerifyCta : isOnboardMode ? pt.stripeOnboardCta : pt.stripeConnectCta;
+    const loadingLabel = isVerifyMode ? pt.stripeVerifying : isOnboardMode ? pt.stripeOnboarding : pt.stripeConnecting;
+    const handleClick = isVerifyMode ? onVerify : isOnboardMode ? onOnboard : onConnect;
+
+    const steps = (isVerifyMode || isOnboardMode)
         ? null
         : [pt.stripeStep1, pt.stripeStep2, pt.stripeStep3];
 
@@ -77,9 +99,37 @@ export function StripeConnectBlock({
                 <h4 className="text-[17px] font-bold text-slate-50 tracking-tight mt-[2px] mb-[6px]">
                     {title}
                 </h4>
-                <p className="text-[13.5px] text-slate-400 leading-[1.55] mb-[14px] max-w-[540px]">
+                <p className="text-[13.5px] text-slate-400 leading-[1.55] mb-[12px] max-w-[540px]">
                     {desc}
                 </p>
+                {(isOnboardMode || isVerifyMode) && connectedAccountId && (
+                    <div className="inline-flex items-center gap-[8px] mb-[14px] px-[10px] py-[5px] rounded-[8px] border border-white/[0.07] bg-white/[0.04]">
+                        <span className="w-[6px] h-[6px] rounded-full bg-sky-400 shrink-0" />
+                        <span className="font-mono text-[12px] text-slate-300 tracking-tight">
+                            {connectedAccountId}
+                        </span>
+                        {accountEmail && (
+                            <span className="text-[12px] text-slate-400">· {accountEmail}</span>
+                        )}
+                        {onDisconnect && (
+                            <button
+                                type="button"
+                                disabled={isDisconnecting}
+                                onClick={async () => {
+                                    setIsDisconnecting(true);
+                                    try { await onDisconnect(); } finally { setIsDisconnecting(false); }
+                                }}
+                                className="inline-flex items-center gap-[4px] ml-[4px] text-[11.5px] text-slate-500 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-wait whitespace-nowrap"
+                            >
+                                {isDisconnecting
+                                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                                    : <Unlink className="w-3 h-3" />
+                                }
+                                {pt.stripeSwitchAccount}
+                            </button>
+                        )}
+                    </div>
+                )}
                 {steps && (
                     <ul className="flex flex-wrap gap-[14px_24px] list-none m-0 p-0">
                         {steps.map((step, i) => (
@@ -104,8 +154,10 @@ export function StripeConnectBlock({
                     style={{
                         background: isVerifyMode
                             ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
-                            : 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
-                        boxShadow: isVerifyMode
+                            : isOnboardMode
+                                ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
+                                : 'linear-gradient(135deg, #0ea5e9 0%, #2dd4bf 100%)',
+                        boxShadow: (isVerifyMode || isOnboardMode)
                             ? '0 4px 14px rgba(251,191,36,0.30)'
                             : '0 4px 14px rgba(14,165,233,0.30)',
                     }}
@@ -115,6 +167,16 @@ export function StripeConnectBlock({
                         : <>{ctaLabel}<ArrowRight className="w-4 h-4" /></>
                     }
                 </button>
+                {isOnboardMode && (
+                    <button
+                        type="button"
+                        onClick={onVerify}
+                        disabled={isVerifying}
+                        className="text-[12px] text-slate-500 hover:text-slate-300 transition-colors whitespace-nowrap underline underline-offset-2"
+                    >
+                        {isVerifying ? pt.stripeVerifying : pt.stripeOnboardSecondary}
+                    </button>
+                )}
                 <div className="inline-flex items-center gap-[6px] text-[11.5px] text-slate-500 whitespace-nowrap">
                     <ShieldCheck className="w-3 h-3 text-emerald-400" />
                     {pt.stripeTrust}

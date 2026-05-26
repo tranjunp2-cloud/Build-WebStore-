@@ -9,7 +9,7 @@ import { trackEvent } from '@/lib/analytics/track-event'
 import {
     ArrowLeft, Loader2, ShoppingBag, X, AlertCircle,
     ShieldCheck, ChevronRight, Rocket, MapPin, Truck,
-    QrCode, UploadCloud, FileImage, /* Tag, */ Info, Lock, AlertTriangle,
+    QrCode, UploadCloud, FileImage, /* Tag, */ Info, Lock,
     Landmark, Check,
 } from 'lucide-react'
 import { useI18n } from '@/i18n'
@@ -32,6 +32,7 @@ type InitialSiteData = {
     enableCod: boolean
     enableQrBanking: boolean
     shippingConfig: ShippingConfig | null
+    stripeEnabled: boolean
 }
 
 type CheckoutClientProps = {
@@ -71,7 +72,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [freeAboveRM, setFreeAboveRM] = useState<number | null>(
         sc?.freeAbove != null ? sc.freeAbove / 100 : null
     )
-    const [showStripe, setShowStripe] = useState(false)
+    const [showStripe, setShowStripe] = useState(initialSiteData?.stripeEnabled ?? false)
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
     const [states, setStates] = useState<GeoState[]>([])
@@ -82,7 +83,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const [selectedDistrictId, setSelectedDistrictId] = useState('')
     const [postcodeOpts, setPostcodeOpts] = useState<string[]>([])
     const [postcodesLoading, setPostcodesLoading] = useState(false)
-    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bank_transfer'>('cod')
+    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bank_transfer' | 'stripe'>('cod')
     const [proofFile, setProofFile] = useState<File | null>(null)
     const [proofPreview, setProofPreview] = useState<string | null>(null)
     const [proofError, setProofError] = useState<string | null>(null)
@@ -149,7 +150,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                     if (s.eastRate != null) setShippingEastRM(s.eastRate / 100)
                     setFreeAboveRM(s.freeAbove != null ? s.freeAbove / 100 : null)
                 }
-                if (data.enableStripe === true) setShowStripe(true)
+                if (data.stripeEnabled === true) setShowStripe(true)
                 if (data.theme) {
                     if (data.theme.fontHeading) setFontHeading(data.theme.fontHeading)
                     if (data.theme.fontBody) setFontBody(data.theme.fontBody)
@@ -259,7 +260,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
         form.city && form.postcode && items.length > 0 &&
-        (paymentMethod === 'cod' || paymentMethod === 'bank_transfer')
+        (paymentMethod === 'cod' || paymentMethod === 'bank_transfer' || paymentMethod === 'stripe')
     )
 
     const dismissOverlay = () => {
@@ -280,7 +281,31 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
             longTimerRef.current = setTimeout(() => setOverlayTakingLong(true), 10000)
         }, 300)
         try {
-            // bank_transfer: no pre-checkout upload — proof submitted post-order via magic link
+            if (paymentMethod === 'stripe') {
+                const stripePayload = {
+                    siteId,
+                    items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+                    customer: {
+                        name: form.name, email: form.email, phone: form.phone,
+                        address: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, postcode: form.postcode, country: 'Malaysia' },
+                    },
+                }
+                const res = await fetch('/api/orders/stripe-checkout', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stripePayload),
+                })
+                const data = await res.json()
+                dismissOverlay()
+                if (res.ok && data.success && data.data.sessionUrl) {
+                    clearCart()
+                    navigatedToConfirm = true
+                    window.location.href = data.data.sessionUrl
+                } else {
+                    toast.error(data.error?.message || 'Failed to initialize payment')
+                }
+                return
+            }
+
+            // bank_transfer / COD: no pre-checkout upload — proof submitted post-order via magic link
             const checkoutPayload: Record<string, unknown> = {
                 siteId,
                 items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
@@ -452,7 +477,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                 <div className="ck-iw"><input value={form.line1} onChange={e => updateField('line1', e.target.value)} placeholder="No. 17, Jalan Kenari 22..." /></div>
                             </div>
                             <div className="ck-f">
-                                <label className="ck-lb">{ck.addressLine2} <span className="ck-opt">(Optional)</span></label>
+                                <label className="ck-lb">{ck.addressLine2}</label>
                                 <div className="ck-iw"><input value={form.line2} onChange={e => updateField('line2', e.target.value)} placeholder="Apartment, suite, unit..." /></div>
                             </div>
                             <div className="ck-row c3">
@@ -495,14 +520,11 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             </div>
                             <div className="pm-list">
                                 {showStripe && (
-                                    <div className="pm pm-stripe locked">
+                                    <div className={`pm${paymentMethod === 'stripe' ? ' active' : ''}`} onClick={() => setPaymentMethod('stripe')}>
                                         <div className="pm-row">
-                                            <div className="pm-rad locked-rad" />
+                                            <div className={`pm-rad${paymentMethod === 'stripe' ? ' on' : ''}`} />
                                             <div className="pm-body">
-                                                <h3 className="pm-title">
-                                                    Pay with Stripe
-                                                    <span className="pm-lock-glyph"><Lock size={10} /> Under maintenance</span>
-                                                </h3>
+                                                <h3 className="pm-title">Pay with Card / FPX</h3>
                                                 <p className="pm-desc">Card · FPX Online Banking · Secure hosted checkout</p>
                                                 <div className="pm-brands">
                                                     <span className="pm-brand visa">VISA</span>
@@ -511,14 +533,10 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                                                     <span className="pm-brand fpx">FPX</span>
                                                 </div>
                                                 <div className="pm-pills">
-                                                    <span className="pm-pill amber"><AlertTriangle size={11} /> Temporarily unavailable</span>
+                                                    <span className="pm-pill teal"><ShieldCheck size={11} /> Secure</span>
+                                                    <span className="pm-pill"><Lock size={11} /> Powered by Stripe</span>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="pm-tooltip tip-right">
-                                            <div className="pt-head"><AlertTriangle size={12} /><span>Payment method unavailable</span></div>
-                                            <p>Phương thức này chưa sẵn sàng. Vui lòng chọn phương thức khác.</p>
-                                            <span className="pt-cta">Choose another method <ChevronRight size={11} /></span>
                                         </div>
                                     </div>
                                 )}
@@ -622,7 +640,9 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
                             <div className={`sum-trust${paymentMethod === 'bank_transfer' ? ' note' : ''}`}>
                                 {paymentMethod === 'bank_transfer'
                                     ? <><Info size={13} style={{ flexShrink: 0, marginTop: 2 }} /> {"You'll upload your payment proof in the next step after your order is created."}</>
-                                    : <><ShieldCheck size={11} /> Encrypted Checkout</>}
+                                    : paymentMethod === 'stripe'
+                                        ? <><Lock size={11} /> {"You'll be redirected to Stripe's secure checkout page."}</>
+                                        : <><ShieldCheck size={11} /> Encrypted Checkout</>}
                             </div>
                         </div>
                     </div>

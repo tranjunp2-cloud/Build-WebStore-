@@ -7,6 +7,32 @@ import { stripeCheckoutSchema } from '@/lib/validations/orders'
 import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 import { buildPaymentMethodTypes } from '@/lib/payment/method-builder'
 import { buildOrderItems } from './build-order-items'
+import { generateConfirmToken } from '@/lib/orders/upload-token'
+
+/** Minimal shape of a tenant document used in stripe-checkout flow. */
+interface TenantDoc {
+    id: string | number
+    stripeAccountId?: string | null
+    stripeOnboardingComplete?: boolean
+    status?: string
+    slug?: string
+    payments?: { payment_card?: boolean; payment_fpx?: boolean }
+}
+
+/** Minimal shape of a site document used in stripe-checkout flow. */
+interface SiteDoc {
+    id: string | number
+    tenant: string | number | { id: string | number }
+    paymentConfig?: { cardEnabled?: boolean; fpxEnabled?: boolean }
+}
+
+/** Shape of the validated request body from stripeCheckoutSchema. */
+interface CheckoutBody {
+    siteId: string | number
+    items: unknown[]
+    customer: { email: string; name: string; phone?: string; address?: { line1?: string; line2?: string; city?: string; state?: string; postcode?: string; country?: string } }
+    paymentMethod?: string
+}
 
 /**
  * POST /api/orders/stripe-checkout
@@ -48,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     const { siteId, items, customer } = parse.data
 
-    if ((rawBody as any).paymentMethod) {
+    if ((rawBody as CheckoutBody).paymentMethod) {
         console.warn('[stripe-checkout] legacy paymentMethod field received and ignored', { siteId })
     }
 
@@ -73,10 +99,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 2: Resolve tenant
+        const siteTyped = site as unknown as SiteDoc
         const tenantId =
-            typeof (site as any).tenant === 'object'
-                ? (site as any).tenant?.id
-                : (site as any).tenant
+            typeof siteTyped.tenant === 'object'
+                ? siteTyped.tenant?.id
+                : siteTyped.tenant
         const tenant = await payload.findByID({
             collection: 'tenants',
             id: tenantId,
@@ -90,8 +117,10 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        const tenantTyped = tenant as unknown as TenantDoc
+
         // TC-F13.88: suspended tenant cannot accept payments
-        if ((tenant as any).status === 'suspended') {
+        if (tenantTyped.status === 'suspended') {
             return NextResponse.json(
                 { success: false, error: { code: 'STORE_UNAVAILABLE', message: 'Store is not available' } },
                 { status: 403 },
@@ -99,8 +128,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 3: Stripe-ready check
-        const stripeAccountId = (tenant as any).stripeAccountId
-        const onboardingComplete = (tenant as any).stripeOnboardingComplete === true
+        const stripeAccountId = tenantTyped.stripeAccountId
+        const onboardingComplete = tenantTyped.stripeOnboardingComplete === true
         if (!stripeAccountId) {
             return NextResponse.json(
                 { success: false, error: { code: 'STRIPE_NOT_CONNECTED', message: 'Seller has not connected Stripe yet' } },
@@ -115,7 +144,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 4: Tenant master gate — build enabled methods from tenant flags
-        let types = buildPaymentMethodTypes(tenant as any)
+        let types = buildPaymentMethodTypes(tenantTyped)
         if (types.length === 0) {
             return NextResponse.json(
                 { success: false, error: { code: 'NO_PAYMENT_METHODS', message: 'Seller has not enabled Card or FPX' } },
@@ -124,7 +153,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Step 5: Site-level layer-2 guard
-        const paymentConfig = (site as any).paymentConfig ?? {}
+        const paymentConfig = siteTyped.paymentConfig ?? {}
         if (paymentConfig.cardEnabled === false) types = types.filter(t => t !== 'card')
         if (paymentConfig.fpxEnabled === false) types = types.filter(t => t !== 'fpx')
         if (types.length === 0) {
@@ -157,6 +186,7 @@ export async function POST(request: NextRequest) {
         if (total <= 0) {
             const freeOrder = await payload.create({
                 collection: 'orders',
+                // Payload collection data type is overly strict; cast required until generated types exist
                 data: {
                     tenant: tenantId,
                     site: siteIdNum,
@@ -172,7 +202,7 @@ export async function POST(request: NextRequest) {
                     customerEmail: customer.email,
                     customerName: customer.name,
                     customerPhone: customer.phone || '',
-                } as any,
+                } as Record<string, unknown>,
             })
             return NextResponse.json({
                 success: true,
@@ -187,6 +217,7 @@ export async function POST(request: NextRequest) {
         // Create order in pending status
         const order = await payload.create({
             collection: 'orders',
+            // Payload collection data type is overly strict; cast required until generated types exist
             data: {
                 tenant: tenantId,
                 site: siteIdNum,
@@ -212,12 +243,12 @@ export async function POST(request: NextRequest) {
                           country: customer.address.country || 'Malaysia',
                       }
                     : undefined,
-            } as any,
+            } as Record<string, unknown>,
         })
 
         // Create Stripe Checkout Session on merchant's connected account (Direct Charges)
         const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
-        const siteSlug = (tenant as any).slug || tenantId
+        const siteSlug = tenantTyped.slug || String(tenantId)
 
         // Include shipping and tax as Stripe line items so buyer is charged the full order total
         const allCheckoutItems = [
@@ -239,8 +270,8 @@ export async function POST(request: NextRequest) {
                 paymentMethodTypes: types,
                 metadata: { siteId: String(siteId), tenantId: String(tenantId), orderNumber },
             })
-        } catch (stripeErr: any) {
-            console.error('[stripe-checkout] Stripe API error:', stripeErr.message)
+        } catch (stripeErr: unknown) {
+            console.error('[stripe-checkout] Stripe API error:', stripeErr instanceof Error ? stripeErr.message : stripeErr)
             // Clean up pending order so it doesn't litter the DB
             await payload.delete({ collection: 'orders', id: order.id }).catch(() => null)
             return NextResponse.json(
@@ -254,7 +285,8 @@ export async function POST(request: NextRequest) {
             await payload.update({
                 collection: 'orders',
                 id: order.id,
-                data: { stripeSessionId: checkout.sessionId } as any,
+                // Payload update data type is overly strict; cast required until generated types exist
+                data: { stripeSessionId: checkout.sessionId } as Record<string, unknown>,
             })
         } catch (updateErr) {
             console.error('[stripe-checkout] Failed to save stripeSessionId, cleaning up:', updateErr)
@@ -265,12 +297,21 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        return NextResponse.json({
+        const confirmToken = generateConfirmToken(order.id, orderNumber)
+        const res = NextResponse.json({
             success: true,
             data: { orderId: order.id, orderNumber, sessionUrl: checkout.url },
         })
-    } catch (err: any) {
-        console.error('[stripe-checkout] Unexpected error:', err.message)
+        res.cookies.set(`ct_${order.id}`, confirmToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 30 * 24 * 60 * 60,
+            path: '/',
+        })
+        return res
+    } catch (err: unknown) {
+        console.error('[stripe-checkout] Unexpected error:', err instanceof Error ? err.message : err)
         return NextResponse.json(
             { success: false, error: { code: 'INTERNAL_ERROR', message: 'Checkout failed' } },
             { status: 500 },

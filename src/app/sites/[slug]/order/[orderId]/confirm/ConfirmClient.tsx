@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Check, ChevronRight, ShieldCheck,
@@ -10,6 +9,7 @@ import {
     PhoneCall, PackageX, HandCoins, Banknote,
 } from 'lucide-react'
 import { TY_CSS } from './confirm-styles'
+import { useI18n } from '@/i18n'
 import { PROOF_ACCEPTED_TYPES, PROOF_MAX_SIZE_BYTES } from '@/lib/storefront/checkout'
 
 type OrderItem = { productName: string; quantity: number; unitPrice: number; variant?: string; imageUrl?: string }
@@ -79,6 +79,8 @@ const CopyIcon = () => (
 
 export default function ConfirmClient({ order, slug, bankName, bankAccountNo, bankAccountHolder, merchantQrUrl, uploadToken }: Props) {
     const router = useRouter()
+    const { t } = useI18n()
+    const cp = t.storefront.confirmPage
 
     const clearAndNavigate = useCallback(async (href: string, clearToken: boolean) => {
         if (clearToken) {
@@ -93,6 +95,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
     const [uploadFile, setUploadFile] = useState<File | null>(null)
     const [dragging, setDragging] = useState(false)
     const [uploadError, setUploadError] = useState('')
+    const [leaveHref, setLeaveHref] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -114,6 +117,26 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         })
         return () => cleanup.forEach(fn => fn())
     }, [])
+
+    // Intercept browser back button and tab close when BT upload is still pending
+    useEffect(() => {
+        if (order.paymentMethod !== 'bank_transfer' || uploadStatus === 'success') return
+        window.history.pushState(null, '', window.location.href)
+        const onPop = () => {
+            window.history.pushState(null, '', window.location.href)
+            setLeaveHref(`/sites/${slug}/products`)
+        }
+        const onBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            e.returnValue = ''
+        }
+        window.addEventListener('popstate', onPop)
+        window.addEventListener('beforeunload', onBeforeUnload)
+        return () => {
+            window.removeEventListener('popstate', onPop)
+            window.removeEventListener('beforeunload', onBeforeUnload)
+        }
+    }, [order.paymentMethod, uploadStatus, slug])
 
     const currency = order.currency || 'MYR'
     const shippingFee = order.shippingFee ?? 0
@@ -165,7 +188,7 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         : isSubmitted
             ? { tone: 'blue', s1: 'Awaiting seller confirmation', s2: 'Seller will verify your transfer shortly.' }
             : isBT
-                ? { tone: 'amber', s1: 'Action Required — Upload Receipt', s2: "We can't ship until your transfer is verified." }
+                ? { tone: 'amber', s1: cp.sumStatusBtS1, s2: cp.sumStatusBtS2 }
                 : isCod
                     ? { tone: 'blue', s1: 'Pending phone verification', s2: "We'll call to confirm your address." }
                     : { tone: 'teal', s1: 'Payment received · Processing', s2: 'Warehouse is preparing your parcel.' }
@@ -233,7 +256,16 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
         <div className="ty-page">
             {/* ── Header ── */}
             <header className="ty-hd">
-                <Link href={`/sites/${slug}/products`} className="ty-back"><ArrowLeft size={16} /></Link>
+                <button
+                    className="ty-back"
+                    onClick={() => {
+                        if (isBT && uploadStatus !== 'success') {
+                            setLeaveHref(`/sites/${slug}/products`)
+                        } else {
+                            clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)
+                        }
+                    }}
+                ><ArrowLeft size={16} /></button>
                 <h1 className="ty-h1">Order Confirmation</h1>
                 <div className="ty-crumbs">
                     <span>Cart</span><ChevronRight size={12} />
@@ -568,7 +600,13 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                             {addrLine && <div className="ty-meta-row"><MapPin size={13} /><span><strong>To</strong> · {order.customerName}, {addrLine}</span></div>}
                         </div>
                         <div className="ty-cta-row">
-                            <button className="ty-btn primary lg" onClick={() => clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)}>
+                            <button className="ty-btn primary lg" onClick={() => {
+                                if (isBT && uploadStatus !== 'success') {
+                                    setLeaveHref(`/sites/${slug}/products`)
+                                } else {
+                                    clearAndNavigate(`/sites/${slug}/products`, isOrderSuccess)
+                                }
+                            }}>
                                 <ShoppingBag size={15} /> Continue Shopping
                             </button>
                             {(!isBT || isPaid) && (
@@ -581,6 +619,32 @@ export default function ConfirmClient({ order, slug, bankName, bankAccountNo, ba
                     </div>
                 </div>
             </div>
+
+            {/* Leave warning modal — shown when BT buyer navigates away without uploading proof */}
+            {leaveHref && (
+                <div
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', padding: '24px', zIndex: 200 }}
+                    onClick={() => setLeaveHref('')}
+                >
+                    <div
+                        style={{ background: 'var(--card)', border: '1px solid var(--bd)', borderRadius: '16px', overflow: 'hidden', maxWidth: '420px', width: '100%', boxShadow: '0 20px 60px -16px rgba(15,23,42,0.20),0 4px 16px -4px rgba(15,23,42,0.12)' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ background: '#fff4dc', borderBottom: '1px solid #f1d693', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <AlertCircle size={15} style={{ color: '#8a5c0a', flexShrink: 0 }} />
+                            <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#8a5c0a', margin: 0 }}>{cp.leaveWarningBanner}</p>
+                        </div>
+                        <div style={{ padding: '20px' }}>
+                            <p style={{ fontSize: '15px', fontWeight: 700, color: 'var(--f1)', margin: '0 0 8px' }}>{cp.leaveWarningTitle}</p>
+                            <p style={{ fontSize: '13px', color: 'var(--f3)', lineHeight: 1.6, margin: '0 0 20px' }}>{cp.leaveWarningBody}</p>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button className="ty-btn ghost" onClick={() => clearAndNavigate(leaveHref, isOrderSuccess)}>{cp.leaveAnyway}</button>
+                                <button className="ty-btn primary" onClick={() => setLeaveHref('')}>{cp.stayUpload}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style>{TY_CSS}</style>
         </div>

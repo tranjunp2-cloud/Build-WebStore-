@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
+import { sql } from 'drizzle-orm'
 import { getPayload } from 'payload'
+import type { Payload } from 'payload'
 import config from '@payload-config'
 import {
     verifyStripeWebhook,
@@ -11,6 +13,13 @@ import { newOrderSellerEmail } from '@/lib/email/templates/new-order-seller'
 import { getTenantOwnerEmails } from '@/lib/email/get-tenant-owner-emails'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 
+/** Minimal shape of a tenant document for webhook notification logic. */
+interface TenantDoc {
+    id: string | number
+    name?: string | null
+    slug?: string | null
+}
+
 /** Minimal shape of an order document for webhook notification logic. */
 interface OrderDoc {
     id: number | string
@@ -18,13 +27,24 @@ interface OrderDoc {
     orderNumber: string
     customerName: string
     customerEmail: string
+    customerPhone?: string | null
     currency: string
     status: string
     total: number
     subtotal: number
     tax: number
-    items: Array<{ product: string | number | { id: string | number }; productName: string; quantity: number; unitPrice: number }>
-    shippingAddress: Record<string, unknown>
+    shippingFee?: number
+    notes?: string | null
+    createdAt?: string
+    site?: string | number | { id: string | number; locale?: string }
+    items: Array<{
+        product: string | number | { id: string | number }
+        productName: string
+        quantity: number
+        unitPrice: number
+        variant?: string | null
+    }>
+    shippingAddress?: Record<string, string>
 }
 
 /**
@@ -72,8 +92,8 @@ export async function POST(request: NextRequest) {
             return new Response('OK', { status: 200 })
         }
         event = normalized
-    } catch (err: any) {
-        console.error('[Stripe Webhook] Signature verification failed:', err.message)
+    } catch (err: unknown) {
+        console.error('[Stripe Webhook] Signature verification failed:', err instanceof Error ? err.message : err)
         return new Response('Webhook signature verification failed', { status: 400 })
     }
 
@@ -105,8 +125,8 @@ export async function POST(request: NextRequest) {
             default:
                 console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`)
         }
-    } catch (err: any) {
-        console.error(`[Stripe Webhook] Error processing ${event.type}:`, err.message)
+    } catch (err: unknown) {
+        console.error(`[Stripe Webhook] Error processing ${event.type}:`, err instanceof Error ? err.message : err)
         // Still return 200 to prevent Stripe from retrying
         // The error is logged for debugging
     }
@@ -117,7 +137,7 @@ export async function POST(request: NextRequest) {
 // ── Event Handlers ───────────────────────────────────────────────────
 
 async function handleCheckoutCompleted(
-    payload: any,
+    payload: Payload,
     event: PaymentWebhookEvent,
 ) {
     const session = event.data
@@ -129,32 +149,29 @@ async function handleCheckoutCompleted(
         return
     }
 
-    // Idempotency: if stripeSessionId is already written to any order (regardless of status),
-    // the webhook was already processed successfully — do not re-run side-effects.
-    // Relies on the DB-level UNIQUE constraint on stripeSessionId (Orders collection).
-    const existing = await payload.find({
-        collection: 'orders',
-        where: {
-            stripeSessionId: { equals: stripeSessionId },
-        },
-        limit: 1,
-    })
-
-    if (existing.docs.length > 0) {
-        console.log(`[Stripe Webhook] Order already processed for session ${stripeSessionId}`)
+    const orderIdInt = parseInt(orderId, 10)
+    if (Number.isNaN(orderIdInt)) {
+        console.warn('[Stripe Webhook] client_reference_id is not a valid integer:', orderId)
         return
     }
 
-    // Guard: verify the order is still pending before triggering side-effects.
-    // Combined with the stripeSessionId check above, this minimises the concurrent-delivery race window.
+    // Atomic status transition: UPDATE WHERE status = 'pending' — only the first concurrent invocation wins.
+    // NOTE: stripe-checkout/route.ts writes stripeSessionId BEFORE payment, so checking sessionId alone
+    // cannot distinguish "already processed" from "not yet paid". Raw SQL is required for atomicity.
+    const transitionResult = await payload.db.drizzle.execute(sql`
+        UPDATE orders SET status = 'new'
+        WHERE id = ${orderIdInt} AND status = 'pending'
+        RETURNING id
+    `)
+    if (!transitionResult.rows?.length) {
+        console.log(`[Stripe Webhook] Order ${orderId} already transitioned — skipping concurrent delivery`)
+        return
+    }
+
+    // Verify order exists (guard against client_reference_id pointing to a deleted order)
     const targetOrder = await payload.findByID({ collection: 'orders', id: orderId })
     if (!targetOrder) {
-        console.warn(`[Stripe Webhook] Order ${orderId} not found`)
-        return
-    }
-    const existingStatus = (targetOrder as any).status
-    if (existingStatus && existingStatus !== 'pending') {
-        console.log(`[Stripe Webhook] Order ${orderId} already in status '${existingStatus}' — skipping`)
+        console.warn(`[Stripe Webhook] Order ${orderId} not found after transition — unexpected state`)
         return
     }
 
@@ -167,24 +184,24 @@ async function handleCheckoutCompleted(
         const paymentMethod: 'card' | 'fpx' =
             enabledTypes.length === 1 && enabledTypes[0] === 'fpx' ? 'fpx' : 'card'
 
-        // session.payment_intent is always a string in webhook events (not expanded).
-        // stripeChargeId requires expand: ['payment_intent'] — deferred to Wave 7.
+        // Record Stripe IDs (idempotent — status already set atomically above)
         await payload.update({
             collection: 'orders',
             id: orderId,
             data: {
-                status: 'new',
                 stripeSessionId,
+                // Stripe types: payment_intent is string|PaymentIntent; .id only exists on expanded object
                 stripePaymentIntentId: typeof session.payment_intent === 'string'
                     ? session.payment_intent
-                    : (session.payment_intent as any)?.id ?? undefined,
+                    : (session.payment_intent as { id?: string } | null)?.id ?? undefined,
                 paymentMethod,
             },
         })
 
         console.log(`[Stripe Webhook] Order ${orderId} marked as new`)
 
-        // Reduce stock with optimistic locking (prevents race condition)
+        // Reduce stock — safe here: atomic SQL above ensures only one invocation reaches this point.
+        // decrementStock retries on Payload API errors, not on concurrent writes.
         const order = await payload.findByID({
             collection: 'orders',
             id: orderId,
@@ -203,12 +220,14 @@ async function handleCheckoutCompleted(
         // Resolve tenant for email templates (shop name + site slug for order page URL)
         const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
         const tenantDoc = await payload.findByID({ collection: 'tenants', id: tenantId, depth: 0, overrideAccess: true }).catch(() => null)
-        const shopName = (tenantDoc as any)?.name ?? ''
-        const siteSlug = (tenantDoc as any)?.slug ?? ''
+        const tenantTyped = tenantDoc as unknown as TenantDoc | null
+        const shopName = tenantTyped?.name ?? ''
+        const siteSlug = tenantTyped?.slug ?? ''
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ''
         const orderPageUrl = `${baseUrl}/sites/${siteSlug}/orders/${order.orderNumber}`
         const dashboardOrderUrl = `${baseUrl}/orders`
-        const siteLocale = typeof (order as any).site === 'object' ? ((order as any).site?.locale ?? 'ms') : 'ms'
+        // site.locale is constrained to 'en'|'ms' by the Sites collection; cast is safe
+        const siteLocale = (typeof order.site === 'object' ? ((order.site as { locale?: string })?.locale ?? 'ms') : 'ms') as 'en' | 'ms'
 
         // Buyer: order confirmation
         try {
@@ -217,33 +236,37 @@ async function handleCheckoutCompleted(
                 orderNumber: order.orderNumber,
                 customerName: order.customerName,
                 customerEmail: order.customerEmail,
-                customerPhone: (order as any).customerPhone ?? null,
-                customerAddress: (order as any).shippingAddress ?? null,
+                customerPhone: order.customerPhone ?? null,
+                customerAddress: order.shippingAddress ?? null,
                 items: (order.items || []).map((item) => ({
                     name: item.productName,
-                    variant: (item as any).variant ?? null,
+                    variant: item.variant ?? null,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     lineTotal: item.quantity * item.unitPrice,
                 })),
                 subtotal: order.subtotal,
-                shippingFee: (order as any).shippingFee ?? 0,
+                shippingFee: order.shippingFee ?? 0,
                 total: order.total,
                 paymentMethod: 'stripe',
-                orderDate: (order as any).createdAt ?? new Date().toISOString(),
+                orderDate: order.createdAt ?? new Date().toISOString(),
                 orderPageUrl,
                 currency: order.currency || 'MYR',
-                buyerNote: (order as any).notes ?? null,
+                buyerNote: order.notes ?? null,
                 locale: siteLocale,
             })
 
-            await sendEmail({
+            const sent = await sendEmail({
                 to: order.customerEmail,
                 subject: emailData.subject,
                 html: emailData.html,
             })
 
-            console.log(`[Stripe Webhook] Confirmation email sent to ${order.customerEmail}`)
+            if (sent) {
+                console.log(`[Stripe Webhook] Confirmation email sent to ${order.customerEmail}`)
+            } else {
+                console.warn(`[Stripe Webhook] Confirmation email failed (sendEmail returned false) for ${order.customerEmail}`)
+            }
         } catch (emailErr) {
             console.error('[Stripe Webhook] Failed to send confirmation email:', emailErr)
             // Don't fail the webhook — email is non-critical
@@ -273,13 +296,13 @@ async function handleCheckoutCompleted(
                 })
             })
             .catch((err) => console.error('[Notification] ORDER_NEW (Stripe) hook failed', err))
-    } catch (err: any) {
-        console.error(`[Stripe Webhook] Failed to update order ${orderId}:`, err.message)
+    } catch (err: unknown) {
+        console.error(`[Stripe Webhook] Failed to update order ${orderId}:`, err instanceof Error ? err.message : err)
     }
 }
 
 async function handlePaymentFailed(
-    payload: any,
+    payload: Payload,
     event: PaymentWebhookEvent,
 ) {
     const paymentIntent = event.data
@@ -342,7 +365,7 @@ async function handlePaymentFailed(
 }
 
 async function handleSubscriptionUpdated(
-    payload: any,
+    payload: Payload,
     event: PaymentWebhookEvent,
 ) {
     const subscription = event.data
@@ -378,11 +401,11 @@ async function handleSubscriptionUpdated(
 
 // TC-F13.87: lock seller's Card/FPX when Stripe revokes the Connect application
 async function handleAccountDeauthorized(
-    payload: any,
+    payload: Payload,
     event: PaymentWebhookEvent,
 ) {
     // Stripe sends the accountId in the top-level 'account' field for Connect events
-    const accountId = event.connectedAccountId ?? (event.data as any).id
+    const accountId = event.connectedAccountId ?? (event.data as { id?: string }).id
     if (!accountId) {
         console.warn('[Stripe Webhook] account.application.deauthorized missing accountId')
         return
@@ -412,7 +435,7 @@ async function handleAccountDeauthorized(
 }
 
 async function handleAccountUpdated(
-    payload: any,
+    payload: Payload,
     event: PaymentWebhookEvent,
 ) {
     const account = event.data
@@ -442,12 +465,16 @@ async function handleAccountUpdated(
         )
     }
 
+    const tenantUpdateData: Record<string, unknown> = { stripeOnboardingComplete: isOnboardingComplete }
+    // Mirror handleAccountDeauthorized: disable card/FPX if Stripe revokes charges_enabled
+    if (!isOnboardingComplete) {
+        tenantUpdateData.payments = { payment_card: false, payment_fpx: false }
+    }
+
     await payload.update({
         collection: 'tenants',
         id: tenants.docs[0].id,
-        data: {
-            stripeOnboardingComplete: isOnboardingComplete,
-        },
+        data: tenantUpdateData,
     })
 
     console.log(
@@ -462,7 +489,7 @@ async function handleAccountUpdated(
  * Retries up to maxRetries times on API/validation errors.
  */
 async function decrementStock(
-    payload: any,
+    payload: Payload,
     productId: number | string,
     quantity: number,
     maxRetries = 3,
@@ -474,11 +501,12 @@ async function decrementStock(
                 id: productId,
             })
 
-            if (!product || (product as any).inventory <= 0) {
+            const productTyped = product as unknown as { inventory?: number } | null
+            if (!productTyped || (productTyped.inventory ?? 0) <= 0) {
                 return // Out of stock or product not found
             }
 
-            const currentInventory = (product as any).inventory
+            const currentInventory = productTyped.inventory ?? 0
             const newInventory = Math.max(0, currentInventory - quantity)
 
             await payload.update({
