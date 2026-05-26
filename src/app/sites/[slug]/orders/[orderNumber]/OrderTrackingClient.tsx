@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
 import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
     Calendar, CreditCard, Copy, Check, Hash, MapPin, ShieldCheck,
@@ -48,6 +50,19 @@ type OrderData = {
 }
 
 type Props = { order: OrderData; slug: string }
+
+const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
+const POLL_INTERVAL = 30_000
+
+const STATUS_CHANGE_LABELS: Record<string, { text: string; type: 'success' | 'error' }> = {
+    new:          { text: 'Your order is being processed!',   type: 'success' },
+    confirmed:    { text: 'Your order has been confirmed!',   type: 'success' },
+    ready_to_ship: { text: 'Your order is ready to ship!',   type: 'success' },
+    shipped:      { text: 'Your order has been shipped!',     type: 'success' },
+    completed:    { text: 'Your order has been delivered!',   type: 'success' },
+    cancelled:    { text: 'Your order has been cancelled.',   type: 'error' },
+    refunded:     { text: 'Your order has been refunded.',    type: 'error' },
+}
 
 function getTrackingStatus(status: string): TrackingStatus {
     if (status === 'shipped') return 'in-transit'
@@ -401,17 +416,68 @@ function OtDeliveredBanner({ order }: { order: OrderData }) {
 }
 
 export default function OrderTrackingClient({ order, slug }: Props) {
-    const trackingStatus = getTrackingStatus(order.status)
+    const [liveOrder, setLiveOrder] = useState(order)
+    const statusRef = useRef(order.status)
+
+    useEffect(() => {
+        if (TERMINAL_STATUSES.has(statusRef.current)) return
+
+        const orderNumber = order.orderNumber
+
+        async function poll() {
+            try {
+                const res = await fetch(`/api/orders/track/${orderNumber}?slug=${encodeURIComponent(slug)}`)
+                if (!res.ok) return
+                const data = await res.json()
+
+                if (data.status !== statusRef.current) {
+                    statusRef.current = data.status
+                    setLiveOrder(prev => ({
+                        ...prev,
+                        status: data.status,
+                        paymentStatus: data.paymentStatus,
+                        trackingNumber: data.trackingNumber,
+                    }))
+                    const label = STATUS_CHANGE_LABELS[data.status]
+                    if (label) {
+                        if (label.type === 'error') toast.error(label.text, { duration: 6000 })
+                        else toast.success(label.text, { duration: 6000 })
+                    }
+                    if (data.terminal) clearInterval(timerId)
+                }
+            } catch {
+                // retry on next tick
+            }
+        }
+
+        const timerId = setInterval(() => {
+            if (!document.hidden) poll()
+        }, POLL_INTERVAL)
+
+        function onVisible() {
+            if (!document.hidden) poll()
+        }
+        document.addEventListener('visibilitychange', onVisible)
+
+        return () => {
+            clearInterval(timerId)
+            document.removeEventListener('visibilitychange', onVisible)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    const trackingStatus = getTrackingStatus(liveOrder.status)
     const isDelivered = trackingStatus === 'delivered'
 
     return (
         <div className={`ot-page${isDelivered ? ' is-delivered' : ''}`}>
+            <Toaster position="top-center" />
             <header className="ck-header">
                 <h1>Order Tracking</h1>
                 <div className="crumbs">
                     <span>My Orders</span>
                     <ChevronRight size={14} />
-                    <strong>#{order.orderNumber}</strong>
+                    <strong>#{liveOrder.orderNumber}</strong>
                 </div>
                 <Link href={`/sites/${slug}/products`} className="ot-shop-back">
                     <Store size={12} /> Back to Shop
@@ -420,15 +486,15 @@ export default function OrderTrackingClient({ order, slug }: Props) {
 
             <div className="ck-shell">
                 <div className="ck-form-col">
-                    {isDelivered && <OtDeliveredBanner order={order} />}
-                    <OtOrderHead order={order} trackingStatus={trackingStatus} />
-                    <OtStageTracker order={order} trackingStatus={trackingStatus} />
-                    <OtShippingCard order={order} trackingStatus={trackingStatus} />
-                    <OtTimeline order={order} trackingStatus={trackingStatus} />
-                    <OtItems order={order} />
+                    {isDelivered && <OtDeliveredBanner order={liveOrder} />}
+                    <OtOrderHead order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtStageTracker order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtShippingCard order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtTimeline order={liveOrder} trackingStatus={trackingStatus} />
+                    <OtItems order={liveOrder} />
                 </div>
                 <div className="ck-summary-col">
-                    <OtSide order={order} slug={slug} />
+                    <OtSide order={liveOrder} slug={slug} />
                 </div>
             </div>
         </div>
