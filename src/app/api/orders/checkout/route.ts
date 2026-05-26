@@ -140,6 +140,13 @@ export async function POST(request: Request) {
             )
         }
 
+        if (!customer.phone?.trim()) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Phone number is required' } },
+                { status: 422 }
+            )
+        }
+
         // State is required for shipping calculation — Zod enum already blocks invalid/empty values, this guards undefined
         if (!customer.address?.state) {
             return NextResponse.json(

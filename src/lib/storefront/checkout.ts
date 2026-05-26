@@ -27,10 +27,10 @@ export function validateEmail(email: string): string | null {
     return null
 }
 
-/** Validates Malaysian phone format; returns null if valid or empty (phone is optional). */
+/** Validates Malaysian phone format; returns null if valid, error string if invalid or empty. */
 export function validatePhone(phone: string): string | null {
     const v = phone.trim()
-    if (!v) return null
+    if (!v) return 'Phone number is required'
     if (!MY_PHONE_REGEX.test(v)) return 'Invalid phone number (e.g. 012-345 6789)'
     return null
 }
@@ -40,7 +40,8 @@ export function validateCheckoutForm(form: CheckoutForm): { valid: boolean; erro
     if (!form.name.trim()) errors.push('Name is required')
     if (!form.email.trim()) errors.push('Email is required')
     if (form.email && !EMAIL_REGEX.test(form.email)) errors.push('Invalid email format')
-    if (form.phone && !MY_PHONE_REGEX.test(form.phone.trim())) errors.push('Invalid phone format')
+    if (!form.phone.trim()) errors.push('Phone number is required')
+    else if (!MY_PHONE_REGEX.test(form.phone.trim())) errors.push('Invalid phone format')
     return { valid: errors.length === 0, errors }
 }
 

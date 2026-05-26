@@ -255,7 +255,7 @@ export function CheckoutClient({ slug, initialThemeCSS, initialFontHeading, init
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
-    const contactVerified = form.name.trim().length > 0 && form.email.trim().length > 0 && !fieldErrors.email && !fieldErrors.phone
+    const contactVerified = form.name.trim().length > 0 && form.email.trim().length > 0 && form.phone.trim().length > 0 && !fieldErrors.email && !fieldErrors.phone
 
     const canPlaceOrder = Boolean(
         siteId && form.name.trim() && form.email.trim() &&
