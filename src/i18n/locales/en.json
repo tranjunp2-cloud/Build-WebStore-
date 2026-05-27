@@ -297,7 +297,7 @@
       "subject": "Welcome to PrimeWeb! 🎉",
       "heading": "Welcome! 🎉",
       "subheading": "Welcome to PrimeWeb",
-      "greeting": "Hi",
+      "greeting": "Hi {userName}",
       "body": "You're ready to create your first website with PrimeWeb! Just describe your idea, and AI will help you build a professional website in minutes.",
       "stepsTitle": "Get started in 3 steps",
       "step1": "Describe the website you want to create",
@@ -310,7 +310,7 @@
       "subject": "Reset your PrimeWeb password 🔐",
       "heading": "Password Reset",
       "subheading": "We received your reset request",
-      "greeting": "Hi",
+      "greeting": "Hi {userName}",
       "body": "We received a request to reset the password for your PrimeWeb account. Click the button below to set a new password. This link will expire in 1 hour.",
       "cta": "Reset Password →",
       "fallback": "If the button doesn't work, copy and paste this link into your browser:",
@@ -322,7 +322,7 @@
       "subject": "Your PrimeWeb verification code 🔐",
       "heading": "Email Verification",
       "subheading": "Verify your identity to continue",
-      "greeting": "Hi",
+      "greeting": "Hi {userName}",
       "body": "Enter this code to verify your identity:",
       "expiry": "This code expires in 5 minutes",
       "security": "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
@@ -333,7 +333,7 @@
       "subject": "Your PrimeWeb password has been changed 🔐",
       "heading": "Password Changed",
       "subheading": "Your account password was updated",
-      "greeting": "Hi",
+      "greeting": "Hi {userName}",
       "body": "Your PrimeWeb account password has been successfully changed.",
       "warning": "If you didn't make this change, contact your workspace admin immediately and reset your password.",
       "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
@@ -342,7 +342,7 @@
       "subject": "Order Confirmed",
       "heading": "Order Confirmed ✓",
       "subheading": "Thank you for your purchase!",
-      "greeting": "Hi",
+      "greeting": "Hi {customerName}",
       "body": "Your order has been placed successfully.",
       "orderNumber": "Order Number",
       "item": "Item",
@@ -439,7 +439,7 @@
       "orderStatusAwaitingPayment": "Awaiting Payment"
     },
     "status": {
-      "greeting": "Hi",
+      "greeting": "Hi {customerName}",
       "orderNumber": "Order Number",
       "tracking": "Tracking",
       "confirmed": {

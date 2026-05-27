@@ -3,6 +3,9 @@
  * Sent when a user is invited to join a PrimeWeb workspace.
  */
 
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
+
 export type EmailLocale = 'en' | 'ms'
 
 interface StaffInvitationEmailData {
@@ -13,17 +16,34 @@ interface StaffInvitationEmailData {
     temporaryPassword?: string
 }
 
-export function staffInvitationEmail(data: StaffInvitationEmailData): { subject: string; html: string } {
+export function staffInvitationEmail(data: StaffInvitationEmailData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const { userName, workspaceName, loginUrl = 'https://primeweb.app/login', locale = 'en', temporaryPassword } = data
-    
-    // Hardcoded en for now
-    const subject = `You've been invited to join ${workspaceName} on PrimeWeb`
-    const heading = 'Workspace Invitation'
-    const subheading = 'Join your team on PrimeWeb'
-    const greeting = 'Hello'
-    const body = `You have been invited to join the workspace <strong>${workspaceName}</strong> as a staff member. Please log in to accept the invitation and access the workspace dashboard.`
-    const cta = 'Log In to Accept'
-    const footer = 'PrimeWeb \u00A9 2026. All rights reserved.'
+
+    const base = {
+        // Hardcoded en for now
+        subject: `You've been invited to join ${workspaceName} on PrimeWeb`,
+        heading: 'Workspace Invitation',
+        subheading: 'Join your team on PrimeWeb',
+        greeting: 'Hello {inviteeName}',
+        body: `You have been invited to join the workspace <strong>${workspaceName}</strong> as a staff member. Please log in to accept the invitation and access the workspace dashboard.`,
+        cta: 'Log In to Accept',
+        footer: 'PrimeWeb \u00A9 2026. All rights reserved.',
+    }
+    const vars = { inviteeName: userName, inviterName: '', brandName: 'PrimeWeb', dashboardUrl: loginUrl }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        subject: 'subject',
+        greeting: 'greeting',
+        ctaLabel: 'cta',
+        closing: 'footer',
+    })
+
+    const subject = t.subject
+    const heading = t.heading
+    const subheading = t.subheading
+    const greeting = t.greeting
+    const body = t.body
+    const cta = t.cta
+    const footer = t.footer
 
     const passwordBlock = temporaryPassword ? `
         <div style="background: rgba(13, 148, 136, 0.1); border-left: 4px solid #0d9488; padding: 16px; margin: 24px 0; border-radius: 4px;">
@@ -50,7 +70,7 @@ export function staffInvitationEmail(data: StaffInvitationEmailData): { subject:
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 16px;">${greeting} <strong>${userName}</strong>,</p>
+                <p style="font-size: 16px; margin: 0 0 16px;">${greeting},</p>
                 <p style="font-size: 14px; color: #555; line-height: 1.7; margin: 0;">
                     ${body}
                 </p>

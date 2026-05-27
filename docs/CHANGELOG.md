@@ -15,6 +15,59 @@ For full architectural decisions + incident post-mortems: see `docs/journals/`.
 
 ## [Unreleased] — Staging
 
+### F32 — Email Template CMS Settings
+
+**Features:**
+- Per-tenant customization of 15 transactional email templates (subject, greeting, CTA label, closing) in 2 languages (English, Malay)
+- Enable/disable toggle per template with critical-type guard (otp-verification, forgot-password, password-changed cannot be disabled)
+- Real-time preview via `/api/email-preview` (sandboxed iframe, debounced 300ms, no DB write/send)
+- Upstash Redis cache (TTL 300s) for config lookups; invalidates on save/delete
+- New Payload collection: `email-template-settings` (multi-tenant scoped, unique index on tenant+type+recipient)
+- Dashboard navigation: Settings → Email Templates
+- 15 email template functions refactored to accept optional CMS override config
+- Backward compatible: no config row = hardcoded defaults, send behavior unchanged
+
+**Email Template Types (15):**
+- Critical (cannot disable): otp-verification, forgot-password, password-changed
+- Commerce: order-confirmation, shipment-notification, refund-processed
+- User: welcome, contact-confirmation, subscription-created, subscription-canceled
+- Engagement: review-notification, product-restock, discount-alert, feature-announcement, generic
+
+**Code changes:**
+- New: `src/collections/EmailTemplateSettings.ts` (Payload collection definition)
+- New: `src/lib/email/types.ts` (EmailTemplateType enum, EmailRecipient enum)
+- New: `src/lib/email/get-template-config.ts` (Redis cache + Payload DB lookup)
+- New: `src/lib/email/merge-template-config.ts` (config merge + variable substitution with HTML escaping)
+- New: `src/lib/email/preview-fixtures.ts` (mock data per template type)
+- New: `src/lib/email/template-registry.ts` (templateType → render fn mapping)
+- New: `src/lib/redis.ts` (shared Upstash Redis singleton, extracted from rateLimit.ts)
+- New: `src/app/api/email-preview/route.ts` (authenticated preview endpoint)
+- New: `src/app/(dashboard)/settings/email-templates/` (page + UI components, server actions)
+- Modified: `src/lib/email/send.ts` (extended with templateType/recipient/tenantId/config params)
+- Modified: `src/lib/rateLimit.ts` (import redis from ./redis)
+- Modified: `src/payload.config.ts` (register EmailTemplateSettings collection)
+- Modified: `scripts/db-setup.js` (4 migrations: create table, add columns, create indices)
+- Modified: `src/components/dashboard/Sidebar.tsx` + `src/components/editor/EditorMenuDrawer.tsx` (add "Email Templates" nav item)
+
+**Tests:**
+- 25 automated test cases (TC-F32-001..020): cache layer (hit/miss/null/fallback), merge/variable substitution, multi-tenant isolation, backward compat, critical-type guard, HTML escaping
+- Unit tests: `src/__tests__/unit/email/get-template-config.test.ts` (6 tests), `src/__tests__/unit/email/merge-template-config.test.ts` (11 tests)
+- Integration tests: `src/__tests__/integration/email-settings/multi-tenant-isolation.test.ts` (8 tests)
+- All tests pass; 100% coverage on new code
+
+**Security:**
+- All DB ops scoped to getCurrentTenantId() (IDOR prevention)
+- Critical types (otp/forgot-pwd/pwd-changed) cannot be disabled (gated at server action + UI)
+- Preview API: authenticated, enum-validated templateType, no DB write/send
+- HTML-escaping of all substituted values prevents XSS injection
+
+**Non-breaking:**
+- No changes to existing email send paths
+- Existing order/user emails render identically when no config row exists
+- All 15 template functions accept optional config; backward compatible with undefined
+
+---
+
 ### GH-1018 — Code Review Bug Fixes (iframe guard + DRY editor detection)
 
 **Bug fixes (fix/BUG-F05-1018-block-product-view-detail):**

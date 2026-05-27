@@ -1,0 +1,23 @@
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { getCurrentTenantId } from '@/lib/auth'
+import { EmailTemplatesClient } from './_components/EmailTemplatesClient'
+
+export default async function EmailTemplatesPage() {
+    const tenantId = await getCurrentTenantId()
+    const payload = await getPayload({ config })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let rows: any[] = []
+    if (tenantId) {
+        const result = await payload.find({
+            collection: 'email-template-settings',
+            where: { tenant: { equals: tenantId } },
+            limit: 100,
+            depth: 0,
+        })
+        rows = result.docs
+    }
+
+    return <EmailTemplatesClient tenantId={tenantId ?? undefined} initialRows={rows} />
+}

@@ -8,6 +8,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -85,9 +87,19 @@ function buildAddress(addr: OrderConfirmationData['customerAddress']): string {
 
 export function orderConfirmationEmail(
     data: OrderConfirmationData,
+    config?: EmailTemplateConfig,
 ): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const t = (locales[locale] ?? locales.ms).order
+    const base = (locales[locale] ?? locales.ms).order
+    const vars = {
+        customerName: data.customerName,
+        orderNumber: data.orderNumber,
+        orderTotal: data.total.toFixed(2),
+    }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        greeting: 'greeting',
+        ctaLabel: 'cta',
+    })
     const isConfirmed = data.event === 'confirmed'
     const isCompleted = data.event === 'completed'
 
@@ -185,7 +197,7 @@ export function orderConfirmationEmail(
 
       <!-- Greeting -->
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting} ${esc(data.customerName)},</div>
+        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-size:14px;line-height:22px;color:#475569;">${bodyText}</div>

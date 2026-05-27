@@ -6,6 +6,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -85,10 +87,15 @@ function paymentMethodLabel(method: string, locale: EmailLocale): string {
     return locale === 'ms' ? 'Kad / FPX' : 'Card / FPX'
 }
 
-export function orderShippedEmail(data: OrderShippedData): { subject: string; html: string } {
+export function orderShippedEmail(data: OrderShippedData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const t = (locales[locale] ?? locales.ms).order
+    const orderBase = (locales[locale] ?? locales.ms).order
     const tS = (locales[locale] ?? locales.ms).shippedOrder
+    const vars = { customerName: data.customerName, orderNumber: data.orderNumber }
+    const t = mergeTemplateConfig(orderBase, config ?? null, vars, {
+        greeting: 'greeting',
+        ctaLabel: 'cta',
+    })
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
@@ -162,7 +169,7 @@ export function orderShippedEmail(data: OrderShippedData): { subject: string; ht
 
       <!-- Greeting -->
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting} ${esc(data.customerName)},</div>
+        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-size:14px;line-height:22px;color:#475569;">${tS.body}</div>

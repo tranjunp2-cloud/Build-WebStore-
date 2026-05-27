@@ -6,6 +6,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -87,10 +89,17 @@ function paymentMethodLabel(method: OrderCancelledData['paymentMethod'], locale:
     return locale === 'ms' ? 'Kad / FPX' : 'Card / FPX'
 }
 
-export function orderCancelledEmail(data: OrderCancelledData): { subject: string; html: string } {
+export function orderCancelledEmail(data: OrderCancelledData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const t = (locales[locale] ?? locales.ms).order
+    const orderBase = (locales[locale] ?? locales.ms).order
     const tC = (locales[locale] ?? locales.ms).cancelledOrder
+    const vars = { customerName: data.customerName, orderNumber: data.orderNumber }
+    const t = mergeTemplateConfig(orderBase, config ?? null, vars, {
+        greeting: 'greeting',
+    })
+    const tCMerged = mergeTemplateConfig(tC, config ?? null, vars, {
+        ctaLabel: 'cta',
+    })
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
@@ -164,7 +173,7 @@ export function orderCancelledEmail(data: OrderCancelledData): { subject: string
 
       <!-- Greeting -->
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting} ${esc(data.customerName)},</div>
+        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-size:14px;line-height:22px;color:#475569;">${tC.body}</div>
@@ -272,7 +281,7 @@ export function orderCancelledEmail(data: OrderCancelledData): { subject: string
 
       <!-- CTA -->
       <tr><td align="center" style="padding:26px 40px 14px;">
-        <a href="${data.shopUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tC.cta}</a>
+        <a href="${data.shopUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tCMerged.cta}</a>
       </td></tr>
 
       <!-- Farewell -->

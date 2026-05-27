@@ -102,6 +102,7 @@ const NAV_ITEMS: NavItemConfig[] = [
         children: [
             { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains', permissionId: 'settings' },
             { label: { en: 'Payments', ms: 'Pembayaran' }, href: '/settings/payments', permissionId: 'settings' },
+            { label: { en: 'Email Templates', ms: 'Templat E-mel' }, href: '/settings/email-templates', permissionId: 'settings' },
             { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff' },
             { label: { en: 'Shipping', ms: 'Penghantaran' }, href: '/settings/shipping', permissionId: 'settings' },
             { label: { en: 'Account profile', ms: 'Profil Akaun' }, href: '/settings/profile' },

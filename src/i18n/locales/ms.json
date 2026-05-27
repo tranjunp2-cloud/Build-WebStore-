@@ -297,7 +297,7 @@
       "subject": "Selamat Datang ke PrimeWeb! 🎉",
       "heading": "Selamat Datang! 🎉",
       "subheading": "Selamat datang ke PrimeWeb",
-      "greeting": "Hai",
+      "greeting": "Hai {userName}",
       "body": "Anda sudah bersedia untuk mencipta laman web pertama anda dengan PrimeWeb! Hanya huraikan idea anda, dan AI akan membantu anda membina laman web profesional dalam beberapa minit.",
       "stepsTitle": "Mula dalam 3 langkah",
       "step1": "Huraikan laman web yang anda mahu cipta",
@@ -310,7 +310,7 @@
       "subject": "Tetapkan semula kata laluan PrimeWeb anda 🔐",
       "heading": "Tetapan Semula Kata Laluan",
       "subheading": "Kami menerima permintaan tetapan semula anda",
-      "greeting": "Hai",
+      "greeting": "Hai {userName}",
       "body": "Kami menerima permintaan untuk menetapkan semula kata laluan akaun PrimeWeb anda. Klik butang di bawah untuk menetapkan kata laluan baharu. Pautan ini akan tamat tempoh dalam 1 jam.",
       "cta": "Tetapkan Semula Kata Laluan →",
       "fallback": "Jika butang tidak berfungsi, salin dan tampal pautan ini ke pelayar anda:",
@@ -322,7 +322,7 @@
       "subject": "Kod pengesahan PrimeWeb anda 🔐",
       "heading": "Pengesahan E-mel",
       "subheading": "Sahkan identiti anda untuk meneruskan",
-      "greeting": "Hai",
+      "greeting": "Hai {userName}",
       "body": "Masukkan kod ini untuk mengesahkan identiti anda:",
       "expiry": "Kod ini tamat tempoh dalam 5 minit",
       "security": "Jika anda tidak meminta kod ini, sila abaikan e-mel ini. Seseorang mungkin telah memasukkan e-mel anda secara tidak sengaja.",
@@ -333,7 +333,7 @@
       "subject": "Kata laluan PrimeWeb anda telah ditukar 🔐",
       "heading": "Kata Laluan Ditukar",
       "subheading": "Kata laluan akaun anda telah dikemas kini",
-      "greeting": "Hai",
+      "greeting": "Hai {userName}",
       "body": "Kata laluan akaun PrimeWeb anda telah berjaya ditukar.",
       "warning": "Jika anda tidak membuat perubahan ini, hubungi pentadbir ruang kerja anda dengan segera dan tetapkan semula kata laluan anda.",
       "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
@@ -342,7 +342,7 @@
       "subject": "Pesanan Disahkan",
       "heading": "Pesanan Disahkan ✓",
       "subheading": "Terima kasih atas pembelian anda!",
-      "greeting": "Hai",
+      "greeting": "Hai {customerName}",
       "body": "Pesanan anda telah berjaya dibuat.",
       "orderNumber": "Nombor Pesanan",
       "item": "Barangan",
@@ -439,7 +439,7 @@
       "orderStatusAwaitingPayment": "Menunggu Pembayaran"
     },
     "status": {
-      "greeting": "Hai",
+      "greeting": "Hai {customerName}",
       "orderNumber": "Nombor Pesanan",
       "tracking": "Penjejakan",
       "confirmed": {

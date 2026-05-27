@@ -1,3 +1,6 @@
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
+
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 interface ResendUploadLinkData {
@@ -8,23 +11,41 @@ interface ResendUploadLinkData {
     locale?: string
 }
 
-export function resendUploadLinkEmail(data: ResendUploadLinkData): { subject: string; html: string } {
+export function resendUploadLinkEmail(data: ResendUploadLinkData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const { shopName, orderNumber, customerName, resumeUrl, locale = 'ms' } = data
     const isMs = locale === 'ms'
 
-    const subject = isMs
-        ? `[${esc(shopName)}] Semak semula — muat naik resit bayaran anda untuk pesanan #${esc(orderNumber)}`
-        : `[${esc(shopName)}] Action required — upload your payment receipt for order #${esc(orderNumber)}`
+    const baseSubject = isMs
+        ? `[${shopName}] Semak semula — muat naik resit bayaran anda untuk pesanan #${orderNumber}`
+        : `[${shopName}] Action required — upload your payment receipt for order #${orderNumber}`
+    const baseGreeting = isMs ? 'Hai {customerName}' : 'Hi {customerName}'
+    const baseCta = isMs ? 'Muat Naik Resit Sekarang' : 'Upload Receipt Now'
+    const baseFooter = isMs ? `Terima kasih kerana membeli di ${shopName}.` : `Thank you for shopping at ${shopName}.`
 
-    const greeting = isMs ? `Hai ${esc(customerName)},` : `Hi ${esc(customerName)},`
+    const base = {
+        subject: baseSubject,
+        greeting: baseGreeting,
+        cta: baseCta,
+        footer: baseFooter,
+    }
+    const vars = { customerName, orderNumber, uploadLink: resumeUrl }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        subject: 'subject',
+        greeting: 'greeting',
+        ctaLabel: 'cta',
+        closing: 'footer',
+    })
+
+    const subject = t.subject
+    const greeting = `${t.greeting},`
     const body = isMs
         ? `Kami perasan anda belum muat naik resit pembayaran untuk pesanan <strong>#${esc(orderNumber)}</strong>. Sila muat naik resit bank transfer anda supaya penjual boleh mengesahkan pembayaran dan memproses pesanan anda.`
         : `We noticed you haven't uploaded your payment receipt for order <strong>#${esc(orderNumber)}</strong>. Please upload your bank transfer receipt so the seller can verify your payment and process your order.`
-    const cta = isMs ? 'Muat Naik Resit Sekarang' : 'Upload Receipt Now'
+    const cta = t.cta
     const note = isMs
         ? 'Link ini hanya sah untuk 24 jam. Selepas tempoh tersebut, hubungi penjual untuk mendapatkan bantuan.'
         : 'This link is valid for 24 hours. After that, please contact the seller for assistance.'
-    const footer = isMs ? `Terima kasih kerana membeli di ${esc(shopName)}.` : `Thank you for shopping at ${esc(shopName)}.`
+    const footer = t.footer
 
     const html = `<!DOCTYPE html>
 <html lang="${isMs ? 'ms' : 'en'}">

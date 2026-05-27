@@ -4043,6 +4043,58 @@ const MIGRATIONS = [
     sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id integer;` },
   { name: 'orders.customer_id_index',
     sql: `CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders (customer_id);` },
+  // ── F32: Email Template Settings ──
+  {
+    name: 'email_template_settings.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS email_template_settings (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      template_type varchar NOT NULL,
+      recipient varchar NOT NULL,
+      enabled boolean NOT NULL DEFAULT true,
+      content_en_subject varchar(200),
+      content_en_greeting text,
+      content_en_cta_label varchar(100),
+      content_en_closing text,
+      content_ms_subject varchar(200),
+      content_ms_greeting text,
+      content_ms_cta_label varchar(100),
+      content_ms_closing text,
+      updated_by_id integer REFERENCES users(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`,
+  },
+  {
+    name: 'email_template_settings.unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS email_template_settings_tenant_type_recipient_uniq
+      ON email_template_settings (tenant_id, template_type, recipient)`,
+  },
+  {
+    name: 'email_template_settings.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS email_template_settings_tenant_idx
+      ON email_template_settings (tenant_id)`,
+  },
+  {
+    name: 'email_template_settings.alter_columns',
+    sql: `
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS tenant_id integer REFERENCES tenants(id) ON DELETE CASCADE;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS template_type varchar;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS recipient varchar;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_en_subject varchar(200);
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_en_greeting text;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_en_cta_label varchar(100);
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_en_closing text;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_ms_subject varchar(200);
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_ms_greeting text;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_ms_cta_label varchar(100);
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS content_ms_closing text;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS updated_by_id integer REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+      ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
+    `,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -4078,6 +4130,7 @@ const COLLECTION_SLUGS = [
   'content_packs',
   'template_versions',
   'customers',
+  'email-template-settings',
 ];
 
 /**

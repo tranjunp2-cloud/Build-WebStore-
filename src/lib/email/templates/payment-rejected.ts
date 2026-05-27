@@ -6,6 +6,9 @@
  * Related: TC-F10-06-23, TC-F10-06-24, PRD BR-Payment-05
  */
 
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
+
 export type RejectionReason = 'image_blurry' | 'wrong_amount' | 'duplicate_order' | 'other'
 
 export interface PaymentRejectedData {
@@ -58,11 +61,29 @@ function resolveReason(reason: RejectionReason, detail?: string): string {
 
 export function paymentRejectedEmail(
     data: PaymentRejectedData,
+    config?: EmailTemplateConfig,
 ): { subject: string; html: string } {
     const reasonText = resolveReason(data.rejectionReason, data.rejectionDetail)
+    const base = {
+        subject: `Action required — Order #${data.orderNumber} payment could not be verified`,
+        greeting: 'Hi {customerName}',
+        cta: 'Re-upload Receipt',
+        footer: 'If you believe this is an error, please contact our support team with your order number.',
+    }
+    const vars = {
+        customerName: data.customerName,
+        orderNumber: data.orderNumber,
+        rejectionReason: reasonText,
+    }
+    const t = mergeTemplateConfig(base, config ?? null, vars, {
+        subject: 'subject',
+        greeting: 'greeting',
+        ctaLabel: 'cta',
+        closing: 'footer',
+    })
 
     return {
-        subject: `Action required — Order #${data.orderNumber} payment could not be verified`,
+        subject: t.subject,
         html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -78,7 +99,7 @@ export function paymentRejectedEmail(
 
             <!-- Body -->
             <div style="padding: 32px;">
-                <p style="font-size: 16px; margin: 0 0 4px;">Hi ${escapeHtml(data.customerName)},</p>
+                <p style="font-size: 16px; margin: 0 0 4px;">${t.greeting},</p>
                 <p style="font-size: 14px; color: #666; margin: 0 0 24px;">
                     We were unable to verify your payment for order <strong>#${escapeHtml(data.orderNumber)}</strong>. Please see the reason below and re-upload a valid receipt.
                 </p>
@@ -109,7 +130,7 @@ export function paymentRejectedEmail(
 
                 <!-- CTA Button -->
                 <div style="text-align: center; margin-top: 28px;">
-                    <a href="${data.magicLinkUrl}" style="display: inline-block; background: linear-gradient(135deg, #f97316, #ef4444); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.02em;">Re-upload Receipt</a>
+                    <a href="${data.magicLinkUrl}" style="display: inline-block; background: linear-gradient(135deg, #f97316, #ef4444); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.02em;">${t.cta}</a>
                 </div>
 
                 <!-- Plaintext fallback -->
@@ -120,7 +141,7 @@ export function paymentRejectedEmail(
 
             <!-- Footer -->
             <div style="background: #fafafa; padding: 24px 32px; text-align: center; border-top: 1px solid #eee;">
-                <p style="font-size: 12px; color: #999; margin: 0;">If you believe this is an error, please contact our support team with your order number.</p>
+                <p style="font-size: 12px; color: #999; margin: 0;">${t.footer}</p>
             </div>
         </div>
     </div>

@@ -8,6 +8,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -103,10 +105,25 @@ function buildAddress(addr: BankTransferInstructionsData['customerAddress']): st
 
 export function bankTransferInstructionsEmail(
     data: BankTransferInstructionsData,
+    config?: EmailTemplateConfig,
 ): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const tOrder = (locales[locale] ?? locales.ms).order
-    const tBT = (locales[locale] ?? locales.ms).bankTransfer
+    const orderBase = (locales[locale] ?? locales.ms).order
+    const btBase = (locales[locale] ?? locales.ms).bankTransfer
+    const vars = {
+        customerName: data.customerName,
+        orderNumber: data.orderNumber,
+        orderTotal: data.total.toFixed(2),
+        bankName: data.bankName ?? '',
+        bankAccountNo: data.bankAccountNo ?? '',
+        bankAccountHolder: data.bankAccountHolder ?? '',
+    }
+    const tOrder = mergeTemplateConfig(orderBase, config ?? null, vars, {
+        greeting: 'greeting',
+    })
+    const tBT = mergeTemplateConfig(btBase, config ?? null, vars, {
+        ctaLabel: 'uploadCta',
+    })
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
@@ -192,7 +209,7 @@ export function bankTransferInstructionsEmail(
 
       <!-- Greeting -->
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${tOrder.greeting} ${esc(data.customerName)},</div>
+        <div style="font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${tOrder.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-size:14px;line-height:22px;color:#475569;">${tBT.body}</div>

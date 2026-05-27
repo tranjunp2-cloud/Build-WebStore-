@@ -6,6 +6,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -79,10 +81,17 @@ function buildAddress(addr: OrderExpiredData['customerAddress']): string {
         .join(', ')
 }
 
-export function orderExpiredEmail(data: OrderExpiredData): { subject: string; html: string } {
+export function orderExpiredEmail(data: OrderExpiredData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const t = (locales[locale] ?? locales.ms).order
+    const orderBase = (locales[locale] ?? locales.ms).order
     const tA = (locales[locale] ?? locales.ms).autoCancelledOrder
+    const vars = { customerName: data.customerName, orderNumber: data.orderNumber }
+    const t = mergeTemplateConfig(orderBase, config ?? null, vars, {
+        greeting: 'greeting',
+    })
+    const tAMerged = mergeTemplateConfig(tA, config ?? null, vars, {
+        ctaLabel: 'cta',
+    })
 
     const fp = (n: number) => formatPrice(n, data.currency, locale)
     const esc = escapeHtml
@@ -151,7 +160,7 @@ export function orderExpiredEmail(data: OrderExpiredData): { subject: string; ht
 
       <!-- Greeting -->
       <tr><td style="padding:18px 40px 6px;">
-        <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting} ${esc(data.customerName)},</div>
+        <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:19px;font-weight:700;color:#0F172A;line-height:28px;">${t.greeting},</div>
       </td></tr>
       <tr><td style="padding:6px 40px 18px;">
         <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;color:#475569;">${tA.body}</div>
@@ -284,7 +293,7 @@ export function orderExpiredEmail(data: OrderExpiredData): { subject: string; ht
 
       <!-- CTA -->
       <tr><td align="center" style="padding:22px 40px 8px;">
-        <a href="${data.reorderUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tA.cta}</a>
+        <a href="${data.reorderUrl}" style="display:inline-block;background:#14C2BB;color:#FFFFFF;font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:18px;padding:14px 28px;border-radius:8px;text-decoration:none;">${tAMerged.cta}</a>
       </td></tr>
       <tr><td align="center" style="padding:0 40px 6px;">
         <div style="font-family:'Inter','Helvetica Neue',Helvetica,Arial,sans-serif;font-size:12.5px;line-height:18px;color:#94A3B8;">${tA.ctaSubtitle}</div>

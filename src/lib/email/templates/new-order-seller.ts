@@ -6,6 +6,8 @@
 
 import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
+import { mergeTemplateConfig } from '../merge-template-config'
+import type { EmailTemplateConfig } from '../types'
 
 type EmailLocale = 'en' | 'ms'
 
@@ -29,9 +31,13 @@ function escapeHtml(s: string): string {
         .replace(/'/g, '&#x27;')
 }
 
-export function newOrderSellerEmail(data: NewOrderSellerData): { subject: string; html: string } {
+export function newOrderSellerEmail(data: NewOrderSellerData, config?: EmailTemplateConfig): { subject: string; html: string } {
     const locale = data.locale ?? 'ms'
-    const tNew = (locales[locale] ?? locales.ms).newOrder
+    const newOrderBase = (locales[locale] ?? locales.ms).newOrder
+    const vars = { orderNumber: data.orderNumber, orderTotal: '' }
+    const tNew = mergeTemplateConfig(newOrderBase, config ?? null, vars, {
+        ctaLabel: 'cta',
+    })
     const esc = escapeHtml
 
     const subject = locale === 'ms'
