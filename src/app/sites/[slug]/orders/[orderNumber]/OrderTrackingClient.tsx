@@ -52,11 +52,12 @@ type Props = { order: OrderData; slug: string }
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'payment_failed'])
 
 
-function getTrackingStatus(status: string): TrackingStatus {
+function getTrackingStatus(status: string, paymentStatus?: string): TrackingStatus {
     if (status === 'shipped') return 'in-transit'
     if (status === 'completed') return 'delivered'
-    if (status === 'cancelled' || status === 'payment_failed') return 'cancelled'
     if (status === 'refunded') return 'refunded'
+    if (status === 'cancelled' && paymentStatus === 'payment_failed') return 'payment_failed'
+    if (status === 'cancelled' || status === 'payment_failed') return 'cancelled'
     return 'processing'
 }
 
@@ -92,6 +93,7 @@ function getStageStates(trackingStatus: TrackingStatus) {
 function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
     const [copied, setCopied] = useState(false)
     const isPaid = order.paymentStatus === 'paid'
+    const isPaymentFailed = order.paymentStatus === 'payment_failed'
 
     const STATUS_META = {
         'processing': { cls: 'processing', Icon: Package, eyebrow: 'Current Status', title: 'Processing' },
@@ -103,10 +105,15 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
     }
     const s = STATUS_META[trackingStatus]
 
-    const paymentLabel = isPaid ? 'Paid' : (() => {
-        const m: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', cod: 'COD', ewallet: 'e-Wallet' }
-        return `Pending · ${m[order.paymentMethod ?? ''] ?? 'Pending'}`
-    })()
+    const paymentLabel = isPaid
+        ? 'Paid'
+        : isPaymentFailed
+            ? 'Payment Failed'
+            : (() => {
+                const m: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', cod: 'COD', ewallet: 'e-Wallet' }
+                return `Pending · ${m[order.paymentMethod ?? ''] ?? 'Pending'}`
+            })()
+    const chipClass = isPaid ? 'paid' : isPaymentFailed ? 'failed' : 'pending'
 
     const handleCopy = () => {
         navigator.clipboard?.writeText(order.orderNumber)
@@ -123,7 +130,7 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
                     <button className="ot-oh-copy" onClick={handleCopy} title="Copy order ID">
                         {copied ? <Check size={13} /> : <Copy size={13} />}
                     </button>
-                    <span className={`ot-payment-chip ${isPaid ? 'paid' : 'pending'}`}>
+                    <span className={`ot-payment-chip ${chipClass}`}>
                         <span className="dot" />
                         {paymentLabel}
                     </span>
@@ -457,7 +464,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const trackingStatus = getTrackingStatus(liveOrder.status)
+    const trackingStatus = getTrackingStatus(liveOrder.status, liveOrder.paymentStatus)
     const isDelivered = trackingStatus === 'delivered'
     const isNegativeTerminal = trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed'
 

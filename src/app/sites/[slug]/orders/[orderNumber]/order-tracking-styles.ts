@@ -49,6 +49,8 @@ export const OT_CSS = `
 .ot-payment-chip.paid .dot{background:var(--tl);}
 .ot-payment-chip.pending{background:var(--amb1);border-color:#f1d693;color:var(--ambfg);}
 .ot-payment-chip.pending .dot{background:var(--ambfg);animation:otDotPulse 1.6s ease-in-out infinite;}
+.ot-payment-chip.failed{background:#fef2f2;border-color:#fca5a5;color:#b91c1c;}
+.ot-payment-chip.failed .dot{background:#ef4444;}
 @keyframes otDotPulse{0%,100%{box-shadow:0 0 0 0 rgba(138,92,10,.50);}50%{box-shadow:0 0 0 5px rgba(138,92,10,0);}}
 .ot-oh-meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--f3);}
 .ot-oh-meta>span{display:inline-flex;align-items:center;gap:6px;}

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Clock, CheckCircle2, Package, Truck } from 'lucide-react'
 import { useI18n } from '@/i18n'
 
@@ -9,20 +9,34 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
     const o = t.dashboard.orders
     const [counts, setCounts] = useState({ pending: 0, readyToShip: 0, confirmed: 0, shipped: 0 })
 
+    const fetchMetrics = useCallback(async () => {
+        try {
+            const res = await fetch('/api/orders/metrics')
+            const json = await res.json()
+            if (json.success && json.data) {
+                setCounts(json.data)
+            }
+        } catch (err) {
+            console.error('Failed to load metrics:', err)
+        }
+    }, [])
+
+    // Refresh when parent triggers (bulk actions, order updates)
     useEffect(() => {
-        async function fetchMetrics() {
-            try {
-                const res = await fetch('/api/orders/metrics')
-                const json = await res.json()
-                if (json.success && json.data) {
-                    setCounts(json.data)
-                }
-            } catch (err) {
-                console.error('Failed to load metrics:', err)
+        fetchMetrics()
+    }, [refreshCounter, fetchMetrics])
+
+    // Refresh on real-time order notifications (new order or status update)
+    useEffect(() => {
+        function handleNotification(e: Event) {
+            const detail = (e as CustomEvent).detail
+            if (detail?.type === 'ORDER_NEW' || detail?.type === 'ORDER_UPDATED') {
+                fetchMetrics()
             }
         }
-        fetchMetrics()
-    }, [refreshCounter])
+        window.addEventListener('notification-toast', handleNotification)
+        return () => window.removeEventListener('notification-toast', handleNotification)
+    }, [fetchMetrics])
 
     const metrics = [
         {
