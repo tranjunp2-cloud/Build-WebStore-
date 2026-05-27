@@ -175,9 +175,6 @@ function normalizeSectionLabels(
     blocks: Record<string, unknown>[],
     language: string,
 ): Record<string, unknown>[] {
-    // Languages with full BlockStrings (hasDedicatedStrings) get their sectionLabels
-    // from the STRINGS chain after the guard below — skip to avoid double-patching.
-    if (hasDedicatedStrings(language)) return blocks
     const labels = getSectionLabels(language)
     if (!labels) return blocks
 
