@@ -425,6 +425,22 @@ function CustomerInformation({ order }: { order: OrderDetail }) {
     )
 }
 
+function fmtPaymentMethod(m?: string | null) {
+    const map: Record<string, string> = { bank_transfer: 'Bank Transfer', card: 'Credit Card', cod: 'Cash on Delivery', ewallet: 'e-Wallet' }
+    return map[m ?? ''] ?? m ?? '—'
+}
+
+function fmtPaymentStatus(s?: string | null) {
+    const map: Record<string, string> = {
+        awaiting_payment: 'Awaiting Payment',
+        pending_verification: 'Pending Verification',
+        paid: 'Paid',
+        payment_failed: 'Payment Failed',
+        refunded: 'Refunded',
+    }
+    return map[s ?? ''] ?? s ?? '—'
+}
+
 // ─── PAYMENT INFORMATION ───
 // layout_ODZ12A: column, gap 12px, padding 17px 17px 1px, height 318
 // Method row — icon fill_RKVNRG rgba(59,130,246,0.1)
@@ -506,7 +522,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.method}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 14, lineHeight: '20px', color: 'var(--dash-text)' }}>
-                            {order.paymentMethod}
+                            {fmtPaymentMethod(order.paymentMethod)}
                         </span>
                     </div>
                 </div>
@@ -523,7 +539,7 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
                             {d.paymentStatus}
                         </span>
                         <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, lineHeight: '20px', color: statusColor }}>
-                            {order.paymentStatus}
+                            {fmtPaymentStatus(order.paymentStatus)}
                         </span>
                     </div>
                 </div>
