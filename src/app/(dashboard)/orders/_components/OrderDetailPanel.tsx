@@ -791,7 +791,8 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {/* Primary Action Button — always visible, disabled for terminal statuses */}
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
-                    const primaryDisabled = isLoading || isTerminal
+                    const isAwaitingBtPayment = order.paymentMethod === 'bank_transfer' && order.paymentStatus !== 'paid' && ['pending', 'new'].includes(status)
+                    const primaryDisabled = isLoading || isTerminal || isAwaitingBtPayment
                     return (
                         <button
                             onClick={() => {
@@ -829,7 +830,7 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
                 {(() => {
                     const isTerminal = ['cancelled', 'refunded', 'completed'].includes(status)
                     const cancelDisabled = isLoading || isTerminal || !['pending', 'new', 'confirmed', 'paid', 'processing'].includes(status)
-                    const refundDisabled = isLoading || !['new', 'paid', 'confirmed', 'ready_to_ship', 'shipped', 'completed'].includes(status)
+                    const refundDisabled = isLoading || !['shipped', 'completed'].includes(status)
                     return (
                         <div className="flex" style={{ gap: 12 }}>
                             {/* Cancel Order Button */}

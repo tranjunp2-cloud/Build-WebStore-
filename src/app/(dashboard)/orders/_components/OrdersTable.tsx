@@ -50,12 +50,6 @@ function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string
     return (statusLabels as any)[keyMap[status]] || status
 }
 
-function formatPaymentMethod(method?: string | null): string {
-    if (method === 'bank_transfer') return 'Bank Transfer'
-    if (method === 'cod') return 'COD'
-    if (method === 'stripe') return 'Card'
-    return method ?? '—'
-}
 
 function formatOrderDate(iso?: string | null): string {
     if (!iso) return '—'
@@ -214,6 +208,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
     const { t } = useI18n()
     const o = t.dashboard.orders
     const statusLabels = o.status
+    const methodLabels = (o.detail as any).paymentMethods as Record<string, string>
     const allSelected = orders.length > 0 && orders.every(o => selectedRows.has(o.id))
     const someSelected = orders.some(o => selectedRows.has(o.id)) && !allSelected
     const allCheckboxRef = useRef<HTMLInputElement>(null)
@@ -286,7 +281,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-[12px]">
-                                        <span className="text-[12px] text-slate-400">{formatPaymentMethod(order.paymentMethod)}</span>
+                                        <span className="text-[12px] text-slate-400">{methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—'}</span>
                                         <span className="text-[12px] text-slate-500">{formatOrderDate(order.createdAt)}</span>
                                     </div>
                                 </div>
@@ -429,7 +424,7 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                                 color: 'var(--dash-text-muted)',
                                             }}
                                         >
-                                            {formatPaymentMethod(order.paymentMethod)}
+                                            {methodLabels[order.paymentMethod ?? ''] ?? order.paymentMethod ?? '—'}
                                         </span>
                                     </td>
                                     <td style={{ padding: `${textPadY}px 24px` }}>
