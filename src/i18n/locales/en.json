@@ -396,6 +396,14 @@
       "cta": "Place a new order",
       "subject": "Order cancellation notice"
     },
+    "refundedOrder": {
+      "body": "Your order has been refunded. The amount will be returned to your original payment method within 5–10 business days.",
+      "orderStatusRefunded": "Refunded",
+      "refundDate": "Refund date",
+      "refundNote": "Refund note",
+      "cta": "Place a new order",
+      "subject": "Order refund confirmation"
+    },
     "shippedOrder": {
       "body": "Thank you for your purchase. Your order has been shipped to you.",
       "orderStatusShipped": "Shipped",
@@ -3199,13 +3207,13 @@
       "contactInfo": "Contact Information",
       "fullName": "Full Name *",
       "emailAddress": "Email Address *",
-      "phone": "Phone (e.g. +60 12-345 6789)",
+      "phone": "Phone * (+60)",
       "shippingAddress": "Shipping Address",
-      "addressLine1": "Address Line 1",
+      "addressLine1": "Address Line 1 *",
       "addressLine2": "Address Line 2 (optional)",
-      "city": "City",
-      "state": "State",
-      "postcode": "Postcode",
+      "city": "City *",
+      "state": "State *",
+      "postcode": "Postcode *",
       "paymentMethod": "Payment Method",
       "cod": "Cash on Delivery (COD)",
       "codDesc": "Pay when you receive your order",

@@ -341,6 +341,7 @@ export default function BuilderCompletionView({
     return (
         <BuilderStepScreen
             floatingControls={floatingControls}
+            gridClassName="lg:grid-cols-[clamp(380px,28vw,460px)_1fr]"
             leftBody={leftBody}
             leftFooter={leftFooter}
             right={(

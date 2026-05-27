@@ -24,7 +24,7 @@ interface TenantDoc {
 }
 
 const RESENDABLE_STATUSES = new Set(['awaiting_payment', 'pending_verification'])
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
+const BASE_URL = process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'
 
 /**
  * POST /api/orders/resend-upload-link
