@@ -117,6 +117,9 @@ function normalizeAboutSectionLabel(
     blocks: Record<string, unknown>[],
     language: string,
 ): Record<string, unknown>[] {
+    // Skip if normalizeSectionLabels already patched via SECTION_LABELS_SEED — its values
+    // are the authoritative section labels; BlockStrings.footer.aboutUs can diverge.
+    if (getSectionLabels(language)) return blocks
     const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'about') return block
@@ -124,11 +127,14 @@ function normalizeAboutSectionLabel(
     })
 }
 
-/** Patch contact block sectionLabel — GPT defaults to English "Contact" even for non-English sites. */
+/** Patch contact block sectionLabel — only for languages without a SECTION_LABELS_SEED entry. */
 function normalizeContactSectionLabel(
     blocks: Record<string, unknown>[],
     language: string,
 ): Record<string, unknown>[] {
+    // Skip if normalizeSectionLabels already patched — navigation.contact is the short nav form
+    // and can differ from the section label (e.g. ms: 'Hubungi' nav vs 'Hubungi Kami' section).
+    if (getSectionLabels(language)) return blocks
     const i18n = getBlockStrings(language)
     return blocks.map((block) => {
         if (block.blockType !== 'contact') return block

@@ -471,7 +471,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                         formFields={formFields}
                         siteId={siteId}
                         className="flex flex-wrap gap-4 items-end"
-                        submitLabel="Send"
+                        submitLabel={submitLabel}
                         inline
                     />
                 </SectionWrapper>

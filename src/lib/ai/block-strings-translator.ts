@@ -241,11 +241,20 @@ function buildSectionLabels(t: RawTranslation): SectionLabels {
     }
 }
 
+/** All non-function fields that must be non-empty strings for the translation to be usable. */
+const REQUIRED_KEYS: ReadonlyArray<keyof RawTranslation> = [
+    'nav_home', 'nav_contact', 'nav_about', 'nav_services', 'nav_get_started',
+    'contact_submit', 'contact_name', 'contact_email', 'contact_phone', 'contact_message',
+    'footer_rights', 'footer_about_us',
+    'testimonials_headline', 'team_headline', 'pricing_headline', 'stats_headline',
+    'sl_gallery', 'sl_about', 'sl_contact', 'sl_features',
+]
+
 function isValidTranslation(raw: Partial<RawTranslation>): raw is RawTranslation {
-    return !!(
-        raw.nav_home && raw.nav_contact && raw.contact_submit &&
-        raw.footer_rights && raw.testimonials_headline && raw.sl_gallery
-    )
+    return REQUIRED_KEYS.every((k) => {
+        const v = raw[k]
+        return typeof v === 'string' && v.trim().length > 0
+    })
 }
 
 async function callGptTranslation(
@@ -256,17 +265,41 @@ async function callGptTranslation(
         model: 'gpt-4.1-nano',
         messages: [{
             role: 'user',
-            content: `Translate all values in the JSON below to ${gpLang}. Return ONLY valid JSON with the same keys. Do not add or remove keys.\n\n${JSON.stringify(ENGLISH_VALUES)}`,
+            content: `Translate all values in the JSON below to ${gpLang}. Return ONLY valid JSON with the exact same keys at the top level. Do not wrap in any parent key. Do not add or remove keys.\n\n${JSON.stringify(ENGLISH_VALUES)}`,
         }],
         temperature: 0,
-        max_tokens: 1000,
+        max_tokens: 2000,
         response_format: { type: 'json_object' },
     })
 
-    const raw = completion.choices[0]?.message?.content ?? ''
-    const parsed = JSON.parse(raw) as Partial<RawTranslation>
+    const choice = completion.choices[0]
+    // Bail early if response was truncated — a partial JSON will fail parse or validation.
+    if (choice?.finish_reason === 'length') {
+        console.warn(`[block-strings-translator] response truncated for ${gpLang} — increase max_tokens`)
+        return null
+    }
 
-    if (!isValidTranslation(parsed)) return null
+    const raw = choice?.message?.content ?? ''
+    let parsed: Partial<RawTranslation>
+    try {
+        let obj = JSON.parse(raw) as Record<string, unknown>
+        // Handle GPT envelope wrapping: {"translation": {...actual keys...}}
+        const keys = Object.keys(obj)
+        if (keys.length === 1 && typeof obj[keys[0]] === 'object' && obj[keys[0]] !== null) {
+            obj = obj[keys[0]] as Record<string, unknown>
+        }
+        parsed = obj as Partial<RawTranslation>
+    } catch {
+        console.warn(`[block-strings-translator] JSON.parse failed for ${gpLang}`)
+        return null
+    }
+
+    if (!isValidTranslation(parsed)) {
+        const missing = REQUIRED_KEYS.filter((k) => !parsed[k]?.toString().trim())
+        console.warn(`[block-strings-translator] invalid translation for ${gpLang} — missing/empty: ${missing.join(', ')}`)
+        return null
+    }
+
     return { blockStrings: buildBlockStrings(parsed), sectionLabels: buildSectionLabels(parsed) }
 }
 
