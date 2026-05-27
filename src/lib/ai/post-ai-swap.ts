@@ -49,7 +49,7 @@ import {
 } from './template-composer'
 import { hasUserDataReference, isGenericContent } from './content-rules'
 import type { ThemeMood } from './theme-moods'
-import { getBlockStrings, hasDedicatedStrings, getNavLabels } from './block-i18n'
+import { getBlockStrings, hasDedicatedStrings, getNavLabels, getSectionLabels } from './block-i18n'
 
 /**
  * Replace nav link labels for known URL slugs with i18n equivalents.
@@ -162,6 +162,44 @@ function normalizeTestimonialsSubheadline(
     return blocks.map((block) => {
         if (block.blockType !== 'testimonials') return block
         return { ...block, subheadline: i18n.testimonials.subheadline }
+    })
+}
+
+/**
+ * Patch sectionLabel on all blocks using the SECTION_LABELS_SEED lookup.
+ * Runs before the hasDedicatedStrings guard so non-Latin-script languages
+ * (ja/zh/ko/ar/th) get correct sectionLabels without a full BlockStrings entry.
+ * en/ms/vi are excluded — their sectionLabels come from the STRINGS chain below.
+ */
+function normalizeSectionLabels(
+    blocks: Record<string, unknown>[],
+    language: string,
+): Record<string, unknown>[] {
+    const labels = getSectionLabels(language)
+    if (!labels) return blocks
+
+    const blockTypeToLabel: Record<string, string> = {
+        'about': labels.about,
+        'gallery': labels.gallery,
+        'contact': labels.contact,
+        'features': labels.features,
+        'testimonials': labels.testimonials,
+        'faq': labels.faq,
+        'team': labels.team,
+        'service-cards': labels.serviceCards,
+        'stats': labels.stats,
+        'pricing': labels.pricing,
+        'newsletter': labels.newsletter,
+        'client-logos': labels.clientLogos,
+        'logo-cloud': labels.clientLogos,
+        'blog-list': labels.blogList,
+    }
+
+    return blocks.map((block) => {
+        const bt = typeof block.blockType === 'string' ? block.blockType : ''
+        const label = blockTypeToLabel[bt]
+        if (!label) return block
+        return { ...block, sectionLabel: label }
     })
 }
 
@@ -335,14 +373,18 @@ export function postAISwapStep(
     // explicit system-prompt instructions are ignored. NAV_LABELS covers
     // en/ms/vi/ja/zh/ko/ar/th; for other languages normalizeNavLinks is a no-op.
     const nav = normalizeNavLinks(swapped, language)
+    // Section labels: patch before hasDedicatedStrings guard so ja/zh/ko/ar/th
+    // get correct sectionLabels from the seed lookup. en/ms/vi are excluded from
+    // SECTION_LABELS_SEED and handled by the full STRINGS chain below.
+    const sectioned = normalizeSectionLabels(nav, language)
 
     // Full structural string chain (contact labels, logos, features headline, etc.)
     // only runs for languages with dedicated BlockStrings (en/ms/vi). For other
     // languages, GPT generates these strings correctly — trust its output rather
     // than overwriting with English fallback strings.
-    if (!hasDedicatedStrings(language)) return { blocks: nav, telemetry }
+    if (!hasDedicatedStrings(language)) return { blocks: sectioned, telemetry }
 
-    const contact = normalizeContactLabels(nav, language)
+    const contact = normalizeContactLabels(sectioned, language)
     const logos = normalizeClientLogosHeadline(contact, language)
     const features = normalizeFeaturesHeadline(logos, language, biz.name)
     const testimonials = normalizeTestimonialsSubheadline(features, language)

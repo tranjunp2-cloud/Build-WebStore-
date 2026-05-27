@@ -393,3 +393,113 @@ export function getNavLabels(lang?: string): NavLabels | null {
     const prefix = lang.split('-')[0]
     return runtimeNavCache.get(prefix) ?? null
 }
+
+// ── Section label lookup ──────────────────────────────────────────────────────
+//
+// GPT has the same training bias for sectionLabel fields ("ABOUT US", "GALLERY",
+// "CONTACT", "OUR SERVICES", etc.) as it does for nav labels — structural chrome
+// that appears identically on millions of English training-data sites.
+// Only covers non-Latin-script languages where the bias is most severe.
+// en/ms/vi are handled by the full STRINGS chain (hasDedicatedStrings).
+
+export interface SectionLabels {
+    about: string
+    gallery: string
+    contact: string
+    features: string
+    testimonials: string
+    faq: string
+    team: string
+    serviceCards: string
+    stats: string
+    pricing: string
+    newsletter: string
+    clientLogos: string
+    blogList: string
+}
+
+const SECTION_LABELS_SEED: Record<string, SectionLabels> = {
+    ja: {
+        about: '会社概要',
+        gallery: 'ギャラリー',
+        contact: 'お問い合わせ',
+        features: 'サービスの特徴',
+        testimonials: 'お客様の声',
+        faq: 'よくある質問',
+        team: 'チーム紹介',
+        serviceCards: 'サービス内容',
+        stats: '実績・数字',
+        pricing: '料金プラン',
+        newsletter: 'ニュースレター',
+        clientLogos: 'お客様・パートナー',
+        blogList: 'ブログ・最新情報',
+    },
+    zh: {
+        about: '关于我们',
+        gallery: '图片展示',
+        contact: '联系我们',
+        features: '服务特色',
+        testimonials: '客户评价',
+        faq: '常见问题',
+        team: '团队介绍',
+        serviceCards: '服务项目',
+        stats: '核心数据',
+        pricing: '价格方案',
+        newsletter: '订阅通讯',
+        clientLogos: '合作客户',
+        blogList: '博客资讯',
+    },
+    ko: {
+        about: '회사 소개',
+        gallery: '갤러리',
+        contact: '문의하기',
+        features: '서비스 특징',
+        testimonials: '고객 후기',
+        faq: '자주 묻는 질문',
+        team: '팀 소개',
+        serviceCards: '서비스 안내',
+        stats: '주요 실적',
+        pricing: '요금제',
+        newsletter: '뉴스레터',
+        clientLogos: '파트너 & 고객사',
+        blogList: '블로그',
+    },
+    ar: {
+        about: 'من نحن',
+        gallery: 'معرض الصور',
+        contact: 'تواصل معنا',
+        features: 'مميزات الخدمة',
+        testimonials: 'آراء العملاء',
+        faq: 'الأسئلة الشائعة',
+        team: 'فريق العمل',
+        serviceCards: 'خدماتنا',
+        stats: 'أرقام وإنجازات',
+        pricing: 'خطط الأسعار',
+        newsletter: 'النشرة البريدية',
+        clientLogos: 'شركاؤنا وعملاؤنا',
+        blogList: 'المدونة',
+    },
+    th: {
+        about: 'เกี่ยวกับเรา',
+        gallery: 'แกลเลอรี่',
+        contact: 'ติดต่อเรา',
+        features: 'จุดเด่นของบริการ',
+        testimonials: 'รีวิวจากลูกค้า',
+        faq: 'คำถามที่พบบ่อย',
+        team: 'ทีมงานของเรา',
+        serviceCards: 'บริการของเรา',
+        stats: 'ตัวเลขที่โดดเด่น',
+        pricing: 'แผนราคา',
+        newsletter: 'จดหมายข่าว',
+        clientLogos: 'ลูกค้าและพันธมิตร',
+        blogList: 'บทความและข่าวสาร',
+    },
+}
+
+/** Get section labels for the given language code. Returns null for unsupported languages. */
+export function getSectionLabels(lang?: string): SectionLabels | null {
+    if (!lang) return null
+    if (SECTION_LABELS_SEED[lang]) return SECTION_LABELS_SEED[lang]!
+    const prefix = lang.split('-')[0]
+    return SECTION_LABELS_SEED[prefix] ?? null
+}
