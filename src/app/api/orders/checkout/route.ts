@@ -288,7 +288,7 @@ export async function POST(request: Request) {
                 secret: magicLinkSecret,
                 expSec,
             })
-            redirectUrl = `${baseUrl}/sites/${siteSlug}/orders/${orderNumber}?token=${token}`
+            redirectUrl = `${baseUrl}/api/orders/${order.id}/confirm-redirect?slug=${siteSlug}&token=${token}`
             const plainUploadUrl = orderPageUrl
 
             const pcConfig = (site as any).paymentConfig
