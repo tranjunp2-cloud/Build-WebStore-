@@ -49,23 +49,25 @@ import {
 } from './template-composer'
 import { hasUserDataReference, isGenericContent } from './content-rules'
 import type { ThemeMood } from './theme-moods'
-import { getBlockStrings, hasDedicatedStrings } from './block-i18n'
+import { getBlockStrings, hasDedicatedStrings, getNavLabels } from './block-i18n'
 
 /**
  * Replace nav link labels for known URL slugs with i18n equivalents.
- * Runs after the main swap loop so AI-generated nav labels are corrected
- * without a full block replacement (nav carries user logo text / mood CTA).
+ * Uses the focused NAV_LABELS lookup (5 strings/lang) which covers languages
+ * where GPT has training bias toward English nav labels. Returns blocks
+ * unchanged when no nav labels are found for the language.
  */
 function normalizeNavLinks(
     blocks: Record<string, unknown>[],
     language: string,
 ): Record<string, unknown>[] {
-    const i18n = getBlockStrings(language)
+    const navLabels = getNavLabels(language)
+    if (!navLabels) return blocks
     const urlToLabel: Record<string, string> = {
-        '/': i18n.navigation.home,
-        '/about': i18n.navigation.about,
-        '/services': i18n.navigation.services,
-        '/contact': i18n.navigation.contact,
+        '/': navLabels.home,
+        '/about': navLabels.about,
+        '/services': navLabels.services,
+        '/contact': navLabels.contact,
     }
     return blocks.map((block) => {
         if (block.blockType !== 'navigation') return block
@@ -328,13 +330,18 @@ export function postAISwapStep(
 
     if (!language) return { blocks: swapped, telemetry }
 
-    // For languages with dedicated i18n strings (en/ms/vi), normalize structural
-    // labels to ensure consistency. For other languages (Japanese, Chinese, etc.),
-    // GPT was instructed to generate in the correct language — trust its output
-    // rather than overwriting with English fallback strings.
-    if (!hasDedicatedStrings(language)) return { blocks: swapped, telemetry }
-
+    // Nav labels: always normalize using the focused NAV_LABELS lookup.
+    // GPT has an insurmountable training bias toward English nav labels — even
+    // explicit system-prompt instructions are ignored. NAV_LABELS covers
+    // en/ms/vi/ja/zh/ko/ar/th; for other languages normalizeNavLinks is a no-op.
     const nav = normalizeNavLinks(swapped, language)
+
+    // Full structural string chain (contact labels, logos, features headline, etc.)
+    // only runs for languages with dedicated BlockStrings (en/ms/vi). For other
+    // languages, GPT generates these strings correctly — trust its output rather
+    // than overwriting with English fallback strings.
+    if (!hasDedicatedStrings(language)) return { blocks: nav, telemetry }
+
     const contact = normalizeContactLabels(nav, language)
     const logos = normalizeClientLogosHeadline(contact, language)
     const features = normalizeFeaturesHeadline(logos, language, biz.name)

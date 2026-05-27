@@ -337,3 +337,44 @@ export function hasDedicatedStrings(lang?: string): boolean {
     const prefix = lang.split('-')[0]
     return !!STRINGS[prefix]
 }
+
+// ── Minimal nav label lookup ──────────────────────────────────────────────────
+//
+// GPT has an insurmountable training bias toward English nav labels ("Home",
+// "About", "Services", "Contact") — prompt instructions alone cannot reliably
+// override this. These 5 structural UI labels are NOT website content; they're
+// chrome identical on every site, so a lookup table is the correct mechanism.
+//
+// Coverage: non-Latin script languages detected by lang-detect fast paths +
+// the en/ms/vi trio already in STRINGS (duplicated here for a single lookup).
+// European Latin-script languages are omitted — GPT generally gets them right.
+
+export interface NavLabels {
+    home: string
+    about: string
+    services: string
+    contact: string
+    getStarted: string
+}
+
+const NAV_LABELS: Record<string, NavLabels> = {
+    en: { home: 'Home', about: 'About', services: 'Services', contact: 'Contact', getStarted: 'Get Started' },
+    ms: { home: 'Utama', about: 'Tentang Kami', services: 'Perkhidmatan', contact: 'Hubungi', getStarted: 'Mulakan' },
+    vi: { home: 'Trang Chủ', about: 'Giới Thiệu', services: 'Dịch Vụ', contact: 'Liên Hệ', getStarted: 'Bắt Đầu' },
+    ja: { home: 'ホーム', about: '会社概要', services: 'サービス', contact: 'お問い合わせ', getStarted: '今すぐ始める' },
+    zh: { home: '首页', about: '关于我们', services: '服务', contact: '联系我们', getStarted: '开始' },
+    ko: { home: '홈', about: '소개', services: '서비스', contact: '연락처', getStarted: '시작하기' },
+    ar: { home: 'الرئيسية', about: 'عن الشركة', services: 'الخدمات', contact: 'اتصل بنا', getStarted: 'ابدأ الآن' },
+    th: { home: 'หน้าหลัก', about: 'เกี่ยวกับเรา', services: 'บริการ', contact: 'ติดต่อ', getStarted: 'เริ่มต้น' },
+}
+
+/**
+ * Get nav labels for the given language code.
+ * Returns null when the language has no entry — caller keeps GPT output.
+ */
+export function getNavLabels(lang?: string): NavLabels | null {
+    if (!lang) return null
+    if (NAV_LABELS[lang]) return NAV_LABELS[lang]
+    const prefix = lang.split('-')[0]
+    return NAV_LABELS[prefix] ?? null
+}
