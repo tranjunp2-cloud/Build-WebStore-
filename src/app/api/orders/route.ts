@@ -46,17 +46,17 @@ export const GET = withAuth(async (user, request) => {
             ]
         }
 
-        if (dateFilter && dateFilter !== 'All Dates' && dateFilter !== 'All dates') {
+        if (dateFilter && dateFilter !== 'all') {
             const now = new Date()
             let fromDate: Date | null = null
-            if (dateFilter === 'Today') {
+            if (dateFilter === 'today') {
                 fromDate = new Date(now.setHours(0, 0, 0, 0))
-            } else if (dateFilter === 'This Week') {
+            } else if (dateFilter === 'thisWeek') {
                 const startOfWeek = new Date(now)
                 startOfWeek.setDate(now.getDate() - now.getDay())
                 startOfWeek.setHours(0, 0, 0, 0)
                 fromDate = startOfWeek
-            } else if (dateFilter === 'This Month') {
+            } else if (dateFilter === 'thisMonth') {
                 fromDate = new Date(now.getFullYear(), now.getMonth(), 1)
             }
             if (fromDate) {

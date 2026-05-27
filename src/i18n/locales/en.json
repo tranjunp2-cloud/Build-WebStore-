@@ -813,6 +813,8 @@
         "orderNumber": "Order #",
         "customer": "Customer",
         "total": "Total",
+        "paymentMethod": "Payment",
+        "orderDate": "Date",
         "status": "Status",
         "loading": "Loading orders...",
         "noOrders": "No orders found",
@@ -881,6 +883,22 @@
         "confirmCancellation": "Confirm Cancellation",
         "confirm": "Confirm Cancel",
         "confirming": "Cancelling..."
+      },
+      "rejectPayment": {
+        "title": "Reject Payment",
+        "reasonLabel": "Rejection reason (required)",
+        "reasons": {
+          "imageBlurry": "Receipt unclear",
+          "wrongAmount": "Wrong amount",
+          "duplicateOrder": "Duplicate order",
+          "other": "Other reason"
+        },
+        "detailLabel": "Details",
+        "detailPlaceholder": "Describe the issue (min 10 characters)...",
+        "detailError": "Detail must be at least 10 characters",
+        "back": "Cancel",
+        "submit": "Reject Payment",
+        "submitting": "Rejecting..."
       },
       "filterDates": {
         "allDates": "All Dates",
@@ -3285,6 +3303,17 @@
       "sending": "Sending…",
       "sendLink": "Send upload link",
       "errorMessage": "Something went wrong. Please try again."
+    },
+    "orderLookup": {
+      "title": "Track Your Order",
+      "subtitle": "Enter your order number to check your order status",
+      "label": "Order Number",
+      "placeholder": "e.g. ORD-00001",
+      "submit": "Track",
+      "required": "Please enter your order number",
+      "navPlaceholder": "Order number…",
+      "navTitle": "Track your order",
+      "navLabel": "Track"
     },
     "notFound": {
       "code": "404",

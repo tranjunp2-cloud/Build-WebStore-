@@ -813,6 +813,8 @@
         "orderNumber": "Pesanan #",
         "customer": "Pelanggan",
         "total": "Jumlah",
+        "paymentMethod": "Pembayaran",
+        "orderDate": "Tarikh",
         "status": "Status",
         "loading": "Memuatkan pesanan...",
         "noOrders": "Tiada pesanan dijumpai",
@@ -881,6 +883,22 @@
         "confirmCancellation": "Sahkan Pembatalan",
         "confirm": "Sahkan Pembatalan",
         "confirming": "Membatalkan..."
+      },
+      "rejectPayment": {
+        "title": "Tolak Pembayaran",
+        "reasonLabel": "Sebab penolakan (wajib)",
+        "reasons": {
+          "imageBlurry": "Resit tidak jelas",
+          "wrongAmount": "Jumlah salah",
+          "duplicateOrder": "Pesanan pendua",
+          "other": "Sebab lain"
+        },
+        "detailLabel": "Butiran",
+        "detailPlaceholder": "Huraikan masalah (min 10 aksara)...",
+        "detailError": "Butiran mestilah sekurang-kurangnya 10 aksara",
+        "back": "Batal",
+        "submit": "Tolak Pembayaran",
+        "submitting": "Menolak..."
       },
       "filterDates": {
         "allDates": "Semua Tarikh",
@@ -3285,6 +3303,17 @@
       "sending": "Menghantar…",
       "sendLink": "Hantar pautan muat naik",
       "errorMessage": "Sesuatu telah berlaku. Sila cuba lagi."
+    },
+    "orderLookup": {
+      "title": "Jejak Pesanan Anda",
+      "subtitle": "Masukkan nombor pesanan anda untuk semak status pesanan",
+      "label": "Nombor Pesanan",
+      "placeholder": "cth. ORD-00001",
+      "submit": "Jejak",
+      "required": "Sila masukkan nombor pesanan anda",
+      "navPlaceholder": "Nombor pesanan…",
+      "navTitle": "Jejak pesanan anda",
+      "navLabel": "Jejak"
     },
     "notFound": {
       "code": "404",

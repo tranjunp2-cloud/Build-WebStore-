@@ -15,6 +15,8 @@ export interface Order {
     total: number
     currency: string
     status: OrderStatus
+    paymentMethod?: string | null
+    createdAt?: string | null
 }
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; borderColor: string; dotColor: string; textColor: string }> = {
@@ -46,6 +48,19 @@ function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string
         'payment_failed': 'pending',
     }
     return (statusLabels as any)[keyMap[status]] || status
+}
+
+function formatPaymentMethod(method?: string | null): string {
+    if (method === 'bank_transfer') return 'Bank Transfer'
+    if (method === 'cod') return 'COD'
+    if (method === 'stripe') return 'Card'
+    return method ?? '—'
+}
+
+function formatOrderDate(iso?: string | null): string {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 // ───────── STATUS BADGE COMPONENT ─────────
@@ -265,9 +280,15 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                     <span className="text-[14px] font-medium leading-[1.4285714285714286em] text-slate-400 truncate max-w-[200px]">
                                         {order.customerName || 'N/A'}
                                     </span>
-                                    <span className="text-[20px] font-semibold leading-[1.4em] text-slate-50">
-                                        {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
-                                    </span>
+                                    <div className="flex items-center gap-[8px]">
+                                        <span className="text-[20px] font-semibold leading-[1.4em] text-slate-50">
+                                            {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-[12px]">
+                                        <span className="text-[12px] text-slate-400">{formatPaymentMethod(order.paymentMethod)}</span>
+                                        <span className="text-[12px] text-slate-500">{formatOrderDate(order.createdAt)}</span>
+                                    </div>
                                 </div>
                             </div>
                         )
@@ -279,13 +300,15 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
             <div className="hidden md:block w-full overflow-x-auto overflow-y-auto" style={{ maxHeight: 685 }}>
                 <table
                     className="w-full border-collapse"
-                    style={{ tableLayout: 'fixed', minWidth: 960 }}
+                    style={{ tableLayout: 'fixed', minWidth: 1100 }}
                 >
                     <colgroup>
-                        <col style={{ width: '20%' }} />
-                        <col style={{ width: '30%' }} />
-                        <col style={{ width: '20%' }} />
-                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '16%' }} />
+                        <col style={{ width: '22%' }} />
+                        <col style={{ width: '13%' }} />
+                        <col style={{ width: '16%' }} />
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '19%' }} />
                     </colgroup>
 
                     <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -300,6 +323,12 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                 <HeaderCell>{o.tableHeaders.total}</HeaderCell>
                             </th>
                             <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
+                                <HeaderCell>{o.tableHeaders.paymentMethod}</HeaderCell>
+                            </th>
+                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
+                                <HeaderCell>{o.tableHeaders.orderDate}</HeaderCell>
+                            </th>
+                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
                                 <HeaderCell>{o.tableHeaders.status}</HeaderCell>
                             </th>
                         </tr>
@@ -308,13 +337,13 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan={4} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                <td colSpan={6} style={{ padding: '60px 24px', textAlign: 'center' }}>
                                     <span style={{ color: 'var(--dash-text-muted)' }}>{o.tableHeaders.loading}</span>
                                 </td>
                             </tr>
                         ) : orders.length === 0 ? (
                             <tr>
-                                <td colSpan={4} style={{ padding: 0 }}>
+                                <td colSpan={6} style={{ padding: 0 }}>
                                     <EmptyOrderState text={o.tableHeaders.noOrders} />
                                 </td>
                             </tr>
@@ -388,6 +417,33 @@ function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, 
                                             }}
                                         >
                                             {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: `${textPadY}px 24px` }}>
+                                        <span
+                                            style={{
+                                                fontFamily: 'Inter, sans-serif',
+                                                fontWeight: 400,
+                                                fontSize: 14,
+                                                lineHeight: '1.4285714285714286em',
+                                                color: 'var(--dash-text-muted)',
+                                            }}
+                                        >
+                                            {formatPaymentMethod(order.paymentMethod)}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: `${textPadY}px 24px` }}>
+                                        <span
+                                            style={{
+                                                fontFamily: 'Inter, sans-serif',
+                                                fontWeight: 400,
+                                                fontSize: 13,
+                                                lineHeight: '1.4285714285714286em',
+                                                color: 'var(--dash-text-muted)',
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            {formatOrderDate(order.createdAt)}
                                         </span>
                                     </td>
                                     <td style={{ padding: '16px 24px' }}>

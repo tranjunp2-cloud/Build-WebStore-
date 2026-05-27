@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useI18n } from '@/i18n'
 
 interface RejectPaymentModalProps {
     orderId: string | number
@@ -13,14 +14,17 @@ interface RejectPaymentModalProps {
 
 type RejectionReason = 'image_blurry' | 'wrong_amount' | 'duplicate_order' | 'other'
 
-const REASONS: { value: RejectionReason; label: string }[] = [
-    { value: 'image_blurry', label: 'Ảnh mờ — Receipt unclear' },
-    { value: 'wrong_amount', label: 'Sai số tiền — Wrong amount' },
-    { value: 'duplicate_order', label: 'Trùng đơn — Duplicate order' },
-    { value: 'other', label: 'Khác — Other reason' },
-]
-
 export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymentModalProps) {
+    const { t } = useI18n()
+    const rp = t.dashboard.orders.rejectPayment
+
+    const REASONS: { value: RejectionReason; label: string }[] = [
+        { value: 'image_blurry', label: rp.reasons.imageBlurry },
+        { value: 'wrong_amount', label: rp.reasons.wrongAmount },
+        { value: 'duplicate_order', label: rp.reasons.duplicateOrder },
+        { value: 'other', label: rp.reasons.other },
+    ]
+
     const [reason, setReason] = useState<RejectionReason>('image_blurry')
     const [detail, setDetail] = useState('')
     const [isLoading, setIsLoading] = useState(false)
@@ -33,7 +37,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
 
     const validate = () => {
         if (reason === 'other' && detail.trim().length < 10) {
-            setDetailError('Detail must be at least 10 characters')
+            setDetailError(rp.detailError)
             return false
         }
         setDetailError('')
@@ -80,7 +84,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                 {/* Header */}
                 <div className="flex items-center justify-between mb-5">
                     <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 18, color: 'var(--dash-text)' }}>
-                        Reject Payment
+                        {rp.title}
                     </span>
                     <button onClick={onClose} disabled={isLoading} className="hover:opacity-70 transition-opacity">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -89,38 +93,49 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                     </button>
                 </div>
 
+                {/* Reason label */}
+                <p style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 13, color: 'var(--dash-text-muted)', marginBottom: 12 }}>
+                    {rp.reasonLabel}
+                </p>
+
                 {/* Reason radios */}
                 <div className="flex flex-col gap-3 mb-4">
-                    {REASONS.map(r => (
-                        <label
-                            key={r.value}
-                            className="flex items-center gap-3 cursor-pointer"
-                            style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: 'var(--dash-text)' }}
-                        >
-                            <input
-                                type="radio"
-                                name="rejection-reason"
-                                value={r.value}
-                                checked={reason === r.value}
-                                onChange={() => { setReason(r.value); setDetailError('') }}
-                                disabled={isLoading}
-                                className="accent-red-500"
-                            />
-                            {r.label}
-                        </label>
-                    ))}
+                    {REASONS.map(r => {
+                        const inputId = `reject-reason-${r.value}`
+                        return (
+                            <div key={r.value} className="flex items-center gap-3">
+                                <input
+                                    type="radio"
+                                    id={inputId}
+                                    name="rejection-reason"
+                                    value={r.value}
+                                    checked={reason === r.value}
+                                    onChange={(e) => { if (e.target.checked) { setReason(r.value); setDetailError('') } }}
+                                    disabled={isLoading}
+                                    className="accent-red-500"
+                                    style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }}
+                                />
+                                <label
+                                    htmlFor={inputId}
+                                    style={{ fontFamily: 'Inter, sans-serif', fontSize: 14, color: 'var(--dash-text)', cursor: 'pointer' }}
+                                >
+                                    {r.label}
+                                </label>
+                            </div>
+                        )
+                    })}
                 </div>
 
                 {/* Detail textarea — shown only for 'other' */}
                 {reason === 'other' && (
                     <div className="flex flex-col gap-1 mb-4">
                         <label style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 13, color: 'var(--dash-text)' }}>
-                            Details *
+                            {rp.detailLabel} *
                         </label>
                         <textarea
                             value={detail}
                             onChange={e => { setDetail(e.target.value); setDetailError('') }}
-                            placeholder="Describe the issue (min 10 characters)..."
+                            placeholder={rp.detailPlaceholder}
                             disabled={isLoading}
                             rows={3}
                             style={{
@@ -158,7 +173,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                             opacity: isLoading ? 0.5 : 1,
                         }}
                     >
-                        Cancel
+                        {rp.back}
                     </button>
                     <button
                         onClick={handleSubmit}
@@ -176,7 +191,7 @@ export function RejectPaymentModal({ orderId, onSuccess, onClose }: RejectPaymen
                         }}
                     >
                         {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                        {isLoading ? 'Rejecting...' : 'Reject Payment'}
+                        {isLoading ? rp.submitting : rp.submit}
                     </button>
                 </div>
             </div>

@@ -28,7 +28,7 @@ export async function paymentExpiryJob(payload: Payload, opts = { limit: 200 }) 
             const updateResult = await (payload.db.drizzle as any).execute(sql`
                 UPDATE orders
                 SET status = 'cancelled',
-                    payment_status = 'cancelled',
+                    payment_status = 'payment_failed',
                     cancel_reason = 'Auto-cancelled: payment not received within 24h'
                 WHERE id = ${order.id}
                 AND payment_status IN ('awaiting_payment', 'pending_verification')

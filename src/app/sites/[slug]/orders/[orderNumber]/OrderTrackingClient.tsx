@@ -6,10 +6,10 @@ import {
     ShoppingBag, Package, Truck, PackageCheck, ReceiptText,
     Calendar, CreditCard, Copy, Check, Hash, MapPin, ShieldCheck,
     CalendarClock, Navigation, LifeBuoy, Mail, ChevronDown,
-    RefreshCw, Store, Star, ChevronRight,
+    RefreshCw, Store, Star, ChevronRight, XCircle, RotateCcw,
 } from 'lucide-react'
 
-type TrackingStatus = 'processing' | 'in-transit' | 'delivered'
+type TrackingStatus = 'processing' | 'in-transit' | 'delivered' | 'cancelled' | 'refunded' | 'payment_failed'
 
 type OrderItem = {
     productName: string
@@ -55,6 +55,8 @@ const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'refunded', 'paymen
 function getTrackingStatus(status: string): TrackingStatus {
     if (status === 'shipped') return 'in-transit'
     if (status === 'completed') return 'delivered'
+    if (status === 'cancelled' || status === 'payment_failed') return 'cancelled'
+    if (status === 'refunded') return 'refunded'
     return 'processing'
 }
 
@@ -95,6 +97,9 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
         'processing': { cls: 'processing', Icon: Package, eyebrow: 'Current Status', title: 'Processing' },
         'in-transit': { cls: 'in-transit', Icon: Truck, eyebrow: 'Current Status', title: 'In Transit' },
         'delivered': { cls: 'delivered', Icon: PackageCheck, eyebrow: 'Order Status', title: 'Delivered' },
+        'cancelled': { cls: 'cancelled', Icon: XCircle, eyebrow: 'Order Status', title: 'Cancelled' },
+        'refunded': { cls: 'refunded', Icon: RotateCcw, eyebrow: 'Order Status', title: 'Refunded' },
+        'payment_failed': { cls: 'cancelled', Icon: XCircle, eyebrow: 'Order Status', title: 'Payment Failed' },
     }
     const s = STATUS_META[trackingStatus]
 
@@ -141,6 +146,7 @@ function OtOrderHead({ order, trackingStatus }: { order: OrderData; trackingStat
 }
 
 function OtStageTracker({ order, trackingStatus }: { order: OrderData; trackingStatus: TrackingStatus }) {
+    if (trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed') return null
     const states = getStageStates(trackingStatus)
     const placedDate = formatDate(order.createdAt)
     const etaText = trackingStatus === 'delivered'
@@ -269,6 +275,12 @@ function OtTimeline({ order, trackingStatus }: { order: OrderData; trackingStatu
     }
     if (trackingStatus === 'delivered') {
         entries.push({ state: 'latest', Icon: PackageCheck, title: 'Parcel delivered', meta: 'Received by recipient', date: '', time: '' })
+    }
+    if (trackingStatus === 'cancelled') {
+        entries.push({ state: 'latest', Icon: XCircle, title: 'Order cancelled', meta: 'This order has been cancelled', date: '', time: '' })
+    }
+    if (trackingStatus === 'refunded') {
+        entries.push({ state: 'latest', Icon: RotateCcw, title: 'Order refunded', meta: 'A refund has been processed for this order', date: '', time: '' })
     }
 
     return (
@@ -447,6 +459,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
 
     const trackingStatus = getTrackingStatus(liveOrder.status)
     const isDelivered = trackingStatus === 'delivered'
+    const isNegativeTerminal = trackingStatus === 'cancelled' || trackingStatus === 'refunded' || trackingStatus === 'payment_failed'
 
     return (
         <div className={`ot-page${isDelivered ? ' is-delivered' : ''}`}>
@@ -467,7 +480,7 @@ export default function OrderTrackingClient({ order, slug }: Props) {
                     {isDelivered && <OtDeliveredBanner order={liveOrder} />}
                     <OtOrderHead order={liveOrder} trackingStatus={trackingStatus} />
                     <OtStageTracker order={liveOrder} trackingStatus={trackingStatus} />
-                    <OtShippingCard order={liveOrder} trackingStatus={trackingStatus} />
+                    {!isNegativeTerminal && <OtShippingCard order={liveOrder} trackingStatus={trackingStatus} />}
                     <OtTimeline order={liveOrder} trackingStatus={trackingStatus} />
                     <OtItems order={liveOrder} />
                 </div>

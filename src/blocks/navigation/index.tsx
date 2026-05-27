@@ -1,17 +1,20 @@
 'use client'
 
 import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import type { BlockProps } from '../types'
 import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, EyeOff } from 'lucide-react'
+import { Menu, X, EyeOff, Package, ArrowRight } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
 import { BrokenLinkWarning } from '@/blocks/shared/BrokenLinkWarning'
 import { BROKEN_URL_PREFIX } from '@/lib/navigation-url'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET, NAV_Z_CLASS } from '@/lib/design-tokens'
 import { useScrollShrink } from './use-scroll-shrink'
+import { NavOrderSearch } from './NavOrderSearch'
+import { useI18n } from '@/i18n'
 
 // Token shortcut: nav containers consume CONTAINER.default + INNER_PADDING.
 // h-16 stays because nav row height is a layout invariant, not section padding.
@@ -365,29 +368,35 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const scrolled = useScrollShrink(50)
 
+    // Order search: only show when site has cart widget enabled (_hasCart injected by SiteRenderer)
+    const { t } = useI18n()
+    const slug = (site as Record<string, unknown>)?.tenantSlug as string | undefined
+    const showOrderSearch = Boolean((block as Record<string, unknown>)._hasCart && slug)
+    const trackOrderLabel = t.storefront.orderLookup.navLabel
+
     // ── Transparent variant ───────────────────────────────────────────────
     if (variant === 'transparent') {
-        return <TransparentNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
+        return <TransparentNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Sidebar variant ───────────────────────────────────────────────────
     if (variant === 'sidebar') {
-        return <SidebarNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
+        return <SidebarNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} trackOrderLabel={trackOrderLabel} />
     }
 
     // ── Floating (pill) variant ───────────────────────────────────────────
     if (variant === 'floating') {
-        return <PillNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
+        return <PillNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Centered variant ────────────────────────────────────────────────
     if (variant === 'centered') {
-        return <CenteredNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
+        return <CenteredNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Mega variant ─────────────────────────────────────────────────────
     if (variant === 'mega') {
-        return <MegaMenuNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} />
+        return <MegaMenuNav mergedBlock={mergedBlock} logoText={logoText} links={links} ctaButton={ctaButton} slug={slug} showOrderSearch={showOrderSearch} />
     }
 
     // ── Default: 'default' (was 'simple') ────────────────────────────────
@@ -429,6 +438,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
 
                 {/* Desktop CTA + Mobile Menu Button */}
                 <div className="flex items-center gap-3">
+                    {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
                         <NavCTAButton
                             href={ctaButton.url || '#'}
@@ -455,11 +465,13 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
 
 // ── Transparent Nav ──────────────────────────────────────────────────────────
 
-function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
+function TransparentNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearch }: {
     mergedBlock: NavigationConfig & { logo?: { url: string; alt?: string } }
     logoText?: string
     links: NavLink[]
     ctaButton?: { show: boolean; label: string; url: string }
+    slug?: string
+    showOrderSearch?: boolean
 }) {
     const scrolled = useScrollShrink(100)
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -508,6 +520,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
 
                 {/* CTA + Mobile */}
                 <div className="flex items-center gap-3">
+                    {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
                         <NavCTAButton href={ctaButton.url || '#'} label={ctaButton.label} />
                     )}
@@ -531,13 +544,31 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
 
 // ── Sidebar Nav ──────────────────────────────────────────────────────────────
 
-function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
+function SidebarNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearch, trackOrderLabel }: {
     mergedBlock: NavigationConfig & { logo?: { url: string; alt?: string } }
     logoText?: string
     links: NavLink[]
     ctaButton?: { show: boolean; label: string; url: string }
+    slug?: string
+    showOrderSearch?: boolean
+    trackOrderLabel?: string
 }) {
     const [isOpen, setIsOpen] = useState(false)
+    const [orderValue, setOrderValue] = useState('')
+    const [orderError, setOrderError] = useState('')
+    const router = useRouter()
+    const { t } = useI18n()
+    const ol = t.storefront.orderLookup
+
+    const handleOrderSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        const trimmed = orderValue.trim()
+        if (!trimmed) { setOrderError(ol.required); return }
+        router.push(`/sites/${slug}/orders/${encodeURIComponent(trimmed)}`)
+        setIsOpen(false)
+        setOrderValue('')
+        setOrderError('')
+    }
 
     return (
         <>
@@ -614,9 +645,54 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                 ))}
                             </nav>
 
-                            {/* CTA at bottom */}
-                            {ctaButton?.show && (
-                                <div className="p-6">
+                            {/* Order search inline form + CTA at bottom */}
+                            <div className="px-6 pb-6 flex flex-col gap-3">
+                                {showOrderSearch && slug && (
+                                    <div style={{
+                                        borderTop: '1px solid color-mix(in srgb, var(--text, #fafafa) 10%, transparent)',
+                                        paddingTop: 16,
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+                                            <Package size={14} strokeWidth={1.8} style={{ opacity: 0.6 }} />
+                                            <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                                                {trackOrderLabel}
+                                            </span>
+                                        </div>
+                                        <form onSubmit={handleOrderSubmit}>
+                                            <input
+                                                type="text"
+                                                value={orderValue}
+                                                onChange={e => { setOrderValue(e.target.value); setOrderError('') }}
+                                                placeholder={ol.placeholder}
+                                                autoComplete="off"
+                                                style={{
+                                                    display: 'block', width: '100%', boxSizing: 'border-box',
+                                                    padding: '8px 11px', fontSize: 13,
+                                                    background: 'color-mix(in srgb, var(--text, #fafafa) 6%, transparent)',
+                                                    border: `1px solid ${orderError ? 'var(--brand-primary)' : 'color-mix(in srgb, var(--text, #fafafa) 14%, transparent)'}`,
+                                                    borderRadius: 8, color: 'inherit', outline: 'none',
+                                                    marginBottom: orderError ? 4 : 8,
+                                                }}
+                                            />
+                                            {orderError && (
+                                                <p style={{ fontSize: 11, color: 'var(--brand-primary)', marginBottom: 8 }}>{orderError}</p>
+                                            )}
+                                            <button
+                                                type="submit"
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    gap: 5, width: '100%', padding: '8px 14px',
+                                                    fontSize: 12, fontWeight: 700, color: '#fff',
+                                                    background: 'linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb, 14 117 86), 0.75))',
+                                                    border: 'none', borderRadius: 8, cursor: 'pointer',
+                                                }}
+                                            >
+                                                {ol.submit} <ArrowRight size={12} />
+                                            </button>
+                                        </form>
+                                    </div>
+                                )}
+                                {ctaButton?.show && (
                                     <a
                                         href={ctaButton.url || '#'}
                                         className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white no-underline text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
@@ -625,8 +701,8 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                     >
                                         {ctaButton.label}
                                     </a>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </motion.div>
                     </>
                 )}
@@ -637,11 +713,13 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
 
 // ── Centered Nav ────────────────────────────────────────────────────────────
 
-function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
+function CenteredNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearch }: {
     mergedBlock: NavigationConfig & { logo?: { url: string; alt?: string } }
     logoText?: string
     links: NavLink[]
     ctaButton?: { show: boolean; label: string; url: string }
+    slug?: string
+    showOrderSearch?: boolean
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const scrolled = useScrollShrink(50)
@@ -667,38 +745,37 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
             }}
         >
             <div className={`${NAV_CONTAINER} ${scrolled ? 'h-14' : 'h-16'} transition-[height] duration-300`}>
-                {/* Desktop: 3-column grid layout */}
-                <div className="hidden md:grid grid-cols-3 items-center h-full">
+                {/* Desktop: logo absolutely centered on page; left/right links flex naturally */}
+                <div className="relative hidden md:flex items-center h-full">
                     {/* Left links */}
-                    <div className="flex items-center gap-1 justify-start">
+                    <div className="flex items-center gap-1">
                         {leftLinks.map((link, i) => (
                             <DropdownLink key={i} link={link} i={i} />
                         ))}
                     </div>
 
-                    {/* Center logo */}
-                    <div className="flex justify-center">
+                    {/* Center logo — absolute so it's always at true page center */}
+                    <div className="absolute left-1/2 -translate-x-1/2">
                         <motion.div
                             whileHover={{ scale: 1.02 }}
-                            className="font-bold text-xl font-heading flex items-center gap-2"
+                            className="font-bold text-xl font-heading flex items-center gap-2 whitespace-nowrap"
                         >
                             <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                         </motion.div>
                     </div>
 
-                    {/* Right links + CTA */}
-                    <div className="flex items-center gap-1 justify-end">
+                    {/* Right links + Track + CTA — pushed to far right */}
+                    <div className="ml-auto flex items-center gap-1">
                         {rightLinks.map((link, i) => (
                             <DropdownLink key={i} link={link} i={i} />
                         ))}
+                        {showOrderSearch && slug && <NavOrderSearch slug={slug} />}
                         {ctaButton?.show && (
-                            <span className="ml-2">
-                                <NavCTAButton
-                                    href={ctaButton.url || '#'}
-                                    label={ctaButton.label}
-                                    className="inline-flex px-5 py-2.5"
-                                />
-                            </span>
+                            <NavCTAButton
+                                href={ctaButton.url || '#'}
+                                label={ctaButton.label}
+                                className="inline-flex shrink-0 ml-2 px-4 py-2"
+                            />
                         )}
                     </div>
                 </div>
@@ -727,11 +804,13 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
 
 // ── Mega Menu Nav ───────────────────────────────────────────────────────────
 
-function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
+function MegaMenuNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearch }: {
     mergedBlock: NavigationConfig & { logo?: { url: string; alt?: string } }
     logoText?: string
     links: NavLink[]
     ctaButton?: { show: boolean; label: string; url: string }
+    slug?: string
+    showOrderSearch?: boolean
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
@@ -809,6 +888,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
 
                 {/* Desktop CTA + Mobile Menu Button */}
                 <div className="flex items-center gap-3">
+                    {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
                         <NavCTAButton href={ctaButton.url || '#'} label={ctaButton.label} />
                     )}
@@ -877,11 +957,13 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
 
 // ── Pill Nav ─────────────────────────────────────────────────────────────────
 
-function PillNav({ mergedBlock, logoText, links, ctaButton }: {
+function PillNav({ mergedBlock, logoText, links, ctaButton, slug, showOrderSearch }: {
     mergedBlock: NavigationConfig & { logo?: { url: string; alt?: string } }
     logoText?: string
     links: NavLink[]
     ctaButton?: { show: boolean; label: string; url: string }
+    slug?: string
+    showOrderSearch?: boolean
 }) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -890,7 +972,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
             initial={false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className={`fixed top-4 left-4 ${NAV_Z_CLASS.base} w-[calc(100%-2rem)] max-w-3xl`}
+            className={`fixed top-4 left-4 ${NAV_Z_CLASS.base} w-[calc(100%-2rem)] max-w-5xl`}
         >
             <div
                 className="rounded-full px-6 py-3 flex items-center justify-between min-h-[56px]"
@@ -922,6 +1004,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
 
                 {/* CTA + Mobile */}
                 <div className="flex items-center gap-2">
+                    {showOrderSearch && slug && <NavOrderSearch slug={slug} className="hidden md:flex" />}
                     {ctaButton?.show && (
                         <a
                             href={ctaButton.url || '#'}
