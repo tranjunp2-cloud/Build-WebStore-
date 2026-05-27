@@ -4095,6 +4095,22 @@ const MIGRATIONS = [
       ALTER TABLE email_template_settings ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
     `,
   },
+  // ── F32: payload_locked_documents_rels FK column for email-template-settings ──
+  // Payload's document locking system queries payload_locked_documents_rels for
+  // all registered collections. Without this column, any request that triggers
+  // Payload's lock check (e.g. send-otp flow) throws:
+  //   error: column email_template_settings_id does not exist
+  // syncPayloadRelsTables() adds this idempotently at runtime but only runs
+  // during db-setup.js invocation. This explicit migration ensures the column
+  // is present on first deploy or if syncPayloadRelsTables was skipped.
+  {
+    name: 'payload_locked_documents_rels.email_template_settings_id',
+    sql: `ALTER TABLE "payload_locked_documents_rels" ADD COLUMN IF NOT EXISTS "email_template_settings_id" integer REFERENCES "public"."email_template_settings"("id") ON DELETE CASCADE ON UPDATE CASCADE;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.email_template_settings_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "payload_locked_documents_rels_email_template_settings_id_idx" ON "payload_locked_documents_rels" ("email_template_settings_id");`,
+  },
 ];
 
 async function runMigrations(pool) {
