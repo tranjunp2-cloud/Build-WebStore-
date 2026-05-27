@@ -52,7 +52,7 @@ export function normalizeStripeEvent(
     return {
         provider: 'stripe',
         type: normalizedType,
-        data: event.data.object as Record<string, unknown>,
+        data: event.data.object as unknown as Record<string, unknown>,
         rawEvent: event,
         connectedAccountId: (event as Stripe.Event & { account?: string }).account ?? undefined,
     }
